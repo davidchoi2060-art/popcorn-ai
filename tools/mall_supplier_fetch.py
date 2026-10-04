@@ -146,6 +146,7 @@ ensure_utf8_console()
 
 from dotenv import load_dotenv                       # noqa: E402
 from sqlalchemy import text                          # noqa: E402
+from api.mall_supplier_write_guard import lock_mall_write_scope  # noqa: E402
 
 # 파싱·매칭·UPSERT SQL은 여기서 정의하지 않는다 -- api/mall_supplier_parse.py가 단일
 # 원천이다(2026-08-26, api/admin_mall_supplier.py 신설과 함께 옮김). 아래 별칭(as _이름)은
@@ -311,6 +312,7 @@ def _plan_and_maybe_apply(engine, apply_: bool, pc: int, sid: int, sname, remain
     if not apply_:
         return
     with engine.begin() as conn:
+        lock_mall_write_scope(conn, pc, [sid], [sid] if will_fill_contact else [])
         conn.execute(_PSP_UPSERT, {
             "pc": pc, "s": sid, "cost": r["o_price"], "state": r["state"],
             "rank": r["idx"], "rpct": r["rebate_pct"], "rprice": r["rebate_price"],

@@ -48,6 +48,9 @@ import os
 from collections import defaultdict
 
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
+
+from .pricing_write_guard_core import lock_products, ProductScopeChanged
 
 from .catalog_map import extract_specs, map_part_type
 
@@ -159,6 +162,53 @@ def gate_fields() -> list:
 GATE_FIELDS = sorted({f for fs in REQUIRED.values() for f in fs})   # 폴백용 상수
 
 
+
+class CatalogConflict(RuntimeError):
+    """Abort the caller transaction; never retry or expand the product scope."""
+
+
+def is_product_key_conflict(exc):
+    original = exc.orig
+    return (getattr(original, "sqlstate", None) or getattr(original, "pgcode", None)) == "23505" and getattr(
+        getattr(original, "diag", None), "constraint_name", None
+    ) in {"products_pkey", "products_sku_key", "idx_products_danawa"}
+
+
+def _plan_basis(conn, expected):
+    codes = list(expected["locked"])
+    locked = {pc: () for pc in codes}
+    if codes:
+        for pc, fields in conn.execute(text(
+                "SELECT product_code, locked_fields FROM products WHERE product_code = ANY(:c)"),
+                {"c": codes}).all():
+            locked[pc] = tuple(sorted(set(fields or [])))
+    existing = {pc: {field: None for field in fields}
+                for pc, fields in expected["existing"].items()}
+    columns = sorted({field for fields in existing.values() for field in fields})
+    if columns:
+        for row in conn.execute(text(
+                f"SELECT product_code, {', '.join(columns)} FROM product_specs"
+                " WHERE product_code = ANY(:c)"), {"c": list(existing)}).all():
+            for field, value in zip(columns, row[1:]):
+                if field in existing[row[0]]:
+                    existing[row[0]][field] = value
+    owners = dict.fromkeys(expected["dan_owner"])
+    if owners:
+        for dan, pc in conn.execute(text(
+                "SELECT danawa_code, product_code FROM products WHERE danawa_code = ANY(:d)"),
+                {"d": list(owners)}).all():
+            owners[dan] = pc
+    return {"locked": locked, "existing": existing, "dan_owner": owners}
+
+
+def _existing_codes(conn, codes):
+    if not codes:
+        return ()
+    return tuple(conn.execute(text(
+        "SELECT product_code FROM products WHERE product_code = ANY(:c) ORDER BY product_code"),
+        {"c": codes}).scalars().all())
+
+
 def read_refs(conn) -> dict:
     """계획 수립에 필요한 현재 DB 상태(잠금·다나와 점유·GPU 참조표·기존 사양)."""
     gpu_ref = dict(conn.execute(text(
@@ -226,6 +276,7 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
 
     prods, specs, reviews, errors = [], [], [], []
     skipped = defaultdict(int)
+    basis = {"locked": {}, "existing": {}, "dan_owner": {}}
     for i, r in enumerate(rows, 1):
         code = _int(r["자체상품코드"])
         name = (r["상품명"] or "").strip()
@@ -247,11 +298,15 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
         # 적재는 채우기만 하고 지우지 않는다(apply_plan의 COALESCE) — 따라서 '없는 사양'은
         # 새로 뽑은 값과 **이미 있는 값을 합쳐서** 판정해야 한다. 새 값만 보면 EAV를 안 올린
         # 파일이 멀쩡한 후보를 전부 검수로 떨어뜨린다(슬라이스 50 실측: 후보 -1 · 검수 +169).
+        basis["locked"][code] = tuple(sorted(_locked_for(refs, code)))
         have = existing.get(code) or {}
+        used = basis["existing"].setdefault(code, {})
+        used.update({f: have.get(f) for f in need if sp.get(f) is None})
         missing = [f for f in need if sp.get(f) is None and have.get(f) is None]
         dan = (r["다나와No"] or "").strip()[:40] or None
         dan_use = dan
         if dan:
+            basis["dan_owner"][dan] = dan_owner.get(dan)
             owner = dan_owner.get(dan)
             if dan_rep.get(dan) != code or (owner is not None and owner != code):
                 dan_use = None          # 대표가 아니거나 다른 상품이 점유 중
@@ -315,7 +370,7 @@ def build_plan(rows: list[dict], kvs: dict, feats: dict, refs: dict, origin: str
                             "detail": f"{pt} 필수 사양 '{f}' 미확인 — 적재 원천에서 추출 실패"})
 
     return {"prods": prods, "specs": specs, "reviews": reviews, "errors": errors,
-            "skipped": dict(skipped), "row_total": len(rows)}
+            "skipped": dict(skipped), "row_total": len(rows), "basis": basis}
 
 
 def plan_impact(conn, plan: dict) -> dict:
@@ -685,12 +740,17 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     """계획을 한 트랜잭션으로 반영하고 배치 번호를 돌려준다. 호출자가 트랜잭션을 연다."""
     prods, specs, reviews, errors = (plan["prods"], plan["specs"],
                                      plan["reviews"], plan["errors"])
-    job_id = conn.execute(text(
-        "INSERT INTO csv_import_jobs (file_name, row_total, row_ok, row_error, row_review,"
-        " status, data_origin, source, created_by)"
-        " VALUES (:f, :t, :ok, :er, :rv, '완료', :o, 'catalog_csv', :by) RETURNING job_id"),
-        {"f": file_name[:200], "t": plan["row_total"], "ok": len(prods),
-         "er": len(errors), "rv": len(reviews), "o": origin, "by": operator_id}).scalar()
+    pcs = list(dict.fromkeys(p["pc"] for p in prods))
+    candidates = _existing_codes(conn, pcs)
+    try:
+        lock_products(conn, list(candidates))
+    except ProductScopeChanged as exc:
+        raise CatalogConflict("상품 범위가 변경되었습니다 — 다시 검증해 주세요") from exc
+    if _existing_codes(conn, pcs) != candidates:
+        raise CatalogConflict("상품 범위가 변경되었습니다 — 다시 검증해 주세요")
+    if _plan_basis(conn, plan["basis"]) != plan["basis"]:
+        raise CatalogConflict("적재 계획의 근거가 변경되었습니다 — 다시 검증해 주세요")
+
 
     ins_p = text(UPSERT_PRODUCTS_SQL)
     # ── 재고 델타·가격 변경 전 값을 함께 읽는다 (슬라이스 98 + 가격 이력 결손 보완) ──
@@ -708,19 +768,54 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     # 왕복(조회)은 하나로 합치되 **쓰는 쪽은 가른다** — `stock_before`는 재고 델타 전용으로
     # 이름·모양을 그대로 유지한다(회귀 [26]이 이 파일에 이 리터럴이 있는지로 "적재가 절대값이
     # 아니라 델타를 남긴다"를 판정한다 — 슬라이스 98). 가격 이력은 별도 `price_before`를 쓴다.
-    pcs = [p["pc"] for p in prods]
     stock_before, price_before = {}, {}
-    if pcs:
+    if candidates:
         rows = conn.execute(text(
             "SELECT product_code, stock_qty, purchase_price, sale_price, locked_fields"
             " FROM products WHERE product_code = ANY(:c)"),
-            {"c": pcs}).all()
+            {"c": list(candidates)}).all()
         stock_before = {r[0]: (r[1] or 0) for r in rows}
         price_before = {r[0]: {"purchase_price": r[2], "sale_price": r[3],
                                "locked": set(r[4] or [])} for r in rows}
 
+    job_id = conn.execute(text(
+        "INSERT INTO csv_import_jobs (file_name, row_total, row_ok, row_error, row_review,"
+        " status, data_origin, source, created_by)"
+        " VALUES (:f, :t, :ok, :er, :rv, '완료', :o, 'catalog_csv', :by) RETURNING job_id"),
+        {"f": file_name[:200], "t": plan["row_total"], "ok": len(prods),
+         "er": len(errors), "rv": len(reviews), "o": origin, "by": operator_id}).scalar()
+
+    # Preserve CSV order and batch boundaries; new identities must not become updates.
+    existing = frozenset(candidates)
+    created = set()
+    insert_only = text(UPSERT_PRODUCTS_SQL.split("ON CONFLICT (product_code)", 1)[0])
     for i in range(0, len(prods), BATCH):
-        conn.execute(ins_p, prods[i:i + BATCH])
+        pending, pending_insert = [], None
+        for p in prods[i:i + BATCH]:
+            new = p["pc"] not in existing and p["pc"] not in created
+            if pending and (new != pending_insert or
+                            (new and any(row["pc"] == p["pc"] for row in pending))):
+                try:
+                    conn.execute(insert_only if pending_insert else ins_p, pending)
+                except IntegrityError as exc:
+                    if is_product_key_conflict(exc):
+                        raise CatalogConflict("상품 식별자가 충돌했습니다 — 다시 검증해 주세요") from exc
+                    raise
+                if pending_insert:
+                    created.update(row["pc"] for row in pending)
+                pending = []
+                new = p["pc"] not in existing and p["pc"] not in created
+            pending_insert = new
+            pending.append(p)
+        if pending:
+            try:
+                conn.execute(insert_only if pending_insert else ins_p, pending)
+            except IntegrityError as exc:
+                if is_product_key_conflict(exc):
+                    raise CatalogConflict("상품 식별자가 충돌했습니다 — 다시 검증해 주세요") from exc
+                raise
+            if pending_insert:
+                created.update(row["pc"] for row in pending)
 
     # ── product_imports — 반영 행 원본 냉동 보관 (2026-08-24, 사장님 지시) ──────────
     # **이건 새 기능이 아니라 «안 지키고 있던 기존 설계를 이제 지키는 것»이다.**
@@ -760,8 +855,10 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
         conn.execute(ins_pi, import_rows[i:i + BATCH])
 
     moves = []
+    stock_current = dict(stock_before)
     for p in prods:
-        b = stock_before.get(p["pc"], 0)
+        b = stock_current.get(p["pc"], 0)
+        stock_current[p["pc"]] = int(p["stock"] or 0)
         a = int(p["stock"] or 0)
         if a == b:
             continue
@@ -796,9 +893,11 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     #   손대지 않으므로(=값이 안 바뀌므로) 애초에 남길 변경이 없다. 잠기지 않은
     #   market_price는 예전처럼 이력 없이 계속 덮인다 — 이번 결정은 그걸 바꾸지 않았다.
     price_moves = []
+    price_current = {pc: dict(values) for pc, values in price_before.items()}
     for p in prods:
-        b = price_before.get(p["pc"])
+        b = price_current.get(p["pc"])
         if b is None:
+            price_current[p["pc"]] = {"purchase_price": p["pp"], "sale_price": p["sp2"], "locked": set()}
             continue                        # 신규 상품 — 최초 가격은 이력 대상이 아니다
         for col, field, key in (("purchase_price", "purchase", "pp"),
                                  ("sale_price", "sale", "sp2")):
@@ -807,6 +906,7 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
             old = b[col]
             raw_new = p[key]
             new = raw_new if raw_new is not None else old   # 위 COALESCE와 동일 규칙
+            b[col] = new
             if new == old:
                 continue                    # 값이 안 바뀌면 남기지 않는다
             price_moves.append({"pc": p["pc"], "field": field, "old": old, "new": new,

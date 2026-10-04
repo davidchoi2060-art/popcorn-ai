@@ -66,6 +66,7 @@ from sqlalchemy import bindparam, text
 from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
+from .mall_supplier_write_guard import lock_mall_write_scope
 from .mall_supplier_parse import (
     PSP_UPSERT, SUPPLIER_CONTACT_UPDATE, cheapest_summary, load_suppliers, parse_rows,
     resolve_supplier,
@@ -235,6 +236,10 @@ def ingest(body: _IngestBody):
                 # 나머지는 계속 처리하기 위해서다 -- 배치 전체를 한 트랜잭션으로 묶으면
                 # 한 상품의 오류가 이미 반영된 다른 상품까지 롤백시킨다.
                 with engine.begin() as wconn:
+                    lock_mall_write_scope(
+                        wconn, pc, [sid for sid, _sn, _rem, _r, _cl in plan],
+                        [sid for sid, _sn, rem, row, _cl in plan
+                         if rem or row["phone"] or row["order_phone"]])
                     for sid, _sname, remainder, r, _classification in plan:
                         wconn.execute(PSP_UPSERT, {
                             "pc": pc, "s": sid, "cost": r["o_price"], "state": r["state"],

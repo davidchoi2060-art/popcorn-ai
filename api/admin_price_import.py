@@ -31,6 +31,8 @@ SIM_THRESHOLD = 0.3
 # 판매가 공식은 pricing이 단일 원천(슬라이스 E) — 세 곳에 흩어져 있던 것을 모았다.
 # 이름은 유지한다(다른 모듈이 이 이름으로 import 중).
 from .pricing import half_up_1000 as _half_up_1000, sale_from_purchase  # noqa: E402
+from .pricing_reprice_core import reprice as _reprice_core
+from .pricing_write_guard_core import lock_products, ProductScopeChanged
 
 
 def _settings(conn):
@@ -187,50 +189,8 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
     하나도 없으니 "재판정"이 아니라 "복원"이다). restore가 없는 기존 호출부(admin_price_review.
     approve의 margin_policy · admin_sourcing.confirm_quote의 sourcing — 둘 다 restore 인자를
     안 준다)는 그대로 조기 return한다 — 동작 불변(git grep "_reprice(" 전수 확인)."""
-    prod = conn.execute(text(
-        "SELECT purchase_price, sale_price, locked_fields FROM products"
-        " WHERE product_code=:pc FOR UPDATE"), {"pc": pc}).mappings().one()
-    rows = conn.execute(text(
-        "SELECT cost_price, supply_state, supplier_id FROM product_supplier_prices"
-        " WHERE product_code=:pc"), {"pc": pc}).all()
-    out = {"purchase_changed": False, "sale_changed": False, "sale_locked": False}
-    src_supplier = None
-    if rows:
-        avail = [(c, sid) for c, s, sid in rows if s == "가능"]
-        pool = avail if avail else [(c, sid) for c, _s, sid in rows]
-        new_purchase, src_supplier = min(pool)   # 최저가 + 그 값을 만든 공급처(이력에 남긴다 — 0004)
-    elif restore is not None:
-        new_purchase = restore["purchase"]   # 공급처 가격 0행 — 재판정 불가, 스냅샷으로 복원
-    else:
-        return out   # 공급처 가격도 없고 복원할 스냅샷도 없다 — 기존 동작 그대로(no-op)
-    if new_purchase != prod["purchase_price"]:
-        conn.execute(text(
-            "UPDATE products SET purchase_price=:v, updated_at=now() WHERE product_code=:pc"),
-            {"v": new_purchase, "pc": pc})
-        conn.execute(text(
-            "INSERT INTO product_price_history"
-            " (product_code, field, old_price, new_price, reason, ref_id, changed_by, supplier_id)"
-            " VALUES (:pc, 'purchase', :o, :n, :r, :ref, :op, :sid)"),
-            {"pc": pc, "o": prod["purchase_price"], "n": new_purchase,
-             "r": reason, "ref": ref_id, "op": current_operator_id(), "sid": src_supplier})
-        out["purchase_changed"] = True
-    if restore is not None and new_purchase == restore["purchase"]:
-        new_sale = restore["sale"]
-    else:
-        new_sale = sale_from_purchase(new_purchase, fee, margin)
-    if "sale_price" in (prod["locked_fields"] or []):
-        out["sale_locked"] = new_sale != prod["sale_price"]
-    elif new_sale != prod["sale_price"]:
-        conn.execute(text(
-            "UPDATE products SET sale_price=:v, updated_at=now() WHERE product_code=:pc"),
-            {"v": new_sale, "pc": pc})
-        conn.execute(text(
-            "INSERT INTO product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)"
-            " VALUES (:pc, 'sale', :o, :n, :r, :ref, :op)"),
-            {"pc": pc, "o": prod["sale_price"], "n": new_sale,
-             "r": reason, "ref": ref_id, "op": current_operator_id()})
-        out["sale_changed"] = True
-    return out
+    return _reprice_core(conn, pc, fee, margin, reason, ref_id, restore=restore,
+                         operator_id=current_operator_id)
 
 
 def _log(conn, action: str, target_id: str, detail: dict) -> int:
@@ -343,7 +303,7 @@ def apply_rows(file_id: int, body: ApplyBody):
     with engine.begin() as conn:
         f = conn.execute(text(
             "SELECT file_id, supplier_id, received_at, status FROM supplier_price_files"
-            " WHERE file_id=:f FOR UPDATE"), {"f": file_id}).mappings().first()
+            " WHERE file_id=:f"), {"f": file_id}).mappings().first()
         if f is None:
             raise HTTPException(404, "파일이 없습니다")
         if f["status"] == "반영 완료":
@@ -355,6 +315,32 @@ def apply_rows(file_id: int, body: ApplyBody):
         if bad:
             raise HTTPException(400, f"반영 불가 행 포함(미매칭·미대기): {bad}")
 
+        # Resolve the complete scope without taking a file/PSP row lock.
+        selected = [(rid, _match(d["pending"][rid], ctx), dict(d["pending"][rid]))
+                    for rid in sorted(body.row_ids)]
+        try:
+            locked = lock_products(conn, [pc for _rid, pc, _row in selected])
+        except ProductScopeChanged:
+            raise HTTPException(409, "반영 대상 상품이 변경되었습니다 — 새로고침 후 다시 반영하세요") from None
+        initial_file = dict(f)
+        f = conn.execute(text(
+            "SELECT file_id, supplier_id, received_at, status FROM supplier_price_files"
+            " WHERE file_id=:f FOR UPDATE"), {"f": file_id}).mappings().first()
+        if f is None:
+            raise HTTPException(404, "파일이 없습니다")
+        if f["status"] == "반영 완료":
+            raise HTTPException(409, "이미 반영 완료된 파일입니다")
+        ctx = _ctx(conn, f["supplier_id"])
+        d = _file_diff(conn, f, ctx)
+        if initial_file != dict(f) or any(rid not in d["pending"] for rid in body.row_ids):
+            raise HTTPException(409, "반영 대상 연결이 변경되었습니다 — 새로고침 후 다시 반영하세요")
+        current = [(rid, _match(d["pending"][rid], ctx), dict(d["pending"][rid]))
+                   for rid in sorted(body.row_ids)]
+        codes = [pc for _rid, pc, _row in current]
+        if (any(type(pc) is not int or pc <= 0 for pc in codes)
+                or tuple(sorted(set(codes))) != locked or current != selected):
+            raise HTTPException(409, "반영 대상 연결이 변경되었습니다 — 새로고침 후 다시 반영하세요")
+
         items, price_changed, sale_locked = [], 0, 0
         for rid in sorted(body.row_ids):
             row = d["pending"][rid]
@@ -363,6 +349,11 @@ def apply_rows(file_id: int, body: ApplyBody):
                 "SELECT cost_price, supply_state FROM product_supplier_prices"
                 " WHERE product_code=:pc AND supplier_id=:s FOR UPDATE"),
                 {"pc": pc, "s": f["supplier_id"]}).first()
+            # This value is read under the product lock immediately before
+            # changing this PSP, including repeated rows for the same product.
+            prod_before = conn.execute(text(
+                "SELECT purchase_price, sale_price FROM products WHERE product_code=:pc"),
+                {"pc": pc}).mappings().one()
             conn.execute(text(
                 "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state, src_file_id)"
                 " VALUES (:pc, :s, :c, :st, :f)"
@@ -370,7 +361,6 @@ def apply_rows(file_id: int, body: ApplyBody):
                 " DO UPDATE SET cost_price=:c, supply_state=:st, src_file_id=:f, updated_at=now()"),
                 {"pc": pc, "s": f["supplier_id"], "c": row["cost_price"],
                  "st": row["supply_state"], "f": file_id})
-            prod_before = ctx["products"][pc]
             rp = _reprice(conn, pc, fee, margin, "price_import", file_id)
             price_changed += 1 if rp["purchase_changed"] or rp["sale_changed"] else 0
             sale_locked += 1 if rp["sale_locked"] else 0
@@ -397,7 +387,7 @@ def apply_rows(file_id: int, body: ApplyBody):
 def undo(log_id: int):
     with engine.begin() as conn:
         log = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id FOR UPDATE"),
             {"id": log_id}).mappings().first()
         if log is None or log["action"] != "price_import_apply":
             raise HTTPException(404, "되돌릴 반영 기록이 없습니다")
@@ -408,6 +398,10 @@ def undo(log_id: int):
             raise HTTPException(409, "이미 되돌린 작업입니다")
         detail = log["detail"]
         file_id = detail["file_id"]
+        try:
+            lock_products(conn, [it["product_code"] for it in detail["items"]])
+        except ProductScopeChanged:
+            raise HTTPException(409, "되돌릴 대상 상품이 변경되었습니다 — 새로고침 후 다시 확인하세요") from None
         f = conn.execute(text(
             "SELECT supplier_id FROM supplier_price_files WHERE file_id=:f FOR UPDATE"),
             {"f": file_id}).mappings().one()

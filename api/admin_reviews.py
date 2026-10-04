@@ -4,6 +4,7 @@
 → review_required 재산정(필수 충족 ∧ 잔여 0) → true→false 전이 시에만 ai_candidate 승격.
 """
 import re
+import json
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ from sqlalchemy.exc import DBAPIError
 from .timeutil import iso
 from .admin_products import PART_TYPE_LABELS, required_fields
 from .db import engine
+from .pricing_write_guard_core import lock_products, ProductScopeChanged
 
 router = APIRouter(prefix="/api/admin")
 
@@ -565,7 +567,7 @@ def sourcing_link(body: LinkBody):
     """편입 ①: 기존 상품에 연결 — map 등록만(psp·가격 무변경 — '다음 단가표부터 자동 매칭')."""
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT r.row_id, r.model_name, f.supplier_id FROM supplier_price_rows r"
+            "SELECT r.row_id, r.file_id, r.model_name, f.supplier_id FROM supplier_price_rows r"
             " JOIN supplier_price_files f USING (file_id) WHERE r.row_id=:i"),
             {"i": body.row_id}).mappings().first()
         if row is None:
@@ -574,6 +576,25 @@ def sourcing_link(body: LinkBody):
             "SELECT product_code, sku FROM products WHERE sku=:s"), {"s": body.sku.strip()}).mappings().first()
         if prod is None:
             raise HTTPException(404, f"상품이 없습니다: {body.sku}")
+        try:
+            lock_products(conn, [prod["product_code"]])
+        except ProductScopeChanged:
+            raise HTTPException(409, "상품이 변경되었습니다. 다시 조회하세요") from None
+        file = conn.execute(text(
+            "SELECT file_id, supplier_id FROM supplier_price_files WHERE file_id=:f FOR UPDATE"),
+            {"f": row["file_id"]}).mappings().first()
+        current_row = conn.execute(text(
+            "SELECT row_id, file_id, model_name FROM supplier_price_rows WHERE row_id=:i FOR UPDATE"),
+            {"i": body.row_id}).mappings().first()
+        current_prod = conn.execute(text(
+            "SELECT product_code, sku FROM products WHERE sku=:s"),
+            {"s": body.sku.strip()}).mappings().first()
+        if (file is None or current_row is None or current_prod is None
+                or dict(file) != {"file_id": row["file_id"], "supplier_id": row["supplier_id"]}
+                or dict(current_row) != {"row_id": row["row_id"], "file_id": row["file_id"],
+                                         "model_name": row["model_name"]}
+                or dict(current_prod) != dict(prod)):
+            raise HTTPException(409, "연결 대상이 변경되었습니다. 다시 조회하세요")
         method = "similarity" if body.via == "candidate" else "manual"
         map_id = conn.execute(text(
             "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
@@ -594,7 +615,7 @@ def sourcing_link(body: LinkBody):
 def sourcing_unlink(log_id: int):
     with engine.begin() as conn:
         log = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": log_id}).mappings().first()
         if log is None or log["action"] != "sourcing_link":
             raise HTTPException(404, "되돌릴 연결 기록이 없습니다")
@@ -604,10 +625,16 @@ def sourcing_unlink(log_id: int):
                 {"i": log_id}).first():
             raise HTTPException(409, "이미 되돌린 연결입니다")
         d = log["detail"]
+        try:
+            lock_products(conn, [d["product_code"]])
+        except ProductScopeChanged:
+            raise HTTPException(409, "연결 이후 상품이 변경되어 되돌릴 수 없습니다") from None
         m = conn.execute(text(
-            "SELECT product_code, match_method FROM supplier_product_map WHERE map_id=:m FOR UPDATE"),
+            "SELECT product_code, match_method, supplier_id, model_key FROM supplier_product_map"
+            " WHERE map_id=:m FOR UPDATE"),
             {"m": d["map_id"]}).first()
-        if m is None or m[0] != d["product_code"] or m[1] != d["method"]:
+        if (m is None or m[0] != d["product_code"] or m[1] != d["method"]
+                or m[2] != d["supplier_id"] or m[3] != d["model_key"]):
             raise HTTPException(409, "연결 이후 매핑이 변경되어 되돌릴 수 없습니다")
         conn.execute(text("DELETE FROM supplier_product_map WHERE map_id=:m"), {"m": d["map_id"]})
         _log(conn, "sourcing_unlink", str(log_id), {"ref_log_id": log_id, "model_key": d["model_key"]})
@@ -860,10 +887,46 @@ def _log(conn, action: str, target_id: str, detail: dict, *, auto: bool = False)
         {"op": op, "a": action, "t": target_id, "d": json.dumps(detail)}).scalar()
 
 
-def _lock_waiting_review(conn, review_id: int):
-    r = conn.execute(text(
-        "SELECT * FROM product_reviews WHERE review_id=:rid FOR UPDATE"),
-        {"rid": review_id}).mappings().first()
+def _review_candidates(conn, review_ids, *, undo=False):
+    rows = {}
+    for rid in dict.fromkeys(review_ids):
+        row = conn.execute(text(
+            "SELECT * FROM product_reviews WHERE review_id=:rid"),
+            {"rid": rid}).mappings().first()
+        if row is None:
+            raise HTTPException(404, f"검수 항목이 없습니다: {rid}" if undo else "검수 항목이 없습니다")
+        rows[rid] = row
+    return rows
+
+
+def _lock_review_scope(conn, candidates, selection_sql=None):
+    """Lock the complete product set, then review IDs, in the caller transaction."""
+    try:
+        lock_products(conn, [r["product_code"] for r in candidates.values()])
+    except ProductScopeChanged:
+        raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요") from None
+    locked = {}
+    for rid in sorted(candidates):
+        row = conn.execute(text(
+            "SELECT * FROM product_reviews WHERE review_id=:rid FOR UPDATE"),
+            {"rid": rid}).mappings().first()
+        old = candidates[rid]
+        if row is None or (row["product_code"], row["field_name"]) != (old["product_code"], old["field_name"]):
+            raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+        locked[rid] = row
+    if selection_sql is not None:
+        current = conn.execute(text(selection_sql)).mappings().all()
+        signature = lambda rows: sorted((r["review_id"], r["product_code"], r["field_name"], r["review_status"]) for r in rows)
+        if signature(current) != signature(candidates.values()):
+            raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+    return locked
+
+
+def _lock_waiting_review(conn, review_id: int, locked=None):
+    if locked is None:
+        candidates = _review_candidates(conn, [review_id])
+        locked = _lock_review_scope(conn, candidates)
+    r = locked[review_id]
     if r is None:
         raise HTTPException(404, "검수 항목이 없습니다")
     if r["review_status"] != "대기":
@@ -933,8 +996,10 @@ def auto_approve_market_price(review_id: int) -> dict:
     처리를 하지 않아도 되게 하기 위해서다.
     """
     with engine.begin() as conn:
+        candidates = _review_candidates(conn, [review_id])
+        locked = _lock_review_scope(conn, candidates)
         try:
-            review = _lock_waiting_review(conn, review_id)
+            review = _lock_waiting_review(conn, review_id, locked)
         except HTTPException as e:
             if e.status_code == 404:
                 raise
@@ -975,11 +1040,14 @@ def auto_approve_market_price(review_id: int) -> dict:
 
         before, _pool_added = _approve_product_field(
             conn, review, str(new_val), "자동승인", auto=True)
+        undo_after = _capture_review_undo_after(conn, [{"mode": "approve", "review_id": review_id,
+            "field": "market_price", "before": before}])
         log_id = _log(conn, "review_auto_approve", str(review_id),
                       {"mode": "approve", "auto": True, "review_id": review_id,
                        "field": "market_price", "value": str(new_val),
                        "pct_change": round(pct, 4) if pct is not None else None,
-                       "threshold_pct": MARKET_AUTO_APPROVE_PCT, "before": before},
+                        "threshold_pct": MARKET_AUTO_APPROVE_PCT, "before": before,
+                        "undo_after": undo_after},
                       auto=True)
         return {"review_id": review_id, "auto_approved": True, "left_to_human": False,
                 "reason": reason, "pct_change": pct, "old_value": current,
@@ -1043,7 +1111,21 @@ def process_review(review_id: int, body: ProcessBody):
     if body.action not in ("origin", "suggested", "manual", "reject"):
         raise HTTPException(400, f"알 수 없는 액션: {body.action}")
     with engine.begin() as conn:
-        review = _lock_waiting_review(conn, review_id)
+        candidates = _review_candidates(conn, [review_id])
+        initial = _lock_waiting_review(conn, review_id, candidates)
+        if body.action != "reject":
+            initial_value = {"origin": initial["origin_value"], "suggested": initial["suggested_value"],
+                             "manual": body.value}[body.action]
+            if initial_value is None:
+                raise HTTPException(400, "확정할 값이 없습니다")
+            candidates.update(_review_candidates(conn, [rid for rid in dict.fromkeys(body.also or []) if rid != review_id]))
+        locked = _lock_review_scope(conn, candidates)
+        review = _lock_waiting_review(conn, review_id, locked)
+        if body.action != "reject":
+            for rid in dict.fromkeys(body.also or []):
+                sib = _lock_waiting_review(conn, rid, locked)
+                if sib["field_name"] != review["field_name"]:
+                    raise HTTPException(400, "다른 사양 항목은 함께 처리할 수 없습니다")
 
         if body.action == "reject":
             # 사유(2026-08-24, §검수 종결) — 화면이 보낸 값이 있으면 그대로,
@@ -1056,12 +1138,15 @@ def process_review(review_id: int, body: ProcessBody):
                 "    THEN coalesce(detail, '') || ' [반려 사유: ' || :rs || ']' ELSE detail END"
                 " WHERE review_id=:rid"),
                 {"op": current_operator_id(), "rid": review_id, "rs": reason})
+            undo_after = _capture_review_undo_after(conn, [{"mode": "reject", "review_id": review_id,
+                "before": {"review_status": "대기", "detail": review["detail"]}}])
             log_id = _log(conn, "review_process", str(review_id),
                           {"mode": "reject", "review_id": review_id, "reason": reason,
                            # before.detail — 되돌릴 때 원문으로 복원한다(_revert_one 참조).
                            # reason이 None이라 detail을 안 건드렸어도 항상 스냅샷을 남겨
                            # 되돌리기 로직을 한 갈래로 통일한다.
-                           "before": {"review_status": "대기", "detail": review["detail"]}})
+                            "before": {"review_status": "대기", "detail": review["detail"]},
+                            "undo_after": undo_after})
             return {"ok": True, "undo_id": log_id, "pool_added": 0}
 
         value = {"origin": review["origin_value"], "suggested": review["suggested_value"],
@@ -1079,7 +1164,7 @@ def process_review(review_id: int, body: ProcessBody):
         for rid in dict.fromkeys(body.also or []):
             if rid == review_id:
                 continue
-            sib = _lock_waiting_review(conn, rid)
+            sib = _lock_waiting_review(conn, rid, locked)
             if sib["field_name"] != review["field_name"]:
                 raise HTTPException(400, "다른 사양 항목은 함께 처리할 수 없습니다")
             sb, sadd = _approve(conn, sib, value, new_status)
@@ -1089,6 +1174,7 @@ def process_review(review_id: int, body: ProcessBody):
         if extra:
             # 한 로그에 함께 담는다 — 되돌리면 전부 함께 되돌아간다(부분 원복 금지).
             detail["also"] = extra
+        detail["undo_after"] = _capture_review_undo_after(conn, _review_undo_entries(detail, "review_process"))
         log_id = _log(conn, "review_process", str(review_id), detail)
         return {"ok": True, "undo_id": log_id, "pool_added": pool_added,
                 "applied": 1 + len(extra),
@@ -1099,9 +1185,11 @@ def process_review(review_id: int, body: ProcessBody):
 @router.post("/reviews/bulk-confirm")
 def bulk_confirm():
     with engine.begin() as conn:
-        rows = conn.execute(text(
-            "SELECT * FROM product_reviews WHERE review_type='low_confidence'"
-            " AND review_status='대기' ORDER BY review_id FOR UPDATE")).mappings().all()
+        selection_sql = "SELECT * FROM product_reviews WHERE review_type='low_confidence' AND review_status='대기' ORDER BY review_id"
+        rows = conn.execute(text(selection_sql)).mappings().all()
+        candidates = {r["review_id"]: r for r in rows}
+        locked = _lock_review_scope(conn, candidates, selection_sql)
+        rows = [locked[r["review_id"]] for r in rows]
         entries, skipped, pool_total = [], 0, 0
         for r in rows:
             if r["origin_value"] is None:
@@ -1113,7 +1201,8 @@ def bulk_confirm():
                             "field": r["field_name"], "value": r["origin_value"], "before": before})
         if not entries:
             raise HTTPException(400, "일괄 확정 대상이 없습니다")
-        log_id = _log(conn, "review_bulk_confirm", f"{len(entries)}건", {"items": entries})
+        log_id = _log(conn, "review_bulk_confirm", f"{len(entries)}건",
+                      {"items": entries, "undo_after": _capture_review_undo_after(conn, entries)})
         return {"count": len(entries), "skipped": skipped, "undo_id": log_id, "pool_added": pool_total}
 
 
@@ -1141,9 +1230,11 @@ def bulk_reject_zero_price():
     review_bulk_confirm과 같은 방식으로 되돌린다(아래 undo() 참조).
     """
     with engine.begin() as conn:
-        rows = conn.execute(text(
-            "SELECT * FROM product_reviews WHERE field_name='market_price'"
-            " AND review_status='대기' ORDER BY review_id FOR UPDATE")).mappings().all()
+        selection_sql = "SELECT * FROM product_reviews WHERE field_name='market_price' AND review_status='대기' ORDER BY review_id"
+        rows = conn.execute(text(selection_sql)).mappings().all()
+        candidates = {r["review_id"]: r for r in rows}
+        locked = _lock_review_scope(conn, candidates, selection_sql)
+        rows = [locked[r["review_id"]] for r in rows]
         entries, skipped = [], 0
         for r in rows:
             v = _parse_price(r["suggested_value"])
@@ -1160,15 +1251,151 @@ def bulk_reject_zero_price():
                             "before": {"review_status": "대기", "detail": r["detail"]}})
         if not entries:
             raise HTTPException(400, "종결할 0원 시세 제안이 없습니다")
-        log_id = _log(conn, "review_bulk_reject", f"{len(entries)}건", {"items": entries})
+        log_id = _log(conn, "review_bulk_reject", f"{len(entries)}건",
+                      {"items": entries, "undo_after": _capture_review_undo_after(conn, entries)})
         return {"count": len(entries), "skipped": skipped, "undo_id": log_id,
                 "note": f"시세 제안 {len(entries):,}건을 반려(보류)했습니다 — {ZERO_PRICE_REASON}"}
 
 
+def _review_undo_entries(detail, action):
+    try:
+        if type(detail) is not dict:
+            raise TypeError
+        if action in ("review_bulk_confirm", "review_bulk_reject"):
+            return detail["items"]
+        also = detail.get("also") or []
+        if type(also) is not list:
+            raise TypeError
+        return [detail] + [{"mode": detail.get("mode"), "field": detail.get("field"),
+            "review_id": a["review_id"], "before": a["before"]} for a in also]
+    except (KeyError, TypeError):
+        raise HTTPException(409, "되돌릴 검수 기록의 근거가 부족합니다 — 현재 검수를 확인하세요") from None
+
+
+def _review_undo_entry_ids(entries):
+    invalid = "되돌릴 검수 기록의 근거가 부족합니다 — 현재 검수를 확인하세요"
+    if type(entries) is not list or not entries:
+        raise HTTPException(409, invalid)
+    ids = []
+    for e in entries:
+        if (type(e) is not dict or type(e.get("review_id")) is not int
+                or e["review_id"] <= 0 or e.get("mode") not in ("approve", "reject")
+                or type(e.get("before")) is not dict
+                or (e["mode"] == "approve" and e.get("field") not in (FIELD_CAST | PRODUCT_FIELD_CAST))):
+            raise HTTPException(409, invalid)
+        if e["review_id"] in ids:
+            raise HTTPException(409, "이미 대기 상태입니다")
+        required = ({"product_value", "locked_fields"} if e.get("field") in PRODUCT_FIELD_CAST else
+                    {"spec_value", "verified_yn", "review_required_yn", "ai_candidate_yn", "locked_fields"})
+        if e["mode"] == "approve" and (not required.issubset(e["before"])
+                or (e["before"]["locked_fields"] is not None and
+                    (type(e["before"]["locked_fields"]) is not list
+                     or any(type(v) is not str for v in e["before"]["locked_fields"])) )):
+            raise HTTPException(409, invalid)
+        if e["mode"] == "approve":
+            b = e["before"]
+            if e["field"] in PRODUCT_FIELD_CAST:
+                if b["product_value"] is not None and type(b["product_value"]) is not int:
+                    raise HTTPException(409, invalid)
+            elif any(type(b[k]) is not bool for k in ("verified_yn", "review_required_yn", "ai_candidate_yn")):
+                raise HTTPException(409, invalid)
+        elif "detail" in e["before"] and e["before"]["detail"] is not None and type(e["before"]["detail"]) is not str:
+            raise HTTPException(409, invalid)
+        ids.append(e["review_id"])
+    return sorted(ids)
+
+
+def _review_undo_product_fields(entries, reviews):
+    fields = {}
+    for e in entries:
+        r = reviews[e["review_id"]]
+        if e["mode"] != "approve":
+            continue
+        if e["field"] != r["field_name"]:
+            raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+        selected = fields.setdefault(r["product_code"], {"locked_fields"})
+        if e["field"] in PRODUCT_FIELD_CAST:
+            selected.add(e["field"])
+        else:
+            selected.update({"specs." + e["field"], "specs.verified_yn", "specs_exists",
+                             "review_required_yn", "ai_candidate_yn"})
+    return {pc: sorted(names) for pc, names in sorted(fields.items())}
+
+
+def _capture_review_undo_after(conn, entries):
+    ids = _review_undo_entry_ids(entries)
+    reviews = [dict(r) for r in conn.execute(text(
+        "SELECT review_id, product_code, field_name,"
+        " jsonb_build_object('review_status',review_status,'reviewed_by',reviewed_by,"
+        " 'reviewed_at',reviewed_at,'detail',detail)::text AS state"
+        " FROM product_reviews WHERE review_id=ANY(:ids) ORDER BY review_id"),
+        {"ids": ids}).mappings().all()]
+    if [r["review_id"] for r in reviews] != ids:
+        raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+    by_id = {r["review_id"]: r for r in reviews}
+    products = []
+    for pc, fields in _review_undo_product_fields(entries, by_id).items():
+        pairs = []
+        for field in fields:
+            value = ("s.product_code IS NOT NULL" if field == "specs_exists" else
+                     "s." + field[6:] if field.startswith("specs.") else "p." + field)
+            pairs.extend(["'" + field + "'", value])
+        row = conn.execute(text(
+            "SELECT jsonb_build_object(" + ",".join(pairs) + ")::text AS state"
+            " FROM products p LEFT JOIN product_specs s USING(product_code)"
+            " WHERE p.product_code=:pc"), {"pc": pc}).mappings().first()
+        if row is None:
+            raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+        products.append({"product_code": pc, "fields": fields, "state": row["state"]})
+    return {"version": "review_undo_after_v1", "reviews": reviews, "products": products}
+
+
+def _validate_review_undo_after(entries, snapshot):
+    invalid = "되돌릴 검수 기록의 근거가 부족합니다 — 현재 검수를 확인하세요"
+    ids = _review_undo_entry_ids(entries)
+    try:
+        if (type(snapshot) is not dict or set(snapshot) != {"version", "reviews", "products"}
+                or snapshot["version"] != "review_undo_after_v1"
+                or type(snapshot["reviews"]) is not list or type(snapshot["products"]) is not list):
+            raise ValueError
+        reviews = snapshot["reviews"]
+        for r in reviews:
+            if (type(r) is not dict or set(r) != {"review_id", "product_code", "field_name", "state"}
+                    or type(r["review_id"]) is not int or type(r["product_code"]) is not int
+                    or r["product_code"] <= 0 or type(r["field_name"]) is not str
+                    or type(r["state"]) is not str):
+                raise ValueError
+            state = json.loads(r["state"])
+            if (type(state) is not dict or set(state) != {"review_status", "reviewed_by", "reviewed_at", "detail"}
+                    or type(state["review_status"]) is not str
+                    or (state["reviewed_by"] is not None and type(state["reviewed_by"]) is not int)
+                    or any(state[k] is not None and type(state[k]) is not str for k in ("reviewed_at", "detail"))):
+                raise ValueError
+        if [r["review_id"] for r in reviews] != ids:
+            raise ValueError
+        expected_fields = _review_undo_product_fields(entries, {r["review_id"]: r for r in reviews})
+        products = snapshot["products"]
+        for r in products:
+            if (type(r) is not dict or set(r) != {"product_code", "fields", "state"}
+                    or type(r["product_code"]) is not int or type(r["fields"]) is not list
+                    or r["fields"] != expected_fields.get(r["product_code"])
+                    or type(r["state"]) is not str):
+                raise ValueError
+            state = json.loads(r["state"])
+            if type(state) is not dict or set(state) != set(r["fields"]):
+                raise ValueError
+        if [r["product_code"] for r in products] != list(expected_fields):
+            raise ValueError
+    except (KeyError, TypeError, ValueError):
+        raise HTTPException(409, invalid) from None
+    return {r["review_id"]: r for r in reviews}
+
+
 def _revert_one(conn, entry: dict):
     rid = entry["review_id"]
+    # undo() already owns all review locks; reread to retain duplicate-entry checks.
     r = conn.execute(text(
-        "SELECT * FROM product_reviews WHERE review_id=:rid FOR UPDATE"),
+        "SELECT * FROM product_reviews WHERE review_id=:rid"),
         {"rid": rid}).mappings().first()
     if r is None:
         raise HTTPException(404, f"검수 항목이 없습니다: {rid}")
@@ -1229,30 +1456,39 @@ def _revert_one(conn, entry: dict):
 def undo(log_id: int):
     with engine.begin() as conn:
         log = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id FOR UPDATE"),
             {"id": log_id}).mappings().first()
         if log is None or log["action"] not in (
                 "review_process", "review_bulk_confirm", "review_auto_approve",
                 "review_bulk_reject"):
             raise HTTPException(404, "되돌릴 작업 기록이 없습니다")
+        if conn.execute(text(
+                "SELECT 1 FROM admin_operator_activity_logs"
+                " WHERE action='review_undo' AND detail->>'ref_log_id'=:id LIMIT 1"),
+                {"id": str(log_id)}).first():
+            raise HTTPException(409, "이미 대기 상태입니다")
         detail = log["detail"]
-        if log["action"] in ("review_bulk_confirm", "review_bulk_reject"):
-            # 둘 다 {"items": [...]} 모양(bulk_confirm·bulk_reject_zero_price
-            # 참조) — 한 번에 한 트랜잭션으로 전부 되돌린다(부분 원복 없음, 위
-            # "함께 적용" 주석과 같은 이유).
-            entries = detail["items"]
-        else:
-            # 함께 적용분(also)도 같은 로그에 담겨 있다 — **부분 원복은 없다**.
-            # 하나만 되돌리면 같은 모델의 형제끼리 값이 갈려 어느 쪽이 맞는지 알 수 없다.
-            # review_auto_approve 로그도 여기로 온다 — also가 없어(자동 승인은 항상
-            # 단건) 아래 리스트 컴프리헨션이 빈 목록을 더해 entries=[detail] 하나가
-            # 된다. detail의 모양(mode·field·review_id·before)은 review_process와
-            # 같다(auto_approve_market_price() 참조) — _revert_one()을 그대로 탄다.
-            entries = [detail] + [
-                {"mode": detail.get("mode"), "field": detail.get("field"),
-                 "review_id": a["review_id"], "before": a["before"]}
-                for a in (detail.get("also") or [])]
-        for e in entries:
+        entries = _review_undo_entries(detail, log["action"])
+        ids = _review_undo_entry_ids(entries)
+        candidates = _review_candidates(conn, ids, undo=True)
+        if any(r["review_status"] == "대기" for r in candidates.values()):
+            raise HTTPException(409, "이미 대기 상태입니다")
+        after = detail.get("undo_after")
+        expected_reviews = _validate_review_undo_after(entries, after)
+        if any((r["product_code"], r["field_name"]) !=
+               (expected_reviews[rid]["product_code"], expected_reviews[rid]["field_name"])
+               for rid, r in candidates.items()):
+            raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+        locked = _lock_review_scope(conn, candidates)
+        for rid, row in locked.items():
+            if row["review_status"] == "대기":
+                raise HTTPException(409, "이미 대기 상태입니다")
+            if row["review_status"] != candidates[rid]["review_status"]:
+                raise HTTPException(409, "검수 대상 연결이 변경되었습니다 — 새로고침 후 다시 시도하세요")
+        if _capture_review_undo_after(conn, entries) != after:
+            raise HTTPException(409,
+                "검수 이후 다른 변경이 감지되어 되돌릴 수 없습니다 — 현재 검수를 확인하세요")
+        for e in reversed(entries):
             _revert_one(conn, e)
         _log(conn, "review_undo", str(log_id), {"ref_log_id": log_id, "count": len(entries)})
         return {"ok": True, "restored": len(entries)}

@@ -8,11 +8,22 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
+from .catalog_ingest import is_product_key_conflict
 from .timeutil import iso
 from .auth import current_operator_id
 from .db import engine
+from .pricing_write_guard_core import lock_products, ProductScopeChanged
+
+
+
+def _lock_restore_products(conn, product_codes):
+    """Complete the caller's product scope before child writes or restoration."""
+    try:
+        return lock_products(conn, product_codes)
+    except ProductScopeChanged:
+        raise HTTPException(409, "상품 범위가 변경되었습니다 — 새로고침 후 다시 시도하세요") from None
 
 
 def _finite_or_none(v):
@@ -383,76 +394,82 @@ def register_product(body: RegisterBody):
         raise HTTPException(400, "상품명이 비어 있습니다")
     if body.supplier_id is not None and (body.model_name is None or body.cost_price is None):
         raise HTTPException(400, "공급처를 지정하면 모델명과 매입가가 함께 있어야 합니다")
-    with engine.begin() as conn:
-        if body.supplier_id is not None and conn.execute(
-                text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
-                {"s": body.supplier_id}).first() is None:
-            raise HTTPException(404, "공급처가 없습니다")
-        if body.danawa_code:
-            dup = conn.execute(text(
-                "SELECT sku FROM products WHERE danawa_code=:d"), {"d": body.danawa_code}).scalar()
-            if dup:
-                raise HTTPException(400, f"다나와 코드 중복 — 기존 상품 {dup}에 연결하세요")
-        # 이름이 거의 같은 상품이 이미 있으면 **먼저 묻는다**(슬라이스 68).
-        # 실수로 같은 상품을 두 번 만들면 재고·매입가가 갈라져 어느 쪽이 맞는지 알 수 없다.
-        # 막지는 않는다 — 운영자가 "다른 상품"이라고 하면 그대로 등록한다.
-        if not body.confirm_similar:
-            from . import dedupe
-            similar = dedupe.find_similar(conn, body.name.strip(), pt)
-            if similar:
-                raise HTTPException(409, {
-                    "error": "similar_products",
-                    "message": "이름이 거의 같은 상품이 이미 있습니다 — 확인해 주세요",
-                    "items": similar})
-        num = conn.execute(text(
-            r"SELECT COALESCE(MAX(CAST(SUBSTRING(sku FROM 3) AS INTEGER)), 0) + 1"
-            r" FROM products WHERE sku ~ '^P-[0-9]+$'")).scalar()
-        sku, pc = f"P-{num}", int(f"2048{num}")
-        # supplier는 VARCHAR(200) 자유 텍스트 — 선택 입력이라 안 넣으면 NULL(등록은 그대로 된다).
-        sup_val = (body.supplier or "").strip()[:200] or None
-        conn.execute(text(
-            "INSERT INTO products (product_code, sku, product_name, part_type, category_group,"
-            " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code,"
-            " supplier)"
-            " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d, :sup)"),
-            {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
-             "cost": body.cost_price, "d": body.danawa_code, "sup": sup_val})
-        if body.maker and body.maker.strip():
-            conn.execute(text("UPDATE products SET maker=:m WHERE product_code=:pc"),
-                         {"m": body.maker.strip()[:60], "pc": pc})
-        conn.execute(text(
-            "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"),
-            {"pc": pc, "pt": pt})  # 검수 대상 필드는 확정 전 NULL 유지(ERD §3.5)
-        if body.supplier_id is None:
-            # 공급처 없는 직접 등록 — 매핑·매입가 원장은 만들지 않는다(없는 사실을 적지 않는다)
+    try:
+        with engine.begin() as conn:
+            if body.supplier_id is not None and conn.execute(
+                    text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
+                    {"s": body.supplier_id}).first() is None:
+                raise HTTPException(404, "공급처가 없습니다")
+            if body.danawa_code:
+                dup = conn.execute(text(
+                    "SELECT sku FROM products WHERE danawa_code=:d"), {"d": body.danawa_code}).scalar()
+                if dup:
+                    raise HTTPException(400, f"다나와 코드 중복 — 기존 상품 {dup}에 연결하세요")
+            # 이름이 거의 같은 상품이 이미 있으면 **먼저 묻는다**(슬라이스 68).
+            # 실수로 같은 상품을 두 번 만들면 재고·매입가가 갈라져 어느 쪽이 맞는지 알 수 없다.
+            # 막지는 않는다 — 운영자가 "다른 상품"이라고 하면 그대로 등록한다.
+            if not body.confirm_similar:
+                from . import dedupe
+                similar = dedupe.find_similar(conn, body.name.strip(), pt)
+                if similar:
+                    raise HTTPException(409, {
+                        "error": "similar_products",
+                        "message": "이름이 거의 같은 상품이 이미 있습니다 — 확인해 주세요",
+                        "items": similar})
+            num = conn.execute(text(
+                r"SELECT COALESCE(MAX(CAST(SUBSTRING(sku FROM 3) AS INTEGER)), 0) + 1"
+                r" FROM products WHERE sku ~ '^P-[0-9]+$'")).scalar()
+            sku, pc = f"P-{num}", int(f"2048{num}")
+            # supplier는 VARCHAR(200) 자유 텍스트 — 선택 입력이라 안 넣으면 NULL(등록은 그대로 된다).
+            sup_val = (body.supplier or "").strip()[:200] or None
+            conn.execute(text(
+                "INSERT INTO products (product_code, sku, product_name, part_type, category_group,"
+                " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code,"
+                " supplier)"
+                " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d, :sup)"),
+                {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
+                 "cost": body.cost_price, "d": body.danawa_code, "sup": sup_val})
+            if body.maker and body.maker.strip():
+                conn.execute(text("UPDATE products SET maker=:m WHERE product_code=:pc"),
+                             {"m": body.maker.strip()[:60], "pc": pc})
+            conn.execute(text(
+                "INSERT INTO product_specs (product_code, part_type) VALUES (:pc, :pt)"),
+                {"pc": pc, "pt": pt})  # 검수 대상 필드는 확정 전 NULL 유지(ERD §3.5)
+            if body.supplier_id is None:
+                # 공급처 없는 직접 등록 — 매핑·매입가 원장은 만들지 않는다(없는 사실을 적지 않는다)
+                _log(conn, "product_register", sku,
+                     {"product_code": pc, "sku": sku, "part_type": pt,
+                      "supplier_id": None, "source": "manual"}, kind="product")
+                return {"ok": True, "sku": sku, "product_code": pc,
+                        "note": ("등록됐습니다 — 검수 대기 상태이고 추천 풀에는 들어가지 않습니다."
+                                 " 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.")}
+            map_id = conn.execute(text(
+                "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
+                " VALUES (:s, :k, :pc, 'manual', :op, now())"
+                " ON CONFLICT (supplier_id, model_key) DO NOTHING RETURNING map_id"),
+                {"s": body.supplier_id, "k": body.model_name, "pc": pc, "op": 1}).scalar()
+            if map_id is None:
+                raise HTTPException(409, "이미 연결된 단가표 모델입니다")
+            srow = conn.execute(text(
+                "SELECT r.supply_state, f.file_id FROM supplier_price_rows r"
+                " JOIN supplier_price_files f USING (file_id)"
+                " WHERE f.supplier_id=:s AND r.model_name=:k"
+                " ORDER BY f.received_at DESC LIMIT 1"),
+                {"s": body.supplier_id, "k": body.model_name}).first()
+            conn.execute(text(
+                "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state, src_file_id)"
+                " VALUES (:pc, :s, :c, :st, :f)"),  # 신규 상품 — 재판정(_reprice) 불요, 기존 가격 무영향
+                {"pc": pc, "s": body.supplier_id, "c": body.cost_price,
+                 "st": srow[0] if srow else "가능", "f": srow[1] if srow else None})
             _log(conn, "product_register", sku,
-                 {"product_code": pc, "sku": sku, "part_type": pt,
-                  "supplier_id": None, "source": "manual"}, kind="product")
-            return {"ok": True, "sku": sku, "product_code": pc,
-                    "note": ("등록됐습니다 — 검수 대기 상태이고 추천 풀에는 들어가지 않습니다."
-                             " 사양 검수와 판매가 산정을 통과해야 추천에 쓰입니다.")}
-        map_id = conn.execute(text(
-            "INSERT INTO supplier_product_map (supplier_id, model_key, product_code, match_method, confirmed_by, confirmed_at)"
-            " VALUES (:s, :k, :pc, 'manual', :op, now())"
-            " ON CONFLICT (supplier_id, model_key) DO NOTHING RETURNING map_id"),
-            {"s": body.supplier_id, "k": body.model_name, "pc": pc, "op": 1}).scalar()
-        if map_id is None:
-            raise HTTPException(409, "이미 연결된 단가표 모델입니다")
-        srow = conn.execute(text(
-            "SELECT r.supply_state, f.file_id FROM supplier_price_rows r"
-            " JOIN supplier_price_files f USING (file_id)"
-            " WHERE f.supplier_id=:s AND r.model_name=:k"
-            " ORDER BY f.received_at DESC LIMIT 1"),
-            {"s": body.supplier_id, "k": body.model_name}).first()
-        conn.execute(text(
-            "INSERT INTO product_supplier_prices (product_code, supplier_id, cost_price, supply_state, src_file_id)"
-            " VALUES (:pc, :s, :c, :st, :f)"),  # 신규 상품 — 재판정(_reprice) 불요, 기존 가격 무영향
-            {"pc": pc, "s": body.supplier_id, "c": body.cost_price,
-             "st": srow[0] if srow else "가능", "f": srow[1] if srow else None})
-        _log(conn, "product_register", sku,
-             {"product_code": pc, "sku": sku, "part_type": pt, "supplier_id": body.supplier_id,
-              "model_key": body.model_name, "cost_price": body.cost_price}, kind="product")
-        return {"ok": True, "sku": sku, "product_code": pc}
+                 {"product_code": pc, "sku": sku, "part_type": pt, "supplier_id": body.supplier_id,
+                  "model_key": body.model_name, "cost_price": body.cost_price}, kind="product")
+            return {"ok": True, "sku": sku, "product_code": pc}
+    except IntegrityError as exc:
+        if is_product_key_conflict(exc):
+            raise HTTPException(409, "상품 식별자가 충돌했습니다 — 다시 확인해 주세요") from None
+        raise
+
 
 
 # ---- 슬라이스 53: 단건 상세 조회·수정 (ADM-PRD-040) ----
@@ -966,7 +983,7 @@ def undo_product_edit(log_id: int):
 
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": log_id}).mappings().first()
         if row is None or row["action"] != "product_edit":
             raise HTTPException(404, "되돌릴 수정 기록이 없습니다")
@@ -978,16 +995,49 @@ def undo_product_edit(log_id: int):
             raise HTTPException(409, "이미 되돌린 수정입니다")
 
         d = row["detail"] or {}
+        invalid = "되돌릴 수정 기록의 근거가 부족합니다 — 현재 상품을 확인하세요"
+        if type(d) is not dict or type(d.get("changes")) is not dict:
+            raise HTTPException(409, invalid)
         pc = d.get("product_code")
-        chg = d.get("changes") or {}
+        chg = d["changes"]
         sets, params = [], {"pc": pc}
         for k, fromto in chg.items():
             if k not in EDITABLE:
                 continue
+            if type(fromto) is not dict or "from" not in fromto or "to" not in fromto:
+                raise HTTPException(409, invalid)
+            values = (fromto["from"], fromto["to"])
+            if k in ("sale_price", "purchase_price", "market_price", "stock_qty"):
+                if any(v is not None and type(v) is not int for v in values):
+                    raise HTTPException(409, invalid)
+            elif any(v is not None and type(v) is not str for v in values):
+                raise HTTPException(409, invalid)
             sets.append(EDITABLE[k][0] + " = :" + k)
             params[k] = fromto.get("from")
         if not sets:
             raise HTTPException(400, "되돌릴 변경 내용이 없습니다")
+        _lock_restore_products(conn, [pc])
+        before = d.get("before")
+        if (type(before) is not dict or type(before.get("locked_fields")) is not list
+                or any(type(v) is not str for v in before["locked_fields"])
+                or type(d.get("locked")) is not bool
+                or any(k not in EDITABLE or type(ft) is not dict
+                       or "from" not in ft or "to" not in ft for k, ft in chg.items())):
+            raise HTTPException(409, invalid)
+        expected_locks = list(before["locked_fields"])
+        if d["locked"]:
+            for k in chg:
+                col = EDITABLE[k][0]
+                if col not in expected_locks:
+                    expected_locks.append(col)
+        columns = list(dict.fromkeys(EDITABLE[k][0] for k in chg))
+        current = conn.execute(text(
+            "SELECT " + ", ".join(columns + ["locked_fields"])
+            + " FROM products WHERE product_code=:pc"), {"pc": pc}).mappings().first()
+        if (current is None or current["locked_fields"] != expected_locks
+                or any(current[EDITABLE[k][0]] != ft["to"] for k, ft in chg.items())):
+            raise HTTPException(409,
+                "수정 이후 다른 변경이 감지되어 되돌릴 수 없습니다 — 현재 상품을 확인하세요")
         restored = len(sets)
         # 잠금도 수정 전 상태로 되돌린다 — 되돌렸는데 잠금만 남으면 적재가 영영 못 채운다
         sets.append("locked_fields = CAST(:lf AS JSONB)")
@@ -1183,7 +1233,7 @@ def undo_spec_edit(log_id: int):
 
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": log_id}).mappings().first()
         if row is None or row["action"] != "spec_edit":
             raise HTTPException(404, "되돌릴 사양 입력 기록이 없습니다")
@@ -1205,6 +1255,7 @@ def undo_spec_edit(log_id: int):
                 continue
             sets.append(f"{k} = CAST(:{k} AS {cast[k]})")
             params[k] = ft.get("from")
+        _lock_restore_products(conn, [pc])
         if sets:
             conn.execute(text("UPDATE product_specs SET " + ", ".join(sets)
                               + ", updated_at = now() WHERE product_code = :pc"), params)
@@ -1268,9 +1319,17 @@ def upsert_supplier_price(product_code: int, body: SupplierPriceBody):
                            {"s": body.supplier_id}).scalar()
         if sup is None:
             raise HTTPException(400, "등록되지 않은 공급처입니다")
+        try:
+            lock_products(conn, [product_code])
+        except ProductScopeChanged:
+            raise HTTPException(409, "상품이 변경되었습니다. 다시 조회하세요") from None
+        sup = conn.execute(text("SELECT name FROM suppliers WHERE supplier_id=:s"),
+                           {"s": body.supplier_id}).scalar()
+        if sup is None:
+            raise HTTPException(409, "공급처가 변경되었습니다. 다시 조회하세요")
         before = conn.execute(text(
             "SELECT psp_id, cost_price FROM product_supplier_prices"
-            " WHERE product_code=:pc AND supplier_id=:s"),
+            " WHERE product_code=:pc AND supplier_id=:s FOR UPDATE"),
             {"pc": product_code, "s": body.supplier_id}).mappings().first()
         # 같은 (상품, 공급처)는 한 행이다 — 같은 공급처를 두 번 넣으면 어느 값이 맞는지 알 수 없다
         conn.execute(text(
@@ -1303,12 +1362,26 @@ def delete_supplier_price(product_code: int, supplier_id: int):
 
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT sp.cost_price, s.name FROM product_supplier_prices sp"
+            "SELECT sp.psp_id, sp.cost_price, s.name FROM product_supplier_prices sp"
             " JOIN suppliers s USING (supplier_id)"
             " WHERE sp.product_code=:pc AND sp.supplier_id=:s"),
             {"pc": product_code, "s": supplier_id}).mappings().first()
+        try:
+            lock_products(conn, [product_code])
+        except ProductScopeChanged:
+            if row is None:
+                raise HTTPException(404, "그 공급처 가격이 없습니다") from None
+            raise HTTPException(409, "상품이 변경되었습니다. 다시 조회하세요") from None
         if row is None:
             raise HTTPException(404, "그 공급처 가격이 없습니다")
+        candidate_id = row["psp_id"]
+        row = conn.execute(text(
+            "SELECT sp.psp_id, sp.cost_price, s.name FROM product_supplier_prices sp"
+            " JOIN suppliers s USING (supplier_id)"
+            " WHERE sp.product_code=:pc AND sp.supplier_id=:s FOR UPDATE OF sp"),
+            {"pc": product_code, "s": supplier_id}).mappings().first()
+        if row is None or row["psp_id"] != candidate_id:
+            raise HTTPException(409, "공급처 가격이 변경되었습니다. 다시 조회하세요")
         conn.execute(text(
             "DELETE FROM product_supplier_prices WHERE product_code=:pc AND supplier_id=:s"),
             {"pc": product_code, "s": supplier_id})
@@ -1497,7 +1570,7 @@ def undo_part_type(log_id: int):
 
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": log_id}).mappings().first()
         if row is None or row["action"] != "part_type_change":
             raise HTTPException(404, "되돌릴 분류 변경 기록이 없습니다")
@@ -1509,6 +1582,7 @@ def undo_part_type(log_id: int):
             raise HTTPException(409, "이미 되돌린 변경입니다")
         d = row["detail"] or {}
         pc, b = d.get("product_code"), d.get("before") or {}
+        _lock_restore_products(conn, [pc])
         # 잠금도 변경 전 상태로 되돌린다 — 값만 원복하고 잠금이 남으면 적재가 영영
         # 못 채운다(CLAUDE.md §관리자 화면 규약: "되돌릴 때 잠금도 함께 되돌린다").
         conn.execute(text(
@@ -1602,14 +1676,26 @@ def merge_product(product_code: int, body: MergeBody):
     with engine.begin() as conn:
         dup = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, status, stock_qty"
-            " FROM products WHERE product_code=:pc FOR UPDATE"),
+            " FROM products WHERE product_code=:pc"),
             {"pc": product_code}).mappings().first()
         keep = conn.execute(text(
             "SELECT product_code, sku, product_name, part_type, status, stock_qty"
-            " FROM products WHERE product_code=:pc FOR UPDATE"),
+            " FROM products WHERE product_code=:pc"),
             {"pc": body.into}).mappings().first()
         if dup is None or keep is None:
             raise HTTPException(404, "상품이 없습니다")
+        # 요청 순서와 무관하게 전체 상품을 먼저 잠그고 현재 값을 다시 읽는다.
+        _lock_restore_products(conn, [product_code, body.into])
+        dup = conn.execute(text(
+            "SELECT product_code, sku, product_name, part_type, status, stock_qty"
+            " FROM products WHERE product_code=:pc"),
+            {"pc": product_code}).mappings().first()
+        keep = conn.execute(text(
+            "SELECT product_code, sku, product_name, part_type, status, stock_qty"
+            " FROM products WHERE product_code=:pc"),
+            {"pc": body.into}).mappings().first()
+        if dup is None or keep is None:
+            raise HTTPException(409, "상품 범위가 변경되었습니다 — 새로고침 후 다시 시도하세요")
         if dup["status"] == "삭제대기":
             raise HTTPException(409, "이미 정리된 상품입니다")
 
@@ -1696,7 +1782,7 @@ def undo_merge(log_id: int):
 
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": log_id}).mappings().first()
         if row is None or row["action"] != "product_merge":
             raise HTTPException(404, "되돌릴 편입 기록이 없습니다")
@@ -1707,9 +1793,10 @@ def undo_merge(log_id: int):
             raise HTTPException(409, "이미 되돌린 편입입니다")
         d = row["detail"] or {}
         pc, into, qty = d.get("dup"), d.get("into"), d.get("moved_stock") or 0
+        _lock_restore_products(conn, [pc, into])
         if qty:
             cur = conn.execute(text(
-                "SELECT stock_qty FROM products WHERE product_code=:p FOR UPDATE"),
+                "SELECT stock_qty FROM products WHERE product_code=:p"),
                 {"p": into}).scalar_one()
             if cur < qty:
                 raise HTTPException(409, "원본 재고가 편입분보다 적습니다 — 이후 판매·조정이 있었습니다")
@@ -1851,6 +1938,13 @@ def bulk_status(body: BulkStatusBody):
             " WHERE product_code = ANY(:c)"), {"c": codes}).mappings().all()
         if not before:
             raise HTTPException(404, "해당 상품을 찾을 수 없습니다")
+        candidate_codes = [r["product_code"] for r in before]
+        _lock_restore_products(conn, candidate_codes)
+        before = conn.execute(text(
+            "SELECT product_code, status, locked_fields FROM products"
+            " WHERE product_code = ANY(:c)"), {"c": codes}).mappings().all()
+        if sorted(r["product_code"] for r in before) != sorted(candidate_codes):
+            raise HTTPException(409, "상품 범위가 변경되었습니다 — 새로고침 후 다시 시도하세요")
         missing = len(codes) - len(before)
 
         locked = [r for r in before if "status" in (r["locked_fields"] or [])]
@@ -1900,7 +1994,7 @@ def bulk_status_undo(body: BulkUndoBody):
     _bulk_operator()
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT detail, action FROM admin_operator_activity_logs WHERE log_id = :i"),
+            "SELECT detail, action FROM admin_operator_activity_logs WHERE log_id = :i FOR UPDATE"),
             {"i": body.log_id}).mappings().first()
         if row is None or row["action"] != "상품 상태 일괄 변경":
             raise HTTPException(404, "되돌릴 기록을 찾을 수 없습니다")
@@ -1914,6 +2008,7 @@ def bulk_status_undo(body: BulkUndoBody):
         before = detail.get("before") or []
         if not before:
             raise HTTPException(400, "되돌릴 내역이 비어 있습니다")
+        _lock_restore_products(conn, [b["pc"] for b in before])
         for b in before:
             conn.execute(text(
                 "UPDATE products SET status = :s, updated_at = now()"

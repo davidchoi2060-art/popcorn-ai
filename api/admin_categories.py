@@ -26,6 +26,7 @@ from sqlalchemy import text
 from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
+from .pricing_policy_guard_core import lock_pricing_policy_exclusive
 from .pricing import margin_source_text, resolve_margins
 from .taxonomy import DISPLAY_LABELS, PART_LABELS, display_labels, expand_display
 from .timeutil import iso
@@ -195,6 +196,7 @@ def create(body: CreateBody):
     name = _clean_name(body.name)
     types = _clean_types(body.allowed_part_types)
     with engine.begin() as conn:
+        lock_pricing_policy_exclusive(conn)
         if body.parent_id is not None:
             if not conn.execute(text("SELECT 1 FROM categories WHERE category_id=:i"),
                                 {"i": body.parent_id}).first():
@@ -228,6 +230,7 @@ class PatchBody(BaseModel):
 def patch(cid: int, body: PatchBody):
     _operator()
     with engine.begin() as conn:
+        lock_pricing_policy_exclusive(conn)
         rows = _rows(conn)
         cur = next((r for r in rows if r["category_id"] == cid), None)
         if cur is None:
@@ -301,6 +304,7 @@ def patch(cid: int, body: PatchBody):
 def remove(cid: int):
     _operator()
     with engine.begin() as conn:
+        lock_pricing_policy_exclusive(conn)
         cur = conn.execute(text(
             "SELECT name FROM categories WHERE category_id=:i"), {"i": cid}).mappings().first()
         if cur is None:
@@ -354,6 +358,7 @@ def set_margin(cid: int, body: MarginBody):
         raise HTTPException(400, "마진율은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
 
     with engine.begin() as conn:
+        lock_pricing_policy_exclusive(conn)
         cur = conn.execute(text(
             "SELECT name FROM categories WHERE category_id=:i"), {"i": cid}).mappings().first()
         if cur is None:

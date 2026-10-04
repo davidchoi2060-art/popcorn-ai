@@ -25,7 +25,7 @@ from dotenv import load_dotenv                      # noqa: E402
 from sqlalchemy import create_engine, text          # noqa: E402
 
 from api.catalog_ingest import (                    # noqa: E402
-    apply_plan, build_plan, load_eav, plan_summary, read_master,
+    CatalogConflict, apply_plan, build_plan, load_eav, plan_summary, read_master,
 )
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,8 +81,12 @@ def main():
         print("--dry 모드 — DB를 바꾸지 않았습니다.")
         return
 
-    with engine.begin() as conn:
-        job_id = apply_plan(conn, plan, os.path.basename(MASTER), args.origin, operator_id=1)
+    try:
+        with engine.begin() as conn:
+            job_id = apply_plan(conn, plan, os.path.basename(MASTER), args.origin, operator_id=1)
+    except CatalogConflict as exc:
+        print(f"적재 실패: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
     print(f"적재 배치 #{job_id} 완료")
 
     q = {

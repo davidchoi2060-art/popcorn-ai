@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/admin")
 
 # 작업 기록 주체 = 세션 운영자(슬라이스 37). 세션 없는 경로는 시드 운영자(1)로 폴백.
 from .auth import current_operator_id
+from .admin_activity_log_core import log_action as _log_core
 
 RF_BASE = 1023  # refund 표시 라벨 파생 기준(RF-1024 재현) — refund_no 컬럼 성문화는 ADM-CLM-010 재결정
 
@@ -66,11 +67,8 @@ def _item_label(kind: str, spec) -> str:
 
 
 def _log(conn, action: str, target_id: str, detail: dict, kind: str = "order") -> int:
-    return conn.execute(text(
-        "INSERT INTO admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)"
-        " VALUES (:op, :a, :k, :t, CAST(:d AS JSONB)) RETURNING log_id"),
-        {"op": current_operator_id(), "a": action, "k": kind, "t": target_id,
-         "d": json.dumps(detail)}).scalar()
+    return _log_core(conn, action, target_id, detail, kind=kind,
+                     operator_id=current_operator_id)
 
 
 @router.get("/orders")

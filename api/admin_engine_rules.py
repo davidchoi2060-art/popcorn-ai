@@ -18,6 +18,7 @@ from .timeutil import iso
 from .pricing import sale_from_purchase, formula_text
 from .candidates import BUDGET_ALLOC, SILENT_SCOPE, WHITE_SCOPE
 from .db import engine
+from .pricing_policy_guard_core import lock_pricing_policy_exclusive
 from .recommend import SLOTS, TIER_LABELS, HIGHEND_CAP_X, SLOT_PRICE_POLICY
 from .taxonomy import SLOT_LABELS
 
@@ -223,6 +224,7 @@ def save_pricing(body: PricingBody):
             raise HTTPException(400, f"{name}은 0 이상 1 미만이어야 합니다(0.13 = 13%)")
 
     with engine.begin() as conn:
+        lock_pricing_policy_exclusive(conn)
         cur = conn.execute(text(
             "SELECT card_fee_rate, margin_rate FROM pricing_settings"
             " ORDER BY effective_from DESC LIMIT 1")).mappings().first()

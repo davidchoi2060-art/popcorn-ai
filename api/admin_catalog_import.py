@@ -30,7 +30,7 @@ from sqlalchemy import text
 
 from .auth import current_operator
 from .catalog_ingest import (
-    apply_plan, build_plan, load_eav, plan_impact, plan_summary, read_master, read_refs,
+    CatalogConflict, apply_plan, build_plan, load_eav, plan_impact, plan_summary, read_master, read_refs,
 )
 from .db import engine
 
@@ -196,18 +196,22 @@ def apply(staging_id: str = Form(...), expect_ok: int = Form(...)):
             "expect_ok": expect_ok, "now_ok": got_ok})
 
     op = current_operator() or {}
-    with engine.begin() as conn:
-        job_id = apply_plan(conn, plan, meta["file_name"], meta["origin"],
-                            operator_id=op.get("operator_id") or 1)
-        after = {
-            "catalog": conn.execute(text("SELECT count(*) FROM products")).scalar_one(),
-            "pool": conn.execute(text(
-                "SELECT count(*) FROM v_recommendation_candidates"
-                " WHERE stock_qty > 0")).scalar_one(),
-            "review": conn.execute(text(
-                "SELECT count(*) FROM product_reviews"
-                " WHERE review_status = '대기'")).scalar_one(),
-        }
+    try:
+        with engine.begin() as conn:
+            job_id = apply_plan(conn, plan, meta["file_name"], meta["origin"],
+                                operator_id=op.get("operator_id") or 1)
+            after = {
+                "catalog": conn.execute(text("SELECT count(*) FROM products")).scalar_one(),
+                "pool": conn.execute(text(
+                    "SELECT count(*) FROM v_recommendation_candidates"
+                    " WHERE stock_qty > 0")).scalar_one(),
+                "review": conn.execute(text(
+                    "SELECT count(*) FROM product_reviews"
+                    " WHERE review_status = '대기'")).scalar_one(),
+            }
+    except CatalogConflict as exc:
+        raise HTTPException(409, str(exc)) from None
+
     # 지우기 «전에» 보관한다(요청 39). 보관에 실패해도 적재는 이미 끝났으므로
     # 요청을 실패로 만들지 않는다 — 대신 무엇이 안 남았는지 응답에 밝힌다
     # (슬라이스 81 과 같은 취지: 파일을 못 써도 조용히 넘어가지 않는다).

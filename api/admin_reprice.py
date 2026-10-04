@@ -40,9 +40,10 @@
 이전 값을 담는다. 되돌리기는 **역방향 전이**이고 `ref_log_id`로 원 기록을 가리킨다.
 """
 import json
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
 from .admin_orders import _log
@@ -50,6 +51,14 @@ from .admin_price_import import _settings
 from .auth import current_operator, current_operator_id
 from .db import engine
 from .pricing import formula_text, resolve_margins, sale_from_purchase
+from .pricing_write_guard_core import lock_products, ProductScopeChanged
+from .pricing_policy_guard_core import lock_pricing_policy_shared
+from .reprice_preview_expected import canonical_basis, make_expected, InvalidPreviewBasis, canonical_basis_v2, make_expected_v2
+from .reprice_basis_snapshot import read_basis, InvalidRepriceBasisSnapshot
+from .admin_operation_receipt_core import (
+    MAX_SAFE_INTEGER, UUID_PATTERN, prepare_reprice_operation, lock_operation,
+    lookup_operation, operation_record, store_operation, ReceiptUnavailable, OperationConflict, PrewriteRejected,
+)
 from .taxonomy import PART_LABELS
 
 router = APIRouter(prefix="/api/admin")
@@ -179,78 +188,206 @@ def _summary(c, scope, fee, margin, ex=6):
     }
 
 
+def _preview_plan(rows, scope, fee, margin, mmap):
+    try:
+        basis = canonical_basis(scope=scope, rows=rows, fee=fee, margin=margin,
+                                mmap=mmap, max_apply=MAX_APPLY)
+        classification = _classify(rows, fee, margin, mmap)
+        expected = make_expected(basis, classification, scope=scope, max_apply=MAX_APPLY)
+    except (InvalidPreviewBasis, ArithmeticError, TypeError, ValueError):
+        raise HTTPException(409, "미리보기 계산 근거를 확인할 수 없습니다 — 데이터를 확인하세요") from None
+    return classification, expected
+
+
+def _read_revision_basis(conn, scope, *, applying=False):
+    try:
+        return read_basis(conn, scope)
+    except InvalidRepriceBasisSnapshot:
+        error = PrewriteRejected if applying else HTTPException
+        raise error(409, "미리보기 변경번호 근거를 확인할 수 없습니다 — 데이터를 확인하세요") from None
+
+
+def _preview_plan_v2(rows, scope, fee, margin, mmap, snapshot):
+    try:
+        basis = canonical_basis_v2(scope=scope, rows=rows, fee=fee, margin=margin,
+                                   mmap=mmap, max_apply=MAX_APPLY,
+                                   product_revisions=snapshot["product_revisions"],
+                                   policy_revision=snapshot["policy_revision"])
+        classification = _classify(rows, fee, margin, mmap)
+        expected = make_expected_v2(basis, classification, scope=scope, max_apply=MAX_APPLY)
+    except (InvalidPreviewBasis, ArithmeticError, TypeError, ValueError, KeyError):
+        raise HTTPException(409, "미리보기 계산 근거를 확인할 수 없습니다 — 데이터를 확인하세요") from None
+    return classification, expected
+
+
+def _require_expected(current, expected):
+    if current != expected:
+        raise HTTPException(409, "재산정 대상 또는 계산 근거가 변경되었습니다 — 미리보기를 다시 확인하세요")
+
+
 @router.get("/reprice/preview")
 def preview(scope: str = "live"):
     if scope not in SCOPES:
         raise HTTPException(400, "알 수 없는 범위입니다")
     with engine.connect() as conn:
-        fee, margin = _settings(conn)
-        mmap = _margin_map(conn, margin)
-        rows = _rows(conn, scope)
-    return _summary(_classify(rows, fee, margin, mmap), scope, fee, margin)
+        lock_pricing_policy_shared(conn)
+        snapshot = _read_revision_basis(conn, scope)
+        fee, margin, mmap, rows = (snapshot[k] for k in ("fee", "margin", "mmap", "rows"))
+    classification, expected = _preview_plan_v2(rows, scope, fee, margin, mmap, snapshot)
+    result = _summary(classification, scope, fee, margin)
+    result["expected"] = expected
+    return result
+
+
+class PreviewExpected(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    version: Literal["reprice_basis_v1", "reprice_basis_v2"]
+    scope: Literal["live", "selling", "all"]
+    fingerprint: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+
+
+class RepriceOperationContext(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    contract_version: Literal["admin_operation_v1"]
+    canonical_version: Literal["reprice_request_v1"]
+    actor_id: int = Field(gt=0, le=MAX_SAFE_INTEGER)
+    environment: str = Field(min_length=36, max_length=36, pattern=UUID_PATTERN)
+    action: Literal["reprice_apply"]
 
 
 class ApplyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
     scope: str
-    expect_changed: int      # 미리보기가 낸 변동 건수 — 그대로 되돌려 보내야 한다
+    expect_changed: int = Field(ge=0, le=MAX_SAFE_INTEGER)
+    expected: PreviewExpected
     note: str = ""
+    operation_id: str = Field(min_length=36, max_length=36, pattern=UUID_PATTERN)
+    operation_context: RepriceOperationContext
+    request_fingerprint: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+
+
+def _selected_reprice_rows(rows, targets):
+    by_code = {r["product_code"]: dict(r) for r in rows}
+    return [by_code.get(t["product_code"]) for t in targets]
 
 
 @router.post("/reprice/apply")
 def apply(body: ApplyBody):
-    _owner()
+    me = _owner()
     if body.scope not in SCOPES:
         raise HTTPException(400, "알 수 없는 범위입니다")
-    with engine.begin() as conn:
-        fee, margin = _settings(conn)
-        mmap = _margin_map(conn, margin)
-        c = _classify(_rows(conn, body.scope), fee, margin, mmap)
-        targets = c["up"] + c["down"]
-        if not targets:
-            raise HTTPException(400, "정책과 다른 판매가가 없습니다 — 바꿀 것이 없습니다")
-        if len(targets) != body.expect_changed:
-            raise HTTPException(409,
-                                f"미리보기 이후 값이 달라졌습니다 — 다시 확인해 주세요"
-                                f" (미리보기 {body.expect_changed:,}건 · 지금 {len(targets):,}건)")
-        dropped = 0
-        if len(targets) > MAX_APPLY:
-            dropped = len(targets) - MAX_APPLY
-            targets = targets[:MAX_APPLY]
+    expected = body.expected.model_dump()
+    if expected["scope"] != body.scope:
+        raise HTTPException(409, "미리보기 범위가 다릅니다 — 미리보기를 다시 확인하세요")
+    try:
+        identity = prepare_reprice_operation(body, me)
+    except ReceiptUnavailable as error:
+        raise HTTPException(503, str(error)) from None
+    except OperationConflict:
+        raise HTTPException(409, "재산정 요청 정보가 다릅니다") from None
+    with engine.execution_options(isolation_level="READ COMMITTED").begin() as conn:
+        lock_pricing_policy_shared(conn)
+        lock_operation(conn, identity)
+        previous = lookup_operation(conn, identity)
+        if previous is not None:
+            try:
+                record = operation_record(previous, expected=identity)
+            except OperationConflict:
+                raise HTTPException(409, "재산정 요청 정보가 다릅니다") from None
+        else:
+            # Only known domain rejections before ANY business mutation are terminal.
+            try:
+                if expected["version"] != "reprice_basis_v2":
+                    raise PrewriteRejected(409, "변경번호를 포함한 새 미리보기가 필요합니다 — 미리보기를 다시 확인하세요")
+                snapshot = _read_revision_basis(conn, body.scope, applying=True)
+                fee, margin, mmap, rows = (snapshot[k] for k in ("fee", "margin", "mmap", "rows"))
+                try:
+                    c, initial_expected = _preview_plan_v2(rows, body.scope, fee, margin, mmap, snapshot)
+                    _require_expected(initial_expected, expected)
+                except HTTPException as error:
+                    raise PrewriteRejected(error.status_code, error.detail) from None
+                targets = c["up"] + c["down"]
+                if not targets:
+                    raise PrewriteRejected(400, "정책과 다른 판매가가 없습니다 — 바꿀 것이 없습니다")
+                if len(targets) != body.expect_changed:
+                    raise PrewriteRejected(409,
+                                        f"미리보기 이후 값이 달라졌습니다 — 다시 확인해 주세요"
+                                        f" (미리보기 {body.expect_changed:,}건 · 지금 {len(targets):,}건)")
+                dropped = 0
+                if len(targets) > MAX_APPLY:
+                    dropped = len(targets) - MAX_APPLY
+                    targets = targets[:MAX_APPLY]
 
-        op = current_operator_id()
-        before = []
-        for t in targets:
-            conn.execute(text(
-                "UPDATE products SET sale_price=:v, updated_at=now() WHERE product_code=:pc"),
-                {"v": t["proposed"], "pc": t["product_code"]})
-            conn.execute(text(
-                "INSERT INTO product_price_history"
-                " (product_code, field, old_price, new_price, reason, changed_by)"
-                " VALUES (:pc, 'sale', :o, :n, 'margin_policy', :op)"),
-                {"pc": t["product_code"], "o": t["current"], "n": t["proposed"], "op": op})
-            before.append({"pc": t["product_code"], "sale": t["current"]})
+                op = current_operator_id()
+                selected_rows = _selected_reprice_rows(rows, targets)
+                try:
+                    lock_products(conn, [t["product_code"] for t in targets])
+                except ProductScopeChanged:
+                    raise PrewriteRejected(409, "재산정 대상 상품이 변경되었습니다 — 미리보기를 다시 확인하세요") from None
+                current_snapshot = _read_revision_basis(conn, body.scope, applying=True)
+                current_fee, current_margin, current_mmap, current_rows = (
+                    current_snapshot[k] for k in ("fee", "margin", "mmap", "rows"))
+                try:
+                    current_c, current_expected = _preview_plan_v2(current_rows, body.scope, current_fee, current_margin, current_mmap, current_snapshot)
+                    _require_expected(current_expected, expected)
+                except HTTPException as error:
+                    raise PrewriteRejected(error.status_code, error.detail) from None
+                current_targets = current_c["up"] + current_c["down"]
+                if (len(current_targets) != body.expect_changed
+                        or (current_fee, current_margin) != (fee, margin)
+                        or current_targets[:MAX_APPLY] != targets
+                        or _selected_reprice_rows(current_rows, current_targets[:MAX_APPLY]) != selected_rows):
+                    raise PrewriteRejected(409, "재산정 대상 또는 계산 근거가 변경되었습니다 — 미리보기를 다시 확인하세요")
+                # The expected covers all scoped rows/margins, but only cap-selected
+                # products are locked. Revision evidence does not freeze unselected rows or new/deleted population members.
+                fee, margin, mmap, c = current_fee, current_margin, current_mmap, current_c
+                targets = current_targets[:MAX_APPLY]
+            except PrewriteRejected as error:
+                if error.status_code not in (400, 409):
+                    raise
+                record = store_operation(conn, identity, {"detail": error.detail}, status=error.status_code)
+            else:
+                before = []
+                after_locks = {r["product_code"]: r["locked_fields"] for r in current_rows}
+                for t in targets:
+                    conn.execute(text(
+                        "UPDATE products SET sale_price=:v, updated_at=now() WHERE product_code=:pc"),
+                        {"v": t["proposed"], "pc": t["product_code"]})
+                    conn.execute(text(
+                        "INSERT INTO product_price_history"
+                        " (product_code, field, old_price, new_price, reason, changed_by)"
+                        " VALUES (:pc, 'sale', :o, :n, 'margin_policy', :op)"),
+                        {"pc": t["product_code"], "o": t["current"], "n": t["proposed"], "op": op})
+                    before.append({"pc": t["product_code"], "sale": t["current"],
+                                   "after_sale": t["proposed"],
+                                   "after_locked_fields": after_locks[t["product_code"]]})
 
-        log_id = _log(conn, "판매가 재산정", body.scope, {
-            "scope": body.scope, "scope_label": SCOPES[body.scope][0],
-            "card_fee_rate": fee, "margin_rate": margin,
-            # 어떤 마진으로 매겼는지 원장에 남긴다 — 나중에 "왜 이 값이지?"에 답하려면
-            # 그때 전역이 얼마였는지만으로는 부족하다(분류별 정책이 섞여 있다).
-            "margins_used": {str(k): v for k, v in sorted(c["margins_used"].items())},
-            "changed": len(targets),
-            "up": len(c["up"]), "down": len(c["down"]),
-            "note": (body.note or "").strip()[:200],
-            "before": before,
-        }, kind="price")
+                log_id = _log(conn, "판매가 재산정", body.scope, {
+                    "scope": body.scope, "scope_label": SCOPES[body.scope][0],
+                    "card_fee_rate": fee, "margin_rate": margin,
+                    # 어떤 마진으로 매겼는지 원장에 남긴다 — 나중에 "왜 이 값이지?"에 답하려면
+                    # 그때 전역이 얼마였는지만으로는 부족하다(분류별 정책이 섞여 있다).
+                    "margins_used": {str(k): v for k, v in sorted(c["margins_used"].items())},
+                    "changed": len(targets),
+                    "up": len(c["up"]), "down": len(c["down"]),
+                    "note": (body.note or "").strip()[:200],
+                    "before": before,
+                }, kind="price")
+                msg = (f"{len(targets):,}건의 판매가를 정책대로 다시 매겼습니다"
+                       f" (오름 {len(c['up']):,} · 내림 {len(c['down']):,})")
+                if c["locked"]:
+                    msg += f" · 잠긴 {len(c['locked']):,}건은 그대로 두었습니다"
+                if dropped:
+                    msg += f" · 상한 {MAX_APPLY:,}건을 넘어 {dropped:,}건은 남았습니다"
+                response_body = {"verdict": msg, "changed": len(targets), "up": len(c["up"]),
+                        "down": len(c["down"]), "locked": len(c["locked"]),
+                        "dropped": dropped, "log_id": log_id}
+                record = store_operation(conn, identity, response_body)
 
-    msg = (f"{len(targets):,}건의 판매가를 정책대로 다시 매겼습니다"
-           f" (오름 {len(c['up']):,} · 내림 {len(c['down']):,})")
-    if c["locked"]:
-        msg += f" · 잠긴 {len(c['locked']):,}건은 그대로 두었습니다"
-    if dropped:
-        msg += f" · 상한 {MAX_APPLY:,}건을 넘어 {dropped:,}건은 남았습니다"
-    return {"verdict": msg, "changed": len(targets), "up": len(c["up"]),
-            "down": len(c["down"]), "locked": len(c["locked"]),
-            "dropped": dropped, "log_id": log_id}
+    # SQL/log/constraint/commit failures escape; they never create a rejected outcome.
+    if record["http_status"] != 200:
+        raise HTTPException(record["http_status"], record["response_body"]["detail"])
+    return record["response_body"] | {"operation_receipt": record["receipt"]}
 
 
 class UndoBody(BaseModel):
@@ -262,7 +399,7 @@ def undo(body: UndoBody):
     _owner()
     with engine.begin() as conn:
         row = conn.execute(text(
-            "SELECT detail, action FROM admin_operator_activity_logs WHERE log_id=:i"),
+            "SELECT detail, action FROM admin_operator_activity_logs WHERE log_id=:i FOR UPDATE"),
             {"i": body.log_id}).mappings().first()
         if row is None or row["action"] != "판매가 재산정":
             raise HTTPException(404, "되돌릴 재산정 기록을 찾을 수 없습니다")
@@ -271,12 +408,38 @@ def undo(body: UndoBody):
             " WHERE detail->>'ref_log_id' = CAST(:i AS TEXT)"), {"i": body.log_id}).first()
         if dup:
             raise HTTPException(409, "이미 되돌린 기록입니다")
-        detail = row["detail"] if isinstance(row["detail"], dict) else json.loads(row["detail"])
+        invalid = "되돌릴 재산정 기록의 근거가 부족합니다 — 현재 상품을 확인하세요"
+        try:
+            detail = row["detail"] if isinstance(row["detail"], dict) else json.loads(row["detail"])
+        except (TypeError, ValueError):
+            raise HTTPException(409, invalid) from None
+        if type(detail) is not dict:
+            raise HTTPException(409, invalid)
         before = detail.get("before") or []
         if not before:
             raise HTTPException(400, "이 기록에는 되돌릴 근거가 없습니다")
+        if (type(before) is not list or any(type(b) is not dict
+                or not {"pc", "sale", "after_sale", "after_locked_fields"}.issubset(b)
+                or type(b["pc"]) is not int or b["pc"] <= 0
+                or any(v is not None and type(v) is not int for v in (b["sale"], b["after_sale"]))
+                or (b["after_locked_fields"] is not None and
+                    (type(b["after_locked_fields"]) is not list
+                     or any(type(v) is not str for v in b["after_locked_fields"]))) for b in before)):
+            raise HTTPException(409, invalid)
 
         op = current_operator_id()
+        try:
+            lock_products(conn, [b["pc"] for b in before])
+        except ProductScopeChanged:
+            raise HTTPException(409, "되돌릴 상품이 변경되었습니다. 다시 조회하세요") from None
+        for b in before:
+            current = conn.execute(text(
+                "SELECT sale_price, locked_fields FROM products WHERE product_code=:pc"),
+                {"pc": b["pc"]}).mappings().first()
+            if (current is None or current["sale_price"] != b["after_sale"]
+                    or current["locked_fields"] != b["after_locked_fields"]):
+                raise HTTPException(409,
+                    "재산정 이후 다른 변경이 감지되어 되돌릴 수 없습니다 — 현재 상품을 확인하세요")
         for b in before:
             cur = conn.execute(text(
                 "SELECT sale_price FROM products WHERE product_code=:pc"),

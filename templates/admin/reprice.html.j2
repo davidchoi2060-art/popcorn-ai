@@ -339,11 +339,14 @@ a.rp-link{color:var(--rv-link)}
 
   var S = {
     scope: 'live',
-    preview: null, previewErr: null, previewBusy: false,
+    preview: null, previewErr: null, previewBusy: false, previewSeq: 0,
     note: '',
-    applyBusy: false, applyErr: null, applyErr409: null, applyOk: null,
+    applyBusy: false, applyErr: null, applyErr409: null, applyOk: null, applySeq: 0,
+    receiptBusy: false, journalError: null,
     undoArmed: null, undoBusy: {}, undoErr: {}
   };
+
+  var J = null;
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -391,7 +394,7 @@ a.rp-link{color:var(--rv-link)}
       return j;
     });
   }
-  function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+  function apiGet(path) { return fetch(path, { credentials: 'same-origin', cache: 'no-store' }).then(handle); }
   function apiSend(method, path, body) {
     return fetch(path, {
       method: method, credentials: 'same-origin',
@@ -402,6 +405,7 @@ a.rp-link{color:var(--rv-link)}
     return err.status === 401 ? '세션이 만료됐습니다 — 다시 로그인해 주세요.' : err.message;
   }
   function canOwner() { return window.Admin2Shell.canWrite('owner'); }
+  function canUndo() { return canOwner() && !!J && !J.pending() && !S.applyBusy && !S.receiptBusy; }
 
   function linkHtml(key, label) {
     var t = LINKS[key];
@@ -440,7 +444,7 @@ a.rp-link{color:var(--rv-link)}
         + r.log_id + '">정말 되돌립니까? 확인</button> '
         + '<button type="button" class="rp-btn rp-btn-ghost rp-btn-sm" data-action="undo-cancel">취소</button>';
     } else {
-      var can = canOwner();
+      var can = canUndo();
       actionCell = '<button type="button" class="rp-btn rp-btn-sm" data-action="undo-arm" data-log="' + r.log_id + '"'
         + (can ? '' : ' disabled title="관리자(owner)만 되돌릴 수 있습니다"') + '>되돌리기</button>';
     }
@@ -483,7 +487,7 @@ a.rp-link{color:var(--rv-link)}
         + '</label>';
     }).join('');
     html += '<div class="rp-actions"><button type="button" class="rp-btn rp-btn-primary" data-action="do-preview"'
-      + (S.previewBusy ? ' disabled' : '') + '>미리보기</button>';
+      + (S.previewBusy || S.applyBusy || S.applyOk ? ' disabled' : '') + '>미리보기</button>';
     if (S.previewBusy) {
       html += '<span class="rp-busy" role="status" aria-live="polite"><span class="rp-busy-sp"></span>미리보기 중…</span>';
     }
@@ -557,17 +561,45 @@ a.rp-link{color:var(--rv-link)}
 
   // ── ③ 실행 ──────────────────────────────────────────────────────
   function previewMatchesScope() { return !!S.preview && S.preview.scope === S.scope; }
+  function hasExpected(p) {
+    var e = p && p.expected;
+    return !!e && Object.keys(e).sort().join(',') === 'fingerprint,scope,version'
+      && e.version === 'reprice_basis_v2' && e.scope === p.scope
+      && typeof e.fingerprint === 'string' && e.fingerprint.length === 64
+      && /^[0-9a-f]{64}$/.test(e.fingerprint);
+  }
+  function invalidatePreview() {
+    S.previewSeq++; S.preview = null; S.previewBusy = false; S.previewErr = null;
+  }
   function canExecute() {
-    return canOwner() && !S.applyBusy && previewMatchesScope() && S.preview.changed > 0;
+    return canOwner() && !!J && !J.pending() && !S.receiptBusy && !S.applyBusy && !S.applyOk && !S.previewBusy
+      && previewMatchesScope() && hasExpected(S.preview) && S.preview.changed > 0;
+  }
+  function applyErrorHtml() {
+    if (S.journalError) return '<div class="rp-saveerr">' + esc(S.journalError) + '</div>';
+    if (J && J.pending() && !S.applyBusy) {
+      var saved = J.snapshot();
+      return '<div class="rp-safetybox"><b>실행 결과를 아직 확인하지 못했습니다.</b><br>'
+        + '요청을 실행한 계정으로 로그인한 뒤 결과를 확인하십시오. 확인 전에는 추가 실행을 할 수 없습니다.'
+        + (saved ? '<button type="button" class="rp-btn" data-action="check-operation"'
+          + (S.receiptBusy ? ' disabled' : '') + '>실행 결과 확인</button>' : '')
+        + (S.applyErr ? '<div class="rp-safetybox-detail">' + esc(S.applyErr) + '</div>' : '') + '</div>';
+    }
+    if (S.applyErr409) {
+      return '<div class="rp-safetybox"><b>미리보기 이후 값이 바뀌었습니다 — 다시 미리보기 하십시오.</b><br>'
+        + '오류가 아니라 안전장치입니다 — 미리보기와 실행 사이에 다른 누군가(또는 다른 작업)가 값을 바꿨다는 뜻입니다.'
+        + '<div class="rp-safetybox-detail">서버 응답: ' + esc(S.applyErr409) + '</div></div>';
+    }
+    return S.applyErr ? '<div class="rp-saveerr">' + esc(S.applyErr) + '</div>' : '';
   }
   function renderExecute() {
     var box = $('rpExecBody');
     if (!S.preview) {
-      box.innerHTML = '<div class="rp-impact-empty">먼저 위에서 미리보기를 하십시오.</div>';
+      box.innerHTML = applyErrorHtml() + '<div class="rp-impact-empty">먼저 위에서 미리보기를 하십시오.</div>';
       return;
     }
     if (!previewMatchesScope()) {
-      box.innerHTML = '<div class="rp-impact-empty">범위를 바꿨습니다 — 다시 미리보기 하십시오.</div>';
+      box.innerHTML = applyErrorHtml() + '<div class="rp-impact-empty">범위를 바꿨습니다 — 다시 미리보기 하십시오.</div>';
       return;
     }
     var p = S.preview;
@@ -579,7 +611,7 @@ a.rp-link{color:var(--rv-link)}
 
     if (p.changed === 0) {
       html += '<div class="rp-impact-empty">바뀔 것이 0건입니다 — 정책이 이미 반영돼 있습니다. 실행할 것이 없습니다.</div>';
-      box.innerHTML = html;
+      box.innerHTML = html + applyErrorHtml();
       return;
     }
 
@@ -594,13 +626,7 @@ a.rp-link{color:var(--rv-link)}
     html += '</div>';
     html += '<p class="rp-safety">되돌릴 수 있지만 <b>그 사이에 나간 견적은 그 값으로 나갑니다.</b></p>';
 
-    if (S.applyErr409) {
-      html += '<div class="rp-safetybox"><b>미리보기 이후 값이 바뀌었습니다 — 다시 미리보기 하십시오.</b><br>'
-        + '오류가 아니라 안전장치입니다 — 미리보기와 실행 사이에 다른 누군가(또는 다른 작업)가 값을 바꿨다는 뜻입니다.'
-        + '<div class="rp-safetybox-detail">서버 응답: ' + esc(S.applyErr409) + '</div></div>';
-    } else if (S.applyErr) {
-      html += '<div class="rp-saveerr">' + esc(S.applyErr) + '</div>';
-    }
+    html += applyErrorHtml();
     if (S.applyOk) html += '<div class="rp-savedok">' + esc(S.applyOk) + '</div>';
     box.innerHTML = html;
   }
@@ -639,37 +665,95 @@ a.rp-link{color:var(--rv-link)}
 
   // ── 동작 ────────────────────────────────────────────────────────
   function doPreview() {
-    if (S.previewBusy) return;
-    S.previewBusy = true; S.previewErr = null; renderAll();
-    apiGet('/api/admin/reprice/preview?scope=' + encodeURIComponent(S.scope)).then(function (j) {
+    if (S.previewBusy || S.applyBusy || S.applyOk) return;
+    var requestedScope = S.scope, requestId = ++S.previewSeq;
+    S.preview = null; S.previewBusy = true; S.previewErr = null;
+    S.applyErr = null; S.applyErr409 = null; renderAll();
+    apiGet('/api/admin/reprice/preview?scope=' + encodeURIComponent(requestedScope)).then(function (j) {
+      if (requestId !== S.previewSeq || requestedScope !== S.scope) return;
+      if (!j || j.scope !== requestedScope || !hasExpected(j)) {
+        throw new Error('미리보기 검증값을 받지 못했습니다 — 다시 미리보기 하십시오.');
+      }
       S.previewBusy = false; S.preview = j; S.previewErr = null;
       S.applyErr = null; S.applyErr409 = null; S.applyOk = null;
       renderAll();
     }).catch(function (err) {
-      S.previewBusy = false; S.previewErr = friendlyErr(err);
+      if (requestId !== S.previewSeq || requestedScope !== S.scope) return;
+      S.previewBusy = false; S.preview = null; S.previewErr = friendlyErr(err);
       renderAll();
     });
+  }
+  function completeOperation(saved, response, status) {
+    if (!saved || !saved.receipt) return false;
+    invalidatePreview();
+    S.applyErr = null; S.applyErr409 = null;
+    if (saved.phase === 'applied') {
+      S.applyOk = ((response && response.verdict) || '실행 결과를 확인했습니다')
+        + ' — 곧 새로고침해 「지난 회차」에 반영합니다…';
+      if (!J.storageFailed()) setTimeout(function () { location.reload(); }, 1500);
+    } else if (status === 409) {
+      S.applyErr409 = (response && response.detail) || '실행되지 않은 요청입니다 — 다시 미리보기 하십시오.';
+    } else {
+      S.applyErr = (response && response.detail) || '실행되지 않은 요청입니다 — 다시 미리보기 하십시오.';
+    }
+    return true;
   }
   function doApply() {
     if (!canExecute()) return;
-    var p = S.preview;
+    var p = S.preview, previewSeq = S.previewSeq, seq = ++S.applySeq, identity = null;
+    var payload = {scope:p.scope, expect_changed:p.changed, expected:p.expected, note:S.note || ''};
     S.applyBusy = true; S.applyErr = null; S.applyErr409 = null; S.applyOk = null; renderAll();
-    apiSend('POST', '/api/admin/reprice/apply',
-      { scope: p.scope, expect_changed: p.changed, note: (S.note || '').trim() }).then(function (j) {
+    function current() { return seq === S.applySeq && p === S.preview && previewSeq === S.previewSeq && p.scope === S.scope; }
+    return apiGet('/api/admin/reprice/operations/context').then(function (context) {
+      if (!current()) throw new Error('미리보기를 다시 확인하십시오.');
+      return J.prepare(context, payload, current);
+    }).then(function (body) {
+      identity = J.snapshot().identity;
+      return apiSend('POST', '/api/admin/reprice/apply', body);
+    }).then(function (j) {
+      if (seq !== S.applySeq) return;
       S.applyBusy = false;
-      S.applyOk = (j.verdict || '실행했습니다') + ' — 곧 새로고침해 「지난 회차」에 반영합니다…';
+      var saved = J.observe(j && j.operation_receipt, 200, identity);
+      if (!completeOperation(saved, j, 200)) {
+        invalidatePreview(); S.applyErr = '서버의 실행 결과를 확인하지 못했습니다.';
+      }
       renderAll();
-      setTimeout(function () { location.reload(); }, 1500);
     }).catch(function (err) {
+      if (seq !== S.applySeq) return;
       S.applyBusy = false;
-      if (err.status === 409) { S.applyErr409 = err.message; } else { S.applyErr = friendlyErr(err); }
+      if (identity) J.observe(null, err.status || null, identity);
+      invalidatePreview(); S.applyErr = friendlyErr(err);
       renderAll();
     });
   }
-  function armUndo(logId) { S.undoArmed = logId; renderRounds(); }
+  function checkOperation() {
+    var saved = J && J.snapshot();
+    if (!saved || S.receiptBusy || S.applyBusy) return;
+    var identity = saved.identity, seq = ++S.applySeq;
+    S.receiptBusy = true; S.applyErr = null; renderAll();
+    return apiGet('/api/admin/reprice/operations/context').then(function (context) {
+      if (seq !== S.applySeq || !J.matchesContext(context)) {
+        throw new Error('요청을 실행한 계정과 환경에서 다시 확인하십시오.');
+      }
+      return apiGet('/api/admin/reprice/operations/' + encodeURIComponent(identity.operation_id));
+    }).then(function (j) {
+      if (seq !== S.applySeq) return;
+      S.receiptBusy = false;
+      var next = J.observe(j && j.operation_receipt, 200, identity);
+      if (!completeOperation(next, j && j.response, j && j.original_http_status)) {
+        S.applyErr = '실행 결과가 아직 확인되지 않았습니다.';
+      }
+      renderAll();
+    }).catch(function (err) {
+      if (seq !== S.applySeq) return;
+      S.receiptBusy = false; J.observe(null, err.status || null, identity);
+      S.applyErr = friendlyErr(err); renderAll();
+    });
+  }
+  function armUndo(logId) { if (!canUndo()) return; S.undoArmed = logId; renderRounds(); }
   function cancelUndo() { S.undoArmed = null; renderRounds(); }
   function confirmUndo(logId) {
-    if (!canOwner() || S.undoBusy[logId]) return;
+    if (!canUndo() || S.undoBusy[logId]) return;
     S.undoArmed = null; S.undoBusy[logId] = true; S.undoErr[logId] = null; renderRounds();
     apiSend('POST', '/api/admin/reprice/undo', { log_id: logId }).then(function (j) {
       $('rpRoundBadge').textContent = (j.verdict || '되돌렸습니다') + ' — 새로고침합니다…';
@@ -687,6 +771,7 @@ a.rp-link{color:var(--rv-link)}
       var act = t.getAttribute('data-action');
       if (act === 'do-preview') doPreview();
       else if (act === 'do-apply') doApply();
+      else if (act === 'check-operation') checkOperation();
       else if (act === 'undo-arm') { if (!t.disabled) armUndo(Number(t.getAttribute('data-log'))); }
       else if (act === 'undo-cancel') cancelUndo();
       else if (act === 'undo-confirm') confirmUndo(Number(t.getAttribute('data-log')));
@@ -694,6 +779,7 @@ a.rp-link{color:var(--rv-link)}
     document.addEventListener('change', function (ev) {
       if (ev.target.name === 'rpScope') {
         S.scope = ev.target.value;
+        invalidatePreview();
         renderAll();
       }
     });
@@ -703,6 +789,19 @@ a.rp-link{color:var(--rv-link)}
   }
 
   function boot() {
+    function ready() {
+      try { J = window.RepriceOperationJournal.create(); }
+      catch (_) { S.journalError = '요청 확인 기능을 사용할 수 없습니다.'; }
+      renderAll();
+    }
+    if (window.RepriceOperationJournal) ready();
+    else {
+      var journalScript = document.createElement('script');
+      journalScript.src = '/shared/admin2/reprice-operation-journal.js';
+      journalScript.onload = ready;
+      journalScript.onerror = function () { S.journalError = '요청 확인 기능을 불러오지 못했습니다.'; renderAll(); };
+      document.head.appendChild(journalScript);
+    }
     bind();
     renderAll();                                  // 회차·범위는 즉시(서버 렌더 데이터) — 권한 확인을 기다리지 않는다
     window.Admin2Shell.meReady.then(function () { renderAll(); });   // owner 여부가 정해지면 버튼 상태를 다시 그린다
