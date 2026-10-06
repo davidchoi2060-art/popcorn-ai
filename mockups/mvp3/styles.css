@@ -247,3 +247,5 @@ body[data-screen="final"] .chat-intro p{color:#536c94}
 .live-mode .live-spec-grid>div{grid-template-columns:100px minmax(0,1fr)}
 @media(max-width:760px){.live-card-spec>div{grid-template-columns:86px minmax(0,1fr)}.live-card-spec dt,.live-card-spec dd{padding:8px 10px}.live-mode .live-spec-grid>div{grid-template-columns:80px minmax(0,1fr)}}
 .live-mode .quote-card p.warn-text,.live-mode .final-summary-price p.warn-text{color:#92510c}
+
+body.live-mode #view h2[tabindex="-1"]:focus { outline: none; }
