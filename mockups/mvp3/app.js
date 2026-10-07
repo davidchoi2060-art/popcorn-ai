@@ -119,9 +119,16 @@ function recoveryBanner(){
 function heading(title,back=true){
   return (back?button(uiIcon('arrow-left')+'이전 화면','back','back live-back'):'')+'<div class="title-row"><h2 tabindex="-1">'+title+'</h2><span class="data-note">판매 중 PC · 조회 시점 참고 금액</span></div>'+requirements();
 }
+function productImage(product,variant='thumbnail'){
+  if(!Number.isSafeInteger(product.product_code)||product.product_code<=0)return '<p class="muted">등록된 상품 사진이 없거나 불러올 수 없어요.</p>';
+  // The existing catalog-linked media route is same-origin; do not substitute
+  // the gateway example or trust an unbound external image URL from a payload.
+  const src='/api/product-images/'+product.product_code+'/'+variant;
+  return '<figure class="live-product-photo" data-product-photo><img data-product-image src="'+src+'" alt="'+esc(product.name)+' 대표 이미지" loading="lazy" decoding="async"><figcaption hidden>등록된 상품 사진이 없거나 불러올 수 없어요.</figcaption></figure>';
+}
 function productCard(product,action='detail',id=product.index){
   const rows=M.specRows(product.spec),spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
-  return '<section class="quote-card live-product-card"><span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
+  return '<section class="quote-card live-product-card">'+productImage(product)+'<span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
     '<h3>'+esc(product.name)+'</h3>'+
     '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+
     spec+
@@ -142,7 +149,7 @@ function renderResults(){
 }
 function productSummary(){
   const p=state.selected;
-  return '<section class="final-summary live-summary"><div><h3>'+esc(p.name)+'</h3><p>'+esc(state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다.':p.tag||p.level||'판매 중인 완제품 구성입니다.')+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div></section>';
+  return '<section class="final-summary live-summary">'+productImage(p,'detail')+'<div><h3>'+esc(p.name)+'</h3><p>'+esc(state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다. 이미지는 현재 등록본입니다.':p.tag||p.level||'판매 중인 완제품 구성입니다.')+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div></section>';
 }
 function productDetails(){
   const p=state.selected;
@@ -181,7 +188,7 @@ function renderFinal(){
 function renderSaved(){
   view.innerHTML=heading('내 견적',false)+'<p class="muted">이 브라우저의 보관 키로 접근하는 서버 기록입니다. 다른 기기와 회원 계정 동기화는 지원하지 않아요.</p>'+errorPanel()+
     (state.phase==='list'?'<div class="empty small-empty"><p>보관 기록을 불러오는 중이에요.</p></div>':state.error?'':state.quotes.length?
-      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card"><span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
+      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card">'+productImage(q.product)+'<span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
       '<div class="empty small-empty"><h3>보관된 견적이 없어요</h3><p>상담 후 상품을 선택하면 서버에 보관할 수 있어요.</p>'+button('상담으로 돌아가기','back','outline')+'</div>')+
     (state.hasMore?'<p class="muted">최근 20개의 보관 기록을 표시하고 있어요.</p>':'');
   actions.hidden=true;
@@ -268,6 +275,12 @@ $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
 mobile.addEventListener('change',syncChat);
+for(const type of ['load','error'])document.addEventListener(type,e=>{
+  const image=e.target;if(!(image instanceof HTMLImageElement)||!image.hasAttribute('data-product-image'))return;
+  const photo=image.closest('[data-product-photo]');if(!photo)return;
+  const failed=type==='error';image.hidden=failed;photo.classList.toggle('is-unavailable',failed);
+  photo.dataset.imageState=failed?'unavailable':'loaded';photo.querySelector('figcaption').hidden=!failed;
+},true);
 window.addEventListener('popstate',e=>{
   captureDraft();const entry=e.state;
   if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){
