@@ -6,7 +6,57 @@ const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+na
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const money=value=>Number.isInteger(value)?value.toLocaleString('ko-KR')+'원':'금액 미확인';
 const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state;
-let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='';
+let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='',enteringRoute=true;
+const draft={version:1,start_mode:null,usage_choice:null,budget_won:null,budget_bound:null,draft_text:'',draft_edited:false};
+const ui={surface:!location.hash||location.hash==='#start'?'gateway':location.hash==='#purpose'?'usage':'consultation',epoch:window.crypto.randomUUID?window.crypto.randomUUID():Array.from(window.crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16)).join('-')};
+const workspace=$('.workspace'),gateway=document.createElement('main'),toolbar=document.createElement('nav');
+gateway.id='gateway-root';gateway.className='gateway-root';gateway.setAttribute('aria-label','시작방식 선택');
+toolbar.className='gateway-route-toolbar';toolbar.setAttribute('aria-label','시작 경로');
+workspace.before(gateway,toolbar);
+const productsButton=document.createElement('button');productsButton.type='button';productsButton.dataset.action='gateway-products';productsButton.className='gateway-products';productsButton.textContent='상품 보기';$('.topbar nav').prepend(productsButton);
+$('.brand').dataset.action='gateway';
+const usageLabels={game:'게임',edit:'영상 편집',office:'사무',unknown:'아직 모르겠어요'};
+const screenNames=['welcome','results','detail','final','saved'];
+function draftSummary(){return (usageLabels[draft.usage_choice]||'용도 미정')+' · '+(draft.budget_won?draft.budget_won/10000+'만원 이하':'예산 미정');}
+function generatedDraft(){
+  const known=draft.usage_choice&&draft.usage_choice!=='unknown';
+  if(!known&&draft.budget_won===null)return '어떤 PC가 좋을지 함께 정하고 싶어요.';
+  return (known?(draft.usage_choice==='office'?'문서 작업과 일상 업무':usageLabels[draft.usage_choice])+'에 쓸 PC를 찾고 있어요.':'어떤 PC가 좋을지 함께 정하고 싶어요.')+' '+(draft.budget_won===null?'예산은 아직 정하지 않았어요.':'예산은 '+draft.budget_won/10000+'만원 이하예요.');
+}
+function captureDraft(){draft.draft_text=$('#request').value;}
+function setDraft(text,edited=false){draft.draft_text=text;draft.draft_edited=edited;$('#request').value=text;}
+function refreshDraft(){if(!draft.draft_edited)setDraft(generatedDraft());}
+function uiHash(){return ui.surface==='gateway'?'#start':ui.surface==='usage'?'#purpose':'#'+state.screen;}
+function uiEntry(){return {screen:state.screen,surface:ui.surface,ui_epoch:ui.epoch};}
+function showSurface(surface,{push=true,focus=true}={}){
+  captureDraft();
+  if(ui.surface===surface){render();if(focus)focusSurface();return;}
+  // Direct #welcome and actual result entries also need a UI-only return anchor
+  // before opening gateway/usage; otherwise Back delegates to cancel/navigate.
+  if(push)history.replaceState(uiEntry(),'',location.hash);
+  ui.surface=surface;
+  if(push)history.pushState(uiEntry(),'',uiHash());
+  render();if(focus)focusSurface();
+}
+function focusSurface(){
+  if(ui.surface==='consultation'){chatPreference=true;syncChat();if(!state.phase)$('#request').focus({preventScroll:true});else view.querySelector('h2')?.focus({preventScroll:true});}
+  else{gateway.querySelector('h1')?.focus({preventScroll:true});window.scrollTo(0,0);}
+}
+function renderGateway(){
+  const icon=name=>uiIcon(name),arrow=icon('arrow-right');
+  if(ui.surface==='gateway')gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
+    [['game-controller','용도부터 시작하기','게임, 작업, 일상 중 필요한 용도부터 골라요.','예산은 아직 몰라도 괜찮아요.','gateway-use'],['chat-circle','바로 상담하기','원하는 사양이나 조건을 자유롭게 이야기해 주세요.','생각해 둔 조건부터 말해 주세요.','gateway-direct']].map(([image,title,text,small,action])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><small>'+small+'</small><span class="entry-action">'+title+' '+arrow+'</span>',action,'entry-card')).join('')+'</div><p class="change-note">선택한 방식은 언제든 바꿀 수 있어요.</p>'+(draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</section>';
+  else gateway.innerHTML=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+
+    [['game','game-controller','즐겨 하는 게임에 쓸 PC예요.'],['edit','video-camera','영상 편집과 작업에 쓸 PC예요.'],['office','monitor','문서 작업과 일상 업무에 써요.'],['unknown','question','어떤 용도가 좋을지 함께 정해요.']].map(([value,image,text])=>button(icon(image)+'<strong>'+usageLabels[value]+'</strong><span>'+text+'</span>','gateway-usage','','data-usage="'+value+'" aria-pressed="'+(draft.usage_choice===value)+'"')).join('')+'</div></fieldset><div class="budget-controls"><label for="gateway-budget">예산은 어느 정도인가요?</label><select id="gateway-budget"><option value="">예산 미정도 괜찮아요</option>'+[100,150,200,250].map(n=>'<option value="'+n+'" '+(draft.budget_won===n*10000?'selected':'')+'>'+n+'만원 이하</option>').join('')+'</select></div><p class="condition-summary" aria-live="polite">'+draftSummary()+'</p>'+button('이 조건으로 상담 시작 '+arrow,'gateway-begin','gateway-button')+'</div><figure class="purpose-image"><img src="assets/gateway-pc-example.png" alt="PC 본체 예시 이미지"><figcaption>예시 이미지 · 실제 추천 상품과 다를 수 있어요.</figcaption></figure></section>';
+  gateway.insertAdjacentHTML('beforeend','<footer class="gateway-footer"><span class="gateway-brand"><img src="assets/popcorn-mark.png" alt=""><strong>팝콘AI</strong></span><small>나에게 맞는 PC를 함께 찾아요.</small></footer>');
+}
+function renderSurface(){
+  const consultation=ui.surface==='consultation';document.body.dataset.surface=ui.surface;workspace.hidden=!consultation;gateway.hidden=consultation;toolbar.hidden=!consultation;
+  $('.topbar [data-action="new"]').hidden=!consultation;productsButton.hidden=consultation;
+  if(!consultation)renderGateway();
+  toolbar.innerHTML=(draft.start_mode==='use_first'?button(uiIcon('arrow-left')+' 용도 선택으로 돌아가기','gateway-use',''):'<span></span>')+button('시작방식 바꾸기','gateway','');
+  if(consultation&&(draft.start_mode==='use_first'||draft.usage_choice||draft.budget_won))view.insertAdjacentHTML('afterbegin','<section class="draft-context"><strong>상담 초안</strong><p>'+draftSummary()+'</p><p>선택한 조건을 입력창에서 확인하고 수정해 주세요.</p>'+button('선택 조건으로 초안 바꾸기','gateway-rebuild','',''+(state.phase?'disabled':''))+'</section>');
+}
 function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('#notice').hidden=true,7000);}
 function budget(product,talk=state.selectionState||state.talk){
   const won=talk?.budget_won;
@@ -139,6 +189,7 @@ function renderSaved(){
 function renderWelcome(){view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header><section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
 function render(){
   const changed=lastScreen!==state.screen,openDetails=[...view.querySelectorAll('details[open]')].map(e=>e.dataset.detail),scroll=view.scrollTop,focused=document.activeElement?.dataset.action;
+  const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
   document.body.dataset.screen=state.screen;document.body.classList.add('live-mode');document.body.classList.toggle('original-flow',['welcome','results','detail','final'].includes(state.screen));
   view.dataset.screen=state.screen;
   if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());}
@@ -147,21 +198,55 @@ function render(){
   else if(state.screen==='final'&&state.selected)renderFinal();
   else if(state.screen==='saved')renderSaved();
   const recovery=recoveryBanner();if(recovery)view.insertAdjacentHTML('afterbegin',recovery);
-  renderMessages();syncChat();
-  if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled)?.focus({preventScroll:true});}
-  else{view.scrollTop=0;view.querySelector('h2')?.focus({preventScroll:true});if(mobile.matches)window.scrollTo(0,0);}
-  if(lastScreen!==state.screen&&location.hash!=='#'+state.screen)history.pushState({screen:state.screen},'','#'+state.screen);
+  renderMessages();syncChat();renderSurface();
+  if(ui.surface==='consultation'){
+    if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled)?.focus({preventScroll:true});}
+    else{view.scrollTop=0;view.querySelector('h2')?.focus({preventScroll:true});if(mobile.matches)window.scrollTo(0,0);}
+    if(!enteringRoute&&lastScreen!==state.screen&&location.hash!=='#'+state.screen)history.pushState({screen:state.screen},'','#'+state.screen);
+  }else{
+    if(!enteringRoute)history.replaceState(uiEntry(),'',uiHash());
+    const target=gatewayFocus?.id?$('#'+gatewayFocus.id):gatewayFocus?.usage?gateway.querySelector('[data-usage="'+gatewayFocus.usage+'"]'):gatewayFocus?.action?gateway.querySelector('[data-action="'+gatewayFocus.action+'"]'):gatewayFocus?.heading?gateway.querySelector('h1'):null;
+    target?.focus({preventScroll:true});
+  }
   lastScreen=state.screen;
   clearTimeout(retryTimer);if(state.error?.retryAt>Date.now())retryTimer=setTimeout(()=>render(),1000);
 }
+function openSaved(){ui.surface='consultation';if(state.screen==='saved'&&state.phase==='list'){render();return;}void flow.list();}
+function enterRoute(hash,initial=false){
+  enteringRoute=true;
+  try{
+    if(initial)flow.reset();
+    if(initial&&(!hash||hash==='#start'||hash==='#purpose')){
+      ui.surface=hash==='#purpose'?'usage':'gateway';history.replaceState(uiEntry(),'',uiHash());render();return;
+    }
+    ui.surface='consultation';let screen=hash.slice(1);
+    if(!screenNames.includes(screen)||(['detail','final'].includes(screen)&&!state.selected)||(screen==='results'&&!state.recommendation))screen='welcome';
+    if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
+    if(screen==='saved')openSaved();else flow.navigate(screen);
+  }finally{enteringRoute=false;}
+}
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
-function submit(text){if(!String(text||'').trim()){notice('원하는 조건을 입력해주세요.');$('#request').focus();return;}
-  if(text.trim().length>300){notice('상담 요청은 300자 이내로 입력해주세요.');return;}void flow.submit(text);}
+async function submit(text,{fromInput=false}={}){if(!String(text||'').trim()){notice('원하는 조건을 입력해주세요.');$('#request').focus();return;}
+  if(text.trim().length>300){notice('상담 요청은 300자 이내로 입력해주세요.');return;}
+  if(state.phase)return;
+  const sent=text.trim();await flow.submit(text);
+  // submit() also returns true after errors. Only validated conversation history
+  // with no current error permits clearing the unchanged, visible input.
+  if(fromInput&&ui.surface==='consultation'&&!state.error&&state.history.some(x=>x.role==='user'&&x.text===sent)&&draft.draft_text===text)setDraft('');
+}
 document.addEventListener('click',e=>{
-  const b=e.target.closest('[data-action]');if(!b||b.disabled)return;
+  const b=e.target.closest('[data-action]');if(!b||b.disabled)return;e.preventDefault();
   switch(b.dataset.action){
-    case 'new':chatPreference=null;lastMessages='';$('#request').value='';flow.reset();break;
-    case 'saved':void flow.list();break;
+    case 'gateway':showSurface('gateway');break;
+    case 'gateway-use':draft.start_mode='use_first';showSurface('usage');break;
+    case 'gateway-direct':draft.start_mode='direct';showSurface('consultation');break;
+    case 'gateway-continue':showSurface('consultation');break;
+    case 'gateway-usage':captureDraft();draft.usage_choice=draft.usage_choice===b.dataset.usage?null:b.dataset.usage;if(!draft.draft_edited)refreshDraft();render();gateway.querySelector('[data-usage="'+b.dataset.usage+'"]')?.focus({preventScroll:true});break;
+    case 'gateway-begin':draft.start_mode='use_first';if(!draft.draft_edited)refreshDraft();showSurface('consultation');break;
+    case 'gateway-rebuild':refreshDraftExplicitly();break;
+    case 'gateway-products':if(state.recommendation){showSurface('consultation',{focus:false});flow.navigate('results');}else{showSurface('consultation');notice('원하는 용도와 예산을 상담창에 알려주시면 추천 상품을 확인할 수 있어요.');}break;
+    case 'new':chatPreference=null;lastMessages='';Object.assign(draft,{start_mode:null,usage_choice:null,budget_won:null,budget_bound:null});setDraft('');ui.surface='consultation';flow.reset();break;
+    case 'saved':captureDraft();openSaved();break;
     case 'prompt':submit(b.dataset.text);break;
     case 'detail':flow.select(Number(b.dataset.id));break;
     case 'final':flow.navigate('final');break;
@@ -173,13 +258,21 @@ document.addEventListener('click',e=>{
     case 'load':flow.load(b.dataset.id);break;
     case 'retry':void flow.retry();break;
     case 'attachment':notice('파일 첨부는 아직 지원하지 않아요. 필요한 조건을 글로 알려주세요.');break;
-    case 'conditions':chatPreference=true;syncChat();$('#request').value='';$('#request').focus({preventScroll:true});if(mobile.matches)$('#chat-toggle').scrollIntoView({block:'start'});notice('바꿀 예산이나 용도를 상담창에 알려주세요. 실제 추천을 다시 조회해요.');break;
+    case 'conditions':chatPreference=true;syncChat();$('#request').focus({preventScroll:true});if(mobile.matches)$('#chat-toggle').scrollIntoView({block:'start'});notice('바꿀 예산이나 용도를 상담창에 알려주세요. 실제 추천을 다시 조회해요.');break;
   }
 });
-$('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;const text=$('#request').value;if(text.trim()&&text.trim().length<=300){$('#request').value='';submit(text);}else submit(text);});
+function refreshDraftExplicitly(){setDraft(generatedDraft());$('#request').focus({preventScroll:true});}
+document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captureDraft();const n=Number(e.target.value);draft.budget_won=[100,150,200,250].includes(n)?n*10000:null;draft.budget_bound=draft.budget_won===null?null:'이하';if(!draft.draft_edited)refreshDraft();render();$('#gateway-budget')?.focus({preventScroll:true});}});
+$('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
+$('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;captureDraft();void submit(draft.draft_text,{fromInput:true});});
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
 mobile.addEventListener('change',syncChat);
-window.addEventListener('popstate',()=>{const screen=location.hash.slice(1);if(['welcome','results','detail','final','saved'].includes(screen))flow.navigate(screen);});
-flow.reset();
+window.addEventListener('popstate',e=>{
+  captureDraft();const entry=e.state;
+  if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){
+    enteringRoute=true;try{ui.surface=entry.surface;render();history.replaceState(uiEntry(),'',uiHash());focusSurface();}finally{enteringRoute=false;}
+  }else enterRoute(location.hash);
+});
+enterRoute(location.hash,true);focusSurface();
 })();
