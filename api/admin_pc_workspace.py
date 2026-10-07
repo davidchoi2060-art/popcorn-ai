@@ -67,15 +67,20 @@ class Proposal(BaseModel):
 def task_for(row):
     if row['status'] == 'retired' or row['management_state'] == 'excluded':
         return None
+    reasons = []
     if row.get('market_alerts'):
-        kind, reason = 'price', '가격·판매 조건 확인'
-    elif not row['description_ready']:
-        kind, reason = 'copy', '상품 설명 또는 부품 설명 보완'
-    elif row.get('review_state') != 'approved' or row['needs_review']:
-        kind, reason = 'review', (row.get('review_reasons') or ['검토 기록 작성 필요'])[0]
-    else:
+        reasons.append(dict(kind='price', text='가격·판매 조건 확인'))
+    if not row['description_ready']:
+        reasons.append(dict(kind='copy', text='상품 설명 또는 부품 설명 보완'))
+    if row.get('review_state') != 'approved' or row['needs_review']:
+        for reason in dict.fromkeys(row.get('review_reasons') or ['검토 기록 작성 필요']):
+            reasons.append(dict(kind='review', text=reason))
+    if not reasons:
         return None
-    return dict(row, task_kind=kind, task_reason=reason)
+    # Preserve the primary action for existing consumers; one product can need several kinds of work.
+    return dict(row, task_kind=reasons[0]['kind'], task_reason=reasons[0]['text'],
+                task_kinds=list(dict.fromkeys(reason['kind'] for reason in reasons)),
+                task_reasons=reasons)
 
 
 def source_context(d):
@@ -127,7 +132,8 @@ def tasks():
         rows = catalog_rows(conn)
     items = [t for row in rows if (t := task_for(row))]
     items.sort(key=lambda r: (r['task_kind'] != 'price', r['status'] != 'review_required', r['configuration_id']))
-    return dict(items=items, catalog_total=len(rows), counts={k:sum(t['task_kind']==k for t in items) for k in ('review','copy','price')})
+    return dict(items=items, catalog_total=len(rows),
+                counts={k:sum(k in t['task_kinds'] for t in items) for k in ('review','copy','price')})
 
 
 @router.post('/api/admin/pc-configurations/{identity}/ai-proposals')

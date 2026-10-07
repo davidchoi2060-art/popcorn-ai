@@ -71,6 +71,24 @@ def _log(conn, action: str, target_id: str, detail: dict, kind: str = "order") -
                      operator_id=current_operator_id)
 
 
+def _commerce_order_ids(conn, order_ids):
+    """신규 주문 소속은 0126 FK 원천으로만 확인한다. 조회 실패는 전파한다."""
+    if not order_ids:
+        return set()
+    if conn.execute(text(
+            "SELECT pg_catalog.to_regclass('public.commerce_order_details')")).scalar() is None:
+        return set()
+    return {r[0] for r in conn.execute(text(
+        "SELECT order_id FROM public.commerce_order_details WHERE order_id = ANY(:ids)"),
+        {"ids": list(order_ids)})}
+
+
+def _guard_legacy_order(conn, order_id):
+    if order_id in _commerce_order_ids(conn, [order_id]):
+        raise HTTPException(409, {"error": "commerce_order_requires_new_workflow",
+                                  "detail": "신규 내부 주문은 신규 주문 업무 화면에서 처리하세요"})
+
+
 @router.get("/orders")
 def list_orders(date_from: str | None = None, date_to: str | None = None):
     # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
@@ -91,6 +109,8 @@ def list_orders(date_from: str | None = None, date_to: str | None = None):
             " FROM orders o LEFT JOIN members m USING (member_id)"
             " WHERE TRUE" + _RANGE +
             " ORDER BY o.created_at DESC, o.order_id DESC"), _p).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [o["order_id"] for o in orders])
+        orders = [o for o in orders if o["order_id"] not in commerce_ids]
         items_by = {}
         for r in conn.execute(text(
                 "SELECT order_id, item_kind, name_snap, price_snap, qty, spec_snap"
@@ -168,6 +188,7 @@ def _advance_one(conn, o, order_no: str, action: str):
     여기서 한다 — 단건은 그대로 오류가 되고, 일괄은 미리 걸러 부르므로 걸리지 않는다.
     """
     expect, target = TRANSITIONS[action]
+    _guard_legacy_order(conn, o["order_id"])
     _guard_refund(conn, o["order_id"])
     if o["status"] != expect:
         raise HTTPException(409, {"error": "invalid_transition",
@@ -257,6 +278,7 @@ def bulk_advance(body: BulkAdvanceBody):
             "SELECT order_id, order_no, status, ops_snapshot FROM orders"
             " WHERE order_no = ANY(:n) ORDER BY order_id FOR UPDATE"),
             {"n": nos}).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [o["order_id"] for o in rows])
         found = {r["order_no"] for r in rows}
         for miss in [x for x in nos if x not in found]:
             skipped.append({"no": miss, "why": "없는 주문"})
@@ -266,6 +288,9 @@ def bulk_advance(body: BulkAdvanceBody):
             {"st": list(ACTIVE_REFUND)})}
 
         for o in rows:
+            if o["order_id"] in commerce_ids:
+                skipped.append({"no": o["order_no"], "why": "신규 내부 주문 — 신규 주문 업무 화면에서 처리하세요"})
+                continue
             if o["status"] != expect:
                 skipped.append({"no": o["order_no"],
                                 "why": f"'{o['status']}' 상태 — '{expect}'에서만 됩니다"})
@@ -299,6 +324,7 @@ def undo(log_id: int):
         o = conn.execute(text(
             "SELECT order_id, status FROM orders WHERE order_id=:o FOR UPDATE"),
             {"o": d["order_id"]}).mappings().one()
+        _guard_legacy_order(conn, o["order_id"])
         if o["status"] != d["to"]:
             raise HTTPException(409, "이미 되돌렸거나 이후 상태가 변경됐습니다")
         _guard_refund(conn, o["order_id"])

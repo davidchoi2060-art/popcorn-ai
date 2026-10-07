@@ -123,6 +123,9 @@ def _new_session(conn, member_id: int, ua: str | None) -> str:
 def resolve_session(sid: str) -> dict | None:
     """세션 검증. 시각 비교는 전부 DB now()로 한다(슬라이스 37에서 겪은 함정 — 로컬
     KST와 DB UTC를 비교하면 방금 만든 세션도 만료로 오판된다)."""
+    # 기존 세션에는 본인 확인 발급 근거가 없다. 검증된 발급기가 준비되기 전에는
+    # 회원 주체를 해석하거나 DB 조회·last_seen 갱신을 하지 않는다.
+    return None
     if not sid:
         return None
     with engine.begin() as conn:
@@ -147,7 +150,21 @@ async def member_middleware(request: Request, call_next):
     path = request.url.path
     token = _current.set(None)
     try:
-        if not path.startswith(OPEN_PREFIXES):
+        if (path != "/api/commerce/owner-context"
+                and not (request.method == "GET" and len(path.split("/")) == 5
+                         and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                         and path.split("/")[4] != "")
+                and not (len(path.split("/")) in (6, 7)
+                         and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                         and path.split("/")[4] != ""
+                         and path.split("/")[5] == "support"
+                         and (len(path.split("/")) == 6 or path.split("/")[6] == ""))
+                and not (request.method == "GET" and len(path.split("/")) in (6, 7)
+                         and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                         and path.split("/")[4] != ""
+                         and path.split("/")[5] == "fulfillment"
+                         and (len(path.split("/")) == 6 or path.split("/")[6] == ""))
+                and not path.startswith(OPEN_PREFIXES)):
             # 동기 DB 호출(engine.begin())을 스레드풀로 넘긴다 — 미들웨어는 항상
             # 이벤트 루프에서 돌아 라우트처럼 자동 오프로드되지 않는다(2026-08-15).
             # resolve_session() 본체는 그대로 두고 부르는 방식만 바꾼다.
@@ -175,6 +192,10 @@ def login(body: LoginBody, request: Request, response: Response):
     email = (body.email or "").strip().lower()
     if "@" not in email:
         raise HTTPException(400, "이메일 형식이 올바르지 않습니다")
+    # 이메일/provider 표시나 기존 dev 세션은 본인 확인 증거가 아니다.
+    # 실신원 발급기가 준비되기 전에는 방문자·회원·세션·쿠키를 쓰지 않는다.
+    raise HTTPException(503, {"error": "auth_unavailable",
+                              "detail": "회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다."})
     via = VIA.get(body.provider, "email")
     with engine.begin() as conn:
         m = conn.execute(text(
@@ -224,7 +245,5 @@ def logout(request: Request, response: Response):
 def me(request: Request):
     m = resolve_session(request.cookies.get(COOKIE, ""))
     return {"authenticated": m is not None, "member": m,
-            "note": ("신원 확인은 현재 dev 어댑터입니다(입력 이메일을 신원으로 신뢰) —"
-                     " 카카오·네이버·구글 연동 시 검증부만 교체되며 세션 로직은 그대로입니다."
-                     " **로컬 전용 — 공개 배포 차단 사유.**"
-                     " 상담·추천·주문은 로그인 없이도 됩니다(게스트 유지).")}
+            "note": ("회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다."
+                     " 상담·추천은 로그인 없이 이용할 수 있습니다.")}

@@ -568,6 +568,7 @@ def new_admin_nav(current_path=''):
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
         ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
+        ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders',)),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members',)),
         ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/product-fit')),
         ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/handoff-log', '/admin2/swap-click-logs')),

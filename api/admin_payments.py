@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
 from .timeutil import iso, kst_day_range, range_sql
-from .admin_orders import _log
+from .admin_orders import _log, _commerce_order_ids
 from .auth import current_operator_id
 from .db import engine
 
@@ -47,6 +47,17 @@ def _rate(conn) -> Decimal:
         " ORDER BY effective_from DESC LIMIT 1")).scalar_one()
 
 
+def _commerce_batch_ids(conn, batch_ids):
+    """현재 배치의 실제 결제 소속을 조회한다. 로그의 payment_ids는 근거가 아니다."""
+    if not batch_ids:
+        return set()
+    memberships = conn.execute(text(
+        "SELECT s.batch_id, p.order_id FROM settlements s JOIN payments p USING (payment_id)"
+        " WHERE s.batch_id = ANY(:ids)"), {"ids": list(batch_ids)}).mappings().all()
+    commerce_ids = _commerce_order_ids(conn, [r["order_id"] for r in memberships])
+    return {r["batch_id"] for r in memberships if r["order_id"] in commerce_ids}
+
+
 @router.get("/payments")
 def list_payments(date_from: str | None = None, date_to: str | None = None):
     # 기간은 **서울 날짜**로 받는다 — 변환은 `timeutil` 하나가 한다(9시간 함정).
@@ -64,7 +75,7 @@ def list_payments(date_from: str | None = None, date_to: str | None = None):
         rate = _rate(conn)
         today = conn.execute(text("SELECT CURRENT_DATE")).scalar_one()
         pays = conn.execute(text(
-            "SELECT p.payment_id, o.order_no, p.pay_mode, p.method, p.pg_ref,"
+            "SELECT p.payment_id, p.order_id, o.order_no, p.pay_mode, p.method, p.pg_ref,"
             " p.amount, p.status, p.paid_at"
             " FROM payments p JOIN orders o USING (order_id)"
             " WHERE TRUE" + _RANGE +
@@ -74,10 +85,14 @@ def list_payments(date_from: str | None = None, date_to: str | None = None):
             " FROM settlement_batches ORDER BY settle_date DESC")).mappings().all()
         # 정산 대상 결제 일자별 원본(대기 파생 + late 판정 공용) — settlements 소속 여부 포함
         rows = conn.execute(text(
-            "SELECT p.payment_id, p.amount, p.status, date(p.paid_at) AS d,"
+            "SELECT p.payment_id, p.order_id, p.amount, p.status, date(p.paid_at) AS d,"
             " s.settlement_id IS NOT NULL AS settled"
             " FROM payments p LEFT JOIN settlements s USING (payment_id)"
             f" WHERE {TARGET} AND p.paid_at IS NOT NULL")).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [p["order_id"] for p in pays + rows])
+        pays = [p for p in pays if p["order_id"] not in commerce_ids]
+        rows = [r for r in rows if r["order_id"] not in commerce_ids]
+        commerce_batch_ids = _commerce_batch_ids(conn, [b["batch_id"] for b in batches])
 
     by_day: dict = {}
     for r in rows:
@@ -86,6 +101,8 @@ def list_payments(date_from: str | None = None, date_to: str | None = None):
 
     settles = []
     for b in batches:
+        if b["batch_id"] in commerce_batch_ids:
+            continue  # 마감 일자는 closed_days에 남겨 가짜 대기 배치를 만들지 않는다.
         late = [r for r in by_day.get(b["settle_date"], []) if not r["settled"]]
         settles.append({
             "date": iso(b["settle_date"]), "state": b["status"],
@@ -125,9 +142,11 @@ def close_settlement(settle_date: str):
     with engine.begin() as conn:
         rate = _rate(conn)
         targets = conn.execute(text(
-            "SELECT p.payment_id, p.pay_mode, p.amount FROM payments p"
+            "SELECT p.payment_id, p.order_id, p.pay_mode, p.amount FROM payments p"
             f" WHERE {TARGET} AND date(p.paid_at)=:d"
             " ORDER BY p.payment_id FOR UPDATE"), {"d": settle_date}).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [t["order_id"] for t in targets])
+        targets = [t for t in targets if t["order_id"] not in commerce_ids]
         if not targets:
             raise HTTPException(400, "해당 일자에 정산 대상 결제가 없습니다")
         items = [{"payment_id": t["payment_id"], "mode": t["pay_mode"],
@@ -182,6 +201,9 @@ def undo_settlement(log_id: int):
         if b is None or b["status"] != "마감" or b["gross"] != d["gross"] \
                 or b["fee"] != d["fee"] or b["net"] != d["net"]:
             raise HTTPException(409, "마감 이후 정산 원장이 변경되어 되돌릴 수 없습니다")
+        if b["batch_id"] in _commerce_batch_ids(conn, [b["batch_id"]]):
+            raise HTTPException(409, {"error": "commerce_settlement_requires_new_workflow",
+                                      "detail": "신규 내부 결제가 포함된 배치는 신규 정산 업무에서 처리하세요"})
         conn.execute(text("DELETE FROM settlements WHERE batch_id=:b"), {"b": b["batch_id"]})
         conn.execute(text("DELETE FROM settlement_batches WHERE batch_id=:b"), {"b": b["batch_id"]})
         _log(conn, "settlement_close_undo", str(log_id),

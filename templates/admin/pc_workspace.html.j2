@@ -1,7 +1,7 @@
 {% extends "admin/_admin2_shell.html.j2" %}
 {% block title %}처리할 일 · AI 도움{% endblock %}
 {% block head_extra %}
-<link rel="stylesheet" href="/shared/pc-workspace.css?v=20261006-inline1">
+<link rel="stylesheet" href="/shared/pc-workspace.css?v=20261007-reasons-inline1">
 <link rel="stylesheet" href="/shared/pc-sales-conditions.css?v=20261003-sales1">
 <link rel="stylesheet" href="/shared/part-explanations.css">
 <link rel="stylesheet" href="/shared/pc-configuration-detail.css">
@@ -16,6 +16,7 @@
   <h1>처리할 일</h1><label class="pcw-search">상품·사유 검색<input id="pcw-search" type="search" maxlength="100" placeholder="상품명, 부품명, 확인할 내용"></label>
   <div id="pcw-filters" class="pcw-filters" aria-label="작업 분류"></div>
   <p id="pcw-count" role="status"></p><div id="pcw-tasks"></div>
+  <p class="pcw-help">한 제품에 필요한 일을 함께 표시합니다. 분류별 제품 수는 겹칠 수 있습니다.</p>
   <a class="pcw-list-link" href="/admin2/pc-batch">AI 일괄 보완 →</a>
   <a class="pcw-list-link" href="/admin2/pc-configurations">전체 조립PC 제품군 보기 →</a>
  </aside>
@@ -28,5 +29,5 @@
 {% endblock %}
 {% block foot_extra %}
 <script src="/shared/pc-sales-conditions.js?v=20261003-sales1"></script>
-<script src="/shared/part-explanations.js"></script><script src="/shared/pc-description-editor.js"></script><script src="/shared/pc-parts-editor.js?v=20261006-inline1"></script><script src="/shared/pc-quote-assembly.js"></script><script src="/shared/pc-review-editor.js?v=20261006-inline1"></script><script src="/shared/pc-configuration-detail.js?v=20261006-inline1"></script><script src="/shared/pc-workspace.js?v=20261006-inline1"></script>
+<script src="/shared/part-explanations.js"></script><script src="/shared/pc-description-editor.js"></script><script src="/shared/pc-parts-editor.js?v=20261006-inline1"></script><script src="/shared/pc-quote-assembly.js"></script><script src="/shared/pc-review-editor.js?v=20261006-inline1"></script><script src="/shared/pc-configuration-detail.js?v=20261006-inline1"></script><script src="/shared/pc-workspace.js?v=20261007-reasons-inline1"></script>
 {% endblock %}

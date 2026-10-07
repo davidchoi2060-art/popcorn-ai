@@ -86,6 +86,75 @@ def read_configuration(conn, identity):
                 recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
                 sales_conditions=effective_conditions(r,parts,offers),customer_publishable=False,price_is_snapshot=True)
 
+def read_sold_offer_configuration(conn, product_code):
+    """Internal/admin read through a registered P offer, never a public sale basis.
+
+    Caller supplies an authorized connection and its snapshot/isolation scope.
+    Comparing observed identity/revision/hash values detects some inter-read
+    changes; this does not prove a shared MVCC snapshot or price/stock freshness.
+    Existing stale/needs_review findings remain in the private detail unchanged.
+    """
+    if type(product_code) is not int or product_code <= 0:
+        raise HTTPException(422, '완제품 상품번호는 양의 정수여야 합니다.')
+    offer_id = f'P{product_code}'
+    found = conn.execute(text('''SELECT o.offer_id,o.configuration_id,o.price_snapshot,o.payload,
+        c.revision,c.bom_fingerprint,c.content_hash,c.copy_hash
+        FROM pc_configuration_offers o JOIN pc_configurations c
+          ON c.configuration_id=o.configuration_id
+        WHERE o.offer_id=:offer'''), dict(offer=offer_id)).mappings().first()
+    if found is None:
+        raise HTTPException(404, '등록된 완제품 구성 연결이 없습니다.')
+    bound = dict(found)
+
+    def mismatch():
+        raise HTTPException(409, '완제품 구성 연결 또는 현재 근거를 다시 확인해 주세요.')
+
+    identity = bound.get('configuration_id')
+    payload = bound.get('payload')
+    if (bound.get('offer_id') != offer_id or not isinstance(identity, str) or not identity.strip()
+            or not isinstance(payload, dict) or payload.get('id') != offer_id
+            or ('quote_only' in payload and payload['quote_only'] is not False)
+            or type(bound.get('price_snapshot')) is not int or bound['price_snapshot'] <= 0
+            or type(bound.get('revision')) is not int or bound['revision'] <= 0):
+        mismatch()
+    for key in ('bom_fingerprint', 'content_hash', 'copy_hash'):
+        if not isinstance(bound.get(key), str) or re.fullmatch(r'[a-f0-9]{64}', bound[key]) is None:
+            mismatch()
+
+    detail = read_configuration(conn, identity)
+    if not isinstance(detail, dict) or detail.get('configuration_id') != identity:
+        mismatch()
+    if type(detail.get('revision')) is not int or any(
+            detail.get(key) != bound[key] for key in ('revision', 'bom_fingerprint', 'content_hash', 'copy_hash')):
+        mismatch()
+    content = detail.get('content')
+    sources = content.get('source_ids') if isinstance(content, dict) else None
+    if (not isinstance(content, dict) or content.get('source') != '기존'
+            or not isinstance(sources, list) or not all(isinstance(s, str) and s for s in sources)
+            or offer_id not in sources):
+        mismatch()
+    offers = detail.get('offers')
+    if not isinstance(offers, list):
+        mismatch()
+    matching = [o for o in offers if isinstance(o, dict) and o.get('offer_id') == offer_id]
+    if (len(matching) != 1 or type(matching[0].get('price_snapshot')) is not int
+            or any(matching[0].get(key) != bound[key] for key in ('configuration_id', 'price_snapshot'))
+            or not isinstance(matching[0].get('payload'), dict)
+            or digest(matching[0]['payload']) != digest(payload)):
+        mismatch()
+    review = detail.get('current_review')
+    if (not isinstance(review, dict) or review.get('configuration_id') != identity
+            or type(review.get('revision')) is not int or review['revision'] != bound['revision']
+            or not isinstance(review.get('basis'), str) or re.fullmatch(r'[a-f0-9]{64}', review['basis']) is None
+            or detail.get('customer_publishable') is not False or detail.get('price_is_snapshot') is not True
+            or type(detail.get('needs_review')) is not bool):
+        mismatch()
+    return dict(product_code=product_code, offer_id=offer_id, configuration_id=identity,
+                revision=bound['revision'], bom_fingerprint=bound['bom_fingerprint'],
+                content_hash=bound['content_hash'], copy_hash=bound['copy_hash'],
+                customer_publishable=False, price_is_snapshot=True, detail=detail)
+
+
 def catalog_rows(conn):
     """Bulk read once; evaluate the same source-review rule used by detail reads."""
     rows=conn.execute(text('SELECT * FROM pc_configurations ORDER BY configuration_id')).mappings().all()

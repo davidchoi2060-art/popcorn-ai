@@ -1,0 +1,32 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+{% block title %}주문 운영{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/admin-commerce-orders.css?v=20261006-flows-1"><link rel="stylesheet" href="/shared/admin-commerce-support.css?v=20261005-1">{% endblock %}
+{% block content %}
+<main class="aco" id="commerce-orders">
+  <header class="aco-heading"><h1>주문 운영</h1><p>주문·결제·재고 배정·환불 상태를 각각 확인합니다.</p></header>
+  <div class="aco-connection aco-query-status"><p id="aco-connection" role="status" aria-live="polite">주문 조회가 연결되지 않았습니다.</p><button id="aco-refresh" type="button" disabled>다시 조회</button></div>
+  <div class="aco-grid">
+    <section class="aco-card aco-list" aria-labelledby="aco-list-title">
+      <header><h2 id="aco-list-title">주문 작업목록</h2></header>
+      <div class="aco-controls">
+        <label for="aco-search">현재 페이지 주문번호 검색</label><input id="aco-search" type="search" maxlength="100" placeholder="현재 페이지에서 주문번호 검색" disabled>
+        <nav class="aco-filters" aria-label="주문 상태별 보기">
+          <button type="button" data-filter="all" aria-pressed="true" disabled>전체</button>
+          <button type="button" data-filter="payment" aria-pressed="false" disabled>결제 확인</button>
+          <button type="button" data-filter="fulfillment" aria-pressed="false" disabled>배정·진행</button>
+          <button type="button" data-filter="refund" aria-pressed="false" disabled>취소·환불</button>
+          <button type="button" disabled title="운영 대사 조회 계약 미연결">대사</button>
+        </nav>
+        <small>상태별 보기는 현재 페이지에만 적용 · 운영 대사 조회 미연결</small>
+      </div>
+      <div id="aco-rows" class="aco-rows"><p class="aco-empty">주문 조회 연결 필요</p></div>
+      <footer><p id="aco-count">전체 주문 건수 미확인</p><nav class="aco-paging" aria-label="주문 목록 페이지"><button id="aco-prev" type="button" disabled>이전 페이지</button><button id="aco-next" type="button" disabled>다음 페이지</button></nav></footer>
+    </section>
+    <aside class="aco-card aco-detail" aria-labelledby="aco-detail-title">
+      <header><h2 id="aco-detail-title" tabindex="-1">주문 상세</h2><button id="aco-back" type="button" class="aco-back">목록으로</button></header>
+      <div id="aco-detail" class="aco-detail-body"><p class="aco-empty">조회가 연결되면 목록에서 주문을 선택하세요.</p></div>
+    </aside>
+  </div>
+</main>
+{% endblock %}
+{% block foot_extra %}<script src="/shared/admin-commerce-orders.js?v=20261006-flows-1"></script><script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script><script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script><script src="/shared/admin-commerce-physical-returns-transport.js?v=20261007-return-read-1"></script><script src="/shared/admin-commerce-physical-returns.js?v=20261007-return-read-1"></script><script>document.getElementById('commerce-orders').commerceOrderFlows=PopcornPhysicalReturns.mount(document.getElementById('commerce-orders'));</script><script src="/shared/admin-commerce-orders-transport.js?v=20261005-2"></script><script src="/shared/admin-commerce-support.js?v=20261005-1"></script>{% endblock %}

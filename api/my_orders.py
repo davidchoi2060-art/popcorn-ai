@@ -46,7 +46,7 @@ from sqlalchemy import text
 
 from . import mall
 from .timeutil import iso
-from .admin_orders import STEP, _item_label, refund_label
+from .admin_orders import STEP, _item_label, refund_label, _commerce_order_ids
 from .customer_auth import require_member
 from .customer_write_lock import write_locked, REASON as WRITE_LOCK_REASON
 from .db import engine
@@ -73,6 +73,8 @@ def my_orders():
             "SELECT order_id, order_no, channel, status, total_amount, ops_snapshot, created_at"
             " FROM orders WHERE member_id=:m ORDER BY created_at DESC, order_id DESC"),
             {"m": member_id}).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [o["order_id"] for o in orders])
+        orders = [o for o in orders if o["order_id"] not in commerce_ids]
         ids = [o["order_id"] for o in orders]
         items_by, pays, ships, refunds = {}, {}, {}, {}
         if ids:
@@ -179,6 +181,9 @@ def create_refund(body: RefundBody):
             raise HTTPException(404, "주문이 없습니다")
         if o["member_id"] != me["member_id"]:
             raise HTTPException(403, "본인 주문만 접수할 수 있습니다")
+        if o["order_id"] in _commerce_order_ids(conn, [o["order_id"]]):
+            raise HTTPException(409, {"error": "commerce_order_requires_new_workflow",
+                                      "detail": "신규 내부 주문은 신규 주문 흐름에서 환불을 접수하세요"})
         if o["status"] in ("접수", "취소"):
             raise HTTPException(409, {"error": "invalid_state",
                                       "detail": f"'{o['status']}' 상태의 주문은 접수할 수 없습니다"})

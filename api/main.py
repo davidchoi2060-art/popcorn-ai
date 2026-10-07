@@ -14,6 +14,10 @@ from sqlalchemy import text
 
 # 미들웨어는 라우터가 아니라서 자동 탐색 대상이 아니다 — 명시적으로만 건다(순서가 계약).
 from .auth import auth_middleware
+from .admin_commerce_orders import admin_commerce_no_store
+from .commerce_support_http import commerce_support_no_store
+from .commerce_fulfillment_http import create_router as create_fulfillment_router, fulfillment_no_store
+from .commerce_physical_return_http import create_router as create_physical_return_router, physical_return_no_store
 from .customer_auth import member_middleware
 from .db import engine
 
@@ -25,6 +29,10 @@ app = FastAPI(title="popcorn-pc-ai (local slice)")
 app.middleware("http")(member_middleware)
 # 관리자(슬라이스 37): /api/admin/*는 세션+권한 필요(인증 엔드포인트 예외)
 app.middleware("http")(auth_middleware)
+app.middleware("http")(admin_commerce_no_store)
+app.middleware("http")(commerce_support_no_store)
+app.middleware("http")(fulfillment_no_store)
+app.middleware("http")(physical_return_no_store)
 
 
 @app.get("/api/health")
@@ -80,6 +88,8 @@ _DISCOVERED_ROUTERS = _discover_routers()
 # 갖는데, 지금 목록엔 그런 중복이 없다(제작 보고서에 라우트 전수 대조 기록).
 for _mod_name, _router in _DISCOVERED_ROUTERS:
     app.include_router(_router)
+app.include_router(create_fulfillment_router())
+app.include_router(create_physical_return_router())
 
 print("[main] auto-included %d routers: %s" % (
     len(_DISCOVERED_ROUTERS), ", ".join(n for n, _ in _DISCOVERED_ROUTERS)))

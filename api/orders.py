@@ -117,6 +117,9 @@ def create_order(body: OrderBody, request: Request, response: Response,
             conn, body.session_id, provided,
             what="orders.create", not_found_detail="그 상담을 찾을 수 없습니다")
 
+        raise HTTPException(409, {"error": "legacy_mock_payment_disabled",
+                                  "detail": "기존 목업 결제 주문 생성은 사용할 수 없습니다"})
+
         snap = conn.execute(text(
             "SELECT items, companion, total_amount FROM quote_snapshots"
             " WHERE session_id=:s AND quote_type=:t ORDER BY snapshot_id DESC LIMIT 1"),

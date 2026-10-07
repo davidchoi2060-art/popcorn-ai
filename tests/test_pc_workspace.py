@@ -24,6 +24,36 @@ class WorkspaceTests(unittest.TestCase):
         self.row.update(market_alerts=['price'])
         self.assertEqual(task_for(self.row)['task_kind'], 'price')
 
+    def test_overlapping_work_keeps_all_reasons_without_mutating_catalog(self):
+        self.row.update(market_alerts=['price'], description_ready=False,
+                        review_reasons=['가격 근거 확인', '부품 조건 확인', '가격 근거 확인'])
+        original = copy.deepcopy(self.row)
+        task = task_for(self.row)
+        self.assertEqual(task['task_kind'], 'price')
+        self.assertEqual(task['task_kinds'], ['price', 'copy', 'review'])
+        self.assertEqual([r['text'] for r in task['task_reasons']],
+                         ['가격·판매 조건 확인', '상품 설명 또는 부품 설명 보완', '가격 근거 확인', '부품 조건 확인'])
+        self.assertEqual(self.row, original)
+
+    def test_queue_counts_products_once_and_each_unfinished_kind(self):
+        multiple = dict(self.row, configuration_id='A', market_alerts=['price'], description_ready=False)
+        review = dict(self.row, configuration_id='B')
+        excluded = dict(self.row, configuration_id='C', management_state='excluded')
+        retired = dict(self.row, configuration_id='D', status='retired')
+        completed = dict(self.row, configuration_id='E', review_state='approved')
+        with patch.object(workspace, 'engine'), patch.object(workspace, 'catalog_rows',
+                                                            return_value=[multiple, review, excluded, retired, completed]):
+            result = workspace.tasks()
+        self.assertEqual([r['configuration_id'] for r in result['items']], ['A', 'B'])
+        self.assertEqual(result['counts'], dict(price=1, copy=1, review=2))
+        self.assertEqual(result['catalog_total'], 5)
+
+    def test_approved_with_another_issue_is_not_automatically_a_review_task(self):
+        self.row.update(review_state='approved', description_ready=False)
+        self.assertEqual(task_for(self.row)['task_kinds'], ['copy'])
+        self.row.update(needs_review=True)
+        self.assertEqual(task_for(self.row)['task_kinds'], ['copy', 'review'])
+
     def test_current_approved_has_no_task_and_excluded_not_promoted(self):
         self.row.update(review_state='approved')
         self.assertIsNone(task_for(self.row))

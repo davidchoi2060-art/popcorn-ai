@@ -25,7 +25,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .timeutil import iso
-from .admin_orders import ACTIVE_REFUND, _log, refund_label
+from .admin_orders import ACTIVE_REFUND, _log, refund_label, _commerce_order_ids, _guard_legacy_order
 from .auth import current_operator_id
 from .db import engine
 
@@ -49,10 +49,12 @@ def _kind(order_status: str) -> str:
 def list_refunds():
     with engine.connect() as conn:
         rows = conn.execute(text(
-            "SELECT r.refund_id, r.refund_mode, r.reason_type, r.amount, r.status, r.created_at,"
+            "SELECT r.refund_id, r.order_id, r.refund_mode, r.reason_type, r.amount, r.status, r.created_at,"
             " o.order_no, o.status AS order_status, COALESCE(m.nickname, '비회원') AS cust"
             " FROM refunds r JOIN orders o USING (order_id)"
             " LEFT JOIN members m USING (member_id)")).mappings().all()
+        commerce_ids = _commerce_order_ids(conn, [r["order_id"] for r in rows])
+        rows = [r for r in rows if r["order_id"] not in commerce_ids]
     items = [{
         "refund_id": r["refund_id"], "no": refund_label(r["refund_id"]),
         "order": r["order_no"], "cust": r["cust"], "kind": _kind(r["order_status"]),
@@ -86,6 +88,7 @@ def advance(refund_id: int, body: AdvanceBody):
         if r["status"] not in expects:
             raise HTTPException(409, {"error": "invalid_transition",
                                       "detail": f"현재 상태 '{r['status']}' — {'/'.join(expects)}에서만 가능한 처리입니다"})
+        _guard_legacy_order(conn, r["order_id"])
         returned, refund_row = 0, None
         if body.action == "complete":
             o = conn.execute(text(
@@ -157,6 +160,7 @@ def undo(log_id: int):
                      "st": list(ACTIVE_REFUND)}).first():
                 raise HTTPException(409, {"error": "refund_active",
                                           "detail": "같은 주문에 다른 환불이 진행 중이라 되돌릴 수 없습니다"})
+        _guard_legacy_order(conn, r["order_id"])
         conn.execute(text("UPDATE refunds SET status=:s WHERE refund_id=:i"),
                      {"s": d["from"], "i": r["refund_id"]})
         _log(conn, "refund_advance_undo", str(log_id),

@@ -209,6 +209,42 @@ def _existing_codes(conn, codes):
         {"c": codes}).scalars().all())
 
 
+_COMMERCE_CATALOG_SQL = "SELECT pg_catalog.to_regclass('commerce_order_details') IS NOT NULL"
+_COMMERCE_STOCK_CODES_SQL = """
+    SELECT r.product_code FROM stock_reservations r
+    JOIN commerce_order_details d ON d.order_id = r.commerce_order_id
+    WHERE r.product_code = ANY(:c)
+    UNION
+    SELECT m.product_code FROM stock_movements m
+    WHERE m.product_code = ANY(:c) AND m.movement_type = 'own_sale'
+      AND m.commerce_operation_id IS NOT NULL AND m.commerce_effect_key IS NOT NULL
+"""
+
+
+def _preflight_commerce_stock(conn, prods, actual_stock):
+    """Under the caller's full product locks, reject every protected CSV stock change."""
+    if not actual_stock:
+        return
+    present = conn.execute(text(_COMMERCE_CATALOG_SQL)).scalar_one()
+    if type(present) is not bool:
+        raise CatalogConflict("실판매 재고 보호 근거를 확인하지 못했습니다")
+    if not present:
+        return                         # Only catalog-confirmed pre-0126 installations bypass.
+    protected = conn.execute(text(_COMMERCE_STOCK_CODES_SQL),
+                             {"c": list(actual_stock)}).scalars().all()
+    if type(protected) is not list or any(
+        type(pc) is not int or pc not in actual_stock for pc in protected
+    ):
+        raise CatalogConflict("실판매 재고 보호 근거를 확인하지 못했습니다")
+    protected = frozenset(protected)
+    for product in prods:               # Do not deduplicate: even a temporary change is forbidden.
+        pc = product["pc"]
+        if pc in protected and (type(actual_stock[pc]) is not int or
+                                type(product["stock"]) is not int or
+                                product["stock"] != actual_stock[pc]):
+            raise CatalogConflict("실판매에 편입된 상품의 재고는 CSV로 변경할 수 없습니다")
+
+
 def read_refs(conn) -> dict:
     """계획 수립에 필요한 현재 DB 상태(잠금·다나와 점유·GPU 참조표·기존 사양)."""
     gpu_ref = dict(conn.execute(text(
@@ -768,15 +804,18 @@ def apply_plan(conn, plan: dict, file_name: str, origin: str, operator_id: int) 
     # 왕복(조회)은 하나로 합치되 **쓰는 쪽은 가른다** — `stock_before`는 재고 델타 전용으로
     # 이름·모양을 그대로 유지한다(회귀 [26]이 이 파일에 이 리터럴이 있는지로 "적재가 절대값이
     # 아니라 델타를 남긴다"를 판정한다 — 슬라이스 98). 가격 이력은 별도 `price_before`를 쓴다.
-    stock_before, price_before = {}, {}
+    stock_before, price_before, actual_stock = {}, {}, {}
     if candidates:
         rows = conn.execute(text(
             "SELECT product_code, stock_qty, purchase_price, sale_price, locked_fields"
             " FROM products WHERE product_code = ANY(:c)"),
             {"c": list(candidates)}).all()
         stock_before = {r[0]: (r[1] or 0) for r in rows}
+        actual_stock = {r[0]: r[1] for r in rows}
         price_before = {r[0]: {"purchase_price": r[2], "sale_price": r[3],
                                "locked": set(r[4] or [])} for r in rows}
+
+    _preflight_commerce_stock(conn, prods, actual_stock)
 
     job_id = conn.execute(text(
         "INSERT INTO csv_import_jobs (file_name, row_total, row_ok, row_error, row_review,"
