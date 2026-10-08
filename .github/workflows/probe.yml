@@ -1,0 +1,22 @@
+# 경로 필터 시험 전용 (PR #14 6절). 이 브랜치에서만 돈다. 배포 · 비밀값 · 체크아웃 없음.
+name: probe-paths-ignore
+on:
+  push:
+    branches: [probe/paths-ignore]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.github/workflows/unit.yml'
+      - 'requirements-test.txt'
+      - 'tests/ci_run.py'
+      - 'tests/conftest.py'
+      - 'tests/test_ci_run.py'
+      - 'tests/bundle_run.py'
+      - 'tests/test_bundle_run.py'
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "ran sha=${{ github.sha }} before=${{ github.event.before }}"

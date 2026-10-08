@@ -1,0 +1,10 @@
+# probe fixture stub for path '.github/workflows/unit.yml' - workflow_dispatch only, never runs on push.
+name: probe-stub-unit
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  noop:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo stub
