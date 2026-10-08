@@ -355,3 +355,185 @@ def create_auth_router(resolver):
 
 
 router = create_auth_router(RUNTIME_RESOLVER)
+
+# V3 standalone phase-bound consumers. Existing C4/R1 definitions and runtime
+# composition above are preserved; these ports are explicitly injected only.
+PHASE_ISSUANCE_FIELDS_V3 = (
+    "proof_ref", "credential_hash", "member_id", "verified_identity_id",
+    "auth_context_id", "issued_auth_revision", "issued_at", "expires_at",
+    "issuer_key", "issuer", "subject", "verified_at",
+    "verification_method", "registration_ref",
+)
+_PHASE_RESOLUTION_SEAL_V3 = object()
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class IssuanceIdentityV3:
+    """Internal original issuance metadata; the class is not authentic proof.
+
+    The trusted read port must independently verify the same-read receipt and
+    restore its principal. Equality of observations does not establish I1
+    authenticity, C2 immutability, intervening history or later revocation.
+    """
+    proof_ref: str
+    credential_hash: str
+    member_id: int
+    verified_identity_id: int
+    auth_context_id: str
+    issued_auth_revision: int
+    issued_at: int
+    expires_at: int
+    issuer_key: str
+    issuer: str
+    subject: str
+    verified_at: int
+    verification_method: str
+    registration_ref: str
+
+
+def _phase_issuance_values_v3(value):
+    try:
+        if type(value) is not IssuanceIdentityV3:
+            raise ValueError()
+        identity._uuid(value.proof_ref)
+        identity._uuid(value.auth_context_id)
+        if type(value.credential_hash) is not str or not _TOKEN.fullmatch(value.credential_hash):
+            raise ValueError()
+        for field in ("member_id", "verified_identity_id", "issued_auth_revision"):
+            identity.positive_bigint(getattr(value, field))
+        for field in ("verified_at", "issued_at", "expires_at"):
+            identity._epoch(getattr(value, field))
+        for field in ("issuer_key", "issuer", "subject", "verification_method", "registration_ref"):
+            identity._opaque(getattr(value, field))
+        if not value.verified_at <= value.issued_at < value.expires_at:
+            raise ValueError()
+        return tuple(getattr(value, field) for field in PHASE_ISSUANCE_FIELDS_V3)
+    except Exception:
+        raise _error(503, "auth_unavailable") from None
+
+
+def _phase_match_issuance_v3(value, principal, session, credential_hash):
+    """Strict local agreement with the same-read native inputs, not proof minting."""
+    values = _phase_issuance_values_v3(value)
+    try:
+        identity._require_principal(principal)
+        if type(session) is not identity.SessionContext:
+            raise ValueError()
+        pairs = [(value.credential_hash, credential_hash)]
+        pairs.extend((getattr(value, field), getattr(principal, field)) for field in
+            ("issuer_key", "issuer", "subject", "verified_at", "verification_method", "registration_ref"))
+        pairs.extend((getattr(value, field), getattr(session, native)) for field, native in (
+            ("member_id", "member_id"), ("verified_identity_id", "verified_identity_id"),
+            ("auth_context_id", "session_context_id"), ("issued_auth_revision", "issued_auth_revision"),
+            ("issued_at", "issued_at"), ("expires_at", "expires_at")))
+        if any(type(left) is not type(right) or left != right for left, right in pairs):
+            raise ValueError()
+        return values
+    except Exception:
+        raise _error(503, "auth_unavailable") from None
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class PersistedSessionSnapshotV3:
+    credential_hash: str
+    principal: identity.VerifiedPrincipal
+    mappings: tuple[identity.VerifiedIdentityMapping, ...]
+    session: identity.SessionContext
+    now: int
+    issuance_identity: IssuanceIdentityV3
+
+
+class VerifiedSessionRepositoryV3(Protocol):
+    def schema_ready(self) -> bool: ...
+    def read_verified_session(self, credential_hash: str) -> PersistedSessionSnapshotV3 | None: ...
+
+
+@dataclass(frozen=True, slots=True, repr=False)
+class VerifiedSessionResolutionV3:
+    member: identity.VerifiedMember
+    session: identity.SessionContext
+    credential_hash: str
+    now: int
+    issuance_identity: IssuanceIdentityV3
+    _seal: object
+
+    def key(self):
+        if getattr(self, "_seal", None) is not _PHASE_RESOLUTION_SEAL_V3:
+            raise _error(401, "unauthenticated")
+        try:
+            identity._require_member(self.member)
+        except Exception:
+            raise _error(503, "auth_unavailable") from None
+        original = _phase_match_issuance_v3(self.issuance_identity, self.member.principal,
+                                          self.session, self.credential_hash)
+        # Keep the current canonical auth_subject and every existing key field.
+        native = VerifiedSessionResolution(self.member, self.session, self.credential_hash,
+                                           self.now, _RESOLUTION_SEAL)
+        return native.key() + original
+
+
+class VerifiedSessionResolverV3(VerifiedSessionResolver):
+    """Fresh typed14 comparison without changing the unversioned runtime.
+
+    The inherited readiness boundary still requires server-injected ports.
+    Current C1 state checks run before comparing successful observations.
+    """
+    def __init__(self, repository: VerifiedSessionRepositoryV3, issuer: IssuerReadiness):
+        super().__init__(repository, issuer)
+
+    def resolve(self, sid, *, expected_context=None):
+        self._ready()
+        if sid is None:
+            return None
+        if type(sid) is not str:
+            raise _error(401, "unauthenticated")
+        if sid == "":
+            return None
+        if not _TOKEN.fullmatch(sid):
+            raise _error(401, "unauthenticated")
+        digest = hashlib.sha256(sid.encode("ascii")).hexdigest()
+        try:
+            row = self.repository.read_verified_session(digest)
+        except Exception:
+            raise _error(503, "auth_unavailable") from None
+        if row is None:
+            raise _error(401, "unauthenticated")
+        try:
+            if (type(row) is not PersistedSessionSnapshotV3
+                    or type(row.credential_hash) is not str or not _TOKEN.fullmatch(row.credential_hash)
+                    or type(row.mappings) is not tuple):
+                raise ValueError()
+            identity._epoch(row.now)
+            _phase_match_issuance_v3(row.issuance_identity, row.principal, row.session, row.credential_hash)
+        except Exception:
+            raise _error(503, "auth_unavailable") from None
+        if not hmac.compare_digest(row.credential_hash, digest):
+            raise _error(401, "unauthenticated")
+        try:
+            member = identity.resolve_identity(row.principal, row.mappings, now=row.now)
+            identity.auth_context(member, row.session, now=row.now, expected_context=expected_context)
+        except identity.IdentityError as error:
+            if error.status in (401, 409):
+                raise _error(error.status, error.code) from None
+            raise _error(503, "auth_unavailable") from None
+        self._ready()
+        return VerifiedSessionResolutionV3(member, row.session, digest, row.now,
+                                            row.issuance_identity, _PHASE_RESOLUTION_SEAL_V3)
+
+    def confirm(self, sid, before, *, expected_context=None):
+        if (type(before) is not VerifiedSessionResolutionV3
+                or getattr(before, "_seal", None) is not _PHASE_RESOLUTION_SEAL_V3):
+            raise _error(401, "unauthenticated")
+        before_key = before.key()
+        current = self.resolve(sid, expected_context=expected_context)
+        if current is None:
+            raise _error(401, "unauthenticated")
+        if current.credential_hash != before.credential_hash or current.key() != before_key:
+            raise _error(409, "auth_context_changed")
+        return current
+
+
+def create_stored_read_resolver_v3(source, principal):
+    """Explicit V2 read/principal ports -> V3 phase consumer, no runtime wiring."""
+    repository = stored_reads.SessionReadAdapterV3(source, principal, PersistedSessionSnapshotV3)
+    return VerifiedSessionResolverV3(repository, principal)

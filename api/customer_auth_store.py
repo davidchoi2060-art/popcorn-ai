@@ -545,3 +545,53 @@ class SessionReadAdapterV2:
             return snapshot
         except Exception:
             raise _unavailable() from None
+
+# V3 is paired with the separately versioned C4 phase consumer. V2's native
+# five-field snapshot gate above and all runtime defaults remain unchanged.
+class SessionReadAdapterV3(SessionReadAdapterV2):
+    """Transfers the same-read validated binding8 and original provenance6.
+
+    This adapter still requires the independent P1/I1 server ports. A typed
+    carrier alone is not proof, and no runtime factory installs this adapter.
+    """
+    def read_verified_session(self, credential_hash):
+        try:
+            if not self.schema_ready():
+                raise _unavailable()
+            _v2_digest(credential_hash)
+            row = _v2_read(self.source.read_current_session, credential_hash)
+            if not self.schema_ready():
+                raise _unavailable()
+            if row is None:
+                return None
+            mappings, session = _v2_components(row, credential_hash)
+            principal = _v2_read(self.principal.restore_verified_principal, row.provenance,
+                                 binding=row.issuance_binding)
+            identity._require_principal(principal)
+            if not self.schema_ready() or not _v2_equal(principal, row.provenance, p1.PROVENANCE_FIELDS):
+                raise _unavailable()
+            from .customer_auth import (IssuanceIdentityV3, PersistedSessionSnapshotV3,
+                                        _phase_match_issuance_v3)
+            b, p = row.issuance_binding, row.provenance
+            issuance = IssuanceIdentityV3(proof_ref=b.proof_ref, credential_hash=b.credential_hash,
+                member_id=b.member_id, verified_identity_id=b.verified_identity_id,
+                auth_context_id=b.auth_context_id, issued_auth_revision=b.issued_auth_revision,
+                issued_at=b.issued_at, expires_at=b.expires_at, issuer_key=p.issuer_key,
+                issuer=p.issuer, subject=p.subject, verified_at=p.verified_at,
+                verification_method=p.verification_method, registration_ref=p.registration_ref)
+            original_values = _phase_match_issuance_v3(issuance, principal, session, row.credential_hash)
+            snapshot = self.snapshot_factory(credential_hash=row.credential_hash, principal=principal,
+                mappings=mappings, session=session, now=row.now, issuance_identity=issuance)
+            if (type(snapshot) is not PersistedSessionSnapshotV3
+                    or type(snapshot.credential_hash) is not str or snapshot.credential_hash != row.credential_hash
+                    or type(snapshot.now) is not int or snapshot.now != row.now
+                    or snapshot.principal is not principal or snapshot.mappings is not mappings
+                    or snapshot.session is not session or snapshot.issuance_identity is not issuance):
+                raise _unavailable()
+            if _phase_match_issuance_v3(snapshot.issuance_identity, snapshot.principal,
+                    snapshot.session, snapshot.credential_hash) != original_values:
+                raise _unavailable()
+            # Current state401/context409 remain in C1/C4 after this source call.
+            return snapshot
+        except Exception:
+            raise _unavailable() from None
