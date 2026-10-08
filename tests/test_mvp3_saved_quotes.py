@@ -21,7 +21,11 @@ PRODUCT = {'product_code': 17, 'name': 'real stored product', 'price': 1500000,
            'price_src': 'current database price', 'spec': {'cpu': 'actual stored model', 'ram_gb': 32,
              'cpu_mt': 12345, 'operator_note': 'private', 'vram_gb': True},
            'reasons': ['stored reason'], 'operator_id': 9, 'purchase_price': 42}
-RECO = {'card_sets': [{'kind': 'sold', 'items': [PRODUCT]}]}
+RECO = {'card_sets': [{'kind': 'sold', 'items': [dict(PRODUCT, photo={'state': 'available', 'url': 'stale'},
+                                                      public_configuration={'stale': True})]}]}
+LIVE = {'photo': {'state': 'available', 'kind': 'ai_assembly_example',
+                  'url': '/api/customer/products/17/representative-image', 'notice': 'n'},
+        'public_configuration': {'product_code': 17}}
 
 
 def body(**kwargs):
@@ -66,6 +70,7 @@ class SavedQuotesTest(unittest.TestCase):
                         patch.object(m.visitor, 'resolve', return_value=11),
                         patch.object(m, 'load_vocab', return_value=None),
                         patch.object(m, 'validate_state', return_value=(SimpleNamespace(model_dump=lambda: {'usages': ['게임']}), [])),
+                        patch.object(m.customer_pc_offer, 'public_item', side_effect=lambda code: dict(LIVE)),
                         patch.object(m.grid_public, 'recommend', return_value=RECO)]
         self.mocks = [p.start() for p in self.patches]
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
@@ -77,6 +82,20 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertNotIn('purchase_price', q['product'])
         self.assertFalse(q['product']['price_confirmed'])
         self.assertEqual(q['product']['spec'], {'cpu': 'actual stored model', 'ram_gb': 32})
+
+    def test_photo_and_configuration_are_live_not_snapshotted(self):
+        q = m.save_quote(body(), request(), Response())['quote']
+        self.assertEqual((q['product']['photo'], q['product']['public_configuration']),
+                         (LIVE['photo'], LIVE['public_configuration']))
+        stored = self.store.rows[0]['product_snapshot']
+        self.assertNotIn('photo', stored)
+        self.assertNotIn('public_configuration', stored)
+        # 승인·선택이 바뀌면 다음 조회가 바로 따른다
+        LIVE_NOW = {'photo': {'state': 'unavailable', 'url': None}, 'public_configuration': None}
+        self.mocks[4].side_effect = lambda code: dict(LIVE_NOW)
+        listed = m.list_quotes(request(), Response(), limit=20)['quotes'][0]['product']
+        self.assertEqual((listed['photo'], listed['public_configuration']), (LIVE_NOW['photo'], None))
+        self.assertNotIn('photo', self.store.rows[0]['product_snapshot'])
 
     def client(self):
         app = FastAPI()

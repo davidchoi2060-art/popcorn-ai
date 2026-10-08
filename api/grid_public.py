@@ -93,6 +93,7 @@ from sqlalchemy import text
 from . import game_copy as GC
 from .db import engine
 from . import sold_reco as SOLD
+from . import customer_pc_offer as _PC_OFFER
 
 # 고객 추천 원천 스위치(2026-09-25 재설계 4단계). 기본 「sold」= 판매 중인 몰 조립PC.
 # 「grid」로 두면 옛 조합 격자(grid_quotes)로 돌아간다 — 격자 코드·표는 지우지 않았다.
@@ -797,6 +798,10 @@ def recommend(body: RecommendBody):
                 assumed.append(ASSUMED_RESOLUTION)
             if state.game.grade_src == "ai_estimate":
                 ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
+
+    # ── 판매 상품 카드에 공개 구성·대표 사진 (PR #2 댓글 6059780234 매핑) ──
+    # 판정은 customer_pc_offer 한 곳 — 공개가 아니면 photo=unavailable, public_configuration=None.
+    _PC_OFFER.attach([it for cs in card_sets if cs.get("kind") == "sold" for it in cs.get("items") or []])
 
     # ── §6 ② 추정 기록 — 카드를 낸 시점, 별도 트랜잭션, 실패해도 응답은 그대로 ──
     # ⚠ G-5 (2026-09-16 사장님 확정): **게임명이 빈 추정은 기록하지 않는다.**

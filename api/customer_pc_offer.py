@@ -21,7 +21,9 @@
   알려 주지 않는다. 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
 """
 import hashlib
+import logging
 import os
+from copy import deepcopy
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -33,6 +35,7 @@ from .pc_publication_source_reader import make_source_reader
 from .product_images import MEDIA_BUCKET, read_image
 from . import pc_media
 
+log = logging.getLogger("customer_pc_offer")
 router = APIRouter()
 OFFER_PATH = "/api/customer/pc-offers/{product_code}"
 IMAGE_PATH = "/api/customer/products/{product_code}/representative-image"
@@ -97,6 +100,37 @@ def _read(product_code):
             return _public_offer(conn, product_code)
         finally:
             conn.rollback()
+
+
+def public_item(product_code):
+    """추천 항목·저장 견적에 싣는 두 키. 공개가 아니거나 읽다 실패하면 unavailable/None.
+
+    추천·저장 견적 응답 전체를 깨뜨리지 않으려고 여기서 실패를 받되, 로그에는 남긴다.
+    None 인 public_configuration 은 UI 검증기가 null 로 받는다(구성 상세 없음).
+    """
+    try:
+        item, _ = _read(product_code)
+    except Exception:  # noqa: BLE001 - 카드 응답을 지키고 사유는 로그로
+        log.exception("public_item failed product_code=%s", product_code)
+        item = None
+    if item is None:
+        return {"photo": dict(UNAVAILABLE), "public_configuration": None}
+    return {"photo": item["photo"], "public_configuration": item["public_configuration"]}
+
+
+def attach(products):
+    """dict 목록(product_code 보유)에 photo·public_configuration 을 제자리에서 싣는다.
+    같은 상품은 한 번만 판정한다."""
+    seen = {}
+    for product in products:
+        code = product.get("product_code")
+        if type(code) is not int or not 0 < code <= 2**63 - 1:
+            product.update(photo=dict(UNAVAILABLE), public_configuration=None)
+            continue
+        if code not in seen:
+            seen[code] = public_item(code)
+        product.update(deepcopy(seen[code]))
+    return products
 
 
 def _representative_png(asset, job_id):

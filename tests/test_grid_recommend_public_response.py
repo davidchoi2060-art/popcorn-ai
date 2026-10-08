@@ -19,7 +19,9 @@ TOP_KEYS = {'ok', 'card_sets', 'cards', 'assumed', 'ai_estimated', 'needs', 'dro
 SET_KEYS = {'usage', 'usage_grid', 'kind', 'items', 'empty_reason', 'empty_note',
             'min_level', 'min_level_work'}
 ITEM_KEYS = {'product_code', 'name', 'price', 'price_src', 'mall_url', 'spec', 'level',
-             'tag', 'over_budget', 'reasons'}
+             'tag', 'over_budget', 'reasons', 'photo', 'public_configuration'}
+# 공개 구성·대표 사진 판정(customer_pc_offer)은 자기 검사가 지킨다. 여기서는 공개 아님 값으로 고정.
+NOT_PUBLIC_ITEM = {'photo': {'state': 'unavailable', 'url': None}, 'public_configuration': None}
 PUBLIC_SPEC = {'cpu', 'gpu', 'ram_gb', 'ssd_gb', 'vram_gb'}
 FIXTURE = pathlib.Path(__file__).parent / 'fixtures' / 'grid_recommend_sold_response.json'
 GAME_CONTEXT = {
@@ -73,7 +75,8 @@ def call_recommend(game_context=None):
          patch.object(G, 'usage_map', lambda: {}), \
          patch.object(G, '_game_context', lambda conn, names, vocab: game_context), \
          patch.object(G, '_record_estimate', lambda st: (False, DB_ERROR)), \
-         patch.object(S, 'load', lambda: (LEVELS, PRODUCTS)):
+         patch.object(S, 'load', lambda: (LEVELS, PRODUCTS)), \
+         patch.object(G._PC_OFFER, 'public_item', lambda code: dict(NOT_PUBLIC_ITEM)):
         return G.recommend(G.RecommendBody(state={'usages': ['게임', '영상편집']}))
 
 
