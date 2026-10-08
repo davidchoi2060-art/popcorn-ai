@@ -1,0 +1,59 @@
+# 단위 테스트를 GitHub 가 빌려주는 일회용 리눅스 머신에서 돌린다 — 서버(GCP VM)와 무관하다.
+#
+# ⚠ deploy.yml 의 「pull_request 트리거 절대 금지」는 **self-hosted 러너(우리 서버)** 이야기다.
+#    이 워크플로는 `ubuntu-latest`(GitHub 호스팅)에서만 돌고, 비밀값을 하나도 쓰지 않으며,
+#    권한은 읽기뿐이다. 그래서 포크에서 온 PR 이 돌아도 우리 서버·DB 에 닿을 길이 없다.
+#    **이 파일에 self-hosted 러너나 secrets 를 넣지 않는다** — 넣는 순간 위 경고가 그대로 적용된다.
+#
+# DB 는 이 작업 안에서만 사는 빈 Postgres 다. 일부 테스트가 조회는 패치해 두고
+# 연결만 실제로 열기 때문에 필요하다(개발 PC 에서는 그 연결이 .env 의 Cloud SQL 로 간다).
+#
+# 실행 방식·알려진 실패 목록은 tests/ci_run.py · tests/conftest.py 머리 주석 참조.
+name: 단위 테스트
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://ci:ci@127.0.0.1:5432/ci
+      POPCORN_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 의존성 설치
+        run: pip install -r requirements-test.txt
+      - name: 단위 테스트 (파일별 격리)
+        run: python tests/ci_run.py
