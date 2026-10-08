@@ -10,7 +10,8 @@ HTTP 요청을 보내 결과를 남긴다. **이 표가 「완료」의 정의�
 | 🟡 미확인 | 경로는 코드에 있는데 이번에 확인하지 못했다(쓰기 금지 · 앞 단계 실패 · 대상 없이 경로만 두드림) |
 | 🔴 실패 | 실제 요청이 실패했다(상태 코드와 응답을 적는다) · 또는 경로 자체가 없다 |
 
-코드에 경로가 있다는 정적 확인은 🟡 가 최대치다.
+코드에 경로가 있다는 정적 확인은 🟡 가 최대치다. 🔎 표시 시나리오는 가용성 점검(목록이 열리는가)이라
+「끝까지 되는 시나리오」 수에 넣지 않는다.
 
 ## 기록 두 곳
 
@@ -32,9 +33,15 @@ python tests/scenarios/meter.py --out docs/scenarios/ci
 python tests/scenarios/meter.py --base-url http://127.0.0.1:8000 --out docs/scenarios/dev
 ```
 
-- `--allow-writes`: 견적·로그인·주문처럼 행을 만드는 단계도 보낸다. PC 의 `.env` 는 공유
-  Cloud SQL 이라 켜면 `consult_sessions`·`handoffs` 등에 행이 남는다(CLAUDE.md 「검증이
-  흔적을 남긴다」). 무엇이 만들어지는지 알고 켠다.
+- `--base-url` 모드는 앱(`api`)·`.env`·DB 엔진을 불러오지 않는다. 경로 존재 확인도 서버 응답으로만 한다.
+- `--allow-writes` 가 없으면 **코드로 쓰지 않음을 확인한(`readonly`) 비로그인 단계만** 보낸다.
+  쿠키를 보내는 단계는 readonly 여도 보내지 않는다(인증 GET 도 세션 last_seen 을 쓸 수 있다).
+  켜면 견적·로그인·주문처럼 행을 만드는 단계도 보낸다. PC 의 `.env` 는 공유 Cloud SQL 이라
+  `consult_sessions`·`handoffs` 등에 행이 남는다(CLAUDE.md 「검증이 흔적을 남긴다」).
+- 기록에는 응답 원문·예외 문장·열쇠·세션 번호가 남지 않는다. 상태 코드, JSON 여부, 오류 코드
+  (`auth_unavailable` 처럼 영문 코드만), 단계가 지정한 숫자·참거짓 값, 경로의 틀만 남는다.
+- `--measured-by PC 쪽` 으로 측정 주체를 기록에 적는다. 클라우드 쪽 측정은 PC 독립 확인이 아니다.
+- 안전 검사: `python -m pytest tests/scenarios/test_meter_safety.py -q` (가짜 전송기, 네트워크·DB 불필요).
 - 관리자 단계: `SCENARIO_ADMIN_EMAIL` · `SCENARIO_ADMIN_PASSWORD` 환경변수. 비밀번호는
   기록에 남지 않는다.
 - 종료 코드는 측정이 끝나면 0 이다(빨강이 있어도). 측정기가 못 돌면 2.

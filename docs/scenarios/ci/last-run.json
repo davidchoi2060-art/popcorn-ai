@@ -1,58 +1,60 @@
 {
  "run": {
-  "at": "2026-10-08 07:23 UTC",
-  "commit": "1ecf4dfe31e670bed14c7ce218e88ab187ffc197",
+  "at": "2026-10-08 07:42 UTC",
+  "commit": "f88f23dfffa65d653017b89a670af7c78ed4cb2b",
   "target": "CI 와 같은 조건의 일회용 DB(마이그레이션만 · 상품 0건)",
-  "allow_writes": true
+  "allow_writes": true,
+  "measured_by": "클라우드 쪽"
  },
  "scenarios": [
   {
    "key": "quote",
    "title": "추천에서 견적까지",
    "actor": "고객",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "quote.bands",
      "title": "예산 구간 보기",
-     "method": "GET",
-     "path": "/api/budget-bands",
-     "status": 200,
-     "ms": 62,
      "sent": "GET /api/budget-bands",
-     "response": "{\"ok\": true, \"axes\": [{\"axis\": \"game\", \"label\": \"게임\", \"bands\": [{\"key\": \"G0\", \"label\": \"내장그래픽·저사양\", \"min_won\": 900000, \"max_won\": 1200000, \"budget_label\": \"120만원\", \"sample_n\": 4, \"source\": \"band_redesign_v2.md §3 — 정화 표본 782벌(게임 421 / 비게임 3",
+     "ms": 90,
+     "status": 200,
+     "json": true,
      "state": "green",
      "reason": "실제 요청 통과"
     },
     {
      "key": "quote.count",
      "title": "조건에 맞는 부품으로 조립 가능한지 확인",
-     "method": "POST",
-     "path": "/api/candidates/count",
-     "status": 200,
-     "ms": 118,
      "sent": "POST /api/candidates/count",
-     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "ms": 137,
+     "status": 200,
+     "json": true,
+     "evidence": {
+      "buildable": false,
+      "total": 0,
+      "count": 0
+     },
      "state": "red",
      "reason": "buildable=False (기대 True)"
     },
     {
      "key": "quote.quote",
      "title": "견적 받기(용도 게임 · 예산 150만원)",
-     "method": "POST",
-     "path": "/api/recommend",
-     "status": 500,
-     "ms": 15,
      "sent": "POST /api/recommend",
-     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "ms": 17,
+     "status": 500,
+     "json": false,
+     "code": "UndefinedColumn",
      "state": "red",
      "reason": "HTTP 500"
     },
     {
      "key": "quote.revalidate",
      "title": "견적 부품의 가격·재고 다시 확인",
-     "method": "POST",
-     "path": "/api/recommend/revalidate",
+     "sent": "POST /api/recommend/revalidate",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(product_codes)"
     }
@@ -62,51 +64,52 @@
    "key": "handoff",
    "title": "견적을 쇼핑몰 주문으로 넘기기(몰 인계)",
    "actor": "고객",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "handoff.count",
      "title": "조건에 맞는 부품으로 조립 가능한지 확인",
-     "method": "POST",
-     "path": "/api/candidates/count",
-     "status": 200,
-     "ms": 8,
      "sent": "POST /api/candidates/count",
-     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "ms": 13,
+     "status": 200,
+     "json": true,
+     "evidence": {
+      "buildable": false,
+      "total": 0,
+      "count": 0
+     },
      "state": "red",
      "reason": "buildable=False (기대 True)"
     },
     {
      "key": "handoff.quote",
      "title": "견적 받기(용도 게임 · 예산 150만원)",
-     "method": "POST",
-     "path": "/api/recommend",
-     "status": 500,
-     "ms": 7,
      "sent": "POST /api/recommend",
-     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "ms": 12,
+     "status": 500,
+     "json": false,
+     "code": "UndefinedColumn",
      "state": "red",
      "reason": "HTTP 500"
     },
     {
      "key": "handoff.create",
      "title": "쇼핑몰 인계 접수",
-     "method": "POST",
-     "path": "/api/handoff",
+     "sent": "POST /api/handoff",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(session_id, tier)"
     },
     {
      "key": "handoff.view",
      "title": "인계 내역 조회",
-     "method": "GET",
-     "path": "/api/handoff/{handoff_no}",
+     "sent": "GET /api/handoff/{handoff_no}",
+     "ms": 28,
      "status": 404,
-     "ms": 18,
-     "sent": "GET /api/handoff/HO-0",
-     "response": "\"인계 기록이 없습니다\"",
+     "json": true,
      "state": "yellow",
-     "reason": "경로는 응답함(HTTP 404) · 앞 단계가 대상(handoff_no)을 못 만들어 실제 확인 못 함"
+     "reason": "경로는 응답함 · 앞 단계가 대상(handoff_no)을 못 만들어 실제 확인 못 함"
     }
    ]
   },
@@ -114,33 +117,32 @@
    "key": "login",
    "title": "고객 로그인",
    "actor": "고객",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "login.login",
      "title": "로그인(가입)",
-     "method": "POST",
-     "path": "/api/auth/login",
-     "status": 503,
-     "ms": 8,
      "sent": "POST /api/auth/login",
-     "response": "{\"error\": \"auth_unavailable\", \"detail\": \"회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다.\"}",
+     "ms": 9,
+     "status": 503,
+     "json": true,
+     "code": "auth_unavailable",
      "state": "red",
      "reason": "HTTP 503"
     },
     {
      "key": "login.me",
      "title": "로그인 상태 확인",
-     "method": "GET",
-     "path": "/api/auth/me",
+     "sent": "GET /api/auth/me",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(member)"
     },
     {
      "key": "login.my_orders",
      "title": "내 주문 보기",
-     "method": "GET",
-     "path": "/api/my/orders",
+     "sent": "GET /api/my/orders",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(member)"
     }
@@ -150,49 +152,51 @@
    "key": "order",
    "title": "주문 만들기",
    "actor": "고객",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "order.count",
      "title": "조건에 맞는 부품으로 조립 가능한지 확인",
-     "method": "POST",
-     "path": "/api/candidates/count",
-     "status": 200,
-     "ms": 8,
      "sent": "POST /api/candidates/count",
-     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "ms": 11,
+     "status": 200,
+     "json": true,
+     "evidence": {
+      "buildable": false,
+      "total": 0,
+      "count": 0
+     },
      "state": "red",
      "reason": "buildable=False (기대 True)"
     },
     {
      "key": "order.quote",
      "title": "견적 받기(용도 게임 · 예산 150만원)",
-     "method": "POST",
-     "path": "/api/recommend",
-     "status": 500,
-     "ms": 7,
      "sent": "POST /api/recommend",
-     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "ms": 10,
+     "status": 500,
+     "json": false,
+     "code": "UndefinedColumn",
      "state": "red",
      "reason": "HTTP 500"
     },
     {
      "key": "order.create",
      "title": "주문 생성",
-     "method": "POST",
-     "path": "/api/orders",
+     "sent": "POST /api/orders",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(session_id, tier)"
     },
     {
      "key": "order.view",
      "title": "주문 조회",
-     "method": "GET",
-     "path": "/api/commerce/orders/{order_no}",
+     "sent": "GET /api/commerce/orders/{order_no}",
+     "ms": 8,
      "status": 503,
-     "ms": 6,
-     "sent": "GET /api/commerce/orders/ORD-SCENARIO-PROBE",
-     "response": "{\"code\": \"owner_configuration_unready\"}",
+     "json": true,
+     "code": "owner_configuration_unready",
      "state": "red",
      "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
     }
@@ -202,117 +206,152 @@
    "key": "payment",
    "title": "결제하기",
    "actor": "고객",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "payment.prepare",
      "title": "결제 준비(주문 금액 확정)",
-     "method": "GET",
-     "path": null,
+     "sent": null,
      "state": "red",
      "reason": "HTTP 경로 없음 — api/commerce_writer.py 의 create_draft·prepare 를 부르는 라우트가 없다"
     },
     {
      "key": "payment.approve",
      "title": "결제 승인",
-     "method": "GET",
-     "path": null,
+     "sent": null,
      "state": "red",
      "reason": "HTTP 경로 없음 — commerce_writer 의 dispatch·finalize 를 부르는 라우트가 없다"
     },
     {
      "key": "payment.history",
      "title": "내 결제 내역 보기",
-     "method": "GET",
-     "path": "/api/my/payments",
+     "sent": "GET /api/my/payments",
      "state": "yellow",
      "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(order_no, member)"
     }
    ]
   },
   {
-   "key": "admin",
-   "title": "운영자 주문 관리",
+   "key": "admin_lists",
+   "title": "운영자 목록 조회",
    "actor": "운영자",
+   "note": "목록이 열린다는 것만 증명한다(빈 목록이어도 통과). 주문을 실제로 처리했다는 증거는 아래 「운영자 주문 처리」다. 그래서 「끝까지 되는 시나리오」 수에 넣지 않는다.",
+   "end_to_end": false,
    "complete": true,
    "steps": [
     {
      "key": "admin.login",
      "title": "관리자 로그인",
-     "method": "POST",
-     "path": "/api/admin/auth/login",
-     "status": 200,
-     "ms": 25,
      "sent": "POST /api/admin/auth/login",
-     "response": "{\"state\": \"active\", \"operator\": {\"id\": 1, \"email\": \"scenario-owner@ci.popcorn.invalid\", \"role\": \"owner\"}, \"bootstrap\": true, \"message\": \"부트스트랩 계정으로 자동 승인됐습니다(관리자 권한)\"}",
+     "ms": 53,
+     "status": 200,
+     "json": true,
      "state": "green",
      "reason": "실제 요청 통과"
     },
     {
      "key": "admin.commerce_orders",
      "title": "커머스 주문 목록",
-     "method": "GET",
-     "path": "/api/admin/commerce/orders",
-     "status": 200,
-     "ms": 19,
      "sent": "GET /api/admin/commerce/orders",
-     "response": "{\"commerce_version\": \"commerce_v1\", \"checked_at\": 1791444203, \"context\": {\"state\": \"confirmed\", \"binding_id\": \"aafd2ade-045d-48b2-9f07-cd7d36e76cea\"}, \"items\": [], \"next_cursor\": null}",
+     "ms": 23,
+     "status": 200,
+     "json": true,
      "state": "green",
      "reason": "실제 요청 통과"
     },
     {
      "key": "admin.payments",
      "title": "결제 내역 목록",
-     "method": "GET",
-     "path": "/api/admin/payments",
-     "status": 200,
-     "ms": 16,
      "sent": "GET /api/admin/payments",
-     "response": "{\"fee_rate\": 0.022, \"today\": \"2026-10-08\", \"payments\": [], \"settles\": []}",
+     "ms": 18,
+     "status": 200,
+     "json": true,
      "state": "green",
      "reason": "실제 요청 통과"
     },
     {
      "key": "admin.refunds",
      "title": "환불 요청 목록",
-     "method": "GET",
-     "path": "/api/admin/refunds",
-     "status": 200,
-     "ms": 13,
      "sent": "GET /api/admin/refunds",
-     "response": "{\"items\": []}",
+     "ms": 13,
+     "status": 200,
+     "json": true,
+     "state": "green",
+     "reason": "실제 요청 통과"
+    },
+    {
+     "key": "admin.wrong_target",
+     "title": "없는 주문 상세는 찾을 수 없음으로 답함",
+     "sent": "GET /api/admin/commerce/orders/ORD-SCENARIO-NONE",
+     "ms": 14,
+     "status": 404,
+     "json": true,
+     "code": "order_not_found",
      "state": "green",
      "reason": "실제 요청 통과"
     }
    ]
   },
   {
-   "key": "fulfillment",
-   "title": "출고 등록과 배송 조회",
+   "key": "admin_task",
+   "title": "운영자 주문 처리(실제 대상)",
    "actor": "운영자",
+   "note": "실제 주문 하나가 출고 등록으로 상태가 바뀌고 되돌릴 수 있어야 초록이다.",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
-     "key": "fulfillment.register",
+     "key": "task.detail",
+     "title": "대상 주문 상세 보기",
+     "sent": "GET /api/admin/commerce/orders/{order_no}",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(order_no)"
+    },
+    {
+     "key": "task.fulfill",
      "title": "출고 등록",
-     "method": "POST",
-     "path": "/api/admin/commerce/orders/{order_no}/fulfillment",
+     "sent": "POST /api/admin/commerce/orders/{order_no}/fulfillment",
+     "ms": 13,
      "status": 503,
-     "ms": 11,
-     "sent": "POST /api/admin/commerce/orders/ORD-SCENARIO-PROBE/fulfillment",
-     "response": "{\"code\": \"fulfillment_origin_unconnected\"}",
+     "json": true,
+     "code": "fulfillment_origin_unconnected",
      "state": "red",
      "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
     },
     {
+     "key": "task.after",
+     "title": "처리 뒤 주문 상태가 바뀌었는지 확인",
+     "sent": "GET /api/admin/commerce/orders/{order_no}",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(order_no, fulfilled)"
+    },
+    {
+     "key": "task.recover",
+     "title": "잘못 처리한 출고 되돌리기",
+     "sent": null,
+     "state": "red",
+     "reason": "복구 기준 미정 — 커머스 출고를 되돌리는 HTTP 경로가 정의되지 않았다(PC 쪽 8번에서 정한다)"
+    }
+   ]
+  },
+  {
+   "key": "fulfillment",
+   "title": "고객 배송 조회",
+   "actor": "고객",
+   "note": "",
+   "end_to_end": true,
+   "complete": false,
+   "steps": [
+    {
      "key": "fulfillment.customer_view",
      "title": "고객이 배송 상태 보기",
-     "method": "GET",
-     "path": "/api/commerce/orders/{order_no}/fulfillment",
+     "sent": "GET /api/commerce/orders/{order_no}/fulfillment",
+     "ms": 8,
      "status": 503,
-     "ms": 6,
-     "sent": "GET /api/commerce/orders/ORD-SCENARIO-PROBE/fulfillment",
-     "response": "{\"code\": \"owner_configuration_unready\"}",
+     "json": true,
+     "code": "owner_configuration_unready",
      "state": "red",
      "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
     }
@@ -322,35 +361,34 @@
    "key": "return",
    "title": "반품",
    "actor": "고객 · 운영자",
+   "note": "",
+   "end_to_end": true,
    "complete": false,
    "steps": [
     {
      "key": "return.request",
      "title": "고객 반품 접수",
-     "method": "GET",
-     "path": null,
+     "sent": null,
      "state": "red",
      "reason": "HTTP 경로 없음 — 실물 반품 접수 라우트가 없다(api/commerce_physical_return_http.py 는 관리자 조회 GET 둘뿐)"
     },
     {
      "key": "return.pickup",
      "title": "회수·입고 처리",
-     "method": "GET",
-     "path": null,
+     "sent": null,
      "state": "red",
      "reason": "HTTP 경로 없음 — 회수·입고·실행 라우트가 없다"
     },
     {
      "key": "return.admin_view",
      "title": "운영자 반품 내역 보기",
-     "method": "GET",
-     "path": "/api/admin/commerce/orders/{order_no}/physical-returns",
+     "sent": "GET /api/admin/commerce/orders/{order_no}/physical-returns",
+     "ms": 35,
      "status": 404,
-     "ms": 38,
-     "sent": "GET /api/admin/commerce/orders/ORD-SCENARIO-PROBE/physical-returns",
-     "response": "{\"code\": \"physical_return_not_found\"}",
+     "json": true,
+     "code": "physical_return_not_found",
      "state": "yellow",
-     "reason": "경로는 응답함(HTTP 404) · 앞 단계가 대상(order_no)을 못 만들어 실제 확인 못 함"
+     "reason": "경로는 응답함 · 앞 단계가 대상(order_no)을 못 만들어 실제 확인 못 함"
     }
    ]
   }
