@@ -10,3 +10,4 @@ jobs:
       - run: echo stub
 # case1 PR1 five CI paths only
 # case3 PR1 five + api/main.py
+# case2 PR13 three CI paths only
