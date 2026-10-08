@@ -29,6 +29,7 @@ from .customer_auth import require_member
 from .customer_auth import require_verified_session
 from . import customer_auth as profile_auth
 from . import customer_identity as profile_identity
+from . import customer_auth_store as profile_store
 from .customer_write_lock import write_locked, REASON as WRITE_LOCK_REASON
 from .db import engine
 
@@ -172,7 +173,12 @@ class RuntimeMemberProfileRepository:
         raise _profile_error(503, "auth_unavailable")
 
 
-_profile_repository = RuntimeMemberProfileRepository()
+def create_stored_profile_reader(source):
+    """Explicit server/fixture read composition, never a request field."""
+    return profile_store.MemberReadAdapter(source)
+
+
+_profile_repository = create_stored_profile_reader(profile_store.RUNTIME_READ_PORT)
 
 
 def get_profile_repository():

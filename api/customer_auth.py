@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
 from . import customer_identity as identity
+from . import customer_auth_store as stored_reads
 
 COOKIE = "popcorn_member_session"
 ABSOLUTE_DAYS = 14
@@ -164,7 +165,18 @@ class VerifiedSessionResolver:
         return current
 
 
-RUNTIME_RESOLVER = VerifiedSessionResolver(RuntimeSessionRepository(), RuntimeIssuerReadiness())
+def create_stored_read_resolver(source, principal):
+    """Explicit server/fixture composition; no client-selected ports or SQL.
+
+    The trusted principal port is independent of stored row shape. Actual
+    persistence/provenance restoration requires the future C2/I1 contract.
+    """
+    repository = stored_reads.SessionReadAdapter(source, principal, PersistedSessionSnapshot)
+    return VerifiedSessionResolver(repository, principal)
+
+
+RUNTIME_RESOLVER = create_stored_read_resolver(
+    stored_reads.RUNTIME_READ_PORT, stored_reads.RUNTIME_PRINCIPAL_PORT)
 
 
 def _cookie(request):
@@ -306,6 +318,8 @@ def login(body: LoginBody, request: Request, response: Response):
 def logout(request: Request, response: Response):
     # Clear the browser credential without claiming persisted revocation.
     # No live verified revocation adapter or legacy DB mutation is used.
+    # R1 declares an unavailable revoke port; its writer/success policy is
+    # unapproved, so this route does not invoke it or promote a fixture result.
     result = JSONResponse({"detail":{"code":"auth_unavailable"}},status_code=503)
     result.delete_cookie(COOKIE,path="/")
     return _no_store(result)
