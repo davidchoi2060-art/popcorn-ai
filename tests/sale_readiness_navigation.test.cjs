@@ -54,7 +54,7 @@ function workspaceHarness(search,{detailPending=false,detailError=false}={}){
  const delayed=deferred();let salesDirty=false;
  function element(id){if(!elements.has(id))elements.set(id,{innerHTML:'',textContent:'',value:'',hidden:false,addEventListener(type,fn){this[type]=fn;},querySelector(selector){return {click(){opened.push(selector);}};},showModal(){opened.push('dialog');},close(){opened.push('close');}});return elements.get(id);}
  const document={activeElement:null,getElementById:element,addEventListener(type,fn){handlers[type]=fn;},querySelectorAll(){return [];},querySelector(){return null;}};
- const win={confirm(){return false;},addEventListener(type,fn){windowHandlers[type]=fn;},PcSalesConditions:{mount(){opened.push('sales');return {dirty:()=>salesDirty,processing:()=>false};}},PcCatalogDetail:{mount(host,data){opened.push('mount:'+data.configuration_id);}}};
+ const win={confirm(){return false;},addEventListener(type,fn){windowHandlers[type]=fn;},PcSalesConditions:{mount(){opened.push('sales');return {dirty:()=>salesDirty,processing:()=>false};}},PcCatalogDetail:{mount(host,data,options){assert.equal(host,element('pcw-inline'));assert.equal(options.inline,true);opened.push('mount:'+data.configuration_id);return {activateTab(tab){opened.push('activate:'+tab);},dirty:()=>false,processing:()=>false,dispose(){}};}}};
  const data={configuration_id:'N02',revision:1,observed_date:'2026-10-05',content:{title:'격리 상품',intro:'격리 설명',scene:'격리 상황',facts:{},benefits:[],checks:[],faq:[]},parts:[],offers:[],current_review:{}};
  const fetch=async(url,options)=>{requests.push({url,method:options.method||'GET'});if(url.endsWith('/tasks'))return {ok:true,json:async()=>({items:[]})};if(url.includes('ai-proposals'))return delayed.promise;
   if(detailPending)return delayed.promise;return {ok:!detailError,json:async()=>detailError?{detail:'조회 실패'}:data};};
@@ -66,7 +66,7 @@ test('workspace opens each requested existing tab after its asynchronous detail 
  for(const tab of ['parts','copy','review','sales']){
   const h=workspaceHarness('?id=N02&tab='+tab,{detailPending:true});await flush();assert.deepEqual(h.opened,[]);
   h.resolve();await flush();
-  if(tab==='sales')assert.deepEqual(h.opened,['sales']);else if(tab==='copy')assert.deepEqual(h.opened,[]);else assert.deepEqual(h.opened,['mount:N02','dialog','[data-tab="'+tab+'"]']);
+  if(tab==='sales')assert.deepEqual(h.opened,['sales']);else if(tab==='copy')assert.deepEqual(h.opened,[]);else assert.deepEqual(h.opened,['mount:N02','activate:'+tab]);
   assert.ok(h.requests.every(r=>r.method==='GET'));
  }
 });
