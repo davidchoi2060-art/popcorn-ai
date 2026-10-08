@@ -108,3 +108,70 @@ def test_server_error_keeps_only_exception_kind():
         err = meter._ServerError(exc)
     assert err.exception == 'ValueError'
     assert not hasattr(err, 'text')
+
+
+class _SetCookieMsg:
+    """requests 가 Set-Cookie 를 읽는 원응답 모양(`_original_response.msg.get_all`)의 최소 구현."""
+
+    class _Msg:
+        @staticmethod
+        def get_all(name, default=None):
+            return ['popcorn_session=leak123; Path=/'] if name.lower() == 'set-cookie' else default
+
+    _original_response = type('Orig', (), {'msg': _Msg()})()
+
+
+class _CookieSettingAdapter:
+    """연결을 열지 않는 가짜 어댑터. 모든 응답에 Set-Cookie 를 싣고, 받은 요청의 Cookie 를 기록한다.
+    쿠키 저장은 requests 의 실제 함수(extract_cookies_to_jar)로 세션 쿠키 통에 넣어,
+    세션에 걸린 쿠키 정책이 실제로 적용되는지를 본다."""
+
+    def __init__(self, jar, seen):
+        self.jar, self.seen = jar, seen
+
+    def send(self, request, **kwargs):
+        import requests
+        from requests.cookies import extract_cookies_to_jar
+        self.seen.append(request.headers.get('Cookie'))
+        extract_cookies_to_jar(self.jar, request, _SetCookieMsg)
+        resp = requests.Response()
+        resp.status_code, resp._content, resp.encoding = 200, b'{"ok": true}', 'utf-8'
+        resp.headers['Content-Type'] = 'application/json'
+        resp.url, resp.request = request.url, request
+        return resp
+
+    def close(self):
+        pass
+
+
+def _fake_session_factory(seen):
+    import requests
+
+    def make():
+        s = requests.Session()
+        adapter = _CookieSettingAdapter(s.cookies, seen)
+        s.mount('http://', adapter)
+        s.mount('https://', adapter)
+        return s
+    return make
+
+
+def test_remote_readonly_never_resends_cookie(no_sockets):
+    """실제 Remote + 실제 requests.Session(가짜 어댑터): 첫 응답이 준 쿠키가 둘째 요청에 실리지 않는다."""
+    seen = []
+    remote = meter.Remote('http://scenario.invalid', allow_writes=False,
+                          session_factory=_fake_session_factory(seen))
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    assert seen == [None, None], seen
+    assert no_sockets == []
+
+
+def test_cookie_counter_case_shared_session_would_leak(no_sockets):
+    """반례: 쓰기 허용(세션 공유)에서는 같은 가짜가 쿠키를 되보낸다 — 위 시험이 헛통과가 아님을 보인다."""
+    seen = []
+    remote = meter.Remote('http://scenario.invalid', allow_writes=True,
+                          session_factory=_fake_session_factory(seen))
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    assert seen[0] is None and seen[1] and 'leak123' in seen[1], seen

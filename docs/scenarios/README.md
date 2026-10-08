@@ -36,12 +36,13 @@ python tests/scenarios/meter.py --base-url http://127.0.0.1:8000 --out docs/scen
 - `--base-url` 모드는 앱(`api`)·`.env`·DB 엔진을 불러오지 않는다. 경로 존재 확인도 서버 응답으로만 한다.
 - `--allow-writes` 가 없으면 **코드로 쓰지 않음을 확인한(`readonly`) 비로그인 단계만** 보낸다.
   쿠키를 보내는 단계는 readonly 여도 보내지 않는다(인증 GET 도 세션 last_seen 을 쓸 수 있다).
+  원격 모드에서는 요청마다 새 세션을 쓰고 쿠키 저장·전송을 모두 막는다(비로그인 읽기 응답의 Set-Cookie 가 다음 요청에 실리지 않는다).
   켜면 견적·로그인·주문처럼 행을 만드는 단계도 보낸다. PC 의 `.env` 는 공유 Cloud SQL 이라
   `consult_sessions`·`handoffs` 등에 행이 남는다(CLAUDE.md 「검증이 흔적을 남긴다」).
 - 기록에는 응답 원문·예외 문장·열쇠·세션 번호가 남지 않는다. 상태 코드, JSON 여부, 오류 코드
   (`auth_unavailable` 처럼 영문 코드만), 단계가 지정한 숫자·참거짓 값, 경로의 틀만 남는다.
 - `--measured-by PC 쪽` 으로 측정 주체를 기록에 적는다. 클라우드 쪽 측정은 PC 독립 확인이 아니다.
-- 안전 검사: `python -m pytest tests/scenarios/test_meter_safety.py -q` (가짜 전송기, 네트워크·DB 불필요).
+- 안전 검사: `python -m pytest tests/scenarios/test_meter_safety.py -q` (가짜 전송기·가짜 어댑터, 네트워크·DB 불필요). pytest 가 없으면 `pip install pytest`.
 - 관리자 단계: `SCENARIO_ADMIN_EMAIL` · `SCENARIO_ADMIN_PASSWORD` 환경변수. 비밀번호는
   기록에 남지 않는다.
 - 종료 코드는 측정이 끝나면 0 이다(빨강이 있어도). 측정기가 못 돌면 2.

@@ -90,16 +90,38 @@ class InProcess:
 
 
 class Remote:
-    """떠 있는 서버용 — requests 만 쓴다. 앱·DB 모듈을 불러오지 않는다."""
+    """떠 있는 서버용 — requests 만 쓴다. 앱·DB 모듈을 불러오지 않는다.
 
-    def __init__(self, base_url: str):
-        self.base, self.sessions = base_url.rstrip('/'), {}
+    쓰기 금지(기본)면 쿠키를 저장도 전송도 하지 않는다(PR #2 재검토): 비로그인 읽기 응답이
+    Set-Cookie 를 주더라도 다음 요청에 Cookie 로 실려 «로그인한 요청»이 되면 안 된다.
+    요청마다 새 세션을 쓰고, 그 세션의 쿠키 정책이 모든 쿠키를 거부하며, Cookie 머리글도 비운다.
+    """
+
+    def __init__(self, base_url: str, allow_writes: bool = False, session_factory=None):
+        self.base, self.allow_writes, self.sessions = base_url.rstrip('/'), allow_writes, {}
+        self._factory = session_factory
+
+    def _new_session(self):
+        if self._factory is not None:
+            return self._factory()
+        import requests
+        return requests.Session()
 
     def send(self, audience: str, method: str, path: str, body: Any):
-        import requests
-        session = self.sessions.setdefault(audience, requests.Session())
-        return session.request(method, self.base + path, timeout=60, allow_redirects=False,
-                               **({'json': body} if body is not None else {}))
+        kw = {'timeout': 60, 'allow_redirects': False, **({'json': body} if body is not None else {})}
+        if self.allow_writes:
+            session = self.sessions.get(audience)
+            if session is None:
+                session = self.sessions[audience] = self._new_session()
+            return session.request(method, self.base + path, **kw)
+        import http.cookiejar
+        session = self._new_session()   # 요청마다 새 세션 — 이전 응답의 쿠키가 남을 자리가 없다
+        session.cookies.set_policy(http.cookiejar.DefaultCookiePolicy(allowed_domains=[]))
+        session.headers.pop('Cookie', None)
+        try:
+            return session.request(method, self.base + path, **kw)
+        finally:
+            session.close()
 
 
 class _ServerError:
@@ -279,7 +301,7 @@ def main(argv: list[str] | None = None, transport=None) -> int:
 
     routes = None
     if args.base_url:
-        transport = transport or Remote(args.base_url)   # 원격: api·.env·DB 엔진을 불러오지 않는다
+        transport = transport or Remote(args.base_url, args.allow_writes)   # 원격: api·.env·DB 엔진을 불러오지 않는다
     else:
         sys.path.insert(0, str(ROOT))
         try:
