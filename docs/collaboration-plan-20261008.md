@@ -65,10 +65,10 @@
 |---|---|---|
 | 1 | 리뷰 대기 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) · CI 초록(1,548 통과). PC 경로에 묶인 61건은 클라우드에서 건너뛰고 「PC 전용」으로 따로 셈 | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
 | 3 | draft [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) · 작업 규칙 초안, 중헌님 승인 대기 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
-| 4 | 원인 확인(회귀 사전조건 누락) · 「준비 실패」 표시 보완 진행 중 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
-| 5 | 진행 중 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
+| 4 | draft [PR #8](https://github.com/davidchoi2060-art/popcorn-ai/pull/8) · 사전조건 누락을 「준비 실패」로 표시 · 서버 환경 설정은 중헌님 조치 필요 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
+| 5 | draft [PR #9](https://github.com/davidchoi2060-art/popcorn-ai/pull/9) · 참고가격↔주문 확정가 계약은 PR #2에 답함 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
 | 6 | draft [PR #3](https://github.com/davidchoi2060-art/popcorn-ai/pull/3) 응답 정리 · draft [PR #5](https://github.com/davidchoi2060-art/popcorn-ai/pull/5) 보관 요청 속도 제한(방문자당 분당 10건·하루 100건, DB 정책 표에서 조정) | `/api/grid/recommend`에서 최상위 `notes`와 `items[].spec`의 내부 키 제거(`spec`은 `cpu`·`gpu`·`ram_gb`·`ssd_gb`·`vram_gb`만), `/api/mvp3/saved-quotes` 쓰기 속도 제한. `mockups/mvp3/`는 고치지 않음. 계약 원문은 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054476845) |
-| 7 | 진행 중 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
+| 7 | draft [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) · push·PR마다 Actions 실행. 첫 측정(마이그레이션만 적용한 빈 DB): 시나리오 8개 중 1개, 단계 27개 중 5개 초록. 표는 `docs/scenarios/ci/status.md` | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
 | 10 | draft [PR #6](https://github.com/davidchoi2060-art/popcorn-ai/pull/6) · 10/3~10/7 기록은 추정 표시, PC 쪽 사실 확인 요청 | 결정 로그(9/25 재설계, 10/4~10/7), ERD(0124~0132), HANDOFF 축약 |
 
 ### 열린 질문
@@ -82,6 +82,8 @@
 ### 상대에게 요청 (클라우드 → PC)
 
 - ~~4번용: 9/23 실패 줄 전달~~ 받음(10/8).
+- 7번에서 발견: 마이그레이션만으로 만든 DB에서 견적 요청이 500. 추천 뷰에 `vram_gb` 컬럼이 없다(0083·0084가 컬럼은 추가했지만 뷰에는 안 넣음). 공유 DB 때문에 지금은 가려져 있고, 새 운영 서버에서는 터진다. **뷰를 고치는 마이그레이션을 PC 쪽에 요청**(ERD 개정 먼저). 근거 [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) 본문.
+- 7번: 클라우드는 개발 서버에 닿지 않으므로, **PC에서 실카탈로그 기준 측정 1회** 실행 요청.
 
 ---
 
