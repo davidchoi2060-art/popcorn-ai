@@ -204,15 +204,16 @@ ORDER BY f.product_code;
 - `tests.test_pc_configuration_offer_binding` 25건 중 1건 실패: `test_original_whole_ast_imports_routes_and_functions_are_unchanged`(고정해 둔 `pc_configuration_copy.py` AST 해시 불일치). `main`에서 이미 실패하는 상태이고 이 문서 변경과 무관하다.
 - 추천 응답 형태는 PR #3 브랜치의 `tests/test_grid_recommend_public_response.py`(28건 통과)와 `tests/fixtures/grid_recommend_sold_response.json`이 고정한다.
 
-## 9. 후속: 공개 BOM·대표 사진 고객 API (2026-10-08 추가)
+## 9. 후속: 공개 BOM·대표 사진 고객 API (2026-10-08 추가, 같은 날 UI 모양으로 개정)
 
-- 계약: [PR #2 댓글 6059286404](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6059286404). 구현: PR #17(draft, PR #10 위에 쌓음).
-- `GET /api/customer/pc-offers/{product_code}` → `{ok, offer}`. `offer`는 §3의 `data`와 같고 둘이 바뀐다:
-  - `parts[].photo`: 실부품 `{"state":"approved","url":"/api/product-images/{부품코드}/detail"}`, pseudo `{"state":"none","url":null}`
-  - `photo`: selected·ready·visual 현재본이면 `{"state":"current","url":"/api/customer/pc-offers/{code}/photo/{job_id}","notice":"AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"}`, 아니면 `{"state":"unresolved","url":null,"notice":null}`
+- 계약: [PR #2 댓글 6059286404](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6059286404). UI 매핑: [6059780234](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6059780234). 구현: PR #17(draft, PR #10 위, HEAD `a8a1102`).
+- `GET /api/customer/pc-offers/{product_code}` → `{ok, product_code, photo, public_configuration}`. 키 이름은 통합 UI(`claude/customer-ui-combined-check` 0e3c665)가 추천 항목 한 건에서 읽는 이름 그대로다.
+  - `public_configuration`: §3의 `data` 그대로. **안의 `photo`는 항상 `{"state":"unresolved","url":null}`** — UI 검증기 `publicConfiguration()`이 이 값이 아니면 구성 전체를 버린다. 추가 필드 `parts[].photo`(실부품 `approved` → `/api/product-images/{부품코드}/detail`, pseudo `none`)는 UI가 쓰지 않는다.
+  - `photo`(SKU 대표 사진): selected·ready이고 `visual_basis`가 현재 구성과 같고 고지문이 정본이면 `{"state":"available","kind":"ai_assembly_example","url":"/api/customer/products/{code}/representative-image","notice":"AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"}`, 아니면 `{"state":"unavailable","url":null}`.
+- `GET /api/customer/products/{product_code}/representative-image`: 매 요청 공개 판정을 다시 돌린 뒤 PNG. `Cache-Control: no-cache`, `ETag: "<sha256>"`, 재검증 `304`. 공개 아님·현재 job 없음 `404`, 저장소 실패·해시 불일치 `503`.
 - 공개 아님은 전부 `404 {"detail":{"error":"not_public"}}`. 가격·재고는 계속 `unknown`이고 부품별 가격은 없다.
 - 운영 설정: `POPCORN_PART_PHOTO_RIGHTS_REFERENCE`가 없으면 모든 SKU가 404다.
-- §0 표 갱신: 공개 BOM·완제품 대표 사진 = 설계 완료 / 단위 검사 완료(PR #17, 13건) / 실 DB 적용 미확인.
+- §0 표 갱신: 공개 BOM·완제품 대표 사진 = 설계 완료 / 단위 검사 완료(PR #17, 15건) / 실 DB 적용 미확인.
 
 ### 9.1 실 DB에서 몇 SKU가 열리는지 확인하는 읽기 전용 질의
 
@@ -284,3 +285,30 @@ PR #17은 `pc_media_jobs`의 selected·ready·visual 현재본만 연다. ZIP �
 4. **공개**: 구성이 발행 승인(`pc_customer_publication_events`)되고 부품 설명·사진 승인이 현재본이면 PR #17이 연다.
 
 `신규` 15개는 판매 offer가 생기기 전까지 4단계에 닿지 않는다.
+
+## 11. 추천·저장 견적 응답에 싣기 (2026-10-08 추가)
+
+구현: [PR #20](https://github.com/davidchoi2060-art/popcorn-ai/pull/20)(draft, PR #17 위, HEAD `0abbd60`). §9의 두 객체를 그대로 싣는다 — 새 판정은 없다(`customer_pc_offer.public_item` 한 곳).
+
+| 응답 | 위치 | 키 |
+|---|---|---|
+| `POST /api/grid/recommend` | `card_sets[kind=sold].items[n]` | `photo`, `public_configuration` |
+| `GET /api/mvp3/saved-quotes` | `quotes[n].product` | 같음 |
+| `POST /api/mvp3/saved-quotes` | `quote.product` | 같음 |
+
+- 저장 견적의 두 키는 **응답 시점에 다시 읽는다.** `product_snapshot`에는 저장하지 않는다 — 승인 철회나 사진 교체가 저장된 견적에도 바로 따른다.
+- 같은 응답에 같은 상품이 여러 번 나오면 판정은 한 번만 한다.
+
+### 11.1 빈 값 계약 — UI는 「이미지 준비 중」을 낸다
+
+| 서버 상태 | `photo` | `public_configuration` | UI(`customerPhoto` · `publicConfiguration`) |
+|---|---|---|---|
+| 공개 + 현재 대표 사진 있음 | `available` 객체(§9) | 공개 BOM | 사진 표시 · 구성 상세 |
+| 공개 + 대표 사진 없음·낡음·고지문 불일치 | `{"state":"unavailable","url":null}` | 공개 BOM | **「이미지 준비 중」** · 구성 상세 |
+| 공개 아님(미승인·철회·판매중 아님·권리 근거 미설정 등, 구분 안 함) | `{"state":"unavailable","url":null}` | `null` | **「이미지 준비 중」** · 구성 상세 없음 |
+| 판정 중 오류(DB·저장소) | `{"state":"unavailable","url":null}` | `null` | 위와 같음. 추천·저장 응답 자체는 실패하지 않고 서버 로그에 남는다 |
+| 키 자체가 없음(이 PR 이전 서버) | — | — | `unavailable` · 「이미지 준비 중」 |
+| `available`인데 이미지 요청이 404·503 | — | — | img 오류 → `temporarily_unavailable` 「이미지를 불러오지 못했습니다」(UI 판단) |
+
+서버는 `temporarily_unavailable`을 보내지 않는다. 비용: sold 항목마다 공개 판정 1회(부품 사진 바이트 해시 포함). 캐시는 넣지 않았다 — 승인 철회가 늦게 반영되는 쪽보다 느린 쪽을 택했다.
+
