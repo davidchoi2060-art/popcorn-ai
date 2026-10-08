@@ -1,1 +1,2 @@
 # probe fixture: requirements-test.txt
+# case1 PR1 five CI paths only
