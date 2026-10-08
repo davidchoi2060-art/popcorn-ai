@@ -97,18 +97,28 @@ class CustomerPcOfferTest(unittest.TestCase):
     def get(self, path):
         return self.client.get("/api/customer/pc-offers" + path)
 
-    def test_public_offer_shape_and_photos(self):
+    def image(self, code=99413, **headers):
+        return self.client.get(f"/api/customer/products/{code}/representative-image", headers=headers)
+
+    def test_response_is_ui_item_shape(self):
         r = self.get("/99413")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["cache-control"], "no-store")
-        offer = r.json()["offer"]
-        self.assertEqual(offer["parts"][0]["photo"], {"state": "approved", "url": "/api/product-images/4321/detail"})
-        self.assertEqual(offer["parts"][1]["photo"], {"state": "none", "url": None})
-        self.assertEqual(offer["photo"], {"state": "current", "url": f"/api/customer/pc-offers/99413/photo/{JOB}",
-                                          "notice": m.pc_media.NOTICE})
+        body = r.json()
+        self.assertEqual(set(body), {"ok", "product_code", "photo", "public_configuration"})
+        self.assertEqual(body["product_code"], 99413)
+        self.assertEqual(body["photo"], {"state": "available", "kind": "ai_assembly_example",
+                                         "url": "/api/customer/products/99413/representative-image",
+                                         "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"})
+        config = body["public_configuration"]
+        # UI 검증기는 공개 BOM 안의 photo 가 정확히 unresolved/null 일 때만 받는다
+        self.assertEqual(config["photo"], {"state": "unresolved", "url": None})
+        self.assertEqual((config["product_code"], config["offer_id"]), (99413, "P99413"))
+        self.assertEqual(config["parts"][0]["photo"], {"state": "approved", "url": "/api/product-images/4321/detail"})
+        self.assertEqual(config["parts"][1]["photo"], {"state": "none", "url": None})
         # 가격은 이 경로가 지어내지 않는다
-        self.assertEqual(offer["price"]["state"], "unknown")
-        self.assertIsNone(offer["price"]["amount"])
+        self.assertEqual(config["price"]["state"], "unknown")
+        self.assertIsNone(config["price"]["amount"])
 
     def test_snapshot_is_repeatable_read_read_only_and_rolled_back(self):
         self.get("/99413")
@@ -136,35 +146,53 @@ class CustomerPcOfferTest(unittest.TestCase):
     def test_invalid_code(self):
         self.assertEqual(self.get("/0").status_code, 422)
         self.assertEqual(self.get("/abc").status_code, 422)
+        self.assertEqual(self.image(0).status_code, 422)
         self.mocks[1].assert_not_called()
 
-    def test_stale_or_missing_representative_photo_is_unresolved(self):
+    def test_stale_missing_or_foreign_notice_photo_is_unavailable(self):
+        unavailable = {"state": "unavailable", "url": None}
         self.visual = "w" * 64
-        self.assertEqual(self.get("/99413").json()["offer"]["photo"], m.UNRESOLVED)
+        body = self.get("/99413").json()
+        self.assertEqual(body["photo"], unavailable)
+        self.assertEqual(body["public_configuration"]["photo"], {"state": "unresolved", "url": None})
+        self.visual = "v" * 64
+        self.conn.job = dict(self.job, asset=dict(ASSET, notice="다른 고지"))
+        self.assertEqual(self.get("/99413").json()["photo"], unavailable)
         self.conn.job = None
-        self.assertEqual(self.get("/99413").json()["offer"]["photo"], m.UNRESOLVED)
+        self.assertEqual(self.get("/99413").json()["photo"], unavailable)
 
-    def test_photo_served_only_for_current_selected_job(self):
-        r = self.get(f"/99413/photo/{JOB}")
+    def test_image_served_only_for_current_selected_job(self):
+        r = self.image()
         self.assertEqual((r.status_code, r.content, r.headers["content-type"]), (200, PNG, "image/png"))
-        self.assertEqual(r.headers["cache-control"], "public, max-age=300")
-        self.assertEqual(self.get(f"/99413/photo/{UUID(int=8)}").status_code, 404)
+        self.assertEqual(r.headers["cache-control"], "no-cache")
+        self.assertEqual(r.headers["etag"], '"' + ASSET["sha256"] + '"')
         self.visual = "w" * 64
-        self.assertEqual(self.get(f"/99413/photo/{JOB}").status_code, 404)
+        self.assertEqual(self.image().status_code, 404)
+        self.visual = "v" * 64
+        self.conn.job = None
+        self.assertEqual(self.image().status_code, 404)
 
-    def test_photo_closed_when_offer_not_public(self):
+    def test_image_revalidation_returns_304_without_fetch(self):
+        self.body = b"not fetched"
+        r = self.image(**{"If-None-Match": '"' + ASSET["sha256"] + '"'})
+        self.assertEqual((r.status_code, r.content), (304, b""))
+
+    def test_image_closed_when_offer_not_public(self):
         self.result = {"status": 404, "error": "not_public"}
-        self.assertEqual(self.get(f"/99413/photo/{JOB}").status_code, 404)
+        self.assertEqual(self.image().status_code, 404)
 
-    def test_photo_checksum_mismatch_is_503_not_served(self):
+    def test_image_checksum_mismatch_is_503_not_served(self):
         self.body = PNG + b"x"
-        r = self.get(f"/99413/photo/{JOB}")
+        r = self.image()
         self.assertEqual(r.status_code, 503)
         self.assertNotIn(b"PNG", r.content)
 
-    def test_photo_wrong_storage_key_is_404(self):
+    def test_image_wrong_storage_key_is_404(self):
         self.job["asset"]["key"] = "pc-configurations/other/representative.png"
         self.conn.job = self.job
+        self.assertEqual(self.image().status_code, 404)
+
+    def test_old_job_photo_route_is_gone(self):
         self.assertEqual(self.get(f"/99413/photo/{JOB}").status_code, 404)
 
     def test_no_internal_or_llm_fields(self):
