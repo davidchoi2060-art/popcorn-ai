@@ -65,7 +65,7 @@
 |---|---|---|
 | 1 | 진행 중 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) · PC 쪽 지적 2건 반영 중(임시 PostgreSQL 표현, 테스트 0건·의존성 누락 시 실패) | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
 | 3 | 착수(초안) · 적용은 결정 ⑥ 뒤 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
-| 4 | PC 쪽에 서버 접근 방식 문의 중([댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054661938)) | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
+| 4 | 합의: PC가 9/23 실패 줄만 인계(선택 1). 원천은 Actions run 35804371636(`417e249`) · 인계 대기 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
 | 5 | 착수 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
 | 6 | 착수 · 소비 필드 계약 합의 | `/api/grid/recommend`에서 최상위 `notes`와 `items[].spec`의 내부 키 제거(`spec`은 `cpu`·`gpu`·`ram_gb`·`ssd_gb`·`vram_gb`만), `/api/mvp3/saved-quotes` 쓰기 속도 제한. `mockups/mvp3/`는 고치지 않음. 계약 원문은 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054476845) |
 | 7 | 착수 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
@@ -81,7 +81,7 @@
 
 ### 상대에게 요청 (클라우드 → PC)
 
-- 4번용: 서버 회귀 9/23 실패 로그 또는 `sudo popcorn-ci regression` 출력 전달.
+- 4번용: Actions run [35804371636](https://github.com/davidchoi2060-art/popcorn-ai/actions/runs/35804371636)의 `FAIL` 줄과 검사 번호를 PR #2 댓글로 전달(비밀값 가림). 운영 DB 쓰기·새 서버 접근은 요청하지 않음.
 
 ---
 
