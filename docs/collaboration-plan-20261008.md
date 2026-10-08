@@ -21,7 +21,7 @@
 5. 항목 상태가 바뀌면 이 파일의 자기 구역 표를 같은 PR에서 갱신한다.
 6. 중헌님 결정이 필요한 항목은 결정 전까지 시작하지 않는다(표의 「결정 대기」).
 
-> 지금은 PC 쪽이 main에 직접 push하고 있다. 3번이 승인되면 PC 쪽도 PR 흐름으로 바꾼다. 그 전까지는 클라우드 쪽 PR이 PC 쪽 커밋과 겹치지 않게 범위를 작게 유지한다.
+> 2026-10-08부터 PC 쪽도 main에 직접 push하지 않고 branch → PR 흐름을 따른다([PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) `docs/pr-flow-rules.md` 기준, PC 쪽 확인 [댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6056555911)). main 보호 설정은 아직 실제 적용되지 않았다.
 
 ---
 
