@@ -14,9 +14,11 @@
                                                live/selling/all, dry_run 파라미터 없음)
   읽기 보강: GET /api/admin/categories(트리 + margin_rate·margin_effective·margin_source).
 
-■ 상단 붉은 경고는 2026-10-08 걷었다. 그 경고가 지적한 두 경로(가격 검토 승인·단가표 반영)와
-  소싱 확정은 이제 `admin_price_import._reprice`에서 `pricing_reprice_core.product_margin`
+■ 상단 붉은 경고(「분류별 마진이 안 먹는 경로가 둘」)는 2026-10-08부터 사실이 아니다.
+  그 경고가 지적한 두 경로(가격 검토 승인·단가표 반영)와 소싱 확정은 이제
+  `admin_price_import._reprice`에서 `pricing_reprice_core.product_margin`
   (-> `pricing.resolve_margins`)으로 분류 마진을 쓴다 — 대량 재산정과 같은 값이다.
+  템플릿의 경고 문구 제거는 화면 문구 담당(Codex)에게 넘겼다(PR #2 요청).
 
   ■★★ 계약이 가정했지만 코드가 다른 곳 둘(신규 발견, 2026-08-15 이 제작자 코드 확인) —
   화면 문구를 계약 그대로 옮기지 않고 이 사실에 맞춰 조정했다:

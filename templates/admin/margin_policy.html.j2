@@ -6,9 +6,15 @@
     1b에서 가져온다). 정의서 `docs/design/req/req-margin-policy.md`.
     원문(Claude Design)은 하네스만 연다 — 이 화면은 계약 요약 텍스트로 지었다.
 
-  ■ 상단 붉은 경고(「분류별 마진이 안 먹는 경로가 둘」)는 2026-10-08 걷었다 — 가격 검토 승인·
-    단가표 반영·소싱 확정이 `admin_price_import._reprice` -> `pricing_reprice_core.product_margin`
-    으로 분류 마진을 쓰게 되어 더는 사실이 아니다(tests/test_margin_unification.py).
+  ■★★ 상단 붉은 경고 — 2026-08-15 이 제작자가 서버(8002)·전수 grep으로 재확인, 지금도
+    사실이다: 가격 검토 승인(`admin_price_review.py:62`)·단가표 일일 반영
+    (`admin_price_import.py:180`)은 둘 다 `_settings()`(전역만)에서 얻은 fee/margin으로
+    `sale_from_purchase`를 부른다 — `resolve_margins`/`category_margin_policies`를 부르지
+    않는다(두 파일 전수 grep, admin_price_review.py의 유일한 매치는 9행 **주석**뿐).
+    분류별 예외는 대량 재산정(`admin_reprice.py`, 이 화면이 쓰는 `/reprice/preview`)에만
+    먹는다. `resolve_margins(`를 실제로 **호출**하는 곳은 저장소 전체에 2곳뿐
+    (`admin_categories.py`·`admin_reprice.py:92`) — `api/admin_ui_margin_policy.py` 상단
+    docstring에 근거를 남겼다.
 
   ■★★ 계약이 가정했지만 코드가 다른 곳 둘(신규 발견, 이 제작자 코드 확인) — 문구를
     계약 그대로 옮기지 않고 이 사실에 맞춰 조정했다:
@@ -274,6 +280,17 @@ a.mp-link{color:var(--rv-link)}
 
 {% block content %}
 <div class="mp-page" data-screen-id="ADM-PRC-020" data-domain="margin-policy">
+
+  <div class="mp-warn" role="alert">
+    <div class="mp-warn-t">분류별 마진이 안 먹는 경로가 둘 있습니다</div>
+    <div class="mp-warn-d">
+      <strong>가격 검토 승인</strong>과 <strong>단가표 일일 반영</strong>은 전역값만 읽습니다
+      (<code>_settings()</code> — <code>resolve_margins</code>를 부르지 않음).
+      여기서 분류별 예외를 걸어도 <strong>그 두 경로에는 적용되지 않고 대량 재산정에만 적용됩니다.</strong>
+      의도인지 누락인지 근거가 없어 화면이 사실만 적어 둡니다.
+    </div>
+    <div class="mp-warn-ref">근거 — <code>admin_price_review.py:62</code> · <code>admin_price_import.py:180</code></div>
+  </div>
 
   <div class="mp-permnote">
     <span class="mp-permnote-i">권한</span>
