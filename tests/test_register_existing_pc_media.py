@@ -4,10 +4,9 @@ Fixture permission is not operating reuse/publication approval.
 from dataclasses import fields, replace
 from pathlib import Path
 import copy
-import os
+import functools
 import sys
 
-import pytest
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -18,19 +17,23 @@ from tools.register_existing_pc_media import (
 
 ARCHIVE = Path('D:/WORK/PopcornAI') / 'outputs' / 'assembled-pc-images-20260929'
 
-# Original archive bytes live only on the development PC (D:/WORK); same rule as
-# tests/conftest.py: skip only when that root is absent on this machine.
-if not os.path.isdir('D:/WORK'):
-    pytest.skip('개발 PC 전용 자료 없음: D:/WORK/PopcornAI/outputs/assembled-pc-images-20260929', allow_module_level=True)
-MANIFEST = (ARCHIVE / 'manifest.json').read_bytes()
-ORIGINALS = {code: (ARCHIVE / 'originals' / f'P{code}.png').read_bytes()
-             for code in (113835, 113836)}
+# Original archive bytes live only on the development PC (D:/WORK). Read lazily so
+# a missing root surfaces as FileNotFoundError at run time, which tests/conftest.py
+# reports as a PC-only skip; pure tests that need no bytes still run.
+@functools.lru_cache(maxsize=None)
+def _manifest():
+    return (ARCHIVE / 'manifest.json').read_bytes()
+
+
+@functools.lru_cache(maxsize=None)
+def _original(code):
+    return (ARCHIVE / 'originals' / f'P{code}.png').read_bytes()
 
 
 class TrustedFixture:
     def __init__(self, code=113835):
         self.code = code
-        self.input = OriginalInput(MANIFEST, ORIGINALS[code])
+        self.input = OriginalInput(_manifest(), _original(code))
         self.binding = ImportBinding(code, f'P{code}', f'P{code}', 2 if code == 113835 else 3,
             'a' * 64, CaseEvidence(129552 if code == 113835 else 129551,
                 'DAVEN N1 MESH', 'black' if code == 113835 else 'white',
@@ -127,7 +130,7 @@ class ImportPlannerTests(unittest.TestCase):
         for which in ('manifest_bytes', 'original_bytes', 'other_sku'):
             with self.subTest(which=which):
                 fixture = self.trusted()
-                delta = {'original_bytes': ORIGINALS[113836]} if which == 'other_sku' else {
+                delta = {'original_bytes': _original(113836)} if which == 'other_sku' else {
                     which: getattr(fixture.input, which) + b'altered'}
                 fixture.input = replace(fixture.input, **delta)
                 self.assertEqual(plan_import(113835, fixture.ports()).state, 'unavailable')

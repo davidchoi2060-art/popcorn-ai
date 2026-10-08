@@ -2,13 +2,12 @@
 from contextlib import contextmanager
 from dataclasses import replace
 import copy
+import functools
 import hashlib
 import json
 from pathlib import Path
-import os
 import sys
 
-import pytest
 import types
 import unittest
 from unittest.mock import patch
@@ -27,11 +26,14 @@ from api.pc_existing_media_import import provenance
 
 ARCHIVE = Path('D:/WORK/PopcornAI') / 'outputs' / 'assembled-pc-images-20260929'
 
-# Original archive bytes live only on the development PC (D:/WORK); same rule as
-# tests/conftest.py: skip only when that root is absent on this machine.
-if not os.path.isdir('D:/WORK'):
-    pytest.skip('개발 PC 전용 자료 없음: D:/WORK/PopcornAI/outputs/assembled-pc-images-20260929', allow_module_level=True)
-RAW = (ARCHIVE / 'originals' / 'P113835.png').read_bytes()
+# Original archive bytes live only on the development PC (D:/WORK). Read lazily so
+# tests that need them raise FileNotFoundError at run time, which tests/conftest.py
+# reports as a PC-only skip when that root is absent; the rest still run.
+@functools.lru_cache(maxsize=None)
+def _raw():
+    return (ARCHIVE / 'originals' / 'P113835.png').read_bytes()
+
+
 REQUEST = 'b7c26ac6-38d7-4cbb-97ea-a0f8945374de'
 WINNER = '5d8e2c70-8052-4543-a701-c15aa57a4b78'
 
@@ -41,7 +43,7 @@ class Fixture:
         snapshot = dict(parts=[], cooling={'fixture': True}, notice='fixture')
         binding = ImportBinding(113835, 'P113835', 'P113835', 2, digest(snapshot),
             CaseEvidence(129552, 'DAVEN N1 MESH', 'black', 'closed_mesh_opaque', 'N1_MESH', 'fixture'))
-        original = OriginalProvenance('P113835', 'originals/P113835.png', hashlib.sha256(RAW).hexdigest(),
+        original = OriginalProvenance('P113835', 'originals/P113835.png', hashlib.sha256(_raw()).hexdigest(),
             MANIFEST_SHA, 1, ('fixture QA',), None, None, None)
         self.capture = Capture(ImportPlan(original, binding), 'b' * 64, canonical(snapshot))
         self.expected = Expected(2, binding.current_visual_basis, 'b' * 64,
@@ -73,7 +75,7 @@ class Fixture:
 
 class Store:
     def __init__(self, fixture): self.f = fixture
-    def original_bytes(self, code): return RAW
+    def original_bytes(self, code): return _raw()
     @contextmanager
     def transaction(self, readonly=False):
         f = self.f
@@ -356,23 +358,23 @@ class Session:
         self.key = kw['params']['name']
         return Response(412 if self.existing else 200, self.metadata())
     def metadata(self):
-        return dict(bucket=BUCKET, name=self.key, generation='123', size=str(len(RAW)), contentType='image/png')
+        return dict(bucket=BUCKET, name=self.key, generation='123', size=str(len(_raw())), contentType='image/png')
     def get(self, url, **kw):
         self.gets.append((url, kw))
-        return (Response(content=b'wrong' if self.corrupt else RAW) if kw.get('params', {}).get('alt') == 'media'
+        return (Response(content=b'wrong' if self.corrupt else _raw()) if kw.get('params', {}).get('alt') == 'media'
                 else Response(data=self.metadata()))
 
 
 class GcsAdapterTests(unittest.TestCase):
     def test_ready_resume_reads_only_pinned_generation(self):
         session = Session()
-        self.assertEqual(GcsObjects(lambda: session).verify_existing(WINNER, RAW, '123').generation, '123')
+        self.assertEqual(GcsObjects(lambda: session).verify_existing(WINNER, _raw(), '123').generation, '123')
         self.assertFalse(session.posts)
     def test_create_and_412_same_bytes_generation_pinned(self):
         for existing in (False, True):
             with self.subTest(existing=existing):
                 session = Session(existing)
-                receipt = GcsObjects(lambda: session).create_or_verify(WINNER, RAW)
+                receipt = GcsObjects(lambda: session).create_or_verify(WINNER, _raw())
                 self.assertEqual(receipt.generation, '123')
                 self.assertEqual(session.posts[0][1]['params']['ifGenerationMatch'], '0')
                 self.assertEqual(session.gets[-1][1]['params'], {'alt': 'media', 'generation': '123'})
@@ -381,14 +383,14 @@ class GcsAdapterTests(unittest.TestCase):
     def test_412_mismatch_never_overwrites_or_deletes(self):
         session = Session(True, True)
         with self.assertRaises(Conflict):
-            GcsObjects(lambda: session).create_or_verify(WINNER, RAW)
+            GcsObjects(lambda: session).create_or_verify(WINNER, _raw())
         self.assertEqual(len(session.posts), 1)
 
     def test_transport_unknown_no_cleanup(self):
         class Timeout(Session):
             def post(self, *args, **kwargs): raise TimeoutError('private')
         with self.assertRaises(ObjectUnknown):
-            GcsObjects(lambda: Timeout()).create_or_verify(WINNER, RAW)
+            GcsObjects(lambda: Timeout()).create_or_verify(WINNER, _raw())
 
 
 class SqlResult:
