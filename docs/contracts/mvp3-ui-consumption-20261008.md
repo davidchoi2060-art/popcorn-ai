@@ -251,13 +251,14 @@ FROM cfg ORDER BY cfg.product_code;
 
 | 확인 대상 | 결과 |
 |---|---|
-| ZIP(`assembled-pc-104-web-handoff.zip`, PR #2 댓글 6059417287) 내려받기·해시 대조 | **못 함.** 클라우드 세션의 GitHub 프록시가 `github.com/user-attachments/...`를 403으로 막는다(저장소 범위 밖 경로). 파일 내용·manifest 해시는 검증되지 않았다 |
+| ZIP(`assembled-pc-104-web-handoff.zip`) | **확인.** 첨부 링크는 클라우드 프록시가 403으로 막아, Codex가 올린 자료 브랜치 커밋 `0a02e23`에서 꺼냈다. SHA256 `a042655f…163d7`·16,469,983바이트 일치. 114항목, 경로 이탈 없음. WebP 104장 전부 manifest `web_sha256`과 일치. **원본 PNG는 ZIP에 없어** `original_sha256`은 대조하지 못했다 |
+| manifest ↔ 구성 시드 | 구성 ID 104개가 시드와 정확히 같다. 각 이미지의 시각 참조(CASE·COOLER·MB·RAM, 100개는 GPU 포함)는 전부 시드 부품에 있다(내장 그래픽 같은 pseudo 포함). manifest의 `db_configuration_revision`은 104개 모두 1이다(9/28~29 스냅샷 기준, 현재 DB revision은 미확인). 재사용 8건 |
 | 버킷 `pc-configurations/` 객체·해시 읽기 | **못 함.** 이 컨테이너에 GCS 자격 증명이 없다(`401 Anonymous caller`) |
 | 실 DB `pc_media_jobs` | **못 함.** DB 접속 없음. 아래 질의로 남긴다 |
 
 ### 10.2 구성 → 판매 SKU → 대표 사진 연결표
 
-파일: [`pc-configuration-photo-links-20261008.csv`](pc-configuration-photo-links-20261008.csv) — 구성 시드 104개 전부.
+파일: [`pc-configuration-photo-links-20261008.csv`](pc-configuration-photo-links-20261008.csv) — 구성 시드 104개 전부. `zip_*` 열은 manifest 값이다(웹 파일·해시·재사용 원본·당시 revision·시각 참조 부품).
 
 - **판매 SKU와 묶인 구성 89개**(`source='기존'`, `P{code}` offer 92개, 전부 추천 시드에 있음).
 - **판매 SKU가 없는 구성 15개**(`N02`~`N17`, `source='신규'`). 이 구성은 `P{code}` offer가 없어 **PR #17로는 절대 공개되지 않는다.**
@@ -277,7 +278,7 @@ visual_basis가 «현재»인지는 SQL로 판정할 수 없다(`pc_media.snapsh
 
 PR #17은 `pc_media_jobs`의 selected·ready·visual 현재본만 연다. ZIP 이미지는 그 표에 행이 없으므로 **지금 상태로는 한 장도 고객에게 나가지 않는다.** 물리려면 아래 순서가 필요하고, 1~3은 DB·저장소 쓰기라 이 스레드에서 하지 않았다.
 
-1. **대조**: 각 이미지의 manifest 부품 참조가 해당 구성의 **현재** 부품(slot·explanation_code·quantity)과 같은지 확인한다. 다르면 그 이미지는 낡은 구성을 그린 것이라 쓰지 않는다.
+1. **대조**: 구성의 현재 revision이 manifest의 1과 같은지, 시각 참조 부품이 현재 부품에 그대로 있는지 실 DB에서 확인한다. 다르면 그 이미지는 낡은 구성을 그린 것이라 쓰지 않는다. 주의: `pc_media`의 `visual_basis`는 시각 참조 5종만이 아니라 **모든 실부품**(CPU·SSD·POWER 포함)과 쿨링 계획으로 계산된다. 그래서 그림에 안 보이는 부품만 바뀌어도 그 사진은 `stale`이 되어 닫힌다.
 2. **등록**: 같은 구성의 기존 job 흐름(`pc_media_jobs` 행 + `pc-configurations/{job_id}/representative.png` + `asset{bucket,key,sha256,notice}`)으로 넣는다. 지금은 외부 이미지를 job으로 들이는 경로가 없다 — 관리자 전용 가져오기 도구를 새로 만들어야 하고, 그때 `visual_basis`는 1에서 대조한 **현재 스냅샷 값**을 기록한다. 새 이미지 생성은 하지 않는다.
 3. **선택**: 운영자가 기존 `/api/admin/pc-media/{id}/select`로 고른다(사람이 고른 것만 공개 후보).
 4. **공개**: 구성이 발행 승인(`pc_customer_publication_events`)되고 부품 설명·사진 승인이 현재본이면 PR #17이 연다.
