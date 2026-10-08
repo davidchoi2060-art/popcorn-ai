@@ -93,7 +93,7 @@ jobs:
           "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r "$RUNNER_TEMP/bundle/requirements_ci.txt"
           "$RUNNER_TEMP/venv/bin/python" -m pip check
       - name: 번들 18개 실행 (격리 · 차단)
-        run: python tests/bundle_run.py run --python "$RUNNER_TEMP/venv/bin/python" --work "$RUNNER_TEMP/bundle" --results "$RUNNER_TEMP/bundle-results.json"
+        run: python tests/bundle_run.py run --python "$RUNNER_TEMP/venv/bin/python" --work "$RUNNER_TEMP/bundle" --results "$RUNNER_TEMP/bundle-results.json" --bundle-sha "$BUNDLE_SHA"
       - name: 결과 보관
         if: always()
         uses: actions/upload-artifact@v4

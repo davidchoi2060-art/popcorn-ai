@@ -5,11 +5,12 @@
 method 18개만 정확히 돌린다. 저장소 단위 테스트(tests/ci_run.py)와는 별개다.
 
     python tests/bundle_run.py verify --bundle-repo DIR --bundle-sha SHA --work DIR
-    python tests/bundle_run.py run    --python VENV_PY --work DIR --results FILE
+    python tests/bundle_run.py run    --python VENV_PY --work DIR --results FILE --bundle-sha SHA
 
 verify: 번들 커밋(SHA)의 blob 바이트를 매니페스트와 대조하고, 소스를 work/src 로 복사한다.
         번들 코드는 import 하지도 실행하지도 않는다.
-run:    별도 venv 의 파이썬(-I)으로 자식 프로세스를 띄워 18개를 돌리고 판정한다.
+run:    실행 전 관문(verify 결과 · SHA · 복사본 재해시)을 통과해야만 별도 venv 의 파이썬(-I)으로
+        자식 프로세스를 띄워 18개를 돌리고 판정한다. 관문에서 막히면 자식을 띄우지 않고 red 로 끝난다.
 
 차단 층(Guard)은 «합성 검사가 실수로 밖에 닿는 사고»를 막는 장치다. 감사 hook 기반이라
 네이티브 코드나 악의적인 코드를 막는 보안 sandbox 가 아니다.
@@ -168,22 +169,31 @@ NET_EVENTS = {'socket.connect', 'socket.bind', 'socket.sendto', 'socket.sendmsg'
               'socket.gethostbyname', 'socket.gethostbyname_ex', 'socket.gethostbyaddr', 'socket.getnameinfo'}
 PROC_EVENTS = {'subprocess.Popen', 'os.system', 'os.exec', 'os.posix_spawn', 'os.spawn', 'os.fork',
                'os.forkpty', 'os.startfile', 'pty.spawn'}
-# 파일을 바꾸는 이벤트: (경로 인자 위치, dir_fd 인자 위치)
+# 파일을 바꾸는 이벤트: (경로 인자 위치, dir_fd 인자 위치, 판정 기준)
+#   'final' - 그 경로가 가리키는 최종 대상(마지막 요소의 symlink 까지 해석)을 바꾼다
+#   'entry' - 디렉터리 항목 자체를 만들거나 지우거나 옮긴다(symlink 를 따라가지 않는다)
 FS_EVENTS = {
-    'os.mkdir': [(0, 2)], 'os.rmdir': [(0, 1)], 'os.remove': [(0, 1)],
-    'os.rename': [(0, 2), (1, 3)], 'os.link': [(0, 2), (1, 3)], 'os.symlink': [(1, 2)],
-    'os.truncate': [(0, None)], 'os.chmod': [(0, 2)], 'os.chown': [(0, 3)], 'os.utime': [(0, 3)],
-    'os.mkfifo': [(0, 2)], 'os.mknod': [(0, 3)], 'os.setxattr': [(0, None)], 'os.removexattr': [(0, None)],
-    'shutil.rmtree': [(0, 1)], 'shutil.copyfile': [(1, None)],
+    'os.mkdir': [(0, 2, 'entry')], 'os.rmdir': [(0, 1, 'entry')], 'os.remove': [(0, 1, 'entry')],
+    'os.rename': [(0, 2, 'entry'), (1, 3, 'entry')],
+    # 하드 링크는 원본 inode 를 허용 루트 안으로 끌어들인다 - 원본의 최종 대상도 안이어야 한다.
+    'os.link': [(0, 2, 'final'), (1, 3, 'entry')],
+    'os.symlink': [(1, 2, 'entry')],  # 링크가 가리킬 대상은 _check 에서 따로 본다
+    'os.truncate': [(0, None, 'final')], 'os.chmod': [(0, 2, 'final')], 'os.chown': [(0, 3, 'final')],
+    'os.utime': [(0, 3, 'final')], 'os.setxattr': [(0, None, 'final')], 'os.removexattr': [(0, None, 'final')],
+    'os.mkfifo': [(0, 2, 'entry')], 'os.mknod': [(0, 3, 'entry')],
+    'shutil.rmtree': [(0, 1, 'entry')], 'shutil.copyfile': [(1, None, 'final')],
 }
 WRITE_FLAGS = os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_TRUNC | os.O_APPEND
 
 
 class Guard:
-    """sys.addaudithook 으로 거는 사고 방지 층. 한 번 걸면 풀 수 없다.
+    """sys.addaudithook 으로 거는 사고 방지 층. 한 번 걸면 풀 수 없다. 보안 sandbox 가 아니다.
 
     phase 가 'selfcheck' 일 때의 거부는 «예상된 거부»로, 'tests' 일 때의 거부는 «실제 거부»로
     따로 기록한다. 실제 거부는 테스트가 예외를 잡아도 runner 가 실패로 판정한다.
+
+    쓰기 대상은 symlink 를 끝까지 따라간 최종 경로로 판정한다(허용 루트 안의 링크가 밖을
+    가리켜도 막힌다). 아직 없는 새 파일은 부모를 해석한 경로, 지우기·옮기기는 항목 자체로 본다.
     """
 
     def __init__(self, write_roots):
@@ -192,17 +202,24 @@ class Guard:
         self.refusals = {'selfcheck': [], 'tests': []}
         self._local = threading.local()
 
-    def _resolve(self, path, dir_fd):
+    @staticmethod
+    def _absolute(path, dir_fd):
         if isinstance(path, int):
             return None  # 이미 열린 fd - 여는 시점에 open 이벤트로 검사됐다
         path = os.fsdecode(os.fspath(path))
         if os.path.isabs(path):
-            full = path
-        elif isinstance(dir_fd, int) and dir_fd >= 0:
-            full = os.path.join(os.readlink(f'/proc/self/fd/{dir_fd}'), path)
-        else:
-            full = os.path.join(os.getcwd(), path)
-        parent, name = os.path.split(os.path.normpath(full))
+            return os.path.normpath(path)
+        if isinstance(dir_fd, int) and dir_fd >= 0:
+            return os.path.normpath(os.path.join(os.readlink(f'/proc/self/fd/{dir_fd}'), path))
+        return os.path.normpath(os.path.join(os.getcwd(), path))
+
+    def _resolve(self, path, dir_fd, how):
+        full = self._absolute(path, dir_fd)
+        if full is None:
+            return None
+        if how == 'final':
+            return os.path.realpath(full)  # 마지막 요소의 symlink(끊긴 링크 포함)까지 따라간다
+        parent, name = os.path.split(full)
         return os.path.join(os.path.realpath(parent), name)
 
     def _deny(self, event, detail):
@@ -228,18 +245,34 @@ class Guard:
             writes = (isinstance(mode, str) and any(c in mode for c in 'wax+')) or \
                      (isinstance(flags, int) and bool(flags & WRITE_FLAGS))
             if writes:
-                full = self._resolve(path, None)
+                full = self._resolve(path, None, 'final')
                 if full is not None and not inside(full, self.roots):
                     self._deny('open(write)', full)
-        spec = FS_EVENTS.get(event)
-        if spec:
-            for pi, fi in spec:
-                if pi >= len(args) or args[pi] is None:
-                    continue
-                dir_fd = args[fi] if fi is not None and fi < len(args) else None
-                full = self._resolve(args[pi], dir_fd)
-                if full is not None and not inside(full, self.roots):
-                    self._deny(event, full)
+        if event == 'os.symlink':
+            link = self._resolve(args[1], args[2] if len(args) > 2 else None, 'entry')
+            target = os.fsdecode(os.fspath(args[0]))
+            if link is not None:
+                target = os.path.realpath(os.path.join(os.path.dirname(link), target))
+                if not inside(target, self.roots):
+                    self._deny(event, f'{link} -> {target}')
+        for pi, fi, how in FS_EVENTS.get(event, ()):
+            if pi >= len(args) or args[pi] is None:
+                continue
+            dir_fd = args[fi] if fi is not None and fi < len(args) else None
+            full = self._resolve(args[pi], dir_fd, how)
+            if full is not None and not inside(full, self.roots):
+                self._deny(event, full)
+
+
+def prepare_selfcheck(work, inside_dir):
+    """자체 점검용 고정물. hook 을 걸기 «전에» 만든다(밖을 가리키는 링크는 hook 이 만들게 두지 않는다)."""
+    forbidden = os.path.join(work, 'forbidden')
+    os.makedirs(forbidden, exist_ok=True)
+    Path(forbidden, 'existing.txt').write_text('keep')
+    os.symlink(os.path.join(forbidden, 'existing.txt'), os.path.join(inside_dir, 'link-out'))
+    os.symlink(os.path.join(forbidden, 'new.txt'), os.path.join(inside_dir, 'dangling-out'))
+    os.symlink(forbidden, os.path.join(inside_dir, 'dir-out'))
+    Path(inside_dir, 'probe.txt').write_text('probe')
 
 
 def selfcheck(guard, work):
@@ -251,8 +284,8 @@ def selfcheck(guard, work):
     existing = os.path.join(forbidden, 'existing.txt')
     inside_dir = guard.roots[0]
     inside_file = os.path.join(inside_dir, 'probe.txt')
-    with open(inside_file, 'w') as fh:  # 허용 경로 안이라 hook 이 있어도 통과한다
-        fh.write('probe')
+    link_out = os.path.join(inside_dir, 'link-out')
+    dangling = os.path.join(inside_dir, 'dangling-out')
 
     def connect():
         s = socket.socket()
@@ -272,6 +305,17 @@ def selfcheck(guard, work):
         ('os.rename', lambda: os.rename(inside_file, os.path.join(forbidden, 'moved.txt'))),
         ('os.remove', lambda: os.remove(existing)),
         ('shutil.rmtree', lambda: shutil.rmtree(forbidden)),
+        # 허용 루트 안의 symlink 가 밖을 가리키는 경우 - 최종 대상으로 판정해야 막힌다
+        ('open(write)', lambda: open(link_out, 'w')),
+        ('open(write)', lambda: open(link_out, 'a')),
+        ('open(write)', lambda: os.open(link_out, os.O_WRONLY | os.O_TRUNC)),
+        ('open(write)', lambda: os.open(dangling, os.O_WRONLY | os.O_CREAT)),
+        ('open(write)', lambda: open(os.path.join(inside_dir, 'dir-out', 'x.txt'), 'w')),
+        ('os.truncate', lambda: os.truncate(link_out, 0)),
+        ('os.chmod', lambda: os.chmod(link_out, 0o600)),
+        ('shutil.copyfile', lambda: shutil.copyfile(inside_file, link_out)),
+        ('os.symlink', lambda: os.symlink(existing, os.path.join(inside_dir, 'new-link'))),
+        ('os.link', lambda: os.link(existing, os.path.join(inside_dir, 'hard-link'))),
     ]
     problems = []
     for event, probe in expected:
@@ -286,6 +330,7 @@ def selfcheck(guard, work):
         except Exception as exc:  # noqa: BLE001 - 무엇이든 «막히지 않음» 으로 본다
             problems.append(f'자체 점검: {event} 가 차단 대신 {type(exc).__name__} 로 끝났다')
     # 허용 경로 안의 쓰기·변경은 통과해야 한다(테스트의 합성 임시 파일).
+    # 밖을 가리키는 링크라도 «항목 자체»를 옮기고 지우는 것은 대상을 건드리지 않으므로 허용한다.
     before = len(guard.refusals['selfcheck'])
     try:
         with tempfile.TemporaryDirectory(dir=inside_dir) as d:
@@ -294,6 +339,11 @@ def selfcheck(guard, work):
             os.mkdir(os.path.join(d, 'sub'))
             os.rename(os.path.join(d, 'a'), os.path.join(d, 'sub', 'b'))
             os.remove(os.path.join(d, 'sub', 'b'))
+        moved = os.path.join(inside_dir, 'link-moved')
+        os.rename(link_out, moved)
+        os.remove(moved)
+        os.remove(dangling)
+        os.remove(os.path.join(inside_dir, 'dir-out'))
         os.remove(inside_file)
     except Exception as exc:  # noqa: BLE001
         problems.append(f'자체 점검: 허용 경로 안 쓰기가 실패했다 ({type(exc).__name__}: {exc})')
@@ -301,7 +351,12 @@ def selfcheck(guard, work):
         problems.append('자체 점검: 허용 경로 안 쓰기가 거부로 기록됐다')
     if sorted(os.listdir(forbidden)) != ['existing.txt']:
         problems.append(f'자체 점검: 금지 경로가 바뀌었다 {sorted(os.listdir(forbidden))}')
+    elif Path(existing).read_bytes() != b'keep' or (os.stat(existing).st_mode & 0o777) == 0o600:
+        problems.append('자체 점검: 금지 경로의 파일 내용·권한이 바뀌었다')
     return problems
+
+
+SELFCHECK_PROBES = 20
 
 
 # ---------------------------------------------------------------- 자식 프로세스
@@ -365,9 +420,9 @@ def _flatten(suite):
 def child_main(args):
     src, work = os.path.realpath(args.src), os.path.realpath(args.work)
     out, tmp = os.path.join(work, 'out'), os.path.join(work, 'tmp')
-    for d in (out, tmp, os.path.join(work, 'forbidden'), os.path.join(work, 'cwd')):
+    for d in (out, tmp, os.path.join(work, 'cwd')):
         os.makedirs(d, exist_ok=True)
-    Path(work, 'forbidden', 'existing.txt').write_text('keep')
+    prepare_selfcheck(work, out)
     methods = json.loads(Path(args.methods).read_text(encoding='utf-8'))
     adapters = json.loads(Path(args.adapters).read_text(encoding='utf-8'))
     pins = json.loads(Path(args.pins).read_text(encoding='utf-8')) if args.pins else None
@@ -487,6 +542,9 @@ def judge(methods, child):
         outcome = (rows.get(key) or {}).get('outcome')
         if outcome != 'passed':
             reasons.append(f'{key}: {outcome or "결과 없음"}')
+    expected_refusals = (child.get('refusals') or {}).get('selfcheck') or []
+    if len(expected_refusals) != SELFCHECK_PROBES:
+        reasons.append(f'자체 점검 예상 거부 {len(expected_refusals)}건 != {SELFCHECK_PROBES}건')
     real = (child.get('refusals') or {}).get('tests') or []
     if real:
         reasons.append(f'테스트 중 차단 {len(real)}건 - 예외가 잡혔더라도 실패로 본다: '
@@ -535,13 +593,58 @@ def run_head():
         return None
 
 
+def pregate(verify, work, bundle_sha, expect=EXPECT):
+    """자식을 띄우기 전 관문. verify 가 실패했거나 필수 필드가 어긋나면 사유를 돌려준다(비면 통과)."""
+    reasons = []
+    if not isinstance(verify, dict):
+        return ['verify.json 이 객체가 아니다']
+    if verify.get('problems') != []:
+        reasons.append(f'verify 실패 또는 problems 없음: {verify.get("problems")!r}'[:500])
+    if not (verify.get('bundle_head') == verify.get('bundle_sha') == bundle_sha):
+        reasons.append(f'bundle SHA 불일치: head {verify.get("bundle_head")} · verify {verify.get("bundle_sha")} · 지정 {bundle_sha}')
+    if verify.get('bundle_root') != BUNDLE_ROOT:
+        reasons.append(f'bundle_root {verify.get("bundle_root")!r} != {BUNDLE_ROOT!r}')
+    if verify.get('files_listed') != expect['files']:
+        reasons.append(f'번들 파일 {verify.get("files_listed")}개 (기대 {expect["files"]})')
+    sources = verify.get('sources')
+    if not isinstance(sources, list) or len(sources) != expect['sources'] \
+            or not all(isinstance(r, dict) and r.get('ok') is True and r.get('worktree_equal') is True for r in sources):
+        reasons.append('소스 대조 기록이 8/8 일치가 아니다')
+    elif verify.get('copy_rehash_ok') is not True:
+        reasons.append('복사본 재해시가 통과하지 않았다')
+    else:
+        # verify 와 run 사이에 복사본이 바뀌지 않았는지 다시 잰다.
+        for r in sources:
+            f = Path(work, 'src', r['path'].removeprefix('source_candidate/'))
+            if not f.is_file() or sha256(f.read_bytes()) != r.get('sha256'):
+                reasons.append(f'실행 직전 복사본 해시 불일치: {f}')
+    methods = verify.get('methods')
+    keys = [(m.get('path'), m.get('class'), m.get('method')) for m in methods] \
+        if isinstance(methods, list) and all(isinstance(m, dict) for m in methods) else []
+    if len(keys) != expect['methods'] or len(set(keys)) != len(keys) or not all(all(k) for k in keys):
+        reasons.append(f'method 목록이 {expect["methods"]}개 고유 항목이 아니다')
+    pins = verify.get('pins')
+    if not isinstance(pins, dict) or len(pins) != expect['pins']:
+        reasons.append(f'핀이 {expect["pins"]}개가 아니다')
+    return reasons
+
+
 def cmd_run(args):
     work = Path(args.work)
-    verify = json.loads((work / 'verify.json').read_text(encoding='utf-8'))
-    child = run_child(args.python, work / 'src', work / 'run', verify['methods'], ADAPTERS, verify['pins'])
-    reasons = list(verify['problems']) + judge(verify['methods'], child)
-    results = {'verdict': 'green' if not reasons else 'red', 'reasons': reasons,
-               'run_head': run_head(), 'bundle_head': verify['bundle_head'], 'bundle_root': verify['bundle_root'],
+    try:
+        verify = json.loads((work / 'verify.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError) as exc:
+        verify = {'problems': [f'verify.json 을 읽지 못했다: {exc}']}
+    gate = pregate(verify, work, args.bundle_sha)
+    if gate:
+        # 관문에서 막히면 번들 코드를 띄우지 않는다.
+        child, reasons = {}, ['실행 전 관문 실패 - 자식 프로세스를 띄우지 않았다'] + gate
+    else:
+        child = run_child(args.python, work / 'src', work / 'run', verify['methods'], ADAPTERS, verify['pins'])
+        reasons = judge(verify['methods'], child)
+    results = {'verdict': 'green' if not reasons else 'red', 'reasons': reasons, 'child_started': not gate,
+               'run_head': run_head(), 'bundle_head': verify.get('bundle_head') if isinstance(verify, dict) else None,
+               'bundle_root': verify.get('bundle_root') if isinstance(verify, dict) else None,
                'verify': verify, 'child': child}
     Path(args.results).write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding='utf-8')
     report(results)
@@ -549,12 +652,14 @@ def cmd_run(args):
 
 
 def report(results):
-    child, verify = results['child'], results['verify']
+    child = results['child']
+    verify = results['verify'] if isinstance(results['verify'], dict) else {}
+    sources = verify.get('sources') if isinstance(verify.get('sources'), list) else []
     rows = child.get('rows') or {}
     refusals = child.get('refusals') or {}
     lines = [f'## 번들 runner - {results["verdict"]}', '',
              f'run HEAD `{results["run_head"]}` · bundle HEAD `{results["bundle_head"]}` · root `{results["bundle_root"]}`', '',
-             f'소스 대조 {sum(r["ok"] for r in verify["sources"])}/{len(verify["sources"])} · '
+             f'소스 대조 {sum(bool(isinstance(r, dict) and r.get("ok")) for r in sources)}/{len(sources)} · '
              f'수집 {len(child.get("collected") or [])} · 통과 {sum(r["outcome"] == "passed" for r in rows.values())} · '
              f'자체 점검 예상 거부 {len(refusals.get("selfcheck") or [])} · 테스트 중 거부 {len(refusals.get("tests") or [])}', '']
     for a in child.get('adapters') or []:
@@ -585,6 +690,7 @@ def main(argv=None):
     r.add_argument('--python', required=True)
     r.add_argument('--work', required=True)
     r.add_argument('--results', required=True)
+    r.add_argument('--bundle-sha', required=True)
     c = sub.add_parser('child')
     for name in ('--src', '--work', '--methods', '--adapters'):
         c.add_argument(name, required=True)
