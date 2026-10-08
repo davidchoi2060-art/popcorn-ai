@@ -63,7 +63,7 @@
 
 | # | 상태 | 고치는 것 |
 |---|---|---|
-| 1 | 리뷰 대기 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) · CI 초록(1,548 통과). PC 경로에 묶인 61건은 클라우드에서 건너뛰고 「PC 전용」으로 따로 셈 | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
+| 1 | 리뷰 대기 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) head `8bcc1c7` · **PC 독립 확인**(run 37745345455: 1,588 통과·0 실패·74 건너뜀·12 xfail, PC 전용 61, Node 15개 수집). Node 0건·집계 없음은 실패 처리 | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
 | 3 | draft [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) · 작업 규칙 초안, 중헌님 승인 대기 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
 | 4 | draft [PR #8](https://github.com/davidchoi2060-art/popcorn-ai/pull/8) · 사전조건 누락을 「준비 실패」로 표시 · 서버 환경 설정은 중헌님 조치 필요 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
 | 5 | draft [PR #9](https://github.com/davidchoi2060-art/popcorn-ai/pull/9) · 참고가격↔주문 확정가 계약은 PR #2에 답함 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
