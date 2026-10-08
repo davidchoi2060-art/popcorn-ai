@@ -66,8 +66,9 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     reasons = [f"{usage} {f['level']} — {lv.get('work', '')}"]
     if lv.get("conditions"):
         reasons.append(f"충족 조건: {lv['conditions']}")
-    if f.get("blocked"):
-        reasons.append("다음 수준까지는: " + ", ".join(f["blocked"][:2]))
+    # 「다음 수준까지는」(f["blocked"])은 내부 평가 지수와 기준값을 숫자로 담고 있어
+    # 고객 응답에 싣지 않는다(협업 6번, 2026-10-08). 업그레이드 안내는 숫자 없는 문구로
+    # 다시 정한 뒤 넣는다 — 원천 blocked 는 관리자 매트릭스가 그대로 쓴다.
     if p.get("includes"):
         reasons.append(f"판매가에 {p['includes']} 포함")
     return {

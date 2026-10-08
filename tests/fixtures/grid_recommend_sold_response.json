@@ -1,0 +1,169 @@
+{
+  "ok": true,
+  "card_sets": [
+    {
+      "usage": "영상편집",
+      "usage_grid": "영상편집",
+      "kind": "sold",
+      "min_level": "기본",
+      "min_level_work": "FHD 편집",
+      "items": [
+        {
+          "product_code": 1,
+          "name": "조립PC 1",
+          "price": 1200000,
+          "price_src": "현재 판매가",
+          "mall_url": "https://mall.example/1",
+          "spec": {
+            "cpu": "라이젠5 9600",
+            "gpu": "RTX 5060 Ti 8GB",
+            "ram_gb": 32,
+            "ssd_gb": 500,
+            "vram_gb": 8
+          },
+          "level": "기본",
+          "tag": "예산 안 최고 수준",
+          "over_budget": false,
+          "reasons": [
+            "영상편집 기본 — FHD 편집"
+          ]
+        },
+        {
+          "product_code": 2,
+          "name": "조립PC 2",
+          "price": 1500000,
+          "price_src": "현재 판매가",
+          "mall_url": "https://mall.example/2",
+          "spec": {
+            "cpu": "라이젠5 9600",
+            "gpu": "RTX 5060 Ti 8GB",
+            "ram_gb": 32,
+            "ssd_gb": 500,
+            "vram_gb": 8
+          },
+          "level": "기본",
+          "tag": "같은 수준 다른 구성",
+          "over_budget": false,
+          "reasons": [
+            "영상편집 기본 — FHD 편집"
+          ]
+        }
+      ],
+      "empty_reason": null,
+      "empty_note": null,
+      "cards": [],
+      "empty_cells": [],
+      "omitted_variants": [],
+      "center_band": null,
+      "center_band_key": null,
+      "bands_considered": [],
+      "center_tier": null,
+      "center_tier_key": null,
+      "tiers_considered": []
+    },
+    {
+      "usage": "게임",
+      "usage_grid": "게임",
+      "kind": "sold",
+      "min_level": "FHD",
+      "min_level_work": "FHD 게임",
+      "items": [
+        {
+          "product_code": 1,
+          "name": "조립PC 1",
+          "price": 1200000,
+          "price_src": "현재 판매가",
+          "mall_url": "https://mall.example/1",
+          "spec": {
+            "cpu": "라이젠5 9600",
+            "gpu": "RTX 5060 Ti 8GB",
+            "ram_gb": 32,
+            "ssd_gb": 500,
+            "vram_gb": 8
+          },
+          "level": "FHD",
+          "tag": "예산 안 최고 수준",
+          "over_budget": false,
+          "reasons": [
+            "게임 FHD — FHD 게임",
+            "충족 조건: GPU 8GB"
+          ]
+        },
+        {
+          "product_code": 2,
+          "name": "조립PC 2",
+          "price": 1500000,
+          "price_src": "현재 판매가",
+          "mall_url": "https://mall.example/2",
+          "spec": {
+            "cpu": "라이젠5 9600",
+            "gpu": "RTX 5060 Ti 8GB",
+            "ram_gb": 32,
+            "ssd_gb": 500,
+            "vram_gb": 8
+          },
+          "level": "FHD",
+          "tag": "같은 수준 다른 구성",
+          "over_budget": false,
+          "reasons": [
+            "게임 FHD — FHD 게임",
+            "충족 조건: GPU 8GB"
+          ]
+        }
+      ],
+      "empty_reason": null,
+      "empty_note": null,
+      "cards": [],
+      "empty_cells": [],
+      "omitted_variants": [],
+      "center_band": null,
+      "center_band_key": null,
+      "bands_considered": [],
+      "center_tier": null,
+      "center_tier_key": null,
+      "tiers_considered": [],
+      "game_context": {
+        "game_name": "배틀그라운드",
+        "spec_summary": "FHD 높음 옵션 기준 RTX 4060급 이상",
+        "why_this_pc": "FHD 높음 옵션에서 60fps 이상을 목표로 한 구성입니다.",
+        "upgrade_hint": "QHD로 올리려면 그래픽카드 상향이 먼저입니다.",
+        "caution": null,
+        "source": {
+          "kind": "game_customer_copy",
+          "fields": [
+            "why_this_pc"
+          ],
+          "url": null
+        },
+        "confidence": "reviewed",
+        "reviewed_at": "2026-10-01T00:00:00+09:00"
+      }
+    }
+  ],
+  "cards": [],
+  "assumed": [
+    "game.resolution=1080p"
+  ],
+  "ai_estimated": [
+    {
+      "game_names": [
+        "배틀그라운드"
+      ],
+      "grade": "C"
+    }
+  ],
+  "needs": [],
+  "dropped": [
+    {
+      "field": "game.resolution",
+      "value": "8K",
+      "reason": "not in vocab"
+    }
+  ],
+  "platform": "인텔",
+  "budget_won": 2000000,
+  "budget_bound": "이하",
+  "game_grade": "C",
+  "game_resolution": "1080p",
+  "game_name": "배틀그라운드"
+}
