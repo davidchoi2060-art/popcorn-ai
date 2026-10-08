@@ -62,13 +62,13 @@
 
 | # | 상태 | 고치는 것 |
 |---|---|---|
-| 1 | 진행 중 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
-| 3 | 결정 대기(⑥) | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
-| 4 | 서버 로그 필요 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
-| 5 | 대기 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
-| 6 | 대기 · 소비 필드 계약 합의 | `/api/grid/recommend`에서 최상위 `notes`와 `items[].spec`의 내부 키 제거(`spec`은 `cpu`·`gpu`·`ram_gb`·`ssd_gb`·`vram_gb`만), `/api/mvp3/saved-quotes` 쓰기 속도 제한. `mockups/mvp3/`는 고치지 않음. 계약 원문은 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054476845) |
-| 7 | 대기 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
-| 10 | 3번 뒤 | 결정 로그(9/25 재설계, 10/4~10/7), ERD(0124~0132), HANDOFF 축약 |
+| 1 | 진행 중 · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) · PC 쪽 지적 2건 반영 중(임시 PostgreSQL 표현, 테스트 0건·의존성 누락 시 실패) | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
+| 3 | 착수(초안) · 적용은 결정 ⑥ 뒤 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
+| 4 | PC 쪽에 서버 접근 방식 문의 중([댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054661938)) | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
+| 5 | 착수 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
+| 6 | 착수 · 소비 필드 계약 합의 | `/api/grid/recommend`에서 최상위 `notes`와 `items[].spec`의 내부 키 제거(`spec`은 `cpu`·`gpu`·`ram_gb`·`ssd_gb`·`vram_gb`만), `/api/mvp3/saved-quotes` 쓰기 속도 제한. `mockups/mvp3/`는 고치지 않음. 계약 원문은 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054476845) |
+| 7 | 착수 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
+| 10 | 착수(3번과 함께) | 결정 로그(9/25 재설계, 10/4~10/7), ERD(0124~0132), HANDOFF 축약 |
 
 ### 열린 질문
 
