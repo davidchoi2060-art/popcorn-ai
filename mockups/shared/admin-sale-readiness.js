@@ -16,6 +16,24 @@
   const stateLabel = (state, scope) => ({needs_work:'보완 필요', needs_check:'확인 필요', basis_met:basisLabel(scope), excluded:'조회 제외'})[state] || '확인 필요';
   const checkLabel = state => ({met:'근거 확인', blocked:'보완 필요', unknown:'확인 필요', na:'해당 없음'})[state] || '확인 필요';
   const linkPaths = new Set(['/admin2/products', '/admin2/reviews', '/admin2/spec-fill', '/admin2/spec-standard', '/admin2/spec-field-defs', '/admin2/candidate-pool', '/admin2/price-review', '/admin2/sale-price', '/admin2/stock-inbound', '/admin2/pc-workspace', '/admin2/pc-configurations', '/admin2/part-explanations', '/admin2/build-map', '/admin2/product-workspace']);
+  const workspaceTabs = new Set(['parts', 'copy', 'review', 'sales']);
+  const identityOf = value => typeof value === 'string' && value.length <= 200 && !/[\u0000-\u001f\u007f]/.test(value) ? value : '';
+  const offsetOf = value => /^\d{1,7}$/.test(String(value)) && Number(value) <= 1000000 && Number(value) % 40 === 0 ? Number(value) : 0;
+  const queryOf = value => String(value || '').replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0,100);
+
+  function readNavigation(search) {
+    const params = new URLSearchParams(search);
+    return {scope:scopeOf(params.get('scope')), q:queryOf(params.get('q')),
+      offset:offsetOf(params.get('offset')), selectedId:identityOf(params.get('selected')) || null};
+  }
+
+  function readinessHref(state) {
+    const params = new URLSearchParams({scope:scopeOf(state.scope)});
+    if (queryOf(state.q)) params.set('q',queryOf(state.q));
+    if (offsetOf(state.offset)) params.set('offset',String(offsetOf(state.offset)));
+    if (identityOf(state.selectedId)) params.set('selected',state.selectedId);
+    return '/admin2/sale-readiness?' + params;
+  }
 
   function safeHref(value, origin) {
     if (typeof value !== 'string' || !value.startsWith('/admin2/') || /[\\\s\u0000-\u001f]/.test(value)) return null;
@@ -23,15 +41,45 @@
       const url = new URL(value, origin);
       const rawPath = value.split(/[?#]/)[0];
       if (url.origin !== origin || url.username || url.password || url.hash || rawPath !== url.pathname || !linkPaths.has(url.pathname)) return null;
+      if (new Set(url.searchParams.keys()).size !== Array.from(url.searchParams).length) return null;
       for (const [key, val] of url.searchParams) {
         if (key === 'admin' && val === 'new') continue;
         if (url.pathname === '/admin2/pc-workspace' && key === 'id' && val) continue;
+        if (url.pathname === '/admin2/pc-workspace') {
+          if (key === 'tab' && workspaceTabs.has(val)) continue;
+          if (key === 'from' && val === 'sale-readiness') continue;
+          if (url.searchParams.get('from') === 'sale-readiness') {
+            if (key === 'sr_scope' && ['parts','configurations'].includes(val)) continue;
+            if (key === 'sr_q' && val === queryOf(val)) continue;
+            if (key === 'sr_offset' && String(offsetOf(val)) === val) continue;
+            if (key === 'sr_selected' && val && identityOf(val) === val) continue;
+          }
+        }
         if (url.pathname === '/admin2/reviews' && ['keyword', 'part_type'].includes(key)) continue;
         if (url.pathname === '/admin2/products' && ['category_id', 'include_desc'].includes(key)) continue;
         return null;
       }
       return url.pathname + url.search;
     } catch (_) { return null; }
+  }
+
+  function resolutionHref(href, item, reason, state, origin) {
+    const safe = safeHref(href, origin);
+    if (!safe) return null;
+    const url = new URL(safe, origin);
+    if (state.scope === 'parts' && url.pathname === '/admin2/reviews') {
+      url.searchParams.set('keyword',item.id);
+    } else if (state.scope === 'configurations' && url.pathname === '/admin2/pc-workspace' && url.searchParams.get('id') === item.id) {
+      const key = reason && reason.key || '';
+      const tab = key === 'parts' ? 'parts' : key === 'description' ? 'copy' : key === 'sales_conditions' || key.startsWith('sales:') ? 'sales' : reason ? 'review' : 'copy';
+      url.searchParams.set('tab',tab);
+      url.searchParams.set('from','sale-readiness');
+      url.searchParams.set('sr_scope',scopeOf(state.scope));
+      url.searchParams.set('sr_q',queryOf(state.q));
+      url.searchParams.set('sr_offset',String(offsetOf(state.offset)));
+      url.searchParams.set('sr_selected',item.id);
+    }
+    return safeHref(url.pathname + url.search, origin);
   }
 
   function readItem(value) {
@@ -74,7 +122,7 @@
   }
 
   function createController(io, initial) {
-    const state = {scope:scopeOf(initial && initial.scope), q:'', offset:0, limit:40, status:'idle', items:[], counts:null, total:null, note:'', error:'', selectedId:null, detail:null, detailStatus:'idle'};
+    const state = {scope:scopeOf(initial && initial.scope), q:queryOf(initial && initial.q), offset:offsetOf(initial && initial.offset), limit:40, status:'idle', items:[], counts:null, total:null, note:'', error:'', selectedId:identityOf(initial && initial.selectedId) || null, detail:null, detailStatus:'idle'};
     let listGeneration = 0, detailGeneration = 0, timer = null;
     const publish = () => { if (io.change) io.change(state); };
     const cancelTimer = () => { if (timer !== null) (io.cancel || clearTimeout)(timer); timer = null; };
@@ -165,7 +213,7 @@
       if (!safe) return null;
       const node = element('a', className, label); node.href = safe; return node;
     };
-    let detailView = false, focusDetail = false;
+    let detailView = Boolean(readNavigation(win.location.search).selectedId), focusDetail = false;
     const controller = createController({
       get:async url => {
         const response = await win.fetch(url, {method:'GET', credentials:'same-origin', cache:'no-store', headers:{Accept:'application/json'}});
@@ -173,9 +221,11 @@
         return response.json();
       },
       change:render
-    }, {scope:new URLSearchParams(win.location.search).get('scope')});
+    }, readNavigation(win.location.search));
+    byId('srSearch').value = controller.state.q;
 
     function render(state) {
+      if (state.status === 'ready' && win.history && win.history.replaceState) win.history.replaceState(null,'',readinessHref(state));
       byId('srBasisLabel').textContent = basisLabel(state.scope);
       [['srNeedsWork','needs_work'], ['srNeedsCheck','needs_check'], ['srBasisMet','basis_met']].forEach(([id,key]) => { byId(id).textContent = state.counts ? state.counts[key].toLocaleString('ko-KR') : '—'; });
       byId('srExcluded').textContent = '조회 제외 ' + (state.counts ? state.counts.excluded.toLocaleString('ko-KR') + '건' : '—');
@@ -239,10 +289,10 @@
       if (item.reasons.length) {
         const reasons = element('ul','sr-reasons');
         const moreReasons = element('ul','sr-reasons');
-        item.reasons.forEach((reason,index) => { const li = element('li','sr-reason'); li.dataset.severity = reason.severity; const copy = element('div'); copy.append(element('strong','',reason.label)); if (reason.detail) copy.append(element('p','',reason.detail)); li.append(copy); const action = link(reason.href,'작업 화면 열기','sr-resolve'); if (action) { action.setAttribute('aria-label', reason.label + ' · 작업 화면 열기'); li.append(action); } (index < 2 ? reasons : moreReasons).append(li); }); detail.append(reasons);
+        item.reasons.forEach((reason,index) => { const li = element('li','sr-reason'); li.dataset.severity = reason.severity; const copy = element('div'); copy.append(element('strong','',reason.label)); if (reason.detail) copy.append(element('p','',reason.detail)); li.append(copy); const action = link(resolutionHref(reason.href,item,reason,state,win.location.origin),'작업 화면 열기','sr-resolve'); if (action) { action.setAttribute('aria-label', reason.label + ' · 작업 화면 열기'); li.append(action); } (index < 2 ? reasons : moreReasons).append(li); }); detail.append(reasons);
         if (item.reasons.length > 2) { const more = element('details','sr-more'); more.append(element('summary','','추가 작업 ' + (item.reasons.length - 2) + '개 보기'),moreReasons); detail.append(more); }
       } else detail.append(element('p','sr-detail-intro','조회된 차단 이유가 없습니다. 확인된 근거의 범위는 위 항목을 참고해 주세요.'));
-      const open = link(item.href, state.scope === 'parts' ? '부품 작업 화면 열기' : '구성 PC 작업실 열기', 'sr-open'); if (open) { open.append(icon('arrow-right','#176242')); detail.append(open); }
+      const open = link(resolutionHref(item.href,item,null,state,win.location.origin), state.scope === 'parts' ? '부품 작업 화면 열기' : '구성 PC 작업실 열기', 'sr-open'); if (open) { open.append(icon('arrow-right','#176242')); detail.append(open); }
       if (focusDetail) { focusDetail = false; title.focus({preventScroll:true}); if (win.matchMedia('(max-width:600px)').matches) detail.scrollIntoView({block:'start'}); }
     }
     doc.querySelectorAll('.sr-tabs button').forEach(button => {
@@ -261,5 +311,5 @@
     win.addEventListener('pagehide', () => controller.dispose(), {once:true});
     void controller.load(); return controller;
   }
-  return {basisLabel, stateLabel, checkLabel, safeHref, readItem, readPage, createController, mount};
+  return {basisLabel, stateLabel, checkLabel, safeHref, readNavigation, readinessHref, resolutionHref, readItem, readPage, createController, mount};
 });

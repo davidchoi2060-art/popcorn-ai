@@ -1,0 +1,142 @@
+{
+  "contract_id": "D-C2-SESSION-PROOF-V1-20261007",
+  "status": "TECHNICAL_PROPOSAL_NOT_ACCEPTED_NOT_IMPLEMENTED",
+  "frozen_r1": "D:/WORK/PopcornAI/worktrees/customer-auth-store-r1-20261007",
+  "accepted_reuse": [
+    "R1 digest input",
+    "revision/context aliases",
+    "current C1/C4 state validation",
+    "default503/no-store"
+  ],
+  "proposed_schema_file": "schema-candidate.txt",
+  "proposed_query_file": "SQL-read-candidate.txt",
+  "r1_signature_compatible": false,
+  "reason": "provenance6 cannot independently identify/recheck session-bound receipt; no accepted uniqueness guarantee",
+  "v2_binding_fields": [
+    "proof_ref",
+    "credential_hash",
+    "member_id",
+    "verified_identity_id",
+    "auth_context_id",
+    "issued_auth_revision",
+    "issued_at",
+    "expires_at"
+  ],
+  "v2_provenance_fields": [
+    "issuer_key",
+    "issuer",
+    "subject",
+    "verified_at",
+    "verification_method",
+    "registration_ref"
+  ],
+  "restore_signature_proposal": "restore_verified_principal(provenance, *, binding: StoredIssuanceBindingV2)",
+  "authority_port_contract": {
+    "input": "proof_ref via server binding only",
+    "lookup": "exact1 current authoritative verified issuance receipt or independently verified persisted receipt",
+    "compare": [
+      "proof_ref",
+      "credential_hash",
+      "member_id",
+      "verified_identity_id",
+      "auth_context_id",
+      "issued_auth_revision",
+      "issued_at",
+      "expires_at",
+      "issuer_key",
+      "issuer",
+      "subject",
+      "verified_at",
+      "verification_method",
+      "registration_ref"
+    ],
+    "untrusted": [
+      "SQL receipt metadata alone",
+      "StoredProvenance shape",
+      "seal minting alone",
+      "client bool/dict",
+      "request/global side channel"
+    ],
+    "actual_authority_ready": false,
+    "authority_ref": "Derived/validated only against independently approved authority source; SQL/client reference cannot select publisher or trusted key"
+  },
+  "time": {
+    "events": "strict UTC integer epoch BIGINT; subsecond event rejected, no coercion",
+    "clock": "single statement_timestamp exact Decimal metadata; explicit bucket only for observation with integer-event equivalence",
+    "no_legacy_timestamp_upgrade": true
+  },
+  "executor": {
+    "injected": true,
+    "isolation": "READ COMMITTED",
+    "read_only": true,
+    "primary": true,
+    "one_statement_per_observation": true,
+    "fresh_calls": true,
+    "mvcc_future_guarantee": false
+  },
+  "revoke": {
+    "ack_axis": [
+      "ACK_COMMITTED",
+      "ACK_ROLLED_BACK",
+      "ACK_UNKNOWN"
+    ],
+    "observation_axis": [
+      "OBSERVED_TARGETS_REVOKED",
+      "OBSERVED_MISMATCH",
+      "OPERATION_ABSENT",
+      "OBSERVATION_FAILED"
+    ],
+    "requires_durable_operation_marker": true,
+    "restores_principal": false,
+    "public_success_selected": false,
+    "automatic_retry": false
+  },
+  "packages": [
+    {
+      "id": "Q1",
+      "exact2": [
+        "api/customer_auth_sql_read.py",
+        "tests/test_customer_auth_sql_read.py"
+      ],
+      "implementable_after": "PM acceptance of schema/query/time/executor contract",
+      "possible_before_v2": "standalone SQL envelope decoder and injected-executor CODE/MOCK only",
+      "blocked": "R1 runtime attachment, actual SQL/DB/role/MVCC proof, final V2 consumer acceptance"
+    },
+    {
+      "id": "P1",
+      "exact2": [
+        "api/customer_auth_provenance.py",
+        "tests/test_customer_auth_provenance.py"
+      ],
+      "implementable_after": "PM acceptance of authority receipt/binding contract",
+      "possible": "independent receipt comparison CODE/MOCK with explicit authority fixtures",
+      "blocked": "R1 provenance6 session-bound restoration; actual I1 authority/registration; V2 composition"
+    },
+    {
+      "id": "STORE_V2_CONDITIONAL",
+      "exact2": [
+        "api/customer_auth_store.py",
+        "tests/test_customer_auth_store_issuance_contract.py"
+      ],
+      "requirement": "PM separate checkout/versioned ownership acceptance before signatures/consumer change",
+      "frozen_r1_changes": 0
+    }
+  ],
+  "business_policy_choices": 0,
+  "migration_reserved": false,
+  "execution": {
+    "product_edits": 0,
+    "source_edits": 0,
+    "test_runs": 0,
+    "sql_execution": 0,
+    "db_connections": 0,
+    "pg": 0,
+    "issuer": 0,
+    "ddl": 0,
+    "deploy": 0
+  },
+  "session_read_v2_additions": {
+    "issuance_binding": "StoredIssuanceBindingV2 exact eight fields",
+    "observed_epoch_exact": "Decimal clock metadata retained; never exposed publicly"
+  }
+}

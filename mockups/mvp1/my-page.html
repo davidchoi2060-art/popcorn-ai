@@ -16,12 +16,52 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 .sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:.2s}
 .sw.on{background:#2b5fd9}.sw.on::after{left:19px}
 @media(max-width:768px){.grid2{grid-template-columns:1fr!important}}
+
+/* Existing beige canvas, profile, two-column cards and section order retained. */
+body{font-size:16px;line-height:1.65;word-break:keep-all;overflow-wrap:break-word}
+[hidden]{display:none!important}
+button,a{font-family:inherit}
+.btn2,.btnp{font-size:16px;line-height:1.5;min-height:44px;justify-content:center}
+.btn2:disabled,.btnp:disabled{background:#eeece7!important;border:1px solid #d8d4cc!important;color:#66615a!important;cursor:default;opacity:1}
+main .card{min-width:0}
+main [style*="font-size:"]{font-size:16px!important}
+main .msym{font-size:20px!important;flex:none}
+.h6{font-size:18px!important;line-height:1.5;margin-bottom:8px}
+.sub,main .sub,main .sub [style*="font-size:"],#my-identity-note,#map-pill,#su-credit,#su-credit a{font-size:14px!important;line-height:1.7;color:#625e56!important}
+main p{margin:0 0 8px}
+main .sub{margin-bottom:16px}
+main .card [style*="color:#8a8578"],main .card [style*="color:#a29d92"]{color:#625e56!important}
+#map-pill{padding:5px 12px!important}
+#my-nick{font-size:20px!important;line-height:1.5}
+#my-avatar{flex:none}
+main a[aria-disabled="true"]{color:#706b62!important;cursor:default;font-size:14px!important;white-space:nowrap}
+main .card>div:has(>.h6){flex-wrap:wrap}
+.status-card{margin-bottom:18px;border-color:#d1ddef;background:#f7faff}
+.status-card .sub{margin-bottom:0}
+#member-retry{margin-top:16px;border-color:#7b96c9;color:#2149b0}
+.empty-box{padding:16px;background:#f6f5f2;border-radius:12px}
+.empty-box .sub{margin-bottom:0}
+.settings-note{display:flex;align-items:center;justify-content:space-between;gap:12px}
+main .settings-help{font-weight:500;margin:6px 0 0}
+a:focus-visible,button:focus-visible{outline:3px solid #2149b0;outline-offset:3px}
+@media(max-width:768px){
+  header>div{height:auto!important;min-height:60px;padding:16px!important;gap:14px;flex-wrap:wrap}
+  header>div>div{flex-wrap:wrap}
+  main{padding:20px 16px 48px!important}
+  .card{padding:20px}
+  main .card [style*="min-width"]{min-width:0!important}
+  main>.card:first-child>div:last-child{width:100%;justify-content:space-between}
+  main>.card:first-child>div:last-child>div{text-align:left!important}
+  #map-panel>div{flex-wrap:nowrap!important;gap:12px!important}
+  #map-panel .btn2,#map-panel .btnp{font-size:14px}
+}
+#member-retry[aria-disabled="true"]{cursor:wait}
+
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
 <link rel="stylesheet" href="../../design-system/tokens.css">
   </head>
 <body>
-
 <header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid #e6e2da;">
   <div style="max-width:1120px;margin:0 auto;height:60px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;">
     <div style="display:flex;align-items:center;gap:12px;">
@@ -30,8 +70,8 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
       <span style="display:flex;align-items:center;gap:6px;font-size:14px;font-weight:800;color:#3a3a40;"><span class="msym" style="font-size:18px;color:#2b5fd9;">person</span>마이페이지</span>
     </div>
     <div style="display:flex;align-items:center;gap:10px;">
-      <a href="s0-landing.html" class="btnp"><span class="msym" style="font-size:15px;">forum</span>새 견적 상담</a>
-      <button id="my-logout" class="btn2">로그아웃</button>
+      <a href="/mvp3/" class="btnp"><span class="msym" style="font-size:15px;">forum</span>새 견적 상담</a>
+      <button id="my-logout" class="btn2" disabled>로그인 준비 중</button>
     </div>
   </div>
 </header>
@@ -40,39 +80,45 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
 
   <!-- 프로필 -->
   <div class="card" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:18px;">
-    <span style="width:54px;height:54px;border-radius:16px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#2b5fd9;" id="my-avatar">?</span>
+    <span style="width:54px;height:54px;border-radius:16px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;color:#2b5fd9;" id="my-avatar"><span class="msym" style="font-size:26px;">person</span></span>
     <div style="flex:1;min-width:200px;">
-      <div style="font-size:18px;font-weight:900;color:#17171b;"><span id="my-nick">-</span> 님</div>
-      <div style="font-size:12.5px;color:#8a8578;font-weight:600;"><span id="my-email">-</span> · <span id="my-via">-</span> 가입 · <span id="my-joined">-</span></div>
+      <div style="font-size:18px;font-weight:900;color:#17171b;"><span id="my-nick">회원 본인 확인 준비 중</span></div>
+      <div style="font-size:12.5px;color:#8a8578;font-weight:600;"><span id="my-identity-note">확인된 회원 정보가 없습니다.</span></div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <div style="text-align:right;">
         <div style="font-size:11.5px;color:#8a8578;font-weight:700;">쇼핑몰 계정</div>
-        <span id="map-pill" style="display:inline-flex;align-items:center;gap:5px;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;"><span class="msym" style="font-size:14px;">link</span>연결 안 됨</span>
+        <span id="map-pill" style="display:inline-flex;align-items:center;gap:5px;background:#f4f2ec;color:#6b6b73;font-size:12px;font-weight:800;padding:4px 10px;border-radius:999px;"><span class="msym" style="font-size:14px;">link</span>확인 전</span>
       </div>
-      <button id="my-map" class="btn2">계정 연결</button>
+      <button id="my-map" class="btn2" disabled>계정 연결 준비 중</button>
     </div>
   </div>
 
-  <!-- 계정 연결 안내 (관리자 매핑 요청 도착 시) -->
+  <section id="member-status" class="card status-card" aria-labelledby="member-status-title">
+  <h2 id="member-status-title" class="h6" role="status" aria-live="polite">회원 본인 확인 준비 중</h2>
+  <p id="member-status-copy">현재 로그인·회원 가입을 이용할 수 없습니다.</p>
+  <p class="sub" id="member-status-help">상담과 추천은 로그인 없이 이용할 수 있습니다.</p>
+  <button id="member-retry" type="button" class="btn2" hidden>다시 확인</button>
+</section>
+<!-- 기존 계정 연결 안내: 실제 연결 요청 대신 준비 상태 안내 -->
   <div class="card" id="map-panel" hidden style="margin-bottom:18px;border-color:#cfe0fb;background:#f7faff;">
     <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;">
       <span style="width:40px;height:40px;border-radius:12px;background:#eaf1fd;display:flex;align-items:center;justify-content:center;flex:none;"><span class="msym" style="font-size:21px;color:#2b5fd9;">link</span></span>
       <div style="flex:1;min-width:240px;">
-        <h3 class="h6" style="margin-bottom:2px;">쇼핑몰 계정 연결 요청이 도착했어요</h3>
-        <p class="sub" style="margin-bottom:10px;">기존 팝콘PC 쇼핑몰에서 주문하신 이력을 이 계정과 연결합니다. <b style="color:#3a3a40;">연결하면 지난 주문·후기가 마이페이지에 함께 표시</b>돼요. 동의하지 않으면 아무것도 바뀌지 않습니다.</p>
+        <h3 class="h6" style="margin-bottom:2px;">쇼핑몰 계정 연결 준비 중</h3>
+        <p class="sub" style="margin-bottom:10px;">실제 쇼핑몰 계정 확인과 연결 기능을 준비 중입니다. 현재 계정 연결이나 과거 주문·후기 이력 이전을 진행할 수 없습니다.</p>
         <div style="border:1.5px solid #e6e2da;background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;">
-          <div style="font-size:12px;font-weight:800;color:#3a3a40;margin-bottom:6px;">연결되는 정보</div>
+          <div style="font-size:12px;font-weight:800;color:#3a3a40;margin-bottom:6px;">연결 전 확인할 정보</div>
           <div style="font-size:12px;color:#8a8578;font-weight:600;line-height:1.8;">
-            · 쇼핑몰 주문 이력(주문번호·구성·금액)<br>
-            · 쇼핑몰에 남긴 후기<br>
-            <span style="color:#a29d92;">· 결제 수단·비밀번호 등 인증 정보는 연결되지 않습니다</span>
+            · 본인 쇼핑몰 계정인지 확인하는 절차<br>
+            · 연결 대상 정보와 동의 범위<br>
+            <span>· 과거 주문·후기의 실제 연동 여부</span>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          <button id="map-agree" class="btnp"><span class="msym" style="font-size:16px;">check</span>동의하고 연결</button>
-          <button id="map-later" class="btn2">나중에</button>
-          <button id="map-deny" class="btn2" style="color:#b31b25;border-color:#f0d3d5;">연결 안 함</button>
+          <button id="map-agree" class="btnp" disabled><span class="msym" style="font-size:16px;">check</span>동의 후 연결 · 준비 중</button>
+          <button id="map-later" class="btn2" disabled>나중에</button>
+          <button id="map-deny" class="btn2" disabled style="color:#b31b25;border-color:#f0d3d5;">연결 안 함</button>
         </div>
       </div>
     </div>
@@ -84,40 +130,40 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
         <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">receipt_long</span>주문 · 배송</h3>
-        <span style="display:flex;gap:12px;"><a href="my-orders.html" style="font-size:12px;font-weight:800;color:#2b5fd9;text-decoration:none;">전체 주문 →</a><a href="my-payments.html" style="font-size:12px;font-weight:800;color:#8a8578;text-decoration:none;">결제 내역</a></span>
+        <span style="display:flex;gap:12px;"><a aria-disabled="true" tabindex="-1" style="font-size:12px;font-weight:800;color:#2b5fd9;text-decoration:none;">전체 주문 →</a><a aria-disabled="true" tabindex="-1" style="font-size:12px;font-weight:800;color:#8a8578;text-decoration:none;">결제 내역</a></span>
       </div>
-      <p class="sub">자체 결제 주문을 표시합니다. 쇼핑몰로 인계한 견적은 전체 주문 내역에서 함께 확인할 수 있습니다.</p>
-      <div id="orders-box"></div>
+      <p class="sub">주문·결제 내역은 본인 확인 후 조회할 수 있습니다.</p>
+      <div id="orders-box" class="empty-box"><p>회원 본인 확인이 필요합니다.</p><p class="sub">현재 주문·배송 정보를 조회하지 않았습니다.</p></div>
     </div>
 
     <!-- 상담 내역 -->
     <div class="card">
       <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">forum</span>상담 내역</h3>
       <p class="sub">상담 내역 저장은 아직 준비 중이에요.</p>
-      <div id="consults"></div>
+      <div id="consults" class="empty-box"><p>상담 내역 저장 준비 중</p><p class="sub">로그인 없이도 새 견적 상담과 추천을 이용할 수 있습니다.</p></div>
     </div>
 
     <!-- 관심 부품 -->
     <div class="card">
       <h3 class="h6"><span class="msym" style="font-size:19px;color:#c77b1f;">interests</span>관심 부품</h3>
       <p class="sub">관심 부품 저장은 아직 준비 중이에요.</p>
-      <div id="wishlist"></div>
+      <div id="wishlist" class="empty-box"><p>관심 부품 저장 준비 중</p><p class="sub">저장한 관심 부품을 확인하는 기능을 준비하고 있습니다.</p></div>
     </div>
 
     <!-- 내 후기 + 계정 -->
     <div style="display:flex;flex-direction:column;gap:18px;">
       <div class="card">
         <h3 class="h6"><span class="msym" style="font-size:19px;color:#2b5fd9;">star</span>내 후기</h3>
-        <p class="sub">구매 인증된 주문만 후기를 남길 수 있어요.</p>
-        <div id="reviews-box"></div>
+        <p class="sub">본인 주문과 배송 완료 여부를 확인한 후 후기를 작성할 수 있습니다.</p>
+        <div id="reviews-box" class="empty-box"><p>회원 본인 확인이 필요합니다.</p><p class="sub">현재 후기·작성 대상 주문을 조회하지 않았습니다.</p></div>
       </div>
       <div class="card">
         <h3 class="h6"><span class="msym" style="font-size:19px;color:#6b6b73;">lock</span>계정 설정</h3>
         <div style="display:flex;flex-direction:column;gap:10px;font-size:13px;font-weight:700;color:#3a3a40;">
-          <div style="display:flex;justify-content:space-between;align-items:center;"><span>비밀번호 변경</span><button class="btn2" data-toast="비밀번호 변경 (목업)">변경</button></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;"><span>가격 알림 수신</span><span class="sw on" data-sw></span></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;"><span>마케팅 수신 동의</span><span class="sw" data-sw></span></div>
-          <a href="#!" style="font-size:11.5px;color:#a29d92;text-decoration:underline;" data-toast="탈퇴 절차 (목업) — 주문·법정 보관 데이터 제외 즉시 파기">회원 탈퇴</a>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>비밀번호 변경</span><button class="btn2" disabled>변경 준비 중</button></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>가격 알림 수신</span><button class="btn2" disabled aria-label="가격 알림 수신 설정 미확인, 준비 중">설정 준비 중</button></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;"><span>마케팅 수신 동의</span><button class="btn2" disabled aria-label="마케팅 수신 동의 설정 미확인, 준비 중">설정 준비 중</button></div>
+          <div class="settings-note"><span>회원 탈퇴</span><button class="btn2" disabled>탈퇴 준비 중</button></div><p class="sub settings-help">수신 동의 상태를 확인하지 않았습니다. 설정 변경·저장 기능은 준비 중입니다.</p>
         </div>
       </div>
     </div>
@@ -125,209 +171,166 @@ body{background:#f1eee8;font-family:var(--font);-webkit-font-smoothing:antialias
   </div>
 </main>
 
+
+
+
+
+
 <script src="../shared/fmt-time.js"></script>
 <script src="../shared/auth.js"></script>
 <script>
 (function(){
- var m=window.popcornAuth.member();
- if(!m){
-  window.popcornAuth.open('join',function(mm){location.reload();});
- }else{
-  document.getElementById('my-nick').textContent=m.nick;
-  document.getElementById('my-email').textContent=m.email;
-  document.getElementById('my-via').textContent=m.via||'이메일';
-  // 없는 값을 지어내지 않는다 — 하드코딩된 '2026-07-16'을 기본값으로 쓰고 있었다
-  document.getElementById('my-joined').textContent=PT.full(m.joined);
-  document.getElementById('my-avatar').textContent=(m.nick||'?').charAt(0);
- }
- document.getElementById('my-logout').onclick=function(){window.popcornAuth.logout();setTimeout(function(){location.href='main-landing.html';},600);};
- // 쇼핑몰 계정 연결 3상태(슬라이스 29 설계) — none: 요청 없음 / requested: 관리자 요청 도착(동의 대기) / mapped: 연결 완료
- // 관리자 ADM-CUS-010의 "매핑 요청 발송"이 이 화면의 안내로 도착한다. 저장 API는 다음 슬라이스.
- // LIVE(슬라이스 30): /api/my/account가 실상태를 주면 그것으로 덮어쓴다. 실패 시 로컬 시안값.
- var MAP_KEY='popcorn-map-state', LIVE=false, MALL_ID=null;
- // 2026-08-24 새벽 감사 §1 고침 — 기본값이 '요청 도착'(시안값)이라, 실데이터가 없는데도
- // (미로그인 · 첫 방문 · 로그아웃 후 남은 캐시) "쇼핑몰 계정 연결 요청이 도착했어요" 패널이
- // 로그인 모달 뒤에 떠 있었다(비로그인 100% 재현). 기본값을 'none'으로 바꾸고,
- // renderMap()은 로그인 상태(m)가 아니면 localStorage 캐시도 쓰지 않는다 — 공유 기기에서
- // 로그아웃한 뒤에도 이전 로그인 때의 상태가 그대로 남아 보이는 것까지 막는다.
- // 로그인 상태에서는 이 값이 /api/my/account 응답(d.map_state)으로 즉시 덮어써진다(LIVE).
- /* MALL_ID(연결된 몰 회원 식별자)·r.item(후기 대상 상품명)·head 주문/배송 텍스트처럼
-    /api/my/* 를 거쳐 온 값을 innerHTML 에 심는 자리에서 쓴다 — s0-landing.html 과 같은
-    5글자(& < > " ') 버전, 속성값 문맥(data-toast="...")에도 안전하다(2026-08-27 감사). */
- function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
- function mapState(){return localStorage.getItem(MAP_KEY)||'none';}
- function renderMap(){
-  var st=m?mapState():'none', pill=document.getElementById('map-pill'), panel=document.getElementById('map-panel');
-  if(st==='mapped'){
-   pill.style.background='#eaf1fd';pill.style.color='#2149b0';
-   pill.innerHTML='<span class="msym" style="font-size:14px;">link</span>연결 완료 · '+esc(MALL_ID||'MALL-2201');
-   panel.hidden=true;
-  }else if(st==='requested'){
-   pill.style.background='#fbf3e2';pill.style.color='#8a561a';
-   pill.innerHTML='<span class="msym" style="font-size:14px;">schedule</span>연결 요청 도착';
-   panel.hidden=false;
-  }else{
-   pill.style.background='#f4f2ec';pill.style.color='#6b6b73';
-   pill.innerHTML='<span class="msym" style="font-size:14px;">link_off</span>연결 안 됨';
-   panel.hidden=true;
-  }
- }
- function setMap(st,msg){localStorage.setItem(MAP_KEY,st);renderMap();window.popcornAuth.toast(msg);}
- document.getElementById('my-map').onclick=function(){
-  var st=mapState();
-  if(st==='mapped'){window.popcornAuth.toast('이미 쇼핑몰 계정과 연결돼 있어요 (MALL-2201)');return;}
-  if(st==='requested'){document.getElementById('map-panel').scrollIntoView({behavior:'smooth',block:'center'});return;}
-  window.popcornAuth.toast('연결은 관리자 요청이 도착했을 때 진행할 수 있어요 — 고객센터로 문의해 주세요 (시안)');
+ 'use strict';
+ // C6: consume accepted C3 snapshots; only the profile GET is allowed here.
+ // No member() cache, legacy account/map/review/order reads or issuance.
+ var auth=window.popcornAuth, generation=0, active=true, pending=false, controller=null;
+ var unsubscribe=null, lastKey=null, retrying=false, retryVersion=0;
+ var retry=document.getElementById('member-retry');
+ var states={
+  preparing:['회원 본인 확인 준비 중','현재 로그인·회원 가입을 이용할 수 없습니다.','상담과 추천은 로그인 없이 이용할 수 있습니다.'],
+  signedOut:['로그인이 필요합니다','회원 본인 확인 전에는 개인정보를 표시하지 않습니다.','상담과 추천은 로그인 없이 이용할 수 있습니다.'],
+  checking:['회원 상태 확인 중','현재 회원 프로필을 확인하고 있습니다.','확인이 끝나기 전에는 개인정보를 표시하지 않습니다.'],
+  error:['회원 정보를 확인하지 못했습니다','회원 프로필을 안전하게 확인할 수 없습니다.','다시 확인해 주세요. 확인 전에는 개인정보를 표시하지 않습니다.'],
+  held:['회원 정보 조회 준비 중','회원 프로필 조회 기능을 준비 중입니다.','주문·결제·후기와 계정 연결 기능도 준비 중입니다.'],
+  profile:['회원 프로필 확인됨','현재 회원 프로필을 표시합니다.','주문·결제·후기와 계정 연결 기능은 준비 중입니다.']
  };
- function postMap(agree,okMsg){
-  if(!LIVE){setMap(agree?'mapped':'none',okMsg+' (시안)');return;}
-  fetch('/api/my/account/map',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({agree:agree})})
-   .then(function(r){return r.json().then(function(j){return {ok:r.ok,j:j};});})
-   .then(function(res){
-     if(!res.ok){window.popcornAuth.toast('처리 실패: '+(res.j.detail||''));return;}
-     MALL_ID=res.j.mall_member_id||null;
-     localStorage.setItem(MAP_KEY,res.j.map_state);renderMap();
-     window.popcornAuth.toast(okMsg);
-   }).catch(function(){window.popcornAuth.toast('처리 실패 — 네트워크 오류');});
+ function wipe(){
+  document.getElementById('my-avatar').innerHTML='<img src="../shared/icons/su/ms-person.svg" alt="" width="20" height="20" data-su="1">';
+  document.getElementById('my-nick').textContent='회원 본인 확인 준비 중';
+  document.getElementById('my-identity-note').textContent='확인된 회원 정보가 없습니다.';
+  document.getElementById('map-pill').innerHTML='<img src="../shared/icons/su/ms-link.svg" alt="" width="20" height="20" data-su="1">확인 전';
+  document.getElementById('orders-box').innerHTML='<p>회원 본인 확인이 필요합니다.</p><p class="sub">현재 주문·배송 정보를 조회하지 않았습니다.</p>';
+  document.getElementById('reviews-box').innerHTML='<p>회원 본인 확인이 필요합니다.</p><p class="sub">현재 후기·작성 대상 주문을 조회하지 않았습니다.</p>';
  }
- document.getElementById('map-agree').onclick=function(){postMap(true,'쇼핑몰 계정을 연결했어요 — 지난 주문·후기가 곧 함께 표시됩니다');};
- document.getElementById('map-later').onclick=function(){document.getElementById('map-panel').hidden=true;window.popcornAuth.toast('나중에 다시 안내해 드릴게요 — 프로필의 "계정 연결"에서 언제든 열 수 있어요');};
- document.getElementById('map-deny').onclick=function(){postMap(false,'연결하지 않기로 했어요 — 기존 쇼핑몰 이력은 따로 유지됩니다');};
- renderMap();
- // 담당 밖 보고(2026-08-20)의 나머지 — "주문·배송"·"내 후기" 판정 근거:
- // /api/my/orders(주문)·/api/my/account(reviewable — 후기 작성 여부)는 실재 조회한다
- // (api/my_orders.py·api/my_account.py, prefix /api/my). 다만 후기는 «쓰기»(POST /reviews)와
- // «작성 여부 조회»만 있고, 이미 쓴 후기의 별점·본문을 돌려주는 고객용 GET은 없다
- // (member_reviews.rating/body를 읽는 라우트는 api/admin_member_reviews.py뿐 — 관리자 전용,
- // /api/admin 접두어·다른 세션). 그래서 후기 카드는 작성 여부·주문 정보까지만 실조회하고
- // 별점(하드코딩 '★5.0')·인용문("사무용 20대…")은 지운다 — 서버가 안 주는 값이었다.
- function noteBox(msg){return '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">'+msg+'</div>';}
- // 이름이 fmt로 시작해야 한다 — [27] 회귀가 "ISO 원문 그대로 출력"을 줄 단위 텍스트로
- // 찾는데, mdOnly라는 이름으로는 PT.short() 재사용이 호출부 줄에서 안 보여 오탐이 났다
- // (my-orders.html·my-payments.html의 fmtT와 같은 이유로 이름을 맞춘다).
- function fmtMD(iso){return PT.short(iso).slice(0,5);}  // "07-14" — fmt-time.js 단일 원천(사본 금지)
-
- if(m&&m.email){
-  fetch('/api/my/account')
-   .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
-                     if(!r.ok)throw new Error(r.status);return r.json();})
-   .then(function(d){
-     if(!d.member){renderReviewsBox([],'error');return;}  // 세션은 있는데 회원 행이 없음 — 확인 불가로 정직하게
-     LIVE=true;MALL_ID=d.mall_member_id;
-     localStorage.setItem(MAP_KEY,d.map_state);renderMap();
-     renderReviewsBox(d.reviewable||[]);
-   }).catch(function(){renderReviewsBox([],'error');});
- }else{
-  renderReviewsBox([],'logout');
+ function cancel(){
+  generation++;pending=false;var previous=controller;controller=null;
+  wipe();if(previous)previous.abort();
  }
-
- // 내 후기 — reviewable 중 written=true만 "이미 쓴 후기"다. 최근 2건만 카드에 보인다
- // (서버가 이미 최신순 정렬해 준다 — api/my_account.py의 sorted(..., reverse=True)).
- function renderReviewsBox(list,state){
-  var box=document.getElementById('reviews-box');
-  if(state==='logout'){box.innerHTML=noteBox('로그인하면 남긴 후기를 볼 수 있어요.');return;}
-  if(state==='error'){box.innerHTML=noteBox('후기 정보를 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.');return;}
-  var written=(list||[]).filter(function(r){return r.written;}).slice(0,2);
-  if(!written.length){
-   var any=(list||[]).length>0;
-   box.innerHTML=noteBox(any?'아직 등록한 후기가 없습니다.':'배송이 완료된 주문이 있으면 후기를 남길 수 있어요.')
-    +(any?'<a class="btnp" href="my-review-write.html" style="margin-top:4px;display:inline-flex;padding:9px 14px;font-size:12.5px;"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</a>':'');
-   return;
-  }
-  /* r.item(구매·리뷰 대상 상품명)·r.order_no 는 카탈로그·주문 원장을 거친 서버
-     텍스트다 — esc() 한다(2026-08-27 감사). */
-  box.innerHTML=written.map(function(r){
-   return '<div style="border:1.5px solid #ece9e3;border-radius:14px;padding:14px 16px;margin-bottom:8px;">'
-    +'<span style="display:inline-flex;align-items:center;gap:5px;background:#eaf1fd;color:#2149b0;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;"><span class="msym" style="font-size:13px;">verified</span>구매 인증</span>'
-    +'<p style="margin:8px 0 0;font-size:12.5px;color:#3a3a40;font-weight:700;line-height:1.5;">'+esc(r.item)+'</p>'
-    +'<div style="font-size:11px;color:#a29d92;font-weight:600;margin-top:6px;">'+esc(r.order_no)+' · '+fmtMD(r.at)+' · <a href="s2-result.html" style="color:#8a8578;">구성 보기</a></div>'
-    +'</div>';
-  }).join('');
+ function render(state,fromRetry){
+  wipe();var copy=states[state];
+  document.getElementById('my-nick').textContent=copy[0];
+  document.getElementById('member-status-title').textContent=copy[0];
+  document.getElementById('member-status-copy').textContent=copy[1];
+  document.getElementById('member-status-help').textContent=copy[2];
+  document.getElementById('member-status').setAttribute('aria-busy',String(state==='checking'));
+  document.getElementById('map-panel').hidden=state!=='preparing'&&state!=='held'&&state!=='profile';
+  retry.hidden=state!=='error'&&state!=='held'&&!(state==='checking'&&fromRetry);
+  retry.textContent=state==='checking'?'다시 확인 중…':'다시 확인';
+  // Same native button/focus is retained while requests are deduplicated.
+  retry.setAttribute('aria-disabled',String(state==='checking'));
+  if(state==='checking')document.getElementById('my-identity-note').textContent='확인 중 · 회원 정보 표시 대기';
  }
-
- // 주문 · 배송 — ORD-84213 하드코딩을 걷어내고 /api/my/orders를 실조회한다. 401·0건·요청
- // 실패 세 상태를 my-orders.html·my-payments.html과 같은 결(401→popcornAuth.expired(),
- // 그 외 실패는 사유를 보여준다)로 다룬다.
- var ORD_STAGE=['결제 완료','조립·검수','배송 중','완료'];
- function ordStepsHtml(step){
-  return ORD_STAGE.map(function(label,i){
-   var st=0;                                     // 0=대기 1=완료 2=진행중
-   if(step>0){ if(i<step-1)st=1; else if(i===step-1)st=(step>=4?1:2); }
-   var col=st===1?'#2b5fd9':(st===2?'#c77b1f':'#d8d4cc');
-   return '<div style="flex:1;text-align:center;"><div style="height:5px;border-radius:3px;background:'+col+';margin-bottom:5px;"></div><span style="font-size:10.5px;font-weight:800;color:'+(st?'#3a3a40':'#a29d92')+';">'+label+(st===2?' ●':'')+'</span></div>';
-  }).join('');
+ function object(v){return !!v&&typeof v==='object'&&!Array.isArray(v);}
+ function fields(v,names){return object(v)&&Object.keys(v).length===names.length&&names.every(function(k){return Object.prototype.hasOwnProperty.call(v,k);});}
+ function text(v,max){return typeof v==='string'&&v.trim().length>0&&v.length<=max&&!/[<>\x00-\x1f\x7f]/.test(v);}
+ function decimal(v){return typeof v==='string'&&/^[1-9][0-9]{0,18}$/.test(v)&&(v.length<19||v<='9223372036854775807');}
+ function validContext(c){return fields(c,['member_id','session_context_id','principal_revision'])&&decimal(c.member_id)&&decimal(c.principal_revision)&&
+  typeof c.session_context_id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(c.session_context_id);}
+ function profileFields(p){return fields(p,['member_id','nickname','email'])&&decimal(p.member_id)&&text(p.nickname,120)&&
+  (p.email===null||(text(p.email,254)&&/^[^\s@]+@[^\s@]+$/.test(p.email)));}
+ function snapshot(s){
+  if(!fields(s,['epoch','phase','member','auth_context'])||!Number.isSafeInteger(s.epoch)||s.epoch<0)return null;
+  if(s.phase==='authenticated'){
+   if(!fields(s.member,['member_id','nickname','email','via'])||s.epoch<1||
+      !profileFields({member_id:s.member.member_id,nickname:s.member.nickname,email:s.member.email})||
+      ['kakao','naver','google','email'].indexOf(s.member.via)<0||!validContext(s.auth_context)||s.auth_context.member_id!==s.member.member_id)return null;
+  }else if(['checking','signed-out','unavailable','error'].indexOf(s.phase)<0||s.member!==null||s.auth_context!==null)return null;
+  return {epoch:s.epoch,phase:s.phase,member:s.member?{member_id:s.member.member_id,nickname:s.member.nickname,email:s.member.email,via:s.member.via}:null,
+   auth_context:s.auth_context?{member_id:s.auth_context.member_id,session_context_id:s.auth_context.session_context_id,principal_revision:s.auth_context.principal_revision}:null};
  }
- function renderOrdersBox(items,state){
-  var box=document.getElementById('orders-box');
-  if(state==='logout'){box.innerHTML=noteBox('로그인하면 주문 내역을 볼 수 있어요.');return;}
-  if(state==='error'){box.innerHTML=noteBox('주문 내역을 불러오지 못했습니다 — 잠시 후 다시 시도해 주세요.');return;}
-  if(!items.length){box.innerHTML=noteBox('아직 주문 내역이 없습니다.');return;}
-  var head=items[0], rest=items.slice(1,2);
-  /* itemLine(상품명)·head.no·head.ship.carrier/no(택배사·송장번호) 는 서버 텍스트다.
-     data-toast 는 속성값 문맥이라 esc() 가 특히 필요하다(2026-08-27 감사). */
-  var itemLine=esc((head.items&&head.items[0]?head.items[0][1]:'구성 정보 없음'))+((head.items||[]).length>1?' 외':'');
-  var shipBtn=head.ship
-   ?'<button class="btn2" data-toast="송장 '+esc(head.ship.carrier)+' '+esc(head.ship.no)+' — 배송 조회 (목업)"><span class="msym" style="font-size:15px;">package_2</span>송장 조회</button>'
-   :'';
-  var html='<div style="border:1.5px solid #ece9e3;border-radius:14px;padding:16px;margin-bottom:10px;">'
-   +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">'
-   +'<b style="font-size:13.5px;color:#17171b;">'+esc(head.no)+' <span style="font-weight:600;color:#8a8578;">· '+fmtMD(head.created_at)+'</span></b>'
-   +'<b style="font-size:14px;color:#17171b;">'+(head.total||0).toLocaleString()+'원</b></div>'
-   +'<div style="font-size:12px;color:#8a8578;font-weight:600;margin-bottom:12px;">'+itemLine+' <a href="s2-result.html" style="color:#2b5fd9;">구성 보기</a></div>'
-   +(head.status!=='취소'?'<div style="display:flex;align-items:center;gap:4px;margin-bottom:12px;">'+ordStepsHtml(head.step)+'</div>':'')
-   +'<div style="display:flex;gap:8px;flex-wrap:wrap;">'+shipBtn
-   +'<a class="btn2" href="my-orders.html?id='+encodeURIComponent(head.no)+'"><span class="msym" style="font-size:15px;">swap_horiz</span>주문 상세</a></div></div>';
-  if(rest.length){
-   var r=rest[0];
-   html+='<div style="display:flex;justify-content:space-between;align-items:center;border:1.5px dashed #ddd8ce;border-radius:14px;padding:13px 16px;">'
-    +'<span style="font-size:12.5px;color:#8a8578;font-weight:700;">'+esc(r.no)+' · '+fmtMD(r.created_at)+' · '+r.status+'</span>'
-    +(r.status==='완료'
-      ?'<a class="btnp" href="my-review-write.html?order='+encodeURIComponent(r.no)+'" style="padding:9px 14px;font-size:12.5px;"><span class="msym" style="font-size:15px;">star</span>후기 쓰기</a>'
-      :'<a class="btn2" href="my-orders.html?id='+encodeURIComponent(r.no)+'" style="padding:9px 14px;font-size:12.5px;">주문 상세</a>')
-    +'</div>';
-  }
-  box.innerHTML=html;
-  box.querySelectorAll('[data-toast]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();window.popcornAuth.toast(b.getAttribute('data-toast'));});});
+ function key(s){return s.phase==='authenticated'?JSON.stringify([s.epoch,s.member.member_id,s.auth_context.session_context_id,s.auth_context.principal_revision]):null;}
+ function currentSnapshot(){try{return snapshot(auth.getSnapshot());}catch(e){return null;}}
+ function sameContext(a,b){return a.member_id===b.member_id&&a.session_context_id===b.session_context_id&&a.principal_revision===b.principal_revision;}
+ function current(turn,captured){
+  if(!active||turn!==generation)return false;
+  var now=currentSnapshot();
+  if(!now||now.phase!=='authenticated'||key(now)!==key(captured)){cancel();lastKey=null;render('error');return false;}
+  return true;
  }
- if(m&&m.email){
-  fetch('/api/my/orders')
-   .then(function(r){if(r.status===401){popcornAuth.expired();throw new Error(401);}
-                     if(!r.ok)throw new Error(r.status);return r.json();})
-   .then(function(d){
-    // 담당 밖 방어: /api/my/orders는 my-orders.html과 같은 응답을 쓴다(공유 계약,
-    // 각 항목에 kind:'order'|'handoff'). 이 카드는 배송 진행률(ordStepsHtml)·"주문 상세"
-    // 링크처럼 주문 전용 구조를 가정하므로, 인계(kind==='handoff')를 섞으면 없는 배송
-    // 단계가 있는 척 그려진다. 이 자리는 요약 카드라 인계까지 넣지 않는다 — 전체 목록은
-    // 바로 위 "전체 주문 →" 링크(my-orders.html)가 인계까지 함께 보여준다.
-    var ordersOnly=(d.items||[]).filter(function(x){return x.kind!=='handoff';});
-    renderOrdersBox(ordersOnly);
-   })
-   .catch(function(){renderOrdersBox([],'error');});
- }else{
-  renderOrdersBox([],'logout');
+ function noStore(r){try{return !!r.headers&&typeof r.headers.get==='function'&&/(?:^|,)\s*no-store\s*(?:,|$)/i.test(r.headers.get('Cache-Control')||'');}catch(e){return false;}}
+ function validResponse(r){
+  if(!r||!Number.isInteger(r.status)||typeof r.json!=='function'||r.redirected===true||r.type==='opaque'||r.type==='opaqueredirect'||!noStore(r))return false;
+  if(!((r.status===200&&r.ok===true)||([401,409,503].indexOf(r.status)>=0&&r.ok===false)))return false;
+  if(r.url){var u=new URL(r.url,location.href);if(u.origin!==location.origin||u.pathname!=='/api/my/profile'||u.search||u.hash)return false;}
+  return true;
  }
-
- // 상담 내역 저장은 아직 준비 중이다(2026-08-20 사장님 확정 — 빈 상태 + 사유로 교정).
- // api/recommend.py가 member_id를 로그인 여부와 무관하게 항상 NULL로 넣어 상담이 회원
- // 계정에 연결되지 않고, 상담 내역을 돌려주는 /api/my/* 엔드포인트도 없다. 예전에는 CS
- // 하드코딩 배열을 그대로 그려 로그인 상태·실제 회원과 무관하게 늘 같은 가짜 3건이 떴고,
- // "그때 가격으로 다시 보기" 버튼도 그냥 s2-result.html로 이동만 했다(재조회가 아니었다).
- // 배열과 죽은 버튼을 지우고, 이 화면이 이미 쓰는 빈 상태 방식(my-orders.html·
- // my-payments.html — 가운데 정렬 · 회색 문구)을 그대로 따른다.
- document.getElementById('consults').innerHTML=
-  '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">지금은 주문 내역·결제 내역·후기만 저장돼요.</div>';
-
- // 관심 부품(찜) 저장도 아직 준비 중이다 — member_favorites는 ERD에만 있고 고객용 라우트가
- // 없다. 예전에는 WL 하드코딩 배열을 그려 늘 같은 가짜 3건 + 동작하지 않는 가격 알림
- // 스위치가 떴다. 배열과 죽은 스위치를 지우고 같은 빈 상태 방식으로 바꾼다.
- document.getElementById('wishlist').innerHTML=
-  '<div style="padding:26px 0;text-align:center;font-size:13px;color:#8a8578;font-weight:600;">지금은 주문 내역·결제 내역·후기만 저장돼요.</div>';
-
- document.querySelectorAll('[data-toast]').forEach(function(b){b.addEventListener('click',function(e){e.preventDefault();window.popcornAuth.toast(b.getAttribute('data-toast'));});});
- document.querySelectorAll('[data-sw]').forEach(function(s){s.addEventListener('click',function(){s.classList.toggle('on');window.popcornAuth.toast(s.classList.contains('on')?'가격 알림을 켰어요 — 변동 시 알려드릴게요':'알림을 껐어요');});});
+ function renderProfile(p){
+  render('profile');
+  document.getElementById('my-nick').textContent=p.nickname;
+  document.getElementById('my-avatar').textContent=p.nickname.charAt(0);
+  document.getElementById('my-identity-note').textContent=p.email===null?'이메일 정보가 제공되지 않았습니다.':p.email;
+  document.getElementById('orders-box').innerHTML='<p>주문·배송 조회 준비 중</p><p class="sub">현재 주문·배송 정보를 조회하지 않았습니다.</p>';
+  document.getElementById('reviews-box').innerHTML='<p>후기 조회 준비 중</p><p class="sub">현재 후기·작성 대상 주문을 조회하지 않았습니다.</p>';
+ }
+ function readProfile(captured){
+  var turn=generation;pending=true;controller=new AbortController();var signal=controller.signal;
+  render('checking',retrying);
+  Promise.resolve().then(function(){
+   if(!current(turn,captured))return null;
+   return fetch('/api/my/profile',{method:'GET',credentials:'same-origin',cache:'no-store',redirect:'error',
+    headers:{'X-Popcorn-Auth-Context':captured.auth_context.session_context_id},signal:signal});
+  }).then(function(r){
+   if(!current(turn,captured))return null;
+   if(!validResponse(r))return {state:'error',invalidate:!!r&&r.ok===false&&(r.status===401||r.status===409)};
+   if(r.status===401||r.status===409)return {state:'error',invalidate:true};
+   return Promise.resolve().then(function(){return current(turn,captured)?r.json():null;}).then(function(d){
+    if(!current(turn,captured))return null;
+    if(r.status===503)return {state:object(d)&&object(d.detail)&&d.detail.code==='auth_unavailable'?'held':'error'};
+    if(!fields(d,['auth_version','auth_context','profile'])||d.auth_version!==2||!validContext(d.auth_context)||!profileFields(d.profile)||
+       d.profile.member_id!==captured.member.member_id||!sameContext(d.auth_context,captured.auth_context))return {state:'error',invalidate:true};
+    return {profile:{member_id:d.profile.member_id,nickname:d.profile.nickname,email:d.profile.email}};
+   });
+  }).then(function(result){
+   if(!current(turn,captured))return;
+   pending=false;controller=null;
+   if(result&&result.profile){renderProfile(result.profile);return;}
+   render(result&&result.state||'error');
+   if(result&&result.invalidate){
+    // Invalidate the accepted shared state; never synthesize a new principal.
+    try{auth.expired();}catch(e){cancel();lastKey=null;render('error');}
+   }
+  }).catch(function(){if(current(turn,captured)){pending=false;controller=null;render('error');}});
+ }
+ function consume(input){
+  if(!active)return;
+  var s=snapshot(input),signature=s&&key(s);
+  if(signature&&signature===lastKey)return;
+  cancel();lastKey=signature;
+  if(!s){render('error');return;}
+  if(s.phase==='authenticated'){readProfile(s);return;}
+  render(s.phase==='checking'?'checking':s.phase==='signed-out'?'signedOut':s.phase==='unavailable'?'preparing':'error',retrying);
+ }
+ function connect(){
+  if(!active||unsubscribe)return;
+  if(!auth||['getSnapshot','subscribe','sync','expired'].some(function(k){return typeof auth[k]!=='function';})){render('preparing');return;}
+  try{unsubscribe=auth.subscribe(consume);if(typeof unsubscribe!=='function')throw new Error('invalid subscription');}
+  catch(e){cancel();unsubscribe=null;lastKey=null;render('error');}
+ }
+ retry.addEventListener('click',function(){
+  if(!active||pending||retrying||!auth||typeof auth.sync!=='function')return;
+  cancel();lastKey=null;retrying=true;var attempt=++retryVersion;render('checking',true);
+  var promise,epoch;
+  try{promise=auth.sync();var s=currentSnapshot();epoch=s&&s.epoch;}
+  catch(e){retrying=false;render('error');return;}
+  Promise.resolve(promise).then(function(){
+   if(active&&attempt===retryVersion)consume(currentSnapshot());
+  },function(){
+   var s=currentSnapshot();if(active&&attempt===retryVersion&&s&&s.epoch===epoch){cancel();lastKey=null;render('error');}
+  }).then(function(){if(attempt===retryVersion)retrying=false;});
+ });
+ function suspend(){
+  active=false;retryVersion++;retrying=false;cancel();lastKey=null;
+  if(unsubscribe){var stop=unsubscribe;unsubscribe=null;stop();}render('preparing');
+ }
+ function resume(){if(active)return;active=true;connect();}
+ window.addEventListener('pagehide',suspend);
+ window.addEventListener('pageshow',resume);
+ document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='hidden')suspend();
+  else if(document.visibilityState==='visible')resume();
+ });
+ connect();
 })();
 </script>
 <script src="../shared/ui-progress.js"></script>
-<script src="../shared/su-icons.js"></script>
-</body></html>
+<script src="../shared/su-icons.js"></script></body></html>
