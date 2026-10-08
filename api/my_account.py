@@ -18,12 +18,18 @@
 스위치가 켜져 있으면 403으로 거부된다 — 근거·켜는 법은 그 모듈 docstring 참조.
 기본은 꺼짐(지금 동작 그대로).
 """
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
+from typing import Protocol
 from pydantic import BaseModel
 from sqlalchemy import text
 
 from .timeutil import iso
 from .customer_auth import require_member
+from .customer_auth import require_verified_session
+from . import customer_auth as profile_auth
+from . import customer_identity as profile_identity
+from . import customer_auth_store as profile_store
 from .customer_write_lock import write_locked, REASON as WRITE_LOCK_REASON
 from .db import engine
 
@@ -146,3 +152,86 @@ def write_review(body: ReviewBody):
             " VALUES (:m, :i, :r, :b, '게시', false) RETURNING review_id"),
             {"m": m["member_id"], "i": body.item_id, "r": body.rating, "b": text_body}).scalar()
         return {"ok": True, "review_id": rid, "order_no": line["order_no"], "status": "게시"}
+
+
+# C5 is a separate members-only read. Existing account/demo/review handlers above
+# are preserved and remain outside the accepted C4 private-read allowlist.
+class MemberProfileRepository(Protocol):
+    def ready(self) -> bool: ...
+    def read_member(self, member_id: int) -> profile_identity.CanonicalMember | None: ...
+
+
+def _profile_error(status, code):
+    return HTTPException(status, detail={"code":code}, headers=profile_auth.NO_STORE)
+
+
+class RuntimeMemberProfileRepository:
+    """C2/live members adapter is unconnected. Never use legacy account engine."""
+    def ready(self):
+        return False
+    def read_member(self, member_id):
+        raise _profile_error(503, "auth_unavailable")
+
+
+def create_stored_profile_reader(source):
+    """Explicit server/fixture read composition, never a request field."""
+    return profile_store.MemberReadAdapter(source)
+
+
+_profile_repository = create_stored_profile_reader(profile_store.RUNTIME_READ_PORT)
+
+
+def get_profile_repository():
+    """Server composition only; query/body/provider cannot select a reader."""
+    return _profile_repository
+
+
+def _profile_repository_ready(repository):
+    try:
+        ready = repository.ready() is True
+    except Exception:
+        raise _profile_error(503, "auth_unavailable") from None
+    if not ready:
+        raise _profile_error(503, "auth_unavailable")
+
+
+@router.get("/profile")
+def profile(request: Request, repository=Depends(get_profile_repository)):
+    """C1 profile DTO after a members-only read and fresh C4 query/emit checks.
+
+    There is no live C2 reader in this slice. CanonicalMember rows are explicit
+    typed repository inputs; they do not prove persistence by themselves.
+    Public contact/display fields use the last C4-confirmed canonical member.
+    """
+    try:
+        _profile_repository_ready(repository)
+        before = require_verified_session()  # Immediately before member query.
+        try:
+            row = repository.read_member(before.member.member.member_id)
+        except Exception:
+            raise _profile_error(503, "auth_unavailable") from None
+        _profile_repository_ready(repository)
+        after = require_verified_session()   # Fresh read immediately before emit.
+        _profile_repository_ready(repository)
+        if before.key() != after.key():
+            raise _profile_error(409, "auth_context_changed")
+        if row is None:
+            raise _profile_error(401, "unauthenticated")
+        if type(row) is not profile_identity.CanonicalMember:
+            raise _profile_error(503, "auth_unavailable")
+        canonical = after.member.member
+        if (row.member_id, row.auth_subject, row.principal_revision) != (
+                canonical.member_id, canonical.auth_subject, canonical.principal_revision):
+            raise _profile_error(409, "auth_context_changed")
+        if row.status != "active":
+            raise _profile_error(401, "member_inactive")
+        body = profile_identity.profile_payload(after.member, after.session, now=after.now,
+            expected_context=request.headers.get("X-Popcorn-Auth-Context"))
+        return JSONResponse(body, headers=profile_auth.NO_STORE)
+    except profile_identity.IdentityError as error:
+        if error.status in (401,409):
+            raise _profile_error(error.status, error.code) from None
+        raise _profile_error(503, "auth_unavailable") from None
+    except HTTPException as error:
+        error.headers = {**(error.headers or {}), **profile_auth.NO_STORE}
+        raise

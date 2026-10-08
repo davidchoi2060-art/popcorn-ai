@@ -65,7 +65,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
 <link rel="stylesheet" href="/shared/fonts/fonts.css">
-<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261002-new">
+<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261005-mobile">
 {% block head_extra %}{% endblock %}
 </head>
 <body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" data-admin-mode="{{ 'new' if new_admin else 'legacy' }}" {% block body_attrs_extra %}{% endblock %}>
@@ -73,7 +73,12 @@
 
   <nav class="a2-lnb" id="lnb" data-keep="1" aria-label="주메뉴">
     <div class="a2-lnb-brand" id="lnbBrand">팝콘 AI</div>
-    <div class="a2-lnb-scroll">
+    {% if new_admin %}
+    <button type="button" class="a2-lnb-mobile-toggle" id="lnbMobileToggle"
+            data-action="toggle-mobile-lnb" aria-controls="lnbMenu" aria-expanded="false"
+            aria-label="메뉴 열기"><span id="lnbMobileLabel">메뉴 열기</span></button>
+    {% endif %}
+    <div class="a2-lnb-scroll" id="lnbMenu">
       {% if not new_admin %}
       <a class="a2-new-entry" href="/admin2/new?admin=new" title="관리자-NEW"><img src="/shared/icons/admin/box.svg" alt=""><span class="a2-t">관리자-NEW →</span></a>
       {% endif %}
@@ -172,7 +177,7 @@
 </div>
 
 <script src="/shared/ui-progress.js"></script>
-<script src="/shared/admin2/admin2-shell.js"></script>
+<script src="/shared/admin2/admin2-shell.js?v=20261005-mobile"></script>
 <script src="/shared/admin2/admin2-text.js"></script>
 {% block foot_extra %}{% endblock %}
 </body>

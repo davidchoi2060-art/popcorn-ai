@@ -1,5 +1,5 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
 {% block title %}제품 소개 영상{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/pc-builder.css"><link rel="stylesheet" href="/shared/pc-media.css">{% endblock %}
-{% block content %}<main class="pc-builder"><header class="builder-top"><div><small>조립PC 제품군 / 제품 소개 영상</small><h1>제품 소개 영상 생성·관리</h1><p>확정 대표 이미지와 실제 사양 기반 · 10초 본편 · 개별 실행</p></div><a id="video-back" href="/admin2/pc-configurations">제품군 목록</a></header><p id="video-message" role="status"></p><div id="video-root">최신 구성·대표 이미지 조회 중</div></main>{% endblock %}
-{% block foot_extra %}<script src="/shared/pc-video.js"></script>{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/pc-assets.css?v=20261002-video">{% endblock %}
+{% block content %}<main class="pc-assets pca-video"><header class="pca-top"><div><h1>제품 소개 영상 생성·관리</h1><p>확정 대표 이미지와 실제 사양으로 소개 영상 제작</p></div><nav aria-label="제품 관련 화면"><a id="video-workspace" href="/admin2/pc-configurations">제품 작업 공간</a><a id="video-back" href="/admin2/pc-configurations">대표 이미지 관리</a></nav></header><p id="video-message" class="pca-message" role="status" aria-live="polite"></p><div id="video-root">최신 구성·대표 이미지 조회 중</div></main>{% endblock %}
+{% block foot_extra %}<script src="/shared/pc-video.js?v=20261002"></script>{% endblock %}
