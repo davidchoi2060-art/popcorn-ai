@@ -68,7 +68,7 @@
 | 4 | draft [PR #8](https://github.com/davidchoi2060-art/popcorn-ai/pull/8) · 사전조건 누락을 「준비 실패」로 표시 · 서버 환경 설정은 중헌님 조치 필요 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
 | 5 | draft [PR #9](https://github.com/davidchoi2060-art/popcorn-ai/pull/9) · 참고가격↔주문 확정가 계약은 PR #2에 답함 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
 | 6 | draft [PR #3](https://github.com/davidchoi2060-art/popcorn-ai/pull/3) 응답 정리 · draft [PR #5](https://github.com/davidchoi2060-art/popcorn-ai/pull/5) 보관 요청 속도 제한(방문자당 분당 10건·하루 100건, DB 정책 표에서 조정) | `/api/grid/recommend`에서 최상위 `notes`와 `items[].spec`의 내부 키 제거(`spec`은 `cpu`·`gpu`·`ram_gb`·`ssd_gb`·`vram_gb`만), `/api/mvp3/saved-quotes` 쓰기 속도 제한. `mockups/mvp3/`는 고치지 않음. 계약 원문은 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6054476845) |
-| 7 | draft [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) · push·PR마다 Actions 실행. 첫 측정(마이그레이션만 적용한 빈 DB, 작성자 측정·PC 독립 확인 전): 시나리오 8개 중 1개, 단계 27개 중 5개 초록. PC 검토 보완 요청 4건(원격 모드 무접속, 쓰기 차단, 증빙 허용목록, 목록 가용성과 업무 완료 분리) 반영 중. 표는 `docs/scenarios/ci/status.md` | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
+| 7 | draft [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) head `48c2c4f` · **PC 독립 읽기 검토 통과**(원격 무접속·쓰기 차단·증빙 허용목록·단일 명령 생성). 작성자 측정 16 PASS는 PC 독립 실행과 별개, 고객 끝까지 0/8. 실카탈로그 측정은 아직 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
 | 10 | draft [PR #6](https://github.com/davidchoi2060-art/popcorn-ai/pull/6) · 10/3~10/7 기록은 추정 표시, PC 쪽 사실 확인 요청 | 결정 로그(9/25 재설계, 10/4~10/7), ERD(0124~0132), HANDOFF 축약 |
 
 ### 열린 질문
