@@ -409,20 +409,26 @@ class MiddlewareAndSourceTests(unittest.TestCase):
         async def check(path, method, fail):
             request = Request({'type':'http','method':method,'path':path,'headers':[],
                                'scheme':'https','server':('shop.example',443),'query_string':b''})
-            before = auth._current.get()
-            seen = []
-            async def next_handler(request):
-                seen.append(auth.current_member())
-                if fail: raise RuntimeError('fixture downstream error')
-                return Response()
-            with patch.object(auth.RUNTIME_RESOLVER, '_ready') as ready, \
-                    patch.object(auth.RUNTIME_RESOLVER, 'resolve', return_value=None) as resolver:
-                if fail:
-                    with self.assertRaises(RuntimeError): await auth.member_middleware(request,next_handler)
-                else: await auth.member_middleware(request,next_handler)
-            ready.assert_not_called(); resolver.assert_not_called()
-            self.assertEqual(seen, [None])
-            self.assertIs(auth._current.get(), before)
+            # An outside sentinel proves the boundary restores the caller's value, not just None.
+            sentinel = object()
+            outer = auth._current.set(sentinel)
+            try:
+                seen = []
+                async def next_handler(request):
+                    seen.append(auth._current.get())
+                    seen.append(auth.current_member())
+                    if fail: raise RuntimeError('fixture downstream error')
+                    return Response()
+                with patch.object(auth.RUNTIME_RESOLVER, '_ready') as ready, \
+                        patch.object(auth.RUNTIME_RESOLVER, 'resolve', return_value=None) as resolver:
+                    if fail:
+                        with self.assertRaises(RuntimeError): await auth.member_middleware(request,next_handler)
+                    else: await auth.member_middleware(request,next_handler)
+                ready.assert_not_called(); resolver.assert_not_called()
+                self.assertEqual(seen, [None, None])
+                self.assertIs(auth._current.get(), sentinel)
+            finally:
+                auth._current.reset(outer)
         # /api/auth/ and /api/my/ are V3 "protected" paths (errors become 503); they are not commerce paths.
         for path in _guard_paths():
             if path.startswith(('/api/auth/', auth.GUARDED_PREFIX)): continue
