@@ -1,0 +1,233 @@
+{
+  "status": "docs-only local share candidate; not executed",
+  "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+  "source_files": [
+    {
+      "path": "source_candidate/api/__init__.py",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "source_candidate/api/admin_existing_pc_media.py",
+      "raw_sha256": "af6a066742ae0ca5aeaf00b186a076bdc0446e688b9f116ae46e4bbcd7694cba",
+      "bytes": 11758
+    },
+    {
+      "path": "source_candidate/api/pc_existing_media_authority.py",
+      "raw_sha256": "c3f978b3a52ba951059c83405910af33db66f5585cc9e5232789f4cd70cddbd7",
+      "bytes": 12607
+    },
+    {
+      "path": "source_candidate/api/pc_existing_media_import.py",
+      "raw_sha256": "c7e8f2de6575e3eece33e3805bc0d4b4532c9dc758c711b016996e003477462a",
+      "bytes": 28127
+    },
+    {
+      "path": "source_candidate/api/pc_existing_media_refresh.py",
+      "raw_sha256": "dfd46f10b99c268110b49f42da246c30b8ef03ee99dda18cd1a224d4d46b6b77",
+      "bytes": 12750
+    },
+    {
+      "path": "source_candidate/tools/register_existing_pc_media.py",
+      "raw_sha256": "9ab648ad44480d4cb45504ff631a76bd0b58c36feca0f01c1ea962ff752324ff",
+      "bytes": 7902
+    },
+    {
+      "path": "source_candidate/tests/test_existing_media_admin_flow_integration.py",
+      "raw_sha256": "904c11f3c11c12a4ef8cdef64a2db40f287cf0fe3d1296335c500314695df879",
+      "bytes": 12618
+    },
+    {
+      "path": "source_candidate/tests/test_existing_media_pg_capture_plan_integration.py",
+      "raw_sha256": "c7e323d939511e97479b43be329e11cbd21ba11e595d71aa9a3cf95a1b27af40",
+      "bytes": 11459
+    }
+  ],
+  "expected_methods": [
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_whole_route_case_session_refresh_final_provenance_then_ready_retry"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_http_expected_mismatch_never_replaces_server_scope_or_reserves"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_valid_refresh_and_local_case_cannot_replace_missing_actual_grant"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_session_revoked_after_reservation_blocks_final_ack"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_CASE_changed_after_reservation_is_denied_by_real_case_adapter"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_fresh_coverage_withdrawal_unknown_after_reservation_is_not_SHA_allow"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_final_unknown_whole_route_new_round_sameconn_exact_job_ack"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_final_unknown_different_valid_job_whole_route_cannot_ack"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_success_both_codes_real_capture_returns_actual_plan_provenance"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_unmodified_production_pins_reject_synthetic_source_before_grant"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_changed_original_bytes_rejected_by_real_sha_check"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_changed_manifest_bytes_rejected_by_real_sha_check"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_manifest_internal_bytes_path_CASE_revision_checked_after_valid_SHA"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_white_reuse_exception_missing_rejected_by_actual_original_validation"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_actual_CASE_adapter_rejects_changed_current_content"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_grant_unknown_rejected_inside_actual_planner"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_second_planner_reuse_call_rechecks_actual_session_adapter"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_readonly_fake_explicitly_refuses_write"
+    }
+  ],
+  "expected_method_count": 18,
+  "dependencies": {
+    "fastapi": "0.141.1",
+    "pydantic": "2.13.5",
+    "httpx": "0.28.1",
+    "starlette": "1.6.0",
+    "anyio": "4.14.2",
+    "sqlalchemy": "2.0.52",
+    "pydantic-core": "2.46.5",
+    "annotated-types": "0.8.0",
+    "typing-extensions": "4.16.0",
+    "typing-inspection": "0.4.4",
+    "httpcore": "1.0.9",
+    "h11": "0.16.0",
+    "certifi": "2026.7.22",
+    "idna": "3.19",
+    "annotated-doc": "0.0.5",
+    "greenlet": "3.5.5"
+  },
+  "runtime_pin_source": "D:/DEV/popcorn-ai/.venv/Scripts/python.exe importlib.metadata",
+  "linux_dependency_resolve": "unknown, not performed",
+  "runner_requirements": [
+    "manifest exact path/hash allowlist",
+    "mandatory unittest methods18, collection0/skip/expectedFailure/error/failure fail closed",
+    "socket/subprocess deny except local ASGI and synthetic temp files",
+    "Linux OUTPUT constant adapter without test source modification",
+    "results JSON and summary",
+    "future PR commit-byte manifest separately verified"
+  ],
+  "minimal_transfer_files": [
+    "docs/ci-candidate-20261008/source_candidate/api/__init__.py",
+    "docs/ci-candidate-20261008/source_candidate/api/admin_existing_pc_media.py",
+    "docs/ci-candidate-20261008/source_candidate/api/pc_existing_media_authority.py",
+    "docs/ci-candidate-20261008/source_candidate/api/pc_existing_media_import.py",
+    "docs/ci-candidate-20261008/source_candidate/api/pc_existing_media_refresh.py",
+    "docs/ci-candidate-20261008/source_candidate/tools/register_existing_pc_media.py",
+    "docs/ci-candidate-20261008/source_candidate/tests/test_existing_media_admin_flow_integration.py",
+    "docs/ci-candidate-20261008/source_candidate/tests/test_existing_media_pg_capture_plan_integration.py",
+    "docs/ci-candidate-20261008/bundle_manifest.json",
+    "docs/ci-candidate-20261008/requirements_ci.txt",
+    "docs/ci-candidate-20261008/runtime-dependency-pins.json",
+    "docs/ci-candidate-20261008/HANDOFF.md",
+    "docs/ci-candidate-20261008/cloud-handoff.json",
+    "docs/ci-candidate-20261008/PR-description-draft.md"
+  ],
+  "claude_owned_pending": [
+    "github-hosted ubuntu workflow draft",
+    "mandatory unittest runner/network-subprocess guard/results JSON+summary"
+  ],
+  "current_source_worktree": "D:\\WORK\\PopcornAI\\worktrees\\cloud-synthetic-ci-bundle-20261008",
+  "current_source_status": "dedicated remote-main-base docs-only candidate",
+  "accepted_untracked_tests": [
+    "tests/test_existing_media_admin_flow_integration.py",
+    "tests/test_existing_media_pg_capture_plan_integration.py"
+  ],
+  "excluded_other_owner_untracked": [
+    "api/pc_existing_media_scope.py",
+    "tests/test_pc_existing_media_scope.py"
+  ],
+  "candidate_clean_commit": "pending; commit proof maintained outside candidate",
+  "existing_shared_PR_evidence": "PR not created",
+  "commit_byte_verification": [
+    "Use separate clean candidate directory/branch; do not stage source worktree dirty files",
+    "Capture per-path raw SHA/EOL before staging and explicit selected path list",
+    "After eventual authorized staging, read each index blob with git show :path; hash bytes and record CRLF/LF changes; no original normalization",
+    "After eventual commit, read git show <candidate>:path for every selected path, compare index bytes and committed-byte manifest; git diff --name-only base candidate must equal agreed list",
+    "Inspect effective gitattributes/autocrlf for candidate, explicitly review any transformation; do not substitute current raw manifest as committed proof",
+    "Cloud verifies committed-byte manifest before loading exactly eighteen unittest methods"
+  ],
+  "execution_counts": {
+    "tests": 0,
+    "dependency_resolve": 0,
+    "push": 0,
+    "PR_published": 0,
+    "Actions": 0,
+    "DB_API": 0,
+    "installation": 0
+  },
+  "constraints": [
+    "Existing source/manifest protected",
+    "workflow/runner owned by Claude",
+    "Linux OUTPUT literal unchanged; explicit runner temp-path adapter pending",
+    "No claim of Claude app acceptance or cloud green",
+    "docs-only CI transfer; inherited product24 not adopted",
+    "copied HANDOFF and original manifest preserve historical source-baseline facts; this mapped handoff defines current layout"
+  ],
+  "remote_base_commit": "1ecf4dfe31e670bed14c7ce218e88ab187ffc197",
+  "bundle_source_baseline": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+  "bundle_root": "docs/ci-candidate-20261008",
+  "candidate_branch": "codex/cloud-synthetic-ci-bundle-20261008",
+  "mapping_contract": {
+    "manifest_paths": "relative to bundle_root; source_candidate/<path> preserved",
+    "runner_import_root": "docs/ci-candidate-20261008/source_candidate only; never blend repository api/tools",
+    "metadata": "bundle_root/<metadata-name>"
+  }
+}
