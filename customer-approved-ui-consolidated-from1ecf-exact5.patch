@@ -1,0 +1,699 @@
+diff --git a/mockups/mvp3/app.js b/mockups/mvp3/app.js
+index 375769a55a5dcfae5586fcde05edc9a7b12bed76..5c5719e50a0cc0fcf07ab17a4118b3bcf87c4a94 100644
+--- a/mockups/mvp3/app.js
++++ b/mockups/mvp3/app.js
+@@ -1,5 +1,33 @@
+ (function(){'use strict';
+ const M=window.MVP3LiveModel,A=window.MVP3Api;
++const assemblyNotice='AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음';
++function customerPhoto(value,code){
++  const unavailable={state:'unavailable',url:null};
++  if(!M.object(value))return unavailable;
++  if(value.state==='temporarily_unavailable')return {state:value.state,url:null};
++  if(value.state!=='available'||value.kind!=='ai_assembly_example'||value.notice!==assemblyNotice||!Number.isSafeInteger(code)||code<=0)return unavailable;
++  const expected='/api/customer/products/'+code+'/representative-image';
++  // Accept only the exact server URL for this SKU, never infer an image URL.
++  if(value.url!==expected&&value.url!==location.origin+expected)return unavailable;
++  return {state:'available',kind:value.kind,url:value.url,notice:value.notice};
++}
++// The existing model drops additive media. Extend only the UI normalization
++// results; keep its original product selection, ordering and quote validation.
++const normalizeRecommendations=M.recommendations,normalizeQuote=M.quote;
++M.recommendations=value=>{
++  const result=normalizeRecommendations(value);
++  const source=value.card_sets.filter(set=>M.object(set)&&set.kind==='sold');
++  result.groups.forEach((group,index)=>{
++    const items=(Array.isArray(source[index].items)?source[index].items:[]).filter(item=>M.product(item));
++    group.products.forEach((product,n)=>{product.photo=customerPhoto(items[n].photo,product.product_code);});
++  });
++  return result;
++};
++M.quote=value=>{
++  const result=normalizeQuote(value);
++  if(result)result.product.photo=customerPhoto(value.product.photo,result.product.product_code);
++  return result;
++};
+ const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
+ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+name+'.svg" alt="">';
+@@ -119,41 +147,88 @@ function recoveryBanner(){
+ function heading(title,back=true){
+   return (back?button(uiIcon('arrow-left')+'이전 화면','back','back live-back'):'')+'<div class="title-row"><h2 tabindex="-1">'+title+'</h2><span class="data-note">판매 중 PC · 조회 시점 참고 금액</span></div>'+requirements();
+ }
+-function productCard(product,action='detail',id=product.index){
+-  const rows=M.specRows(product.spec),spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
+-  return '<section class="quote-card live-product-card"><span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
+-    '<h3>'+esc(product.name)+'</h3>'+
+-    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+
+-    spec+
+-    '<ul class="live-reasons">'+product.reasons.map(reason=>'<li>'+esc(reason)+'</li>').join('')+'</ul>'+
+-    '<p class="'+(product.over_budget?'warn-text':'green')+'">'+esc(budget(product,state.talk))+'</p>'+
+-    button('추천 상품 자세히 보기',action,'primary','data-id="'+esc(id)+'"')+'</section>';
++function productImage(product){
++  const photo=customerPhoto(product.photo,product.product_code);
++  if(photo.state!=='available')return '<figure class="live-product-photo is-unavailable" data-product-photo data-image-state="'+photo.state+'"><p class="live-product-image-status">'+(photo.state==='temporarily_unavailable'?'이미지를 불러오지 못했습니다':'이미지 준비 중')+'</p></figure>';
++  return '<figure class="live-product-photo" data-product-photo><img data-product-image src="'+esc(photo.url)+'" alt="'+esc(product.name)+' · AI 조립 예시" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>이미지를 불러오지 못했습니다</p><figcaption class="live-product-photo-notice">'+esc(photo.notice)+'</figcaption></figure>';
++}
++function productCard(product,action='detail',id=product.index,comparison=null){
++  const rows=M.specRows(product.spec),description=product.public_configuration?.description;
++  const spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
++  const intro=description?.intro||product.reasons[0]||'',title=description?.title||product.name;
++  const sameBasis=comparison&&product.price_src&&product.price_src===comparison.price_src&&Number.isSafeInteger(product.price)&&Number.isSafeInteger(comparison.price);
++  const delta=sameBasis?product.price-comparison.price:null;
++  const difference=delta===null?'':delta===0?'다른 구성과 같은 금액이에요.':(comparison.tag||'다른 구성')+'보다 '+money(Math.abs(delta))+(delta>0?' 높아요.':' 낮아요.');
++  return '<section class="quote-card live-product-card"><div class="live-card-heading"><div class="live-card-copy"><span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
++    '<h3>'+esc(title)+'</h3>'+(title!==product.name?'<p class="live-product-name">'+esc(product.name)+'</p>':'')+(intro?'<p class="live-card-intro">'+esc(intro)+'</p>':'')+'</div>'+productImage(product)+'</div>'+
++    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+
++    '<ul class="live-reasons">'+product.reasons.slice(description?.intro?0:1).map(reason=>'<li>'+esc(reason)+'</li>').join('')+'</ul>'+
++    (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+'<p class="'+(product.over_budget?'warn-text':'green')+'">'+esc(budget(product,state.talk))+'</p>'+
++    button('구성 자세히 보기',action,product.tag.includes('최고')?'primary':'outline','data-id="'+esc(id)+'"')+'</section>';
+ }
+ function renderResults(){
+   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
++  const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
+   view.innerHTML=heading('나에게 맞는 PC',false)+errorPanel()+
+-    groups.map(group=>'<section class="live-result-group"><h3>'+esc(group.usage||group.usage_grid||'추천 상품')+'</h3>'+
++    groups.map(group=>{const ctx=group.game_context,url=M.safeUrl(ctx?.source.url);return '<section class="live-result-group"><h3>'+esc(group.usage||group.usage_grid||'추천 상품')+'</h3>'+
+       (group.empty_note?'<p class="muted">'+esc(group.empty_note)+'</p>':'')+
+-      (group.products.length?'<div class="quote-cards">'+group.products.map(p=>productCard(p)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+'</section>').join('')+
++      (group.products.length?'<div class="quote-cards">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n===1&&group.products.length===2?group.products[0]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
++      (ctx?'<div class="live-explanation"><h4>게임 안내 · '+esc(ctx.game_name)+'</h4><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</div>':'')+'</section>';}).join('')+
+     (!hasProducts&&!groups.length?'<div class="empty"><h3>'+(state.missing.length?'조건을 조금 더 알려주세요':'현재 조건의 추천 상품이 없어요')+'</h3><p>상담은 계속할 수 있어요. 예산이나 사용 목적을 알려주세요.</p></div>':'')+
+     (state.assumed.includes('game.resolution=1080p')?'<p class="muted">해상도를 정하지 않아 FHD(1080p)를 기준으로 조회했어요.</p>':'')+
+     (state.recommendation?.aiEstimated.length?'<p class="muted">일부 게임 등급은 AI 추정입니다. 실제 게임 성능 측정값과는 달라요.</p>':'');
+   actions.hidden=true;
+ }
+ function productSummary(){
+-  const p=state.selected;
+-  return '<section class="final-summary live-summary"><div><h3>'+esc(p.name)+'</h3><p>'+esc(state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다.':p.tag||p.level||'판매 중인 완제품 구성입니다.')+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div></section>';
++  const p=state.selected,description=p.public_configuration?.description,title=description?.title||p.name;
++  const intro=state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
++  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div>'+productImage(p)+'</section>';
+ }
+-function productDetails(){
++function publicBomDetails(configuration,p,information,finalOnly){
++  const roles={
++    CPU:['CPU','cpu','프로그램의 명령을 계산하고 처리하는 부품이에요.'],
++    GPU:['그래픽카드','graphics-card','게임 화면과 그림을 출력하는 부품이에요.'],
++    RAM:['메모리','memory','실행 중인 프로그램의 정보를 잠시 담아두는 부품이에요.'],
++    SSD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
++    HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
++    MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
++    PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
++    CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
++  const rows=configuration.parts.map(part=>{
++    const [label,icon,role]=(Object.hasOwn(roles,part.slot)?roles[part.slot]:null)||[part.pseudo?'서비스':part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];
++    const id='bom-unavailable-'+part.ordinal;
++    const specs=part.specs.length?'<dl class="live-spec-grid">'+part.specs.map(x=>'<div><dt>'+esc(x.label)+'</dt><dd>'+esc(x.value)+'</dd></div>').join('')+'</dl>':'<p>등록 사양 미확인</p>';
++    return '<tr data-part="bom-'+part.ordinal+'"><td colspan="3"><details class="public-bom-disclosure" data-detail="bom-'+part.ordinal+'"><summary>'+
++      '<div class="final-part-description">'+uiIcon(icon,'part-symbol')+'<div><h4><span>'+esc(label)+'</span><span class="part-name">'+esc(part.name||'항목명 미확인')+'</span><span class="public-bom-quantity">수량 '+part.quantity+'</span></h4><p>'+esc(part.description||'등록 설명 미확인')+'</p>'+
++      '<span class="public-bom-toggle"><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
++      '<span class="final-part-price">미확인</span><span class="final-part-change">'+button('변경','unavailable','outline small','disabled aria-describedby="'+id+'"')+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
++      '<div class="public-bom-photo">부품 사진 미확인</div><div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
++      '<p class="public-bom-unavailable" id="'+id+'">부품 질문과 변경은 아직 지원하지 않아요.</p></div></div></details></td></tr>';
++  }).join('');
++  return '<section class="final-parts public-bom"><h3>부품 구성과 선택 이유</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
++    '<thead><tr><th scope="col">부품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+
++    (finalOnly?'<details class="public-bom-information" data-detail="spec"><summary>추천 근거·변경 안내 펼치기</summary><div class="final-part-expanded">'+information+'</div></details>':information);
++}
++function productDetails(finalOnly=false){
+   const p=state.selected;
++  // Read only the selected recommendation group; saved/recovery records have no game-context contract.
++  const context=state.savedQuote||state.pendingSave?null:(state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(p.index)&&g.products.some(item=>item.index===p.index&&item.product_code===p.product_code)));
++  const ctx=context?.game_context,url=M.safeUrl(ctx?.source.url);
++  const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
+   const rows=M.specRows(p.spec),spec=rows.length?'<dl class="live-spec-grid">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-full-spec">'+esc(M.specText(p.spec)||'등록된 상세 사양을 확인하지 못했어요.')+'</p>';
+-  return '<section class="final-parts"><h3>구성 상품 상세</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
+-    '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
+-    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
+-    '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+
+-    '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+(p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
++  const information=
++    '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+
++    '<p class="muted">상담 조건: '+M.conditions(state.selectionState||state.talk).map(esc).join(' · ')+'</p>'+
++    (p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
++    (ctx?'<section class="live-explanation"><h3>게임 안내 · '+esc(ctx.game_name)+'</h3><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</section>':'')+
+     '<section class="live-capabilities"><div>'+button('다른 GPU 선택','unavailable','outline small','disabled aria-describedby="change-unavailable"')+
+     button('저장장치 변경','unavailable','outline small','disabled aria-describedby="change-unavailable"')+'</div><p id="change-unavailable">현재 판매 중인 완제품을 안내해요. 부품별 옵션 변경과 게임 FPS 비교 자료는 아직 제공되지 않아요.</p></section>';
++  const configuration=M.publicConfiguration(p.public_configuration,p.product_code);
++  if(configuration)return publicBomDetails(configuration,p,information,finalOnly);
++  return '<section class="final-parts"><h3>부품 구성과 선택 이유</h3><p class="public-bom-empty" role="status">부품 구성 정보는 아직 연결되지 않았어요. 등록된 완제품 사양을 먼저 확인해주세요.</p><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
++    '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
++    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
++    '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+(finalOnly?'':information);
+ }
+ function finalConditions(){
+   const row=(name,label,text)=>'<div>'+uiIcon(name)+'<dt>'+label+'</dt><dd>'+esc(text)+'</dd></div>';
+@@ -165,14 +240,14 @@ function finalConditions(){
+ function renderDetail(){
+   view.innerHTML=heading('추천 구성 상세')+errorPanel()+productSummary()+productDetails()+finalConditions();
+   const p=state.selected;
+-  actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('다른 추천 상품 보기','results','outline')+button('이 견적으로 확인','final','primary')+'</div>';actions.hidden=false;
++  actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('구성 변경 요청','unavailable','outline','disabled aria-describedby="change-unavailable"')+button('이 견적 저장하기','final','primary')+'</div>';actions.hidden=false;
+ }
+ function renderFinal(){
+   const label={idle:'아직 보관 전',saving:'보관 확인 중',saved:'서버에 보관됨',uncertain:'보관 결과 미확인',failed:'보관되지 않음'};
+   const saved=state.saveState==='saved',disabled=!!state.phase||saved||state.needsRefresh||state.selected.price===null||!!state.pendingSave||!!state.pendingProblem;
+   view.innerHTML=button(uiIcon('arrow-left')+'상품 상세 다시 보기','edit','back final-back')+
+     '<div class="final-title-row"><div><h2 tabindex="-1">최종 견적 확인</h2><span class="save-status '+(saved?'is-saved':'')+'">'+uiIcon(saved?'file-text':'warning-circle-fill')+label[state.saveState]+'</span></div><span class="data-note">보관은 상품·시점 가격의 참고 기록입니다.</span></div>'+
+-    errorPanel()+productSummary()+productDetails()+finalConditions()+
++    errorPanel()+productSummary()+productDetails(true)+finalConditions()+
+     '<footer class="final-footer"><p>'+uiIcon('info')+'<span>포함 품목과 보증 조건은 구매 전에 확인해주세요.</span></p><div><div class="final-buttons">'+button('다른 상품 비교','results','outline')+
+     button(saved?'보관 완료':state.phase==='save'?'서버 확인 중…':state.pendingSave?'이전 보관 결과 확인 필요':'견적 보관하기','save','primary',disabled?'disabled':'')+'</div><small>주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다.</small></div></footer>'+
+     (state.savedQuote?'<p class="muted live-saved-note">보관일 '+esc(new Date(state.savedQuote.saved_at).toLocaleString('ko-KR'))+' · 이 브라우저의 보관 키로 접근합니다.</p>':'');
+@@ -181,7 +256,7 @@ function renderFinal(){
+ function renderSaved(){
+   view.innerHTML=heading('내 견적',false)+'<p class="muted">이 브라우저의 보관 키로 접근하는 서버 기록입니다. 다른 기기와 회원 계정 동기화는 지원하지 않아요.</p>'+errorPanel()+
+     (state.phase==='list'?'<div class="empty small-empty"><p>보관 기록을 불러오는 중이에요.</p></div>':state.error?'':state.quotes.length?
+-      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card"><span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
++      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card">'+productImage(q.product)+'<span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
+       '<div class="empty small-empty"><h3>보관된 견적이 없어요</h3><p>상담 후 상품을 선택하면 서버에 보관할 수 있어요.</p>'+button('상담으로 돌아가기','back','outline')+'</div>')+
+     (state.hasMore?'<p class="muted">최근 20개의 보관 기록을 표시하고 있어요.</p>':'');
+   actions.hidden=true;
+@@ -268,6 +343,12 @@ $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)
+ $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
+ $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
+ mobile.addEventListener('change',syncChat);
++for(const type of ['load','error'])document.addEventListener(type,e=>{
++  const image=e.target;if(!(image instanceof HTMLImageElement)||!image.hasAttribute('data-product-image'))return;
++  const photo=image.closest('[data-product-photo]');if(!photo)return;
++  const failed=type==='error';image.hidden=failed;photo.classList.toggle('is-unavailable',failed);
++  photo.dataset.imageState=failed?'temporarily_unavailable':'loaded';photo.querySelector('[data-product-image-status]').hidden=!failed;
++},true);
+ window.addEventListener('popstate',e=>{
+   captureDraft();const entry=e.state;
+   if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){
+diff --git a/mockups/mvp3/live-model.js b/mockups/mvp3/live-model.js
+index 81c0a8edd1f9094288cc4f35776d96276c279559..b1bbb6e36b28de2bfd906a8004fc6d429b816104 100644
+--- a/mockups/mvp3/live-model.js
++++ b/mockups/mvp3/live-model.js
+@@ -22,11 +22,61 @@
+     if(typeof value!=='string')return null;
+     try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&!url.username&&!url.password?url.href:null;}catch{return null;}
+   }
++  function publicConfiguration(value,productCode){
++    const nullable=v=>v===null||typeof v==='string',positive=v=>Number.isSafeInteger(v)&&v>0;
++    if(!object(value)||!positive(productCode)||value.product_code!==productCode||value.offer_id!=='P'+productCode||
++      !text(value.configuration_id).trim()||!positive(value.revision))return null;
++    const d=value.description;
++    if(!object(d)||!['title','intro','scene'].every(k=>nullable(d[k]))||
++      !Array.isArray(d.benefits)||!d.benefits.every(x=>Array.isArray(x)&&x.length===2&&x.every(y=>typeof y==='string'))||
++      !Array.isArray(d.checks)||!d.checks.every(x=>typeof x==='string')||
++      !Array.isArray(d.faq)||!d.faq.every(x=>object(x)&&typeof x.question==='string'&&typeof x.answer==='string'))return null;
++    if(!Array.isArray(value.parts)||!value.parts.length)return null;
++    const ordinals=new Set(),parts=[];
++    for(const p of value.parts){
++      if(!object(p)||!Number.isSafeInteger(p.ordinal)||p.ordinal<0||ordinals.has(p.ordinal)||!text(p.slot).trim()||
++        !positive(p.quantity)||typeof p.pseudo!=='boolean'||!nullable(p.name)||!nullable(p.description)||
++        !Array.isArray(p.specs)||!p.specs.every(x=>object(x)&&typeof x.label==='string'&&typeof x.value==='string')||
++        (p.pseudo&&(p.name!==null||p.description!==null||p.specs.length)))return null;
++      ordinals.add(p.ordinal);
++      parts.push({ordinal:p.ordinal,slot:p.slot,quantity:p.quantity,pseudo:p.pseudo,name:p.name,description:p.description,
++        specs:p.specs.map(x=>({label:x.label,value:x.value}))});
++    }
++    const price=value.price,stock=value.stock,c=value.compatibility,photo=value.photo,conditions={};
++    if(!object(price)||!['confirmed','snapshot','estimated','needs_reconfirmation','unknown'].includes(price.state)||
++      !nullable(price.checked_at)||!nullable(price.observed_date)||!([null,'bundle','new_parts_sum','derived_delta'].includes(price.model))||
++      (['unknown','needs_reconfirmation'].includes(price.state)?price.amount!==null:!positive(price.amount))||
++      (price.state==='confirmed'&&!text(price.checked_at).trim())||
++      !object(stock)||!['available','unavailable','unknown'].includes(stock.state)||!nullable(stock.checked_at)||
++      !object(c)||!['pass','fail','unknown'].includes(c.document_state)||!nullable(c.public_summary)||c.assembly_state!=='unknown'||
++      !object(photo)||photo.state!=='unresolved'||photo.url!==null||!object(value.customer_conditions))return null;
++    for(const key of ['os','keyboard','mouse','monitor','warranty']){
++      const x=value.customer_conditions[key],states=key==='warranty'?['verified','unknown']:['included','excluded','unknown'];
++      if(!object(x)||!states.includes(x.state)||typeof x.detail!=='string'||typeof x.customer_statement!=='string'||
++        typeof x.needs_reconfirmation!=='boolean'||(x.months!==null&&(!positive(x.months)||x.months>120))||
++        (key!=='warranty'&&x.months!==null)||(key==='warranty'&&x.state==='verified'&&(!positive(x.months)||!x.detail.trim()||x.needs_reconfirmation)))return null;
++      conditions[key]={state:x.state,detail:x.detail,months:x.months,needs_reconfirmation:x.needs_reconfirmation,customer_statement:x.customer_statement};
++    }
++    return {product_code:productCode,configuration_id:value.configuration_id,revision:value.revision,offer_id:value.offer_id,
++      description:{title:d.title,intro:d.intro,scene:d.scene,benefits:d.benefits.map(x=>[...x]),checks:[...d.checks],faq:d.faq.map(x=>({question:x.question,answer:x.answer}))},
++      parts:parts.sort((a,b)=>a.ordinal-b.ordinal),customer_conditions:conditions,
++      price:{state:price.state,amount:price.amount,checked_at:price.checked_at,observed_date:price.observed_date,model:price.model},
++      stock:{state:stock.state,checked_at:stock.checked_at},compatibility:{document_state:c.document_state,public_summary:c.public_summary,assembly_state:c.assembly_state},
++      photo:{state:'unresolved',url:null}};
++  }
+   function product(value){
+     if(!object(value)||!Number.isInteger(value.product_code)||value.product_code<=0||!text(value.name))return null;
+     return {product_code:value.product_code,name:value.name,price:Number.isInteger(value.price)&&value.price>=0?value.price:null,
+       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
+-      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),over_budget:value.over_budget===true};
++      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),over_budget:value.over_budget===true,
++      public_configuration:publicConfiguration(value.public_configuration,value.product_code)};
++  }
++  function gameContext(value){
++    if(!object(value)||!text(value.game_name).trim()||!object(value.source)||value.source.kind!=='game_customer_copy')return null;
++    const out={};
++    for(const key of ['game_name','spec_summary','why_this_pc','upgrade_hint','caution'])out[key]=text(value[key]);
++    out.source={kind:'game_customer_copy',fields:Array.isArray(value.source.fields)?value.source.fields.filter(x=>typeof x==='string'):[],url:safeUrl(value.source.url)};
++    return out;
+   }
+   function recommendations(value){
+     if(!object(value)||value.ok!==true||!Array.isArray(value.card_sets))throw new Error('추천 응답 형식을 확인할 수 없어요.');
+@@ -35,6 +85,7 @@
+       if(!object(set))return null;
+       if(set.kind!=='sold'){unsupported=true;return null;}
+       return {usage:text(set.usage),usage_grid:text(set.usage_grid),empty_reason:text(set.empty_reason),empty_note:text(set.empty_note),
++        min_level:text(set.min_level),min_level_work:text(set.min_level_work),game_context:set.usage_grid==='게임'?gameContext(set.game_context):null,
+         products:(Array.isArray(set.items)?set.items:[]).map(product).filter(Boolean).map(p=>({...p,index:index++}))};
+     }).filter(Boolean);
+     return {groups,unsupported,needs:Array.isArray(value.needs)?value.needs.filter(x=>typeof x==='string'):[],
+@@ -58,6 +109,6 @@
+     if(text(state.platform))result.push(state.platform);
+     return result;
+   }
+-  const model={object,text,copy,uuid,safeUrl,publicSpec,specRows,specText,product,recommendations,quote,sources,conditions};
++  const model={object,text,copy,uuid,safeUrl,publicSpec,publicConfiguration,specRows,specText,product,gameContext,recommendations,quote,sources,conditions};
+   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
+ })(typeof window==='undefined'?globalThis:window);
+diff --git a/mockups/mvp3/styles.css b/mockups/mvp3/styles.css
+index 5645a2ca15608c8ada96afa30a8e521080ca115b..d92f53365a8ce858133d07d2024f129d5256ca49 100644
+--- a/mockups/mvp3/styles.css
++++ b/mockups/mvp3/styles.css
+@@ -275,3 +275,137 @@ body.live-mode #chat-form textarea:focus-visible{outline:none}
+  .gateway-root .purpose-layout{width:100%;max-width:1320px;margin:0 auto;padding:0 40px 58px}
+  .gateway-root>.route-back{align-self:flex-start;margin:28px 0 28px max(40px,calc((100% - 1240px)/2))}
+ }
++
++/* Server-bound AI assembly examples retain their notice in every state. */
++.live-product-photo{margin:0 0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden}
++.live-product-photo img{display:block;width:100%;height:180px;object-fit:contain}
++.live-product-photo.is-unavailable{min-height:72px;padding:12px;border-style:dashed;color:var(--muted);font-size:14px;text-align:center}
++.live-summary{grid-template-columns:140px minmax(0,1fr) 200px}
++.live-summary>.live-product-photo{margin:0}
++.live-summary>.live-product-photo img{height:140px}
++@media(max-width:1100px){.live-summary{grid-template-columns:1fr}.live-summary>.live-product-photo{width:100%;margin-bottom:8px}.live-summary>.live-product-photo img{height:160px}}
++
++.live-product-photo-notice{padding:8px 10px;color:var(--muted);font-size:12px;line-height:1.5;text-align:center;overflow-wrap:anywhere}
++.live-product-photo .live-product-image-status{margin:0;font-size:14px;line-height:1.5;color:var(--muted)}
++
++/* Approved results/detail hierarchy, populated only by public sold-product data. */
++body.live-mode.original-flow .live-product-card{gap:10px;padding:24px;min-width:0}
++body.live-mode.original-flow .live-card-heading{display:grid;grid-template-columns:minmax(0,1fr) 38%;gap:16px;width:100%;align-items:start}
++body.live-mode.original-flow .live-card-copy{min-width:0}
++body.live-mode.original-flow .live-product-card h3{font-size:22px;line-height:1.4;color:var(--green);margin:20px 0 12px;overflow-wrap:anywhere}
++body.live-mode.original-flow .live-card-intro{font-size:16px;line-height:1.7;color:var(--muted);margin:0}
++body.live-mode.original-flow .live-product-name{font-size:14px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
++body.live-mode.original-flow .live-card-heading>.live-product-photo{width:100%;margin:0;border:0;background:#fff;align-self:center}
++body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:185px;object-fit:contain}
++body.live-mode.original-flow .live-card-heading>.live-product-photo.is-unavailable{border:1px dashed var(--line);min-height:120px;padding:10px}
++body.live-mode.original-flow .live-product-card .price{display:block;width:100%;border-top:1px solid var(--line);padding-top:12px;margin-top:10px;font-size:30px;line-height:1.3}
++body.live-mode.original-flow .live-card-spec{width:100%;margin:0}
++body.live-mode.original-flow .live-reasons:empty{display:none}
++body.live-mode.original-flow .live-price-difference{font-size:14px;color:var(--muted);margin:0}
++body.live-mode.original-flow .public-bom-empty{font-size:14px;line-height:1.6;margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--tint);color:var(--muted)}
++body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 205px 150px;gap:18px;align-items:center;padding:20px 18px;margin-bottom:18px}
++body.live-mode.original-flow .live-summary-copy{min-width:0}
++body.live-mode.original-flow .live-summary h3{font-size:26px;line-height:1.4;letter-spacing:-.5px;color:var(--green)}
++body.live-mode.original-flow .live-summary p{font-size:16px;line-height:1.6}
++body.live-mode.original-flow .live-summary .live-product-name{font-size:14px}
++body.live-mode.original-flow .live-summary>.live-product-photo{width:100%;margin:0;border:0}
++body.live-mode.original-flow .live-summary>.live-product-photo img{height:140px}
++body.live-mode.original-flow .live-summary>.live-product-photo.is-unavailable{border:1px dashed var(--line);min-height:110px}
++body.live-mode.original-flow .live-summary .final-summary-price{padding:0;border:0;min-width:0}
++body.live-mode.original-flow .live-summary .final-summary-price strong{font-size:30px;white-space:normal;overflow-wrap:anywhere}
++body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:170px minmax(0,1fr) minmax(170px,.95fr);gap:18px;background:var(--tint);border-left:3px solid var(--green)}
++body.live-mode.original-flow .public-bom .public-bom-role{grid-column:auto;border-left:1px solid #d5e6de;padding-left:18px}
++body.live-mode.original-flow .public-bom .public-bom-role h5{font-size:16px;color:var(--green)}
++body.live-mode.original-flow .public-bom .public-bom-role p{font-size:14px;line-height:1.6}
++body.live-mode.original-flow .public-bom .public-bom-photo{min-height:150px}
++body.live-mode.original-flow .public-bom .live-spec-grid{margin:0}
++body.live-mode.original-flow .public-bom .live-spec-grid>div{grid-template-columns:minmax(80px,.8fr) minmax(0,1.2fr);gap:8px;font-size:14px;padding:7px 4px}
++@media(max-width:1250px){
++ body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 160px;gap:14px}
++ body.live-mode.original-flow .live-summary>.live-product-photo{grid-column:2;grid-row:1/3}
++ body.live-mode.original-flow .live-summary .final-summary-price{grid-column:1}
++ body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:110px minmax(0,1fr)}
++ body.live-mode.original-flow .public-bom .public-bom-role{grid-column:1/-1;border:0;padding-left:0}
++}
++@media(max-width:760px){
++ body.live-mode.original-flow .live-product-card{padding:18px}
++ body.live-mode.original-flow .live-card-heading{grid-template-columns:minmax(0,1fr) 34%;gap:12px}
++ body.live-mode.original-flow .live-product-card h3{font-size:20px;margin:14px 0 10px}
++ body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:145px}
++ body.live-mode.original-flow .live-card-intro{font-size:15px;line-height:1.6}
++ body.live-mode.original-flow .live-product-card .price{font-size:28px}
++ body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 105px;padding:16px;gap:12px}
++ body.live-mode.original-flow .live-summary h3{font-size:22px}
++ body.live-mode.original-flow .live-summary p{font-size:15px}
++ body.live-mode.original-flow .live-summary>.live-product-photo img{height:120px}
++ body.live-mode.original-flow .live-summary .final-summary-price strong{font-size:27px}
++ body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:80px minmax(0,1fr);gap:12px;padding:12px}
++ body.live-mode.original-flow .public-bom .public-bom-photo{min-height:100px}
++ body.live-mode.original-flow .public-bom .public-bom-role{grid-column:1/-1}
++ body.live-mode.original-flow .public-bom .live-spec-grid>div{grid-template-columns:minmax(0,1fr);gap:3px}
++ body.live-mode.original-flow .live-product-photo-notice{font-size:12px;padding:6px 0}
++ body.live-mode.original-flow .footer-buttons button{min-width:0}
++}
++
++
++/* Final-only information inside the existing specification disclosure. */
++body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities){font-size:16px;color:#0a121c}
++body.live-mode.original-flow[data-screen="final"] .final-part-expanded .live-explanation{line-height:1.6;margin-top:18px}
++body.live-mode.original-flow[data-screen="final"] .final-part-expanded .live-capabilities{line-height:1.5}
++body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities) p{font-size:14px;line-height:1.5;color:var(--muted)}
++@media(max-width:760px){
++ body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities){color:#15305c}
++}
++
++/* Public BOM: preserve the approved detail table; unavailable data stays explicit. */
++.live-mode .public-bom .public-bom-quantity{font-size:14px;color:var(--muted);font-weight:400}
++.live-mode .public-bom .public-bom-expanded{display:grid;grid-template-columns:100px minmax(0,1fr);gap:16px}
++.live-mode .public-bom .public-bom-photo{min-height:100px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--muted);background:#fff}
++.live-mode .public-bom .public-bom-role{grid-column:1/-1}
++.live-mode .public-bom .public-bom-role h5{font-size:14px;margin:0 0 6px}
++.live-mode .public-bom .public-bom-role p{margin:0 0 12px}
++.live-mode .public-bom .public-bom-unavailable{font-size:14px;color:var(--muted);margin-top:8px}
++.live-mode .public-bom .final-part-change button{white-space:nowrap}
++.live-mode .public-bom-information{margin:16px 0}
++.live-mode .public-bom-information>summary{cursor:pointer;font-size:14px;padding:12px 0}
++@media(max-width:760px){
++  .live-mode .public-bom .public-bom-expanded{grid-template-columns:80px minmax(0,1fr);gap:12px}
++  .live-mode .public-bom .public-bom-photo{min-height:80px}
++  .live-mode .public-bom .final-part-description>div{min-width:0;flex:1}
++  .live-mode .public-bom .part-name,.live-mode .public-bom .live-spec-grid dd{overflow-wrap:anywhere}
++}
++
++/* Native disclosure spans the approved table width, keeping its three column header. */
++body.live-mode.original-flow .public-bom-disclosure>summary{display:grid;grid-template-columns:65% 20% 15%;list-style:none;cursor:pointer;align-items:stretch}
++body.live-mode.original-flow .public-bom-disclosure>summary::-webkit-details-marker{display:none}
++body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-description{min-height:72px;padding:8px 16px}
++body.live-mode.original-flow .public-bom-disclosure>summary>span{display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line);font-size:14px}
++body.live-mode.original-flow .public-bom-toggle{display:flex;align-items:center;gap:4px;font-size:14px;line-height:1.5;color:var(--muted);padding:4px 0}
++body.live-mode.original-flow .public-bom-toggle .ui-icon{width:14px;height:14px}
++body.live-mode.original-flow .public-bom-disclosure[open] .public-bom-toggle .ui-icon{transform:rotate(180deg)}
++body.live-mode.original-flow .public-bom-disclosure>.public-bom-expanded{margin:0 16px 10px;min-width:0}
++body.live-mode.original-flow .public-bom-specs,body.live-mode.original-flow .public-bom-role{min-width:0;overflow-wrap:anywhere}
++body.live-mode.original-flow .public-bom .live-spec-grid dd{margin:0;min-width:0;overflow-wrap:anywhere}
++@media(max-width:760px){
++ body.live-mode.original-flow .public-bom-disclosure>summary{grid-template-columns:minmax(0,1fr) auto}
++ body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-description{grid-column:1/-1;min-height:0;padding:0}
++ body.live-mode.original-flow .public-bom-disclosure>summary>span{border:0;justify-content:flex-start;padding:6px 0}
++ body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-change{justify-content:flex-end}
++ body.live-mode.original-flow .public-bom-disclosure>.public-bom-expanded{margin:8px 0 0}
++}
++
++/* Desktop density keeps the supplied comparison data and actions within normal scrolling. */
++@media(min-width:761px){
++ body.live-mode.original-flow .live-product-card{gap:6px}
++ body.live-mode.original-flow .live-product-card h3{margin:14px 0 8px}
++ body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:160px}
++ body.live-mode.original-flow .live-card-spec dt,body.live-mode.original-flow .live-card-spec dd{padding:6px 12px}
++ body.live-mode.original-flow .live-product-card .live-reasons{font-size:14px;line-height:1.5;margin:4px 0}
++ body.live-mode.original-flow .live-product-card .live-reasons li{margin:3px 0}
++ body.live-mode.original-flow .live-product-card>p{margin:4px 0}
++ body.live-mode.original-flow .live-result-group{margin:14px 0}
++ body.live-mode.original-flow .live-result-group>h3{font-size:16px;margin-bottom:8px}
++ body.live-mode.original-flow .live-result-group .quote-cards{margin:14px 0}
++ body.live-mode.original-flow .live-summary{padding:14px 18px}
++ body.live-mode.original-flow .live-summary>.live-product-photo img{height:110px}
++}
+diff --git a/mockups/mvp3/tests/mvp3-public-bom.test.cjs b/mockups/mvp3/tests/mvp3-public-bom.test.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..29e00ee1ffea04bad925d52721a63cff9be30d65
+--- /dev/null
++++ b/mockups/mvp3/tests/mvp3-public-bom.test.cjs
+@@ -0,0 +1,116 @@
++'use strict';
++const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
++const M=require('../live-model.js');
++// CODE/MOCK DTO reconstructed from test_customer_sold_offer_read's CPU/MB fixture.
++// SERVICE follows its pseudo test. SSD variants below test multiplicity, not actual inventory.
++function fixture(){return {product_code:99413,configuration_id:'P10',revision:1,offer_id:'P99413',
++  description:{title:'검증 PC',intro:'근거 설명',scene:null,benefits:[],checks:[],faq:[]},
++  parts:[{ordinal:0,slot:'CPU',quantity:1,pseudo:false,name:'CPU',description:'실제 등록 역할 11',specs:[{label:'등록 사실',value:'AM4'}]},
++    {ordinal:1,slot:'MB',quantity:1,pseudo:false,name:'MB',description:'실제 등록 역할 12',specs:[{label:'등록 사실',value:'AM4'}]},
++    {ordinal:8,slot:'SERVICE',quantity:1,pseudo:true,name:null,description:null,specs:[]}],
++  price:{state:'unknown',amount:null,checked_at:null,observed_date:null,model:null},stock:{state:'unknown',checked_at:null},
++  compatibility:{document_state:'pass',public_summary:null,assembly_state:'unknown'},photo:{state:'unresolved',url:null},
++  customer_conditions:Object.fromEntries(['os','keyboard','mouse','monitor','warranty'].map(k=>[k,{state:'unknown',detail:'',months:null,needs_reconfirmation:false,customer_statement:'구매 전에 확인해 주세요.'}]))};}
++const clone=x=>JSON.parse(JSON.stringify(x));
++function render(configuration,finalOnly=false,source){
++  const p=M.product({product_code:99413,name:'CODE/MOCK 검증 PC',price:900000,spec:{cpu:'CPU'},reasons:['추천 근거'],public_configuration:configuration});
++  const app=source||fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
++  // Execute the actual render declarations; no startup, network or state-machine substitute.
++  const start=app.indexOf('function publicBomDetails('),end=app.indexOf('function finalConditions(');
++  const code=app.slice(start<0?app.indexOf('function productDetails('):start,end);
++  return vm.runInNewContext(code+'\nproductDetails('+finalOnly+')',{M,state:{selected:p,selectedContext:null,selectionState:{usages:['게임']},talk:{}},
++    esc:v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),
++    uiIcon:(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+name+'.svg" alt="">',
++    button:(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>',
++    money:v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미확인'});
++}
++test('valid sold-offer binding accepts configuration identity different from offer; sorts without mutation',()=>{
++  const f=fixture();f.parts.reverse();const before=clone(f),out=M.publicConfiguration(f,99413);
++  assert.equal(out.configuration_id,'P10');assert.deepEqual(out.parts.map(p=>p.ordinal),[0,1,8]);assert.deepEqual(f,before);
++});
++test('missing, wrong selected product/offer, unsafe revision, duplicate ordinal and invalid quantity fail closed',()=>{
++  assert.equal(M.publicConfiguration(null,99413),null);assert.equal(M.publicConfiguration(fixture(),101),null);
++  for(const change of [f=>f.offer_id='P10',f=>f.revision=0,f=>f.revision='1',f=>f.revision=Number.MAX_SAFE_INTEGER+1,f=>f.revision=true,
++    f=>f.parts[1].ordinal=0,f=>f.parts[0].quantity=0,f=>f.parts[0].quantity=1.5,f=>f.parts[0].specs=null,
++    f=>f.photo.url='https://example.invalid/fake.png',f=>f.parts[2].name='가짜 조립',f=>f.parts=[],f=>f.description.faq=null]){
++    const f=fixture();change(f);assert.equal(M.publicConfiguration(f,99413),null);
++  }
++});
++test('public projection strips private fields deeply and is detached from its input',()=>{
++  const f=fixture();f.source_basis='SECRET';f.parts[0].unit_price=100;f.parts[0].source_code='SECRET';f.parts[0].specs[0].operator_id=1;
++  f.description.faq=[{question:'질문',answer:'답변',approved_by:1}];f.customer_conditions.os.private='SECRET';
++  const out=M.publicConfiguration(f,99413);assert.doesNotMatch(JSON.stringify(out),/SECRET|unit_price|operator_id|approved_by|private/);
++  f.parts[0].specs[0].value='changed';f.description.faq[0].answer='changed';assert.equal(out.parts[0].specs[0].value,'AM4');assert.equal(out.description.faq[0].answer,'답변');
++});
++test('needs_reconfirmation keeps null price; no frontend latest-revision proof is invented',()=>{
++  const f=fixture();f.price.state='needs_reconfirmation';f.revision=2;assert.equal(M.publicConfiguration(f,99413).price.amount,null);
++  assert.equal(M.publicConfiguration(f,99413).revision,2);
++});
++test('optional product seam survives recommendation and saved quote normalization without new requests',()=>{
++  const p={product_code:99413,name:'검증 PC',price:900000,public_configuration:fixture()};
++  const recommendation=M.recommendations({ok:true,card_sets:[{kind:'sold',items:[p]}]});
++  const selected=recommendation.groups[0].products[0];assert.equal(selected.public_configuration.parts.length,3);
++  const saved=M.quote({id:'11111111-1111-4111-8111-111111111111',product:p,state:{usages:['게임']},saved_at:'2026-10-06T00:00:00Z'});
++  assert.deepEqual(saved.product.public_configuration,selected.public_configuration);p.public_configuration.parts[0].name='mutated';assert.equal(selected.public_configuration.parts[0].name,'CPU');
++  assert.equal(M.product({product_code:99413,name:'PC',price:900000}).public_configuration,null);
++});
++test('pseudo and multiple SSD rows use ordinal keys and quantities without guessed price/photo',()=>{
++  const f=fixture();f.parts.push(...[2,3].map(ordinal=>({...clone(f.parts[0]),ordinal,slot:'SSD',quantity:ordinal,name:'SSD'})));
++  const html=render(f);assert.equal((html.match(/<tr data-part="bom-/g)||[]).length,5);
++  assert.match(html,/data-detail="bom-2"/);assert.match(html,/data-detail="bom-3"/);assert.match(html,/수량 3/);assert.match(html,/서비스/);
++  assert.equal((html.match(/class="final-part-price">미확인/g)||[]).length,5);assert.match(html,/900,000원/);
++  assert.doesNotMatch(html,/100원|fake\.png|<img[^>]+(?:merchant|photo)/);assert.match(html,/disabled aria-describedby="bom-unavailable-/);
++});
++test('part text/specs are escaped and cannot insert executable markup',()=>{
++  const f=fixture();f.parts[0].name='<img src=x onerror=alert(1)>';f.parts[0].description='<script>alert(1)</script>';f.parts[0].specs=[{label:'<svg>',value:'" onclick="bad'}];
++  const html=render(f);assert.match(html,/&lt;script&gt;/);assert.match(html,/&lt;svg&gt;/);assert.match(html,/&quot; onclick=&quot;bad/);assert.doesNotMatch(html,/<script>|<img src=x|<svg>/);
++});
++test('absent and rejected public BOM keep identical legacy markup; final recommendations remain collapsible',()=>{
++  assert.equal(render(null),render(undefined));const wrong=fixture();wrong.product_code=101;assert.equal(render(wrong),render(null));
++  const current=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
++  const legacy=current.replace(/  const configuration=M\.publicConfiguration\(p\.public_configuration,p\.product_code\);\r?\n  if\(configuration\)return publicBomDetails\(configuration,p,information,finalOnly\);\r?\n/,'');
++  for(const final of [false,true])assert.equal(render(null,final),render(null,final,legacy));
++  const detail=render(fixture()),final=render(fixture(),true);assert.match(detail,/<\/section><section class="live-explanation">/);
++  assert.match(final,/<details class="public-bom-information" data-detail="spec">/);assert.ok(final.indexOf('추천 근거')>final.indexOf('public-bom-information'));
++});
++// Whole-app DOM regression uses the existing jsdom test runtime (via NODE_PATH).
++async function wholeApp(configuration){
++  const {JSDOM}=require('jsdom'),read=name=>fs.readFileSync(path.join(__dirname,'../'+name),'utf8');
++  const dom=new JSDOM(read('index.html'),{url:'http://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window;
++  const calls={parse:0,recommend:0,network:0,save:0};
++  w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
++  w.fetch=()=>{calls.network++;throw Error('Network forbidden');};
++  w.eval(read('live-model.js'));
++  w.MVP3Api={parse:async()=>{calls.parse++;return {ok:true,state:{usages:['게임'],budget_won:1000000},missing:[]};},
++    recommend:async()=>{calls.recommend++;return {ok:true,card_sets:[{kind:'sold',items:[{product_code:99413,name:'검증 PC',price:900000,reasons:['추천 근거'],public_configuration:configuration}]}],needs:[],assumed:[]};},
++    save:async()=>{calls.save++;throw Error('Save forbidden');}};
++  w.eval(read('live-flow.js'));const factory=w.MVP3LiveFlow.createFlow;let flow;
++  w.MVP3LiveFlow.createFlow=(...args)=>{flow=factory(...args);return flow;};
++  try{w.eval(read('app.js'));await flow.submit('CODE/MOCK 부품 슬롯 회귀');return {dom,flow,calls};}
++  catch(error){dom.window.close();throw error;}
++}
++for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE']){
++  test('whole app/model/flow renders accepted slot '+slot+' in detail and final',async()=>{
++    const f=fixture();f.parts[0].slot=slot;assert.equal(M.publicConfiguration(f,99413).parts[0].slot,slot);
++    const h=await wholeApp(f);
++    try{
++      assert.equal(h.flow.state.error,null);assert.equal(h.flow.state.screen,'results');
++      h.flow.select(0);
++      for(const screen of ['detail','final']){
++        if(screen==='final')h.flow.navigate('final');
++        const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);
++        assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,3);
++        const row=doc.querySelector('tr[data-part="bom-0"]');assert.ok(row.querySelector('h4').textContent.includes(slot));
++        assert.equal(row.querySelector('.final-part-price').textContent,'미확인');
++        const details=row.querySelector('details');details.open=true;h.flow.emit();
++        assert.equal(doc.querySelector('details[data-detail="bom-0"]').open,true);
++        assert.match(doc.querySelector('.public-bom-role').textContent,slot==='CPU'?/프로그램의 명령/:/등록된 사양과 설명/);
++        assert.match(doc.querySelector('.final-summary-price').textContent,/900,000원/);
++        const explanation=doc.querySelector('.live-explanation');assert.ok(explanation);
++        assert.equal(!!explanation.closest('details.public-bom-information'),screen==='final');
++      }
++      assert.deepEqual(h.calls,{parse:1,recommend:1,network:0,save:0});
++    }finally{h.dom.window.close();}
++  });
++}
++module.exports={fixture,render};
+diff --git a/mockups/mvp3/tests/product-images.test.cjs b/mockups/mvp3/tests/product-images.test.cjs
+new file mode 100644
+index 0000000000000000000000000000000000000000..eaf8c7b7759d493fea3215cc082667b24953defd
+--- /dev/null
++++ b/mockups/mvp3/tests/product-images.test.cjs
+@@ -0,0 +1,161 @@
++'use strict';
++const test=require('node:test'),assert=require('node:assert/strict');
++const fs=require('node:fs'),path=require('node:path'),{webcrypto}=require('node:crypto');
++const {JSDOM,VirtualConsole}=require('jsdom');
++const base=path.resolve(__dirname,'..'),read=n=>fs.readFileSync(path.join(base,n),'utf8');
++const NOTICE='AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음';
++const URL='/api/customer/products/113836/representative-image';
++const available={state:'available',kind:'ai_assembly_example',url:URL,notice:NOTICE};
++const product={product_code:113836,name:'CODE/MOCK <PC>',price:900000,price_src:'현재 판매가',spec:{cpu:'CPU'},reasons:['사무용'],over_budget:false,stock:0,image_url:'https://untrusted.invalid/case.png'};
++const qid='22222222-2222-4222-8222-222222222222';
++const clone=v=>JSON.parse(JSON.stringify(v));
++const tick=()=>new Promise(r=>setImmediate(r));
++async function until(check){for(let n=0;n<50;n++){if(check())return;await tick();}throw Error('render did not settle');}
++function harness({saved=false,item={...product,photo:available},groups=null,quoteItem=item,talkState={usages:['사무용'],budget_won:1500000}}={}){
++  const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
++  const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#'+(saved?'saved':'welcome'),runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
++  const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
++  Object.defineProperty(w,'crypto',{value:webcrypto});w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
++  w.eval(read('live-model.js'));w.eval(read('api-client.js'));
++  const response={ok:true,card_sets:groups||[{kind:'sold',usage:'사무용',items:[item]}]};
++  const quote={id:qid,product:quoteItem,state:{usages:['사무용']},saved_at:'2026-10-08T00:00:00Z'};
++  const before=clone(w.MVP3LiveModel.recommendations(response)),original=clone(response);
++  w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async(url,options)=>{
++    calls.push({url,method:options.method});
++    const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:url==='/api/grid/recommend'?response:{ok:true,quotes:[quote],has_more:false};
++    return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
++  }});w.eval(read('live-flow.js'));
++  const create=w.MVP3LiveFlow.createFlow;let flow;
++  w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
++  w.eval(read('app.js'));
++  return {dom,w,flow,calls,errors,response,original,before,quote,click:s=>w.document.querySelector(s).click(),close:()=>dom.window.close()};
++}
++async function recommend(h){const input=h.w.document.querySelector('#request');input.value='CODE/MOCK 사무용';input.dispatchEvent(new h.w.Event('input',{bubbles:true}));h.w.document.querySelector('#chat-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>h.w.document.querySelector('.live-product-card'));}
++function business(result){const out=clone(result);for(const g of out.groups)for(const p of g.products)delete p.photo;return out;}
++
++test('generated-media: exact server route and canonical AI notice survive normalization, card and detail',async()=>{
++  assert.ok(fs.readFileSync(path.resolve(base,'../../api/pc_media.py'),'utf8').includes("NOTICE='"+NOTICE+"'"));
++  for(const url of [URL,'https://qa.invalid'+URL]){
++    const h=harness({item:{...product,photo:{...available,url,job_id:'private',bucket:'private'}}});try{
++      await recommend(h);const img=h.w.document.querySelector('[data-product-image]');assert.equal(img.getAttribute('src'),url);assert.equal(img.alt,'CODE/MOCK <PC> · AI 조립 예시');
++      assert.equal(h.w.document.querySelector('figcaption').textContent,NOTICE);assert.equal(h.w.document.querySelector('figcaption').hidden,false);
++      const normalized=h.w.MVP3LiveModel.recommendations(h.response);assert.deepEqual(business(normalized),h.before);assert.deepEqual(Object.keys(normalized.groups[0].products[0].photo).sort(),['kind','notice','state','url']);
++      h.click('[data-action=detail]');assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),url);assert.equal(h.calls.length,2);assert.deepEqual(h.errors,[]);
++      assert.equal(h.w.document.querySelector('[src*="product-images"]'),null);assert.deepEqual(h.response,h.original);
++    }finally{h.close();}
++  }
++});
++test('generated-media: missing/unavailable/temporary states request no image and preserve the product',async()=>{
++  for(const [photo,label] of [[undefined,'이미지 준비 중'],[null,'이미지 준비 중'],[{state:'unavailable',url:URL},'이미지 준비 중'],[{state:'temporarily_unavailable',url:URL},'이미지를 불러오지 못했습니다']]){
++    const h=harness({item:{...product,photo}});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null);assert.equal(h.w.document.querySelector('.live-product-image-status').textContent,label);assert.match(h.w.document.querySelector('.live-product-card').textContent,/900,000원/);assert.deepEqual(business(h.w.MVP3LiveModel.recommendations(h.response)),h.before);assert.equal(h.calls.length,2);}finally{h.close();}
++  }
++});
++test('generated-media: external, executable, wrong-SKU, admin, cloud, CASE, query and noncanonical URLs are rejected',async()=>{
++  const bad=[null,42,'https://external.invalid'+URL,'javascript:alert(1)','data:image/png;base64,AA','//qa.invalid'+URL,'/api/customer/products/113835/representative-image','/api/admin/pc-configurations/1/media','https://storage.googleapis.com/bucket/representative.png','/api/product-images/129551/detail',URL+'?v=1',URL+'#a','/mvp3/..'+URL,'/api/customer/products/0113836/representative-image','https://user@qa.invalid'+URL,'https://qa.invalid:444'+URL];
++  for(const url of bad){const h=harness({item:{...product,photo:{...available,url}}});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null,String(url));assert.equal(h.w.document.querySelector('.live-product-image-status').textContent,'이미지 준비 중');assert.equal(h.calls.length,2);}finally{h.close();}}
++});
++test('generated-media: original-photo kind, invalid state, altered/missing notice and unsafe code do not claim an AI image',async()=>{
++  for(const item of [{...product,photo:{...available,kind:'registered_product_photo'}},{...product,photo:{...available,state:'unknown'}},{...product,photo:{...available,notice:''}},{...product,photo:{...available,notice:'실제 조립 사진'}},{...product,product_code:Number.MAX_SAFE_INTEGER+1,photo:available}]){
++    const h=harness({item});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null);assert.equal(h.w.document.querySelector('figcaption'),null);assert.match(h.w.document.querySelector('.live-product-card').textContent,/이미지 준비 중/);}finally{h.close();}
++  }
++});
++test('generated-media: img error retains AI notice, price, spec, selection and API call count; unrelated icon is unaffected',async()=>{
++  const h=harness();try{await recommend(h);const card=h.w.document.querySelector('.live-product-card'),img=card.querySelector('[data-product-image]');
++    const price=card.querySelector('.price').textContent,spec=card.querySelector('.live-card-spec').textContent,calls=clone(h.calls);
++    img.dispatchEvent(new h.w.Event('error'));assert.equal(img.hidden,true);assert.equal(card.querySelector('[data-product-image-status]').hidden,false);assert.equal(card.querySelector('[data-product-image-status]').textContent,'이미지를 불러오지 못했습니다');assert.equal(card.querySelector('figcaption').textContent,NOTICE);assert.equal(card.querySelector('figcaption').hidden,false);
++    assert.equal(card.querySelector('.price').textContent,price);assert.equal(card.querySelector('.live-card-spec').textContent,spec);assert.deepEqual(h.calls,calls);
++    const icon=h.w.document.querySelector('.brand-mark');icon.dispatchEvent(new h.w.Event('error'));assert.equal(icon.hidden,false);
++    h.click('[data-action=detail]');assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),URL);assert.match(h.w.document.querySelector('.live-summary').textContent,/900,000원/);
++    const detail=h.w.document.querySelector('[data-product-image]');detail.dispatchEvent(new h.w.Event('load'));assert.equal(detail.parentElement.dataset.imageState,'loaded');assert.equal(detail.parentElement.querySelector('[data-product-image-status]').hidden,true);assert.equal(detail.parentElement.querySelector('figcaption').hidden,false);assert.deepEqual(h.calls,calls);
++  }finally{h.close();}
++});
++test('generated-media: saved quote consumes only its own photo and retains saved price/date without original-photo wording',async()=>{
++  for(const photo of [available,undefined,{state:'temporarily_unavailable',url:null}]){
++    const h=harness({saved:true,quoteItem:{...product,photo}});try{await until(()=>h.w.document.querySelector('[data-action=load]'));const card=h.w.document.querySelector('.live-product-card');assert.match(card.textContent,/900,000원/);h.click('[data-action=load]');const summary=h.w.document.querySelector('.live-summary');assert.match(summary.textContent,/보관 시점의 상품 구성과 참고 금액/);assert.doesNotMatch(summary.textContent,/현재 등록본|실제 조립 사진/);assert.equal(!!summary.querySelector('[data-product-image]'),photo===available);if(photo===available)assert.equal(summary.querySelector('figcaption').textContent,NOTICE);assert.ok(h.calls.every(c=>c.method==='GET'));assert.equal(h.w.MVP3LiveModel.quote(h.quote).saved_at,h.quote.saved_at);}finally{h.close();}
++  }
++});
++test('generated-media: invalid products and unsupported groups do not shift photo binding or change recommendation eligibility',async()=>{
++  const second={...product,product_code:113835,name:'Second PC',photo:{state:'temporarily_unavailable',url:null}};
++  const groups=[{kind:'estimate',items:[product]},{kind:'sold',usage:'사무용',items:[{product_code:113800,photo:available},{...product,photo:available},second]}];
++  const h=harness({groups});try{await recommend(h);const normalized=h.w.MVP3LiveModel.recommendations(h.response);assert.deepEqual(business(normalized),h.before);assert.equal(normalized.groups[0].products[0].photo.url,URL);assert.equal(normalized.groups[0].products[1].photo.state,'temporarily_unavailable');assert.equal(h.w.document.querySelectorAll('.live-product-card').length,2);assert.equal(h.w.document.querySelectorAll('[data-product-image]').length,1);assert.equal(normalized.unsupported,true);}finally{h.close();}
++});
++
++// Integration-only fixtures. These describe CODE/MOCK data, not current offers or inventory.
++function publicBom(code=113836){return {product_code:code,configuration_id:'CODE-MOCK-CONFIG',revision:1,offer_id:'P'+code,
++  description:{title:'CODE/MOCK 부품 구성을 확인하세요',intro:'공개 등록 사양을 함께 확인하는 검사 구성입니다.',scene:null,benefits:[],checks:[],faq:[]},
++  parts:[{ordinal:0,slot:'CPU',quantity:1,pseudo:false,name:'CODE/MOCK CPU',description:'등록 CPU 설명',specs:[{label:'등록 사양',value:'Fixture CPU'}]},
++    {ordinal:1,slot:'GPU',quantity:1,pseudo:false,name:'CODE/MOCK GPU',description:'등록 GPU 설명',specs:[{label:'그래픽 메모리',value:'Fixture 8GB'}]}],
++  price:{state:'unknown',amount:null,checked_at:null,observed_date:null,model:null},stock:{state:'unknown',checked_at:null},
++  compatibility:{document_state:'unknown',public_summary:null,assembly_state:'unknown'},photo:{state:'unresolved',url:null},
++  customer_conditions:Object.fromEntries(['os','keyboard','mouse','monitor','warranty'].map(k=>[k,{state:'unknown',detail:'',months:null,needs_reconfirmation:false,customer_statement:'구매 전에 확인해 주세요.'}]))};}
++const gameContext={game_name:'CODE/MOCK 게임',why_this_pc:'같은 게임 문맥의 안내',caution:'실제 게임 성능 측정값 아님',source:{kind:'game_customer_copy',fields:['why_this_pc'],url:null}};
++
++test('approved-ui: zero/one/two sold results preserve cardinality, ordering and supplied prices',async()=>{
++  for(const count of [0,1,2]){
++    const items=[{...product,name:'CODE/MOCK A',price:820000,photo:available},{...product,product_code:113835,name:'CODE/MOCK B',price:930000,photo:{state:'unavailable'},tag:'예산 안 최고 수준'}].slice(0,count);
++    const h=harness({groups:[{kind:'sold',usage:'CODE/MOCK',items}]});try{
++      await h.flow.submit('CODE/MOCK 결과 수 검사');assert.equal(h.flow.state.screen,'results');
++      const cards=[...h.w.document.querySelectorAll('.live-product-card')];assert.equal(cards.length,count);
++      assert.deepEqual(clone(h.flow.state.groups[0].products.map(p=>p.product_code)),items.map(p=>p.product_code));
++      cards.forEach((card,n)=>{assert.match(card.textContent,new RegExp(items[n].price.toLocaleString('ko-KR')+'원'));assert.equal(card.querySelector('[data-action=detail]').dataset.id,String(n));});
++      if(count===0){assert.match(h.w.document.querySelector('#view').textContent,/추천 상품이 없어요/);assert.equal(h.w.document.querySelector('[data-action=detail]'),null);}
++      if(count===2){assert.match(cards[1].querySelector('.live-price-difference').textContent,/110,000원 높아요/);assert.equal(cards[0].querySelector('.live-price-difference'),null);}
++      assert.equal(h.calls.length,2);assert.deepEqual(h.errors,[]);
++    }finally{h.close();}
++  }
++});
++test('approved-ui: selected BOM, photo, game context and native GPU disclosure survive rerender and final confirmation',async()=>{
++  const item={...product,name:'CODE/MOCK 게임 PC',reasons:['고객 추천 이유 하나','고객 추천 이유 둘'],photo:available,public_configuration:publicBom()};
++  const talkState={usages:['게임'],budget_won:1500000,game:{names:['CODE/MOCK 게임'],resolution:'1080p'}};
++  const h=harness({item,talkState,groups:[{kind:'sold',usage_grid:'게임',usage:'게임',game_context:gameContext,items:[item]}]});try{
++    await h.flow.submit('CODE/MOCK 같은 문맥');h.click('[data-action=detail]');
++    const doc=h.w.document;assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,2);assert.match(doc.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
++    assert.deepEqual(clone(h.flow.state.selectionState),talkState);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 하나/);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 둘/);
++    const selected=clone(h.flow.state.selected),calls=clone(h.calls);doc.querySelector('details[data-detail="bom-1"]').open=true;h.flow.emit();
++    assert.equal(doc.querySelector('details[data-detail="bom-1"]').open,true);assert.match(doc.querySelector('tr[data-part="bom-1"]').textContent,/Fixture 8GB/);
++    assert.ok([...doc.querySelectorAll('.public-bom [data-action=unavailable]')].every(b=>b.disabled));assert.equal(doc.querySelectorAll('.public-bom .final-part-price').length,2);
++    assert.ok([...doc.querySelectorAll('.public-bom .final-part-price')].every(e=>e.textContent==='미확인'));assert.match(doc.querySelector('.public-bom-photo').textContent,/미확인/);
++    doc.querySelector('[data-product-image]').dispatchEvent(new h.w.Event('error'));assert.equal(doc.querySelector('figcaption').textContent,NOTICE);assert.equal(doc.querySelector('[data-product-image-status]').hidden,false);
++    assert.deepEqual(clone(h.flow.state.selected),selected);assert.deepEqual(h.calls,calls);assert.match(doc.querySelector('#actions').textContent,/900,000원/);
++    h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');assert.ok(doc.querySelector('.public-bom-information .live-explanation'));assert.equal(doc.querySelector('.public-bom-information').open,false);
++    assert.equal(doc.querySelector('[data-product-image]').getAttribute('src'),URL);assert.deepEqual(h.calls,calls);assert.deepEqual(h.errors,[]);
++  }finally{h.close();}
++});
++test('approved-ui: same SKU in another usage and a loaded saved quote cannot inherit the prior game context',async()=>{
++  const item={...product,photo:available,public_configuration:publicBom()};
++  const h=harness({item,groups:[{kind:'sold',usage_grid:'게임',game_context:gameContext,items:[item]},{kind:'sold',usage_grid:'영상 편집',items:[item]}]});try{
++    await h.flow.submit('CODE/MOCK 재선택');h.flow.select(0);assert.match(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
++    h.flow.navigate('results');h.flow.select(1);assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
++    h.flow.select(0);await h.flow.list();h.flow.load(qid);assert.equal(h.flow.state.screen,'final');assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
++    assert.match(h.w.document.querySelector('.live-summary').textContent,/보관 시점/);assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,2);
++    assert.equal(h.w.document.querySelector('figcaption').textContent,NOTICE);h.flow.reset();assert.equal(h.flow.state.selected,null);assert.equal(h.flow.state.groups.length,0);
++    assert.deepEqual(h.errors,[]);
++  }finally{h.close();}
++});
++test('approved-ui: missing/rejected BOM preserves the complete-product fallback and valid photo binding',async()=>{
++  for(const configuration of [undefined,{...publicBom(),product_code:113835}]){
++    const h=harness({item:{...product,photo:available,public_configuration:configuration}});try{
++      await recommend(h);h.click('[data-action=detail]');assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,0);assert.ok(h.w.document.querySelector('tr[data-part=pc]'));
++      assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),URL);assert.match(h.w.document.querySelector('#actions').textContent,/900,000원/);
++      h.click('[data-action=final]');assert.ok(h.w.document.querySelector('details[data-detail=spec] .live-explanation'));assert.equal(h.w.document.querySelector('details[data-detail=spec]').open,false);assert.equal(h.calls.length,2);
++    }finally{h.close();}
++  }
++});
++test('approved-ui: absent/different price basis and unknown prices do not create a comparison amount',async()=>{
++  for(const second of [{...product,price_src:'다른 기준'},{...product,price:null},{...product,price_src:''}]){
++    const h=harness({groups:[{kind:'sold',items:[{...product,photo:available},{...second,product_code:113835,photo:{state:'unavailable'}}]}]});try{
++      await recommend(h);assert.equal(h.w.document.querySelector('.live-price-difference'),null);assert.equal(h.w.document.querySelectorAll('.live-product-card').length,2);
++      if(second.price===null)assert.match(h.w.document.querySelectorAll('.live-product-card')[1].textContent,/금액 미확인/);assert.equal(h.calls.length,2);
++    }finally{h.close();}
++  }
++});
++
++test('every deployed landing start CTA invokes approved MVP3 destination in the real handler',()=>{
++  const dom=new JSDOM(read('../mvp1/main-landing.html'),{runScripts:'outside-only'});try{
++    const source=Array.from(dom.window.document.scripts).find(s=>s.textContent.includes('window.location.href')&&s.textContent.includes('[data-cta="start"]'))?.textContent;assert.ok(source);
++    const location={href:''};new Function('document','window','setTimeout',source)(dom.window.document,{location},()=>{});
++    dom.window.document.dispatchEvent(new dom.window.Event('DOMContentLoaded'));
++    const starts=dom.window.document.querySelectorAll('[data-cta="start"]');assert.ok(starts.length>=5);
++    for(const start of starts){location.href='';start.click();assert.equal(location.href,'/mvp3/');}
++  }finally{dom.window.close();}
++});
