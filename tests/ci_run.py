@@ -53,8 +53,10 @@ def run_python(env):
     for path in sorted(TESTS.glob('test_*.py')):
         rel = path.relative_to(ROOT).as_posix()
         out, code, secs = run([sys.executable, '-m', 'pytest', '-q', '-p', 'no:cacheprovider',
-                               '--tb=short', '-rfEX', rel], env)
+                               '--tb=short', '-rfEXs', rel], env)
         counts = pytest_counts(out)
+        # conftest 가 «개발 PC 전용 자료 없음» 으로 건너뛴 수 - 건너뜀 안에 묻히지 않게 따로 센다.
+        counts['pc_only'] = sum(int(n) for n in re.findall(r'^SKIPPED \[(\d+)\].*개발 PC 전용', out, re.M))
         # 0 만 정상이다. 5(수집된 테스트 0건)도 실패로 본다 - import 가 조용히 비어도 초록이 되지 않게.
         # 그 밖의 코드인데 실패 수가 0이면 수집 오류(의존성 누락 포함)다.
         bad = code != 0 or counts['failed'] or counts['errors'] or counts['xpassed']
@@ -94,19 +96,27 @@ def run_node(env):
 
 def report(rows, problems):
     total = {k: sum(r[1][k] for r in rows) for k in KINDS}
+    pc_only = sum(r[1].get('pc_only', 0) for r in rows)
+    pc_files = [r[0] for r in rows if r[1].get('pc_only')]
     broken = [r for r in rows if r[1]['failed'] or r[1]['errors'] or r[1]['xpassed']]
     for msg in problems:
         print(f'FAIL {msg}')
     for rel, counts, secs, out in broken:
         print(f'\n===== {rel} =====\n{out.strip()[-6000:]}')
     print('\n' + ' · '.join(f'{k} {total[k]}' for k in KINDS) + f'  ({len(rows)} files)')
+    if pc_only:
+        print(f'PC only: {pc_only} skipped in {len(pc_files)} files (D:/WORK 자료 없음)')
     for rel, counts, secs, _ in broken:
         print(f'  FAIL {rel}  ' + ' '.join(f'{k}={v}' for k, v in counts.items() if v))
 
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary:
-        lines = ['## 단위 테스트', '', ' · '.join(f'{k} **{total[k]}**' for k in KINDS), '',
-                 '| 파일 | ' + ' | '.join(KINDS) + ' | 초 |', '|' + '---|' * (len(KINDS) + 2)]
+        lines = ['## 단위 테스트', '', ' · '.join(f'{k} **{total[k]}**' for k in KINDS), '']
+        if pc_only:
+            lines += [f'**PC 전용으로 건너뜀 {pc_only}건** ({len(pc_files)}개 파일) - 개발 PC 의 D:/WORK 자료를 읽는 테스트라 '
+                      '이 기계에서는 돌지 않는다. 건너뜀 수에 포함돼 있다.', '',
+                      *[f'- {f}' for f in pc_files], '']
+        lines += ['| 파일 | ' + ' | '.join(KINDS) + ' | 초 |', '|' + '---|' * (len(KINDS) + 2)]
         for rel, counts, secs, _ in rows:
             mark = ' ❌' if (counts['failed'] or counts['errors'] or counts['xpassed']) else ''
             lines.append(f'| {rel}{mark} | ' + ' | '.join(str(counts[k]) for k in KINDS) + f' | {secs:.1f} |')
