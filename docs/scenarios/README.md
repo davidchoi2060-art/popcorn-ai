@@ -43,6 +43,7 @@ python tests/scenarios/meter.py --base-url http://127.0.0.1:8000 --out docs/scen
   (`auth_unavailable` 처럼 영문 코드만), 단계가 지정한 숫자·참거짓 값, 경로의 틀만 남는다.
 - `--measured-by PC 쪽` 으로 측정 주체를 기록에 적는다. 클라우드 쪽 측정은 PC 독립 확인이 아니다.
 - 안전 검사: `python -m pytest tests/scenarios/test_meter_safety.py -q` (가짜 전송기·가짜 어댑터, 네트워크·DB 불필요). pytest 가 없으면 `pip install pytest`.
+- 같은 일회용 DB 에서 두 번 돌리면 관리자 로그인이 403 `password_not_set` 이 된다(부트스트랩은 첫 로그인 한 번만). CI 기록은 매번 새 DB 에서 잰다.
 - 관리자 단계: `SCENARIO_ADMIN_EMAIL` · `SCENARIO_ADMIN_PASSWORD` 환경변수. 비밀번호는
   기록에 남지 않는다.
 - 종료 코드는 측정이 끝나면 0 이다(빨강이 있어도). 측정기가 못 돌면 2.
