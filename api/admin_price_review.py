@@ -8,8 +8,8 @@ history(reason='margin_policy'). 자동 집행하지 않는다 — 가격 결정
   → **v1은 '첫 산정' 유형만 실데이터.** ±15% 매입가 임계 유형은 purchase 이력 의존(현 DB 희소),
   마진 위반 유형은 **스키마 원천 부재**(category_margin_policies에 최소 마진율·끝자리·정책 버전
   컬럼 없음) — 응답 note로 정직 표기하고 이관. 검수 미통과 상품은 검수 큐 소관이라 제외.
-제안가 = purchase × (1 + card_fee + margin) 천원 half-up (pricing_settings 실값 —
-현행 2.2% + 0%라 목업의 마진 12~19% 연출과 달리 실제 ~2.1%로 표기된다).
+제안가 = purchase × (1 + card_fee + margin) 천원 half-up. margin은 상품 분류의 마진
+(자기 노드 -> 조상 -> 전역, 2026-10-08부터 — 승인 경로 _reprice와 같은 값).
 액션 3종은 모두 지속 처리(목록이 파생이므로 재등장 방지):
   approve = _reprice(reason='margin_policy') 재사용(정본 경로 — 매입가 재판정 동반.
             공급처가 여럿인 상품은 purchase도 최저가로 재판정될 수 있음)
@@ -28,6 +28,8 @@ from .admin_orders import _log
 from .auth import current_operator_id
 from .admin_price_import import _reprice, _settings
 from .pricing import sale_from_purchase
+from .pricing_reprice_core import margin_map
+from .pricing_policy_guard_core import lock_pricing_policy_shared
 from .admin_products import PART_TYPE_LABELS
 from .db import engine
 
@@ -42,7 +44,7 @@ NOTE = ("v1은 '첫 산정'(판매가 미산정) 유형만 실데이터입니다
 def _rows(conn):
     return conn.execute(text(
         "SELECT p.product_code, p.sku, p.product_name, p.part_type, p.purchase_price,"
-        " p.sale_price, s.name AS supplier, psp.cost_price"
+        " p.sale_price, p.category_id, s.name AS supplier, psp.cost_price"
         " FROM products p"
         " LEFT JOIN (SELECT DISTINCT ON (product_code) product_code, supplier_id, cost_price"
         "            FROM product_supplier_prices ORDER BY product_code, cost_price) psp"
@@ -55,11 +57,14 @@ def _rows(conn):
 def price_review():
     with engine.connect() as conn:
         fee, margin = _settings(conn)
+        mmap = margin_map(conn, margin)
         rows = _rows(conn)
     items = []
     for r in rows:
         purchase = r["purchase_price"] or r["cost_price"] or 0
-        proposed = sale_from_purchase(purchase, fee, margin) if purchase else None
+        # 제안가도 승인(_reprice)과 같은 분류 마진으로 낸다 — 제안과 승인 결과가 갈라지지 않게
+        m = mmap.get(r["category_id"], margin)
+        proposed = sale_from_purchase(purchase, fee, m) if purchase else None
         items.append({
             "product_code": r["product_code"], "sku": r["sku"], "name": r["product_name"],
             "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
@@ -67,6 +72,7 @@ def price_review():
             "purchase": purchase or None, "current": r["sale_price"], "proposed": proposed,
             "margin_pct": round((proposed - purchase) / purchase * 100, 1)
                           if (purchase and proposed) else None,
+            "margin_rate": m,  # 이 상품에 실제로 쓰인 마진(분류 예외 또는 전역)
             "kind": "first",  # 첫 산정 — v1 유일 유형
             "why": "첫 산정 — 판매가 미정",
         })
@@ -85,6 +91,7 @@ def decide(product_code: int, body: DecideBody):
     if body.action == "manual" and not (body.price and body.price > 0):
         raise HTTPException(400, "직접 수정에는 0보다 큰 판매가가 필요합니다")
     with engine.begin() as conn:
+        lock_pricing_policy_shared(conn)   # 정책 잠금이 상품 잠금보다 먼저다
         p = conn.execute(text(
             "SELECT product_code, sku, purchase_price, sale_price, locked_fields"
             f" FROM products p WHERE product_code=:pc AND {PENDING} FOR UPDATE"),

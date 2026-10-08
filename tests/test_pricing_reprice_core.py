@@ -13,7 +13,7 @@ from unittest.mock import Mock
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from api.pricing_reprice_core import reprice
+from api.pricing_reprice_core import reprice, product_margin, _PRODUCT_CATEGORY_SQL
 from api.pricing import sale_from_purchase
 
 PRODUCT_SQL=('SELECT purchase_price, sale_price, locked_fields FROM products'
@@ -33,6 +33,7 @@ class Result:
     def mappings(self): return self
     def one(self): return self.value
     def all(self): return self.value
+    def scalar(self): return self.value
 
 class ScriptedConnection:
     def __init__(self,product,rows):
@@ -42,6 +43,7 @@ class ScriptedConnection:
         if self.fail_query==q: raise RuntimeError('SQL failure sentinel')
         if q==PRODUCT_SQL:return Result(self.product)
         if q==PSP_SQL:return Result(self.rows)
+        if q==_PRODUCT_CATEGORY_SQL:return Result(None)   # 미분류 -> 전역 마진
         if q not in (PURCHASE_UPDATE,SALE_UPDATE,PURCHASE_HISTORY,SALE_HISTORY):
             raise AssertionError('unregistered SQL')
         return Result(None)
@@ -159,9 +161,9 @@ class AdapterAndImportTests(unittest.TestCase):
         tree=ast.parse((ROOT/'api/admin_price_import.py').read_text(encoding='utf-8'))
         node=next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='_reprice')
         imported=next(n for n in tree.body if isinstance(n,ast.ImportFrom) and n.module=='pricing_reprice_core')
-        self.assertEqual([(n.name,n.asname) for n in imported.names],[('reprice','_reprice_core')])
-        self.assertEqual(len(node.body),2);self.assertIsInstance(node.body[1],ast.Return)
-        actor=Mock(return_value=37);scope={'_reprice_core':reprice,'current_operator_id':actor}
+        self.assertEqual([(n.name,n.asname) for n in imported.names],[('reprice','_reprice_core'),('product_margin',None)])
+        self.assertEqual(len(node.body),3);self.assertIsInstance(node.body[2],ast.Return)
+        actor=Mock(return_value=37);scope={'_reprice_core':reprice,'product_margin':product_margin,'current_operator_id':actor}
         module=ast.Module(body=[node],type_ignores=[]);exec(compile(module,'checked-in-adapter','exec'),scope)
         return scope['_reprice'],actor
 
@@ -169,7 +171,8 @@ class AdapterAndImportTests(unittest.TestCase):
         adapter,actor=self.adapter();c=ScriptedConnection({'purchase_price':1000,'sale_price':1000,'locked_fields':None},[(9000,'가능',7)])
         self.assertEqual(tuple(inspect.signature(adapter).parameters),('conn','pc','fee','margin','reason','ref_id','restore'))
         self.assertEqual(adapter(c,123,0,0,'sourcing',88),dict(purchase_changed=True,sale_changed=True,sale_locked=False))
-        self.assertEqual(actor.call_count,2);self.assertEqual(c.calls[3][1]['op'],37);self.assertEqual(c.calls[5][1]['op'],37)
+        self.assertEqual(c.calls[0],(_PRODUCT_CATEGORY_SQL,{'pc':123}))   # 분류 마진을 먼저 정한다
+        self.assertEqual(actor.call_count,2);self.assertEqual(c.calls[4][1]['op'],37);self.assertEqual(c.calls[6][1]['op'],37)
 
     def test_adapter_does_not_eagerly_lookup_actor_on_noop(self):
         adapter,actor=self.adapter();c=ScriptedConnection({'purchase_price':None,'sale_price':None,'locked_fields':None},[])

@@ -31,7 +31,8 @@ SIM_THRESHOLD = 0.3
 # 판매가 공식은 pricing이 단일 원천(슬라이스 E) — 세 곳에 흩어져 있던 것을 모았다.
 # 이름은 유지한다(다른 모듈이 이 이름으로 import 중).
 from .pricing import half_up_1000 as _half_up_1000, sale_from_purchase  # noqa: E402
-from .pricing_reprice_core import reprice as _reprice_core
+from .pricing_reprice_core import reprice as _reprice_core, product_margin
+from .pricing_policy_guard_core import lock_pricing_policy_shared
 from .pricing_write_guard_core import lock_products, ProductScopeChanged
 
 
@@ -189,6 +190,10 @@ def _reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
     하나도 없으니 "재판정"이 아니라 "복원"이다). restore가 없는 기존 호출부(admin_price_review.
     approve의 margin_policy · admin_sourcing.confirm_quote의 sourcing — 둘 다 restore 인자를
     안 준다)는 그대로 조기 return한다 — 동작 불변(git grep "_reprice(" 전수 확인)."""
+    # `margin`은 전역 기본값이다. 이 상품의 분류 마진(자기 노드 -> 조상 -> 전역)으로 바꿔
+    # 대량 재산정과 같은 판매가를 낸다(2026-10-08). 이 함수를 지나는 단가표 반영·되돌리기·
+    # 가격 검토 승인·소싱 확정이 모두 여기서 통일된다.
+    margin = product_margin(conn, pc, margin)
     return _reprice_core(conn, pc, fee, margin, reason, ref_id, restore=restore,
                          operator_id=current_operator_id)
 
@@ -301,6 +306,9 @@ def apply_rows(file_id: int, body: ApplyBody):
     if not body.row_ids:
         raise HTTPException(400, "반영할 행이 없습니다")
     with engine.begin() as conn:
+        # 마진 정책(전역·분류)을 읽어 판매가를 쓰므로, 정책 쓰기(exclusive)와 겹치지 않게
+        # 다른 잠금보다 먼저 공유 잠금을 잡는다(대량 재산정과 같은 순서).
+        lock_pricing_policy_shared(conn)
         f = conn.execute(text(
             "SELECT file_id, supplier_id, received_at, status FROM supplier_price_files"
             " WHERE file_id=:f"), {"f": file_id}).mappings().first()
@@ -386,6 +394,7 @@ def apply_rows(file_id: int, body: ApplyBody):
 @router.post("/price-import/undo/{log_id}")
 def undo(log_id: int):
     with engine.begin() as conn:
+        lock_pricing_policy_shared(conn)
         log = conn.execute(text(
             "SELECT action, detail FROM admin_operator_activity_logs WHERE log_id=:id FOR UPDATE"),
             {"id": log_id}).mappings().first()

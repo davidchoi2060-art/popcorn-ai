@@ -14,20 +14,11 @@
                                                live/selling/all, dry_run 파라미터 없음)
   읽기 보강: GET /api/admin/categories(트리 + margin_rate·margin_effective·margin_source).
 
-■★★ 상단 붉은 경고 — 코드 재확인(2026-08-15, 이 제작자, 서버 8002 실측 + 전수 grep):
-  지금도 사실이다.
-    admin_price_review.py:62   proposed = sale_from_purchase(purchase, fee, margin)
-    admin_price_import.py:180  new_sale = sale_from_purchase(new_purchase, fee, margin)
-  두 곳의 `fee, margin`은 둘 다 `_settings(conn)`(pricing_settings 최신 행 하나만 읽는다 —
-  분류 조인 없음)에서 왔다. `rg "resolve_margins|category_margin_policies"`를 두 파일에
-  돌리면 admin_price_review.py의 유일한 매치는 9행 **주석**(다른 화면 기능 부재 이유를
-  설명하는 산문, "category_margin_policies에 …컬럼 없음")뿐이고 admin_price_import.py는
-  매치 0건 — 둘 다 실제로 `resolve_margins`를 부르지 않는다. 저장소 전체에서
-  `resolve_margins(`를 실제로 **호출**하는 곳은 `admin_categories.py`(표시)·
-  `admin_reprice.py:92`(대량 재산정 — 이 화면이 쓰는 `/reprice/preview`가 바로 이 파일)
-  **2곳뿐**이다(`pricing.py`도 매치되지만 그건 함수 정의부라 호출이 아니다).
+■ 상단 붉은 경고는 2026-10-08 걷었다. 그 경고가 지적한 두 경로(가격 검토 승인·단가표 반영)와
+  소싱 확정은 이제 `admin_price_import._reprice`에서 `pricing_reprice_core.product_margin`
+  (-> `pricing.resolve_margins`)으로 분류 마진을 쓴다 — 대량 재산정과 같은 값이다.
 
-■★★ 계약이 가정했지만 코드가 다른 곳 둘(신규 발견, 2026-08-15 이 제작자 코드 확인) —
+  ■★★ 계약이 가정했지만 코드가 다른 곳 둘(신규 발견, 2026-08-15 이 제작자 코드 확인) —
   화면 문구를 계약 그대로 옮기지 않고 이 사실에 맞춰 조정했다:
 
   ① 분류별 예외 서랍의 "저장하면 이렇게 바뀝니다" 4줄 — **분류로 좁혀 셀 방법이 없다.**
