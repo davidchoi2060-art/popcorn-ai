@@ -27,7 +27,12 @@
           "reasons": [
             "영상편집 기본 — FHD 편집",
             "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요."
-          ]
+          ],
+          "photo": {
+            "state": "unavailable",
+            "url": null
+          },
+          "public_configuration": null
         },
         {
           "product_code": 2,
@@ -48,7 +53,12 @@
           "reasons": [
             "영상편집 기본 — FHD 편집",
             "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요."
-          ]
+          ],
+          "photo": {
+            "state": "unavailable",
+            "url": null
+          },
+          "public_configuration": null
         }
       ],
       "empty_reason": null,
@@ -90,7 +100,12 @@
             "게임 FHD — FHD 게임",
             "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
             "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
-          ]
+          ],
+          "photo": {
+            "state": "unavailable",
+            "url": null
+          },
+          "public_configuration": null
         },
         {
           "product_code": 2,
@@ -112,7 +127,12 @@
             "게임 FHD — FHD 게임",
             "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
             "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
-          ]
+          ],
+          "photo": {
+            "state": "unavailable",
+            "url": null
+          },
+          "public_configuration": null
         }
       ],
       "empty_reason": null,
