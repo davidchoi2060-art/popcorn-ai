@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
 from . import access_gate, grid_public, visitor
+from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
 from .timeutil import iso
@@ -51,15 +52,8 @@ def public_product(item):
         raise HTTPException(409, '상품 가격을 다시 확인해 주세요.')
     # Use the already public sold recommendation, never administrative rows.
     out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'over_budget')}
-    spec = item.get('spec')
-    if isinstance(spec, dict):
-        # Public component descriptions/capacities, never evaluation internals.
-        out['spec'] = {k: v for k, v in spec.items()
-                       if (k in ('cpu', 'gpu') and isinstance(v, str))
-                       or (k in ('ram_gb', 'ssd_gb', 'vram_gb')
-                           and type(v) in (int, float) and v >= 0)}
-    else:
-        out['spec'] = spec if isinstance(spec, str) else None
+    # Public component descriptions/capacities, never evaluation internals.
+    out['spec'] = public_spec(item.get('spec'))
     out['reasons'] = [v for v in item.get('reasons', []) if isinstance(v, str)]
     out['price_confirmed'] = False
     return out

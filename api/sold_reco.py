@@ -36,6 +36,20 @@ USAGE_RULES = [
 ]
 GAME_RES_RANK = {"1080p": 2, "1440p": 3, "4K": 4}
 MAX_ITEMS = 2
+PUBLIC_SPEC_TEXT = ("cpu", "gpu")
+PUBLIC_SPEC_NUM = ("ram_gb", "ssd_gb", "vram_gb")
+
+
+def public_spec(spec):
+    """고객에게 보여도 되는 사양만 — 부품 이름과 용량. 평가 점수(cpu_mt·cpu_st·gpu_idx 등)는
+    내부 판정 근거라 빼고 서버에만 둔다(협업 6번). MVP3 `live-model.js` 의 publicSpec 과 같은 집합."""
+    if isinstance(spec, str):
+        return spec
+    if not isinstance(spec, dict):
+        return None
+    return {k: v for k, v in spec.items()
+            if (k in PUBLIC_SPEC_TEXT and isinstance(v, str))
+            or (k in PUBLIC_SPEC_NUM and type(v) in (int, float) and v >= 0)}
 
 
 def fit_usage(label: str | None) -> str | None:
@@ -58,7 +72,7 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
         reasons.append(f"판매가에 {p['includes']} 포함")
     return {
         "product_code": p["code"], "name": p["name"], "price": p["price"],
-        "price_src": p["price_src"], "mall_url": p["url"], "spec": p["spec"],
+        "price_src": p["price_src"], "mall_url": p["url"], "spec": public_spec(p["spec"]),
         "level": f["level"], "tag": tag, "over_budget": over, "reasons": reasons,
     }
 
