@@ -12,10 +12,10 @@ const EMPTY_BOM='부품 구성 정보는 아직 연결되지 않았어요.';
 const available={state:'available',kind:'ai_assembly_example',url:URL,notice:NOTICE};
 const qid='22222222-2222-4222-8222-222222222222';
 const talk={usages:['사무용'],budget_won:1500000};
-function publicBom(code=113836){return {product_code:code,configuration_id:'CODE-MOCK-CONFIG',revision:1,offer_id:'P'+code,
+function publicBom(code=113836,gpu='CODE/MOCK GPU'){return {product_code:code,configuration_id:'CODE-MOCK-CONFIG',revision:1,offer_id:'P'+code,
   description:{title:'CODE/MOCK 부품 구성을 확인하세요',intro:'공개 등록 사양을 함께 확인하는 검사 구성입니다.',scene:null,benefits:[],checks:[],faq:[]},
   parts:[{ordinal:0,slot:'CPU',quantity:1,pseudo:false,name:'CODE/MOCK CPU',description:'등록 CPU 설명',specs:[{label:'등록 사양',value:'Fixture CPU'}]},
-    {ordinal:1,slot:'GPU',quantity:1,pseudo:false,name:'CODE/MOCK GPU',description:'등록 GPU 설명',specs:[{label:'그래픽 메모리',value:'Fixture 8GB'}]}],
+    {ordinal:1,slot:'GPU',quantity:1,pseudo:false,name:gpu,description:'등록 GPU 설명',specs:[{label:'그래픽 메모리',value:'Fixture 8GB'}]}],
   price:{state:'unknown',amount:null,checked_at:null,observed_date:null,model:null},stock:{state:'unknown',checked_at:null},
   compatibility:{document_state:'unknown',public_summary:null,assembly_state:'unknown'},photo:{state:'unresolved',url:null},
   customer_conditions:Object.fromEntries(['os','keyboard','mouse','monitor','warranty'].map(k=>[k,{state:'unknown',detail:'',months:null,needs_reconfirmation:false,customer_statement:'구매 전에 확인해 주세요.'}]))};}
@@ -37,6 +37,8 @@ function harness({hash='saved',quoteProduct=savedProduct,recommendItem=currentPr
     let data;
     if(url==='/api/talk/parse')data={ok:true,state:talk,history:[],missing:[]};
     else if(url==='/api/grid/recommend')data={ok:true,card_sets:[{kind:'sold',usage:'사무용',items:[recommendItem]}]};
+    // POST: 이 fixture 는 product_code·price 를 요청 값으로 채운다. 즉 「expected_price 일치 성공」만 다룬다
+    // (불일치·409 는 다른 검사 몫). 사진·BOM 은 postProduct 그대로 돌려준다.
     else if(options.method==='POST'&&url==='/api/mvp3/saved-quotes')data={ok:true,quote:{id:qid,product:{...postProduct,product_code:body.product_code,price:body.expected_price},state:body.state,saved_at:'2026-10-08T01:00:00Z'}};
     else data={ok:true,quotes:hash==='saved'?[quote]:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
@@ -44,9 +46,14 @@ function harness({hash='saved',quoteProduct=savedProduct,recommendItem=currentPr
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
   w.eval(read('app.js'));
-  return {w,doc:w.document,get flow(){return flow;},calls,errors,quote,click:s=>w.document.querySelector(s).click(),
-    // 렌더 뒤 남은 타이머가 닫힌 문서를 만지지 않게 한 박자 기다린 뒤 닫는다.
-    close:async()=>{await new Promise(r=>setTimeout(r,50));dom.window.close();}};
+  return {w,doc:w.document,get flow(){return flow;},calls,errors,quote,click:s=>w.document.querySelector(s).click(),close:()=>dom.window.close()};
+}
+// 렌더 뒤 남은 타이머가 닫힌 문서를 만지지 않게 한 박자 기다린 뒤 닫는다. 그 대기 중에 생긴 오류까지
+// 마지막에 확인하되, 본문 assertion 이 이미 실패했으면 그 실패를 가리지 않도록 오류 검사를 건너뛴다.
+async function withHarness(options,body){
+  const h=harness(options);let passed=false;
+  try{await body(h);passed=true;}
+  finally{await new Promise(r=>setTimeout(r,50));const errors=[...h.errors];h.close();if(passed)assert.deepEqual(errors,[],'jsdom errors through settle');}
 }
 function finalView(h){return h.doc.querySelector('#view');}
 function assertSavedBasis(h,{photo,bom}){
@@ -60,7 +67,6 @@ function assertSavedBasis(h,{photo,bom}){
   else{assert.equal(img,null);assert.match(text,/이미지 준비 중/);}
   if(bom){assert.ok(view.querySelector('.public-bom'),'public BOM section');assert.ok(!text.includes(EMPTY_BOM));assert.match(text,/CODE\/MOCK GPU/);}
   else{assert.ok(text.includes(EMPTY_BOM));assert.equal(view.querySelector('.public-bom'),null);assert.doesNotMatch(text,/CODE\/MOCK GPU/);}
-  assert.deepEqual(h.errors,[]);
 }
 async function loadSaved(h){await until(()=>h.doc.querySelector('[data-action=load]'));h.click('[data-action=load]');await until(()=>h.flow.state.screen==='final');}
 async function saveCurrent(h){
@@ -70,32 +76,37 @@ async function saveCurrent(h){
 }
 
 test('saved-basis GET load: saved price/spec with current photo and public BOM plus basis notice',async()=>{
-  const h=harness({quoteProduct:{...savedProduct,photo:available,public_configuration:publicBom()}});try{
+  await withHarness({quoteProduct:{...savedProduct,photo:available,public_configuration:publicBom()}},async h=>{
     await loadSaved(h);assertSavedBasis(h,{photo:true,bom:true});
     assert.equal(h.flow.state.messages.at(-1).text,'이 브라우저에서 보관한 '+savedProduct.name+'을 불러왔어요. '+BASIS);
     assert.ok(h.calls.every(c=>c.method==='GET'));
-  }finally{await h.close();}
+  });
 });
 test('saved-basis GET load: photo unavailable and public_configuration null/withdrawn fall back to 이미지 준비 중 and no BOM',async()=>{
   for(const [photo,configuration] of withdrawn){
-    const h=harness({quoteProduct:{...savedProduct,photo,public_configuration:configuration}});try{
+    await withHarness({quoteProduct:{...savedProduct,photo,public_configuration:configuration}},async h=>{
       await loadSaved(h);assertSavedBasis(h,{photo:false,bom:false});assert.ok(h.calls.every(c=>c.method==='GET'));
-    }finally{await h.close();}
+    });
   }
 });
-test('saved-basis POST performSave: returned saved.product photo and BOM drive the final view with basis notice',async()=>{
-  const h=harness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:available,public_configuration:publicBom()},
-    postProduct:{...savedProduct,photo:available,public_configuration:publicBom()}});try{
+// POST 두 검사는 expected_price 가 서버 반환과 일치하는 «성공» 경로만 다룬다. 추천 응답과 반환 saved.product 의
+// 사진·BOM 을 서로 다르게 두어, 최종 화면이 반환값을 채택했는지 구별되게 한다.
+test('saved-basis POST performSave (expected_price match success): returned saved.product photo and BOM replace different recommendation photo/BOM',async()=>{
+  await withHarness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:{state:'temporarily_unavailable',url:null},public_configuration:publicBom(113836,'RECOMMEND GPU')},
+    postProduct:{...savedProduct,photo:available,public_configuration:publicBom()}},async h=>{
     await saveCurrent(h);assertSavedBasis(h,{photo:true,bom:true});
+    const view=finalView(h);assert.doesNotMatch(view.textContent,/RECOMMEND GPU/);
+    // 추천의 temporarily_unavailable 상태 그림이 남지 않는다(사용 가능 사진의 숨은 오류 문구는 textContent 에 포함되므로 구조로 본다).
+    assert.equal(view.querySelector('[data-image-state="temporarily_unavailable"]'),null);assert.equal(view.querySelector('[data-product-image-status]').hidden,true);
     const post=h.calls.filter(c=>c.method==='POST'&&c.url==='/api/mvp3/saved-quotes');assert.equal(post.length,1);assert.equal(post[0].body.expected_price,900000);
-  }finally{await h.close();}
+  });
 });
-test('saved-basis POST performSave: unavailable photo and null/withdrawn BOM in saved.product override the recommendation view',async()=>{
+test('saved-basis POST performSave (expected_price match success): unavailable photo and null/withdrawn BOM in saved.product override the recommendation view',async()=>{
   for(const [photo,configuration] of withdrawn){
-    const h=harness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:available,public_configuration:publicBom()},
-      postProduct:{...savedProduct,photo,public_configuration:configuration}});try{
-      await saveCurrent(h);assertSavedBasis(h,{photo:false,bom:false});
+    await withHarness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:available,public_configuration:publicBom(113836,'RECOMMEND GPU')},
+      postProduct:{...savedProduct,photo,public_configuration:configuration}},async h=>{
+      await saveCurrent(h);assertSavedBasis(h,{photo:false,bom:false});assert.doesNotMatch(finalView(h).textContent,/RECOMMEND GPU/);
       assert.equal(h.calls.filter(c=>c.method==='POST'&&c.url==='/api/mvp3/saved-quotes').length,1);
-    }finally{await h.close();}
+    });
   }
 });
