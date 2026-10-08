@@ -68,45 +68,58 @@ ORIGIN = 'https://shop.example'
 GOOD_HEADERS = {'Origin': ORIGIN, 'Sec-Fetch-Site': 'same-origin'}
 
 
-def _historical_member_source(case, raw):
-    """Validate the two accepted branches before removing their exact lines."""
-    tree=ast.parse(raw.decode('utf-8'))
-    members=[n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='member_middleware']
-    case.assertEqual(len(members),1)
-    guards=[n for n in ast.walk(members[0]) if isinstance(n,ast.If) and isinstance(n.test,ast.BoolOp)]
-    case.assertEqual(len(guards),1)
-    guard=guards[0]
-    support=ast.parse('''not (len(path.split("/")) in (6, 7)
-        and path.split("/")[:4] == ["", "api", "commerce", "orders"]
-        and path.split("/")[4] != ""
-        and path.split("/")[5] == "support"
-        and (len(path.split("/")) == 6 or path.split("/")[6] == ""))''',mode='eval').body
-    fulfillment=ast.parse('''not (request.method == "GET" and len(path.split("/")) in (6, 7)
-        and path.split("/")[:4] == ["", "api", "commerce", "orders"]
-        and path.split("/")[4] != ""
-        and path.split("/")[5] == "fulfillment"
-        and (len(path.split("/")) == 6 or path.split("/")[6] == ""))''',mode='eval').body
-    case.assertIsInstance(guard.test.op,ast.And)
-    case.assertEqual(len(guard.test.values),5,'approved branch count')
-    for index,branch in ((2,support),(3,fulfillment)):
-        wanted=ast.dump(branch,include_attributes=False)
-        case.assertEqual(ast.dump(guard.test.values[index],include_attributes=False),wanted,'approved branch shape/order')
-        case.assertEqual(sum(ast.dump(n,include_attributes=False)==wanted for n in ast.walk(tree)),1,'approved branch count')
-        case.assertEqual(guard.test.values[index].end_lineno-guard.test.values[index].lineno+1,5)
-    case.assertEqual(guard.test.values[3].lineno,guard.test.values[2].end_lineno+1)
-    base=Path('D:/WORK/PopcornAI/outputs')
-    stages=((3,base/'admin-sourcing-inbound-20261003/U2-E-정책잠금/배송-main-정확5-CODE-변경전-20261005/api/customer_auth.py',
-             'db3542405b0a8f2ecf682d3df8b8968adc8e9b67e26091d83e74310e9a20d4c5'),
-            (2,base/'opening-commerce-backend-20261005/support-main-code4/변경전동결/api/customer_auth.py',
-             'e43b364eb773d9ef1beae3103328eaa4df2dff2651f694aadca4bfdf159b6e50'))
-    lines=raw.splitlines(keepends=True); removed=set()
-    for index,path,pin in stages:
-        node=guard.test.values[index]; removed.update(range(node.lineno-1,node.end_lineno))
-        historical=path.read_bytes()
-        case.assertEqual(hashlib.sha256(historical).hexdigest(),pin)
-        normalized=b''.join(line for i,line in enumerate(lines) if i not in removed)
-        case.assertEqual(normalized,historical,'whole approved-before raw')
-    return normalized
+# Accepted customer_auth is V3 (474cb43, sha256 below). V3 moved main's member guard out of a
+# module-level `member_middleware` into `_needs_member_resolution(path, method)`, used by
+# `create_member_middleware(resolver)`; `member_middleware` delegates to that factory product.
+# These checks prove the commerce path exceptions are the same ones main accepted (d2c66b3).
+ACCEPTED_V3_AUTH_SHA256 = '65df7b64bd07dd877e1f7c9d5e306a89a5829ecb751eb46a73e978fee115eaed'
+MAIN_OPEN_PREFIXES = ("/api/auth/", "/shared/", "/design-system/", "/admin2/", "/admin/", "/api/admin/")
+# Verbatim guard condition of main's accepted member_middleware (d2c66b3).
+MAIN_ACCEPTED_GUARD = compile('''(path != "/api/commerce/owner-context"
+        and not (request.method == "GET" and len(path.split("/")) == 5
+                 and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                 and path.split("/")[4] != "")
+        and not (len(path.split("/")) in (6, 7)
+                 and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                 and path.split("/")[4] != ""
+                 and path.split("/")[5] == "support"
+                 and (len(path.split("/")) == 6 or path.split("/")[6] == ""))
+        and not (request.method == "GET" and len(path.split("/")) in (6, 7)
+                 and path.split("/")[:4] == ["", "api", "commerce", "orders"]
+                 and path.split("/")[4] != ""
+                 and path.split("/")[5] == "fulfillment"
+                 and (len(path.split("/")) == 6 or path.split("/")[6] == ""))
+        and not path.startswith(OPEN_PREFIXES))''', 'main-accepted-member-guard', 'eval')
+METHODS = ('GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH')
+
+
+def _guard_paths():
+    paths = ['/api/commerce/owner-context', '/api/commerce/owner-context/', '/api/commerce/orders',
+             '/api/commerce/orders/', '/api/commerce/orders/order-1', '/api/commerce/orders/invalid!',
+             '/api/commerce/orders/order-1/', '/api/commerce/orders/order-1/confirm',
+             '/api/commerce/orders/draft', '/api/my/orders', '/api/my/profile', '/api/auth/login',
+             '/api/admin/x', '/admin2/x', '/shared/a.js', '/mvp3/', '/']
+    for suffix in ('support', 'fulfillment'):
+        paths.extend('/api/commerce/orders/'+value for value in (
+            'order-1/'+suffix, 'order-1/'+suffix+'/', 'order-1/'+suffix+'//',
+            '/'+suffix, 'order-1/'+suffix+'-extra', 'order-1/'+suffix+'/x'))
+    return paths
+
+
+def _predicate_mismatches(predicate):
+    """Every (path, method) where `predicate` disagrees with main's accepted guard."""
+    return [(path, method) for path in _guard_paths() for method in METHODS
+            if predicate(path, method) != eval(MAIN_ACCEPTED_GUARD, {}, dict(
+                path=path, request=SimpleNamespace(method=method), OPEN_PREFIXES=MAIN_OPEN_PREFIXES))]
+
+
+def _predicate_from_source(source):
+    """Compile `_needs_member_resolution` from customer_auth source bytes, isolated from the module."""
+    tree = ast.parse(source.decode('utf-8'))
+    node = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == '_needs_member_resolution')
+    namespace = {'OPEN_PREFIXES': auth.OPEN_PREFIXES}
+    exec(compile(ast.Module(body=[node], type_ignores=[]), 'selected-member-predicate', 'exec'), namespace)
+    return namespace['_needs_member_resolution']
 
 
 class Engine:
@@ -375,11 +388,13 @@ class OwnerHttpTests(unittest.TestCase):
     def test_actual_member_middleware_skips_exact_owner_get_with_valid_member_cookie(self):
         self.seed()
         self.app.middleware('http')(auth.member_middleware)
-        with patch.object(auth, 'resolve_session', return_value={'member_id':11}) as resolver:
+        with patch.object(auth, 'resolve_session', return_value={'member_id':11}) as resolver, \
+                patch.object(auth.RUNTIME_RESOLVER, 'resolve', return_value={'member_id':11}) as runtime:
             response = self.client.get(ENDPOINT, headers={**self.cookie(),
                   'Cookie':o.COOKIE+'='+TOKEN+'; popcorn_member_session=valid-dev-cookie'})
         self.assert_private(response)
         resolver.assert_not_called()
+        runtime.assert_not_called()
         self.assertTrue({'insert_user','insert_context'}.isdisjoint({t for t,_ in self.engine.trace}))
 
 
@@ -390,119 +405,76 @@ class MiddlewareAndSourceTests(unittest.TestCase):
                 with self.assertRaisesRegex(AssertionError,'live network/process forbidden'):
                     client.connect(address)
 
-    def test_neighbor_paths_still_resolve_and_contextvar_restores_after_success_and_error(self):
-        async def check(path, method, bypass, fail=False):
+    def test_commerce_paths_never_reach_the_member_resolver_and_contextvar_restores(self):
+        async def check(path, method, fail):
             request = Request({'type':'http','method':method,'path':path,'headers':[],
                                'scheme':'https','server':('shop.example',443),'query_string':b''})
-            before = {'member_id':99}
-            token = auth._current.set(before)
+            before = auth._current.get()
+            seen = []
             async def next_handler(request):
-                self.assertEqual(auth.current_member(), None if bypass else {'member_id':11})
+                seen.append(auth.current_member())
                 if fail: raise RuntimeError('fixture downstream error')
                 return Response()
-            try:
-                with patch.object(auth, 'resolve_session', return_value={'member_id':11}) as resolver:
-                    if fail:
-                        with self.assertRaises(RuntimeError): await auth.member_middleware(request,next_handler)
-                    else: await auth.member_middleware(request,next_handler)
-                    self.assertEqual(resolver.call_count, 0 if bypass else 1)
-                self.assertEqual(auth.current_member(), before)
-            finally: auth._current.reset(token)
-        cases = [(ENDPOINT,'GET',True), (ENDPOINT,'POST',True), (ENDPOINT+'/','GET',False),
-                 ('/api/commerce/orders','GET',False), ('/api/my/orders','GET',False),
-                 ('/api/commerce/orders/fixture-order','GET',True),
-                 ('/api/commerce/orders/invalid!','GET',True),
-                 ('/api/commerce/orders/fixture-order','POST',False),
-                 ('/api/commerce/orders/fixture-order/','GET',False),
-                 ('/api/commerce/orders/fixture-order/confirm','GET',False),
-                 ('/api/commerce/orders/fixture-order/confirm','POST',False),
-                 ('/api/commerce/orders/draft','POST',False),
-                 ('/api/commerce/orders/','GET',False)]
-        for path, method, bypass in cases:
-            for fail in [False,True]:
-                with self.subTest(path=path,method=method,fail=fail):
-                    asyncio.run(check(path,method,bypass,fail))
+            with patch.object(auth.RUNTIME_RESOLVER, '_ready') as ready, \
+                    patch.object(auth.RUNTIME_RESOLVER, 'resolve', return_value=None) as resolver:
+                if fail:
+                    with self.assertRaises(RuntimeError): await auth.member_middleware(request,next_handler)
+                else: await auth.member_middleware(request,next_handler)
+            ready.assert_not_called(); resolver.assert_not_called()
+            self.assertEqual(seen, [None])
+            self.assertIs(auth._current.get(), before)
+        # /api/auth/ and /api/my/ are V3 "protected" paths (errors become 503); they are not commerce paths.
+        for path in _guard_paths():
+            if path.startswith(('/api/auth/', auth.GUARDED_PREFIX)): continue
+            for method in ('GET','POST'):
+                for fail in (False,True):
+                    with self.subTest(path=path,method=method,fail=fail):
+                        asyncio.run(check(path,method,fail))
 
-    def test_customer_auth_changes_only_exact_middleware_guard(self):
-        raw = _historical_member_source(self,Path(auth.__file__).read_bytes())
-        tree = ast.parse(raw.decode('utf-8'))
-        # Overlay only the PM-approved fail-closed gates and truthful status note;
-        # keep the accepted historical module digest and all detail assertions.
-        login = next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='login')
-        gate = ast.parse('raise HTTPException(503, {"error": "auth_unavailable", '
-            '"detail": "회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다."})').body[0]
-        self.assertEqual(ast.dump(login.body[3]), ast.dump(gate))
-        del login.body[3]
-        resolver = next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='resolve_session')
-        self.assertEqual(ast.dump(resolver.body[1]), ast.dump(ast.parse('return None').body[0]))
-        del resolver.body[1]
-        me = next(n for n in tree.body if isinstance(n,ast.FunctionDef) and n.name=='me')
-        note = next(v for k,v in zip(me.body[1].value.keys,me.body[1].value.values) if k.value=='note')
-        self.assertEqual(note.value,'회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다.'
-                                   ' 상담·추천은 로그인 없이 이용할 수 있습니다.')
-        note.value = ('신원 확인은 현재 dev 어댑터입니다(입력 이메일을 신원으로 신뢰) —'
-                      ' 카카오·네이버·구글 연동 시 검증부만 교체되며 세션 로직은 그대로입니다.'
-                      ' **로컬 전용 — 공개 배포 차단 사유.**'
-                      ' 상담·추천·주문은 로그인 없이도 됩니다(게스트 유지).')
-        middleware = next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef)
-                          and n.name=='member_middleware')
-        guard = next(n for n in ast.walk(middleware) if isinstance(n,ast.If)
-                     and isinstance(n.test,ast.BoolOp))
-        expected = ast.parse('path != "/api/commerce/owner-context" and not path.startswith(OPEN_PREFIXES)',
-                             mode='eval').body
-        approved = ast.parse('path != "/api/commerce/owner-context" '
-            'and not (request.method == "GET" and len(path.split("/")) == 5 '
-            'and path.split("/")[:4] == ["", "api", "commerce", "orders"] '
-            'and path.split("/")[4] != "") and not path.startswith(OPEN_PREFIXES)',mode='eval').body
-        self.assertEqual(ast.dump(guard.test), ast.dump(approved))
-        original_guard = deepcopy(guard.test)
-        del original_guard.values[1]  # Only the exact, PM-approved new detail condition.
-        self.assertEqual(ast.dump(original_guard), ast.dump(expected))
-        guard.test = ast.Constant(value='OWNER_CONTEXT_EXACT_GUARD')
-        digest = hashlib.sha256(ast.dump(tree,include_attributes=False).encode()).hexdigest()
-        self.assertEqual(digest,'557b0ffa9b68dd5f4017bf08bd8d681dfa83bfd574af1e48d67764850acfc080')
+    def test_guarded_my_paths_still_consult_the_runtime_resolver(self):
+        async def check(path, method):
+            request = Request({'type':'http','method':method,'path':path,'headers':[],
+                               'scheme':'https','server':('shop.example',443),'query_string':b''})
+            async def next_handler(request): raise AssertionError('handler must not run without a member')
+            with patch.object(auth.RUNTIME_RESOLVER, '_ready'), \
+                    patch.object(auth.RUNTIME_RESOLVER, 'resolve', return_value=None) as resolver:
+                response = await auth.member_middleware(request,next_handler)
+            self.assertEqual(resolver.call_count, 1)
+            self.assertEqual(response.status_code, 401)
+        for path in ('/api/my/orders','/api/my/profile'):
+            with self.subTest(path=path): asyncio.run(check(path,'GET'))
 
-    def test_approved_member_branches_keep_exact_path_method_and_neighbor_boundaries(self):
-        raw=Path(auth.__file__).read_bytes()
-        historical=_historical_member_source(self,raw)
-        def expression(source):
-            tree=ast.parse(source.decode('utf-8'))
-            member=next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='member_middleware')
-            guard=next(n.test for n in ast.walk(member) if isinstance(n,ast.If) and isinstance(n.test,ast.BoolOp))
-            return compile(ast.Expression(guard),'selected-member-guard','eval')
-        current,old=expression(raw),expression(historical)
-        prefixes=next(n.value for n in ast.parse(raw.decode('utf-8')).body
-                      if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='OPEN_PREFIXES' for t in n.targets))
-        paths=[ENDPOINT,'/api/commerce/orders','/api/commerce/orders/order-1','/api/my/orders']
-        for suffix in ('support','fulfillment'):
-            paths.extend('/api/commerce/orders/'+value for value in (
-                'order-1/'+suffix,'order-1/'+suffix+'/', 'order-1/'+suffix+'//',
-                '/'+suffix,'order-1/'+suffix+'-extra','order-1/'+suffix+'/x'))
-        for path in paths:
-            for method in ('GET','POST','PUT','DELETE','HEAD','OPTIONS','PATCH'):
-                with self.subTest(path=path,method=method):
-                    env=dict(path=path,request=SimpleNamespace(method=method),OPEN_PREFIXES=ast.literal_eval(prefixes))
-                    bypass=(path in ('/api/commerce/orders/order-1/support','/api/commerce/orders/order-1/support/')
-                            or method=='GET' and path in ('/api/commerce/orders/order-1/fulfillment','/api/commerce/orders/order-1/fulfillment/'))
-                    self.assertEqual(eval(current,{},env),False if bypass else eval(old,{},env))
+    def test_v3_member_predicate_equals_main_accepted_guard_on_every_path_and_method(self):
+        self.assertEqual(auth.OPEN_PREFIXES, MAIN_OPEN_PREFIXES)
+        self.assertEqual(_predicate_mismatches(auth._needs_member_resolution), [])
+        self.assertEqual(_predicate_mismatches(_predicate_from_source(Path(auth.__file__).read_bytes())), [])
 
-    def test_member_adapter_rejects_unapproved_branch_and_duplicate_exception(self):
-        raw=Path(auth.__file__).read_bytes()
-        tree=ast.parse(raw.decode('utf-8'))
-        member=next(n for n in tree.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='member_middleware')
-        guard=next(n for n in ast.walk(member) if isinstance(n,ast.If) and isinstance(n.test,ast.BoolOp))
-        lines=raw.splitlines(keepends=True)
-        fulfillment=guard.test.values[3]
-        branch=b''.join(lines[fulfillment.lineno-1:fulfillment.end_lineno])
-        self.assertEqual(branch.count(b'request.method == "GET"'),1)
-        changed=raw.replace(branch,branch.replace(b'request.method == "GET"',b'request.method == "POST"'),1)
-        with self.assertRaisesRegex(AssertionError,'approved branch shape/order'):
-            _historical_member_source(self,changed)
-        support=guard.test.values[2]
-        branch=b''.join(lines[support.lineno-1:support.end_lineno])
-        duplicate=raw.replace(branch,branch+branch,1)
-        with self.assertRaisesRegex(AssertionError,'approved branch count'):
-            _historical_member_source(self,duplicate)
+    def test_predicate_check_fails_when_one_path_segment_or_method_changes(self):
+        raw = Path(auth.__file__).read_bytes()
+        for old, new in ((b'path.split("/")[5] == "fulfillment"', b'path.split("/")[5] == "fulfilment"'),
+                         (b'path.split("/")[5] == "support"', b'path.split("/")[5] == "supports"'),
+                         (b'len(path.split("/")) == 5', b'len(path.split("/")) == 6'),
+                         (b'and not (method == "GET" and len(path.split("/")) in (6, 7)',
+                          b'and not (method == "POST" and len(path.split("/")) in (6, 7)')):
+            with self.subTest(change=new.decode()):
+                self.assertEqual(raw.count(old), 1)
+                self.assertNotEqual(_predicate_mismatches(_predicate_from_source(raw.replace(old,new,1))), [])
+
+    def test_member_middleware_is_the_v3_factory_product_wired_in_main(self):
+        self.assertEqual(hashlib.sha256(Path(auth.__file__).read_bytes()).hexdigest(), ACCEPTED_V3_AUTH_SHA256)
+        runtime = auth._runtime_middleware
+        self.assertEqual(runtime.__qualname__, 'create_member_middleware.<locals>.boundary')
+        self.assertIs(dict(zip(runtime.__code__.co_freevars, (c.cell_contents for c in runtime.__closure__)))['resolver'],
+                      auth.RUNTIME_RESOLVER)
+        member = next(n for n in ast.parse(Path(auth.__file__).read_text(encoding='utf-8')).body
+                      if isinstance(n, ast.AsyncFunctionDef) and n.name == 'member_middleware')
+        self.assertEqual(ast.dump(member.body[-1]),
+                         ast.dump(ast.parse('return await _runtime_middleware(request, call_next)').body[0]))
+        main = ast.parse((Path(auth.__file__).parent/'main.py').read_text(encoding='utf-8'))
+        imports = [(n.module, a.name) for n in main.body if isinstance(n, ast.ImportFrom) for a in n.names]
+        self.assertIn(('customer_auth', 'member_middleware'), imports)
+        wired = [ast.unparse(n.value) for n in main.body if isinstance(n, ast.Expr)]
+        self.assertIn("app.middleware('http')(member_middleware)", wired)
 
     def test_runtime_module_exposes_only_two_routes_and_no_legacy_identity_import(self):
         self.assertEqual([(r.path, r.methods) for r in routes.router.routes],

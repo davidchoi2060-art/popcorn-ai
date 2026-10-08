@@ -68,14 +68,19 @@ class NoDatabase:
     def begin(self):self.calls.append('begin');raise AssertionError('legacy DB transaction forbidden')
 
 
+CURRENT_AUTH_SHA256='65df7b64bd07dd877e1f7c9d5e306a89a5829ecb751eb46a73e978fee115eaed'
+HISTORICAL_AUTH_SHA256='fa5e74a14be681ed9b1b8bffa54475ece5c8aa53b6f2e2004812a4eee588027e'
+HISTORICAL_AUTH_FIXTURE=Path(__file__).resolve().parent/'fixtures'/'customer_auth_accepted_e7e098d.py.txt'
+
 sys.addaudithook(_deny_external)
 _GUARD=True
 legacy_database=NoDatabase()
 try:
     identity=accepted_api('api.customer_identity','CUSTOMER_IDENTITY_ACCEPTED_SOURCE',
         '43566f3e25ac826a9bb47e4e0eccf40b30f778c01ffb5bac87757fd12ce152a8')
-    auth=accepted_api('api.customer_auth','CUSTOMER_AUTH_ACCEPTED_SOURCE',
-        'fa5e74a14be681ed9b1b8bffa54475ece5c8aa53b6f2e2004812a4eee588027e')
+    # Profile behaviour runs against the accepted V3 customer_auth that ships (474cb43).
+    # The earlier C1 pin (e7e098d) is kept as a historical check below, on a committed fixture.
+    auth=accepted_api('api.customer_auth','CUSTOMER_AUTH_ACCEPTED_SOURCE',CURRENT_AUTH_SHA256)
     _FAKE_DB=types.ModuleType('api.db');_FAKE_DB.engine=legacy_database
     previous_db=sys.modules.get('api.db');sys.modules['api.db']=_FAKE_DB
     try:profile=importlib.import_module('api.my_account')
@@ -445,6 +450,21 @@ class CustomerProfileContextTests(unittest.TestCase):
         self.assertEqual(len(helper_calls),2)
         self.assertIs(profile.engine,legacy_database)
         self.assertNotIn('api.db',sys.modules)
+
+
+
+class HistoricalAcceptedAuthPinTests(unittest.TestCase):
+    """The C1-era accepted customer_auth (e7e098d) stays pinned as history, not as the runtime."""
+
+    def test_historical_fixture_is_the_accepted_e7e098d_bytes(self):
+        raw=HISTORICAL_AUTH_FIXTURE.read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),HISTORICAL_AUTH_SHA256)
+        ast.parse(raw.decode('utf-8'))
+
+    def test_runtime_auth_is_the_current_accepted_v3_not_the_historical_file(self):
+        raw=Path(auth.__file__).read_bytes()
+        self.assertEqual(hashlib.sha256(raw).hexdigest(),CURRENT_AUTH_SHA256)
+        self.assertNotEqual(raw,HISTORICAL_AUTH_FIXTURE.read_bytes())
 
 
 if __name__=='__main__':unittest.main()
