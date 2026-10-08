@@ -49,15 +49,25 @@ jobs:
         run: |
           set -o pipefail
           log=$(mktemp)
-          if sudo -n /usr/local/bin/popcorn-ci regression 2>&1 | tee "$log"; then
-            ok=0
+          set +e
+          sudo -n /usr/local/bin/popcorn-ci regression 2>&1 | tee "$log"
+          rc=$?
+          set -e
+          # 준비 실패(사전조건 누락 — 검사 0건)를 회귀 실패와 가른다.
+          # tests/regression.py 가 `[준비 실패] <설정 이름>` 줄을 찍고 2로 끝난다.
+          prep=$(grep -m1 '^\[준비 실패\]' "$log" || true)
+          if [ "$rc" -eq 0 ]; then
+            title='## 회귀 세트 — 통과'
+          elif [ -n "$prep" ]; then
+            title='## 회귀 세트 — 준비 실패 (검사 미실행 · 기능 회귀 아님)'
+            echo "::error title=회귀 준비 실패::$prep"
           else
-            ok=1
+            title="## 회귀 세트 — 실패 (exit $rc)"
           fi
           {
-            echo '## 회귀 세트'
+            echo "$title"
             echo '```'
             tail -n 30 "$log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          exit "$ok"
+          exit "$rc"
