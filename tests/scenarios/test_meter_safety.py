@@ -126,14 +126,19 @@ class _CookieSettingAdapter:
     쿠키 저장은 requests 의 실제 함수(extract_cookies_to_jar)로 세션 쿠키 통에 넣어,
     세션에 걸린 쿠키 정책이 실제로 적용되는지를 본다."""
 
-    def __init__(self, jar, seen, auth_seen):
+    def __init__(self, jar, seen, auth_seen, record=None):
         self.jar, self.seen, self.auth_seen = jar, seen, auth_seen
+        record = {} if record is None else record
+        self.proxies_seen = record.setdefault('proxies', [])
+        self.proxy_auth_seen = record.setdefault('proxy_auth', [])
 
     def send(self, request, **kwargs):
         import requests
         from requests.cookies import extract_cookies_to_jar
         self.seen.append(request.headers.get('Cookie'))
         self.auth_seen.append(request.headers.get('Authorization'))
+        self.proxy_auth_seen.append(request.headers.get('Proxy-Authorization'))
+        self.proxies_seen.append(dict(kwargs.get('proxies') or {}))
         extract_cookies_to_jar(self.jar, request, _SetCookieMsg)
         resp = requests.Response()
         resp.status_code, resp._content, resp.encoding = 200, b'{"ok": true}', 'utf-8'
@@ -145,13 +150,17 @@ class _CookieSettingAdapter:
         pass
 
 
-def _fake_session_factory(seen, auth_seen=None):
+def _fake_session_factory(seen, auth_seen=None, record=None, inject_auth=False):
     import requests
     auth_seen = [] if auth_seen is None else auth_seen
 
     def make():
         s = requests.Session()
-        adapter = _CookieSettingAdapter(s.cookies, seen, auth_seen)
+        if inject_auth:   # 누군가 세션에 인증을 미리 실어 둔 경우(공장·전역 설정)
+            s.auth = ('leaky', 'injected-secret')
+            s.headers['Authorization'] = 'Bearer injected-token'
+            s.headers['Proxy-Authorization'] = 'Basic injected-proxy'
+        adapter = _CookieSettingAdapter(s.cookies, seen, auth_seen, record)
         s.mount('http://', adapter)
         s.mount('https://', adapter)
         return s
@@ -208,3 +217,50 @@ def test_environment_auth_counter_case(no_sockets, netrc_for_target):
     remote.send('guest', 'GET', '/api/budget-bands', None)
     assert auth_seen[0] and auth_seen[0].startswith('Basic '), auth_seen
     assert no_sockets == []
+
+
+def test_remote_readonly_does_not_inherit_proxy_env(no_sockets, netrc_for_target):
+    """쓰기 금지 Remote: HTTP_PROXY 환경을 물려받지 않는다(어댑터가 받은 proxies 로 확인). 반례: 쓰기 허용은 물려받는다."""
+    record = {}
+    meter.Remote('http://scenario.invalid', session_factory=_fake_session_factory([], [], record)) \
+        .send('guest', 'GET', '/api/budget-bands', None)
+    assert not any('proxy.invalid' in v for v in record['proxies'][0].values()), record
+    shared = {}
+    meter.Remote('http://scenario.invalid', allow_writes=True, session_factory=_fake_session_factory([], [], shared)) \
+        .send('guest', 'GET', '/api/budget-bands', None)
+    assert any('proxy.invalid' in v for v in shared['proxies'][0].values()), shared
+    assert no_sockets == []
+
+
+def test_remote_readonly_strips_injected_auth(no_sockets):
+    """세션에 auth·Authorization·Proxy-Authorization 이 미리 실려 있어도 쓰기 금지 요청에는 하나도 없다. 반례: 쓰기 허용은 그대로."""
+    auth_seen, record = [], {}
+    meter.Remote('http://scenario.invalid',
+                 session_factory=_fake_session_factory([], auth_seen, record, inject_auth=True)) \
+        .send('guest', 'GET', '/api/budget-bands', None)
+    assert auth_seen == [None] and record['proxy_auth'] == [None], (auth_seen, record)
+    auth_kept, kept = [], {}
+    meter.Remote('http://scenario.invalid', allow_writes=True,
+                 session_factory=_fake_session_factory([], auth_kept, kept, inject_auth=True)) \
+        .send('guest', 'GET', '/api/budget-bands', None)
+    assert auth_kept[0] and kept['proxy_auth'][0], (auth_kept, kept)
+    assert no_sockets == []
+
+
+def _lookup_step():
+    return next(s for sc in definitions.SCENARIOS for s in sc.steps if s.key == 'task.recover_lookup')
+
+
+def test_original_result_lookup_rejects_everything_but_the_same_confirmed_operation():
+    op = '11111111-1111-4111-8111-111111111111'
+    ctx = dict(order_no='ORD-A', request_basis='a' * 64,
+               fulfillment_command=dict(operation_id=op, action='prepare_shipment'))
+    good = dict(state='confirmed', order_no='ORD-A', operation_id=op, action='prepare_shipment', request_basis='a' * 64)
+    expect = _lookup_step().expect
+    assert expect(200, good, ctx) is None
+    for wrong in (dict(order_no='ORD-B'), dict(operation_id='22222222-2222-4222-8222-222222222222'),
+                  dict(action='handoff'), dict(state='pending'), dict(request_basis='b' * 64)):
+        assert expect(200, good | wrong, ctx), wrong
+    assert expect(404, {'detail': {'code': 'physical_operation_not_found'}}, ctx)   # 미실행 증명 아님
+    assert expect(503, {'detail': {'code': 'physical_result_unconfirmed'}}, ctx)    # 미확인 유지
+    assert expect(200, None, ctx)                                                   # HTML 200

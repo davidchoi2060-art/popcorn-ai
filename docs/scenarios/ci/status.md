@@ -1,8 +1,8 @@
 # 끝까지 시나리오 진척
 
-측정 2026-10-08 07:53 UTC · 커밋 `fe1c4b7` · 대상 CI 와 같은 조건의 일회용 DB(마이그레이션만 · 상품 0건) · 쓰기 허용 · 측정자 클라우드 쪽
+측정 2026-10-08 08:05 UTC · 커밋 `362963f` · 대상 CI 와 같은 조건의 일회용 DB(마이그레이션만 · 상품 0건) · 쓰기 허용 · 측정자 클라우드 쪽
 
-**끝까지 되는 시나리오 0/8 · 단계 통과 6/32** (🟢 6 · 🟡 12 · 🔴 14) · 가용성 점검 1/1 통과(완료 수에 넣지 않음)
+**끝까지 되는 시나리오 0/8 · 단계 통과 6/33** (🟢 6 · 🟡 13 · 🔴 14) · 가용성 점검 1/1 통과(완료 수에 넣지 않음)
 
 판정: 🟢 이번 실행에서 실제 요청이 기대대로 끝남(유일한 통과 근거) · 🟡 경로는 있으나 이번에 확인 못 함 · 🔴 실제 요청 실패 또는 경로 없음. 정의 `tests/scenarios/definitions.py`.
 
@@ -68,7 +68,8 @@
 | 단계 | 판정 | 요청 | 근거 |
 |---|---|---|---|
 | 대상 주문 상세 보기 | 🟡 미확인 | `GET /api/admin/commerce/orders/{order_no}` | 경로는 있음 · 앞 단계가 남긴 값 없음(order_no) |
-| 출고 등록(합성 명령 대기) | 🟡 미확인 | `POST /api/admin/commerce/orders/{order_no}/fulfillment` | 경로는 있음 · 앞 단계가 남긴 값 없음(order_no, fulfillment_command) |
+| 출고 현황과 처리 가능 여부 보기 | 🟡 미확인 | `GET /api/admin/commerce/orders/{order_no}/fulfillment` | 경로는 있음 · 앞 단계가 남긴 값 없음(order_no) |
+| 출고 준비 등록 | 🟡 미확인 | `POST /api/admin/commerce/orders/{order_no}/fulfillment` | 경로는 있음 · 앞 단계가 남긴 값 없음(order_no, fulfillment_command) |
 | 처리 뒤 주문 상태가 바뀌었는지 확인 | 🟡 미확인 | `GET /api/admin/commerce/orders/{order_no}` | 경로는 있음 · 앞 단계가 남긴 값 없음(order_no, fulfilled) |
 | 전송 결과 불명확 시 확정 원결과 조회 | 🟡 미확인 | `GET /api/admin/commerce/orders/{order_no}/fulfillment/operations/{operation_id} → 404` | 경로는 응답함 · 앞 단계가 대상(order_no, fulfilled, operation_id)을 못 만들어 실제 확인 못 함 · 코드 `order_not_found` |
 | 잘못 처리한 출고 정정 | 🔴 실패 | `—` | 정책 미정 — 커머스 출고의 undo·cancel·reverse·ref_log_id 계약이 없다(PC 쪽 8번 검토). 실물 반품 재고 복원은 별도 효과이고 금융 환불과 분리한다 |
