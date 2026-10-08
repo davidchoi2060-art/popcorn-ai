@@ -201,6 +201,46 @@ class CustomerPcOfferTest(unittest.TestCase):
             self.assertNotIn(word, text)
 
 
+class PublicItemTest(unittest.TestCase):
+    ITEM = {"product_code": 5, "photo": {"state": "available"}, "public_configuration": {"x": 1}}
+
+    def test_public_item_returns_the_two_ui_keys(self):
+        with patch.object(m, "_read", return_value=(deepcopy(self.ITEM), None)):
+            self.assertEqual(m.public_item(5), {"photo": {"state": "available"}, "public_configuration": {"x": 1}})
+
+    def test_not_public_is_unavailable_and_null(self):
+        with patch.object(m, "_read", return_value=(None, None)):
+            self.assertEqual(m.public_item(5), {"photo": {"state": "unavailable", "url": None},
+                                                "public_configuration": None})
+
+    def test_read_failure_is_unavailable_and_logged(self):
+        with patch.object(m, "_read", side_effect=RuntimeError("db down")), \
+                self.assertLogs("customer_pc_offer", "ERROR"):
+            self.assertEqual(m.public_item(5)["photo"], {"state": "unavailable", "url": None})
+
+    def test_attach_in_place_once_per_code_and_rejects_bad_codes(self):
+        products = [{"product_code": 5}, {"product_code": 5}, {"product_code": True}, {"name": "x"}]
+        with patch.object(m, "_read", return_value=(deepcopy(self.ITEM), None)) as read:
+            m.attach(products)
+        read.assert_called_once_with(5)
+        self.assertEqual(products[0]["public_configuration"], {"x": 1})
+        self.assertIsNot(products[0]["public_configuration"], products[1]["public_configuration"])
+        for p in products[2:]:
+            self.assertEqual((p["photo"]["state"], p["public_configuration"]), ("unavailable", None))
+
+
+class RecommendWiringTest(unittest.TestCase):
+    def test_recommend_attaches_sold_items_before_return(self):
+        import ast, inspect
+        from api import grid_public
+        tree = ast.parse(inspect.getsource(grid_public.recommend))
+        calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                 and isinstance(n.func, ast.Attribute) and n.func.attr == "attach"
+                 and isinstance(n.func.value, ast.Name) and n.func.value.id == "_PC_OFFER"]
+        self.assertEqual(len(calls), 1)
+        self.assertIs(grid_public._PC_OFFER, m)
+
+
 class SourceReaderWiringTest(unittest.TestCase):
     def test_rights_reference_comes_from_environment(self):
         with patch.object(m, "make_source_reader") as make, \
