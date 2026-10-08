@@ -243,4 +243,4 @@ SELECT cfg.product_code, cfg.configuration_id, cfg.revision,
 FROM cfg ORDER BY cfg.product_code;
 ```
 
-`publication='approve'`이고 두 승인 수가 `real_parts`와 같아야 200 후보가 된다. 최종 판정은 해시 비교까지 하는 라우트가 내린다(이 질의는 후보 수만 센다). `part_explanation_approval_events`는 PR #10의 0130 마이그레이션이 만든다.
+`publication='approve'`이고 두 승인 수가 `real_parts`와 같아야 200 후보가 된다. 최종 판정은 해시 비교까지 하는 라우트가 내린다(이 질의는 후보 수만 센다).
