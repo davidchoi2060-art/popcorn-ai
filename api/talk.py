@@ -168,6 +168,9 @@ from . import talk_answer as TA
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
 log = logging.getLogger(__name__)
+PARSE_FAILED = "AI 상담 응답을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요."
+PARSE_FAILED_LIMIT = "AI 상담 이용량이 많아 잠시 응답할 수 없습니다. 잠시 후 다시 시도해 주세요."
+ANSWER_UNAVAILABLE = "answer_unavailable"
 
 MAX_TEXT_LEN = 300
 # ⚠ 도헤드(dead, 2026-09-16 격자 안내 재설계) -- 옛 `_validate` 만 쓰던 상한. 새 경로는
@@ -832,10 +835,12 @@ def parse_talk(body: ParseBody, request: Request):
            evidence[], reply, assumed[], pc_related: true|false|null, note,
            chat_flow{smalltalk_turns}, stage:"pc"|"open"|"guide"|"silent", silent: bool,
            constraints[{l,v}](하위호환 -- mvp1 전용, `_legacy_constraints`),
-           history_used, provider, model, elapsed_sec, cost_usd, tokens_in, tokens_out, stored}
+           history_used, elapsed_sec, answer_error: null|"answer_unavailable", stored}
+           (provider·model·cost_usd·tokens 는 2026-10-08 부터 싣지 않는다 -- 로그·api_cost_logs 전용)
       429 {error:"rate_limited", scope:"visitor", window:"minute"|"day",
            used, limit, retry_after_sec, detail}  + `Retry-After` 헤더
-      502 {detail: 사유}  -- LLM 한도·전 프로바이더 실패·설정 없음·응답이 JSON 이 아님
+      502 {detail: 고정 안내문}  -- LLM 한도·전 프로바이더 실패·설정 없음·응답이 JSON 이 아님
+           (구체 사유는 서버 로그에만. 한도만 별도 문구)
 
     ■ assumed
       게임 계열인데 `game.resolution` 이 null 이면 서버가 1080p 로 카드를 낸다(§6 ③). 그
@@ -889,16 +894,22 @@ def parse_talk(body: ParseBody, request: Request):
         return TA.answer_path(engine.connect, text, vocab,
                               prev_state=prev_state_obj, history=history)
 
+    # 고객 응답에는 프로바이더·모델·비용·토큰·원문 오류를 싣지 않는다(PR #2 계약).
+    # 사유는 서버 로그와 api_cost_logs 에만 남긴다.
     try:
         result, ans = TA.run_parallel(_call_a, _call_b)
     except llm.LLMBlockedError as e:
-        raise HTTPException(502, f"AI 파싱이 한도에 걸렸습니다({e.kind}/{e.provider}) - {e}")
+        log.warning("[talk] parse blocked: kind=%s provider=%s err=%s", e.kind, e.provider, e)
+        raise HTTPException(502, PARSE_FAILED_LIMIT)
     except llm.LLMAllProvidersFailedError as e:
-        raise HTTPException(502, f"AI 파싱에 실패했습니다 - 연동된 프로바이더가 모두 실패: {e}")
+        log.warning("[talk] parse failed: all providers: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
     except llm.LLMNotConfiguredError as e:
-        raise HTTPException(502, f"AI 연동이 설정되지 않았습니다 - {e}")
+        log.warning("[talk] parse not configured: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
     except llm.LLMProviderError as e:
-        raise HTTPException(502, f"AI 파싱에 실패했습니다 - {e}")
+        log.warning("[talk] parse provider error: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
 
     try:
         obj = _extract_json(result.text)
@@ -907,7 +918,7 @@ def parse_talk(body: ParseBody, request: Request):
         # "AI가 깨졌다"를 화면이 구분하지 못한다.
         log.warning("[talk] non-JSON response from %s/%s: %s",
                     result.provider, result.model, e)
-        raise HTTPException(502, f"AI 응답을 조건으로 읽지 못했습니다 - {e}")
+        raise HTTPException(502, PARSE_FAILED)
 
     # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
     state, dropped = TS.validate_state(obj.get("state") or {}, vocab)
@@ -987,6 +998,8 @@ def parse_talk(body: ParseBody, request: Request):
                     unmatched_n=len(dropped), intent_key=body.intent_key,
                     answer_kind="constraint_parse", llm_called=True)
 
+    if ans.error:
+        log.warning("[talk] answer path B failed: %s", ans.error)
     parsed = TS.ParseResult(state=state, missing=missing, dropped=dropped, evidence=evidence,
                             reply=reply, assumed=assumed, pc_related=pc)
     return {
@@ -1025,19 +1038,16 @@ def parse_talk(body: ParseBody, request: Request):
         # {kept, replaced[{before, after, kinds, source}], dropped[], gate_hit}
         "answer_filter": ans.filter_report,
         "answer_elapsed_sec": ans.elapsed_sec,
-        "answer_provider": ans.provider, "answer_model": ans.model,
-        "answer_cost_usd": ans.cost_usd,
-        "answer_error": ans.error,
+        # 사유 원문(프로바이더 이름 포함 가능)은 로그에만. 고객에게는 실패 여부만 준다.
+        "answer_error": ANSWER_UNAVAILABLE if ans.error else None,
         # 침묵 턴 표시. reply 가 빈 문자열인 것과 같은 사실이지만, 화면이 «빈 문자열»을
         # 「모델이 실수로 안 냈다」와 구분해 다룰 수 있게 명시 플래그로 준다.
         "silent": stage == TS.STAGE_SILENT,
         # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 0 이면 이력 없이 판정한 응답이다.
         "history_used": len(history),
-        "provider": result.provider, "model": result.model,
-        "elapsed_sec": result.elapsed_sec, "cost_usd": result.cost_usd,
-        # 프롬프트가 격자 설명서만큼 길어졌다(설계서 §10 「토큰 수 실측」) -- 화면·확인자가
-        # 비용을 볼 수 있게 토큰 수도 싣는다. None 이면 프로바이더가 안 준 것이다.
-        "tokens_in": result.tokens_in, "tokens_out": result.tokens_out,
+        "elapsed_sec": result.elapsed_sec,
+        # 프로바이더·모델·비용·토큰은 고객 응답에 싣지 않는다(2026-10-08 PR #2 계약).
+        # 운영자는 api_cost_logs(관리자 AI 사용 비용 화면)와 서버 로그에서 본다.
         # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
         # 여전히 「이 응답이 상담 원장(consult_sessions)을 만들지 않았다」이다.
         "stored": False,
