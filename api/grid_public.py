@@ -27,6 +27,8 @@
   · `notes[]` 는 서버 내부 사유(로그·디버그용)다. 화면은 이것을 고객 말풍선에 싣지
     않는다(되묻기는 AI 의 reply 만) — 옛 화면이 실수로 못 쓰게 필드명을 `note`(문자열)
     에서 `notes`(배열)로 바꿨다.
+    2026-10-08(협업 6번): 응답에서 아예 뺐다. 공개 경로라 누구나 읽을 수 있는데
+    DB 예외 원문(`insert failed: {err}`)까지 실렸다. 이제 서버 로그에만 남는다.
 
 ■ 스키마 대전환(0091·0092, 이 재작성의 배경 — A-135)
   옛 판(0072~0082): grid_cells.tier 는 브랜드명 문자열이고 budget_min/max 가
@@ -712,7 +714,6 @@ def recommend(body: RecommendBody):
           dropped[]        validate_state 가 접은 값 [{field, value, reason}] 그대로 — 화면이
                            '반영하지 못한 조건'(예: resolution=8K → 1080p)을 고객에게 말할 수
                            있게 싣는다(parse 응답의 dropped 와 같은 모양). legacy 경로는 [],
-          notes[]          서버 내부 사유(로그·디버그) — 고객 문구 아님,
           platform, budget_won, budget_bound, game_grade, game_resolution, game_name}
 
       cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성. 각 안에 {quote_id,
@@ -809,6 +810,10 @@ def recommend(body: RecommendBody):
     elif ai_estimated:
         notes.append("ai_estimate without game names - not recorded (G-5)")
 
+    # 내부 사유는 응답에 싣지 않는다 — 공개 경로라 예외 원문이 고객에게 간다(협업 6번).
+    if notes:
+        log.info("[grid_public] recommend notes: %r", notes)
+
     return {
         "ok": True,
         "card_sets": card_sets,
@@ -817,7 +822,6 @@ def recommend(body: RecommendBody):
         "ai_estimated": ai_estimated,
         "needs": needs,
         "dropped": dropped,
-        "notes": notes,
         "platform": platform,
         "budget_won": state.budget_won,
         "budget_bound": state.budget_bound,

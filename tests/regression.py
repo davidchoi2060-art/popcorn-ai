@@ -7234,8 +7234,8 @@ def test_talk_grid_contract():
            if _re.search(r"\bnotes?\b", m.group(0))]
     check("[54] app.js 의 addMessage 인자에 note/notes 가 없다(내부 사유 차단)",
           len(bad) == 0, 0, bad[:3])
-    check("[54] recommend 응답의 notes 는 배열이다(옛 화면이 문자열로 못 쓰게)",
-          isinstance(d.get("notes"), list), list, type(d.get("notes")).__name__)
+    check("[54] recommend 응답에 notes 가 없다(내부 사유·예외 원문은 서버 로그로만, 협업 6번)",
+          "notes" not in d, "없음", sorted(d)[:20])
 
     # ── ④ card_sets 수 == 게임 계열을 하나로 합친 usages 수 ────────────────
     # 이 검사가 실패하려면: 용도별 반복이 빠지거나(카드 한 벌만 나옴) 게임 계열을
