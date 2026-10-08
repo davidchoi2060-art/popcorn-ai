@@ -126,13 +126,14 @@ class _CookieSettingAdapter:
     쿠키 저장은 requests 의 실제 함수(extract_cookies_to_jar)로 세션 쿠키 통에 넣어,
     세션에 걸린 쿠키 정책이 실제로 적용되는지를 본다."""
 
-    def __init__(self, jar, seen):
-        self.jar, self.seen = jar, seen
+    def __init__(self, jar, seen, auth_seen):
+        self.jar, self.seen, self.auth_seen = jar, seen, auth_seen
 
     def send(self, request, **kwargs):
         import requests
         from requests.cookies import extract_cookies_to_jar
         self.seen.append(request.headers.get('Cookie'))
+        self.auth_seen.append(request.headers.get('Authorization'))
         extract_cookies_to_jar(self.jar, request, _SetCookieMsg)
         resp = requests.Response()
         resp.status_code, resp._content, resp.encoding = 200, b'{"ok": true}', 'utf-8'
@@ -144,12 +145,13 @@ class _CookieSettingAdapter:
         pass
 
 
-def _fake_session_factory(seen):
+def _fake_session_factory(seen, auth_seen=None):
     import requests
+    auth_seen = [] if auth_seen is None else auth_seen
 
     def make():
         s = requests.Session()
-        adapter = _CookieSettingAdapter(s.cookies, seen)
+        adapter = _CookieSettingAdapter(s.cookies, seen, auth_seen)
         s.mount('http://', adapter)
         s.mount('https://', adapter)
         return s
@@ -175,3 +177,34 @@ def test_cookie_counter_case_shared_session_would_leak(no_sockets):
     remote.send('guest', 'GET', '/api/budget-bands', None)
     remote.send('guest', 'GET', '/api/budget-bands', None)
     assert seen[0] is None and seen[1] and 'leak123' in seen[1], seen
+
+
+@pytest.fixture
+def netrc_for_target(tmp_path, monkeypatch):
+    """환경 자동 인증: requests 는 trust_env 이면 NETRC 파일의 계정을 Authorization 으로 싣는다."""
+    rc = tmp_path / 'netrc'
+    rc.write_text('machine scenario.invalid login leaky password netrc-secret\n', encoding='utf-8')
+    rc.chmod(0o600)
+    monkeypatch.setenv('NETRC', str(rc))
+    monkeypatch.setenv('HTTP_PROXY', 'http://proxy.invalid:9')
+    return rc
+
+
+def test_remote_readonly_ignores_environment_auth(no_sockets, netrc_for_target):
+    """쓰기 금지 Remote: .netrc·프록시 환경이 있어도 Authorization 을 싣지 않고 연결도 열지 않는다."""
+    seen, auth_seen = [], []
+    remote = meter.Remote('http://scenario.invalid', allow_writes=False,
+                          session_factory=_fake_session_factory(seen, auth_seen))
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    assert auth_seen == [None], auth_seen
+    assert no_sockets == []
+
+
+def test_environment_auth_counter_case(no_sockets, netrc_for_target):
+    """반례: 환경을 믿는 세션(쓰기 허용 = 기존 동작 유지)은 같은 환경에서 .netrc 계정을 싣는다."""
+    seen, auth_seen = [], []
+    remote = meter.Remote('http://scenario.invalid', allow_writes=True,
+                          session_factory=_fake_session_factory(seen, auth_seen))
+    remote.send('guest', 'GET', '/api/budget-bands', None)
+    assert auth_seen[0] and auth_seen[0].startswith('Basic '), auth_seen
+    assert no_sockets == []

@@ -153,6 +153,20 @@ QUOTE_CONSTRAINTS = [{'l': '용도', 'v': '게임'}, {'l': '예산', 'v': '150�
 SCENARIO_MEMBER = {'nick': '시나리오', 'email': 'scenario-member@ci.popcorn.invalid', 'via': 'email'}
 SCENARIO_SHIPPING = {'name': '시나리오', 'phone': '010-0000-0000', 'addr': '측정기 전용 주소'}
 NO_SUCH_ORDER = 'ORD-SCENARIO-NONE'
+NO_SUCH_OPERATION = '00000000-0000-4000-8000-000000000000'
+
+
+def _confirmed_original(data: Any, ctx: Ctx) -> str | None:
+    """확정 원결과: 같은 주문·같은 operation_id·같은 action 이 confirmed 로 남아 있어야 한다.
+    이것만으로 «중복 효과 0»까지 증명하지는 않는다(PR #2 PC 쪽 8번 검토)."""
+    if not isinstance(data, dict) or data.get('state') != 'confirmed':
+        return '원결과가 confirmed 가 아님'
+    cmd = ctx.get('fulfillment_command') or {}
+    for key, want in (('order_no', ctx.get('order_no')), ('operation_id', cmd.get('operation_id')),
+                      ('action', cmd.get('action'))):
+        if data.get(key) != want:
+            return f'원결과의 {key} 가 보낸 명령과 다름'
+    return None
 
 
 def _order_body(ctx: Ctx) -> dict:
@@ -245,15 +259,28 @@ SCENARIOS: list[Scenario] = [
         Step('task.detail', '대상 주문 상세 보기', 'GET', '/api/admin/commerce/orders/{order_no}', audience='admin',
              needs=('order_no', 'admin'), readonly=True, expect=ok_json(),
              keep=lambda d, c: c.__setitem__('order_state_before', _state_of(d))),
-        Step('task.fulfill', '출고 등록', 'POST', '/api/admin/commerce/orders/{order_no}/fulfillment',
-             audience='admin', needs=('order_no', 'admin'), probe={'order_no': NO_SUCH_ORDER},
-             body=lambda c: {}, expect=ok_json(), keep=lambda d, c: c.__setitem__('fulfilled', True)),
+        # 출고 명령은 operation_id·action·revision·basis 가 필수다. 빈 명령은 422 invalid_fulfillment_command 이므로
+        # 보내지 않는다 — PC 쪽 8번의 합성 명령 fixture 가 ctx['fulfillment_command'] 를 채울 때까지 노랑이다.
+        Step('task.fulfill', '출고 등록(합성 명령 대기)', 'POST', '/api/admin/commerce/orders/{order_no}/fulfillment',
+             audience='admin', needs=('order_no', 'admin', 'fulfillment_command'),
+             body=lambda c: c['fulfillment_command'], expect=ok_json(),
+             keep=lambda d, c: c.update(fulfilled=True, operation_id=c['fulfillment_command']['operation_id'])),
         Step('task.after', '처리 뒤 주문 상태가 바뀌었는지 확인', 'GET', '/api/admin/commerce/orders/{order_no}',
              audience='admin', needs=('order_no', 'admin', 'fulfilled'), readonly=True,
              expect=lambda s, d, c: ok_json()(s, d) or _state_changed(d, c)),
-        Step('task.recover', '잘못 처리한 출고 되돌리기', missing=(
-            '복구 기준 미정 — 커머스 출고를 되돌리는 HTTP 경로가 정의되지 않았다(PC 쪽 8번에서 정한다)')),
-    ], note='실제 주문 하나가 출고 등록으로 상태가 바뀌고 되돌릴 수 있어야 초록이다.'),
+        # 전송 결과가 불명확할 때의 복구 = 같은 operation_id 의 확정 원결과 조회. 자동 재전송·새 UUID·역방향 전이로
+        # 복구하지 않는다. 404 physical_operation_not_found 는 «실행 안 됨»의 증명이 아니고,
+        # 503 physical_result_unconfirmed 는 미확인 유지다 — 둘 다 초록이 아니다.
+        Step('task.recover_lookup', '전송 결과 불명확 시 확정 원결과 조회', 'GET',
+             '/api/admin/commerce/orders/{order_no}/fulfillment/operations/{operation_id}',
+             audience='admin', needs=('order_no', 'admin', 'fulfilled', 'operation_id'),
+             probe={'order_no': NO_SUCH_ORDER, 'operation_id': NO_SUCH_OPERATION, 'fulfilled': True},
+             readonly=True,  # commerce_fulfillment_http._read: READ ONLY 트랜잭션 + rollback
+             expect=lambda s, d, c: ok_json()(s, d) or _confirmed_original(d, c)),
+        Step('task.correct', '잘못 처리한 출고 정정', missing=(
+            '정책 미정 — 커머스 출고의 undo·cancel·reverse·ref_log_id 계약이 없다(PC 쪽 8번 검토). '
+            '실물 반품 재고 복원은 별도 효과이고 금융 환불과 분리한다')),
+    ], note='실제 주문 하나가 출고 등록으로 상태가 바뀌고, 같은 operation_id 의 확정 원결과가 조회되고, 잘못된 출고를 정정할 수 있어야 끝까지다.'),
     Scenario('fulfillment', '고객 배송 조회', '고객', [
         Step('fulfillment.customer_view', '고객이 배송 상태 보기', 'GET',
              '/api/commerce/orders/{order_no}/fulfillment', needs=('order_no',),
