@@ -262,6 +262,8 @@ CREATE INDEX idx_reviews_queue ON product_reviews (review_status, created_at);
 
 ### 3.6 v_recommendation_candidates — 추천 후보 뷰 (유일한 정의처)
 
+**재구성 계약(0133):** 아래 `p.*, ps.*`는 후보 조건을 설명하는 개념 예시다. 실제 migration 뷰는 중복 컬럼을 피하려고 사양 컬럼을 명시한다. `0083`·`0084`가 테이블에 추가한 `vram_gb`·`cpu_cores`는 추천 `_load_pool`이 함께 조회하므로 신규 설치에도 뷰에 노출되어야 한다. `0133`은 현재 `pg_get_viewdef`의 SELECT 목록 끝에 누락된 두 컬럼만 추가한다. 기존 컬럼의 순서·타입·별칭, JOIN, 후보 필터, 기존 의존 객체를 보존하며 전체 정의를 하드코딩하거나 DROP/CASCADE하지 않는다. 테이블의 두 필드와 이미 존재하는 뷰 필드가 INTEGER 타입인지 확인하며, 둘이 이미 올바른 타입이면 아무 작업도 하지 않는다. 단순 명시 SELECT만 처리하고 중첩 SELECT나 예상하지 않은 FROM/ps 별칭은 거절한다. 이 형상 확인은 일반 SQL parser가 아니며 동명 INTEGER 계산식의 원천까지 검증하지 않는다. downgrade는 no-op이며 뷰 컬럼·사양 데이터·메타를 삭제하거나 과거 정의로 복원하지 않는다. 실제 PostgreSQL 신규 설치/의존뷰 검증은 별도로 수행한다.
+
 ```sql
 CREATE VIEW v_recommendation_candidates AS
 SELECT p.*, ps.*
