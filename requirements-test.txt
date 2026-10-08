@@ -1,0 +1,4 @@
+# Test-only deps for tests/ci_run.py (CI and dev PC). App deps stay in requirements.txt.
+# NOTE: ASCII only in this file (Windows pip decodes with cp949)
+-r requirements.txt
+pytest==9.1.1
