@@ -9,11 +9,24 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
 from . import access_gate, grid_public, visitor
+from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
 from .timeutil import iso
 
 router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
+
+# Each new save reruns the public recommendation, so writes get their own per-visitor
+# limit, separate from the AI call budget (rate_limit_policies key overrides these).
+SAVE_POLICY_KEY = 'visitor.mvp3_save'
+SAVE_PER_MINUTE = 10
+SAVE_PER_DAY = 100
+# Customer wording is Codex's (PR #2 comment 6057234341); copy verbatim. The day window
+# resets at KST midnight (access_gate), which is what "내일" promises.
+SAVE_LIMIT_MESSAGES = {
+    'minute': '잠시 동안 견적 저장 요청이 많았습니다. {retry_after_sec}초 후 다시 저장해 주세요.',
+    'day': '오늘 저장할 수 있는 견적 수에 도달했습니다. 내일 다시 저장해 주세요.',
+}
 
 
 class SaveBody(BaseModel):
@@ -51,15 +64,8 @@ def public_product(item):
         raise HTTPException(409, '상품 가격을 다시 확인해 주세요.')
     # Use the already public sold recommendation, never administrative rows.
     out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'over_budget')}
-    spec = item.get('spec')
-    if isinstance(spec, dict):
-        # Public component descriptions/capacities, never evaluation internals.
-        out['spec'] = {k: v for k, v in spec.items()
-                       if (k in ('cpu', 'gpu') and isinstance(v, str))
-                       or (k in ('ram_gb', 'ssd_gb', 'vram_gb')
-                           and type(v) in (int, float) and v >= 0)}
-    else:
-        out['spec'] = spec if isinstance(spec, str) else None
+    # Public component descriptions/capacities, never evaluation internals.
+    out['spec'] = public_spec(item.get('spec'))
     out['reasons'] = [v for v in item.get('reasons', []) if isinstance(v, str)]
     out['price_confirmed'] = False
     return out
@@ -115,6 +121,10 @@ def save_quote(body: SaveBody, request: Request, response: Response):
             if previous['request_basis'] != basis:
                 raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
             return {'ok': True, 'quote': render_quote(previous)}
+        # Idempotent replays above are free; only new saves count.
+        access_gate.check_rate(conn, request, what='mvp3.save', policy_key=SAVE_POLICY_KEY,
+                               default_per_minute=SAVE_PER_MINUTE, default_per_day=SAVE_PER_DAY,
+                               messages=SAVE_LIMIT_MESSAGES)
         state, _ = validate_state(body.state, load_vocab(conn))
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
     product = selected_product(public, body.product_code, body.expected_price)
