@@ -8,7 +8,7 @@
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const S = {canWrite:root.dataset.canWrite === 'true', page:1, size:20, q:'', status:'all',
     data:null, selected:null, profile:null, mode:'read', draft:null, baseline:null,
-    error:'', duplicate:null, latest:null, impact:null, impactError:'', products:null,
+    detailTab:'base', view:'list', error:'', duplicate:null, latest:null, impact:null, impactError:'', products:null,
     productsError:'', productsPage:1, busy:false, directorySeq:0, detailSeq:0};
   const base = '/api/admin/suppliers';
   function notice(text) { el('sw-message').textContent = text || ''; }
@@ -68,7 +68,15 @@
     readDraft();
     return S.mode === 'new' ? Object.values(S.draft).some(v => v.trim()) : Object.keys(edits()).length > 0;
   }
-  function leaveForm() { return !dirty() || window.confirm('저장하지 않은 입력이 있습니다. 입력을 버리고 이동할까요?'); }
+  let leaveResolve = null;
+  async function leaveForm() {
+    if (!dirty()) return true;
+    if (leaveResolve) return false;
+    return new Promise(resolve => { leaveResolve = resolve; el('sw-leave').showModal(); });
+  }
+  function finishLeave(discard) { const resolve = leaveResolve; leaveResolve = null; el('sw-leave').close(); resolve?.(discard); }
+  el('sw-leave').addEventListener('click', e => { const button = e.target.closest('[data-leave-choice]'); if (button) finishLeave(button.dataset.leaveChoice === 'discard'); });
+  el('sw-leave').addEventListener('cancel', e => { e.preventDefault(); finishLeave(false); });
   function renderList() {
     const j = S.data;
     if (!j) return;
@@ -107,7 +115,7 @@
       el('sw-size').value = String(S.size);
       renderList();
       if (j.empty) notice(j.note);
-      if (S.selected == null && S.mode === 'read' && j.items.length) await select(j.items[0].id);
+      if (S.selected == null && S.mode === 'read' && j.items.length) await select(j.items[0].id, false);
       else if (S.mode === 'read' && S.profile) renderDetail();
     } catch (e) {
       if (token !== S.directorySeq) return;
@@ -119,39 +127,41 @@
       el('sw-directory-error').innerHTML = esc(e.message) + ' <button type="button" data-action="retry-directory">다시 조회</button>';
     }
   }
-  async function select(id) {
+  async function select(id, open = true) {
     const token = ++S.detailSeq;
-    S.selected = id; S.profile = null; S.mode = 'read'; S.error = ''; S.duplicate = null;
+    S.selected = id; S.profile = null; S.mode = 'read'; S.detailTab = 'base'; if (open) S.view = 'detail'; root.dataset.view = S.view; S.error = ''; S.duplicate = null;
     S.products = null; S.productsError = ''; S.productsPage = 1;
     renderList(); el('sw-detail').innerHTML = '<p>상세 조회 중…</p>';
     try {
       const p = await api(base + '/' + id + '/profile');
       if (token !== S.detailSeq) return;
-      S.profile = p; renderDetail(); await products(token);
+      S.profile = p; renderDetail(); if (open) { document.getElementById('shell')?.scrollTo(0,0); el('sw-detail').querySelector('h2')?.focus({preventScroll:true}); } await products(token);
     } catch (e) {
       if (token !== S.detailSeq) return;
       el('sw-detail').innerHTML = '<div class="sw-error" role="alert">' + esc(e.message) + '</div><button type="button" data-action="retry-detail">다시 조회</button>';
     }
   }
+  function detailBack() { return '<button type="button" class="sw-back" data-action="back">공급처 목록으로</button>'; }
   function renderDetail() {
     if (S.mode === 'new' || S.mode === 'edit') { renderForm(); return; }
     if (S.mode === 'stop') { renderStop(); return; }
     if (!S.profile) return;
     const it = S.profile.item, c = S.profile.contact;
     const outside = S.data && !S.data.items.some(i => i.id === S.selected) ? '<p class="sw-muted">현재 목록 밖의 선택 공급처 · ID ' + esc(it.id) + '</p>' : '';
-    const actions = S.canWrite && S.profile.can_write ? '<div class="sw-actions"><button type="button" data-action="edit">정보 수정</button><button type="button" class="' +
-      (it.status === '활성' ? 'sw-danger' : '') + '" data-action="' + (it.status === '활성' ? 'stop' : 'revive') + '">' +
-      (it.status === '활성' ? '중지 영향 확인' : '활성으로 되돌리기') + '</button></div>' : '<p class="sw-muted">조회 전용 권한입니다.</p>';
-    const contact = c.name || c.phone || c.order_phone ? '<dl><dt>담당자</dt><dd>' + esc(c.name || '미등록') + '</dd><dt>대표 전화</dt><dd>' +
-      esc(c.phone || '미등록') + '</dd><dt>발주 전화</dt><dd>' + esc(c.order_phone || '미등록') + '</dd></dl>' : '<p class="sw-muted">등록된 연락 정보가 없습니다.</p>';
-    el('sw-detail').innerHTML = outside + '<div class="sw-detail-title"><div><span class="sw-muted sw-brief">공급처 상세 · ID ' + esc(it.id) + '</span><h2>' + esc(it.name) + '</h2></div>' + badge(it.status) +
-      '</div><h3>기본 정보</h3><dl><dt>플랫폼</dt><dd>' + esc(it.platform || '미등록') + '</dd><dt>취급 브랜드</dt><dd>' + esc(it.brands || '미등록') + '</dd></dl>' + actions +
-      '<hr><h3>연락 정보 <span class="sw-muted sw-brief">조회</span></h3>' + contact + '<p class="sw-muted">' +
-      (c.source === 'mall_observation' ? '쇼핑몰 수집 기록 · ' : '출처 미확인 · ') + esc(stamp(c.fetched_at)) +
-      '<br>저장된 정보입니다. 현재 연락 가능 여부를 확인한 것은 아닙니다.</p><hr><h3>상품·단가표 연결</h3><dl><dt>매입가 연결 상품</dt><dd>' + esc(it.linked_products) +
-      '개</dd><dt>단가표 파일</dt><dd>' + esc(it.price_files) + '건</dd><dt>파서 프리셋</dt><dd>' + (it.preset_count ? '등록됨' : '없음') + '</dd></dl>' +
-      (!it.preset_count ? '<div class="sw-callout sw-warning">파서 프리셋이 없어 단가표 자동 반영 준비가 필요합니다.</div>' : '') +
-      '<h3>연결 상품</h3><div id="sw-products"></div><p class="sw-muted">이 화면에서는 상품 연결·가격·재고를 변경하지 않습니다.</p>';
+    const canWrite = S.canWrite && S.profile.can_write;
+    const tabs = [['base','기본·연락 정보'],['links','상품·단가표 연결'],['manage','정보·상태 관리']].filter(([key]) => key !== 'manage' || canWrite);
+    if (!tabs.some(([key]) => key === S.detailTab)) S.detailTab = 'base';
+    const tabHtml = '<nav class="sw-tabs" aria-label="공급처 상세">' + tabs.map(([key,label]) => '<button type="button" data-action="detail-tab" data-tab="' + key + '" aria-pressed="' + (S.detailTab === key) + '">' + label + '</button>').join('') + '</nav>';
+    const edit = canWrite ? '<button type="button" data-action="edit">기본 정보 수정</button>' : '<p class="sw-muted">조회 전용 권한입니다.</p>';
+    let body;
+    if (S.detailTab === 'base') {
+      body = '<div class="sw-basic-grid"><article><h3>거래 기본 정보</h3><dl><dt>플랫폼</dt><dd>' + esc(it.platform || '미등록') + '</dd><dt>취급 브랜드</dt><dd>' + esc(it.brands || '미등록') + '</dd></dl><div class="sw-actions">' + edit + '</div></article><article class="sw-contact"><h3>연락 정보</h3><dl><dt>담당자</dt><dd>' + esc(c.name || '미등록') + '</dd><dt>대표 전화</dt><dd>' + esc(c.phone || '미등록') + '</dd><dt>발주 전화</dt><dd>' + esc(c.order_phone || '미등록') + '</dd></dl><p>' + (c.source === 'mall_observation' ? '쇼핑몰 수집 기록 · ' : '출처 미확인 · ') + esc(stamp(c.fetched_at)) + '</p><p>저장된 정보이며 현재 연락 가능 여부는 확인되지 않았습니다.</p></article></div>';
+    } else if (S.detailTab === 'links') {
+      body = '<h3>상품·단가표 연결</h3><dl><dt>매입가 연결 상품</dt><dd>' + esc(it.linked_products) + '개</dd><dt>단가표 파일</dt><dd>' + esc(it.price_files) + '건</dd><dt>파서 프리셋</dt><dd>' + (it.preset_count ? '등록됨' : '없음') + '</dd></dl>' + (!it.preset_count ? '<div class="sw-callout sw-warning">파서 프리셋이 없어 단가표 자동 반영 준비가 필요합니다.</div>' : '') + '<h3>연결 상품</h3><div id="sw-products"></div><p>이 화면에서는 상품 연결·가격·재고를 변경하지 않습니다.</p>';
+    } else {
+      body = '<h3>정보·상태 관리</h3><div class="sw-actions">' + edit + '<button type="button" class="' + (it.status === '활성' ? 'sw-danger' : '') + '" data-action="' + (it.status === '활성' ? 'stop' : 'revive') + '">' + (it.status === '활성' ? '중지 영향 확인' : '활성으로 되돌리기') + '</button></div><p>연락 정보와 상품 연결은 기본 정보 수정에 포함되지 않습니다.</p>';
+    }
+    el('sw-detail').innerHTML = detailBack() + outside + '<div class="sw-detail-title"><div><span class="sw-muted sw-brief">공급처 상세 · ID ' + esc(it.id) + '</span><h2 tabindex="-1">' + esc(it.name) + '</h2></div>' + badge(it.status) + '</div>' + tabHtml + body;
     renderProducts();
   }
   async function products(token) {
@@ -183,7 +193,7 @@
       esc(S.duplicate.supplier_id) + ' · ' + esc(S.duplicate.status) + '<p>같은 회사인지 먼저 확인하세요. 입력은 유지됩니다.</p><button type="button" data-action="duplicate">기존 공급처 상세 보기</button></div>' : '';
     const latest = S.latest ? '<div class="sw-callout"><strong>최신 기본 정보</strong><p>' + esc(S.latest.item.name) + ' · ' + esc(S.latest.item.platform || '플랫폼 미등록') +
       ' · ' + esc(S.latest.item.brands || '브랜드 미등록') + ' · ' + esc(S.latest.item.status) + '</p><button type="button" data-action="adopt-latest">최신값 기준으로 계속 수정</button></div>' : '';
-    el('sw-detail').innerHTML = '<div class="sw-muted">' + (editing ? '공급처 수정 · ID ' + esc(S.selected) : '새 공급처') + '</div><h2>' + (editing ? '기본 정보 수정' : '공급처 등록') +
+    el('sw-detail').innerHTML = detailBack() + '<div class="sw-muted">' + (editing ? '공급처 수정 · ID ' + esc(S.selected) : '새 공급처') + '</div><h2>' + (editing ? '기본 정보 수정' : '공급처 등록') +
       '</h2><p class="sw-muted">' + (editing ? '연락 정보·상품 연결은 함께 변경하지 않습니다.' : '이름은 필수입니다. 새 공급처는 활성 상태로 등록합니다.') + '</p>' +
       '<form id="sw-form" class="sw-form"><label>공급처 이름 *<input id="sw-name" required maxlength="100" value="' + esc(S.draft.name) +
       '" autocomplete="off" placeholder="공급처 이름"><small>최대 100자 · 대소문자와 앞뒤 공백은 중복 판정에서 무시합니다.</small></label><label>플랫폼<input id="sw-platform" maxlength="50" value="' +
@@ -255,14 +265,16 @@
   root.addEventListener('click', async function (e) {
     const button = e.target.closest('button[data-action]'); if (!button || S.busy) return;
     const action = button.dataset.action;
-    if (['select','new','duplicate','cancel'].includes(action) && !leaveForm()) return;
+    if (['select','new','duplicate','cancel','back','detail-tab'].includes(action) && !(await leaveForm())) return;
+    if (action === 'back') { S.view = 'list'; root.dataset.view = S.view; S.mode = 'read'; S.draft = null; renderDetail(); el('sw-search').focus({preventScroll:true}); return; }
+    if (action === 'detail-tab') { if (!['base','links','manage'].includes(button.dataset.tab)) return; S.mode = 'read'; S.draft = null; S.detailTab = button.dataset.tab; renderDetail(); return; }
     if (action === 'select' || action === 'duplicate') {
       const id = action === 'select' ? Number(button.dataset.id) : S.duplicate.supplier_id;
       notice(''); await select(id);
     } else if (action === 'new' && S.canWrite) {
-      ++S.detailSeq; S.mode = 'new'; S.draft = {name:'',platform:'',brands:''}; S.error = ''; S.duplicate = S.latest = null; notice(''); renderForm(); el('sw-name').focus();
+      ++S.detailSeq; S.view = 'detail'; root.dataset.view = S.view; S.mode = 'new'; S.draft = {name:'',platform:'',brands:''}; S.error = ''; S.duplicate = S.latest = null; notice(''); renderForm(); el('sw-name').focus();
     } else if (action === 'edit' && S.canWrite && S.profile) {
-      S.mode = 'edit'; S.baseline = {...S.profile.edit_snapshot};
+      S.view = 'detail'; root.dataset.view = S.view; S.mode = 'edit'; S.baseline = {...S.profile.edit_snapshot};
       S.draft = {name:S.baseline.name, platform:S.baseline.platform || '', brands:S.baseline.brands || ''}; S.error = ''; S.duplicate = S.latest = null; renderForm();
     } else if (action === 'cancel') {
       ++S.detailSeq; S.mode = 'read'; S.draft = null;
