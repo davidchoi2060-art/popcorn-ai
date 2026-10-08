@@ -244,3 +244,42 @@ FROM cfg ORDER BY cfg.product_code;
 ```
 
 `publication='approve'`이고 두 승인 수가 `real_parts`와 같아야 200 후보가 된다. 최종 판정은 해시 비교까지 하는 라우트가 내린다(이 질의는 후보 수만 센다).
+
+## 10. 조립PC 완성 예시 이미지 104장과 PR #17 연결 (2026-10-08 추가)
+
+### 10.1 이 환경에서 확인한 것과 못 한 것
+
+| 확인 대상 | 결과 |
+|---|---|
+| ZIP(`assembled-pc-104-web-handoff.zip`, PR #2 댓글 6059417287) 내려받기·해시 대조 | **못 함.** 클라우드 세션의 GitHub 프록시가 `github.com/user-attachments/...`를 403으로 막는다(저장소 범위 밖 경로). 파일 내용·manifest 해시는 검증되지 않았다 |
+| 버킷 `pc-configurations/` 객체·해시 읽기 | **못 함.** 이 컨테이너에 GCS 자격 증명이 없다(`401 Anonymous caller`) |
+| 실 DB `pc_media_jobs` | **못 함.** DB 접속 없음. 아래 질의로 남긴다 |
+
+### 10.2 구성 → 판매 SKU → 대표 사진 연결표
+
+파일: [`pc-configuration-photo-links-20261008.csv`](pc-configuration-photo-links-20261008.csv) — 구성 시드 104개 전부.
+
+- **판매 SKU와 묶인 구성 89개**(`source='기존'`, `P{code}` offer 92개, 전부 추천 시드에 있음).
+- **판매 SKU가 없는 구성 15개**(`N02`~`N17`, `source='신규'`). 이 구성은 `P{code}` offer가 없어 **PR #17로는 절대 공개되지 않는다.**
+- 연락 스레드가 확인한 selected 대표 사진(`N07`, job `4fd70b96-…`)은 **`신규` 구성이라 판매 SKU 연결이 없다.** 다른 두 job(`08850be4-…`, `9f879ccb-…`)의 구성은 이 환경에서 알 수 없다(미확인).
+- 나머지 행의 job·selected·visual_basis는 전부 미확인이다.
+
+```sql
+SELECT j.configuration_id, j.job_id, j.status, j.selected, j.visual_basis, j.asset->>'sha256' AS sha256,
+       (SELECT string_agg(o.offer_id, ' ') FROM pc_configuration_offers o
+         WHERE o.configuration_id = j.configuration_id AND o.offer_id LIKE 'P%') AS sold_offers
+FROM pc_media_jobs j ORDER BY j.configuration_id, j.created_at;
+```
+
+visual_basis가 «현재»인지는 SQL로 판정할 수 없다(`pc_media.snapshot()`이 부품 설명·사진 자산·쿨링 계획으로 계산한다). 관리자 화면 `/admin2/pc-media`의 `current` 표시가 같은 계산이다.
+
+### 10.3 104장을 PR #17에 물리는 방법
+
+PR #17은 `pc_media_jobs`의 selected·ready·visual 현재본만 연다. ZIP 이미지는 그 표에 행이 없으므로 **지금 상태로는 한 장도 고객에게 나가지 않는다.** 물리려면 아래 순서가 필요하고, 1~3은 DB·저장소 쓰기라 이 스레드에서 하지 않았다.
+
+1. **대조**: 각 이미지의 manifest 부품 참조가 해당 구성의 **현재** 부품(slot·explanation_code·quantity)과 같은지 확인한다. 다르면 그 이미지는 낡은 구성을 그린 것이라 쓰지 않는다.
+2. **등록**: 같은 구성의 기존 job 흐름(`pc_media_jobs` 행 + `pc-configurations/{job_id}/representative.png` + `asset{bucket,key,sha256,notice}`)으로 넣는다. 지금은 외부 이미지를 job으로 들이는 경로가 없다 — 관리자 전용 가져오기 도구를 새로 만들어야 하고, 그때 `visual_basis`는 1에서 대조한 **현재 스냅샷 값**을 기록한다. 새 이미지 생성은 하지 않는다.
+3. **선택**: 운영자가 기존 `/api/admin/pc-media/{id}/select`로 고른다(사람이 고른 것만 공개 후보).
+4. **공개**: 구성이 발행 승인(`pc_customer_publication_events`)되고 부품 설명·사진 승인이 현재본이면 PR #17이 연다.
+
+`신규` 15개는 판매 offer가 생기기 전까지 4단계에 닿지 않는다.
