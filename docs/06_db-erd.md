@@ -1803,3 +1803,23 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 이 저장본은 추천상품/당시 참고가격 보관이며 주문·인계·부품변경 적용·구매 가격확정이 아니다. 기존 quote_snapshots/pc_customer_quotes의 계약에 완제품 보관을 끼워 넣지 않는다. 견적 본문은 DB에서 조회하며 소유자 쿠키가 다른 저장본은 반환하지 않는다. 가격은 참고 스냅샷이며 price_confirmed=false, 포함조건/성능근거가 없으면 만들지 않는다. 대화 원문·회원 개인정보·관리자 근거·비밀키는 이 신규 표에 넣지 않는다. 새 빈 테이블 추가만 하며 기존 자료는 변경하지 않는다. 자료가 들어 있으면 downgrade를 거부한다.
 
 공개 사양 spec의 현재 원천은 product_fit_products의 JSONB다. 서버 보관은 cpu/gpu 문자열과 ram_gb/ssd_gb/vram_gb 용량 값만 허용하며 CPU/GPU 평가 점수나 임의 내부 필드는 제외한다. 부품별 구매가격·옵션 차액·게임 FPS를 이 값에서 생성하지 않는다.
+
+### 26. 0124 ~ 0132 소급 등재 (2026-10-04 · 10-07 마이그레이션 · 2026-10-08 기록)
+
+⚠ **순서가 거꾸로다.** 이 프로젝트 규칙은 「ERD 개정 → 새 마이그레이션」인데, 아래 아홉 개는 마이그레이션이 먼저 main 에 들어가고 ERD 가 비어 있었다. 2026-10-08 클라우드 쪽이 마이그레이션 파일에서 표 이름과 머리 주석만 옮겼다. **컬럼 · 제약 · 트리거의 정본은 각 마이그레이션 파일**이고, 아래는 어느 표가 어디서 생겼는지 찾는 목록이다. 서버 DB 에 실제로 적용됐는지는 배포 실행 기록으로 추정했을 뿐 직접 조회하지 않았다(결정 로그 「기록 따라잡기」 절).
+
+아홉 개 모두 **downgrade 를 거부한다**(자료가 있으면 거부하거나 무조건 거부).
+
+| 리비전 | 파일 | 커밋 | 새 표 · 바뀐 컬럼 | 머리 주석 요지 |
+|---|---|---|---|---|
+| 0124 | `0124_admin_operation_receipts.py` | `e28fee1` | `admin_operation_receipts` | 일괄 재계산 결과를 가격·이력·로그 쓰기와 같은 트랜잭션에 불변으로 남긴다 |
+| 0125 | `0125_pricing_basis_revisions.py` | `e28fee1` | `pricing_basis_policy_revision` · 시퀀스 `pricing_basis_revision_seq`. 컬럼 추가: `products.pricing_basis_revision`(NOT NULL). 정책·상품 리비전 트리거 | 미리보기와 적용 사이 변경을 가려내는 토큰. 토큰을 버리면 옛 미리보기가 통과할 수 있어(ABA) 되돌리지 않는다 |
+| 0126 | `0126_opening_commerce.py` | `c8487e0` | `commerce_order_details` · `commerce_owner_contexts` · `commerce_payment_operations` · `commerce_payment_events` · 시퀀스 `commerce_stock_revision_seq`. 컬럼 추가: `products.commerce_stock_revision` · `payments.commerce_operation_id/commerce_effect_key` · `stock_movements.commerce_operation_id/commerce_effect_key` · `stock_reservations.commerce_order_id` | 커머스 저장 구조만. 옛 소유권·결제 자료를 옮기지 않는다 |
+| 0127 | `0127_commerce_fulfillment_persistence.py` | `c8487e0` | `commerce_shipments` · `commerce_shipment_lines` · `commerce_physical_operations` | 출고 기록만. 금액·재고 효과 없음 |
+| 0128 | `0128_commerce_support.py` | `c8487e0` | `commerce_support_cases` · `commerce_support_events` | 고객 지원 기록만 |
+| 0129 | `0129_pc_customer_publication.py` | `c8487e0` | `pc_customer_publication_events` | 조립PC 고객 공개 이력(추가만 가능). 이 이력을 쓰는 라우트는 아직 없다 |
+| 0130 | `0130_part_explanation_approval.py` | `c8487e0` | `part_explanation_approval_events`. `product_explanations.approved_by` 정수 폭 확대 | 부품 설명 승인 이력(불변) |
+| 0131 | `0131_part_photo_approval.py` | `c8487e0` | `part_photo_approval_events` | 등록된 부품 사진 승인 근거(불변) |
+| 0132 | `0132_commerce_physical_return_persistence.py` | `c8487e0` | `commerce_return_cases` · `commerce_return_lines` · `commerce_return_operations` · `commerce_return_restoration_effects`. 컬럼 추가: `stock_movements.physical_return_operation_id` | 실물 반품 저장. 금액·배송 기록은 보존한다 |
+
+확인법: `grep -oE 'CREATE TABLE (__S(CHEMA)?__\.)?[a-z_]+' db/migrations/versions/01{24,25,26,27,28,29,30,31,32}_*.py`
