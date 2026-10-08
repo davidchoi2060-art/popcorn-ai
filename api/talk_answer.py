@@ -70,9 +70,9 @@ ANSWER_TASK_KEY = "task.talk_answer"
 # ── 고정 문구 — **서버가 정한다. 모델에게 맡기지 않는다** ──────────────────────
 # 근거: 실측에서 OpenAI 는 묻지도 않았는데 먼저 견적을 제안했다("100/150/200만").
 # 유도 문구를 모델이 쓰면 그 안에 숫자가 들어간다(`REPLY_ROLE_GUIDE` 전례).
-NOTICE_WEB = "저희 자료에 없는 내용이라 잠깐 찾아볼게요. 조금만 기다려 주세요."
-SOURCE_OWN = "저희가 정리해 둔 자료예요."
-SOURCE_WEB = "저희 자료엔 없어서 방금 찾아봤어요 - {origin}, {as_of} 기준이에요."
+# 웹검색 안내(NOTICE_WEB)와 근거 구분 라벨(SOURCE_OWN/SOURCE_WEB)은 2026-10-08 대표 지시로
+# 고객 노출에서 뺐다. 대체 문구를 두지 않는다. 근거 수집(DB·위키)은 그대로 하고
+# `sources` 에는 종류와 주소만 내부 기록으로 남긴다.
 # 유도 한 줄 — narrow 에서 **1회만**. wide 에서는 쓰지 않는다(이른 유도가 대화를 끊는다).
 NUDGE_NARROW = "혹시 이 중에 마음이 가는 게임이 있으시면, 그 게임 기준으로 PC를 맞춰 보여드릴게요."
 NO_DATA = "이 게임은 저희 자료로 아직 정리하지 못했어요. 확인해서 알려드릴게요."
@@ -335,7 +335,7 @@ def collect_evidence(conn, sentence: str, vocab: "TS.Vocab", *,
     for f in ev.facts:
         ev.db_lines.extend(_fact_lines(f))
     if ev.db_lines:
-        ev.sources.append({"kind": "own", "label": SOURCE_OWN})
+        ev.sources.append({"kind": "own"})
 
     # U2 — 「무슨 게임인가」는 DB 에 컬럼이 0/86 이다. 게임명이 특정됐고 아직 소개가
     # 없으면(= 검수된 copy 가 없으면) 웹으로 간다. 이것이 기본 경로가 된다.
@@ -352,10 +352,7 @@ def collect_evidence(conn, sentence: str, vocab: "TS.Vocab", *,
                 continue
             ev.used_web = True
             ev.web_lines.append("%s: %s" % (f.name, r.extract[:600]))
-            ev.sources.append({
-                "kind": "web", "url": r.url,
-                "label": SOURCE_WEB.format(origin="위키백과", as_of="방금"),
-            })
+            ev.sources.append({"kind": "web", "url": r.url})
     return ev
 
 
@@ -415,7 +412,7 @@ class AnswerResult:
     answer: str = ""
     sources: list[dict] = field(default_factory=list)
     narrowing: str = TS.NARROWING_WIDE
-    notice: str | None = None                 # 「조금 걸린다」 안내(웹검색 턴만)
+    notice: str | None = None                 # 고객 안내 없음(2026-10-08 제거) - 항상 None
     game_names: list[str] = field(default_factory=list)
     filter_report: dict = field(default_factory=dict)
     used_web: bool = False
@@ -485,8 +482,6 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         res.used_web = ev.used_web
         res.sources = ev.sources
         res.game_names = [f.name for f in ev.facts]
-        if ev.used_web:
-            res.notice = NOTICE_WEB
         if not ev.has_any():
             # 둘 다 없다 — **지어내지 않는다.** 「자료 없음」으로 둔다.
             res.answer = NO_DATA

@@ -1,5 +1,33 @@
 (function(){'use strict';
 const M=window.MVP3LiveModel,A=window.MVP3Api;
+const assemblyNotice='AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음';
+function customerPhoto(value,code){
+  const unavailable={state:'unavailable',url:null};
+  if(!M.object(value))return unavailable;
+  if(value.state==='temporarily_unavailable')return {state:value.state,url:null};
+  if(value.state!=='available'||value.kind!=='ai_assembly_example'||value.notice!==assemblyNotice||!Number.isSafeInteger(code)||code<=0)return unavailable;
+  const expected='/api/customer/products/'+code+'/representative-image';
+  // Accept only the exact server URL for this SKU, never infer an image URL.
+  if(value.url!==expected&&value.url!==location.origin+expected)return unavailable;
+  return {state:'available',kind:value.kind,url:value.url,notice:value.notice};
+}
+// The existing model drops additive media. Extend only the UI normalization
+// results; keep its original product selection, ordering and quote validation.
+const normalizeRecommendations=M.recommendations,normalizeQuote=M.quote;
+M.recommendations=value=>{
+  const result=normalizeRecommendations(value);
+  const source=value.card_sets.filter(set=>M.object(set)&&set.kind==='sold');
+  result.groups.forEach((group,index)=>{
+    const items=(Array.isArray(source[index].items)?source[index].items:[]).filter(item=>M.product(item));
+    group.products.forEach((product,n)=>{product.photo=customerPhoto(items[n].photo,product.product_code);});
+  });
+  return result;
+};
+M.quote=value=>{
+  const result=normalizeQuote(value);
+  if(result)result.product.photo=customerPhoto(value.product.photo,result.product.product_code);
+  return result;
+};
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+name+'.svg" alt="">';
@@ -72,19 +100,12 @@ function syncChat(){
   body.hidden=!open;toggle.setAttribute('aria-expanded',String(open));$('#chat-toggle-label').textContent=open?'상담 접기 ▴':'상담 내용 보기 ▾';
   $('#chat-summary').textContent=M.conditions(state.talk).join(' · ')||'게임과 예산을 알려주세요';
 }
-function renderSources(items){
-  if(!items?.length)return '';
-  return '<div class="message-sources">'+['own','web'].map(kind=>{
-    const group=items.filter(x=>x.kind===kind);if(!group.length)return '';
-    return '<div><strong>'+(kind==='own'?'우리 자료':'찾아본 자료')+'</strong><ul>'+group.map(x=>'<li>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.label)+'</a>':esc(x.label))+'</li>').join('')+'</ul></div>';
-  }).join('')+'</div>';
-}
 function renderMessages(){
   const key=JSON.stringify(state.messages);
   if(key!==lastMessages){
     $('#messages').innerHTML=state.messages.map(x=>'<div class="message '+(x.who==='user'?'user':'ai')+'"><span class="avatar">'+(x.who==='user'?uiIcon('user'):'<img class="avatar-mark" src="assets/popcorn-mark.png" alt="팝콘AI">')+'</span><div class="message-content"><p>'+(
       x.text==='안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.'&&state.screen==='welcome'?
-      '안녕하세요! 즐기는 게임과 예산을<br>알려주시면 나에게 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p>'+(x.notice?'<small class="answer-notice">'+esc(x.notice)+'</small>':'')+renderSources(x.sources)+'</div></div>').join('');
+      '안녕하세요! 즐기는 게임과 예산을<br>알려주시면 나에게 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
     $('#messages').scrollTop=$('#messages').scrollHeight;lastMessages=key;
   }
   const examples=$('#start-examples');examples.hidden=state.screen!=='welcome';
@@ -119,41 +140,88 @@ function recoveryBanner(){
 function heading(title,back=true){
   return (back?button(uiIcon('arrow-left')+'이전 화면','back','back live-back'):'')+'<div class="title-row"><h2 tabindex="-1">'+title+'</h2><span class="data-note">판매 중 PC · 조회 시점 참고 금액</span></div>'+requirements();
 }
-function productCard(product,action='detail',id=product.index){
-  const rows=M.specRows(product.spec),spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
-  return '<section class="quote-card live-product-card"><span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
-    '<h3>'+esc(product.name)+'</h3>'+
-    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+
-    spec+
-    '<ul class="live-reasons">'+product.reasons.map(reason=>'<li>'+esc(reason)+'</li>').join('')+'</ul>'+
-    '<p class="'+(product.over_budget?'warn-text':'green')+'">'+esc(budget(product,state.talk))+'</p>'+
-    button('추천 상품 자세히 보기',action,'primary','data-id="'+esc(id)+'"')+'</section>';
+function productImage(product){
+  const photo=customerPhoto(product.photo,product.product_code);
+  if(photo.state!=='available')return '<figure class="live-product-photo is-unavailable" data-product-photo data-image-state="'+photo.state+'"><p class="live-product-image-status">'+(photo.state==='temporarily_unavailable'?'이미지를 불러오지 못했습니다':'이미지 준비 중')+'</p></figure>';
+  return '<figure class="live-product-photo" data-product-photo><img data-product-image src="'+esc(photo.url)+'" alt="'+esc(product.name)+' · AI 조립 예시" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>이미지를 불러오지 못했습니다</p><figcaption class="live-product-photo-notice">'+esc(photo.notice)+'</figcaption></figure>';
+}
+function productCard(product,action='detail',id=product.index,comparison=null){
+  const rows=M.specRows(product.spec),description=product.public_configuration?.description;
+  const spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
+  const intro=description?.intro||product.reasons[0]||'',title=description?.title||product.name;
+  const sameBasis=comparison&&product.price_src&&product.price_src===comparison.price_src&&Number.isSafeInteger(product.price)&&Number.isSafeInteger(comparison.price);
+  const delta=sameBasis?product.price-comparison.price:null;
+  const difference=delta===null?'':delta===0?'다른 구성과 같은 금액이에요.':(comparison.tag||'다른 구성')+'보다 '+money(Math.abs(delta))+(delta>0?' 높아요.':' 낮아요.');
+  return '<section class="quote-card live-product-card"><div class="live-card-heading"><div class="live-card-copy"><span class="pill '+(product.tag.includes('최고')?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
+    '<h3>'+esc(title)+'</h3>'+(title!==product.name?'<p class="live-product-name">'+esc(product.name)+'</p>':'')+(intro?'<p class="live-card-intro">'+esc(intro)+'</p>':'')+'</div>'+productImage(product)+'</div>'+
+    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+
+    '<ul class="live-reasons">'+product.reasons.slice(description?.intro?0:1).map(reason=>'<li>'+esc(reason)+'</li>').join('')+'</ul>'+
+    (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+'<p class="'+(product.over_budget?'warn-text':'green')+'">'+esc(budget(product,state.talk))+'</p>'+
+    button('구성 자세히 보기',action,product.tag.includes('최고')?'primary':'outline','data-id="'+esc(id)+'"')+'</section>';
 }
 function renderResults(){
   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
+  const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
   view.innerHTML=heading('나에게 맞는 PC',false)+errorPanel()+
-    groups.map(group=>'<section class="live-result-group"><h3>'+esc(group.usage||group.usage_grid||'추천 상품')+'</h3>'+
+    groups.map(group=>{const ctx=group.game_context,url=M.safeUrl(ctx?.source.url);return '<section class="live-result-group"><h3>'+esc(group.usage||group.usage_grid||'추천 상품')+'</h3>'+
       (group.empty_note?'<p class="muted">'+esc(group.empty_note)+'</p>':'')+
-      (group.products.length?'<div class="quote-cards">'+group.products.map(p=>productCard(p)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+'</section>').join('')+
+      (group.products.length?'<div class="quote-cards">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n===1&&group.products.length===2?group.products[0]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
+      (ctx?'<div class="live-explanation"><h4>게임 안내 · '+esc(ctx.game_name)+'</h4><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</div>':'')+'</section>';}).join('')+
     (!hasProducts&&!groups.length?'<div class="empty"><h3>'+(state.missing.length?'조건을 조금 더 알려주세요':'현재 조건의 추천 상품이 없어요')+'</h3><p>상담은 계속할 수 있어요. 예산이나 사용 목적을 알려주세요.</p></div>':'')+
     (state.assumed.includes('game.resolution=1080p')?'<p class="muted">해상도를 정하지 않아 FHD(1080p)를 기준으로 조회했어요.</p>':'')+
     (state.recommendation?.aiEstimated.length?'<p class="muted">일부 게임 등급은 AI 추정입니다. 실제 게임 성능 측정값과는 달라요.</p>':'');
   actions.hidden=true;
 }
 function productSummary(){
-  const p=state.selected;
-  return '<section class="final-summary live-summary"><div><h3>'+esc(p.name)+'</h3><p>'+esc(state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다.':p.tag||p.level||'판매 중인 완제품 구성입니다.')+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div></section>';
+  const p=state.selected,description=p.public_configuration?.description,title=description?.title||p.name;
+  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
+  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div>'+productImage(p)+'</section>';
 }
-function productDetails(){
+function publicBomDetails(configuration,p,information,finalOnly){
+  const roles={
+    CPU:['CPU','cpu','프로그램의 명령을 계산하고 처리하는 부품이에요.'],
+    GPU:['그래픽카드','graphics-card','게임 화면과 그림을 출력하는 부품이에요.'],
+    RAM:['메모리','memory','실행 중인 프로그램의 정보를 잠시 담아두는 부품이에요.'],
+    SSD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
+    HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
+    MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
+    PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
+  const rows=configuration.parts.map(part=>{
+    const [label,icon,role]=(Object.hasOwn(roles,part.slot)?roles[part.slot]:null)||[part.pseudo?'서비스':part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];
+    const id='bom-unavailable-'+part.ordinal;
+    const specs=part.specs.length?'<dl class="live-spec-grid">'+part.specs.map(x=>'<div><dt>'+esc(x.label)+'</dt><dd>'+esc(x.value)+'</dd></div>').join('')+'</dl>':'<p>등록 사양 미확인</p>';
+    return '<tr data-part="bom-'+part.ordinal+'"><td colspan="3"><details class="public-bom-disclosure" data-detail="bom-'+part.ordinal+'"><summary>'+
+      '<div class="final-part-description">'+uiIcon(icon,'part-symbol')+'<div><h4><span>'+esc(label)+'</span><span class="part-name">'+esc(part.name||'항목명 미확인')+'</span><span class="public-bom-quantity">수량 '+part.quantity+'</span></h4><p>'+esc(part.description||'등록 설명 미확인')+'</p>'+
+      '<span class="public-bom-toggle"><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
+      '<span class="final-part-price">미확인</span><span class="final-part-change">'+button('변경','unavailable','outline small','disabled aria-describedby="'+id+'"')+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
+      '<div class="public-bom-photo">부품 사진 미확인</div><div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
+      '<p class="public-bom-unavailable" id="'+id+'">부품 질문과 변경은 아직 지원하지 않아요.</p></div></div></details></td></tr>';
+  }).join('');
+  return '<section class="final-parts public-bom"><h3>부품 구성과 선택 이유</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
+    '<thead><tr><th scope="col">부품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+
+    (finalOnly?'<details class="public-bom-information" data-detail="spec"><summary>추천 근거·변경 안내 펼치기</summary><div class="final-part-expanded">'+information+'</div></details>':information);
+}
+function productDetails(finalOnly=false){
   const p=state.selected;
+  // Read only the selected recommendation group; saved/recovery records have no game-context contract.
+  const context=state.savedQuote||state.pendingSave?null:(state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(p.index)&&g.products.some(item=>item.index===p.index&&item.product_code===p.product_code)));
+  const ctx=context?.game_context,url=M.safeUrl(ctx?.source.url);
+  const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
   const rows=M.specRows(p.spec),spec=rows.length?'<dl class="live-spec-grid">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-full-spec">'+esc(M.specText(p.spec)||'등록된 상세 사양을 확인하지 못했어요.')+'</p>';
-  return '<section class="final-parts"><h3>구성 상품 상세</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
-    '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
-    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
-    '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+
-    '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+(p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
+  const information=
+    '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+
+    '<p class="muted">상담 조건: '+M.conditions(state.selectionState||state.talk).map(esc).join(' · ')+'</p>'+
+    (p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
+    (ctx?'<section class="live-explanation"><h3>게임 안내 · '+esc(ctx.game_name)+'</h3><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</section>':'')+
     '<section class="live-capabilities"><div>'+button('다른 GPU 선택','unavailable','outline small','disabled aria-describedby="change-unavailable"')+
     button('저장장치 변경','unavailable','outline small','disabled aria-describedby="change-unavailable"')+'</div><p id="change-unavailable">현재 판매 중인 완제품을 안내해요. 부품별 옵션 변경과 게임 FPS 비교 자료는 아직 제공되지 않아요.</p></section>';
+  const configuration=M.publicConfiguration(p.public_configuration,p.product_code);
+  if(configuration)return publicBomDetails(configuration,p,information,finalOnly);
+  return '<section class="final-parts"><h3>부품 구성과 선택 이유</h3><p class="public-bom-empty" role="status">부품 구성 정보는 아직 연결되지 않았어요. 등록된 완제품 사양을 먼저 확인해주세요.</p><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
+    '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
+    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
+    '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+(finalOnly?'':information);
 }
 function finalConditions(){
   const row=(name,label,text)=>'<div>'+uiIcon(name)+'<dt>'+label+'</dt><dd>'+esc(text)+'</dd></div>';
@@ -165,14 +233,14 @@ function finalConditions(){
 function renderDetail(){
   view.innerHTML=heading('추천 구성 상세')+errorPanel()+productSummary()+productDetails()+finalConditions();
   const p=state.selected;
-  actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('다른 추천 상품 보기','results','outline')+button('이 견적으로 확인','final','primary')+'</div>';actions.hidden=false;
+  actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('구성 변경 요청','unavailable','outline','disabled aria-describedby="change-unavailable"')+button('이 견적 저장하기','final','primary')+'</div>';actions.hidden=false;
 }
 function renderFinal(){
   const label={idle:'아직 보관 전',saving:'보관 확인 중',saved:'서버에 보관됨',uncertain:'보관 결과 미확인',failed:'보관되지 않음'};
   const saved=state.saveState==='saved',disabled=!!state.phase||saved||state.needsRefresh||state.selected.price===null||!!state.pendingSave||!!state.pendingProblem;
   view.innerHTML=button(uiIcon('arrow-left')+'상품 상세 다시 보기','edit','back final-back')+
     '<div class="final-title-row"><div><h2 tabindex="-1">최종 견적 확인</h2><span class="save-status '+(saved?'is-saved':'')+'">'+uiIcon(saved?'file-text':'warning-circle-fill')+label[state.saveState]+'</span></div><span class="data-note">보관은 상품·시점 가격의 참고 기록입니다.</span></div>'+
-    errorPanel()+productSummary()+productDetails()+finalConditions()+
+    errorPanel()+productSummary()+productDetails(true)+finalConditions()+
     '<footer class="final-footer"><p>'+uiIcon('info')+'<span>포함 품목과 보증 조건은 구매 전에 확인해주세요.</span></p><div><div class="final-buttons">'+button('다른 상품 비교','results','outline')+
     button(saved?'보관 완료':state.phase==='save'?'서버 확인 중…':state.pendingSave?'이전 보관 결과 확인 필요':'견적 보관하기','save','primary',disabled?'disabled':'')+'</div><small>주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다.</small></div></footer>'+
     (state.savedQuote?'<p class="muted live-saved-note">보관일 '+esc(new Date(state.savedQuote.saved_at).toLocaleString('ko-KR'))+' · 이 브라우저의 보관 키로 접근합니다.</p>':'');
@@ -181,7 +249,7 @@ function renderFinal(){
 function renderSaved(){
   view.innerHTML=heading('내 견적',false)+'<p class="muted">이 브라우저의 보관 키로 접근하는 서버 기록입니다. 다른 기기와 회원 계정 동기화는 지원하지 않아요.</p>'+errorPanel()+
     (state.phase==='list'?'<div class="empty small-empty"><p>보관 기록을 불러오는 중이에요.</p></div>':state.error?'':state.quotes.length?
-      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card"><span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
+      '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card">'+productImage(q.product)+'<span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
       '<div class="empty small-empty"><h3>보관된 견적이 없어요</h3><p>상담 후 상품을 선택하면 서버에 보관할 수 있어요.</p>'+button('상담으로 돌아가기','back','outline')+'</div>')+
     (state.hasMore?'<p class="muted">최근 20개의 보관 기록을 표시하고 있어요.</p>':'');
   actions.hidden=true;
@@ -268,6 +336,12 @@ $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
 mobile.addEventListener('change',syncChat);
+for(const type of ['load','error'])document.addEventListener(type,e=>{
+  const image=e.target;if(!(image instanceof HTMLImageElement)||!image.hasAttribute('data-product-image'))return;
+  const photo=image.closest('[data-product-photo]');if(!photo)return;
+  const failed=type==='error';image.hidden=failed;photo.classList.toggle('is-unavailable',failed);
+  photo.dataset.imageState=failed?'temporarily_unavailable':'loaded';photo.querySelector('[data-product-image-status]').hidden=!failed;
+},true);
 window.addEventListener('popstate',e=>{
   captureDraft();const entry=e.state;
   if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){

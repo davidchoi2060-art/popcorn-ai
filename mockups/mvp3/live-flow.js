@@ -63,7 +63,7 @@
         state.history.push({role:'user',text});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
-          if(answer.trim()){message(answer,'ai',{sources:M.sources(response.sources),notice:M.text(response.answer_notice)});state.history.push({role:'assistant',text:answer.slice(0,300)});}
+          if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
           if(reply.trim()){message(reply);state.history.push({role:'assistant',text:reply.slice(0,300)});}
         }
         state.history=state.history.slice(-6);state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
@@ -157,7 +157,7 @@
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
       cancel();state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
-      message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 표시 금액과 사양은 보관 시점 기준입니다.');emit();
+      message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
     async function retry(){
       if(state.phase||!state.retry||Date.now()<(state.error?.retryAt||0))return;

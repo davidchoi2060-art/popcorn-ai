@@ -1008,9 +1008,10 @@ def parse_talk(body: ParseBody, request: Request):
         # `answer` 가 빈 문자열이면 [B] 가 답할 근거를 못 찾았거나 경로가 막힌 것이다 --
         # 화면은 그때 `reply` 만 띄운다.
         "answer": answer,
-        # 「저희 자료」와 「찾아본 것」을 **같은 문단에 넣지 않는다**(A-18 정신).
-        # [{kind:"own"|"web", label, url?}] -- 화면이 말풍선을 나눈다.
-        "sources": ans.sources,
+        # 근거 구분 표시는 2026-10-08 대표 지시로 고객 노출에서 뺐다. 키는 계약 호환을 위해
+        # 남기되 항상 빈 목록이다 -- 예전 화면(mvp2·mvp3)이 받아도 아무것도 그리지 않는다.
+        # 수집한 근거(`ans.sources`)는 서버 안에만 있다.
+        "sources": [],
         # wide | narrow | ready -- 순수함수 `talk_schema.narrowing_level` 이 정한다.
         # 화면이 다시 계산하지 않게 서버가 붙인다(경계를 두 벌로 두지 않는다).
         "narrowing": ans.narrowing,
@@ -1018,9 +1019,8 @@ def parse_talk(body: ParseBody, request: Request):
         # 문장에서 뽑은 것)와 **다른 축**이다 -- 저쪽은 «고객이 말한 이름», 이쪽은
         # «우리 표에서 찾아 근거로 쓴 이름»이다. 비어 있으면 DB 를 못 봤다는 뜻이다.
         "answer_game_names": ans.game_names,
-        # 「조금 시간이 걸린다」 안내 -- **웹검색을 탈 때만** 있다. 항상 띄우면 안내가
-        # «늘 있는 것»이 되어 뜻을 잃는다(설계서 §4-2).
-        "answer_notice": ans.notice,
+        # 웹검색 안내도 2026-10-08 대표 지시로 뺐다. 대체 문구를 두지 않는다 -- 항상 null.
+        "answer_notice": None,
         # ★ 필터가 무엇을 손댔는가 -- 조용히 지우지 않는다(`dropped[]` 규약과 같은 원칙).
         # {kept, replaced[{before, after, kinds, source}], dropped[], gate_hit}
         "answer_filter": ans.filter_report,
