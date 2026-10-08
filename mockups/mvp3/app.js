@@ -174,7 +174,7 @@ function renderResults(){
 }
 function productSummary(){
   const p=state.selected,description=p.public_configuration?.description,title=description?.title||p.name;
-  const intro=state.savedQuote?'보관 시점의 상품 구성과 참고 금액입니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
+  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
   return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong><p class="'+(p.over_budget?'warn-text':'green')+'">'+esc(budget(p))+'</p></div>'+productImage(p)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){

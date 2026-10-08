@@ -157,7 +157,7 @@
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
       cancel();state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
-      message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 표시 금액과 사양은 보관 시점 기준입니다.');emit();
+      message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
     async function retry(){
       if(state.phase||!state.retry||Date.now()<(state.error?.retryAt||0))return;
