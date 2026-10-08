@@ -16,6 +16,12 @@ from .timeutil import iso
 
 router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
 
+# Each new save reruns the public recommendation, so writes get their own per-visitor
+# limit, separate from the AI call budget (rate_limit_policies key overrides these).
+SAVE_POLICY_KEY = 'visitor.mvp3_save'
+SAVE_PER_MINUTE = 10
+SAVE_PER_DAY = 100
+
 
 class SaveBody(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -109,6 +115,10 @@ def save_quote(body: SaveBody, request: Request, response: Response):
             if previous['request_basis'] != basis:
                 raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
             return {'ok': True, 'quote': render_quote(previous)}
+        # Idempotent replays above are free; only new saves count.
+        access_gate.check_rate(conn, request, what='mvp3.save', policy_key=SAVE_POLICY_KEY,
+                               default_per_minute=SAVE_PER_MINUTE, default_per_day=SAVE_PER_DAY,
+                               label='견적 저장')
         state, _ = validate_state(body.state, load_vocab(conn))
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
     product = selected_product(public, body.product_code, body.expected_price)

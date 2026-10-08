@@ -88,7 +88,7 @@ _KST = timezone(timedelta(hours=9))    # llm.py 의 일일 경계와 같은 기�
 _MAX_SUBJECTS = 20000                  # 메모리 상한 -- 넘으면 가장 오래된 축부터 버린다
 _HITS: "OrderedDict[str, deque]" = OrderedDict()
 
-_policy_cache: dict = {"at": None, "per_minute": None, "per_day": None, "default": True}
+_policy_cache: dict = {}               # policy_key -> {"at", "per_minute", "per_day", "default"}
 _POLICY_TTL_SEC = 60
 
 _col_cache: dict = {}                  # "table.column" -> (ready: bool, checked_at)
@@ -193,17 +193,18 @@ def require_session_owner(conn, session_id: int, provided: str | None, *,
 # ============================================================================
 # 횟수 제한
 # ============================================================================
-def _policy(conn) -> tuple:
-    """(per_minute, per_day, 기본값인가). `rate_limit_policies` 를 60초 캐시한다."""
+def _policy(conn, policy_key: str = POLICY_KEY, default_per_minute: int = DEFAULT_PER_MINUTE,
+            default_per_day: int = DEFAULT_PER_DAY) -> tuple:
+    """(per_minute, per_day, 기본값인가). `rate_limit_policies` 를 키마다 60초 캐시한다."""
     now = datetime.now(timezone.utc)
-    at = _policy_cache["at"]
-    if at is not None and (now - at).total_seconds() < _POLICY_TTL_SEC:
-        return _policy_cache["per_minute"], _policy_cache["per_day"], _policy_cache["default"]
-    pm, pd, is_default = DEFAULT_PER_MINUTE, DEFAULT_PER_DAY, True
+    cached = _policy_cache.get(policy_key)
+    if cached is not None and (now - cached["at"]).total_seconds() < _POLICY_TTL_SEC:
+        return cached["per_minute"], cached["per_day"], cached["default"]
+    pm, pd, is_default = default_per_minute, default_per_day, True
     try:
         r = conn.execute(text(
             "SELECT per_minute, per_day FROM rate_limit_policies WHERE key = :k"),
-            {"k": POLICY_KEY}).mappings().first()
+            {"k": policy_key}).mappings().first()
         if r is not None:
             # is not None 으로 명시 비교 -- 0 을 "값 없음"으로 오독하는 or-폴백을 피한다
             # (api/llm.py `_check_caps` 가 같은 함정을 같은 방식으로 피한다).
@@ -215,7 +216,7 @@ def _policy(conn) -> tuple:
         # 정책을 못 읽었다고 제한을 «푸는» 것은 조용한 실패다 -- 코드 기본값으로 계속 막는다.
         log.warning("[gate] rate_limit_policies read failed (%s: %s) - using code default",
                     type(e).__name__, e)
-    _policy_cache.update({"at": now, "per_minute": pm, "per_day": pd, "default": is_default})
+    _policy_cache[policy_key] = {"at": now, "per_minute": pm, "per_day": pd, "default": is_default}
     return pm, pd, is_default
 
 
@@ -249,23 +250,29 @@ def _prune(dq: deque, now: datetime) -> None:
         dq.popleft()
 
 
-def check_rate(conn, request: Request, *, what: str) -> str:
+def check_rate(conn, request: Request, *, what: str, policy_key: str = POLICY_KEY,
+               default_per_minute: int = DEFAULT_PER_MINUTE,
+               default_per_day: int = DEFAULT_PER_DAY, label: str = "AI 호출") -> str:
     """방문자별 호출 횟수 제한. 넘으면 **429**(소유자 확인 실패 403 과 다른 응답).
 
     통과하면 이번 호출을 «쓴 것으로» 세고 축 이름을 돌려준다. 부르는 쪽은 **실제로 돈이
     나가는 자리 직전**에만 부른다 -- 캐시로 답하는 요청은 비용이 0 이라 세지 않는다.
+
+    `policy_key` 가 다르면 카운터도 따로 센다(2026-10-08 협업 6번 -- MVP3 견적 저장이
+    AI 호출 몫을 먹지 않게). 기본값은 AI 호출(`visitor.ai`) 하나를 함께 쓰는 옛 동작 그대로다.
     """
-    per_minute, per_day, is_default = _policy(conn)
+    per_minute, per_day, is_default = _policy(conn, policy_key, default_per_minute, default_per_day)
     subject = subject_of(conn, request)
+    bucket = subject if policy_key == POLICY_KEY else "%s|%s" % (policy_key, subject)
     now = datetime.now(timezone.utc)
 
-    dq = _HITS.get(subject)
+    dq = _HITS.get(bucket)
     if dq is None:
         dq = deque()
-        _HITS[subject] = dq
+        _HITS[bucket] = dq
         while len(_HITS) > _MAX_SUBJECTS:
             _HITS.popitem(last=False)     # 가장 오래 안 쓴 축부터 버린다(메모리 상한)
-    _HITS.move_to_end(subject)
+    _HITS.move_to_end(bucket)
     _prune(dq, now)
 
     day_lo = now.astimezone(_KST).replace(
@@ -284,15 +291,15 @@ def check_rate(conn, request: Request, *, what: str) -> str:
         log.info("[gate] rate limited: what=%s subject=%s window=minute used=%d limit=%d%s",
                  what, subject, n_minute, per_minute, note)
         raise _too_many("minute", n_minute, per_minute, retry,
-                        "방문자별 AI 호출 한도 초과 - 분당 %d회 제한(현재 %d회). %d초 뒤 재시도 가능."
-                        % (per_minute, n_minute, retry))
+                        "방문자별 %s 한도 초과 - 분당 %d회 제한(현재 %d회). %d초 뒤 재시도 가능."
+                        % (label, per_minute, n_minute, retry))
     if n_day >= per_day:
         retry = max(1, int((day_lo + timedelta(days=1) - now).total_seconds()))
         log.info("[gate] rate limited: what=%s subject=%s window=day used=%d limit=%d%s",
                  what, subject, n_day, per_day, note)
         raise _too_many("day", n_day, per_day, retry,
-                        "방문자별 AI 호출 한도 초과 - 일 %d회 제한(현재 %d회). 다음 날 재시도 가능."
-                        % (per_day, n_day))
+                        "방문자별 %s 한도 초과 - 일 %d회 제한(현재 %d회). 다음 날 재시도 가능."
+                        % (label, per_day, n_day))
 
     dq.append(now)
     return subject
@@ -309,4 +316,4 @@ def _reset_for_test() -> None:
     """검증용 -- 프로세스 카운터·캐시를 비운다. 운영 경로에서는 부르지 않는다."""
     _HITS.clear()
     _col_cache.clear()
-    _policy_cache.update({"at": None})
+    _policy_cache.clear()
