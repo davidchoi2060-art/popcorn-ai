@@ -100,19 +100,12 @@ function syncChat(){
   body.hidden=!open;toggle.setAttribute('aria-expanded',String(open));$('#chat-toggle-label').textContent=open?'상담 접기 ▴':'상담 내용 보기 ▾';
   $('#chat-summary').textContent=M.conditions(state.talk).join(' · ')||'게임과 예산을 알려주세요';
 }
-function renderSources(items){
-  if(!items?.length)return '';
-  return '<div class="message-sources">'+['own','web'].map(kind=>{
-    const group=items.filter(x=>x.kind===kind);if(!group.length)return '';
-    return '<div><strong>'+(kind==='own'?'우리 자료':'찾아본 자료')+'</strong><ul>'+group.map(x=>'<li>'+(x.url?'<a href="'+esc(x.url)+'" target="_blank" rel="noopener noreferrer">'+esc(x.label)+'</a>':esc(x.label))+'</li>').join('')+'</ul></div>';
-  }).join('')+'</div>';
-}
 function renderMessages(){
   const key=JSON.stringify(state.messages);
   if(key!==lastMessages){
     $('#messages').innerHTML=state.messages.map(x=>'<div class="message '+(x.who==='user'?'user':'ai')+'"><span class="avatar">'+(x.who==='user'?uiIcon('user'):'<img class="avatar-mark" src="assets/popcorn-mark.png" alt="팝콘AI">')+'</span><div class="message-content"><p>'+(
       x.text==='안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.'&&state.screen==='welcome'?
-      '안녕하세요! 즐기는 게임과 예산을<br>알려주시면 나에게 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p>'+(x.notice?'<small class="answer-notice">'+esc(x.notice)+'</small>':'')+renderSources(x.sources)+'</div></div>').join('');
+      '안녕하세요! 즐기는 게임과 예산을<br>알려주시면 나에게 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
     $('#messages').scrollTop=$('#messages').scrollHeight;lastMessages=key;
   }
   const examples=$('#start-examples');examples.hidden=state.screen!=='welcome';

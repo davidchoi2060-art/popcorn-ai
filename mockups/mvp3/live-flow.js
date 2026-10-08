@@ -63,7 +63,7 @@
         state.history.push({role:'user',text});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
-          if(answer.trim()){message(answer,'ai',{sources:M.sources(response.sources),notice:M.text(response.answer_notice)});state.history.push({role:'assistant',text:answer.slice(0,300)});}
+          if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
           if(reply.trim()){message(reply);state.history.push({role:'assistant',text:reply.slice(0,300)});}
         }
         state.history=state.history.slice(-6);state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];

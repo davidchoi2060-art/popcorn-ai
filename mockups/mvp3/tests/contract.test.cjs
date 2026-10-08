@@ -4,7 +4,7 @@ const ID='11111111-1111-4111-8111-111111111111',QID='22222222-2222-4222-8222-222
 const talk={usages:['게임','영상 편집'],budget_won:1500000,budget_bound:'이하',game:{names:['검증용 게임'],resolution:'1440p'}};
 const product={product_code:101,name:'검증용 PC',price:1430000,price_src:'등록 판매가',spec:{cpu:'검증용 CPU',gpu:'검증용 GPU',ram_gb:32,ssd_gb:1024,vram_gb:8,cpu_mt:999,gpu_idx:999},reasons:['조건에 맞는 등록 상품'],tag:'추천'};
 const reco={ok:true,card_sets:[{kind:'sold',usage:'게임',items:[product,{...product,product_code:102,name:'대안 PC'}]},{kind:'sold',usage:'영상 편집',items:[]}],needs:[],assumed:[]};
-const parsed={ok:true,state:talk,chat_flow:{step:2},answer:'게임 성능 조건 안내',reply:'해상도도 알려주세요.',sources:[{kind:'own',label:'게임 자료'},{kind:'web',label:'참고 페이지',url:'https://example.invalid/game'}],pc_related:true,missing:[]};
+const parsed={ok:true,state:talk,chat_flow:{step:2},answer:'게임 성능 조건 안내',reply:'해상도도 알려주세요.',sources:[{kind:'own',label:'게임 자료'},{kind:'web',label:'참고 페이지',url:'https://example.invalid/game'}],answer_notice:'예전 안내',pc_related:true,missing:[]};
 const saved={ok:true,quote:{id:QID,product,state:talk,saved_at:'2026-10-03T09:00:00+00:00'}};
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k),map};}
 function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};}
@@ -78,9 +78,9 @@ test('bad JSON, network, timeout and caller abort remain distinct',async()=>{
  await assert.rejects(stalled.parse({}, {timeoutMs:10}),e=>e.code==='timeout');
  const controller=new AbortController(),request=stalled.parse({}, {signal:controller.signal});controller.abort();await assert.rejects(request,e=>e.code==='aborted');
 });
-test('answer/reply, sources and history stay separate and sequential',async()=>{
+test('answer/reply and history stay separate and sequential; sources and notice are not shown',async()=>{
  let last;const h=harness({parse:async payload=>{last=payload;return parsed;}});await h.flow.submit('첫 요청');assert.equal(last.history.length,0);
- assert.deepEqual(h.flow.state.messages.slice(-3).map(m=>m.text),['첫 요청',parsed.answer,parsed.reply]);assert.equal(h.flow.state.messages.at(-2).sources.length,2);assert.equal(h.flow.state.screen,'results');
+ assert.deepEqual(h.flow.state.messages.slice(-3).map(m=>m.text),['첫 요청',parsed.answer,parsed.reply]);assert.equal(h.flow.state.messages.at(-2).sources,undefined);assert.equal(h.flow.state.messages.at(-2).notice,undefined);assert.equal(h.flow.state.screen,'results');
  await h.flow.submit('두번째');assert.equal(last.history.length,3);assert.deepEqual(last.chat_flow,{step:2});assert.equal(h.flow.state.history.length,6);
 });
 test('missing/silent/non-PC answer does not fabricate recommendations',async()=>{

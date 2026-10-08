@@ -108,3 +108,12 @@ test('server missing/silent/non-PC guards and new reset remain explicit; product
   for(const guard of [{missing:['budget']},{silent:true},{pc_related:false}]){const h=harness({respond:()=>({...parsed,...guard})});edit(h,'요청');send(h);await until(()=>h.flow.state.phase===null);assert.equal(h.calls.length,1);assert.equal(h.flow.state.screen,'welcome');}
   const h=harness({hash:''});h.click('gateway-products');assert.equal(h.calls.length,0);assert.equal(surface(h),'consultation');await h.flow.submit('조건');h.click('gateway');h.click('gateway-products');assert.equal(h.flow.state.screen,'results');assert.equal(h.calls.length,2);h.click('new');assert.equal(h.flow.state.talk,null);assert.equal(h.input.value,'');assert.equal(h.flow.state.selected,null);assert.equal(surface(h),'consultation');
 });
+test('consultation never shows removed source labels or web notice, including old stored messages',async()=>{
+  const removed=['저희 자료에 없는 내용이라 잠깐 찾아볼게요. 조금만 기다려 주세요.','우리 자료','저희가 정리해 둔 자료예요.','찾아본 자료','저희 자료엔 없어서 방금 찾아봤어요 - 위키백과, 방금 기준이에요.'];
+  const reply={...parsed,missing:['budget'],answer:'게임 설명입니다.',sources:[{kind:'own',label:removed[2]},{kind:'web',label:removed[4],url:'https://ko.wikipedia.org/wiki/x'}],answer_notice:removed[0]};
+  const h=harness({respond:()=>reply});await h.flow.submit('게임 알려줘');
+  h.flow.state.messages.push({text:'예전 답변',who:'ai',sources:reply.sources,notice:removed[0]});await h.flow.submit('다시');
+  const box=h.w.document.querySelector('#messages');assert.match(box.textContent,/게임 설명입니다\./);assert.match(box.textContent,/예전 답변/);
+  for(const phrase of removed)assert.ok(!box.textContent.includes(phrase),phrase);
+  assert.equal(box.querySelectorAll('.message-sources,.answer-notice,a[href*="wikipedia"]').length,0);
+});
