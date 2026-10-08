@@ -78,7 +78,7 @@ METHODS = [{'path': 'tests/test_fake.py', 'class': 'Fake', 'method': 'test_one'}
 
 
 def child(**over):
-    base = {'problems': [], 'counts': {'run': 1, 'failures': 0, 'errors': 0, 'skipped': 0, 'xfailed': 0, 'xpassed': 0},
+    base = {'problems': [], 'stage': 'done', 'suite_runs': 1, 'counts': {'run': 1, 'failures': 0, 'errors': 0, 'skipped': 0, 'xfailed': 0, 'xpassed': 0},
             'rows': {'tests/test_fake.py::Fake::test_one': {'outcome': 'passed'}},
             'refusals': {'selfcheck': [{'event': 'probe'}] * br.SELFCHECK_PROBES, 'tests': []}}
     base.update(over)
@@ -101,7 +101,8 @@ class JudgeTests(unittest.TestCase):
                      {'counts': dict(child()['counts'], xfailed=1)},
                      {'rows': {}},
                      {'counts': dict(child()['counts'], run=0)},
-                     {'problems': ['import 실패']}):
+                     {'problems': ['import 실패']},
+                     {'stage': 'collect', 'suite_runs': 0}):
             with self.subTest(over=over):
                 self.assertTrue(br.judge(METHODS, child(**over)))
 
@@ -112,9 +113,11 @@ from pathlib import Path
 import api
 from tools import helper
 OUTPUT = Path('D:/WORK/fake/outputs/fake-out')
+print('IMPORT_SENTINEL')
 
 class Fake(unittest.TestCase):
     def test_one(self):
+        print('RUN_SENTINEL')
         self.assertEqual((api.VALUE, helper.VALUE), (1, 2))
         OUTPUT.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=OUTPUT, prefix='synthetic-') as d:
@@ -198,30 +201,58 @@ class ChildTests(unittest.TestCase):
                 self.assertTrue(any('테스트 중 차단' in r for r in reasons), reasons)
                 self.assertFalse(probe.exists())
 
-    def test_extra_method_and_skip_fail_closed(self):
-        extra = GOOD_TEST + '''
+    def assert_stopped(self, result, reasons, stage, imports, needle):
+        self.assertTrue(any(needle in r for r in reasons), reasons)
+        self.assertEqual((result['stage'], result['bundle_imports'], result['suite_runs']), (stage, imports, 0))
+        self.assertNotIn('RUN_SENTINEL', result['log_tail'])
+        if imports == 0:
+            self.assertNotIn('IMPORT_SENTINEL', result['log_tail'])
+
+    def test_green_path_runs_suite_once(self):
+        result, reasons, _ = self.run_fake(GOOD_TEST)
+        self.assertEqual(reasons, [])
+        self.assertEqual((result['stage'], result['bundle_imports'], result['suite_runs']), ('done', 1, 1))
+        self.assertIn('IMPORT_SENTINEL', result['log_tail'])
+        self.assertIn('RUN_SENTINEL', result['log_tail'])
+
+    def test_pin_mismatch_stops_before_bundle_import(self):
+        result, reasons, _ = self.run_fake(GOOD_TEST, pins={'definitely-not-installed-pkg': '1.0'})
+        self.assert_stopped(result, reasons, 'pins', 0, '핀 불일치')
+
+    def test_import_error_stops_before_run(self):
+        result, reasons, _ = self.run_fake('import does_not_exist_xyz\n')
+        self.assert_stopped(result, reasons, 'import', 1, 'import 실패')
+
+    def test_adapter_problems_stop_before_run(self):
+        result, reasons, _ = self.run_fake(GOOD_TEST, adapters={'tests/test_fake.py': {'OUTPUT': 'D:/WORK/other'}})
+        self.assert_stopped(result, reasons, 'adapter', 1, '어댑터 원문 값 불일치')
+        result, reasons, _ = self.run_fake(GOOD_TEST, adapters={})
+        self.assert_stopped(result, reasons, 'adapter', 1, '어댑터 없는 Windows 경로')
+
+    def test_collection_mismatch_stops_before_run(self):
+        extra = GOOD_TEST + """
     def test_two(self):
-        pass
-'''
-        _, reasons, _ = self.run_fake(extra)
-        self.assertTrue(any('수집 불일치' in r for r in reasons), reasons)
+        print('RUN_SENTINEL')
+"""
+        result, reasons, _ = self.run_fake(extra)
+        self.assert_stopped(result, reasons, 'collect', 1, '수집 불일치')
+        missing = METHODS + [{'path': 'tests/test_fake.py', 'class': 'Fake', 'method': 'test_absent'}]
+        result, reasons, _ = self.run_fake(GOOD_TEST, methods=missing)
+        self.assert_stopped(result, reasons, 'collect', 1, '수집 불일치')
+
+    def test_module_origin_outside_src_stops_before_run(self):
+        foreign = GOOD_TEST.replace("print('IMPORT_SENTINEL')", "print('IMPORT_SENTINEL')\n"
+                                    "import sys, types\n"
+                                    "_m = types.ModuleType('api.foreign'); _m.__file__ = '/elsewhere/foreign.py'\n"
+                                    "sys.modules['api.foreign'] = _m")
+        result, reasons, _ = self.run_fake(foreign)
+        self.assert_stopped(result, reasons, 'origin', 1, '번들 소스 밖에서 import 됨')
+
+    def test_skip_is_run_but_fails(self):
         skipped = GOOD_TEST.replace('    def test_one(self):', "    @unittest.skip('x')\n    def test_one(self):")
-        _, reasons, _ = self.run_fake(skipped)
+        result, reasons, _ = self.run_fake(skipped)
+        self.assertEqual(result['suite_runs'], 1)
         self.assertTrue(any('skipped' in r for r in reasons), reasons)
-
-    def test_adapter_literal_mismatch_and_unadapted_windows_path_fail(self):
-        _, reasons, _ = self.run_fake(GOOD_TEST, adapters={'tests/test_fake.py': {'OUTPUT': 'D:/WORK/other'}})
-        self.assertTrue(any('어댑터 원문 값 불일치' in r for r in reasons), reasons)
-        _, reasons, _ = self.run_fake(GOOD_TEST, adapters={})
-        self.assertTrue(any('어댑터 없는 Windows 경로' in r for r in reasons), reasons)
-
-    def test_import_error_and_pin_mismatch_fail(self):
-        _, reasons, _ = self.run_fake('import does_not_exist_xyz\n')
-        self.assertTrue(any('import 실패' in r for r in reasons), reasons)
-        _, reasons, _ = self.run_fake(GOOD_TEST, pins={'definitely-not-installed-pkg': '1.0'})
-        self.assertTrue(any('핀 불일치' in r for r in reasons), reasons)
-
-
 
 @unittest.skipUnless(LINUX, 'bundle_run 은 Linux 전용')
 class GuardSymlinkTests(unittest.TestCase):

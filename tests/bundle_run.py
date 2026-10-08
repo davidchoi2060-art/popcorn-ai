@@ -417,7 +417,28 @@ def _flatten(suite):
             yield item
 
 
+def module_origins(src):
+    """sys.modules 의 api/tools 모듈이 어디서 왔는지 모은다. (출처 목록, 문제 목록)"""
+    origins, problems = {}, []
+    for name, mod in list(sys.modules.items()):
+        if name in ('api', 'tools') or name.startswith(('api.', 'tools.')):
+            where = [getattr(mod, '__file__', None)] + list(getattr(mod, '__path__', []) or [])
+            where = [os.path.realpath(w) for w in where if w]
+            origins[name] = where
+            if not where or not all(inside(w, [src]) for w in where):
+                problems.append(f'번들 소스 밖에서 import 됨: {name} {where}')
+    if not origins:
+        problems.append('api/tools 모듈이 하나도 import 되지 않았다')
+    return origins, problems
+
+
 def child_main(args):
+    """단계마다 관문을 둔다. 앞 단계에 문제가 있으면 다음 단계를 하지 않고 바로 결과를 낸다.
+
+    pins -> selfcheck -> import -> adapter -> collect -> origin -> run
+    핀이 어긋나면 번들을 import 하지 않고, import · 어댑터 · 수집 · 모듈 출처가 어긋나면
+    suite.run 을 부르지 않는다. 결과의 bundle_imports · suite_runs 가 실제 호출 수다.
+    """
     src, work = os.path.realpath(args.src), os.path.realpath(args.work)
     out, tmp = os.path.join(work, 'out'), os.path.join(work, 'tmp')
     for d in (out, tmp, os.path.join(work, 'cwd')):
@@ -427,8 +448,18 @@ def child_main(args):
     adapters = json.loads(Path(args.adapters).read_text(encoding='utf-8'))
     pins = json.loads(Path(args.pins).read_text(encoding='utf-8')) if args.pins else None
     result = {'problems': [], 'adapters': [], 'collected': [], 'rows': {}, 'pins_actual': {},
-              'modules': {}, 'counts': {}}
+              'modules': {}, 'counts': {}, 'stage': 'pins', 'bundle_imports': 0, 'suite_runs': 0}
     problems = result['problems']
+    guard = None
+
+    def finish():
+        if guard is not None:
+            guard.phase = 'done'
+            guard.refusals.setdefault('done', [])
+            result['refusals'] = guard.refusals
+        sys.stdout.write('\n' + MARKER + json.dumps(result, ensure_ascii=False) + '\n')
+        sys.stdout.flush()
+        return 0
 
     # import 루트: 번들 소스 + 표준 라이브러리 + venv site-packages. 저장소 루트는 넣지 않는다(-I 로 실행됨).
     repo_root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -437,6 +468,7 @@ def child_main(args):
     import tempfile
     tempfile.tempdir = tmp
 
+    # 1. 핀 - 어긋나면 번들을 import 하지 않는다.
     if pins is not None:
         from importlib import metadata
         for name, ver in pins.items():
@@ -447,80 +479,95 @@ def child_main(args):
             result['pins_actual'][name] = actual
             if actual != ver:
                 problems.append(f'핀 불일치 {name}: 설치 {actual} != {ver}')
+    if problems:
+        return finish()
 
+    # 2. 차단 층 자체 점검 - 안 막히면 번들을 import 하지 않는다.
+    result['stage'] = 'selfcheck'
     guard = Guard([out, tmp])
     sys.addaudithook(guard)
     result['selfcheck_problems'] = selfcheck(guard, work)
     problems += result['selfcheck_problems']
+    if problems:
+        return finish()
     guard.phase = 'tests'
     os.chdir(os.path.join(work, 'cwd'))  # 허용 경로 밖 - 상대 경로 쓰기는 거부된다
 
-    if not result['selfcheck_problems']:
-        modules = {}
-        for rel in sorted({m['path'] for m in methods}):
-            name = 'bundle_tests.' + Path(rel).stem
-            try:
-                spec = importlib.util.spec_from_file_location(name, os.path.join(src, rel))
-                mod = importlib.util.module_from_spec(spec)
-                sys.modules[name] = mod
-                spec.loader.exec_module(mod)
-                modules[rel] = mod
-            except BaseException as exc:  # noqa: BLE001 - import 실패도 기록하고 실패로 판정
-                problems.append(f'import 실패 {rel}: {type(exc).__name__}: {exc}')
-        for rel, mod in modules.items():
-            want = adapters.get(rel, {})
-            for attr, literal in want.items():
-                value = getattr(mod, attr, None)
-                rec = {'path': rel, 'attr': attr, 'original': None if value is None else str(value),
-                       'expected_original': literal, 'applied': False}
-                if value is None or str(value) != literal or not isinstance(value, Path):
-                    problems.append(f'어댑터 원문 값 불일치 {rel}:{attr} = {value!r}')
-                else:
-                    target = Path(out, Path(literal.replace('\\', '/')).name)
-                    setattr(mod, attr, target)
-                    rec.update(adapted=str(target), applied=True)
-                result['adapters'].append(rec)
-            for attr, value in vars(mod).items():
-                if attr not in want and isinstance(value, (str, Path)) and WINDOWS_PATH.match(str(value)):
-                    problems.append(f'어댑터 없는 Windows 경로 {rel}:{attr} = {value}')
-        expected = [(m['path'], m['class'], m['method']) for m in methods]
-        by_id, collected = {}, []
-        loader = unittest.TestLoader()
-        suite = unittest.TestSuite()
-        for rel, mod in modules.items():
-            for test in _flatten(loader.loadTestsFromModule(mod)):
-                key = (rel, type(test).__name__, getattr(test, '_testMethodName', test.id()))
-                collected.append(key)
-                by_id[test.id()] = key
-                suite.addTest(test)
-        result['collected'] = [list(k) for k in collected]
-        if sorted(collected) != sorted(expected):
-            missing = sorted(set(expected) - set(collected))
-            extra = sorted(set(collected) - set(expected))
-            problems.append(f'수집 불일치: 수집 {len(collected)} · 기대 {len(expected)} · 누락 {missing} · 추가 {extra}')
-        else:
-            res = Recorder()
-            suite.run(res)
-            result['counts'] = {'run': res.testsRun, 'failures': len(res.failures), 'errors': len(res.errors),
-                                'skipped': len(res.skipped), 'xfailed': len(res.expectedFailures),
-                                'xpassed': len(res.unexpectedSuccesses)}
-            result['rows'] = {'::'.join(by_id.get(tid, ('?', '?', tid))): row for tid, row in res.rows.items()}
-        for name, mod in list(sys.modules.items()):
-            if name in ('api', 'tools') or name.startswith(('api.', 'tools.')):
-                where = [getattr(mod, '__file__', None)] + list(getattr(mod, '__path__', []) or [])
-                where = [os.path.realpath(w) for w in where if w]
-                result['modules'][name] = where
-                if not where or not all(inside(w, [src]) for w in where):
-                    problems.append(f'번들 소스 밖에서 import 됨: {name} {where}')
-        if not result['modules']:
-            problems.append('api/tools 모듈이 하나도 import 되지 않았다')
+    # 3. import - 하나라도 실패하면 거기서 멈춘다.
+    result['stage'] = 'import'
+    modules = {}
+    for rel in sorted({m['path'] for m in methods}):
+        name = 'bundle_tests.' + Path(rel).stem
+        result['bundle_imports'] += 1
+        try:
+            spec = importlib.util.spec_from_file_location(name, os.path.join(src, rel))
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[name] = mod
+            spec.loader.exec_module(mod)
+            modules[rel] = mod
+        except BaseException as exc:  # noqa: BLE001 - import 실패도 기록하고 실패로 판정
+            problems.append(f'import 실패 {rel}: {type(exc).__name__}: {exc}')
+            return finish()
 
-    guard.phase = 'done'
-    guard.refusals.setdefault('done', [])
-    result['refusals'] = guard.refusals
-    sys.stdout.write('\n' + MARKER + json.dumps(result, ensure_ascii=False) + '\n')
-    sys.stdout.flush()
-    return 0
+    # 4. 어댑터 - 원문 값이 정확히 같을 때만 다시 묶는다. 어긋나면 실행하지 않는다.
+    result['stage'] = 'adapter'
+    for rel, mod in modules.items():
+        want = adapters.get(rel, {})
+        for attr, literal in want.items():
+            value = getattr(mod, attr, None)
+            rec = {'path': rel, 'attr': attr, 'original': None if value is None else str(value),
+                   'expected_original': literal, 'applied': False}
+            if value is None or str(value) != literal or not isinstance(value, Path):
+                problems.append(f'어댑터 원문 값 불일치 {rel}:{attr} = {value!r}')
+            else:
+                target = Path(out, Path(literal.replace('\\', '/')).name)
+                setattr(mod, attr, target)
+                rec.update(adapted=str(target), applied=True)
+            result['adapters'].append(rec)
+        for attr, value in vars(mod).items():
+            if attr not in want and isinstance(value, (str, Path)) and WINDOWS_PATH.match(str(value)):
+                problems.append(f'어댑터 없는 Windows 경로 {rel}:{attr} = {value}')
+    if problems:
+        return finish()
+
+    # 5. 수집 - manifest 와 정확히 같아야 한다.
+    result['stage'] = 'collect'
+    expected = [(m['path'], m['class'], m['method']) for m in methods]
+    by_id, collected = {}, []
+    suite = unittest.TestSuite()
+    for rel, mod in modules.items():
+        for test in _flatten(unittest.TestLoader().loadTestsFromModule(mod)):
+            key = (rel, type(test).__name__, getattr(test, '_testMethodName', test.id()))
+            collected.append(key)
+            by_id[test.id()] = key
+            suite.addTest(test)
+    result['collected'] = [list(k) for k in collected]
+    if sorted(collected) != sorted(expected) or len(collected) != len(set(collected)):
+        missing = sorted(set(expected) - set(collected))
+        extra = sorted(set(collected) - set(expected))
+        problems.append(f'수집 불일치: 수집 {len(collected)} · 기대 {len(expected)} · 누락 {missing} · 추가 {extra}')
+        return finish()
+
+    # 6. 모듈 출처 - import 로 들어온 api/tools 가 전부 번들 소스여야 실행한다.
+    result['stage'] = 'origin'
+    result['modules'], origin_problems = module_origins(src)
+    if origin_problems:
+        problems += origin_problems
+        return finish()
+
+    # 7. 실행. 테스트 중에 늦게 import 된 모듈도 실행 뒤 다시 확인한다.
+    result['stage'] = 'run'
+    res = Recorder()
+    result['suite_runs'] += 1
+    suite.run(res)
+    result['counts'] = {'run': res.testsRun, 'failures': len(res.failures), 'errors': len(res.errors),
+                        'skipped': len(res.skipped), 'xfailed': len(res.expectedFailures),
+                        'xpassed': len(res.unexpectedSuccesses)}
+    result['rows'] = {'::'.join(by_id.get(tid, ('?', '?', tid))): row for tid, row in res.rows.items()}
+    result['modules'], origin_problems = module_origins(src)
+    problems += origin_problems
+    result['stage'] = 'done'
+    return finish()
 
 
 # ---------------------------------------------------------------- 판정·보고 (부모)
@@ -528,6 +575,8 @@ def child_main(args):
 def judge(methods, child):
     """자식 결과를 판정한다. 실패 사유 목록(비면 green)을 돌려준다."""
     reasons = list(child.get('problems') or [])
+    if child.get('stage') != 'done' or child.get('suite_runs') != 1:
+        reasons.append(f'실행 단계 {child.get("stage")!r} 에서 멈췄다 (suite.run {child.get("suite_runs")}회)')
     expected = ['::'.join((m['path'], m['class'], m['method'])) for m in methods]
     if len(expected) != len(set(expected)):
         reasons.append('기대 method 목록에 중복이 있다')
