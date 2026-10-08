@@ -54,8 +54,8 @@ jobs:
           cache-dependency-path: requirements.txt
       - name: 의존성 설치
         run: pip install -r requirements.txt pytest==9.1.1
-      - name: 측정기 안전 검사 (원격 모드 무import · 쓰기 금지 시 무접속 · 기록 허용 목록)
-        run: python -m pytest tests/scenarios/test_meter_safety.py -q -p no:cacheprovider
+      - name: 측정기 안전 검사 + 합성 출고 명령 검사
+        run: python -m pytest tests/scenarios/test_meter_safety.py tests/scenarios/test_fulfillment_command.py -q -p no:cacheprovider
       - name: 스키마 적용 (alembic upgrade head)
         working-directory: db
         run: alembic upgrade head

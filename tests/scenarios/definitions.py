@@ -28,6 +28,9 @@
 """
 from __future__ import annotations
 
+import re
+import uuid
+
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
@@ -156,6 +159,62 @@ NO_SUCH_ORDER = 'ORD-SCENARIO-NONE'
 NO_SUCH_OPERATION = '00000000-0000-4000-8000-000000000000'
 
 
+_CODE = re.compile(r'^[a-z0-9_]{1,64}$')
+FULFILLMENT_FIELDS = ('operation_id', 'action', 'expected_order_basis', 'expected_order_revision',
+                      'expected_policy_basis', 'shipment_id', 'expected_shipment_revision', 'lines',
+                      'expected_order_state')
+
+
+def build_prepare_command(data: Any) -> tuple[dict | None, str | None]:
+    """합성 출고 명령(prepare_shipment) — PR #2 PC 쪽 fixture 원천의 공개 명령 모양
+    (HTTP tests make -> writer tests prep_request -> h.intent -> h.command)을 따른다.
+
+    값은 **서버가 이번에 돌려준 것만** 쓴다: 최신 order_revision·expected_order_basis·order_state,
+    그리고 actions.prepare_shipment 가 내준 expected_policy_basis·lines. operation_id 는 새 실제 UUID.
+    fixture 의 serial=1 / UUID(int=1) / 'd'*64 같은 자리표시 값은 쓰지 않는다 — 실제 주문과 맞지 않는다.
+    서버가 actionable 값을 주지 않으면 명령을 만들지 않고 이유 코드만 돌려준다.
+    ⚠ actions.prepare_shipment 의 policy·lines 필드 이름은 출고 원천 생산자가 연결될 때 PC 쪽이 확정한다.
+    """
+    if not isinstance(data, dict):
+        return None, 'not_json'
+    act = (data.get('actions') or {}).get('prepare_shipment') if isinstance(data.get('actions'), dict) else None
+    if not isinstance(act, dict) or act.get('allowed') is not True:
+        why = act.get('reason') if isinstance(act, dict) else None
+        return None, why if isinstance(why, str) and _CODE.match(why) else 'prepare_not_allowed'
+    basis, rev, state = data.get('expected_order_basis'), data.get('order_revision'), data.get('order_state')
+    policy, lines = act.get('expected_policy_basis'), act.get('lines')
+    if not (isinstance(basis, str) and isinstance(policy, str) and type(rev) is int and isinstance(state, str)):
+        return None, 'basis_or_revision_missing'
+    if not isinstance(lines, list) or not lines or not all(
+            isinstance(l, dict) and isinstance(l.get('line_id'), str) and type(l.get('qty')) is int for l in lines):
+        return None, 'lines_missing'
+    return dict(operation_id=str(uuid.uuid4()), action='prepare_shipment', expected_order_basis=basis,
+                expected_order_revision=rev, expected_policy_basis=policy, shipment_id=None,
+                expected_shipment_revision=None, lines=[dict(line_id=l['line_id'], qty=l['qty']) for l in lines],
+                expected_order_state=state), None
+
+
+def _expect_actionable(status: int, data: Any, ctx: Ctx | None = None) -> str | None:
+    bad = ok_json()(status, data)
+    if bad:
+        return bad
+    _, why = build_prepare_command(data)
+    return f'출고 명령을 만들 서버 값이 없음 · 코드 {why}' if why else None
+
+
+def _keep_command(data: Any, ctx: Ctx) -> None:
+    cmd, _ = build_prepare_command(data)
+    if cmd:
+        ctx['fulfillment_command'] = cmd
+
+
+def _keep_fulfilled(data: Any, ctx: Ctx) -> None:
+    ctx.update(fulfilled=True, operation_id=ctx['fulfillment_command']['operation_id'])
+    rb = data.get('request_basis') if isinstance(data, dict) else None
+    if isinstance(rb, str):
+        ctx['request_basis'] = rb   # 최초 POST 응답에서 받는다 — 공개 명령으로 추정하지 않는다
+
+
 def _confirmed_original(data: Any, ctx: Ctx) -> str | None:
     """확정 원결과: 같은 주문·같은 operation_id·같은 action 이 confirmed 로 남아 있어야 한다.
     이것만으로 «중복 효과 0»까지 증명하지는 않는다(PR #2 PC 쪽 8번 검토)."""
@@ -166,7 +225,9 @@ def _confirmed_original(data: Any, ctx: Ctx) -> str | None:
                       ('action', cmd.get('action'))):
         if data.get(key) != want:
             return f'원결과의 {key} 가 보낸 명령과 다름'
-    return None
+    if ctx.get('request_basis') and data.get('request_basis') != ctx['request_basis']:
+        return '원결과의 request_basis 가 최초 POST 응답과 다름'
+    return None   # checked_at 은 조회 시각이라 비교하지 않는다
 
 
 def _order_body(ctx: Ctx) -> dict:
@@ -259,12 +320,15 @@ SCENARIOS: list[Scenario] = [
         Step('task.detail', '대상 주문 상세 보기', 'GET', '/api/admin/commerce/orders/{order_no}', audience='admin',
              needs=('order_no', 'admin'), readonly=True, expect=ok_json(),
              keep=lambda d, c: c.__setitem__('order_state_before', _state_of(d))),
-        # 출고 명령은 operation_id·action·revision·basis 가 필수다. 빈 명령은 422 invalid_fulfillment_command 이므로
-        # 보내지 않는다 — PC 쪽 8번의 합성 명령 fixture 가 ctx['fulfillment_command'] 를 채울 때까지 노랑이다.
-        Step('task.fulfill', '출고 등록(합성 명령 대기)', 'POST', '/api/admin/commerce/orders/{order_no}/fulfillment',
+        Step('task.current', '출고 현황과 처리 가능 여부 보기', 'GET', '/api/admin/commerce/orders/{order_no}/fulfillment',
+             audience='admin', needs=('order_no', 'admin'),
+             readonly=True,  # commerce_fulfillment_http._read: READ ONLY 트랜잭션 + rollback
+             expect=_expect_actionable, keep=_keep_command),
+        # 출고 명령은 operation_id·action·revision·basis 가 필수다. 빈 명령은 보내지 않는다 —
+        # 앞 단계가 서버 값으로 합성 명령(build_prepare_command)을 만들었을 때만 보낸다.
+        Step('task.fulfill', '출고 준비 등록', 'POST', '/api/admin/commerce/orders/{order_no}/fulfillment',
              audience='admin', needs=('order_no', 'admin', 'fulfillment_command'),
-             body=lambda c: c['fulfillment_command'], expect=ok_json(),
-             keep=lambda d, c: c.update(fulfilled=True, operation_id=c['fulfillment_command']['operation_id'])),
+             body=lambda c: c['fulfillment_command'], expect=ok_json(), keep=_keep_fulfilled),
         Step('task.after', '처리 뒤 주문 상태가 바뀌었는지 확인', 'GET', '/api/admin/commerce/orders/{order_no}',
              audience='admin', needs=('order_no', 'admin', 'fulfilled'), readonly=True,
              expect=lambda s, d, c: ok_json()(s, d) or _state_changed(d, c)),

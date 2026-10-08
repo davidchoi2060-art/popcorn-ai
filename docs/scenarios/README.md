@@ -48,6 +48,15 @@ python tests/scenarios/meter.py --base-url http://127.0.0.1:8000 --out docs/scen
   기록에 남지 않는다.
 - 종료 코드는 측정이 끝나면 0 이다(빨강이 있어도). 측정기가 못 돌면 2.
 
+## 운영자 출고 단계
+
+출고 준비 등록은 **빈 명령을 보내지 않는다.** 앞 단계 「출고 현황과 처리 가능 여부 보기」가 서버에서
+받은 값(최신 order_revision·expected_order_basis·order_state, `actions.prepare_shipment` 의 정책 basis·라인)으로
+합성 명령을 만들 때만 보내고, operation_id 는 매번 새 UUID 다. 오늘 서버는 `source_unconnected` 라
+그 단계에서 멈춘다. 명령 모양은 PC 쪽 fixture 사슬(prep_request → h.intent → h.command)과 대조한다:
+`python -m pytest tests/scenarios/test_fulfillment_command.py -q`. 확정 원결과 조회 성공만으로
+«중복 효과 0»을 증명하지 않으며, 잘못된 출고 정정은 계약이 없어 정책 미정이다.
+
 ## 시나리오를 고칠 때
 
 정의는 [`tests/scenarios/definitions.py`](../../tests/scenarios/definitions.py) 하나다. 새 경로가
