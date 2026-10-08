@@ -64,6 +64,8 @@
 | # | 상태 | 고치는 것 |
 |---|---|---|
 | 1 | **병합 준비 완료** · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) head `8bcc1c7` · PC 독립 확인(run 37745345455: 1,588 통과·0 실패). 중헌님 병합 대기 | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
+| 1+ | 번들 실행기 draft [PR #13](https://github.com/davidchoi2060-art/popcorn-ai/pull/13) head `13e5e02` (base PR #1 브랜치) · PC 독립 읽기 수용 · unit CI 성공(run 37755379291), bundle job은 손 실행 전용이라 건너뜀. 순서: PR #1 → main, PR #13 base 재지정, CI 재확인, 병합. 첫 번들 실행은 main에 `unit.yml`이 들어간 뒤 | `tests/bundle_run.py` · `tests/test_bundle_run.py` · `unit.yml` bundle job |
+| 1+ | CI 전용 배포 분리 설계 draft [PR #14](https://github.com/davidchoi2060-art/popcorn-ai/pull/14) head `202ea26` (docs 1파일) · PC 설계 수용. 격리 orphan 브랜치 `probe/paths-ignore` 시험 6건 전부 기대와 일치([결과](https://github.com/davidchoi2060-art/popcorn-ai/pull/14#issuecomment-6057085421)). **main에 들어가면 배포가 도는 상태라 PR #1·#13 병합은 분리안 반영 뒤.** 실제 `deploy.yml` 후보는 PC 배포 담당이 작성, 클라우드는 독립 검토만(같은 파일 병렬 수정 없음, 10/8 합의) | 문서와 시험만. `deploy.yml`은 고치지 않음 |
 | 3 | draft [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) · 작업 규칙 초안, 중헌님 승인 대기 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
 | 4 | draft [PR #8](https://github.com/davidchoi2060-art/popcorn-ai/pull/8) · 사전조건 누락을 「준비 실패」로 표시 · 서버 비밀번호 설정 한 줄과 회귀 1회 실행은 중헌님 조치 대기 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
 | 5 | draft [PR #9](https://github.com/davidchoi2060-art/popcorn-ai/pull/9) · 참고가격↔주문 확정가 계약은 PR #2에 답함 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
