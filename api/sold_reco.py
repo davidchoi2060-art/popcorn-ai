@@ -18,7 +18,12 @@
 ■ 가격은 현재값 — `api/admin_product_fit.load()` 와 같은 판정(품절·단종 제외, sale_price 우선).
   관리자 매트릭스와 고객 추천이 같은 원천을 본다(술어를 두 벌 두지 않는다).
 """
+import logging
+import re
+
 from .admin_product_fit import load
+
+log = logging.getLogger("sold_reco")
 
 # 고객 용도 라벨(usage_floors · usage_label_map) -> 평가 용도. 앞에서부터 먼저 맞는 것.
 USAGE_RULES = [
@@ -36,6 +41,46 @@ USAGE_RULES = [
 ]
 GAME_RES_RANK = {"1080p": 2, "1440p": 3, "4K": 4}
 MAX_ITEMS = 2
+MAX_UPGRADE_HINTS = 2
+
+# 「다음 수준」 안내 — 고객 문구는 Codex 확정본 그대로(PR #2 댓글 6057234341, 2026-10-08).
+# blocked 원문은 tools/product_fit.check() 가 COND_KO 의 고정 틀로만 만든다. 그 틀 전체와
+# 일치할 때만 종류가 확정된 것으로 본다(부분 문자열로 추측하지 않는다). 「미확인」 행은
+# 값을 몰라 부족한지 알 수 없으므로 안내하지 않는다. CPU 게임 등급은 확정 문구가 없어 뺀다.
+_DEFICIT = r" [\d,.]+(?:GB)? 미만(?:\(현재 [\d,.]+(?:GB)?\))?"
+UPGRADE_HINTS = [
+    (re.compile("CPU 멀티 지수" + _DEFICIT),
+     "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요."),
+    (re.compile("CPU 싱글 지수" + _DEFICIT),
+     "다음 수준을 고려한다면 CPU의 단일 작업 처리 성능을 높여 보세요."),
+    (re.compile("그래픽 지수" + _DEFICIT),
+     "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요."),
+    (re.compile("그래픽 메모리" + _DEFICIT),
+     "다음 수준을 고려한다면 그래픽 메모리 용량이 더 큰 구성을 살펴보세요."),
+    (re.compile("램" + _DEFICIT),
+     "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."),
+    (re.compile("SSD" + _DEFICIT),
+     "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."),
+    (re.compile("외장 그래픽 없음"),
+     "다음 수준을 고려한다면 별도 그래픽카드가 있는 구성을 살펴보세요."),
+    (re.compile("엔비디아 그래픽 아님"),
+     "다음 수준은 NVIDIA 그래픽카드가 필요한 조건입니다."),
+]
+
+
+def upgrade_hints(blocked) -> list[str]:
+    """blocked 원문 -> 고객 안내 문장(종류별 한 번, 최대 2개). 종류를 확정 못 한 행은 로그로만."""
+    out, skipped = [], []
+    for raw in blocked or []:
+        hint = next((h for rx, h in UPGRADE_HINTS
+                     if isinstance(raw, str) and rx.fullmatch(raw)), None)
+        if hint is None:
+            skipped.append(raw)
+        elif hint not in out:
+            out.append(hint)
+    if skipped:
+        log.info("[sold_reco] upgrade hint omitted for unmapped blocked: %r", skipped)
+    return out[:MAX_UPGRADE_HINTS]
 PUBLIC_SPEC_TEXT = ("cpu", "gpu")
 PUBLIC_SPEC_NUM = ("ram_gb", "ssd_gb", "vram_gb")
 
@@ -64,11 +109,9 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     lv = levels_by.get((usage, f["level"])) or {}
     over = bool(budget_won is not None and bound != "이상" and p["price"] > budget_won)
     reasons = [f"{usage} {f['level']} — {lv.get('work', '')}"]
-    if lv.get("conditions"):
-        reasons.append(f"충족 조건: {lv['conditions']}")
-    # 「다음 수준까지는」(f["blocked"])은 내부 평가 지수와 기준값을 숫자로 담고 있어
-    # 고객 응답에 싣지 않는다(협업 6번, 2026-10-08). 업그레이드 안내는 숫자 없는 문구로
-    # 다시 정한 뒤 넣는다 — 원천 blocked 는 관리자 매트릭스가 그대로 쓴다.
+    # 수준 조건(lv["conditions"])과 blocked 원문은 내부 지수·기준값을 담아 고객 응답에
+    # 싣지 않는다(협업 6번). 원천은 관리자 매트릭스가 그대로 쓴다.
+    reasons.extend(upgrade_hints(f.get("blocked")))
     if p.get("includes"):
         reasons.append(f"판매가에 {p['includes']} 포함")
     return {

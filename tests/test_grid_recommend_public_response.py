@@ -32,7 +32,8 @@ DB_ERROR = 'OperationalError: connection to server at "10.20.30.40" failed: pass
 
 LEVELS = [
     {'usage': '게임', 'level': '기본', 'level_rank': 1, 'work': '캐주얼 게임', 'conditions': None},
-    {'usage': '게임', 'level': 'FHD', 'level_rank': 2, 'work': 'FHD 게임', 'conditions': 'GPU 8GB'},
+    {'usage': '게임', 'level': 'FHD', 'level_rank': 2, 'work': 'FHD 게임',
+     'conditions': '그래픽 지수 100 이상 · 램 16GB 이상 · SSD 480GB 이상 · CPU 게임 등급 1.0 이상'},
     {'usage': '영상편집', 'level': '기본', 'level_rank': 1, 'work': 'FHD 편집', 'conditions': None},
 ]
 
@@ -44,7 +45,9 @@ def product(code, price):
                      'vram_gb': 8, 'cpu_mt': 16500, 'cpu_st': 2100, 'gpu_idx': 118},
             'balance': None, 'dominated_by': None, 'band': None,
             'fit': {'게임': {'level': 'FHD', 'rank': 2,
-                            'blocked': ['그래픽 지수 150 미만(현재 118)']},
+                            'blocked': ['그래픽 지수 150 미만(현재 118)', 'CPU 게임 등급 1.1 미만(현재 1.0)',
+                                        '램 미확인', '그래픽 지수 195 미만(현재 118)',
+                                        'SSD 960GB 미만(현재 500GB)']},
                     '영상편집': {'level': '기본', 'rank': 1,
                              'blocked': ['CPU 멀티 지수 24,000 미만(현재 16,500)']}}}
 
@@ -116,15 +119,20 @@ class RecommendPublicResponseTest(unittest.TestCase):
         for internal in ('cpu_mt', 'cpu_st', 'gpu_idx', '16500', '2100'):
             self.assertNotIn(internal, body)
 
-    def test_reasons_drop_next_level_line_with_internal_scores(self):
+    def test_reasons_carry_no_internal_scores_or_raw_conditions(self):
         with self.assertLogs('grid_public', level='INFO'):
             d = call_recommend()
         body = json.dumps(d, ensure_ascii=False)
-        for internal in ('다음 수준까지는', '현재 118', '현재 16,500'):
+        for internal in ('다음 수준까지는', '충족 조건', '지수', '등급 1.', '미확인', '현재 118', '현재 16,500'):
             self.assertNotIn(internal, body)
-        for s in d['card_sets']:
-            for item in s['items']:
-                self.assertTrue(item['reasons'][0].startswith(s['usage_grid']))
+        reasons = {s['usage_grid']: s['items'][0]['reasons'] for s in d['card_sets']}
+        self.assertEqual(reasons['게임'], [
+            '게임 FHD — FHD 게임',
+            '다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.',
+            '다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요.'])
+        self.assertEqual(reasons['영상편집'], [
+            '영상편집 기본 — FHD 편집',
+            '다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.'])
 
     def test_published_fixture_matches_live_response(self):
         # tests/fixtures/grid_recommend_sold_response.json is the sample the PC side builds
@@ -137,6 +145,44 @@ class RecommendPublicResponseTest(unittest.TestCase):
         with self.assertLogs('grid_public', level='INFO'):
             call_recommend()
         self.assertIn('cpu_mt', PRODUCTS[1]['spec'])
+
+
+class UpgradeHintsTest(unittest.TestCase):
+    CASES = [
+        ('CPU 멀티 지수 20,000 미만(현재 16,500)',
+         '다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.'),
+        ('CPU 싱글 지수 1,950 미만(현재 1,850)', '다음 수준을 고려한다면 CPU의 단일 작업 처리 성능을 높여 보세요.'),
+        ('그래픽 지수 150 미만(현재 118)', '다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.'),
+        ('그래픽 지수 100 미만', '다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.'),
+        ('그래픽 메모리 12GB 미만(현재 8GB)',
+         '다음 수준을 고려한다면 그래픽 메모리 용량이 더 큰 구성을 살펴보세요.'),
+        ('그래픽 메모리 8GB 미만', '다음 수준을 고려한다면 그래픽 메모리 용량이 더 큰 구성을 살펴보세요.'),
+        ('램 32GB 미만(현재 16GB)', '다음 수준을 고려한다면 메모리 용량을 늘려 보세요.'),
+        ('SSD 960GB 미만(현재 500GB)', '다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요.'),
+        ('외장 그래픽 없음', '다음 수준을 고려한다면 별도 그래픽카드가 있는 구성을 살펴보세요.'),
+        ('엔비디아 그래픽 아님', '다음 수준은 NVIDIA 그래픽카드가 필요한 조건입니다.'),
+    ]
+
+    def test_each_generator_template_maps_to_its_sentence(self):
+        for raw, hint in self.CASES:
+            with self.subTest(raw=raw):
+                self.assertEqual(S.upgrade_hints([raw]), [hint])
+
+    def test_unknown_unmapped_or_partial_kinds_are_omitted_and_logged(self):
+        for raw in ('램 미확인', '그래픽 지수 미확인', 'CPU 게임 등급 1.1 미만(현재 1.0)',
+                    '고성능 램 32GB 미만(현재 16GB)', 'SSD 960GB 미만(현재 500GB) 및 외장 그래픽 없음',
+                    '', None, 42):
+            with self.subTest(raw=raw):
+                with self.assertLogs('sold_reco', level='INFO'):
+                    self.assertEqual(S.upgrade_hints([raw]), [])
+
+    def test_dedup_and_at_most_two_in_source_order(self):
+        hints = S.upgrade_hints(['램 32GB 미만(현재 16GB)', '램 64GB 미만(현재 16GB)',
+                                 '외장 그래픽 없음', 'SSD 960GB 미만(현재 500GB)'])
+        self.assertEqual(hints, ['다음 수준을 고려한다면 메모리 용량을 늘려 보세요.',
+                                 '다음 수준을 고려한다면 별도 그래픽카드가 있는 구성을 살펴보세요.'])
+        self.assertEqual(S.upgrade_hints([]), [])
+        self.assertEqual(S.upgrade_hints(None), [])
 
 
 class PublicSpecTest(unittest.TestCase):
