@@ -165,15 +165,16 @@ FULFILLMENT_FIELDS = ('operation_id', 'action', 'expected_order_basis', 'expecte
                       'expected_order_state')
 
 
-def build_prepare_command(data: Any) -> tuple[dict | None, str | None]:
-    """합성 출고 명령(prepare_shipment) — PR #2 PC 쪽 fixture 원천의 공개 명령 모양
-    (HTTP tests make -> writer tests prep_request -> h.intent -> h.command)을 따른다.
+def prepare_intent(data: Any) -> tuple[dict | None, str | None]:
+    """판정만 한다 — 출고 준비(prepare_shipment)의 업무 의도를 서버 응답에서 읽는다. UUID 를 만들지 않는다.
 
-    값은 **서버가 이번에 돌려준 것만** 쓴다: 최신 order_revision·expected_order_basis·order_state,
-    그리고 actions.prepare_shipment 가 내준 expected_policy_basis·lines. operation_id 는 새 실제 UUID.
-    fixture 의 serial=1 / UUID(int=1) / 'd'*64 같은 자리표시 값은 쓰지 않는다 — 실제 주문과 맞지 않는다.
-    서버가 actionable 값을 주지 않으면 명령을 만들지 않고 이유 코드만 돌려준다.
-    ⚠ actions.prepare_shipment 의 policy·lines 필드 이름은 출고 원천 생산자가 연결될 때 PC 쪽이 확정한다.
+    공개 명령 모양은 PR #2 PC 쪽 fixture 원천(HTTP tests make -> writer tests prep_request ->
+    h.intent -> h.command)을 따른다. 값은 **서버가 이번에 돌려준 것만** 쓴다: 최신
+    order_revision·expected_order_basis·order_state, 그리고 actions.prepare_shipment 가 내준
+    expected_policy_basis·lines. fixture 의 serial·UUID(int=…)·'d'*64 자리표시 값은 쓰지 않는다.
+    서버가 actionable 값을 주지 않으면(오늘: source_unconnected · basis=None) 이유 코드만 돌려준다.
+    ⚠ actions.prepare_shipment 의 expected_policy_basis·lines 는 가정한 계약이다 — 출고 원천 생산자가
+    연결될 때 PC 쪽이 확정한다.
     """
     if not isinstance(data, dict):
         return None, 'not_json'
@@ -188,24 +189,34 @@ def build_prepare_command(data: Any) -> tuple[dict | None, str | None]:
     if not isinstance(lines, list) or not lines or not all(
             isinstance(l, dict) and isinstance(l.get('line_id'), str) and type(l.get('qty')) is int for l in lines):
         return None, 'lines_missing'
-    return dict(operation_id=str(uuid.uuid4()), action='prepare_shipment', expected_order_basis=basis,
-                expected_order_revision=rev, expected_policy_basis=policy, shipment_id=None,
-                expected_shipment_revision=None, lines=[dict(line_id=l['line_id'], qty=l['qty']) for l in lines],
+    return dict(action='prepare_shipment', expected_order_basis=basis, expected_order_revision=rev,
+                expected_policy_basis=policy, shipment_id=None, expected_shipment_revision=None,
+                lines=sorted((dict(line_id=l['line_id'], qty=l['qty']) for l in lines), key=lambda l: l['line_id']),
                 expected_order_state=state), None
+
+
+def command_for(intent: dict, ctx: Ctx) -> dict:
+    """명령을 만드는 **유일한** 자리. 같은 업무 의도를 다시 관측·재시도하면 처음 명령(같은 operation_id·
+    basis·lines·action)을 그대로 쓰고, 의도가 실제로 달라졌을 때만 새 UUID 를 낸다. 결과는 ctx 에 둔다."""
+    prev = ctx.get('fulfillment_command')
+    if isinstance(prev, dict) and {k: v for k, v in prev.items() if k != 'operation_id'} == intent:
+        return prev
+    ctx['fulfillment_command'] = cmd = dict(operation_id=str(uuid.uuid4()), **intent)
+    return cmd
 
 
 def _expect_actionable(status: int, data: Any, ctx: Ctx | None = None) -> str | None:
     bad = ok_json()(status, data)
     if bad:
         return bad
-    _, why = build_prepare_command(data)
+    _, why = prepare_intent(data)   # 판정만 — 여기서는 명령·UUID 를 만들지 않는다
     return f'출고 명령을 만들 서버 값이 없음 · 코드 {why}' if why else None
 
 
 def _keep_command(data: Any, ctx: Ctx) -> None:
-    cmd, _ = build_prepare_command(data)
-    if cmd:
-        ctx['fulfillment_command'] = cmd
+    intent, _ = prepare_intent(data)
+    if intent:
+        command_for(intent, ctx)
 
 
 def _keep_fulfilled(data: Any, ctx: Ctx) -> None:
@@ -325,7 +336,7 @@ SCENARIOS: list[Scenario] = [
              readonly=True,  # commerce_fulfillment_http._read: READ ONLY 트랜잭션 + rollback
              expect=_expect_actionable, keep=_keep_command),
         # 출고 명령은 operation_id·action·revision·basis 가 필수다. 빈 명령은 보내지 않는다 —
-        # 앞 단계가 서버 값으로 합성 명령(build_prepare_command)을 만들었을 때만 보낸다.
+        # 앞 단계가 서버 값으로 합성 명령(prepare_intent -> command_for)을 만들었을 때만 보낸다.
         Step('task.fulfill', '출고 준비 등록', 'POST', '/api/admin/commerce/orders/{order_no}/fulfillment',
              audience='admin', needs=('order_no', 'admin', 'fulfillment_command'),
              body=lambda c: c['fulfillment_command'], expect=ok_json(), keep=_keep_fulfilled),
