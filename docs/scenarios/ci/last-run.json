@@ -1,0 +1,358 @@
+{
+ "run": {
+  "at": "2026-10-08 07:23 UTC",
+  "commit": "1ecf4dfe31e670bed14c7ce218e88ab187ffc197",
+  "target": "CI 와 같은 조건의 일회용 DB(마이그레이션만 · 상품 0건)",
+  "allow_writes": true
+ },
+ "scenarios": [
+  {
+   "key": "quote",
+   "title": "추천에서 견적까지",
+   "actor": "고객",
+   "complete": false,
+   "steps": [
+    {
+     "key": "quote.bands",
+     "title": "예산 구간 보기",
+     "method": "GET",
+     "path": "/api/budget-bands",
+     "status": 200,
+     "ms": 62,
+     "sent": "GET /api/budget-bands",
+     "response": "{\"ok\": true, \"axes\": [{\"axis\": \"game\", \"label\": \"게임\", \"bands\": [{\"key\": \"G0\", \"label\": \"내장그래픽·저사양\", \"min_won\": 900000, \"max_won\": 1200000, \"budget_label\": \"120만원\", \"sample_n\": 4, \"source\": \"band_redesign_v2.md §3 — 정화 표본 782벌(게임 421 / 비게임 3",
+     "state": "green",
+     "reason": "실제 요청 통과"
+    },
+    {
+     "key": "quote.count",
+     "title": "조건에 맞는 부품으로 조립 가능한지 확인",
+     "method": "POST",
+     "path": "/api/candidates/count",
+     "status": 200,
+     "ms": 118,
+     "sent": "POST /api/candidates/count",
+     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "state": "red",
+     "reason": "buildable=False (기대 True)"
+    },
+    {
+     "key": "quote.quote",
+     "title": "견적 받기(용도 게임 · 예산 150만원)",
+     "method": "POST",
+     "path": "/api/recommend",
+     "status": 500,
+     "ms": 15,
+     "sent": "POST /api/recommend",
+     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "state": "red",
+     "reason": "HTTP 500"
+    },
+    {
+     "key": "quote.revalidate",
+     "title": "견적 부품의 가격·재고 다시 확인",
+     "method": "POST",
+     "path": "/api/recommend/revalidate",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(product_codes)"
+    }
+   ]
+  },
+  {
+   "key": "handoff",
+   "title": "견적을 쇼핑몰 주문으로 넘기기(몰 인계)",
+   "actor": "고객",
+   "complete": false,
+   "steps": [
+    {
+     "key": "handoff.count",
+     "title": "조건에 맞는 부품으로 조립 가능한지 확인",
+     "method": "POST",
+     "path": "/api/candidates/count",
+     "status": 200,
+     "ms": 8,
+     "sent": "POST /api/candidates/count",
+     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "state": "red",
+     "reason": "buildable=False (기대 True)"
+    },
+    {
+     "key": "handoff.quote",
+     "title": "견적 받기(용도 게임 · 예산 150만원)",
+     "method": "POST",
+     "path": "/api/recommend",
+     "status": 500,
+     "ms": 7,
+     "sent": "POST /api/recommend",
+     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "state": "red",
+     "reason": "HTTP 500"
+    },
+    {
+     "key": "handoff.create",
+     "title": "쇼핑몰 인계 접수",
+     "method": "POST",
+     "path": "/api/handoff",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(session_id, tier)"
+    },
+    {
+     "key": "handoff.view",
+     "title": "인계 내역 조회",
+     "method": "GET",
+     "path": "/api/handoff/{handoff_no}",
+     "status": 404,
+     "ms": 18,
+     "sent": "GET /api/handoff/HO-0",
+     "response": "\"인계 기록이 없습니다\"",
+     "state": "yellow",
+     "reason": "경로는 응답함(HTTP 404) · 앞 단계가 대상(handoff_no)을 못 만들어 실제 확인 못 함"
+    }
+   ]
+  },
+  {
+   "key": "login",
+   "title": "고객 로그인",
+   "actor": "고객",
+   "complete": false,
+   "steps": [
+    {
+     "key": "login.login",
+     "title": "로그인(가입)",
+     "method": "POST",
+     "path": "/api/auth/login",
+     "status": 503,
+     "ms": 8,
+     "sent": "POST /api/auth/login",
+     "response": "{\"error\": \"auth_unavailable\", \"detail\": \"회원 본인 확인 기능을 준비 중입니다. 현재 로그인·가입을 이용할 수 없습니다.\"}",
+     "state": "red",
+     "reason": "HTTP 503"
+    },
+    {
+     "key": "login.me",
+     "title": "로그인 상태 확인",
+     "method": "GET",
+     "path": "/api/auth/me",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(member)"
+    },
+    {
+     "key": "login.my_orders",
+     "title": "내 주문 보기",
+     "method": "GET",
+     "path": "/api/my/orders",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(member)"
+    }
+   ]
+  },
+  {
+   "key": "order",
+   "title": "주문 만들기",
+   "actor": "고객",
+   "complete": false,
+   "steps": [
+    {
+     "key": "order.count",
+     "title": "조건에 맞는 부품으로 조립 가능한지 확인",
+     "method": "POST",
+     "path": "/api/candidates/count",
+     "status": 200,
+     "ms": 8,
+     "sent": "POST /api/candidates/count",
+     "response": "{\"total\": 0, \"count\": 0, \"effects\": [{\"label\": \"용도\", \"value\": \"게임\", \"applied\": true, \"delta\": 0, \"count_after\": 0, \"reason\": \"용도 하한 미달 부품 제외 — 그래픽카드 550W 이상 · 메모리 16GB 이상 · SSD 1,000GB 이상\"}, {\"label\": \"예산\", \"value\": \"150만원\", \"applied\": true",
+     "state": "red",
+     "reason": "buildable=False (기대 True)"
+    },
+    {
+     "key": "order.quote",
+     "title": "견적 받기(용도 게임 · 예산 150만원)",
+     "method": "POST",
+     "path": "/api/recommend",
+     "status": 500,
+     "ms": 7,
+     "sent": "POST /api/recommend",
+     "response": "500 UndefinedColumn: column \"vram_gb\" does not exist",
+     "state": "red",
+     "reason": "HTTP 500"
+    },
+    {
+     "key": "order.create",
+     "title": "주문 생성",
+     "method": "POST",
+     "path": "/api/orders",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(session_id, tier)"
+    },
+    {
+     "key": "order.view",
+     "title": "주문 조회",
+     "method": "GET",
+     "path": "/api/commerce/orders/{order_no}",
+     "status": 503,
+     "ms": 6,
+     "sent": "GET /api/commerce/orders/ORD-SCENARIO-PROBE",
+     "response": "{\"code\": \"owner_configuration_unready\"}",
+     "state": "red",
+     "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
+    }
+   ]
+  },
+  {
+   "key": "payment",
+   "title": "결제하기",
+   "actor": "고객",
+   "complete": false,
+   "steps": [
+    {
+     "key": "payment.prepare",
+     "title": "결제 준비(주문 금액 확정)",
+     "method": "GET",
+     "path": null,
+     "state": "red",
+     "reason": "HTTP 경로 없음 — api/commerce_writer.py 의 create_draft·prepare 를 부르는 라우트가 없다"
+    },
+    {
+     "key": "payment.approve",
+     "title": "결제 승인",
+     "method": "GET",
+     "path": null,
+     "state": "red",
+     "reason": "HTTP 경로 없음 — commerce_writer 의 dispatch·finalize 를 부르는 라우트가 없다"
+    },
+    {
+     "key": "payment.history",
+     "title": "내 결제 내역 보기",
+     "method": "GET",
+     "path": "/api/my/payments",
+     "state": "yellow",
+     "reason": "경로는 있음 · 앞 단계가 남긴 값 없음(order_no, member)"
+    }
+   ]
+  },
+  {
+   "key": "admin",
+   "title": "운영자 주문 관리",
+   "actor": "운영자",
+   "complete": true,
+   "steps": [
+    {
+     "key": "admin.login",
+     "title": "관리자 로그인",
+     "method": "POST",
+     "path": "/api/admin/auth/login",
+     "status": 200,
+     "ms": 25,
+     "sent": "POST /api/admin/auth/login",
+     "response": "{\"state\": \"active\", \"operator\": {\"id\": 1, \"email\": \"scenario-owner@ci.popcorn.invalid\", \"role\": \"owner\"}, \"bootstrap\": true, \"message\": \"부트스트랩 계정으로 자동 승인됐습니다(관리자 권한)\"}",
+     "state": "green",
+     "reason": "실제 요청 통과"
+    },
+    {
+     "key": "admin.commerce_orders",
+     "title": "커머스 주문 목록",
+     "method": "GET",
+     "path": "/api/admin/commerce/orders",
+     "status": 200,
+     "ms": 19,
+     "sent": "GET /api/admin/commerce/orders",
+     "response": "{\"commerce_version\": \"commerce_v1\", \"checked_at\": 1791444203, \"context\": {\"state\": \"confirmed\", \"binding_id\": \"aafd2ade-045d-48b2-9f07-cd7d36e76cea\"}, \"items\": [], \"next_cursor\": null}",
+     "state": "green",
+     "reason": "실제 요청 통과"
+    },
+    {
+     "key": "admin.payments",
+     "title": "결제 내역 목록",
+     "method": "GET",
+     "path": "/api/admin/payments",
+     "status": 200,
+     "ms": 16,
+     "sent": "GET /api/admin/payments",
+     "response": "{\"fee_rate\": 0.022, \"today\": \"2026-10-08\", \"payments\": [], \"settles\": []}",
+     "state": "green",
+     "reason": "실제 요청 통과"
+    },
+    {
+     "key": "admin.refunds",
+     "title": "환불 요청 목록",
+     "method": "GET",
+     "path": "/api/admin/refunds",
+     "status": 200,
+     "ms": 13,
+     "sent": "GET /api/admin/refunds",
+     "response": "{\"items\": []}",
+     "state": "green",
+     "reason": "실제 요청 통과"
+    }
+   ]
+  },
+  {
+   "key": "fulfillment",
+   "title": "출고 등록과 배송 조회",
+   "actor": "운영자",
+   "complete": false,
+   "steps": [
+    {
+     "key": "fulfillment.register",
+     "title": "출고 등록",
+     "method": "POST",
+     "path": "/api/admin/commerce/orders/{order_no}/fulfillment",
+     "status": 503,
+     "ms": 11,
+     "sent": "POST /api/admin/commerce/orders/ORD-SCENARIO-PROBE/fulfillment",
+     "response": "{\"code\": \"fulfillment_origin_unconnected\"}",
+     "state": "red",
+     "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
+    },
+    {
+     "key": "fulfillment.customer_view",
+     "title": "고객이 배송 상태 보기",
+     "method": "GET",
+     "path": "/api/commerce/orders/{order_no}/fulfillment",
+     "status": 503,
+     "ms": 6,
+     "sent": "GET /api/commerce/orders/ORD-SCENARIO-PROBE/fulfillment",
+     "response": "{\"code\": \"owner_configuration_unready\"}",
+     "state": "red",
+     "reason": "대상 없이 두드려도 HTTP 503 — 이 단계는 지금 막혀 있다"
+    }
+   ]
+  },
+  {
+   "key": "return",
+   "title": "반품",
+   "actor": "고객 · 운영자",
+   "complete": false,
+   "steps": [
+    {
+     "key": "return.request",
+     "title": "고객 반품 접수",
+     "method": "GET",
+     "path": null,
+     "state": "red",
+     "reason": "HTTP 경로 없음 — 실물 반품 접수 라우트가 없다(api/commerce_physical_return_http.py 는 관리자 조회 GET 둘뿐)"
+    },
+    {
+     "key": "return.pickup",
+     "title": "회수·입고 처리",
+     "method": "GET",
+     "path": null,
+     "state": "red",
+     "reason": "HTTP 경로 없음 — 회수·입고·실행 라우트가 없다"
+    },
+    {
+     "key": "return.admin_view",
+     "title": "운영자 반품 내역 보기",
+     "method": "GET",
+     "path": "/api/admin/commerce/orders/{order_no}/physical-returns",
+     "status": 404,
+     "ms": 38,
+     "sent": "GET /api/admin/commerce/orders/ORD-SCENARIO-PROBE/physical-returns",
+     "response": "{\"code\": \"physical_return_not_found\"}",
+     "state": "yellow",
+     "reason": "경로는 응답함(HTTP 404) · 앞 단계가 대상(order_no)을 못 만들어 실제 확인 못 함"
+    }
+   ]
+  }
+ ]
+}
