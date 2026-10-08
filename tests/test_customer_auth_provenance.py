@@ -298,12 +298,10 @@ class P1StandaloneEvidenceTests(unittest.TestCase):
                 self.assertNotIn(provenance().subject, repr(value))
 
     def test_external_c2_field_contract_matches_standalone_input(self):
-        # The accepted C2 contract is not in the repo yet. Read it from the repo fixture, or from
-        # POPCORN_C2_CONTRACT_SOURCE; the sha256 pin below still decides whether it is the accepted file.
+        # C2 contract fixture (technical proposal, not accepted or implemented), committed byte-exact.
+        # POPCORN_C2_CONTRACT_SOURCE can point elsewhere; the sha256 pin below still decides the bytes.
         path = Path(os.environ.get('POPCORN_C2_CONTRACT_SOURCE') or
                     Path(__file__).resolve().parent / 'fixtures' / 'c2-session-proof-contract-v1.json')
-        if not path.is_file():
-            self.skipTest('개발 PC 전용 자료 없음: accepted C2 contract fixture missing at ' + str(path))
         raw = path.read_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(), 'f28ccf34a308fd147dabc98345c602696bc984f7bb23cfd339e3b30fc46a160a')
         contract = json.loads(raw)
