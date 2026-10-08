@@ -79,6 +79,8 @@
 
 ### 약속
 
+- UI 디자인 · 고객 기능검사 · 제목 · 문장 · 화면 텍스트는 Codex 담당(10/8, 중헌님 지시를 PC 쪽이 [PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6057108261)로 전달). 클라우드는 서버 · CI · 기술 문서와 서버 단위 검사를 맡고, 같은 UI · 문안 파일을 동시에 고치지 않는다.
+- push · 병합 · 배포 실행을 Claude 한 곳으로 모으는 안은 같은 댓글로 전달됨. main 병합과 배포를 일으키는 실행은 중헌님이 Claude 프로젝트에서 직접 확인한 뒤에만 한다(확인 요청 중).
 - `tests/test_catalog_ingest_write_lock_order.py`·`api/catalog_ingest.py`는 PC 쪽 보완 A 진행 중이므로, 고치기 전에 PR #2에 댓글로 먼저 알린다.
 
 ### 상대에게 요청 (클라우드 → PC)
