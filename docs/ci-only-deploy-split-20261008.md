@@ -46,7 +46,7 @@
 
 | 경로 | 서버 배포가 쓰나 | 근거 |
 |---|---|---|
-| `.github/workflows/unit.yml` | 아니다 | ubuntu-latest 에서만 돈다. 서버는 workflow 를 읽지 않는다 |
+| `.github/workflows/unit.yml` | 아니다 | 앱 runtime(`popcorn-ci deploy` 1~5단계)은 workflow 파일을 읽지 않는다. 이 workflow 의 job 은 `runs-on: ubuntu-latest` 라 self-hosted 러너가 가져가지 않는다. 단, self-hosted 러너가 workflow 를 실행하는 일(deploy.yml)과 앱이 파일을 읽는 일은 별개이며, 이 근거는 앞의 것만 말한다 |
 | `requirements-test.txt` | 아니다 | `popcorn-ci` 59행은 `requirements.txt` 만 설치한다 |
 | `tests/ci_run.py` · `tests/test_ci_run.py` | 아니다 | unit job 전용 실행기 |
 | `tests/conftest.py` | 아니다 | pytest 전용. 서버 회귀는 `tests/regression.py` 를 스크립트로 실행하고(`popcorn-ci` 86행) 그 파일은 표준 라이브러리만 import 한다 |
@@ -56,7 +56,7 @@
 
 ## 4. 반례 표 (기대 동작)
 
-GitHub 규칙: push 의 바뀐 파일이 **전부** `paths-ignore` 에 걸릴 때만 건너뛴다. 하나라도 안 걸리면 돈다.
+GitHub 규칙: push 의 바뀐 파일이 **전부** `paths-ignore` 에 걸릴 때만 건너뛴다. 하나라도 안 걸리면 돈다. 아래 「배포」 기대는 **GitHub 가 diff 를 온전히 보는 범위(300파일 이하) 안에서의** 기대다 — 그 밖은 「알려진 한계」 참조.
 
 | # | push 에 담긴 변경 | 기대 | 이유 |
 |---|---|---|---|
@@ -72,12 +72,12 @@ GitHub 규칙: push 의 바뀐 파일이 **전부** `paths-ignore` 에 걸릴 �
 | 10 | `docs/x.md` 만 | 건너뜀 | 기존 규칙 그대로 |
 | 11 | workflow_dispatch (손 실행) | **배포** | paths 필터는 push 에만 적용된다 (기준 5) |
 
-건너뛴 CI 커밋이 쌓여도 서버가 어긋나지 않는다: 다음 정상 배포가 `merge --ff-only FETCH_HEAD` 로 그 커밋들을 함께 받는다(`popcorn-ci` 46~54행). 그 사이 서버 트리의 CI 파일만 main 보다 뒤처지고, 서버는 그 파일을 읽지 않는다.
+건너뛴 CI 커밋이 쌓여도 다음 정상 배포가 `merge --ff-only FETCH_HEAD` 로 그 커밋들을 함께 받는다(`popcorn-ci` 46~54행). 그 사이 서버 트리의 CI 파일만 main 보다 뒤처지고, 앱 runtime 은 그 파일을 읽지 않는다.
 
 ### 알려진 한계
 
 - GitHub 문서 기준으로 경로 필터는 diff 를 최대 300파일까지만 본다. 한 push 가 300파일을 넘으면 판정이 어긋날 수 있고, 그 방향이 「배포 누락」일 수도 있다. 그래서 300파일을 넘는 main push 뒤에는 배포가 실제로 돌았는지 확인한다(PR #1 · #13 은 5 · 3파일, PR #10 은 51파일).
-- 판정은 push 의 before..after 차이로 한다. 여러 PR 을 한 번에 push 하면 합집합으로 판정한다(제품 파일이 하나라도 있으면 배포 — 안전한 쪽).
+- 판정은 push 의 before..after 차이로 한다. 여러 PR 을 한 번에 push 하면 합집합으로 판정한다. 제품 파일이 하나라도 있으면 배포한다는 기대는 위 300파일 관측 한계 안에서만 성립한다.
 
 ## 5. 이 변경을 처음 넣는 커밋 자체가 배포를 일으킨다
 
@@ -87,8 +87,8 @@ GitHub 규칙: push 의 바뀐 파일이 **전부** `paths-ignore` 에 걸릴 �
 
 `[skip ci]` 와 배포 중지 없이 가는 길은 둘이다.
 
-**A. 다음 정규 배포에 얹는다 (추가 배포 0회, 추천)**
-- 어차피 배포될 제품 변경(예: 0133 PR #11, PC 작업 PR #10)과 **같은 push** 로 main 에 넣는다.
+**A. 다음 정규 배포에 얹는다 (운영 조건 1~4 충족 시 추가 배포 0회)**
+- 승인된 정규 배포 후보와 **같은 push** 로 main 에 넣는다. 예를 들면 PR #11(0133) · PR #10(PC 작업)이 떠오르지만, **둘 다 지금 운영 배포 승인 후보가 아니다** — PR #10 은 51파일 소유 확인, PR #11 은 고립 검증 밖의 확인이 남아 있어, 얹으려면 별도의 정확 범위 · 승인 검토가 먼저 필요하다.
 - 그 배포는 이미 승인 절차를 거치는 배포라, 분리안 때문에 늘어나는 배포가 없다.
 - 순서: 분리안이 들어간 정규 배포 → PR #1 → PR #13 (둘 다 건너뜀).
 - 조건: 그 정규 배포의 승인 · 운영 조건(아래 B 와 같음)을 그대로 충족해야 한다.
@@ -97,7 +97,7 @@ GitHub 규칙: push 의 바뀐 파일이 **전부** `paths-ignore` 에 걸릴 �
 - 현재 main 위에 deploy.yml 한 파일만 바꾼 커밋. 앱 코드 · requirements · migration 변경 0.
 - 서버에서 일어나는 일: ff-only 로 그 커밋만 받기 → 같은 requirements 재설치 → `alembic upgrade head`(서버가 이미 main head 면 무변경) → 재시작(수 초 중단) → 헬스 체크.
 - 필요한 운영 조건 (PC 배포 담당 확인 몫):
-  1. 서버 HEAD 가 main 의 조상이다(아니면 1단계 ff-only 에서 배포가 멈춘다. 그때 서버가 그대로 남는지는 wrapper 실측으로 확인해야 하며, 이 문서는 무손상을 보장하지 않는다).
+  1. 서버 HEAD 가 main 의 조상이다. 아니면 1단계 `merge --ff-only` 가 실패하고, `set -Eeuo pipefail` 에 따라 **그 뒤 pip · migration · 재시작 단계는 실행되지 않는다**(이 문서가 말하는 범위는 여기까지다). 앞의 `git fetch` 가 남기는 FETCH_HEAD 등 메타 변경, 그리고 merge 가 성공한 뒤 설치 · 헬스 체크가 실패했을 때의 복구 조건은 별개이며, 무손상 · 자동 복구를 뜻하지 않는다.
   2. 서버 `alembic current` 가 main 의 head 와 같다(다르면 이 배포가 밀린 migration 을 실제로 적용한다 — 이것이 「강제 migration」 위험의 실체다).
   3. 재시작 중 짧은 중단을 받아들일 수 있는 시간대.
   4. 되돌림 경로(이전 커밋으로 ff 불가 시의 절차)가 확인돼 있다.
