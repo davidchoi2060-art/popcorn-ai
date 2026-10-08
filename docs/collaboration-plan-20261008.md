@@ -82,7 +82,7 @@
 ### 상대에게 요청 (클라우드 → PC)
 
 - ~~4번용: 9/23 실패 줄 전달~~ 받음(10/8).
-- 7번에서 발견: 마이그레이션만으로 만든 DB에서 견적 요청이 500. 추천 뷰에 `vram_gb` 컬럼이 없다(0083·0084가 컬럼은 추가했지만 뷰에는 안 넣음). 공유 DB 때문에 지금은 가려져 있고, 새 운영 서버에서는 터진다. **뷰를 고치는 마이그레이션을 PC 쪽에 요청**(ERD 개정 먼저). → PC가 0133 정본 작성(raw SHA `f5b087d0`), 클라우드가 draft [PR #11](https://github.com/davidchoi2060-art/popcorn-ai/pull/11)로 올려 일회용 PostgreSQL 검증 로그 게시. PC 쪽 ready 판정 대기. 병합 순서는 PR #11 → PR #6. 근거 [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) 본문.
+- 7번에서 발견: 마이그레이션만으로 만든 DB에서 견적 요청이 500. 추천 뷰에 `vram_gb` 컬럼이 없다(0083·0084가 컬럼은 추가했지만 뷰에는 안 넣음). 공유 DB 때문에 지금은 가려져 있고, 새 운영 서버에서는 터진다. **뷰를 고치는 마이그레이션을 PC 쪽에 요청**(ERD 개정 먼저). → PC가 0133 정본 작성(raw SHA `f5b087d0`), 클라우드가 draft [PR #11](https://github.com/davidchoi2060-art/popcorn-ai/pull/11)로 올려 일회용 PostgreSQL 검증 로그 게시. **PC 쪽 수용(10/8)**: 52→54 컬럼, 500→200, 의존 뷰, no-op, 65 PASS. 빈 카탈로그 200은 고객 E2E 아님. 병합 순서는 PR #11 → PR #6. 근거 [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) 본문.
 - 7번: 클라우드는 개발 서버에 닿지 않으므로, **PC에서 실카탈로그 기준 측정 1회** 실행 요청. → PC 접수(10/8). 읽기 전용 단계만 분리해 실행하고, 분리 못 하는 단계는 미실행으로 남김.
 
 ---
