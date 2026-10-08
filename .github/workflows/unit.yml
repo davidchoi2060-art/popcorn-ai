@@ -61,3 +61,43 @@ jobs:
         run: pip install -r requirements-test.txt
       - name: 단위 테스트 (파일별 격리)
         run: python tests/ci_run.py
+
+  # PR #12 합성 CI 번들(docs/ci-candidate-20261008/) 전용. 손으로 실행(workflow_dispatch)할 때만 돈다 -
+  # push · pull_request 에서는 건너뛴다. 저장소 단위 테스트(unit job)와 프로세스 · venv 가 따로다.
+  # 번들은 이 브랜치에 복사하지 않고 고정 커밋(BUNDLE_SHA)을 별도 경로로 checkout 한다.
+  # 차단 층은 사고 방지용이며 보안 sandbox 가 아니다(tests/bundle_run.py 머리 주석).
+  bundle:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUNDLE_SHA: a2772616a7b7c349f1def94f06ef8d4c6e99ec87
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 번들 고정 커밋 checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BUNDLE_SHA }}
+          path: bundle-src
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 번들 대조 (8개 커밋 바이트 · 14개 파일 · 18개 method · 16개 핀, 실행 없음)
+        run: python tests/bundle_run.py verify --bundle-repo bundle-src --bundle-sha "$BUNDLE_SHA" --work "$RUNNER_TEMP/bundle"
+      - name: 핀 16개 설치 (no-deps) + pip check
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r "$RUNNER_TEMP/bundle/requirements_ci.txt"
+          "$RUNNER_TEMP/venv/bin/python" -m pip check
+      - name: 번들 18개 실행 (격리 · 차단)
+        run: python tests/bundle_run.py run --python "$RUNNER_TEMP/venv/bin/python" --work "$RUNNER_TEMP/bundle" --results "$RUNNER_TEMP/bundle-results.json" --bundle-sha "$BUNDLE_SHA"
+      - name: 결과 보관
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-results
+          path: ${{ runner.temp }}/bundle-results.json
+          if-no-files-found: warn
