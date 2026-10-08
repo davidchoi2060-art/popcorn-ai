@@ -6,7 +6,7 @@ const {JSDOM}=require('jsdom');
 const html=fs.readFileSync(path.join(__dirname,'..','my-page.html'),'utf8');
 const inline=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].filter(m=>!/\bsrc\s*=/.test(m[1])&&m[2].trim());
 assert.equal(inline.length,1);const source=inline[0][2];
-const c3File=process.env.POPCORN_C3_AUTH_SOURCE||'D:/WORK/PopcornAI/outputs/customer-auth-c3-code-20261007/frozen/mockups/shared/auth.js';
+const c3File=process.env.POPCORN_C3_AUTH_SOURCE||path.join(__dirname,'..','..','shared','auth.js');
 const c3Bytes=fs.readFileSync(c3File);
 assert.equal(crypto.createHash('sha256').update(c3Bytes).digest('hex'),'f2d6afab2bb9068e885142e3a8c54442ec94b0d826870cb12574baedf8773406','read accepted C3 only');
 const NAME='PRIVATE-CURRENT-NAME',EMAIL='private-current@example.test';
