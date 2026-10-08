@@ -203,3 +203,44 @@ ORDER BY f.product_code;
 - `tests.test_customer_pc_projection` 18건, `tests.test_customer_sold_offer_read` 32건, `tests.test_part_explanations` 4건, `tests.test_pc_customer_publication` 36건, `tests.test_pc_media` 6건 통과.
 - `tests.test_pc_configuration_offer_binding` 25건 중 1건 실패: `test_original_whole_ast_imports_routes_and_functions_are_unchanged`(고정해 둔 `pc_configuration_copy.py` AST 해시 불일치). `main`에서 이미 실패하는 상태이고 이 문서 변경과 무관하다.
 - 추천 응답 형태는 PR #3 브랜치의 `tests/test_grid_recommend_public_response.py`(28건 통과)와 `tests/fixtures/grid_recommend_sold_response.json`이 고정한다.
+
+## 9. 후속: 공개 BOM·대표 사진 고객 API (2026-10-08 추가)
+
+- 계약: [PR #2 댓글 6059286404](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6059286404). 구현: PR #17(draft, PR #10 위에 쌓음).
+- `GET /api/customer/pc-offers/{product_code}` → `{ok, offer}`. `offer`는 §3의 `data`와 같고 둘이 바뀐다:
+  - `parts[].photo`: 실부품 `{"state":"approved","url":"/api/product-images/{부품코드}/detail"}`, pseudo `{"state":"none","url":null}`
+  - `photo`: selected·ready·visual 현재본이면 `{"state":"current","url":"/api/customer/pc-offers/{code}/photo/{job_id}","notice":"AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"}`, 아니면 `{"state":"unresolved","url":null,"notice":null}`
+- 공개 아님은 전부 `404 {"detail":{"error":"not_public"}}`. 가격·재고는 계속 `unknown`이고 부품별 가격은 없다.
+- 운영 설정: `POPCORN_PART_PHOTO_RIGHTS_REFERENCE`가 없으면 모든 SKU가 404다.
+- §0 표 갱신: 공개 BOM·완제품 대표 사진 = 설계 완료 / 단위 검사 완료(PR #17, 13건) / 실 DB 적용 미확인.
+
+### 9.1 실 DB에서 몇 SKU가 열리는지 확인하는 읽기 전용 질의
+
+§1.3 결과에 아래를 더하면, 승인 이벤트가 없어서 닫히는 SKU를 구분할 수 있다.
+
+```sql
+WITH cfg AS (
+  SELECT f.product_code, c.configuration_id, c.revision
+  FROM product_fit_products f
+  JOIN pc_configuration_offers o ON o.offer_id = 'P' || f.product_code
+  JOIN pc_configurations c ON c.configuration_id = o.configuration_id
+), real_parts AS (
+  SELECT cfg.product_code, p.explanation_code
+  FROM cfg JOIN pc_configuration_parts p ON p.configuration_id = cfg.configuration_id AND NOT p.pseudo
+)
+SELECT cfg.product_code, cfg.configuration_id, cfg.revision,
+       (SELECT action FROM pc_customer_publication_events e
+         WHERE e.configuration_id = cfg.configuration_id ORDER BY event_seq DESC LIMIT 1) AS publication,
+       (SELECT count(*) FROM real_parts r WHERE r.product_code = cfg.product_code) AS real_parts,
+       (SELECT count(*) FROM real_parts r WHERE r.product_code = cfg.product_code AND
+          (SELECT action FROM part_explanation_approval_events a WHERE a.source_product_code = r.explanation_code
+            ORDER BY event_seq DESC LIMIT 1) = 'approve') AS parts_text_approved,
+       (SELECT count(*) FROM real_parts r WHERE r.product_code = cfg.product_code AND
+          (SELECT action FROM part_photo_approval_events a WHERE a.source_product_code = r.explanation_code
+            ORDER BY event_seq DESC LIMIT 1) = 'approve') AS parts_photo_approved,
+       EXISTS (SELECT 1 FROM pc_media_jobs j WHERE j.configuration_id = cfg.configuration_id
+                 AND j.selected AND j.status = 'ready') AS has_selected_photo
+FROM cfg ORDER BY cfg.product_code;
+```
+
+`publication='approve'`이고 두 승인 수가 `real_parts`와 같아야 200 후보가 된다. 최종 판정은 해시 비교까지 하는 라우트가 내린다(이 질의는 후보 수만 센다). `part_explanation_approval_events`는 PR #10의 0130 마이그레이션이 만든다.
