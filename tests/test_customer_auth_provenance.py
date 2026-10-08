@@ -4,6 +4,7 @@ from dataclasses import FrozenInstanceError, asdict, replace
 from decimal import Decimal
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import unittest
@@ -297,7 +298,12 @@ class P1StandaloneEvidenceTests(unittest.TestCase):
                 self.assertNotIn(provenance().subject, repr(value))
 
     def test_external_c2_field_contract_matches_standalone_input(self):
-        path = Path('D:/WORK/PopcornAI/outputs/d-c2-session-proof-contract-v1-20261007/candidate-contract.json')
+        # The accepted C2 contract is not in the repo yet. Read it from the repo fixture, or from
+        # POPCORN_C2_CONTRACT_SOURCE; the sha256 pin below still decides whether it is the accepted file.
+        path = Path(os.environ.get('POPCORN_C2_CONTRACT_SOURCE') or
+                    Path(__file__).resolve().parent / 'fixtures' / 'c2-session-proof-contract-v1.json')
+        if not path.is_file():
+            self.skipTest('개발 PC 전용 자료 없음: accepted C2 contract fixture missing at ' + str(path))
         raw = path.read_bytes()
         self.assertEqual(hashlib.sha256(raw).hexdigest(), 'f28ccf34a308fd147dabc98345c602696bc984f7bb23cfd339e3b30fc46a160a')
         contract = json.loads(raw)
