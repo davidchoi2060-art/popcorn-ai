@@ -21,6 +21,12 @@ router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
 SAVE_POLICY_KEY = 'visitor.mvp3_save'
 SAVE_PER_MINUTE = 10
 SAVE_PER_DAY = 100
+# Customer wording is Codex's (PR #2 comment 6057234341); copy verbatim. The day window
+# resets at KST midnight (access_gate), which is what "내일" promises.
+SAVE_LIMIT_MESSAGES = {
+    'minute': '잠시 동안 견적 저장 요청이 많았습니다. {retry_after_sec}초 후 다시 저장해 주세요.',
+    'day': '오늘 저장할 수 있는 견적 수에 도달했습니다. 내일 다시 저장해 주세요.',
+}
 
 
 class SaveBody(BaseModel):
@@ -118,7 +124,7 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         # Idempotent replays above are free; only new saves count.
         access_gate.check_rate(conn, request, what='mvp3.save', policy_key=SAVE_POLICY_KEY,
                                default_per_minute=SAVE_PER_MINUTE, default_per_day=SAVE_PER_DAY,
-                               label='견적 저장')
+                               messages=SAVE_LIMIT_MESSAGES)
         state, _ = validate_state(body.state, load_vocab(conn))
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
     product = selected_product(public, body.product_code, body.expected_price)

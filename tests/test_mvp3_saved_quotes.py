@@ -129,8 +129,33 @@ class SavedQuotesTest(unittest.TestCase):
         with self.assertRaises(HTTPException) as ex:
             m.save_quote(body(request_id=UUID(int=999)), request(), Response())
         self.assertEqual(ex.exception.status_code, 429)
-        self.assertIn('견적 저장', ex.exception.detail['detail'])
+        d = ex.exception.detail
+        self.assertEqual((d['error'], d['window']), ('rate_limited', 'minute'))
+        self.assertIsInstance(d['retry_after_sec'], int)
+        self.assertEqual(ex.exception.headers['Retry-After'], str(d['retry_after_sec']))
+        self.assertEqual(d['detail'], f"잠시 동안 견적 저장 요청이 많았습니다. {d['retry_after_sec']}초 후 다시 저장해 주세요.")
         self.assertEqual(len(self.store.rows), m.SAVE_PER_MINUTE)
+
+    def test_daily_limit_uses_day_message(self):
+        with patch.object(m, 'SAVE_PER_MINUTE', 100), patch.object(m, 'SAVE_PER_DAY', 3):
+            for i in range(3):
+                m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+            with self.assertRaises(HTTPException) as ex:
+                m.save_quote(body(request_id=UUID(int=999)), request(), Response())
+        d = ex.exception.detail
+        self.assertEqual((ex.exception.status_code, d['window']), (429, 'day'))
+        self.assertEqual(d['detail'], '오늘 저장할 수 있는 견적 수에 도달했습니다. 내일 다시 저장해 주세요.')
+        # "내일" is only true because the day window ends at the next KST midnight.
+        self.assertLessEqual(d['retry_after_sec'], 24 * 3600)
+        self.assertEqual(len(self.store.rows), 3)
+
+    def test_replay_still_wins_while_limited(self):
+        first = m.save_quote(body(), request(), Response())
+        for i in range(m.SAVE_PER_MINUTE - 1):
+            m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+        with self.assertRaises(HTTPException):
+            m.save_quote(body(request_id=UUID(int=999)), request(), Response())
+        self.assertEqual(m.save_quote(body(), request(), Response()), first)
 
     def test_replay_does_not_count_toward_limit(self):
         for _ in range(m.SAVE_PER_MINUTE + 5):
@@ -144,6 +169,10 @@ class SavedQuotesTest(unittest.TestCase):
         # AI parse/explain still has its own full per-minute allowance.
         for _ in range(m.access_gate.DEFAULT_PER_MINUTE):
             m.access_gate.check_rate(self.store, request(), what='talk.parse')
+        # ...and keeps its own, unchanged wording when exhausted.
+        with self.assertRaises(HTTPException) as ex:
+            m.access_gate.check_rate(self.store, request(), what='talk.parse')
+        self.assertTrue(ex.exception.detail['detail'].startswith('방문자별 AI 호출 한도 초과 - 분당'))
 
     def test_changed_request_id_content_is_rejected(self):
         m.save_quote(body(), request(), Response())

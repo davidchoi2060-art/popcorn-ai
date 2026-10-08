@@ -252,7 +252,7 @@ def _prune(dq: deque, now: datetime) -> None:
 
 def check_rate(conn, request: Request, *, what: str, policy_key: str = POLICY_KEY,
                default_per_minute: int = DEFAULT_PER_MINUTE,
-               default_per_day: int = DEFAULT_PER_DAY, label: str = "AI 호출") -> str:
+               default_per_day: int = DEFAULT_PER_DAY, messages: dict | None = None) -> str:
     """방문자별 호출 횟수 제한. 넘으면 **429**(소유자 확인 실패 403 과 다른 응답).
 
     통과하면 이번 호출을 «쓴 것으로» 세고 축 이름을 돌려준다. 부르는 쪽은 **실제로 돈이
@@ -260,6 +260,8 @@ def check_rate(conn, request: Request, *, what: str, policy_key: str = POLICY_KE
 
     `policy_key` 가 다르면 카운터도 따로 센다(2026-10-08 협업 6번 -- MVP3 견적 저장이
     AI 호출 몫을 먹지 않게). 기본값은 AI 호출(`visitor.ai`) 하나를 함께 쓰는 옛 동작 그대로다.
+    `messages` = {"minute": ..., "day": ...} 를 주면 429 의 `detail` 문장을 그것으로 바꾼다
+    (`{retry_after_sec}` 자리에 초가 들어간다). 없으면 AI 한도 문장 그대로다.
     """
     per_minute, per_day, is_default = _policy(conn, policy_key, default_per_minute, default_per_day)
     subject = subject_of(conn, request)
@@ -291,15 +293,17 @@ def check_rate(conn, request: Request, *, what: str, policy_key: str = POLICY_KE
         log.info("[gate] rate limited: what=%s subject=%s window=minute used=%d limit=%d%s",
                  what, subject, n_minute, per_minute, note)
         raise _too_many("minute", n_minute, per_minute, retry,
-                        "방문자별 %s 한도 초과 - 분당 %d회 제한(현재 %d회). %d초 뒤 재시도 가능."
-                        % (label, per_minute, n_minute, retry))
+                        messages["minute"].format(retry_after_sec=retry) if messages else
+                        "방문자별 AI 호출 한도 초과 - 분당 %d회 제한(현재 %d회). %d초 뒤 재시도 가능."
+                        % (per_minute, n_minute, retry))
     if n_day >= per_day:
         retry = max(1, int((day_lo + timedelta(days=1) - now).total_seconds()))
         log.info("[gate] rate limited: what=%s subject=%s window=day used=%d limit=%d%s",
                  what, subject, n_day, per_day, note)
         raise _too_many("day", n_day, per_day, retry,
-                        "방문자별 %s 한도 초과 - 일 %d회 제한(현재 %d회). 다음 날 재시도 가능."
-                        % (label, per_day, n_day))
+                        messages["day"].format(retry_after_sec=retry) if messages else
+                        "방문자별 AI 호출 한도 초과 - 일 %d회 제한(현재 %d회). 다음 날 재시도 가능."
+                        % (per_day, n_day))
 
     dq.append(now)
     return subject
