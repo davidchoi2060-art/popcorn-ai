@@ -1823,3 +1823,11 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 | 0132 | `0132_commerce_physical_return_persistence.py` | `c8487e0` | `commerce_return_cases` · `commerce_return_lines` · `commerce_return_operations` · `commerce_return_restoration_effects`. 컬럼 추가: `stock_movements.physical_return_operation_id` | 실물 반품 저장. 금액·배송 기록은 보존한다 |
 
 확인법: `grep -oE 'CREATE TABLE (__S(CHEMA)?__\.)?[a-z_]+' db/migrations/versions/01{24,25,26,27,28,29,30,31,32}_*.py`
+
+### 27. 대표 이미지 작업의 출처 구분 (2026-10-08, 0134)
+
+`pc_media_jobs`에 두 컬럼을 더한다. `origin_kind` TEXT NOT NULL DEFAULT 'generated'(값은 `generated` 또는 `existing_import`), `import_provenance` JSONB NULL. `model`은 NOT NULL을 푼다. CHECK `pc_media_jobs_origin_provenance_check`가 두 경우만 허용한다: `generated`는 model 있음·provenance 없음, `existing_import`는 model 없음·provenance 있음이며 함수 `pc_media_import_provenance_valid(provenance, configuration_id, visual_basis, review_basis)`가 v1 형태와 현재 작업 행의 구성·근거 일치를 확인한다. 기존 행은 기본값으로 `generated`가 된다.
+
+`import_provenance.original`은 원본 SKU·원본 해시·manifest 해시·QA 근거를 담고 원본 생성 모델·생성자·생성 시각은 null로 둔다. `current_binding`은 현재 SKU·구성·revision·케이스 상품 코드·근거를 담는다. 현재 등록 주체와 시각은 기존 `actor`·`created_at` 컬럼이며 원본 생성 이력으로 쓰지 않는다. 이 컬럼들은 재사용 승인·대표 선택·고객 공개의 근거가 아니다.
+
+일반 생성 worker와 저장 재시도는 `origin_kind='generated'`인 행만 처리하고, 컬럼이 없거나 값이 다르면 아무것도 쓰지 않는다. 그래서 이 마이그레이션 적용 전에는 새 코드를 배포하지 않는다. downgrade는 `generated`가 아닌 행, provenance가 있는 행, model이 null인 행이 하나라도 있으면 거부한다. 같은 번호 0133은 추천 뷰 VRAM·CPU 코어 개정이 이미 쓰고 있어 이 개정은 0134다.
