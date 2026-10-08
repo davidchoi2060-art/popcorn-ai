@@ -66,6 +66,7 @@
 | 1 | **병합 준비 완료** · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) head `8bcc1c7` · PC 독립 확인(run 37745345455: 1,588 통과·0 실패). 중헌님 병합 대기 | push·PR마다 GitHub 호스팅 러너에서 단위 테스트 실행 |
 | 1+ | 번들 실행기 draft [PR #13](https://github.com/davidchoi2060-art/popcorn-ai/pull/13) head `13e5e02` (base PR #1 브랜치) · PC 독립 읽기 수용 · unit CI 성공(run 37755379291), bundle job은 손 실행 전용이라 건너뜀. 순서: PR #1 → main, PR #13 base 재지정, CI 재확인, 병합. 첫 번들 실행은 main에 `unit.yml`이 들어간 뒤 | `tests/bundle_run.py` · `tests/test_bundle_run.py` · `unit.yml` bundle job |
 | 1+ | CI 전용 배포 분리 설계 draft [PR #14](https://github.com/davidchoi2060-art/popcorn-ai/pull/14) head `202ea26` (docs 1파일) · PC 설계 수용. 격리 orphan 브랜치 `probe/paths-ignore` 시험 6건 전부 기대와 일치([결과](https://github.com/davidchoi2060-art/popcorn-ai/pull/14#issuecomment-6057085421)). **main에 들어가면 배포가 도는 상태라 PR #1·#13 병합은 분리안 반영 뒤.** 실제 `deploy.yml` 후보는 PC 배포 담당이 작성, 클라우드는 독립 검토만(같은 파일 병렬 수정 없음, 10/8 합의) | 문서와 시험만. `deploy.yml`은 고치지 않음 |
+| 배포 분리 | **병합** [PR #16](https://github.com/davidchoi2060-art/popcorn-ai/pull/16) → main `f4dc91d` (PC 배포 담당 후보 그대로, after SHA256 `2cf4f8bb…`). 설계 [PR #14](https://github.com/davidchoi2060-art/popcorn-ai/pull/14) → main `d10934e` | `deploy.yml` paths-ignore 에 CI 전용 7경로 |
 | 3 | draft [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) · 작업 규칙 초안, 중헌님 승인 대기 | PR 양식, 「완료」 정의, 리뷰 후 병합 규칙 |
 | 4 | draft [PR #8](https://github.com/davidchoi2060-art/popcorn-ai/pull/8) · 사전조건 누락을 「준비 실패」로 표시 · 서버 비밀번호 설정 한 줄과 회귀 1회 실행은 중헌님 조치 대기 | 9/23 회귀 실패 원인 수정, 커머스 검사 추가, 배포 후 1회 실행 |
 | 5 | draft [PR #9](https://github.com/davidchoi2060-art/popcorn-ai/pull/9) · 참고가격↔주문 확정가 계약은 PR #2에 답함 | 가격표 반영·가격 검토·소싱 확정이 `resolve_margins`와 마진 정책 잠금을 쓰게 함 |
@@ -73,9 +74,9 @@
 | 7 | **리뷰 준비 완료** · [PR #7](https://github.com/davidchoi2060-art/popcorn-ai/pull/7) head `48c2c4f` · PC 독립 읽기 검토 통과. 고객 끝까지 0/8(빈 테스트 DB, 작성자 측정). 실카탈로그 측정은 PC 쪽 대기 | 고객·운영자 여정 단계별 자동 표. 빨강=경로 없음, 노랑=경로만 있음(정적 검사의 최대치), 초록=실제 통과 증거(E2E 기록·검수 링크)가 있을 때만 |
 | 10 | draft [PR #6](https://github.com/davidchoi2060-art/popcorn-ai/pull/6) · PC 사실 대조 6건과 HANDOFF 문구 정정 반영. PR #11 병합 뒤 rebase | 결정 로그(9/25 재설계, 10/4~10/7), ERD(0124~0132), HANDOFF 축약 |
 
-### 역할 재조정 제안 (2026-10-08, PC 쪽 합의 대기)
+### 역할 재조정 (2026-10-08 합의 — [Codex 동의](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6058683669))
 
-중헌님 지시(「메인을 니가 해도 상관없어」)와 Codex PM 재분담안([PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6058580920))을 합친 안. 기존 번호별 담당과 파일 소유는 합의 전까지 그대로 둔다.
+중헌님 지시(「메인을 니가 해도 상관없어」)와 Codex PM 재분담안([PR #2 댓글](https://github.com/davidchoi2060-art/popcorn-ai/pull/2#issuecomment-6058580920))을 합친 안. 기존 번호별 담당과 파일 소유는 그대로 둔다. 완료 보고 · 독립 QA · 검수 수용 · 실 DB 적용 · 배포 run/health · 고객 화면/E2E 근거를 따로 적는 공동 기준도 유지한다.
 
 | 영역 | 주 담당 | 상대 역할 |
 |---|---|---|
@@ -87,6 +88,7 @@
 | PC 환경 전용 검증(실카탈로그 측정 · PC 전용 테스트 · 로컬 작업 공간) | PC/Codex | Claude 는 측정 대상 HEAD 인계 |
 | 관리자 업그레이드 · 신규 · 폐기 정리 | Codex PM + 기획 담당 | Claude 는 서버/DB 영향 의견 |
 | 커머스(8번) · MVP3 정리(9번) | 현행 유지(PC) | 서버 쪽 변경이 필요하면 Claude 가 PR 로 받음 |
+| **신규(서버): 완제품 공개 BOM · 대표 사진 고객 경로** — 지금은 고객용 서버 경로가 없어 판매 SKU 와 연결되지 않음([PR #15](https://github.com/davidchoi2060-art/popcorn-ai/pull/15) 계약 문서) | Claude | Codex 는 소비 계약 검토 · 프런트 통합 |
 
 유지: 결제 대행사 · 고객 실인증 제외(계약 전) · MVP3 최종 정본 · 같은 파일 동시 수정 금지 · 각자 구역만 고침.
 
