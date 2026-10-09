@@ -119,7 +119,10 @@ class NoCacheStatic(StaticFiles):
 
     async def get_response(self, path, scope):
         resp = await super().get_response(path, scope)
-        if path.endswith((".html", ".js", ".css")) or path in ("", "/"):
+        # A directory URL (`/mvp3/`) serves its index.html under a path with no
+        # ".html", so match the served media type as well as the extension.
+        if (path.endswith((".html", ".js", ".css")) or path in ("", "/")
+                or (getattr(resp, "media_type", None) or "").startswith("text/html")):
             resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
             resp.headers["Pragma"] = "no-cache"
         return resp
