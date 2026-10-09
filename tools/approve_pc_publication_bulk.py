@@ -128,6 +128,11 @@ def media_manifest(conn, identity):
     return rows[0] if len(rows) == 1 else None
 
 
+class OutOfScope(Exception):
+    """This configuration is no longer covered by the owner decision (withdrawn,
+    decision removed, or media manifest changed). Only this configuration fails."""
+
+
 class Stop(Exception):
     """The executor is no longer allowed to write: stop the whole batch."""
 
@@ -236,14 +241,39 @@ class Batch:
             return f'대표 이미지 묶음이 승인 범위와 다름({manifest})'
         return None
 
-    def guard(self, conn):
-        """Inside the write transaction: the switch is still on and the executor is still
-        an active owner (FOR SHARE holds it until commit)."""
+    def check_scope(self, conn, identity):
+        """Re-read the ledger now: the decision still exists, this configuration is not
+        withdrawn, and its media manifest is still the approved one. Returns the decision."""
+        found = parse_approvals()   # LedgerError: the whole run stops
+        decision = found['decisions'].get(self.decision_id)
+        if decision is None or (self.decision_id, identity) in found['withdrawn']:
+            raise OutOfScope('approval_decision_missing_or_withdrawn')
+        if self.scope_reason(conn, identity, decision):
+            raise OutOfScope('out_of_scope')
+        return decision
+
+    def guard(self, conn, identity):
+        """Inside every write transaction: the switch is still on, the executor is still
+        an active owner (FOR SHARE holds it until commit), and the owner decision still
+        covers this configuration. Returns (actor, decision)."""
         try:
             require_apply(self.rights, self.environment)
-            return owner(conn, self.operator_id, lock=True)
+            actor = owner(conn, self.operator_id, lock=True)
         except PermissionError as error:
             raise Stop(str(error)) from None
+        return actor, self.check_scope(conn, identity)
+
+    def shared(self, done, by, code, identity):
+        """A part/photo another configuration already handled in this run. The cached
+        result says only what that write did; this configuration's own scope is checked
+        again before it may count on it."""
+        try:
+            with self.engine.connect() as conn:
+                self.check_scope(conn, identity)
+        except OutOfScope as error:
+            return ('failed', str(error))
+        state, detail = done[code]
+        return ('committed_by_other', by[code]) if state == 'committed' else (state, detail)
 
     # read-only precheck ---------------------------------------------------
     def pre_part(self, code):
@@ -381,17 +411,15 @@ class Batch:
                     publication=publication, verdict=verdict)
 
     # writes -----------------------------------------------------------------
-    def write_part(self, code, identity=None):
+    def write_part(self, code, identity):
         if code in self.parts:
-            state, detail = self.parts[code]
-            return ('committed_by_other', self.part_by[code]) if state == 'committed' else (state, detail)
-        self.part_by[code] = identity
+            return self.shared(self.parts, self.part_by, code, identity)
         from api import part_explanation_approval as part
         from fastapi import HTTPException
         conn = _tx(self.engine)
         try:
             with conn.begin():
-                actor = self.guard(conn)
+                actor, _ = self.guard(conn, identity)
                 cur = part.read_current(conn, code)
                 row = part._read(conn, code)
                 if cur['allowed']:
@@ -402,18 +430,18 @@ class Batch:
                     part.approve(conn, code, expected_seq=0, expected_basis=part.basis(row),
                                  request_id=rid('explain', code, part.basis(row)), note=self.note, actor=actor)
                     result = ('committed', None)
+        except OutOfScope as error:   # this configuration only: not cached for the others
+            return ('failed', str(error))
         except HTTPException as error:
             result = ('failed', error.detail)
         finally:
             conn.close()
-        self.parts[code] = result
+        self.parts[code], self.part_by[code] = result, identity
         return result
 
-    def write_photo(self, code, identity=None):
+    def write_photo(self, code, identity):
         if code in self.photos:
-            state, detail = self.photos[code]
-            return ('committed_by_other', self.photo_by[code]) if state == 'committed' else (state, detail)
-        self.photo_by[code] = identity
+            return self.shared(self.photos, self.photo_by, code, identity)
         from api import part_explanation_approval as part
         from api import part_photo_approval as photo
         from fastapi import HTTPException
@@ -421,7 +449,7 @@ class Batch:
         conn = _tx(self.engine)
         try:
             with conn.begin():
-                actor = self.guard(conn)
+                actor, _ = self.guard(conn, identity)
                 cur = photo.read_current(conn, code, provenance_reader=reader, image_reader=self.image_reader,
                                          business_rights_reference=self.rights)
                 if cur['allowed']:
@@ -435,11 +463,13 @@ class Batch:
                                   provenance_reader=reader, image_reader=self.image_reader,
                                   business_rights_reference=self.rights)
                     result = ('committed', None)
+        except OutOfScope as error:   # this configuration only: not cached for the others
+            return ('failed', str(error))
         except HTTPException as error:
             result = ('failed', error.detail)
         finally:
             conn.close()
-        self.photos[code] = result
+        self.photos[code], self.photo_by[code] = result, identity
         return result
 
     def evidence(self, identity, revision, basis, label, decision):
@@ -457,16 +487,10 @@ class Batch:
         conn = _tx(self.engine)
         try:
             with conn.begin():
-                actor = self.guard(conn)
+                actor, decision = self.guard(conn, identity)
                 _, _, _, state = load_review(conn, identity)
                 if state['state'] == 'approved':
                     return ('already', None)
-                found = parse_approvals()
-                decision = found['decisions'].get(self.decision_id)
-                if decision is None or (self.decision_id, identity) in found['withdrawn']:
-                    return ('failed', 'approval_decision_missing_or_withdrawn')
-                if self.scope_reason(conn, identity, decision):
-                    return ('failed', 'out_of_scope')
                 if (state['blockers'] or state['recommendation_state'] == 'hold'
                         or set(state['required']) - (AUTO_FINDINGS & set(decision['scope']['findings']))
                         or state['state'] != 'pending' or state.get('approved_by') or state.get('prior_review')):
@@ -477,6 +501,8 @@ class Batch:
                 save_review(conn, identity, ReviewEdit(revision=state['revision'], basis=state['basis'], action='approve',
                                                        findings=findings, note=self.note), actor)
                 return ('committed', None)
+        except OutOfScope as error:
+            return ('failed', str(error))
         except HTTPException as error:
             return ('failed', error.detail)
         finally:
@@ -490,7 +516,7 @@ class Batch:
         conn = _tx(self.engine, repeatable=True)
         try:
             with conn.begin():
-                actor = self.guard(conn)
+                actor, _ = self.guard(conn, identity)
                 cur = publication.read_current(conn, identity, source_reader=reader)
                 if cur['allowed']:
                     return ('already', None)
@@ -501,6 +527,8 @@ class Batch:
                                     request_id=rid('publish', identity, cur['publication_basis']),
                                     note=self.note, actor=actor, source_reader=reader)
                 return ('committed', None)
+        except OutOfScope as error:
+            return ('failed', str(error))
         except HTTPException as error:
             return ('failed', error.detail)
         finally:
@@ -585,7 +613,7 @@ def run(engine, *, apply=False, operator_id=None, note='', decision=None, rights
     out(rights_line(engine, rights))
     with engine.connect() as conn:
         ids = targets(conn, all_configs, set(only))
-    rows, stopped = [], None
+    rows, stopped, ledger_error = [], None, None
     for identity in ids:
         if stopped:
             rows.append(dict(configuration_id=identity, precheck=('not_run', stopped),
@@ -597,8 +625,9 @@ def run(engine, *, apply=False, operator_id=None, note='', decision=None, rights
         except Stop as error:      # executor no longer allowed: nothing more is written
             stopped = str(error)
             row = _interrupted(batch, identity, 'stopped', stopped)
-        except LedgerError:
-            raise                  # a malformed ledger stops the whole run
+        except LedgerError as error:   # the whole run stops; what was written is still reported
+            stopped = ledger_error = f'승인 원장 {APPROVALS.name}: {error}'
+            row = _interrupted(batch, identity, 'ledger_error', ledger_error)
         except Exception as error:   # one configuration must not stop the batch
             row = _interrupted(batch, identity, 'failed', type(error).__name__)
         rows.append(row)
@@ -620,7 +649,7 @@ def run(engine, *, apply=False, operator_id=None, note='', decision=None, rights
         + (f' · 중단: {stopped}' if stopped else ''))
     for key in ('precheck', 'parts', 'photos', 'part_writes', 'photo_writes', 'review', 'publication'):
         out(f'  {key}: ' + ' · '.join(f'{k} {v}' for k, v in sorted(summary[key].items())))
-    return dict(mode='apply' if apply else 'dry-run',
+    return dict(mode='apply' if apply else 'dry-run', ledger_error=ledger_error,
                 decision=f'{APPROVALS_REF}#{decision}' if decision else None, summary=summary,
                 configurations=rows, shared_parts={str(c): u for c, u in shared.items()})
 
@@ -657,6 +686,9 @@ def main(argv=None, environment=None):
                  environment=environment)
     if args.report:
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
+    if result['ledger_error']:   # report saved first; the run still counts as stopped
+        print(f"{result['ledger_error']} -- 전체 실행을 중단했습니다", file=sys.stderr)
+        return 2
     return 0
 
 

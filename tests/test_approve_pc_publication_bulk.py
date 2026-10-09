@@ -311,7 +311,7 @@ class Bulk(unittest.TestCase):
             go(World(), db=DB(operator=dict(OWNER, role='operator')), apply=True)
         w = World()
         with patch.dict(m.os.environ, {}, clear=True), self.assertRaises(m.Stop):
-            m.Batch(DB(), apply=False, operator_id=1, rights=RIGHTS, image_reader=lambda *a: b'').guard(Conn(DB()))
+            m.Batch(DB(), apply=False, operator_id=1, rights=RIGHTS, image_reader=lambda *a: b'').guard(Conn(DB()), 'C1')
 
     def test_rights_line(self):
         for p in World().patches(): p.start()
@@ -373,6 +373,128 @@ class ApprovalLedger(unittest.TestCase):
             result, _ = go(w, apply=True, approvals=approvals, only=['C1'])
         self.assertEqual(by_id(result, 'C1')['review'], ('failed', 'approval_decision_missing_or_withdrawn'))
         self.assertNotIn('review', {c[0] for c in w.calls})
+
+
+def withdraw(approvals, *identities):
+    approvals.write_text(json.dumps(dict(decisions=[DECISION], withdrawn=[
+        dict(decision=DECISION['id'], configuration_id=i, reference='철회') for i in identities])), encoding='utf-8')
+
+
+class EveryWriteRechecksScope(unittest.TestCase):
+    """Part, photo, review and publication writes each re-read the ledger for the
+    configuration they write for."""
+    def test_withdrawal_before_part_and_photo_writes(self):
+        for step in ('write_part', 'write_photo'):
+            with self.subTest(step=step):
+                w, approvals = World(), ledger()
+                real = getattr(m.Batch, step)
+                def first(batch, code, identity, real=real):
+                    withdraw(approvals, 'C1')
+                    return real(batch, code, identity)
+                with patch.object(m.Batch, step, first):
+                    result, _ = go(w, apply=True, approvals=approvals, only=['C1'])
+                c1 = by_id(result, 'C1')
+                key = 'parts' if step == 'write_part' else 'photos'
+                self.assertEqual(c1['steps'][key][101], ('failed', 'approval_decision_missing_or_withdrawn'))
+                kind = 'explain' if step == 'write_part' else 'photo'
+                self.assertNotIn(kind, {c[0] for c in w.calls})
+                self.assertEqual((c1['review'][0], c1['publication'][0]), ('not_run', 'not_attempted'))
+
+    def test_withdrawal_after_review_blocks_publication(self):
+        for already_reviewed in (False, True):
+            with self.subTest(already_reviewed=already_reviewed):
+                w, approvals = World(), ledger()
+                if already_reviewed:
+                    w.reviewed.add('C1')
+                real = m.Batch.write_publication
+                def publish(batch, identity):
+                    withdraw(approvals, identity)
+                    return real(batch, identity)
+                with patch.object(m.Batch, 'write_publication', publish):
+                    result, _ = go(w, apply=True, approvals=approvals, only=['C1'])
+                c1 = by_id(result, 'C1')
+                self.assertEqual(c1['review'][0], 'already' if already_reviewed else 'committed')
+                self.assertEqual(c1['publication'], ('failed', 'approval_decision_missing_or_withdrawn'))
+                self.assertNotIn('publish', {c[0] for c in w.calls})
+
+    def test_manifest_change_before_publication(self):
+        w, db, approvals = World(), DB(), ledger()
+        real = m.Batch.write_publication
+        def publish(batch, identity):
+            db.manifests[identity] = 'c' * 64
+            return real(batch, identity)
+        with patch.object(m.Batch, 'write_publication', publish):
+            result, _ = go(w, db=db, apply=True, approvals=approvals, only=['C1'])
+        self.assertEqual(by_id(result, 'C1')['publication'], ('failed', 'out_of_scope'))
+        self.assertNotIn('publish', {c[0] for c in w.calls})
+
+    def test_shared_cache_does_not_cover_a_withdrawn_configuration(self):
+        w, approvals = World(), ledger()
+        real = m.Batch.configuration
+        def config(batch, identity):
+            if identity == 'C2':
+                withdraw(approvals, 'C2')
+            return real(batch, identity)
+        # C2 is withdrawn after its precheck would pass: patch precheck scope out of the way
+        real_pre = m.Batch.precheck
+        def pre(batch, identity):
+            r = real_pre(batch, identity)
+            if identity == 'C2':
+                r['verdict'] = ('ok', None)
+            return r
+        with patch.object(m.Batch, 'configuration', config), patch.object(m.Batch, 'precheck', pre):
+            result, _ = go(w, apply=True, approvals=approvals)
+        c2 = by_id(result, 'C2')
+        self.assertEqual(c2['steps']['parts'], {102: ('failed', 'approval_decision_missing_or_withdrawn'),
+                                                103: ('failed', 'approval_decision_missing_or_withdrawn')})
+        self.assertNotIn(103, {c[1] for c in w.calls})
+        self.assertEqual(by_id(result, 'C1')['steps']['parts'][102], ('committed', None))
+
+    def test_out_of_scope_failure_is_not_cached_for_the_next_configuration(self):
+        w, approvals = World(), ledger()
+        real = m.Batch.configuration
+        def config(batch, identity):
+            withdraw(approvals, 'C1') if identity == 'C1' else withdraw(approvals)
+            return real(batch, identity)
+        real_pre = m.Batch.precheck
+        def pre(batch, identity):
+            r = real_pre(batch, identity)
+            r['verdict'] = ('ok', None)
+            return r
+        with patch.object(m.Batch, 'configuration', config), patch.object(m.Batch, 'precheck', pre):
+            result, _ = go(w, apply=True, approvals=approvals)
+        self.assertEqual(by_id(result, 'C1')['steps']['parts'][102][0], 'failed')
+        self.assertEqual(by_id(result, 'C2')['steps']['parts'][102], ('committed', None))
+        self.assertEqual(by_id(result, 'C2')['publication'], ('committed', None))
+
+
+class LedgerBrokenMidRun(unittest.TestCase):
+    def test_committed_steps_are_reported_and_the_run_stops(self):
+        w, approvals = World(), ledger()
+        real = m.Batch.write_review
+        def broken(batch, identity):
+            approvals.write_text('{"decisions": [', encoding='utf-8')
+            return real(batch, identity)
+        with patch.object(m.Batch, 'write_review', broken):
+            result, _ = go(w, apply=True, approvals=approvals)
+        c1 = by_id(result, 'C1')
+        self.assertEqual(c1['interrupted'][0], 'ledger_error')
+        self.assertEqual(c1['steps']['parts'], {101: ('committed', None), 102: ('committed', None)})
+        self.assertEqual(c1['steps']['photos'], {101: ('committed', None), 102: ('committed', None)})
+        self.assertEqual((c1['review'], c1['publication']), (('not_run', None), ('not_run', None)))
+        self.assertEqual(by_id(result, 'C2')['precheck'][0], 'not_run')
+        self.assertTrue(result['ledger_error'])
+        self.assertEqual(result['summary']['stopped'], result['ledger_error'])
+        self.assertNotIn('review', {c[0] for c in w.calls})
+
+    def test_cli_saves_the_report_then_exits_nonzero(self):
+        report = Path(tempfile.mkdtemp()) / 'r.json'
+        stopped = dict(mode='apply', ledger_error='승인 원장 x: 형식', summary={}, configurations=[{'configuration_id': 'C1'}])
+        with patch.object(m, 'run', lambda *a, **kw: stopped), patch.dict(sys.modules, {'api.db': type(sys)('api.db')}):
+            sys.modules['api.db'].engine = None
+            code = m.main(['--report', str(report)], environment={})
+        self.assertEqual(code, 2)
+        self.assertEqual(json.loads(report.read_text(encoding='utf-8'))['configurations'], [{'configuration_id': 'C1'}])
 
 
 class Interrupted(unittest.TestCase):
