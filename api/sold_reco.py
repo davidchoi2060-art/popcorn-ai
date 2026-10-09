@@ -15,6 +15,11 @@
               추천 구성 = 한 단계 위 수준의 최저가(없으면 앞의 1장이 추천 구성)
   예산 안에 없음  추천 카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
               (over_budget=true) — 고객이 얼마부터 되는지 알 수 있게
+  고객 공개 승인 우선 (2026-10-09 조정 결정): 위 규칙이 정한 후보 안에서만, 고객 공개 승인된
+              구성(부품 사진이 나오는 상품)을 가격보다 먼저 고른다. 수준·예산 판정과 카드 수는
+              그대로이고, 승인 후보가 없으면 지금과 같다. 「예산을 넘는 최저가」 참고 카드는
+              「얼마부터 되는지」를 말하므로 승인 여부와 무관하게 최저가를 둔다.
+              승인 집합은 힌트일 뿐이다 — 실제 공개 판정은 customer_pc_offer 가 매번 한다.
   게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K).
   캐주얼(rank 1)은 고객이 말한 게임 «전부»가 캐주얼 수준의 대상 게임(product_fit_levels.work
   에 적힌 게임)일 때만 쓴다 — 하나라도 밖이면 가장 까다로운 쪽을 따라 해상도 수준으로 간다.
@@ -27,7 +32,10 @@
 import logging
 import re
 
+from sqlalchemy import text
+
 from .admin_product_fit import load
+from .db import engine
 from .talk_schema import match_game
 
 log = logging.getLogger("sold_reco")
@@ -132,8 +140,34 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     }
 
 
+# 판매 상품코드 -> 그 P 오퍼 구성의 최신 고객 공개 이벤트가 승인인 것. 순서 힌트 전용.
+PUBLIC_CODES_SQL = """
+    SELECT CAST(substr(o.offer_id, 2) AS bigint) AS product_code
+      FROM pc_configuration_offers o
+      JOIN LATERAL (SELECT e.action FROM pc_customer_publication_events e
+                     WHERE e.configuration_id = o.configuration_id
+                     ORDER BY e.event_seq DESC LIMIT 1) last ON true
+     WHERE o.offer_id ~ '^P[1-9][0-9]{0,17}$' AND last.action = 'approve'
+"""
+
+
+def public_codes() -> frozenset:
+    """고객 공개 승인된 판매 상품코드. 읽지 못하면 빈 집합(지금과 같은 추천) — 사유는 로그로."""
+    try:
+        with engine.connect() as conn:
+            return frozenset(int(r.product_code) for r in conn.execute(text(PUBLIC_CODES_SQL)))
+    except Exception:  # noqa: BLE001 - 순서 힌트라 추천을 막지 않는다
+        log.exception("[sold_reco] public codes unavailable - no preference applied")
+        return frozenset()
+
+
+def _prefer(cands, preferred):
+    """공개 승인 먼저, 그다음 최저가. preferred 가 비면 최저가(기존 규칙)와 같다."""
+    return min(cands, key=lambda p: (p["code"] not in preferred, p["price"]))
+
+
 def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
-         levels, products) -> dict:
+         levels, products, preferred=frozenset()) -> dict:
     """한 용도 -> {items[≤2], empty_reason, empty_note}."""
     levels_by = {(l["usage"], l["level"]): l for l in levels}
     ok = sorted((p for p in products.values()
@@ -146,12 +180,13 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
 
     if budget_won is None or bound == "이상":
         pool = [p for p in ok if budget_won is None or p["price"] >= budget_won] or ok
-        first = pool[0]
-        up = [p for p in pool if rank(p) > rank(first)]
+        base = rank(pool[0])
+        first = _prefer([p for p in pool if rank(p) == base], preferred)
+        up = [p for p in pool if rank(p) > base]
         if not up:
             return {"items": [_item(first, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
         return {"items": [_item(first, usage, levels_by, TAG_VALUE, budget_won, bound),
-                          _item(up[0], usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
+                          _item(_prefer(up, preferred), usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
 
     within = [p for p in ok if p["price"] <= budget_won]
     if not within:
@@ -159,11 +194,11 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
                 "empty_reason": "예산 안 상품 없음",
                 "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
     top = max(rank(p) for p in within)
-    best = min((p for p in within if rank(p) == top), key=lambda p: p["price"])
+    best = _prefer([p for p in within if rank(p) == top], preferred)
     rec = _item(best, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)
-    cheap = within[0]
-    if cheap["price"] < best["price"]:
-        return {"items": [_item(cheap, usage, levels_by, TAG_VALUE, budget_won, bound), rec]}
+    cheaper = [p for p in within if p["price"] < best["price"]]
+    if cheaper:
+        return {"items": [_item(_prefer(cheaper, preferred), usage, levels_by, TAG_VALUE, budget_won, bound), rec]}
     return {"items": [rec]}
 
 
@@ -210,6 +245,7 @@ def game_min_rank(g, levels, vocab, notes) -> int:
 def card_sets(state, game_usages, other_usages, notes, vocab=None) -> list[dict]:
     """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 2개."""
     levels, products = load()
+    preferred = public_codes()
     out = []
     targets = []
     for u in other_usages:
@@ -225,7 +261,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None) -> list[dict]
         if (fu, r) in seen:
             continue
         seen.add((fu, r))
-        res = pick(fu, r, state.budget_won, state.budget_bound, levels, products)
+        res = pick(fu, r, state.budget_won, state.budget_bound, levels, products, preferred)
         lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
         out.append({
             "usage": label, "usage_grid": fu, "kind": "sold",
