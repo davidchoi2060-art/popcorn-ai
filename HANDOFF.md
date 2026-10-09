@@ -2,6 +2,8 @@
 
 이 절은 짧게 유지한다. 아래 날짜별 인계는 그대로 두었다.
 
+> **서버 구분 (2026-10-09 중헌님 결정 ⑩):** GCP `popcorn-app`(`admin.popcornai.co.kr`)는 **개발 서버**다. 실제 운영 서버는 완료 뒤 새로 만들어 옮긴다(I-01). 아래 과거 기록의 「운영」은 이 개발 서버를 가리킨다. 10/9 결정 전체는 결정 로그 「2026-10-09 중헌님 결정」 절.
+
 ## 갱신 · 2026-10-08 저녁 (main `69697c4` 기준 · 마지막 배포 `9bd441d`)
 
 아래 「기능 영역별 진척」 표는 **오전 main `1ecf4df` 기준의 과거 기록**이다. 그 뒤 바뀐 것만 여기 적는다.
@@ -18,7 +20,7 @@
 |---|---|---|
 | 협업 분담표 (누가 무엇을 · 결정 ①~⑥, 10/8 에 ①③⑤ 결정) | `docs/collaboration-plan-20261008.md` · [PR #2](https://github.com/davidchoi2060-art/popcorn-ai/pull/2) | 초안 PR. 병합 전에는 그 브랜치의 파일이 정본 |
 | 단위 테스트 자동 실행 (항목 1) | `.github/workflows/unit.yml` · [PR #1](https://github.com/davidchoi2060-art/popcorn-ai/pull/1) | 초안 PR |
-| 작업 규칙과 PR 흐름 (항목 3) | `docs/pr-flow-rules.md` · [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) | 중헌님 승인 대기. 승인 전에는 효력 없음 |
+| 작업 규칙과 PR 흐름 (항목 3) | `docs/pr-flow-rules.md` · [PR #4](https://github.com/davidchoi2060-art/popcorn-ai/pull/4) | 2026-10-08 18:04 KST 중헌님 승인으로 시행. 병합 전에는 그 브랜치의 파일이 정본 |
 | 9/25 · 10/3 오후 ~ 10/7 기록 | 결정 로그 끝 「기록 따라잡기」 절 · ERD §26 | 소급 등재. [기록]/[점검]/[추정] 구분 |
 
 **항목 1~10 의 진행 상태는 분담표가 정본이다.** 여기에 다시 적지 않는다(두 곳에 적으면 한쪽만 고쳐진다).
