@@ -63,7 +63,7 @@ def public_product(item):
     if type(code) is not int or type(price) is not int or price < 0:
         raise HTTPException(409, '상품 가격을 다시 확인해 주세요.')
     # Use the already public sold recommendation, never administrative rows.
-    out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'over_budget')}
+    out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'role', 'over_budget')}
     # Public component descriptions/capacities, never evaluation internals.
     out['spec'] = public_spec(item.get('spec'))
     out['reasons'] = [v for v in item.get('reasons', []) if isinstance(v, str)]

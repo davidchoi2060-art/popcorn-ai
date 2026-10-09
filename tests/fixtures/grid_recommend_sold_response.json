@@ -22,33 +22,8 @@
             "vram_gb": 8
           },
           "level": "기본",
-          "tag": "예산 안 최고 수준",
-          "over_budget": false,
-          "reasons": [
-            "영상편집 기본 — FHD 편집",
-            "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요."
-          ],
-          "photo": {
-            "state": "unavailable",
-            "url": null
-          },
-          "public_configuration": null
-        },
-        {
-          "product_code": 2,
-          "name": "조립PC 2",
-          "price": 1500000,
-          "price_src": "현재 판매가",
-          "mall_url": "https://mall.example/2",
-          "spec": {
-            "cpu": "라이젠5 9600",
-            "gpu": "RTX 5060 Ti 8GB",
-            "ram_gb": 32,
-            "ssd_gb": 500,
-            "vram_gb": 8
-          },
-          "level": "기본",
-          "tag": "같은 수준 다른 구성",
+          "tag": "추천 구성",
+          "role": "recommended",
           "over_budget": false,
           "reasons": [
             "영상편집 기본 — FHD 편집",
@@ -94,7 +69,8 @@
             "vram_gb": 8
           },
           "level": "FHD",
-          "tag": "예산 안 최고 수준",
+          "tag": "알뜰 구성",
+          "role": "value",
           "over_budget": false,
           "reasons": [
             "게임 FHD — FHD 게임",
@@ -120,13 +96,13 @@
             "ssd_gb": 500,
             "vram_gb": 8
           },
-          "level": "FHD",
-          "tag": "같은 수준 다른 구성",
+          "level": "QHD",
+          "tag": "추천 구성",
+          "role": "recommended",
           "over_budget": false,
           "reasons": [
-            "게임 FHD — FHD 게임",
-            "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
-            "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
+            "게임 QHD — QHD 게임",
+            "다음 수준을 고려한다면 그래픽 메모리 용량이 더 큰 구성을 살펴보세요."
           ],
           "photo": {
             "state": "unavailable",
