@@ -57,9 +57,10 @@ def probes():
 
 
 def cards(node):
-    """product_code 를 가진 dict(추천 카드)를 모두 찾는다."""
+    """product_code 와 숫자 price 를 가진 dict(추천 카드)를 모두 찾는다.
+    공개 구성 안의 product_code(가격이 {'state': 'unknown', ...} 객체)는 카드가 아니다."""
     if isinstance(node, dict):
-        if 'product_code' in node and 'price' in node:
+        if 'product_code' in node and isinstance(node.get('price'), (int, float)):
             yield node
         for v in node.values():
             yield from cards(v)
