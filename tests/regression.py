@@ -6625,10 +6625,25 @@ def test_supplier_scale():
     if st == 200:
         check("[49] data-screen-id=ADM-SRC-030", 'data-screen-id="ADM-SRC-030"' in html,
               True, 'data-screen-id="ADM-SRC-030"' in html)
-        check("[49] 목록 렌더가 항목을 자르지 않는다(전체를 그대로 그린다 — slice 없음)",
-              "S.data.items.map(rowHtml)" in html and ".slice(" not in html,
+        # 2026-10-06(#10)부터 목록은 서버 페이지네이션이고 렌더는 템플릿이 싣는 외부
+        # 스크립트에 있다. 그래서 «템플릿 HTML 안의 글자»가 아니라 **템플릿이 실제로
+        # 싣는 스크립트**를 따라가 본다 — 증명할 것은 그대로다: 서버가 준 행을 화면이
+        # 자르지 않고 전부 그린다, 범위 문구는 서버 total 로 말한다.
+        _srcs = re.findall(r'<script[^>]+src="/shared/([^"?]+)', html)
+        _js = ""
+        for _s in _srcs:
+            _p = os.path.join(ROOT, "mockups", "shared", _s)
+            if os.path.isfile(_p):
+                _js += io.open(_p, encoding="utf-8").read()
+        _code = html + _js
+        _has_map = "S.data.items.map(rowHtml)" in _code or "j.items.map(" in _code
+        _has_slice = ".slice(" in _code
+        check("[49] 목록 렌더가 항목을 자르지 않는다(서버가 준 행을 전부 그린다 — slice 없음)",
+              _has_map and not _has_slice,
               "전체 렌더·slice 없음",
-              {"map 있음": "S.data.items.map(rowHtml)" in html, "slice 있음": ".slice(" in html})
+              {"스크립트": _srcs, "map 있음": _has_map, "slice 있음": _has_slice})
+        check("[49] 목록 범위 문구가 서버 total 로 말한다(화면이 세지 않는다)",
+              "j.total" in _js, "j.total 사용", {"스크립트": _srcs})
 
 
 def test_alloc_capped_uncapped():

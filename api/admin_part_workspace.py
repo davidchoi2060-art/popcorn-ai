@@ -9,6 +9,7 @@ from sqlalchemy import text
 from . import llm
 from .auth import current_operator
 from .db import engine
+from .timeutil import now_iso
 from .part_explanations import SELECT, present, is_current
 from .pc_configuration_copy import digest
 
@@ -110,7 +111,7 @@ def save(conn,code,body,actor):
             content[key]=[copy.deepcopy(next((f for f in old if f.get('label')==v['label'] and f.get('value')==v['value']),dict(v,verification='운영자 편집 · 근거 기록 확인'))) for v in after[key]]
         else: content[key]=after[key]
     # Never refresh source fingerprint, remove review issues or approve on a content edit.
-    content.setdefault('_admin_part_history',[]).append(dict(at=datetime.now(timezone.utc).isoformat(),operator_id=actor['operator_id'],
+    content.setdefault('_admin_part_history',[]).append(dict(at=now_iso(),operator_id=actor['operator_id'],
         evidence_note=body.evidence_note,before={k:before[k] for k in changed},after={k:after[k] for k in changed}))
     conn.execute(text("UPDATE product_explanations SET content=CAST(:v AS jsonb),status='draft',approved_by=NULL,approved_at=NULL,updated_at=now() WHERE source_product_code=:code"),dict(code=code,v=json.dumps(content,ensure_ascii=False)))
     return dict(changed=True,affected=usages(conn,code),note='부품 설명 저장 · 검토 대기')
