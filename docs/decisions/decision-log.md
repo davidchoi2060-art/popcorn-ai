@@ -7973,3 +7973,12 @@ main 에 올릴지는 결정 대기였다(분담표 결정 ③). **2026-10-08 16
 15. 01:44 (`DVL5u9`): 「모든 걸 너한테 모든 권한을 다 일임할꼐」
 
 [미반영] 이 발언에 따른 작업 규칙(`docs/pr-flow-rules.md` 5 · 6 · 7번) 개정은 아직 하지 않았다. 리뷰·병합 조건에서 Codex 를 빼고 Claude 의 판단 범위를 넓히는 개정이라, Claude 가 스스로 자기 권한을 넓히는 문서 변경(CLAUDE.md T-03)에 해당한다. 중헌님이 개정문을 직접 보고 확정한다.
+
+## 2026-10-10 개발 서버 실행 · 코디네이터 결정 (당일 기록)
+
+[기록] 01:45 KST 중헌님 원문 「그럼 내가 지금 30시간 동안 못잤는데.. 니가 뭘 시킬지 모르니까.. 화면을 보면서 니 지시를 기다릴께」(`DP6KTq`). 그 뒤 중헌님이 개발 서버(`popcorn-app`)에서 직접 실행하고 출력을 붙였다. 아래 수치는 붙인 출력 원문 그대로다.
+- 01:57 (`DGBFzf`) 대표 이미지 등록 적용 결과: 「합계 file_error 15 · registered_unselected 10 · selected 20 · selected_by_decision 59 (manifest 104건)」. 선택 79(20 + 59) · 등록만 10 · 파일 오류 15 다.
+- 01:58 (`D1ySDG`) `tools/approve_pc_publication_bulk.py` 미리 보기(`--operator-id 4 --approval-decision pc-publication-20261009-bundle`): 「구성 81개 · 부품 166종」, 「precheck: blocked 34 · ok 45 · out_of_scope 2」, 「review: ready 36 · would_approve 45」.
+- 02:07 (`DWE32y`) 같은 도구 `--apply` 실행 시작. 로그 첫 줄 「기존 사진 승인 최신 107건 중 env 와 바이트 일치 107건」. 차단 사유는 「part 110899 part_approval_review_issues; part 113685 part_approval_review_issues」. [미확인] 붙인 로그는 실행 도중이라 적용의 최종 합계는 이 기록에 없다.
+
+16. **[코디네이터 결정(위임)]** (02:09 KST, 근거 ⑫ 01:41 · ⑮ 01:44 「모든 걸 너한테 모든 권한을 다 일임할꼐」): 부품 110899 · 113685 의 `review_issues` 가운데 9/30 조립 단계로 이관된 항목은 부품 설명 승인과 고객 발행을 막지 않도록 정책을 바꾼다(고객 API 담당 PR 예정). 이관되지 않은 항목은 계속 차단한다. 후속으로 「확인 완료 기록」 API/도구를 추가한다.
