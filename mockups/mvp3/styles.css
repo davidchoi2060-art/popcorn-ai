@@ -361,6 +361,10 @@ body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live
 .live-mode .public-bom .public-bom-quantity{font-size:14px;color:var(--muted);font-weight:400}
 .live-mode .public-bom .public-bom-expanded{display:grid;grid-template-columns:100px minmax(0,1fr);gap:16px}
 .live-mode .public-bom .public-bom-photo{min-height:100px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--muted);background:#fff}
+.live-mode .public-bom .public-bom-photo{margin:0;overflow:hidden}
+.live-mode .public-bom .public-bom-photo img{display:block;width:100%;height:100%;max-height:150px;object-fit:contain}
+.live-mode .public-bom .public-bom-photo.is-unavailable img{display:none}
+.live-mode .public-bom .public-bom-photo .live-product-image-status{margin:0;padding:8px;font-size:14px;line-height:1.5;color:var(--muted)}
 .live-mode .public-bom .public-bom-role{grid-column:1/-1}
 .live-mode .public-bom .public-bom-role h5{font-size:14px;margin:0 0 6px}
 .live-mode .public-bom .public-bom-role p{margin:0 0 12px}
