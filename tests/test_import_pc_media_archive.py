@@ -206,6 +206,27 @@ class ReuseAuthority(unittest.TestCase):
                 with self.subTest(body=body), patch.object(m, 'LEDGER', path):
                     self.assertIsNone(m.ledger())
 
+    def test_duplicate_decisions_and_bad_references_are_rejected(self):
+        base = json.loads(m.LEDGER.read_text(encoding='utf-8'))
+        first = base['decisions'][0]
+        # The withdrawal names the first decision; a second decision for the same archive
+        # must not shadow it and let the withdrawn product through.
+        gone = [dict(decision=first['id'], product_code=200001, reference='x', original_sha256=None)]
+        bodies = [dict(base, decisions=[first, dict(first, id='pc-media-reuse-later')], withdrawn=gone),
+                  dict(base, decisions=[first, dict(first, manifest_sha256='c' * 64)], withdrawn=gone),
+                  *[dict(base, decisions=[dict(first, references=refs)]) for refs in
+                    ([None], [''], ['  '], [first['references'][0], None], [7])]]
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'ledger.json'
+            for body in bodies:
+                path.write_text(json.dumps(body), encoding='utf-8')
+                with self.subTest(decisions=body['decisions']), patch.object(m, 'LEDGER', path):
+                    with self.assertRaisesRegex(m.LedgerError, 'decisions [12]번째 행'):
+                        m.parse_ledger()
+                    self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.DENY)
+                    with self.assertRaises(SystemExit):
+                        m.main(['--archive', d])
+
     def test_repo_ledger_is_valid_and_pins_the_22_archive(self):
         found = m.ledger()
         self.assertEqual(set(found['decisions']), {M})

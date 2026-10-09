@@ -85,10 +85,15 @@ def parse_ledger(path=None):
         if (not isinstance(d.get('manifest_sha256'), str) or not re.fullmatch('[a-f0-9]{64}', d['manifest_sha256'])
                 or not isinstance(d.get('id'), str) or not d['id'].strip()
                 or not isinstance(d.get('references'), list) or not d['references']
+                or not all(isinstance(r, str) and r.strip() for r in d['references'])
                 or not isinstance(scope, dict) or scope.get('reused_from') != 'same_archive_only'
                 or not isinstance(scope.get('select_despite'), list)
                 or not set(scope['select_despite']) <= {'revision'}):
             raise LedgerError(f'decisions {n}번째 행 형식 불일치')
+        if d['manifest_sha256'] in decisions or d['id'] in ids:
+            # A later decision must never silently replace an earlier one (its withdrawals
+            # would then be looked up under the wrong id).
+            raise LedgerError(f'decisions {n}번째 행이 앞 행과 manifest 또는 id 가 중복')
         decisions[d['manifest_sha256']] = d
         ids.add(d['id'])
     gone = set()
