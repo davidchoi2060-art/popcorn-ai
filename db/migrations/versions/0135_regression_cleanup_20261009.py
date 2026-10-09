@@ -64,7 +64,7 @@ DECLARE
   ev CONSTANT jsonb := '["cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r","cmsg_012k6fnspU3tgfYTTB56KTuDKmFfwwH2KAv7BxovsXaL7i"]';
   meta jsonb;
   r record; it record; tl_id bigint; tl_detail jsonb;
-  v_sku text; lf jsonb; sj jsonb; locks text[]; d jsonb; chg jsonb;
+  v_sku text; lf jsonb; sj jsonb; locks text[]; vals jsonb; d jsonb; chg jsonb;
   n_found int;
   u_applied int := 0; u_products int := 0; u_unlocked int := 0; u_changed int := 0; u_missing int := 0;
   s94959 text := 'skipped_missing'; s105053 text := 'skipped_missing'; s123034 text := 'skipped_missing';
@@ -90,7 +90,7 @@ BEGIN
       CONTINUE;
     END IF;
     SELECT to_jsonb(s) INTO sj FROM __S__.product_specs s WHERE s.product_code = r.product_code;
-    locks := ARRAY[]::text[];
+    locks := ARRAY[]::text[]; vals := '{}'::jsonb;
     FOR it IN SELECT field, expect FROM m0135_unlock WHERE product_code = r.product_code ORDER BY field LOOP
       IF NOT lf ? ('specs.'||it.field) THEN
         u_unlocked := u_unlocked + 1;
@@ -98,6 +98,7 @@ BEGIN
         u_changed := u_changed + 1;
       ELSE
         locks := locks || ('specs.'||it.field);
+        vals := vals || jsonb_build_object(it.field, it.expect);
       END IF;
     END LOOP;
     CONTINUE WHEN cardinality(locks) = 0;
@@ -108,7 +109,7 @@ BEGIN
       'kind','unlock','product_code',r.product_code,'sku',v_sku,'changes','{}'::jsonb,
       'before',jsonb_build_object('locked_fields',lf),
       'after',jsonb_build_object('locked_fields',lf - locks),
-      'unlocked',to_jsonb(locks),'locked',false));
+      'unlocked',to_jsonb(locks),'values',vals,'locked',false));
     u_applied := u_applied + cardinality(locks);
     u_products := u_products + 1;
   END LOOP;
@@ -131,7 +132,8 @@ BEGIN
        OR (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(chg) k) IS DISTINCT FROM ARRAY['sale_price','status']
        OR chg #> '{sale_price,from}' IS DISTINCT FROM '131400'::jsonb
        OR chg #> '{status,from}' IS DISTINCT FROM '"판매중"'::jsonb
-       OR jsonb_typeof(chg #> '{sale_price,to}') IS DISTINCT FROM 'number'
+       OR chg #> '{sale_price,to}' IS DISTINCT FROM '132400'::jsonb
+       OR chg #> '{status,to}' IS DISTINCT FROM '"품절"'::jsonb
        OR d #> '{before,locked_fields}' IS DISTINCT FROM '[]'::jsonb
        OR d->'locked' IS DISTINCT FROM 'true'::jsonb THEN
       s94959 := 'skipped_not_regression_edit';
@@ -223,8 +225,8 @@ DOWNGRADE_SQL = r'''
 DO $down$
 DECLARE
   meta jsonb;
-  r record; lf jsonb; sj jsonb; relock jsonb; d jsonb;
-  n_relocked int := 0; n_skipped int := 0; n_reviews int := 0;
+  r record; lf jsonb; sj jsonb; spec jsonb; relock jsonb; d jsonb;
+  n_relocked int := 0; n_skipped int := 0; n_changed int := 0; n_reviews int := 0; n_tmp int;
 BEGIN
   meta := jsonb_build_object('migration','0135','phase','down','source','migration 0135 downgrade');
   PERFORM 1 FROM __S__.products
@@ -245,9 +247,18 @@ BEGIN
     IF NOT FOUND THEN n_skipped := n_skipped + 1; CONTINUE; END IF;
 
     IF d->>'kind' = 'unlock' THEN
-      -- re-add only the entries this migration removed and nobody re-added since
+      -- re-add only the entries this migration removed and nobody re-added since, and
+      -- only while the spec value is still the one that was unlocked (a value changed
+      -- after the upgrade belongs to whoever changed it: skipped and counted)
+      SELECT to_jsonb(s) INTO spec FROM __S__.product_specs s
+       WHERE s.product_code = (d->>'product_code')::bigint;
+      SELECT count(*) INTO n_tmp FROM jsonb_array_elements_text(d->'unlocked') e
+       WHERE NOT lf ? e AND (spec IS NULL OR (spec -> substr(e, 7)) IS DISTINCT FROM (d->'values'->substr(e, 7)));
+      n_changed := n_changed + n_tmp;
       SELECT COALESCE(jsonb_agg(e), '[]'::jsonb) INTO relock
-        FROM jsonb_array_elements_text(d->'unlocked') e WHERE NOT lf ? e;
+        FROM jsonb_array_elements_text(d->'unlocked') e
+       WHERE NOT lf ? e AND spec IS NOT NULL AND d->'values' ? substr(e, 7)
+         AND (spec -> substr(e, 7)) IS NOT DISTINCT FROM (d->'values'->substr(e, 7));
       IF jsonb_array_length(relock) = 0 THEN n_skipped := n_skipped + 1; CONTINUE; END IF;
       UPDATE __S__.products SET locked_fields = lf || relock, updated_at = now()
        WHERE product_code = (d->>'product_code')::bigint;
@@ -304,13 +315,14 @@ BEGIN
         'restored',d->'before','locked',false));
     END IF;
   END LOOP;
-  IF n_relocked + n_skipped > 0 OR EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs
+  IF n_relocked + n_skipped + n_changed > 0 OR EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs
                                              WHERE detail->>'migration' = '0135') THEN
     INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
     VALUES (NULL, 'migration_0135', 'migration', '0135', meta || jsonb_build_object(
-      'fields_relocked',n_relocked,'skipped_changed',n_skipped));
+      'fields_relocked',n_relocked,'skipped_rows',n_skipped,'skipped_value_changed',n_changed));
   END IF;
-  RAISE NOTICE 'migration 0135 down: re-locked % fields, skipped % rows', n_relocked, n_skipped;
+  RAISE NOTICE 'migration 0135 down: re-locked % fields, % fields skipped (value changed), % rows skipped',
+    n_relocked, n_changed, n_skipped;
 END $down$;
 '''
 
