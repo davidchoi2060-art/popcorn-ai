@@ -17,6 +17,21 @@
       .filter(pair=>Object.prototype.hasOwnProperty.call(spec,pair[1]))
       .map(([label,key])=>[label,typeof spec[key]==='number'?spec[key]+'GB':spec[key]]):[];
   }
+  // Results cards show the four rows of the approved R01 card, built only from
+  // server spec fields (no inferred core counts or interface names).
+  function storageLabel(gb){return gb>=1000&&gb%1000===0?gb/1000+'TB':gb>=1024&&gb%1024===0?gb/1024+'TB':gb+'GB';}
+  function cardSpecRows(spec){
+    if(!object(spec))return [];
+    const rows=[],has=key=>Object.prototype.hasOwnProperty.call(spec,key);
+    if(has('cpu'))rows.push(['CPU',spec.cpu]);
+    if(has('gpu')||has('vram_gb')){
+      const gpu=has('gpu')?spec.gpu:'',vram=has('vram_gb')?spec.vram_gb+'GB':'';
+      rows.push(['GPU',gpu&&vram&&!gpu.replace(/\s+/g,'').toUpperCase().includes(vram.toUpperCase())?gpu+' · '+vram:gpu||vram+' 그래픽카드']);
+    }
+    if(has('ram_gb'))rows.push(['RAM',spec.ram_gb+'GB']);
+    if(has('ssd_gb'))rows.push(['저장장치',storageLabel(spec.ssd_gb)+' SSD']);
+    return rows;
+  }
   function specText(spec){return typeof spec==='string'?spec:specRows(spec).map(([label,value])=>label+' '+value).join('\n');}
   function safeUrl(value){
     if(typeof value!=='string')return null;
@@ -64,11 +79,18 @@
       stock:{state:stock.state,checked_at:stock.checked_at},compatibility:{document_state:c.document_state,public_summary:c.public_summary,assembly_state:c.assembly_state},
       photo:{state:'unresolved',url:null}};
   }
+  // Card role (sold_reco: value · recommended · reference). Responses and saved
+  // snapshots from before the role field carry only the badge text.
+  const legacyRoles={'추천 구성':'recommended','예산 안 최고 수준':'recommended','알뜰 구성':'value','가장 저렴한 선택':'value','예산을 넘는 최저가':'reference'};
+  function productRole(value){
+    if(['value','recommended','reference'].includes(value.role))return value.role;
+    return value.role===undefined||value.role===null?legacyRoles[text(value.tag)]||'':'';
+  }
   function product(value){
     if(!object(value)||!Number.isInteger(value.product_code)||value.product_code<=0||!text(value.name))return null;
     return {product_code:value.product_code,name:value.name,price:Number.isInteger(value.price)&&value.price>=0?value.price:null,
       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
-      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),over_budget:value.over_budget===true,
+      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:productRole(value),over_budget:value.over_budget===true,
       public_configuration:publicConfiguration(value.public_configuration,value.product_code)};
   }
   function gameContext(value){
@@ -109,6 +131,21 @@
     if(text(state.platform))result.push(state.platform);
     return result;
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,publicConfiguration,specRows,specText,product,gameContext,recommendations,quote,sources,conditions};
+  // Condition chips for the results heading: what the server parsed, plus
+  // assumptions it reported (shown as provisional, never as the customer's words).
+  function conditionChips(state,assumed){
+    const chips=[];
+    if(object(state)){
+      if(Array.isArray(state.game?.names))state.game.names.filter(x=>typeof x==='string'&&x.trim()).forEach(x=>chips.push({icon:'game-controller',label:x}));
+      if(Number.isInteger(state.budget_won)&&state.budget_won>0)chips.push({icon:'tag',label:'예산 '+state.budget_won.toLocaleString('ko-KR')+'원'+(state.budget_bound?' '+text(state.budget_bound):'')});
+      if(Array.isArray(state.usages)&&state.usages.length)chips.push({icon:'computer-tower',label:state.usages.filter(x=>typeof x==='string').join(' · ')});
+      if(text(state.game?.resolution))chips.push({icon:'monitor',label:state.game.resolution});
+      if(text(state.platform))chips.push({icon:'gear',label:state.platform});
+    }
+    if(Array.isArray(assumed)&&assumed.includes('game.resolution=1080p')&&!text(state?.game?.resolution))
+      chips.push({icon:'monitor',label:'FHD · 임시 기준',assumed:true,note:'해상도를 정하지 않아 FHD(1080p)를 기준으로 조회했어요.'});
+    return chips;
+  }
+  const model={object,text,copy,uuid,safeUrl,publicSpec,publicConfiguration,specRows,cardSpecRows,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);
