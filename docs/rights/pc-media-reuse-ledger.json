@@ -1,0 +1,25 @@
+{
+  "about": "Reuse authority ledger for archived assembled-PC originals, read by tools/import_pc_media_archive.py owner_reuse_verifier on every registration and selection step. A decision covers exactly one archive (manifest_sha256). A withdrawal names a decision, a product_code and optionally an original_sha256 (null = every original of that product), with a non-empty reference to the owner's withdrawal. Unreadable or malformed ledger = deny all.",
+  "decisions": [
+    {
+      "id": "pc-media-reuse-20261009",
+      "manifest_sha256": "48b0999b276d8a2aff0152a18cb65f5e98c9833489a2edac13bf57cb536b1e39",
+      "decided_by": "owner",
+      "decided_at": "2026-10-09T18:35:32+09:00",
+      "references": [
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDK2hTCfHq5dVQu9X69SAbb8",
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDA5QazRckoWKUdcdRG2Gkgf"
+      ],
+      "quotes": [
+        "대표이미지와 다시 생성이 필요한 이미지를 또 헷갈려서.. 다시 생성안하면 안쓰는건가? 이런 바보같은 짓거리를 왜 계속 봐야 하지..",
+        "그걸 안쓸거면 왜 만들었겠어.."
+      ],
+      "interpretation": "Author's interpretation, not the owner's words: the owner-made originals in this archive may be registered and selected as representative images without regeneration.",
+      "scope": {
+        "reused_from": "same_archive_only",
+        "forceable_mismatch": ["revision", "case"]
+      }
+    }
+  ],
+  "withdrawn": []
+}

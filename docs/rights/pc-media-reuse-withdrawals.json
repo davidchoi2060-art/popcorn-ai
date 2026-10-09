@@ -1,4 +1,0 @@
-{
-  "about": "Owner withdrawals of the 2026-10-09 reuse decision for the archived assembled-PC originals (tools/import_pc_media_archive.py OWNER_DECISION). Each entry needs product_code (int), optional original_sha256 (null = every original of that product) and a non-empty reference to the owner's withdrawal. A withdrawn item is denied at every registration and selection step.",
-  "withdrawn": []
-}

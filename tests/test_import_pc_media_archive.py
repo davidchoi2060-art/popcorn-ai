@@ -100,11 +100,13 @@ class ArchiveChecks(unittest.TestCase):
                 self.assertIn(word, m.archive_reason(value, raw))
 
     def test_reuse_reference_comes_from_owner_decision_not_text(self):
-        bare = m.provenance(item(reused_from='P113838'), 'e' * 64, binding())['original']
-        self.assertEqual(bare['reuse_exception_reference'], m.OWNER_DECISION['reference'])
-        noted = m.provenance(item(reused_from='P113838', reuse_exception='같은 케이스'), 'e' * 64, binding())
+        bare = m.provenance(item(reused_from='P113838'), M, binding())
+        ref = 'ledger:docs/rights/pc-media-reuse-ledger.json#pc-media-reuse-20261009'
+        self.assertEqual(bare['original']['reuse_exception_reference'], ref)
+        self.assertEqual(bare['reuse_authority']['decision'], ref)
+        self.assertEqual(len(bare['reuse_authority']['references']), 2)
+        noted = m.provenance(item(reused_from='P113838', reuse_exception='같은 케이스'), M, binding())
         self.assertTrue(noted['original']['reuse_exception_reference'].endswith('/reuse_exception'))
-        self.assertEqual(noted['reuse_authority']['basis'], m.OWNER_DECISION['basis'])
 
     def test_request_id_is_stable_and_specific(self):
         a = m.request_id('f' * 64, 1, 'a' * 64)
@@ -139,19 +141,16 @@ class ReuseAuthority(unittest.TestCase):
     def subject(self, raw=PNG, mismatch=(), force=False, sha=M, value=None, skus=()):
         return m.reuse_subject(value or item(), raw, sha, dict(binding(), mismatch=list(mismatch)), force, skus)
 
-    def test_owner_with_intact_file_is_allowed(self):
+    def test_ledger_decision_is_allowed(self):
         self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
 
     def test_denials(self):
         cases = [(self.subject(raw=PNG + b'x'), Principal(1, 'owner'), FakeDB()),
-                 (self.subject(), Principal(1, 'operator'), FakeDB()),
-                 (self.subject(), Principal(1, 'owner'), FakeDB(operator=('owner', '정지'))),
-                 (self.subject(), Principal(1, 'owner'), None),
                  (self.subject(mismatch=[IMG], force=True), Principal(1, 'owner'), FakeDB()),
                  (self.subject(sha='e' * 64), Principal(1, 'owner'), FakeDB()),
                  (self.subject(value=item(reused_from='P999999')), Principal(1, 'owner'), FakeDB())]
         for subject, principal, conn in cases:
-            with self.subTest(principal=principal):
+            with self.subTest(subject=subject):
                 self.assertIs(m.owner_reuse_verifier(subject, principal, conn), Decision.DENY)
 
     def test_reuse_inside_the_same_archive_is_allowed(self):
@@ -159,20 +158,37 @@ class ReuseAuthority(unittest.TestCase):
         self.assertIs(m.owner_reuse_verifier(s, Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
 
     def test_withdrawal_ledger(self):
+        base = json.loads(m.LEDGER.read_text(encoding='utf-8'))
+        sha = item()['original_sha256']
+        w = lambda **kw: dict(base, withdrawn=[dict(dict(decision='pc-media-reuse-20261009', reference='x'), **kw)])
+        bad_scope = dict(base, decisions=[dict(base['decisions'][0], scope=dict(reused_from='any', forceable_mismatch=[]))])
         with tempfile.TemporaryDirectory() as d:
-            path = Path(d) / 'w.json'
-            for body, expected in [(dict(withdrawn=[]), Decision.ALLOW),
-                                   (dict(withdrawn=[dict(product_code=200001, original_sha256=None, reference='x')]), Decision.DENY),
-                                   (dict(withdrawn=[dict(product_code=200001, original_sha256=item()['original_sha256'],
-                                                         reference='x')]), Decision.DENY),
-                                   (dict(withdrawn=[dict(product_code=200002, original_sha256=None, reference='x')]), Decision.ALLOW),
+            path = Path(d) / 'ledger.json'
+            for body, expected in [(base, Decision.ALLOW),
+                                   (w(product_code=200001, original_sha256=None), Decision.DENY),
+                                   (w(product_code=200001, original_sha256=sha), Decision.DENY),
+                                   (w(product_code=200002, original_sha256=None), Decision.ALLOW),
+                                   (w(product_code=200001, original_sha256=None, decision='other'), Decision.ALLOW),
+                                   (w(product_code='200001', original_sha256=None), Decision.DENY),
+                                   (dict(base, decisions=[]), Decision.DENY), (bad_scope, Decision.DENY),
                                    ('not json', Decision.DENY)]:
                 path.write_text(body if isinstance(body, str) else json.dumps(body), encoding='utf-8')
-                with self.subTest(body=body), patch.object(m, 'WITHDRAWALS', path):
+                with self.subTest(body=body), patch.object(m, 'LEDGER', path):
                     self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), expected)
 
-    def test_repo_withdrawal_ledger_is_valid_and_empty(self):
-        self.assertEqual(m.withdrawn(), set())
+    def test_repo_ledger_is_valid_and_pins_the_22_archive(self):
+        found = m.ledger()
+        self.assertEqual(set(found['decisions']), {M})
+        self.assertEqual(found['withdrawn'], set())
+
+    def test_operator_binding_is_separate(self):
+        from api.pc_existing_media_import import Denied
+        m.bind_operator(FakeDB(), Principal(1, 'owner'), 1)
+        for principal, db, bound in [(Principal(1, 'operator'), FakeDB(), 1), (Principal(2, 'owner'), FakeDB(), 1),
+                                     (Principal(1, 'owner'), FakeDB(operator=('owner', '정지')), 1),
+                                     (Principal(1, 'owner'), FakeDB(operator=('operator', '활성')), 1)]:
+            with self.subTest(principal=principal, operator=db.operator), self.assertRaises(Denied):
+                m.bind_operator(db, principal, bound)
 
     def test_forced_revision_mismatch_is_allowed(self):
         s = self.subject(mismatch=[REV], force=True)
@@ -287,7 +303,7 @@ class Apply(unittest.TestCase):
 
     def test_denied_authority_writes_nothing(self):
         self.db = FakeDB(operator=('owner', '정지'))
-        self.assertEqual(self.apply(), ('skipped', '재사용 권한 확인 거부'))
+        self.assertEqual(self.apply(), ('skipped', '실행자 확인 거부'))
         self.assertEqual((self.db.jobs, self.objects.calls), ({}, []))
 
     def test_no_select_only_registers(self):
@@ -322,7 +338,10 @@ class Cli(unittest.TestCase):
             with patch.object(m, 'current_binding', return_value=(binding(), None)), \
                     patch.object(m, 'authority', return_value=auth()):
                 outside = m.run(d, engine=db, operator_id=1, out=lambda _: None)
-                with patch.object(m, 'decision_manifest_sha', return_value=pinned):
+                ledger = json.loads(m.LEDGER.read_text(encoding='utf-8'))
+                ledger['decisions'][0]['manifest_sha256'] = pinned
+                (Path(d) / 'ledger.json').write_text(json.dumps(ledger), encoding='utf-8')
+                with patch.object(m, 'LEDGER', Path(d) / 'ledger.json'):
                     result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
             self.assertEqual(outside['counts'], {'skipped': 1, 'file_error': 2})
             self.assertEqual(result['counts'], {'would_select': 1, 'file_error': 2})

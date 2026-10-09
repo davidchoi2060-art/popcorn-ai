@@ -11,17 +11,16 @@ Per item, without any generation call:
                      has exactly one CASE. A later revision or a different case does NOT
                      block registration; it withholds automatic selection unless
                      --force-select. An open image condition is reported, never forced.
-  3. reuse authority api.pc_existing_media_import.ServerAuthority.verify_reuse and
-                     verify_registration, wired to owner_reuse_verifier. Scope of the
-                     owner decision (OWNER_DECISION: originals made by the owner, used
-                     as-is without regeneration): the archive pinned by #22's
-                     MANIFEST_SHA only; items listed in docs/rights/
-                     pc-media-reuse-withdrawals.json are withdrawn; a reused original must
-                     come from the same archive; a forced mismatch is revision/case only;
-                     the principal is an active owner re-read on the same transaction.
-                     Asked on the insert transaction, right before upload, inside the
-                     ready transaction and inside the selection transaction. Never
-                     granted by the manifest's reuse_exception text alone.
+  3. authority       two separate checks on every write transaction (insert, right
+                     before upload, ready, selection):
+                     executor  bind_operator: --operator-id is still an active owner.
+                     approval  ServerAuthority.verify_reuse + verify_registration, wired to
+                               owner_reuse_verifier, which reads docs/rights/
+                               pc-media-reuse-ledger.json: a decision must cover this exact
+                               archive (manifest sha256), the item/hash must not be
+                               withdrawn, a reused original must come from the same archive
+                               and a forced mismatch must be inside the decision's scope.
+                     The manifest's reuse_exception text never grants reuse.
   4. apply           insert an origin_kind='existing_import' job bound to the
                      CURRENT visual/review basis, upload create-only to the private
                      bucket (same key layout as generated jobs), mark ready, and
@@ -50,36 +49,36 @@ NAMESPACE = UUID('6f1d5a8e-3c2b-4b7e-9a51-0c4d2e8f7a19')
 PNG = b'\x89PNG\r\n\x1a\n'
 MAX_BYTES = 20 * 1024 * 1024
 VERSION = 'pc-media-existing-import-v1'
-# Owner decision recorded in the project chat (2026-10-09 18:35 / 18:41 KST): the archived
-# originals were made by the owner and are used as-is; not regenerating them is no reason
-# to discard them. This is the reuse authority basis; it is not publication permission.
-OWNER_DECISION = dict(
-    reference='project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDK2hTCfHq5dVQu9X69SAbb8'
-              '+cmsg_012k6fnspU3tgfYTTB56KTuDA5QazRckoWKUdcdRG2Gkgf',
-    decided_at='2026-10-09T18:35:32+09:00',
-    basis='owner_made_original_reuse_without_regeneration')
-# Mismatch kinds the owner decision allows to be selected with --force-select.
-FORCEABLE = frozenset({'revision', 'case'})
-# Scope of that decision: exactly the archive pinned by #22 (tools/register_existing_pc_media).
-# Another manifest is outside the decision and is denied.
-WITHDRAWALS = ROOT / 'docs' / 'rights' / 'pc-media-reuse-withdrawals.json'
+# Reuse authority lives in a ledger, not in code: which archive the owner's decision
+# covers, its scope, and per-item withdrawals. Not publication permission.
+LEDGER = ROOT / 'docs' / 'rights' / 'pc-media-reuse-ledger.json'
 
 
-def decision_manifest_sha():
-    from tools.register_existing_pc_media import MANIFEST_SHA
-    return MANIFEST_SHA
-
-
-def withdrawn(path=None):
-    """Owner withdrawals of the reuse decision: {(product_code, original_sha256|None)}.
-    An unreadable or malformed file withdraws everything (fail closed)."""
+def ledger(path=None):
+    """{'decisions': {manifest_sha: decision}, 'withdrawn': {(decision_id, code, sha|None)}}
+    or None when the ledger is unreadable or malformed (fail closed)."""
     try:
-        data = json.loads(Path(path or WITHDRAWALS).read_text(encoding='utf-8'))
-        rows = data['withdrawn']
-        return {(int(r['product_code']), r.get('original_sha256')) for r in rows
-                if type(r.get('product_code')) is int and str(r.get('reference', '')).strip()}
+        data = json.loads(Path(path or LEDGER).read_text(encoding='utf-8'))
+        decisions = {}
+        for d in data['decisions']:
+            if (not re.fullmatch('[a-f0-9]{64}', d['manifest_sha256']) or not str(d['id']).strip()
+                    or not d['references'] or d['scope']['reused_from'] != 'same_archive_only'
+                    or not set(d['scope']['forceable_mismatch']) <= {'revision', 'case'}):
+                return None
+            decisions[d['manifest_sha256']] = d
+        gone = set()
+        for w in data['withdrawn']:
+            if type(w.get('product_code')) is not int or not str(w.get('reference', '')).strip():
+                return None
+            gone.add((w['decision'], w['product_code'], w.get('original_sha256')))
+        return dict(decisions=decisions, withdrawn=gone)
     except Exception:
         return None
+
+
+def decision_for(manifest_sha):
+    found = ledger()
+    return found['decisions'].get(manifest_sha) if found else None
 
 
 @dataclass(frozen=True)
@@ -176,12 +175,12 @@ def _texts(mismatch):
     return ' · '.join(text for _, text in mismatch)
 
 
-def selectable(binding, force_select):
+def selectable(binding, force_select, forceable=frozenset({'revision', 'case'})):
     """'auto' | 'forced' | None. Image conditions are never forced."""
     kinds = {kind for kind, _ in binding['mismatch']}
     if not kinds:
         return 'auto'
-    return 'forced' if force_select and kinds <= FORCEABLE else None
+    return 'forced' if force_select and kinds <= set(forceable) else None
 
 
 def reuse_subject(item, raw, manifest_sha, binding, force_select, manifest_skus=()):
@@ -192,37 +191,45 @@ def reuse_subject(item, raw, manifest_sha, binding, force_select, manifest_skus=
 
 
 def owner_reuse_verifier(subject, principal, connection):
-    """Reuse authority for the owner-made archive. ALLOW only when every scope holds:
-    the archive is the one the decision covers (pinned manifest sha256), the item
-    and its original hash are not withdrawn, a reused original comes from the same
-    archive, the file is intact, a forced mismatch is revision/case only, and the
-    principal is an active owner re-read on the caller's connection. Else DENY."""
-    from sqlalchemy import text
+    """Approval check only (who runs it is bind_operator's job). ALLOW only when the
+    ledger has a decision for this exact archive, the item/hash is not withdrawn from
+    it, a reused original comes from the same archive, the file is intact and a
+    forced mismatch is inside the decision's scope. Anything else is DENY."""
     from tools.register_existing_pc_media import Decision
-    if type(subject) is not ArchiveReuse or subject.file_reason or connection is None:
+    if type(subject) is not ArchiveReuse or subject.file_reason or type(subject.product_code) is not int:
         return Decision.DENY
-    if subject.manifest_sha256 != decision_manifest_sha() or type(subject.product_code) is not int:
+    found = ledger()
+    decision = found['decisions'].get(subject.manifest_sha256) if found else None
+    if decision is None:
         return Decision.DENY
-    gone = withdrawn()
-    if gone is None or (subject.product_code, None) in gone or (subject.product_code, subject.original_sha256) in gone:
+    gone = found['withdrawn']
+    if ((decision['id'], subject.product_code, None) in gone
+            or (decision['id'], subject.product_code, subject.original_sha256) in gone):
         return Decision.DENY
     if subject.reused_from is not None and not subject.reused_from_in_manifest:
         return Decision.DENY
-    if getattr(principal, 'role', None) != 'owner':
-        return Decision.DENY
-    row = connection.execute(text('SELECT role,status FROM admin_operators WHERE operator_id=:o FOR SHARE'),
-                             dict(o=principal.operator_id)).mappings().first()
-    if not row or row['role'] != 'owner' or row['status'] != '활성':
-        return Decision.DENY
     kinds = {kind for kind, _ in subject.mismatch}
-    if subject.force_select and not kinds <= FORCEABLE:
+    if subject.force_select and not kinds <= set(decision['scope']['forceable_mismatch']):
         return Decision.DENY
     return Decision.ALLOW
 
 
+def bind_operator(conn, principal, operator_id):
+    """Executor binding, separate from the approval check: the principal must be the
+    operator named at start, still an active owner on THIS transaction."""
+    from sqlalchemy import text
+    from api.pc_existing_media_import import Denied
+    if type(principal).__name__ != 'Principal' or principal.operator_id != operator_id or principal.role != 'owner':
+        raise Denied('operator_binding_mismatch')
+    row = conn.execute(text('SELECT operator_id,role,status FROM admin_operators WHERE operator_id=:o FOR SHARE'),
+                       dict(o=operator_id)).mappings().first()
+    if not row or row['operator_id'] != operator_id or row['role'] != 'owner' or row['status'] != '활성':
+        raise Denied('operator_not_active_owner')
+
+
 def authority(engine, operator_id):
-    """ServerAuthority wired with the owner decision verifier; the principal is the
-    named operator, read from the DB, never from the archive."""
+    """ServerAuthority wired with the ledger verifier for both reuse and registration;
+    its principal is the named operator, read from the DB, never from the archive."""
     from sqlalchemy import text
     from api.pc_existing_media_import import ServerAuthority
 
@@ -240,7 +247,10 @@ def authority(engine, operator_id):
 def provenance(item, manifest_sha, binding, principal=None, selection=None):
     reference = f"manifest:sha256:{manifest_sha}#items/{item['configuration_id']}"
     reused = item.get('reused_from') or None
-    return dict(version=VERSION, reuse_authority=dict(OWNER_DECISION, verified_by='ServerAuthority.verify_reuse',
+    decision = decision_for(manifest_sha) or {}
+    decision_ref = f"ledger:docs/rights/pc-media-reuse-ledger.json#{decision.get('id')}"
+    return dict(version=VERSION, reuse_authority=dict(decision=decision_ref, references=decision.get('references'),
+        decided_at=decision.get('decided_at'), verified_by='ServerAuthority.verify_reuse+verify_registration',
         principal=principal.actor if principal else None, selection=selection,
         mismatch=[text for _, text in binding['mismatch']]), original=dict(
         source_sku=item['configuration_id'], original_revision=item['db_configuration_revision'],
@@ -248,9 +258,9 @@ def provenance(item, manifest_sha, binding, principal=None, selection=None):
         manifest_sha256=manifest_sha,
         qa_references=[f'{reference}/qa_notes/{i}' for i in range(len(item['qa_notes']))],
         qa_notes=list(item['qa_notes']), reused_from=reused,
-        # Reuse is authorised by verify_reuse/OWNER_DECISION, not by the manifest text.
+        # Reuse is authorised by verify_reuse and the ledger decision, not by the manifest text.
         reuse_exception_reference=(f'{reference}/reuse_exception' if item.get('reuse_exception')
-                                   else OWNER_DECISION['reference']) if reused else None,
+                                   else decision_ref) if reused else None,
         reuse_exception_note=item.get('reuse_exception') if reused else None,
         ssd_facts_reference=None, generation_model=None, generation_actor=None,
         generation_time=None, original_visual_basis=None),
@@ -277,10 +287,15 @@ def _row(conn, request):
     return dict(found) if found else None
 
 
-def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus):
-    """(binding, None) or (None, reason) on this transaction: current binding, then
-    verify_reuse and verify_registration. Called before every write and upload."""
+def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus, bound=None):
+    """(binding, None) or (None, reason) on this transaction: executor binding, current
+    binding, then verify_reuse and verify_registration. Called before every write and
+    upload."""
     from api.pc_existing_media_import import Denied
+    try:
+        bind_operator(conn, principal, principal.operator_id if bound is None else bound)
+    except Denied:
+        return None, '실행자 확인 거부'
     binding, reason = current_binding(conn, product_code(item), item)
     if reason:
         return None, reason
@@ -382,6 +397,7 @@ def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select,
             mode = selectable(binding, force_select)
             if auth is not None:
                 try:
+                    bind_operator(conn, principal, principal.operator_id)
                     subject = reuse_subject(item, raw, manifest_sha, binding, mode == 'forced', skus)
                     auth.verify_reuse(subject, principal, conn)
                     auth.verify_registration(subject, principal, conn)
