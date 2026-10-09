@@ -764,18 +764,24 @@ def recommend(body: RecommendBody):
         game_resolution = game_name = None
         if RECO_SOURCE == "sold":
             # 2026-09-25 재설계 4단계 — 조합 격자 대신 판매 중인 몰 조립PC 최대 2개(api/sold_reco).
-            # 게임은 등급이 있어야 수준을 정한다(needs 에 game.grade 가 남는 것은 그대로).
+            # 판매 경로의 수준은 등급이 아니라 게임명·해상도가 정한다(sold_reco.game_min_rank).
+            # 게임명이 «없으면» 해상도 기준(기본 FHD)으로 등급 없이 추천한다(2026-10-09 조정 결정:
+            # 「게임용 250만원」이 0장이었다). 게임명이 «있는데» 등급이 없으면 validate_state 가
+            # 「전체 게임 적합성 확인 전 추천 보류」로 막은 것이라 그대로 보류한다.
+            # needs 의 game.grade 는 어느 쪽이든 그대로.
+            named = bool(state.game and state.game.names)
+            sold_games = game_usages if (game_grade is not None or not named) else []
             others = [u for u in state.usages if not is_game_usage(u)]
-            card_sets.extend(SOLD.card_sets(
-                state, game_usages if game_grade is not None else [], others, notes, vocab))
-            if game_usages and game_grade is not None:
-                game_resolution = state.game.resolution or DEFAULT_RESOLUTION
-                game_name = state.game.names[0] if state.game.names else None
-                if state.game.resolution is None:
+            card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab))
+            if sold_games:
+                g = state.game
+                game_resolution = (g.resolution if g else None) or DEFAULT_RESOLUTION
+                game_name = g.names[0] if g and g.names else None
+                if g is None or g.resolution is None:
                     assumed.append(ASSUMED_RESOLUTION)
-                if state.game.grade_src == "ai_estimate":
-                    ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
-                ctx = _game_context(conn, state.game.names, vocab)
+                if g is not None and game_grade is not None and g.grade_src == "ai_estimate":
+                    ai_estimated.append({"game_names": list(g.names), "grade": game_grade})
+                ctx = _game_context(conn, g.names if g else [], vocab)
                 for cs in card_sets:
                     if cs["usage_grid"] == "게임":
                         cs["game_context"] = ctx
