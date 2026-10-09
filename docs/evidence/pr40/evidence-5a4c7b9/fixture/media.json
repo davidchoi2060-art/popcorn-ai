@@ -1,0 +1,74 @@
+{
+ "title": "골드 NO.04 게이밍 PC (fixture)",
+ "snapshot": {
+  "parts": [
+   {
+    "slot": "CASE",
+    "code": 129552,
+    "name": "케이스 (fixture)",
+    "quantity": 1
+   },
+   {
+    "slot": "CPU",
+    "code": 1,
+    "name": "CPU (fixture)",
+    "quantity": 1
+   }
+  ],
+  "cooling": {
+   "method_label": "공랭"
+  },
+  "notice": "AI 조립 예시 · 실제 출고 사진 아님"
+ },
+ "assembly_checks": [],
+ "errors": [],
+ "provider_ready": true,
+ "cloud_ready": true,
+ "model": "fixture-model",
+ "basis": "b",
+ "visual_basis": "v",
+ "jobs": [
+  {
+   "job_id": "fx-1",
+   "status": "ready",
+   "phase": "complete",
+   "origin_kind": "existing_import",
+   "current": true,
+   "selected": false,
+   "created_at": "2026-10-09T01:10:00Z",
+   "updated_at": "2026-10-09T01:10:00Z",
+   "model": null,
+   "image_url": "/fx/tower.png",
+   "staged_available": false,
+   "interrupted": false
+  },
+  {
+   "job_id": "fx-2",
+   "status": "ready",
+   "phase": "complete",
+   "origin_kind": "generated",
+   "current": true,
+   "selected": true,
+   "created_at": "2026-10-09T02:10:00Z",
+   "updated_at": "2026-10-09T02:10:00Z",
+   "model": "모델 A (fixture)",
+   "image_url": "/fx/tower.png",
+   "staged_available": false,
+   "interrupted": false
+  },
+  {
+   "job_id": "fx-3",
+   "status": "ready",
+   "phase": "complete",
+   "origin_kind": null,
+   "current": true,
+   "selected": false,
+   "created_at": "2026-10-09T03:10:00Z",
+   "updated_at": "2026-10-09T03:10:00Z",
+   "model": null,
+   "image_url": "/fx/tower.png",
+   "staged_available": false,
+   "interrupted": false
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+{
+ "groups": [
+  {
+   "usage_key": "game_high",
+   "usage_label": "고사양 게임",
+   "match_terms": [
+    "배그",
+    "고사양 게임"
+   ],
+   "items": [
+    {
+     "floor_id": 1,
+     "slot": "GPU",
+     "slot_label": "그래픽카드",
+     "field": "required_power_watt",
+     "op": ">=",
+     "value": 550,
+     "label": "",
+     "active": true,
+     "field_label": "권장 전원",
+     "unit": "W",
+     "pass_count": 220,
+     "slot_total": 410,
+     "at": "2026-10-01T00:00:00Z"
+    },
+    {
+     "floor_id": 2,
+     "slot": "RAM",
+     "slot_label": "메모리",
+     "field": "capacity_gb",
+     "op": ">=",
+     "value": 32,
+     "label": "",
+     "active": true,
+     "field_label": "용량",
+     "unit": "GB",
+     "pass_count": 180,
+     "slot_total": 260,
+     "at": "2026-10-01T00:00:00Z"
+    }
+   ]
+  },
+  {
+   "usage_key": "office",
+   "usage_label": "사무",
+   "match_terms": [
+    "사무",
+    "문서"
+   ],
+   "items": [
+    {
+     "floor_id": 3,
+     "slot": "RAM",
+     "slot_label": "메모리",
+     "field": "capacity_gb",
+     "op": ">=",
+     "value": 8,
+     "label": "",
+     "active": true,
+     "field_label": "용량",
+     "unit": "GB",
+     "pass_count": 250,
+     "slot_total": 260,
+     "at": "2026-10-01T00:00:00Z"
+    },
+    {
+     "floor_id": 4,
+     "slot": "SSD",
+     "slot_label": "SSD",
+     "field": "capacity_gb",
+     "op": ">=",
+     "value": 256,
+     "label": "",
+     "active": false,
+     "field_label": "용량",
+     "unit": "GB",
+     "pass_count": 300,
+     "slot_total": 330,
+     "at": "2026-10-01T00:00:00Z"
+    }
+   ]
+  }
+ ],
+ "fields": {},
+ "note": "fixture"
+}

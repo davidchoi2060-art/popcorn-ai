@@ -1,0 +1,8 @@
+{
+ "authenticated": true,
+ "operator": {
+  "operator_id": 1,
+  "name": "검수용 owner",
+  "role": "owner"
+ }
+}

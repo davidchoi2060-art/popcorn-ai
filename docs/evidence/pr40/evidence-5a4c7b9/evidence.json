@@ -1,0 +1,62 @@
+[
+ {
+  "shot": "media-1440-full.png",
+  "errors": [],
+  "buttons": [
+   "대표 이미지로 선택",
+   "대표 이미지 선택됨(disabled)",
+   "대표 이미지로 선택"
+  ],
+  "hscroll": false
+ },
+ {
+  "shot": "media-390-full.png",
+  "errors": [],
+  "buttons": [
+   "대표 이미지로 선택",
+   "대표 이미지 선택됨(disabled)",
+   "대표 이미지로 선택"
+  ],
+  "hscroll": false
+ },
+ {
+  "shot": "floors-1440-expanded.png",
+  "errors": [],
+  "saveBeforePreview": {
+   "save": true,
+   "label": "확인했습니다 — 저장"
+  },
+  "saveAfterPreview": {
+   "save": false,
+   "label": "확인했습니다 — 저장",
+   "preview": "후보가 220개 → 140개로 줄어듭니다. 0이 되지는 않아 견적은 계속 만들어집니다. 다만 이 용도의 그래픽카드 선택폭이 크게 좁아져, 예산이 낮은 요청에서는 불성립이 늘 수 있습니다."
+  },
+  "actionButtonRect": {
+   "x": 1268,
+   "w": 51,
+   "right": 1319,
+   "vw": 1440
+  },
+  "hscroll": false
+ },
+ {
+  "shot": "floors-390-expanded.png",
+  "errors": [],
+  "saveBeforePreview": {
+   "save": true,
+   "label": "확인했습니다 — 저장"
+  },
+  "saveAfterPreview": {
+   "save": false,
+   "label": "확인했습니다 — 저장",
+   "preview": "후보가 220개 → 140개로 줄어듭니다. 0이 되지는 않아 견적은 계속 만들어집니다. 다만 이 용도의 그래픽카드 선택폭이 크게 좁아져, 예산이 낮은 요청에서는 불성립이 늘 수 있습니다."
+  },
+  "actionButtonRect": {
+   "x": 253,
+   "w": 51,
+   "right": 304,
+   "vw": 390
+  },
+  "hscroll": false
+ }
+]

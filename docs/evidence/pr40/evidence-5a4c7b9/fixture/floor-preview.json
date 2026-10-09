@@ -1,0 +1,15 @@
+{
+ "preview": true,
+ "impact": {
+  "usage": "고사양 게임",
+  "slot": "그래픽카드",
+  "field": "required_power_watt",
+  "from": 550,
+  "to": 650,
+  "pass_before": 220,
+  "pass_after": 140,
+  "slot_total": 410,
+  "buildable_after": true,
+  "note": "fixture"
+ }
+}
