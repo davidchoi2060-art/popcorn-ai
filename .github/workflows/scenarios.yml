@@ -1,0 +1,71 @@
+# 「끝까지 시나리오」 진척 측정 (협업 분담표 7번) — GitHub 호스팅 일회용 리눅스 머신에서 돈다.
+#
+# ⚠ deploy.yml 의 「pull_request 트리거 절대 금지」는 self-hosted 러너(우리 서버) 이야기다.
+#    이 워크플로는 ubuntu-latest 에서만 돌고 비밀값을 쓰지 않으며 권한은 읽기뿐이다.
+#    **이 파일에 self-hosted 러너나 secrets 를 넣지 않는다.**
+#
+# DB: 이 작업 안에서만 사는 빈 Postgres 에 `alembic upgrade head` 만 적용한다(상품 0건).
+#     «새로 세운 서버에서 무엇이 되는가»를 잰다 — 카탈로그가 필요한 단계는 여기서 빨강이고,
+#     실제 카탈로그 기준 기록은 개발 서버 측정(docs/scenarios/README.md)이 맡는다.
+#
+# 판정은 tests/scenarios/meter.py — 초록은 실제 요청이 통과했을 때만. 빨강이 있어도 이 작업은
+# 성공으로 끝난다(진척 측정이지 합격 판정이 아니다). 측정기 자체가 못 돌면 실패한다.
+# 결과: 작업 요약(Summary) 표 + 산출물 scenario-status(status.md · last-run.json).
+name: 끝까지 시나리오
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scenarios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  meter:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://ci:ci@127.0.0.1:5432/ci
+      # 일회용 DB 의 첫 관리자 — 비밀번호 없이 owner 가 되는 부트스트랩 경로(이 DB 에서만 존재)
+      ADMIN_BOOTSTRAP_EMAILS: scenario-owner@ci.popcorn.invalid
+      SCENARIO_ADMIN_EMAIL: scenario-owner@ci.popcorn.invalid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - name: 의존성 설치
+        run: pip install -r requirements.txt pytest==9.1.1
+      - name: 측정기 안전 검사 + 합성 출고 명령 검사
+        run: python -m pytest tests/scenarios/test_meter_safety.py tests/scenarios/test_fulfillment_command.py -q -p no:cacheprovider
+      - name: 스키마 적용 (alembic upgrade head)
+        working-directory: db
+        run: alembic upgrade head
+      - name: 시나리오 측정
+        run: >-
+          python tests/scenarios/meter.py --allow-writes
+          --target-label "CI 일회용 DB(마이그레이션만 · 상품 0건)"
+          --out scenario-status --summary "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: scenario-status
+          path: scenario-status/
