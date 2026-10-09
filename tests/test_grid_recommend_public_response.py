@@ -19,7 +19,7 @@ TOP_KEYS = {'ok', 'card_sets', 'cards', 'assumed', 'ai_estimated', 'needs', 'dro
 SET_KEYS = {'usage', 'usage_grid', 'kind', 'items', 'empty_reason', 'empty_note',
             'min_level', 'min_level_work'}
 ITEM_KEYS = {'product_code', 'name', 'price', 'price_src', 'mall_url', 'spec', 'level',
-             'tag', 'over_budget', 'reasons', 'photo', 'public_configuration'}
+             'tag', 'role', 'over_budget', 'reasons', 'photo', 'public_configuration'}
 # 공개 구성·대표 사진 판정(customer_pc_offer)은 자기 검사가 지킨다. 여기서는 공개 아님 값으로 고정.
 NOT_PUBLIC_ITEM = {'photo': {'state': 'unavailable', 'url': None}, 'public_configuration': None}
 PUBLIC_SPEC = {'cpu', 'gpu', 'ram_gb', 'ssd_gb', 'vram_gb'}
@@ -36,6 +36,7 @@ LEVELS = [
     {'usage': '게임', 'level': '기본', 'level_rank': 1, 'work': '캐주얼 게임', 'conditions': None},
     {'usage': '게임', 'level': 'FHD', 'level_rank': 2, 'work': 'FHD 게임',
      'conditions': '그래픽 지수 100 이상 · 램 16GB 이상 · SSD 480GB 이상 · CPU 게임 등급 1.0 이상'},
+    {'usage': '게임', 'level': 'QHD', 'level_rank': 3, 'work': 'QHD 게임', 'conditions': None},
     {'usage': '영상편집', 'level': '기본', 'level_rank': 1, 'work': 'FHD 편집', 'conditions': None},
 ]
 
@@ -54,7 +55,14 @@ def product(code, price):
                              'blocked': ['CPU 멀티 지수 24,000 미만(현재 16,500)']}}}
 
 
-PRODUCTS = {1: product(1, 1200000), 2: product(2, 1500000)}
+def qhd_product(code, price):
+    p = product(code, price)
+    p['fit']['게임'] = {'level': 'QHD', 'rank': 3, 'blocked': ['그래픽 메모리 12GB 미만(현재 8GB)']}
+    return p
+
+
+# 게임: 1(FHD·싼 쪽) + 2(QHD) -> [알뜰 1, 추천 2]. 영상편집: 같은 수준 -> 추천 1 한 장.
+PRODUCTS = {1: product(1, 1200000), 2: qhd_product(2, 1500000)}
 
 
 class FakeEngine:
@@ -107,6 +115,7 @@ class RecommendPublicResponseTest(unittest.TestCase):
             self.assertEqual(s['kind'], 'sold')
             self.assertLessEqual(SET_KEYS, set(s))
             self.assertTrue(s['items'])
+            self.assertEqual(s['items'][-1]['role'], 'recommended')
             for item in s['items']:
                 self.assertEqual(set(item), ITEM_KEYS)
                 self.assertEqual(item['mall_url'], f"https://mall.example/{item['product_code']}")
@@ -148,6 +157,58 @@ class RecommendPublicResponseTest(unittest.TestCase):
         with self.assertLogs('grid_public', level='INFO'):
             call_recommend()
         self.assertIn('cpu_mt', PRODUCTS[1]['spec'])
+
+
+class PickRuleTest(unittest.TestCase):
+    """승인 시안 R01: 카드 두 장은 「알뜰 구성」(싼 쪽, 앞) · 「추천 구성」(강조, 뒤)."""
+
+    @staticmethod
+    def p(code, price, rank):
+        return {'code': code, 'name': f'PC{code}', 'price': price, 'price_src': '현재 판매가',
+                'url': None, 'spec': {}, 'includes': None,
+                'fit': {'게임': {'level': f'L{rank}', 'rank': rank, 'blocked': []}}}
+
+    def pick(self, items, budget, bound='이하'):
+        prods = {i['code']: i for i in items}
+        return S.pick('게임', 1, budget, bound, [], prods)
+
+    def roles(self, res):
+        return [(i['product_code'], i['tag'], i['role']) for i in res['items']]
+
+    def test_budget_pair_is_value_then_recommended(self):
+        res = self.pick([self.p(1, 900000, 1), self.p(2, 1200000, 2), self.p(3, 1400000, 2),
+                         self.p(4, 1600000, 3)], 1500000)
+        self.assertEqual(self.roles(res), [(1, '알뜰 구성', 'value'), (2, '추천 구성', 'recommended')])
+        self.assertLess(res['items'][0]['price'], res['items'][1]['price'])
+
+    def test_budget_single_when_cheapest_is_best(self):
+        res = self.pick([self.p(1, 900000, 2), self.p(2, 1000000, 2), self.p(3, 1100000, 1)], 1500000)
+        self.assertEqual(self.roles(res), [(1, '추천 구성', 'recommended')])
+
+    def test_over_budget_reference_is_not_recommended(self):
+        res = self.pick([self.p(1, 2000000, 1)], 1500000)
+        self.assertEqual(self.roles(res), [(1, '예산을 넘는 최저가', 'reference')])
+        self.assertEqual(res['empty_reason'], '예산 안 상품 없음')
+        self.assertIs(res['items'][0]['over_budget'], True)
+
+    def test_no_budget_value_then_one_level_up(self):
+        res = self.pick([self.p(1, 900000, 1), self.p(2, 1000000, 1), self.p(3, 1300000, 2)], None)
+        self.assertEqual(self.roles(res), [(1, '알뜰 구성', 'value'), (3, '추천 구성', 'recommended')])
+
+    def test_no_budget_single_is_recommended(self):
+        res = self.pick([self.p(1, 900000, 1), self.p(2, 1000000, 1)], None)
+        self.assertEqual(self.roles(res), [(1, '추천 구성', 'recommended')])
+
+    def test_at_least_budget_uses_pool_from_budget(self):
+        res = self.pick([self.p(1, 900000, 2), self.p(2, 1600000, 1), self.p(3, 1800000, 2)],
+                        1500000, '이상')
+        self.assertEqual(self.roles(res), [(2, '알뜰 구성', 'value'), (3, '추천 구성', 'recommended')])
+
+    def test_every_tag_has_a_role_and_old_tags_are_gone(self):
+        self.assertEqual(set(S.ROLE_OF.values()), {'value', 'recommended', 'reference'})
+        src = pathlib.Path(S.__file__).read_text(encoding='utf-8')
+        for old in ('예산 안 최고 수준', '같은 수준 다른 구성', '가장 저렴한 선택', '한 단계 위"'):
+            self.assertNotIn(old, src.split('"""', 2)[2])
 
 
 class UpgradeHintsTest(unittest.TestCase):

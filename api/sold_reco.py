@@ -6,12 +6,14 @@
   **실제 판매 상품**을 고른다. 조합을 만들지 않고 부품을 바꾸지 않는다 — 몰에서 호환성까지
   검증된 구성을 그대로 권한다.
 
-■ 고르는 규칙 (용도마다 최대 2개)
-  예산 있음   ① 예산 안에서 도달 수준이 가장 높은 상품 중 최저가 — 「예산 안 최고 수준」
-              ② 예산 안 최저가 상품(①과 다를 때) — 「가장 저렴한 선택」
-                 ①과 같으면 ①과 같은 수준의 다음 최저가 — 「같은 수준 다른 구성」
-  예산 없음   ① 최소 수준을 충족하는 최저가  ② 한 단계 위 수준의 최저가
-  예산 안에 없음  카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
+■ 고르는 규칙 (용도마다 최대 2개 · 승인 시안 R01 「알뜰 구성 / 추천 구성」 2026-10-09)
+  items 순서가 화면 순서다 — 싼 「알뜰 구성」이 앞(왼쪽), 강조하는 「추천 구성」이 뒤.
+  강조 여부는 문구가 아니라 role 로 말한다(value · recommended · reference).
+  예산 있음   추천 구성 = 예산 안에서 도달 수준이 가장 높은 상품 중 최저가
+              알뜰 구성 = 예산 안 최저가 상품, 추천 구성보다 쌀 때만(같으면 추천 1장)
+  예산 없음   알뜰 구성 = 최소 수준을 충족하는 최저가
+              추천 구성 = 한 단계 위 수준의 최저가(없으면 앞의 1장이 추천 구성)
+  예산 안에 없음  추천 카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
               (over_budget=true) — 고객이 얼마부터 되는지 알 수 있게
   게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K, E등급=캐주얼).
 
@@ -41,6 +43,9 @@ USAGE_RULES = [
 ]
 GAME_RES_RANK = {"1080p": 2, "1440p": 3, "4K": 4}
 MAX_ITEMS = 2
+# 승인 시안 R01 의 배지 문구와 역할. 화면은 role 로 강조를 정한다(문구로 추측하지 않는다).
+TAG_VALUE, TAG_RECOMMENDED, TAG_REFERENCE = "알뜰 구성", "추천 구성", "예산을 넘는 최저가"
+ROLE_OF = {TAG_VALUE: "value", TAG_RECOMMENDED: "recommended", TAG_REFERENCE: "reference"}
 MAX_UPGRADE_HINTS = 2
 
 # 「다음 수준」 안내 — 고객 문구는 Codex 확정본 그대로(PR #2 댓글 6057234341, 2026-10-08).
@@ -117,7 +122,8 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     return {
         "product_code": p["code"], "name": p["name"], "price": p["price"],
         "price_src": p["price_src"], "mall_url": p["url"], "spec": public_spec(p["spec"]),
-        "level": f["level"], "tag": tag, "over_budget": over, "reasons": reasons,
+        "level": f["level"], "tag": tag, "role": ROLE_OF[tag],
+        "over_budget": over, "reasons": reasons,
     }
 
 
@@ -137,27 +143,23 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
         pool = [p for p in ok if budget_won is None or p["price"] >= budget_won] or ok
         first = pool[0]
         up = [p for p in pool if rank(p) > rank(first)]
-        items = [_item(first, usage, levels_by, "가장 저렴한 선택", budget_won, bound)]
-        if up:
-            items.append(_item(up[0], usage, levels_by, "한 단계 위", budget_won, bound))
-        return {"items": items[:MAX_ITEMS]}
+        if not up:
+            return {"items": [_item(first, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
+        return {"items": [_item(first, usage, levels_by, TAG_VALUE, budget_won, bound),
+                          _item(up[0], usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
 
     within = [p for p in ok if p["price"] <= budget_won]
     if not within:
-        return {"items": [_item(ok[0], usage, levels_by, "예산을 넘는 최저가", budget_won, bound)],
+        return {"items": [_item(ok[0], usage, levels_by, TAG_REFERENCE, budget_won, bound)],
                 "empty_reason": "예산 안 상품 없음",
                 "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
     top = max(rank(p) for p in within)
     best = min((p for p in within if rank(p) == top), key=lambda p: p["price"])
-    items = [_item(best, usage, levels_by, "예산 안 최고 수준", budget_won, bound)]
+    rec = _item(best, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)
     cheap = within[0]
-    if cheap is not best:
-        items.append(_item(cheap, usage, levels_by, "가장 저렴한 선택", budget_won, bound))
-    else:
-        same = [p for p in within if rank(p) == top and p is not best]
-        if same:
-            items.append(_item(same[0], usage, levels_by, "같은 수준 다른 구성", budget_won, bound))
-    return {"items": items[:MAX_ITEMS]}
+    if cheap["price"] < best["price"]:
+        return {"items": [_item(cheap, usage, levels_by, TAG_VALUE, budget_won, bound), rec]}
+    return {"items": [rec]}
 
 
 def card_sets(state, game_usages, other_usages, notes) -> list[dict]:
