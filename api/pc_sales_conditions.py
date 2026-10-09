@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
 from sqlalchemy import text
 from .auth import current_operator
 from .db import engine
+from .timeutil import iso
 
 router = APIRouter()
 LABELS = {'os':'운영체제', 'keyboard':'키보드', 'mouse':'마우스', 'monitor':'모니터', 'warranty':'보증·AS'}
@@ -120,7 +121,7 @@ def save_condition(conn, identity, body, actor):
     if not before.get('stale') and all(before.get(k) == v for k,v in payload.items()):
         return dict(revision=cfg['revision'], changed=False)
     item = dict(payload, scope_basis=scope_basis(cfg, parts, offers), operator_id=actor['operator_id'],
-                confirmed_at=datetime.now(timezone.utc).isoformat())
+                confirmed_at=iso(datetime.now(timezone.utc)))
     # An unknown state removes previous assertions but may retain operator notes for follow-up.
     terms = dict(cfg['content'].get('_sales_conditions') or {})
     terms[body.key] = item

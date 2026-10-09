@@ -1034,7 +1034,10 @@ def undo_product_edit(log_id: int):
         current = conn.execute(text(
             "SELECT " + ", ".join(columns + ["locked_fields"])
             + " FROM products WHERE product_code=:pc"), {"pc": pc}).mappings().first()
-        if (current is None or current["locked_fields"] != expected_locks
+        # 순서는 비교하지 않는다 — `changes` 는 JSONB 객체라 키가 길이순으로 다시
+        # 정렬되어(status < sale_price) 수정 때 붙인 잠금 순서와 어긋난다(회귀 #5 409).
+        if (current is None or type(current["locked_fields"]) is not list
+                or sorted(current["locked_fields"]) != sorted(expected_locks)
                 or any(current[EDITABLE[k][0]] != ft["to"] for k, ft in chg.items())):
             raise HTTPException(409,
                 "수정 이후 다른 변경이 감지되어 되돌릴 수 없습니다 — 현재 상품을 확인하세요")

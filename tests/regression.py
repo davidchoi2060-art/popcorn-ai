@@ -2385,9 +2385,25 @@ def test_reprice():
         check("알 수 없는 범위는 400", False, 400, 200)
     except urllib.error.HTTPError as e:
         check("알 수 없는 범위는 400", e.code == 400, 400, e.code)
-    st, _ = post("/api/admin/reprice/apply", {"scope": "nope", "expect_changed": 1})
+    # 반영 요청은 e28fee1 부터 작업 영수증 필드(operation_id·operation_context·
+    # request_fingerprint·expected)가 필수다. 그것이 빠진 요청은 가드에 닿기 전에
+    # 422 로 끝나므로, 형식은 온전하고 «내용만» 틀린 요청으로 가드를 겨눈다.
+    # 두 가드 모두 영수증 준비(prepare_reprice_operation)보다 앞이라 아무것도 남기지 않는다.
+    def _apply_body(scope, expected_scope):
+        zero = "0" * 64
+        return {"scope": scope, "expect_changed": 1,
+                "expected": {"version": "reprice_basis_v2", "scope": expected_scope,
+                             "fingerprint": zero},
+                "operation_id": "00000000-0000-4000-8000-000000000000",
+                "operation_context": {"contract_version": "admin_operation_v1",
+                                      "canonical_version": "reprice_request_v1",
+                                      "actor_id": 1,
+                                      "environment": "00000000-0000-4000-8000-000000000000",
+                                      "action": "reprice_apply"},
+                "request_fingerprint": zero}
+    st, _ = post("/api/admin/reprice/apply", _apply_body("nope", "live"))
     check("반영도 알 수 없는 범위는 400", st == 400, 400, st)
-    st, r = post("/api/admin/reprice/apply", {"scope": "live", "expect_changed": -1})
+    st, r = post("/api/admin/reprice/apply", _apply_body("live", "all"))
     check("미리보기 확인값이 다르면 409", st == 409, 409, st)
     st, _ = post("/api/admin/reprice/undo", {"log_id": 999999999})
     check("없는 재산정 기록 되돌리기는 404", st == 404, 404, st)
