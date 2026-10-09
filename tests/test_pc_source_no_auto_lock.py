@@ -65,6 +65,13 @@ class FakeConn:
         return [(q, p) for q, p in self.sql if q.startswith("UPDATE %s " % table)]
 
 
+LOCKED_MSG = r"^Locked field requires review$"
+
+
+def updates(conn):
+    return [q for q, _ in conn.sql if q.startswith(("UPDATE", "INSERT", "DELETE"))]
+
+
 def _fixture(code, spec):
     name, src = "Exact model", "spec text"
     explanation = dict(source_product_code=code, product_code=code, status="draft",
@@ -108,8 +115,10 @@ class NoAutoLockTests(unittest.TestCase):
         product["locked_fields"] = ["specs.cooler_tdp"]
         item = dict(code=120906, specs=dict(cooler_tdp=280), facts=[], note="n",
                     source=dict(id="mfr", kind="manufacturer", url="https://example.com/c"))
-        with self.assertRaises(AssertionError):
-            enrich.apply(FakeConn(explanation, product, spec), snapshot, [item])
+        conn = FakeConn(explanation, product, spec)
+        with self.assertRaisesRegex(AssertionError, LOCKED_MSG):
+            enrich.apply(conn, snapshot, [item])
+        self.assertEqual(updates(conn), [])
 
     def test_repair_fills_spec_without_lock(self):
         spec = dict(product_code=129775, mem_type=None, spec_sources={})
@@ -124,30 +133,52 @@ class NoAutoLockTests(unittest.TestCase):
             "mem_type": "audit:2026-09-30:https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=129775"})
         self.assert_no_lock(conn)
 
-    def run_repair_114723(self, locked_fields):
+    def repair_114723(self, locked_fields, sources=None):
         # The real 114723 entry: socket_list already has a value and is overwritten when unlocked.
         old = ["AM4", "AM5"]
-        spec = dict(product_code=114723, socket_list=old, spec_sources={})
+        spec = dict(product_code=114723, socket_list=old, spec_sources=dict(sources or {}))
         explanation, product, snapshot = _fixture(114723, spec)
         product["locked_fields"] = locked_fields
-        conn = FakeConn(explanation, product, spec)
+        return FakeConn(explanation, product, spec), snapshot
+
+    def run_repair_114723(self, conn, snapshot):
         with patch.object(repair, "FACT_CODES", set()), \
              patch.object(repair, "SPEC_REPAIRS", {114723: repair.SPEC_REPAIRS[114723]}):
             repair.apply(conn, snapshot)
-        return conn
 
     def test_repair_overwrites_unlocked_114723_with_audit_source(self):
-        conn = self.run_repair_114723(["cost_price"])
+        conn, snapshot = self.repair_114723(["cost_price"])
+        self.run_repair_114723(conn, snapshot)
         filled = [json.loads(p["v"]) for q, p in conn.writes("product_specs") if "SET socket_list=" in q]
         self.assertEqual(filled, [repair.SPEC_REPAIRS[114723]["socket_list"]])
         self.assertEqual(self.saved_sources(conn), {"socket_list": "audit:2026-09-30:" + repair.THERMAL})
         self.assert_no_lock(conn)
 
+    def test_existing_spec_sources_keys_are_kept(self):
+        # Writing one field's source must not drop other fields' sources.
+        other = {"socket": "manual:2026-08-01:admin", "cooler_height_mm": "danawa:x"}
+        conn, snapshot = self.repair_114723(["cost_price"], sources=other)
+        self.run_repair_114723(conn, snapshot)
+        self.assertEqual(self.saved_sources(conn),
+                         dict(other, socket_list="audit:2026-09-30:" + repair.THERMAL))
+
+        spec = dict(product_code=120906, cooler_tdp=None, gpu_power_draw_watt=None,
+                    spec_sources=dict(other))
+        explanation, product, snapshot = _fixture(120906, spec)
+        item = dict(code=120906, specs=dict(cooler_tdp=280), facts=[], note="n",
+                    source=dict(id="mfr", kind="manufacturer", url="https://example.com/c"))
+        conn = FakeConn(explanation, product, spec)
+        enrich.apply(conn, snapshot, [item])
+        self.assertEqual(self.saved_sources(conn),
+                         dict(other, cooler_tdp="manufacturer:2026-09-30:https://example.com/c"))
+
     def test_repair_refuses_locked_field_in_either_spelling_and_writes_nothing(self):
         for locks in (["specs.socket_list"], ["socket_list"]):
             with self.subTest(locks=locks):
-                with self.assertRaises(AssertionError):
-                    self.run_repair_114723(locks)
+                conn, snapshot = self.repair_114723(locks)
+                with self.assertRaisesRegex(AssertionError, LOCKED_MSG):
+                    self.run_repair_114723(conn, snapshot)
+                self.assertEqual(updates(conn), [])
         # Same for a NULL-fill target, checked on the connection itself.
         for locks in (["specs.mem_type"], ["mem_type"]):
             with self.subTest(locks=locks):
@@ -157,9 +188,9 @@ class NoAutoLockTests(unittest.TestCase):
                 conn = FakeConn(explanation, product, spec)
                 with patch.object(repair, "FACT_CODES", set()), \
                      patch.object(repair, "SPEC_REPAIRS", {129775: dict(mem_type="DDR5")}):
-                    with self.assertRaises(AssertionError):
+                    with self.assertRaisesRegex(AssertionError, LOCKED_MSG):
                         repair.apply(conn, snapshot)
-                self.assertEqual([q for q, _ in conn.sql if q.startswith("UPDATE")], [])
+                self.assertEqual(updates(conn), [])
 
     def test_enrich_refuses_bare_field_lock_too(self):
         spec = dict(product_code=120906, cooler_tdp=None, gpu_power_draw_watt=None, spec_sources={})
@@ -168,9 +199,9 @@ class NoAutoLockTests(unittest.TestCase):
         item = dict(code=120906, specs=dict(cooler_tdp=280), facts=[], note="n",
                     source=dict(id="mfr", kind="manufacturer", url="https://example.com/c"))
         conn = FakeConn(explanation, product, spec)
-        with self.assertRaises(AssertionError):
+        with self.assertRaisesRegex(AssertionError, LOCKED_MSG):
             enrich.apply(conn, snapshot, [item])
-        self.assertEqual(conn.writes("product_specs"), [])
+        self.assertEqual(updates(conn), [])
 
 
 if __name__ == "__main__":
