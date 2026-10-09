@@ -243,15 +243,29 @@ class Batch:
                     review=review, publication=publish)
 
 
+def rights_line(engine, rights):
+    """One line: is the env value well-formed, and do recorded photo approvals carry
+    exactly (byte for byte) the same rights_reference?"""
+    from sqlalchemy import text
+    from api.part_photo_approval import _reference
+    if not _reference(rights, rights=True):
+        return f'권리 참조값: {RIGHTS_ENV} 미설정 또는 형식 불일치 · 부품 사진 승인과 발행은 적용 단계에서 거부된다'
+    with engine.connect() as conn:
+        row = conn.execute(text("""SELECT count(*) AS total,
+            count(*) FILTER (WHERE convert_to(snapshot->'provenance'->>'rights_reference','UTF8')=convert_to(:r,'UTF8')) AS same
+            FROM (SELECT DISTINCT ON (source_product_code) snapshot FROM part_photo_approval_events
+                  ORDER BY source_product_code, event_seq DESC) latest"""), dict(r=rights)).mappings().first()
+    total, same = (row['total'], row['same']) if row else (0, 0)
+    return f'권리 참조값: env 형식 일치 · 기존 사진 승인 최신 {total}건 중 env 와 바이트 일치 {same}건 · 새 승인은 env 값으로 기록'
+
+
 def run(engine, *, apply=False, operator_id=None, note='', rights=None, all_configs=False, only=(),
         image_reader=None, out=print):
     actor = None
     if apply or operator_id is not None:
         with engine.connect() as conn:
             actor = owner(conn, operator_id)
-    from api.part_photo_approval import _reference
-    if not _reference(rights, rights=True):
-        out(f'주의: {RIGHTS_ENV} 미설정 또는 형식 불일치 · 부품 사진 승인과 발행은 적용 단계에서 거부된다')
+    out(rights_line(engine, rights))
     with engine.connect() as conn:
         ids = targets(conn, all_configs, set(only))
     batch = Batch(engine, apply=apply, actor=actor, note=note, rights=rights, image_reader=image_reader, out=out)

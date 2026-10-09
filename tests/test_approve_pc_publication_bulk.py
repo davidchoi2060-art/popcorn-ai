@@ -26,6 +26,8 @@ class Conn:
 
     def execute(self, clause, params=None):
         sql = str(clause)
+        if 'FROM part_photo_approval_events' in sql:
+            return Rows([dict(total=self.db.photo_events, same=self.db.photo_events if params['r'] == RIGHTS else 0)])
         if 'FROM admin_operators' in sql:
             return Rows([self.db.operator])
         if 'FROM pc_media_jobs' in sql or 'FROM pc_configurations' in sql:
@@ -45,7 +47,7 @@ class Rows:
 
 class DB:
     def __init__(self, configs=('C1', 'C2'), parts=None, operator=OWNER):
-        self.configs, self.operator, self.isolation = list(configs), operator, []
+        self.configs, self.operator, self.isolation, self.photo_events = list(configs), operator, [], 0
         self.parts = parts or {'C1': [101, 102], 'C2': [102, 103]}
     def connect(self): return Conn(self)
 
@@ -183,6 +185,17 @@ class Bulk(unittest.TestCase):
     def test_non_owner_is_refused(self):
         with self.assertRaises(PermissionError):
             go(World(), db=DB(operator=dict(OWNER, role='operator')), apply=True, operator_id=1)
+
+    def test_rights_line(self):
+        db = DB(); db.photo_events = 3
+        _, lines = go(World(), db=db)
+        self.assertIn('최신 3건 중 env 와 바이트 일치 3건', lines[0])
+        for p in World().patches(): p.start()
+        try:
+            self.assertIn('미설정', m.rights_line(DB(), None))
+            self.assertIn('형식 불일치', m.rights_line(DB(), 'workroom:x@v1:short'))
+        finally:
+            patch.stopall()
 
     def test_targets_option(self):
         result, _ = go(World(), only=['C2'])
