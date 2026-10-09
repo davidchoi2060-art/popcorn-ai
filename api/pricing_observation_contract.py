@@ -26,6 +26,15 @@ def _aware_utc(value):
     return value.astimezone(timezone.utc)
 
 
+def _iso_utc(at):
+    # Pure module: api.timeutil.iso is not importable here. _aware_utc already
+    # returned an offset-aware UTC value; refuse anything else instead of
+    # emitting a zone-less string (the 9-hour bug the regression guards).
+    if at.utcoffset() is None:
+        raise ValueError("aware_timestamp_required")
+    return at.isoformat(sep="T")
+
+
 def _freshness(at, now):
     if at < now - timedelta(days=30):
         return "stale"
@@ -122,7 +131,7 @@ def normalize_observations(records, *, product_code, now):
         seen.add(key)
         candidate = {"product_code": pc, "item_kind": row["item_kind"],
                      "handoff_id": key[0], "line_no": key[1],
-                     "created_at": at.isoformat(), "price_mall": row["price_mall"],
+                     "created_at": _iso_utc(at), "price_mall": row["price_mall"],
                      "mall_status": row["mall_status"],
                      "freshness": _freshness(at, reference)}
         normalized.append((at, candidate))
