@@ -36,3 +36,20 @@
 #media-root .pca-job details{padding:9px;margin-top:14px;font-size:12px}
 #media-root .pca-job .job-note{font-size:12px;margin:8px 0 12px}
 @media(max-width:650px){#media-root .origin-meta{grid-template-columns:82px minmax(0,1fr)}}
+
+/* Codex image-list redesign 2026-10-09: titled cards, larger preview, full-width select button. */
+#media-root .pca-gallery-head{margin-bottom:6px}
+#media-root .pca-gallery-note{margin:0 0 16px;font-size:12px}
+#media-root .pca-jobs{gap:16px}
+#media-root .pca-job{padding:16px;border-radius:8px}
+#media-root .pca-job-title{margin:12px 0 10px;font-size:15px;line-height:1.45}
+#media-root .pca-job img{height:220px;margin:0 0 10px}
+#media-root .pca-job-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;height:220px;margin:0 0 10px;border-radius:5px;background:var(--container-low);text-align:center;padding:12px}
+#media-root .pca-job-empty b{font-size:13px;color:var(--on)}
+#media-root .pca-job-empty span{font-size:12px;color:var(--on-variant)}
+#media-root .origin-meta{grid-template-columns:112px minmax(0,1fr)}
+#media-root .pca-job-foot{margin-top:10px;font-size:12px}
+#media-root .pca-job button{min-height:42px;font-size:13px}
+#media-root .pca-job button.primary{background:var(--rv-green);border-color:var(--rv-green);color:var(--card)}
+#media-root .pca-job button.chosen:disabled{opacity:1;background:color-mix(in srgb,var(--rv-green) 22%,var(--card));border-color:transparent;color:var(--rv-green)}
+@media(max-width:650px){#media-root .origin-meta{grid-template-columns:104px minmax(0,1fr)}#media-root .pca-job img,#media-root .pca-job-empty{height:200px}}
