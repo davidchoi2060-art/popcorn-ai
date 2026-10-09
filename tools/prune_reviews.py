@@ -15,12 +15,19 @@
 
 이 정리가 필요 없는 상태를 회귀가 지킨다("대기 검수에 이미 채워진 필드가 없다").
 
-**사람이 확인한 값만 해소한다 (2026-10-09 개정).** 값이 채워졌다는 것만으로는 검수가
-끝났다고 볼 수 없다 — 웹 제안·자동 추출로 들어온 값은 사람이 아직 안 봤다. 회귀 run #5
-에서 그런 행 5건을 이 도구가 '처리'로 넘길 뻔했다(당시 11건을 잡았다). 그래서 해소 대상은
-그 필드가 `products.locked_fields` 에 잠긴 행, 즉 운영자가 상품 상세에서 직접 넣은 값만이다
-(잠금 표기는 `field` 또는 `specs.field` 둘 다 — `tools/std_import_public.py` 의 `human`
-판정과 같은 기준). 나머지는 «값 검수 대기»로 남기고 건수만 알린다.
+**잠긴 값만 해소한다 (2026-10-09 개정).** 값이 채워졌다는 것만으로는 검수가
+끝났다고 볼 수 없다 — 웹 제안·자동 추출로 들어온 값은 사람이 아직 안 봤을 수 있다.
+회귀 run #5 에서 그런 행 5건을 이 도구가 '처리'로 넘길 뻔했다(당시 11건을 잡았다).
+그래서 해소 대상은 그 필드가 `products.locked_fields` 에 잠긴 행으로 좁혔다(잠금 표기는
+`field` 또는 `specs.field` 둘 다 — `tools/std_import_public.py` 의 `human` 판정과 같은 기준).
+나머지는 «값 검수 대기»로 남기고 건수만 알린다.
+
+⚠ 잠금은 «사람이 승인했다»는 출처 기록이 아니다. 상품 상세 사양 입력이 잠그므로 근사로
+쓸 뿐, 다른 경로가 잠근 값도 같은 취급을 받는다.
+
+⚠ 이 도구의 영향은 검수 행 전이만이 아니다. 끝에서 `products` 를 전역으로 갱신한다 —
+대기 검수가 하나도 없는 core_part 상품은 이번 실행에서 해소된 것이든 원래 그랬던 것이든
+전부 `review_required_yn=false · ai_candidate_yn=true` 가 된다(추천 후보 진입).
 """
 import argparse
 import os
@@ -38,7 +45,8 @@ from api.catalog_ingest import SPEC_COLS            # noqa: E402
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # product_specs에 실제로 있는 사양 컬럼 전부(JSONB 배열 컬럼 포함)
 FIELDS = sorted(set(SPEC_COLS) | {"form_factor_list"})
-# 사람이 확인한 값 = 그 필드가 products.locked_fields 에 잠겨 있다(상품 상세 사양 입력이 잠근다).
+# 해소 기준 = 그 필드가 products.locked_fields 에 잠겨 있다(상품 상세 사양 입력이 잠근다).
+# 잠금은 사람 승인의 출처 기록이 아니라 근사다 — 이름이 HUMAN_LOCKED 인 것은 그 근사의 의도다.
 # 별칭 r(product_reviews)·p(products)를 전제로 한다.
 HUMAN_LOCKED = ("(COALESCE(p.locked_fields, '[]'::jsonb) ? r.field_name"
                 " OR COALESCE(p.locked_fields, '[]'::jsonb) ? ('specs.' || r.field_name))")
@@ -68,11 +76,11 @@ def main():
                 found[col] = row[0]
             if row[1]:
                 unconfirmed[col] = row[1]
-    print(f"대기 {before:,}건 중 사람이 확인한 값으로 채워진 항목 {sum(found.values()):,}건")
+    print(f"대기 {before:,}건 중 잠긴 값으로 채워진 항목 {sum(found.values()):,}건")
     for k in sorted(found, key=lambda x: -found[x]):
         print(f"  {k:22s} {found[k]:>5,}")
     if unconfirmed:
-        print(f"값은 있으나 사람 확인 전이라 남기는 항목 {sum(unconfirmed.values()):,}건 (값 검수 대상)")
+        print(f"값은 있으나 잠기지 않아 남기는 항목 {sum(unconfirmed.values()):,}건 (값 검수 대상)")
         for k in sorted(unconfirmed, key=lambda x: -unconfirmed[x]):
             print(f"  {k:22s} {unconfirmed[k]:>5,}")
 
@@ -88,7 +96,7 @@ def main():
         for col in found:
             r = conn.execute(text(f"""
                 UPDATE product_reviews r SET review_status='처리', reviewed_at=now(),
-                       detail = detail || ' [정합 정리: 사람이 확인한(잠긴) 값으로 해소]'
+                       detail = detail || ' [정합 정리: 잠긴 값으로 해소]'
                  WHERE r.review_status='대기' AND r.review_type='spec_missing'
                    AND r.field_name = :f
                    AND EXISTS (SELECT 1 FROM product_specs s JOIN products p USING (product_code)
@@ -97,6 +105,7 @@ def main():
             """), {"f": col})
             total += r.rowcount
         # 필수 사양이 모두 찬 상품은 검수 플래그를 내리고 추천 후보로 올린다(게이트 ②)
+        # ⚠ 전역 갱신이다 — 이번 실행이 해소한 상품만이 아니라 대기 검수가 없는 core_part 전부
         conn.execute(text("""
             UPDATE products p SET review_required_yn = false, ai_candidate_yn = true,
                                  updated_at = now()

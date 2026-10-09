@@ -887,10 +887,10 @@ def test_upload():
         print(f"  [SKIP] (I) 적재 분류 판정 — {e}")
 
     # 검수 큐 정합 — 이미 값이 채워진 항목이 '대기'로 남아 있으면 큐가 부풀어 보인다
-    # 2026-10-09 (회귀 run #5): «사람이 확인한 값»만 센다. 웹 제안·자동 추출로 채워진 값은
-    # 사람이 아직 안 봤으므로 검수 대기가 맞는 상태다(그 5건을 '처리'로 넘기지 않기로 함).
-    # 사람이 확인한 값 = 그 필드가 products.locked_fields 에 잠김(상품 상세 사양 입력이
-    # 잠그고 같은 자리에서 검수 행도 닫는다 — 그런데도 대기가 남으면 그게 결함이다).
+    # 2026-10-09 (회귀 run #5): 그 필드가 잠긴(locked_fields) 행만 센다. 웹 제안·자동 추출로
+    # 채워지고 잠기지 않은 값은 검수 대기가 맞는 상태다(그 5건을 '처리'로 넘기지 않기로 함).
+    # 잠금은 «사람이 승인했다»는 출처 기록이 아니다 — 상품 상세 사양 입력이 잠그면서 같은
+    # 자리에서 검수 행을 닫으므로, 잠겼는데 대기가 남으면 결함이라고 보는 근사 기준일 뿐이다.
     # 기준은 tools/prune_reviews.HUMAN_LOCKED 와 같다.
     _stale_where = """
           FROM product_reviews r JOIN product_specs s USING (product_code)
@@ -908,10 +908,10 @@ def test_upload():
     if stale is None:
         print("  [SKIP] (I) 검수 큐 정합 — DB 미연결")
     else:
-        check("검수 대기에 사람이 확인한 값으로 이미 채워진 필드가 없다(tools/prune_reviews.py)",
+        check("검수 대기에 잠긴 값으로 이미 채워진 필드가 없다(tools/prune_reviews.py)",
               stale == 0, 0, stale)
         if unconfirmed:
-            print(f"  [INFO] 값은 있으나 사람 확인 전이라 검수 대기로 남은 필드 {unconfirmed}건 (값 검수 대상)")
+            print(f"  [INFO] 값은 있으나 잠기지 않아 검수 대기로 남은 필드 {unconfirmed}건 (값 검수 대상)")
 
 
 # ───────────────────────── 2. 호환 규칙 (DB 단일 원천) ─────────────────────────
