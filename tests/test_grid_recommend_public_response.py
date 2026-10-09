@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from api import grid_public as G
 from api import sold_reco as S
-from api.talk_schema import GameState, TalkState
+from api.talk_schema import GameState, TalkState, Vocab
 
 TOP_KEYS = {'ok', 'card_sets', 'cards', 'assumed', 'ai_estimated', 'needs', 'dropped',
             'platform', 'budget_won', 'budget_bound', 'game_grade', 'game_resolution', 'game_name'}
@@ -77,7 +77,7 @@ def call_recommend(game_context=None):
     dropped = [{'field': 'game.resolution', 'value': '8K', 'reason': 'not in vocab'}]
     with patch.object(G, 'engine', FakeEngine()), \
          patch.object(G, 'RECO_SOURCE', 'sold'), \
-         patch.object(G, 'load_vocab', lambda conn: object()), \
+         patch.object(G, 'load_vocab', lambda conn: Vocab()), \
          patch.object(G, 'validate_state', lambda raw, vocab: (state, dropped)), \
          patch.object(G, 'missing_for', lambda st, vocab: []), \
          patch.object(G, 'usage_map', lambda: {}), \
@@ -209,6 +209,62 @@ class PickRuleTest(unittest.TestCase):
         src = pathlib.Path(S.__file__).read_text(encoding='utf-8')
         for old in ('예산 안 최고 수준', '같은 수준 다른 구성', '가장 저렴한 선택', '한 단계 위"'):
             self.assertNotIn(old, src.split('"""', 2)[2])
+
+
+class GameMinRankTest(unittest.TestCase):
+    """여러 게임이면 가장 까다로운 게임이 최소 수준을 정한다 — 용도 최소 수준 밑으로 가지 않는다."""
+    LV = [
+        {'usage': '게임', 'level': '캐주얼', 'level_rank': 1, 'work': '롤·발로란트·피파·메이플 FHD'},
+        {'usage': '게임', 'level': 'FHD', 'level_rank': 2, 'work': '최신 대작 FHD'},
+        {'usage': '게임', 'level': 'QHD', 'level_rank': 3, 'work': '최신 대작 QHD'},
+    ]
+    VOCAB = Vocab(
+        confirmed_games={'리그 오브 레전드': 'E', '배틀그라운드': 'E', '발로란트': 'E',
+                         '메이플스토리': 'L', 'FC온라인': 'E'},
+        all_game_names=['리그 오브 레전드', '배틀그라운드', '발로란트', '메이플스토리', 'FC온라인'],
+        game_aliases={'롤': '리그 오브 레전드', '배그': '배틀그라운드'})
+
+    def rank(self, names, grade='E', resolution=None):
+        g = GameState(names=names, grade=grade, grade_src='catalog', resolution=resolution)
+        return S.game_min_rank(g, self.LV, self.VOCAB, [])
+
+    def test_pubg_with_lol_is_fhd_not_casual(self):
+        # 2026-10-09 실사고: 배그·롤 둘 다 E 라 캐주얼로 내려갔다.
+        self.assertEqual(self.rank(['배그', '롤']), 2)
+        self.assertEqual(self.rank(['롤', '배그']), 2)
+
+    def test_casual_only_when_every_game_is_casual(self):
+        self.assertEqual(self.rank(['롤']), 1)
+        self.assertEqual(self.rank(['롤', '발로란트']), 1)
+        self.assertEqual(self.rank(['메이플'], grade='L'), 1)
+        self.assertEqual(self.rank(['배그']), 2)
+
+    def test_resolution_beats_casual_and_no_names_never_casual(self):
+        self.assertEqual(self.rank(['롤'], resolution='1440p'), 3)
+        self.assertEqual(self.rank([]), 2)
+        self.assertEqual(S.game_min_rank(None, self.LV, self.VOCAB, []), 2)
+        # 게임명을 대조할 어휘가 없으면 캐주얼로 내리지 않는다.
+        self.assertEqual(S.game_min_rank(GameState(names=['롤'], grade='E'), self.LV, None, []), 2)
+
+    def test_unknown_game_is_not_casual(self):
+        self.assertEqual(self.rank(['롤', '처음 보는 게임']), 2)
+
+    def test_screenshot_case_returns_reference_not_casual_pc(self):
+        # 배그·롤 · 150만원 이하 · FHD: FHD 이상 상품이 예산 안에 없으면 참고 상품 1개.
+        def prod(code, price, rank):
+            return {'code': code, 'name': f'PC {code}', 'price': price, 'price_src': '현재 판매가',
+                    'status': '판매중', 'url': None, 'includes': None, 'spec': {}, 'balance': None,
+                    'dominated_by': None, 'band': None,
+                    'fit': {'게임': {'level': 'x', 'rank': rank, 'blocked': []}}}
+        prods = {93454: prod(93454, 1199600, 1), 98149: prod(98149, 1585100, 2)}
+        st = TalkState(usages=['게임'], budget_won=1500000, budget_bound='이하',
+                       game=GameState(names=['배그', '롤'], grade='E', grade_src='catalog'))
+        with patch.object(S, 'load', lambda: (self.LV, prods)):
+            sets = S.card_sets(st, ['게임'], [], [], self.VOCAB)
+        self.assertEqual(len(sets), 1)
+        self.assertEqual(sets[0]['min_level'], 'FHD')
+        self.assertEqual(sets[0]['empty_reason'], '예산 안 상품 없음')
+        self.assertEqual([(i['product_code'], i['role']) for i in sets[0]['items']], [(98149, 'reference')])
 
 
 class UpgradeHintsTest(unittest.TestCase):

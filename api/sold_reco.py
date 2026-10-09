@@ -15,7 +15,11 @@
               추천 구성 = 한 단계 위 수준의 최저가(없으면 앞의 1장이 추천 구성)
   예산 안에 없음  추천 카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
               (over_budget=true) — 고객이 얼마부터 되는지 알 수 있게
-  게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K, E등급=캐주얼).
+  게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K).
+  캐주얼(rank 1)은 고객이 말한 게임 «전부»가 캐주얼 수준의 대상 게임(product_fit_levels.work
+  에 적힌 게임)일 때만 쓴다 — 하나라도 밖이면 가장 까다로운 쪽을 따라 해상도 수준으로 간다.
+  등급(E)으로 정하지 않는 이유: E 에는 롤과 배그가 함께 있는데 캐주얼 수준은 배그를 못 돌린다
+  (2026-10-09 실사고 — 배그·롤 150만원에 캐주얼 PC 1,199,600원이 추천됐다).
 
 ■ 가격은 현재값 — `api/admin_product_fit.load()` 와 같은 판정(품절·단종 제외, sale_price 우선).
   관리자 매트릭스와 고객 추천이 같은 원천을 본다(술어를 두 벌 두지 않는다).
@@ -24,6 +28,7 @@ import logging
 import re
 
 from .admin_product_fit import load
+from .talk_schema import match_game
 
 log = logging.getLogger("sold_reco")
 
@@ -162,7 +167,47 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
     return {"items": [rec]}
 
 
-def card_sets(state, game_usages, other_usages, notes) -> list[dict]:
+def _casual_games(levels, vocab, notes) -> set[str]:
+    """캐주얼 수준(게임 rank 1)이 대상으로 적은 게임 -> games.name 집합.
+
+    원천은 product_fit_levels.work("롤·발로란트·피파·메이플 FHD") 하나다 — 목록을 코드에 다시
+    적지 않는다. 게임명으로 못 읽은 토큰은 집합에 넣지 않는다(넓히지 않는 쪽이 안전하다).
+    """
+    lv = next((l for l in levels if l["usage"] == "게임" and l["level_rank"] == 1), None)
+    if lv is None or not lv.get("work") or vocab is None:
+        return set()
+    out = set()
+    for tok in re.split(r"[·,/]", lv["work"]):
+        tok = re.sub(r"\s*(FHD|QHD|4K|1080p|1440p)\s*$", "", tok.strip(), flags=re.I).strip()
+        if not tok:
+            continue
+        name = match_game(tok, vocab)
+        if name:
+            out.add(name)
+        else:
+            notes.append(f"sold: casual level game '{tok}' not matched - not counted as casual")
+    return out
+
+
+def game_min_rank(g, levels, vocab, notes) -> int:
+    """게임 최소 수준 rank — 고객이 말한 게임 중 가장 까다로운 쪽이 정한다.
+
+    캐주얼(1)은 게임명이 하나 이상 있고 «전부» 캐주얼 대상 게임이며 해상도가 1080p 일 때만.
+    그 밖은 해상도 수준(FHD 2 · QHD 3 · 4K 4)이다 — 용도 최소 수준 밑으로 내려가지 않는다.
+    """
+    res = (g.resolution if g else None) or "1080p"
+    r = GAME_RES_RANK.get(res, 2)
+    names = list(g.names) if g else []
+    if not names or res != "1080p":
+        return r
+    casual = _casual_games(levels, vocab, notes)
+    matched = [match_game(n, vocab) if vocab is not None else None for n in names]
+    if casual and all(m in casual for m in matched):
+        return 1
+    return r
+
+
+def card_sets(state, game_usages, other_usages, notes, vocab=None) -> list[dict]:
     """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 2개."""
     levels, products = load()
     out = []
@@ -174,10 +219,7 @@ def card_sets(state, game_usages, other_usages, notes) -> list[dict]:
             continue
         targets.append((u, fu, 1))
     if game_usages:
-        g = state.game
-        res = (g.resolution if g else None) or "1080p"
-        r = 1 if (g and g.grade == "E") else GAME_RES_RANK.get(res, 2)
-        targets.append((game_usages[0], "게임", r))
+        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
     seen = set()
     for label, fu, r in targets:
         if (fu, r) in seen:

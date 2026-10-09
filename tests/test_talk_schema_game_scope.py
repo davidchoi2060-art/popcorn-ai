@@ -145,7 +145,7 @@ class GameScopeTests(unittest.TestCase):
                'DEFAULT_RESOLUTION': TS.DEFAULT_RESOLUTION,
                'ASSUMED_RESOLUTION': 'game.resolution=1080p', 'conn': None, 'vocab': v}
         exec(compile(ast.Module(body=branch.body, type_ignores=[]), 'grid sold branch', 'exec'), env)
-        cards.assert_called_once_with(grid_state, [], [], env['notes'])
+        cards.assert_called_once_with(grid_state, [], [], env['notes'], v)
         context.assert_not_called()
         self.assertEqual(env['card_sets'], [])
 

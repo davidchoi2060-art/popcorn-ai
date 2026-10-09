@@ -6873,7 +6873,8 @@ def main():
                test_game_copy_review_gate,
                test_game_context_gate,
                test_game_aliases,
-               test_market_bands_and_handling):
+               test_market_bands_and_handling,
+               test_sold_game_floor):
         try:
             fn()
         except Exception as e:
@@ -10549,6 +10550,48 @@ process.stdout.write(JSON.stringify(out));
           re.findall(r"#[0-9a-fA-F]{3,8}\b", seg)[:3])
     check("[61] 긴 답이 좁은 화면에서 넘치지 않는다(overflow-wrap)",
           "overflow-wrap:anywhere" in seg, "있음", "없음")
+
+
+def test_sold_game_floor():
+    """[65] 판매 상품 추천 — 게임 최소 수준 밑으로 내려가지 않는다 (2026-10-09 실사고).
+
+    배그·롤을 함께 적으면 둘 다 E 등급이라 캐주얼 수준(롤·발로란트·피파·메이플)으로
+    내려가, 배그를 FHD 로 못 돌리는 PC 가 「추천 구성」으로 나갔다. 캐주얼은 말한 게임
+    «전부»가 캐주얼 대상일 때만 쓴다(api/sold_reco.game_min_rank).
+
+    이 검사가 실패하려면: 최소 수준을 등급만 보고 정하거나, 고른 상품의 도달 수준이
+    최소 수준보다 낮아야 한다. 수준 rank 는 DB(product_fit_levels)에서 읽는다.
+    """
+    print(chr(10) + "[65] 판매 상품 추천 — 게임 최소 수준 (여러 게임은 가장 까다로운 쪽)")
+    st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임"], "budget_won": 1500000, "budget_bound": "이하",
+        "game": {"names": ["배그", "롤"], "grade": "E", "grade_src": "catalog",
+                 "resolution": "1080p"}}})
+    sets = [x for x in ((d or {}).get("card_sets") or []) if isinstance(x, dict)
+            and x.get("usage_grid") == "게임"] if st == 200 else []
+    check("[65] 배그·롤 요청이 게임 세트를 돌려준다", st == 200 and len(sets) == 1,
+          "200 · 게임 세트 1", (st, len(sets)))
+    if not sets:
+        return
+    gs = sets[0]
+    if gs.get("kind") != "sold":
+        check("[65] 추천 원천이 sold 가 아니라 건너뜀", True, "건너뜀", gs.get("kind"), kind="SKIP")
+        return
+    rank_of = {r["level"]: r["level_rank"] for r in db_all(
+        "SELECT level, level_rank FROM product_fit_levels WHERE usage = '게임'")}
+    if not rank_of:
+        check("[65] 수준 대조 — DB 없음으로 건너뜀", True, "건너뜀", _db_why, kind="DB")
+        return
+    floor = rank_of.get(gs.get("min_level"))
+    check("[65] 배그·롤의 최소 수준이 FHD 이상이다(캐주얼로 내려가지 않는다)",
+          floor is not None and floor >= rank_of.get("FHD", 2), "FHD 이상", gs.get("min_level"))
+    low = [(i.get("product_code"), i.get("level")) for i in gs.get("items") or []
+           if rank_of.get(i.get("level"), 0) < (floor or 0)]
+    check("[65] 고른 상품 전부가 최소 수준 이상이다", not low, [], low)
+    over = [i.get("product_code") for i in gs.get("items") or []
+            if i.get("role") != "reference" and isinstance(i.get("price"), int)
+            and i["price"] > 1500000]
+    check("[65] 예산을 넘는 상품은 참고(reference)로만 나온다", not over, [], over)
 
 
 if __name__ == "__main__":
