@@ -37,10 +37,17 @@ test('conditionChips: one chip per game, budget, usage; FHD only as a provisiona
   assert.deepEqual(M.conditionChips({game:{names:['롤'],resolution:'QHD'}},['game.resolution=1080p']).map(c=>c.label),['롤','QHD']);
   assert.deepEqual(M.conditionChips(null,[]),[]);
 });
-test('product role: only value/recommended survive normalization',()=>{
-  assert.equal(M.product(pc(1,1,{role:'recommended'})).role,'recommended');
-  assert.equal(M.product(pc(1,1,{role:'value'})).role,'value');
-  assert.equal(M.product(pc(1,1,{role:'<b>'})).role,'');
+test('product role: server roles survive; legacy badges infer a role; unknown roles are dropped',()=>{
+  for(const role of ['value','recommended','reference'])assert.equal(M.product(pc(1,1,{role,tag:'아무 문구'})).role,role);
+  assert.equal(M.product(pc(1,1,{role:'<b>',tag:'추천 구성'})).role,'');
+  for(const [tag,role] of [['추천 구성','recommended'],['예산 안 최고 수준','recommended'],['알뜰 구성','value'],['가장 저렴한 선택','value'],['예산을 넘는 최저가','reference'],['같은 수준 다른 구성',''],['한 단계 위',''],['','']])
+    assert.equal(M.product(pc(1,1,{tag})).role,role,tag);
+});
+test('saved quote: role is kept through quote normalization; old snapshots without role still load',()=>{
+  const q=product=>({id:'22222222-2222-4222-8222-222222222222',product,state:{usages:['게임']},saved_at:'2026-10-09T00:00:00Z'});
+  assert.equal(M.quote(q(pc(41,1490000,{tag:'추천 구성',role:'recommended'}))).product.role,'recommended');
+  const old=M.quote(q(pc(42,1199600,{tag:'예산 안 최고 수준'})));assert.equal(old.product.role,'recommended');assert.equal(old.product.price,1199600);
+  assert.equal(M.quote(q(pc(43,1268900,{tag:'같은 수준 다른 구성'}))).product.role,'');
 });
 test('results: R01 heading, chips, four spec rows, single comparison line, footnote, no group heading or start toolbar',async()=>{
   const h=harness({items:[pc(11,1290000,{tag:'알뜰 구성',role:'value'}),pc(12,1490000,{tag:'추천 구성',role:'recommended'})]});try{await recommend(h);

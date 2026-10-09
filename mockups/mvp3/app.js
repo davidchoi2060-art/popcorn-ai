@@ -147,10 +147,10 @@ function productImage(product){
   if(photo.state!=='available')return '<figure class="live-product-photo is-unavailable" data-product-photo data-image-state="'+photo.state+'"><p class="live-product-image-status">'+(photo.state==='temporarily_unavailable'?'이미지를 불러오지 못했습니다':'이미지 준비 중')+'</p></figure>';
   return '<figure class="live-product-photo" data-product-photo><img data-product-image src="'+esc(photo.url)+'" alt="'+esc(product.name)+' · AI 조립 예시" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>이미지를 불러오지 못했습니다</p><figcaption class="live-product-photo-notice">'+esc(photo.notice)+'</figcaption></figure>';
 }
-// The emphasized card: the server's "recommended" role, or (older responses) the "최고" tag.
-function recommendedCard(product,group){return group&&group.products.some(p=>p.role)?product.role==='recommended':product.tag.includes('최고');}
-function productCard(product,action='detail',id=product.index,comparison=null,group=null){
-  const rows=M.cardSpecRows(product.spec),strong=recommendedCard(product,group),description=product.public_configuration?.description;
+// The emphasized card is the server's "recommended" role (normalized in live-model.js).
+function recommendedCard(product){return product.role==='recommended';}
+function productCard(product,action='detail',id=product.index,comparison=null){
+  const rows=M.cardSpecRows(product.spec),strong=recommendedCard(product),description=product.public_configuration?.description;
   const spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
   const intro=description?.intro||product.reasons[0]||'',title=description?.title||product.name;
   const sameBasis=comparison&&product.price_src&&product.price_src===comparison.price_src&&Number.isSafeInteger(product.price)&&Number.isSafeInteger(comparison.price);
@@ -174,7 +174,7 @@ function renderResults(){
   view.innerHTML=heading('나에게 맞는 PC',false,subtitle,true)+errorPanel()+
     groups.map(group=>{const ctx=group.game_context,url=M.safeUrl(ctx?.source.url);return '<section class="live-result-group">'+groupHeading(group)+
       (group.empty_note?'<p class="muted">'+esc(group.empty_note)+'</p>':'')+
-      (group.products.length?'<div class="quote-cards">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n===1&&group.products.length===2?group.products[0]:null,group)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
+      (group.products.length?'<div class="quote-cards">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n===1&&group.products.length===2?group.products[0]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
       (ctx?'<div class="live-explanation"><h4>게임 안내 · '+esc(ctx.game_name)+'</h4><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</div>':'')+'</section>';}).join('')+
     (!hasProducts&&!groups.length?'<div class="empty"><h3>'+(state.missing.length?'조건을 조금 더 알려주세요':'현재 조건의 추천 상품이 없어요')+'</h3><p>상담은 계속할 수 있어요. 예산이나 사용 목적을 알려주세요.</p></div>':'')+
     (hasProducts?'<p class="results-note">'+uiIcon('info')+'해상도나 포함 품목을 바꾸면 견적이 달라질 수 있어요.</p>':'')+

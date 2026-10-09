@@ -79,11 +79,18 @@
       stock:{state:stock.state,checked_at:stock.checked_at},compatibility:{document_state:c.document_state,public_summary:c.public_summary,assembly_state:c.assembly_state},
       photo:{state:'unresolved',url:null}};
   }
+  // Card role (sold_reco: value · recommended · reference). Responses and saved
+  // snapshots from before the role field carry only the badge text.
+  const legacyRoles={'추천 구성':'recommended','예산 안 최고 수준':'recommended','알뜰 구성':'value','가장 저렴한 선택':'value','예산을 넘는 최저가':'reference'};
+  function productRole(value){
+    if(['value','recommended','reference'].includes(value.role))return value.role;
+    return value.role===undefined||value.role===null?legacyRoles[text(value.tag)]||'':'';
+  }
   function product(value){
     if(!object(value)||!Number.isInteger(value.product_code)||value.product_code<=0||!text(value.name))return null;
     return {product_code:value.product_code,name:value.name,price:Number.isInteger(value.price)&&value.price>=0?value.price:null,
       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
-      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:['value','recommended'].includes(value.role)?value.role:'',over_budget:value.over_budget===true,
+      mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:productRole(value),over_budget:value.over_budget===true,
       public_configuration:publicConfiguration(value.public_configuration,value.product_code)};
   }
   function gameContext(value){
