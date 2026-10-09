@@ -15,6 +15,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from api import customer_pc_offer as m
+from api import part_photo_approval as photo_approval
+from tools import approve_pc_publication_bulk as BULK
 
 JOB = UUID(int=7)
 PNG = b"\x89PNG\r\n\x1a\nfake"
@@ -249,10 +251,31 @@ class SourceReaderWiringTest(unittest.TestCase):
         make.assert_called_once_with(image_reader=m.read_image,
                                      business_rights_reference="workroom:x@v1:" + "a" * 64)
 
-    def test_missing_rights_reference_is_none_fail_closed(self):
+    def test_missing_env_uses_repository_file(self):
+        # 2026-10-09: 서버에 환경변수가 없어 부품 사진이 전부 닫혔다 — 파일 값으로 열린다.
         with patch.object(m, "make_source_reader") as make, patch.dict(m.os.environ, {}, clear=True):
             m._source_reader()
+        self.assertEqual(make.call_args.kwargs["business_rights_reference"], BULK.RIGHTS_ATTESTATION)
+
+    def test_repository_file_matches_bulk_approval_reference_byte_for_byte(self):
+        # 승인 도구가 provenance 에 적은 값과 바이트 단위로 같아야 사진이 열린다.
+        with patch.dict(m.os.environ, {}, clear=True):
+            got = m.rights_reference()
+        self.assertEqual(got.encode("utf-8"), BULK.RIGHTS_ATTESTATION.encode("utf-8"))
+        self.assertTrue(photo_approval._reference(got, rights=True))
+
+    def test_missing_env_and_file_is_none_fail_closed(self):
+        with patch.object(m, "make_source_reader") as make, patch.dict(m.os.environ, {}, clear=True), \
+                patch.object(m, "RIGHTS_FILE", m.pathlib.Path("/nonexistent/rights.json")):
+            m._source_reader()
         self.assertIsNone(make.call_args.kwargs["business_rights_reference"])
+
+    def test_invalid_file_is_none_fail_closed(self):
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as f:
+            f.write("not json")
+        with patch.dict(m.os.environ, {}, clear=True), patch.object(m, "RIGHTS_FILE", m.pathlib.Path(f.name)):
+            self.assertIsNone(m.rights_reference())
 
 
 if __name__ == "__main__":

@@ -10551,5 +10551,49 @@ process.stdout.write(JSON.stringify(out));
           "overflow-wrap:anywhere" in seg, "있음", "없음")
 
 
+def test_part_photos_open():
+    """[66] 승인된 완제품 구성이 있으면 고객 응답에 부품 사진이 실제로 실린다 (2026-10-09 실사고).
+
+    부품 사진은 권리 근거값(POPCORN_PART_PHOTO_RIGHTS_REFERENCE)이 승인 원장의 값과 바이트
+    단위로 같을 때만 열린다. 서버에 환경변수가 없어 그 값이 None 이 됐고, 모든 구성이 조용히
+    닫혀 고객 화면의 부품 사진이 전부 사라졌다 — 에러도 500 도 없이 404 로만.
+    지금은 환경변수가 없으면 저장소 설정 파일(docs/rights/part-photo-rights-reference.json)을 쓴다.
+
+    이 검사가 실패하려면: 권리 근거값을 읽지 못하거나, 발행 승인된 판매중 구성이 있는데
+    고객 응답의 부품 사진이 하나도 approved 가 아니어야 한다.
+    """
+    print(chr(10) + "[66] 부품 사진 — 승인된 구성이 있으면 고객 응답이 비지 않는다")
+    from api import customer_pc_offer as _cpo
+    ref = _cpo.rights_reference()
+    check("[66] 부품 사진 권리 근거값을 읽는다(환경변수 또는 저장소 설정)",
+          bool(ref), "값 있음", ref)
+    if _engine is None:
+        check("[66] 승인 구성 대조 — DB 없음으로 건너뜀", True, "건너뜀", _db_why, kind="DB")
+        return
+    codes = [r["code"] for r in db_all(
+        "SELECT p.product_code AS code FROM pc_configuration_offers o"
+        " JOIN products p ON o.offer_id = 'P' || p.product_code::text"
+        " JOIN LATERAL (SELECT action FROM pc_customer_publication_events e"
+        "   WHERE e.configuration_id = o.configuration_id ORDER BY event_seq DESC LIMIT 1) l ON true"
+        " WHERE l.action = 'approve' AND p.status = '판매중' ORDER BY p.product_code LIMIT 5")]
+    if not codes:
+        check("[66] 발행 승인된 판매중 구성이 없어 건너뜀(판정 불가)", True, "건너뜀", 0, kind="SKIP")
+        return
+    opened, photos, why = [], 0, []
+    for code in codes:
+        st, d, _h = anon_call(f"/api/customer/pc-offers/{code}")
+        if st != 200 or not isinstance(d, dict):
+            why.append((code, st))
+            continue
+        parts = ((d.get("public_configuration") or {}).get("parts") or [])
+        n = sum(1 for x in parts if isinstance(x, dict)
+                and (x.get("photo") or {}).get("state") == "approved")
+        opened.append(code)
+        photos += n
+    check("[66] 승인 구성 중 하나 이상이 고객 응답으로 열린다",
+          bool(opened), f"{len(codes)}건 중 1건 이상", why)
+    check("[66] 열린 구성의 부품 사진이 비어 있지 않다", photos > 0, "1장 이상", photos)
+
+
 if __name__ == "__main__":
     sys.exit(main())
