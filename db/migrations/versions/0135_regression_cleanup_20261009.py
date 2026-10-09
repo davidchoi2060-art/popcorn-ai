@@ -1,36 +1,38 @@
-"""Clean up the 2026-10-09 data findings on the server DB as a migration.
+"""Clean up the 2026-10-09 data findings on the dev server DB as a migration.
 
 Approved in the project thread on 2026-10-09 (KST 23:37 "허락..", 23:40
 "막으면 그걸 풀어"; message ids cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r
-and cmsg_012k6fnspU3tgfYTTB56KTuDKmFfwwH2KAv7BxovsXaL7i). Specs:
-/mnt/project-files/handoff/auto-lock-20261009/unlock.sql, unlock-extra.sql and
-/mnt/project-files/handoff/regression-cleanup-20261009/README.md.
+and cmsg_012k6fnspU3tgfYTTB56KTuDKmFfwwH2KAv7BxovsXaL7i).
 
-1. Remove the 11 `specs.<field>` locks (7 products) that tools/enrich_pc_catalog_sources.py and
-   tools/repair_pc_audit_evidence.py added on 2026-09-30 (fixed in PR #36).
-   Spec values, spec_sources and reviews stay as they are. The owner's approval
-   (docs/rights/pc-publication-approval-ledger.json, pc-publication-20261009-bundle)
-   names "7개 상품 11개 항목"; the 3 in unlock-extra.sql (114723, 128080, 128085)
-   are left for a separate approval, as the server owner's README says.
-2. 94959: undo the regression product_edit that was never undone (sale price
-   +1000, status 품절, both locked) exactly like POST /products/undo/{log_id}:
-   price, status and locks back, a reverse price history row, and a
-   product_edit_undo row with ref_log_id. Stock is not touched.
-3. 105053: create the missing product_specs row and open 대기 reviews for
-   rated_watt and form_factor.
-4. 123034: review_required_yn=true and lock it, so loads stop putting it back
-   into the candidate pool (CLAUDE.md, 123034 note).
+This is the server owner's bundle moved into the deploy path. The originals are
+pinned in /mnt/project-files/handoff/regression-cleanup-20261009/:
+  apply_bundle_20261009.py  10613 B  sha256 05caa7b43885585a9f3e4eef34608e662c825dbae1ee03286b5f6687153ede75
+  undo_bundle_20261009.sql   5637 B  sha256 b8895737b2d7cf21979154b2b2ebf5b6e889639ad90bd9ce27c35f6042e6d26c
+upgrade() makes the same checks and the same writes as apply_bundle_20261009.py
+(same values, ledger actions, details and notes, so undo_bundle_20261009.sql also
+works on its result); downgrade() follows undo_bundle_20261009.sql.
 
-Every target is checked against its expected current value first. A target
-that already differs is skipped and counted, never forced. Each changed product
-gets one ledger row in admin_operator_activity_logs; the counts go in one
-migration_0135 row. On a DB without these products nothing is written.
+  1. 94959    undo regression log 22137 (sale 132400 -> 131400, 품절 -> 판매중, locks
+               cleared), reverse price history row, product_edit_undo row (ref_log_id)
+  2. 105053   empty product_specs row, rated_watt/form_factor spec_missing reviews,
+               review_required_yn=true
+  3. (B)      reviews 631, 637, 2544, 7164, 8614 must still be 대기 (read only)
+  4. unlock   the 11 `specs.<field>` locks the 2026-09-30 spec-fill tools added on
+               7 products (values and reviews untouched). The 3 in unlock-extra.sql
+               are not in the owner's approval ("7개 상품 11개 항목") and not here.
+  5. 123034   review_required_yn=true and lock it (review 8193 pending)
 
-downgrade() is a reverse transition, not a delete: it re-adds the removed
-locks, re-applies the 94959 edit as a new product_edit row (undoable from the
-admin screen), clears 123034 back to its recorded before-state, and moves the
-105053 reviews it opened to 처리. Each reverse row points at the upgrade row
-with ref_log_id. The 105053 specs row is kept (no values in it).
+Differences from the originals, on purpose:
+  - A failed check does not raise. Like the original, nothing at all is written
+    (all-or-nothing), but the migration still completes and one migration_0135
+    ledger row records which check failed. A raise would stop every later deploy
+    until someone fixed the server by hand. On a DB without these products
+    nothing is written at all.
+  - Ledger rows carry "migration": "0135" so downgrade finds exactly its own rows.
+  - Operator: the original writes operator 1 (and 22137's operator for 94959);
+    here operator 1 is used only if it exists, else NULL (other DBs).
+  - Downgrade re-locks a product only while its lock list and its spec values
+    are still what the upgrade left; a changed product is skipped and recorded.
 """
 import re
 from alembic import op
@@ -41,288 +43,287 @@ down_revision = '0134'
 branch_labels = None
 depends_on = None
 
-# Expected values are what unlock.sql checks (to_jsonb(product_specs) -> field).
-COMMON_SQL = r'''
-CREATE TEMP TABLE m0135_unlock(product_code bigint, field text, expect jsonb) ON COMMIT DROP;
-INSERT INTO m0135_unlock VALUES
-  (120906,'cooler_tdp','280'),
-  (121011,'cooler_tdp','280'),
-  (114514,'cooler_tdp','290'),
-  (128119,'cooler_tdp','200'),
-  (129775,'mem_type','"DDR5"'),
-  (129552,'gpu_max_mm','240'),
-  (129552,'cooler_height_mm','75'),
-  (129552,'form_factor_list','["m-ATX", "mini-ITX"]'),
-  (129551,'gpu_max_mm','240'),
-  (129551,'cooler_height_mm','75'),
-  (129551,'form_factor_list','["m-ATX", "mini-ITX"]');
-'''
-
-UPGRADE_SQL = COMMON_SQL + r'''
+UPGRADE_SQL = r'''
 DO $up$
 DECLARE
   ev CONSTANT jsonb := '["cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r","cmsg_012k6fnspU3tgfYTTB56KTuDKmFfwwH2KAv7BxovsXaL7i"]';
-  meta jsonb;
-  r record; it record; tl_id bigint; tl_detail jsonb;
-  v_sku text; lf jsonb; sj jsonb; locks text[]; vals jsonb; d jsonb; chg jsonb;
-  n_found int;
-  u_applied int := 0; u_products int := 0; u_unlocked int := 0; u_changed int := 0; u_missing int := 0;
-  s94959 text := 'skipped_missing'; s105053 text := 'skipped_missing'; s123034 text := 'skipped_missing';
-  review_ids jsonb; rid bigint; specs_created boolean; pt text; rr boolean;
+  note CONSTANT text := 'regression cleanup 2026-10-09';
+  mark jsonb;
+  op1 bigint; src record; p record; r record; n int; v jsonb; why text := NULL;
+  lid bigint; logs jsonb := '{}'::jsonb;
 BEGIN
-  meta := jsonb_build_object('migration','0135','phase','up','source','migration 0135','evidence',ev);
-  SELECT count(*) INTO n_found FROM __S__.products
-   WHERE product_code IN (SELECT product_code FROM m0135_unlock UNION SELECT unnest(ARRAY[94959,105053,123034]));
-  IF n_found = 0 THEN
+  IF NOT EXISTS (SELECT 1 FROM __S__.products
+                  WHERE product_code IN (94959,105053,123034,120906,121011,114514,128119,129552,129551,129775)) THEN
     RAISE NOTICE 'migration 0135: no target products in this DB, nothing written';
     RETURN;
   END IF;
+  mark := jsonb_build_object('migration','0135','phase','up','evidence',ev);
+  SELECT operator_id INTO op1 FROM __S__.admin_operators WHERE operator_id = 1;
   PERFORM 1 FROM __S__.products
-   WHERE product_code IN (SELECT product_code FROM m0135_unlock UNION SELECT unnest(ARRAY[94959,105053,123034]))
+   WHERE product_code IN (94959,105053,123034,120906,121011,114514,128119,129552,129551,129775)
    ORDER BY product_code FOR UPDATE;
 
-  -- 1. unlock: only 'specs.<field>' entries whose value still equals the expected one
-  FOR r IN SELECT product_code FROM m0135_unlock GROUP BY product_code ORDER BY product_code LOOP
-    SELECT p.sku, COALESCE(p.locked_fields,'[]'::jsonb) INTO v_sku, lf
-      FROM __S__.products p WHERE p.product_code = r.product_code;
-    IF NOT FOUND THEN
-      u_missing := u_missing + (SELECT count(*) FROM m0135_unlock WHERE product_code = r.product_code);
-      CONTINUE;
+  CREATE TEMP TABLE m0135_values(product_code bigint, field text, expect jsonb) ON COMMIT DROP;
+  INSERT INTO m0135_values VALUES
+    (120906,'cooler_tdp','280'), (121011,'cooler_tdp','280'), (114514,'cooler_tdp','290'),
+    (128119,'cooler_tdp','200'), (129775,'mem_type','"DDR5"'),
+    (129552,'gpu_max_mm','240'), (129552,'cooler_height_mm','75'), (129552,'form_factor_list','["m-ATX", "mini-ITX"]'),
+    (129551,'gpu_max_mm','240'), (129551,'cooler_height_mm','75'), (129551,'form_factor_list','["m-ATX", "mini-ITX"]');
+  -- (product, lock list now -- must match exactly, entries to drop)
+  CREATE TEMP TABLE m0135_unlock(ord int, product_code bigint, before jsonb, drop_ text[]) ON COMMIT DROP;
+  INSERT INTO m0135_unlock VALUES
+    (1,120906,'["market_price", "specs.cooler_height_mm", "specs.cooler_tdp", "specs.socket_list"]',ARRAY['specs.cooler_tdp']),
+    (2,121011,'["market_price", "specs.cooler_height_mm", "specs.cooler_tdp", "specs.socket_list"]',ARRAY['specs.cooler_tdp']),
+    (3,114514,'["market_price", "specs.cooler_tdp"]',ARRAY['specs.cooler_tdp']),
+    (4,128119,'["market_price", "specs.cooler_tdp"]',ARRAY['specs.cooler_tdp']),
+    (5,129552,'["specs.cooler_height_mm", "specs.form_factor_list", "specs.gpu_max_mm"]',
+            ARRAY['specs.cooler_height_mm','specs.form_factor_list','specs.gpu_max_mm']),
+    (6,129551,'["specs.cooler_height_mm", "specs.form_factor_list", "specs.gpu_max_mm"]',
+            ARRAY['specs.cooler_height_mm','specs.form_factor_list','specs.gpu_max_mm']),
+    (7,129775,'["specs.mem_type"]',ARRAY['specs.mem_type']);
+
+  -- ---- checks first; any failure writes nothing (original: Abort -> rollback)
+  SELECT operator_id, target_id, detail INTO src FROM __S__.admin_operator_activity_logs
+   WHERE log_id = 22137 AND action = 'product_edit';
+  IF NOT FOUND OR src.detail->'product_code' IS DISTINCT FROM '94959'::jsonb THEN
+    why := '94959: source log 22137 mismatch';
+  ELSIF EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs WHERE action = 'product_edit_undo'
+                 AND (detail->>'ref_log_id')::bigint = 22137) THEN
+    why := '94959: undo row for 22137 already exists';
+  END IF;
+  IF why IS NULL THEN
+    SELECT sale_price, status, locked_fields INTO p FROM __S__.products WHERE product_code = 94959;
+    IF NOT FOUND OR p.sale_price IS DISTINCT FROM 132400 OR p.status IS DISTINCT FROM '품절'
+       OR p.locked_fields IS DISTINCT FROM '["sale_price", "status"]'::jsonb THEN
+      why := '94959: current values differ';
     END IF;
-    SELECT to_jsonb(s) INTO sj FROM __S__.product_specs s WHERE s.product_code = r.product_code;
-    locks := ARRAY[]::text[]; vals := '{}'::jsonb;
-    FOR it IN SELECT field, expect FROM m0135_unlock WHERE product_code = r.product_code ORDER BY field LOOP
-      IF NOT lf ? ('specs.'||it.field) THEN
-        u_unlocked := u_unlocked + 1;
-      ELSIF sj IS NULL OR (sj -> it.field) IS DISTINCT FROM it.expect THEN
-        u_changed := u_changed + 1;
-      ELSE
-        locks := locks || ('specs.'||it.field);
-        vals := vals || jsonb_build_object(it.field, it.expect);
+  END IF;
+  IF why IS NULL THEN
+    SELECT part_type, category_group, review_required_yn, locked_fields INTO p
+      FROM __S__.products WHERE product_code = 105053;
+    IF NOT FOUND OR p.part_type IS DISTINCT FROM 'POWER' OR p.category_group IS DISTINCT FROM 'core_part'
+       OR p.review_required_yn IS DISTINCT FROM false THEN
+      why := '105053: current values differ';
+    ELSIF EXISTS (SELECT 1 FROM __S__.product_specs WHERE product_code = 105053) THEN
+      why := '105053: product_specs row already exists';
+    ELSIF EXISTS (SELECT 1 FROM __S__.product_reviews WHERE product_code = 105053) THEN
+      why := '105053: review rows already exist';
+    END IF;
+  END IF;
+  IF why IS NULL THEN
+    SELECT count(*) INTO n FROM __S__.product_reviews
+     WHERE review_id IN (631,637,2544,7164,8614) AND review_status = '대기';
+    IF n <> 5 THEN why := '(B): pending reviews are not 5 (' || n || ')'; END IF;
+  END IF;
+  IF why IS NULL THEN
+    FOR r IN SELECT t.product_code, t.field, t.expect, to_jsonb(s) -> t.field AS got
+               FROM m0135_values t LEFT JOIN __S__.product_specs s USING (product_code) LOOP
+      IF r.got IS DISTINCT FROM r.expect THEN
+        why := r.product_code || '.' || r.field || ': value differs'; EXIT;
       END IF;
     END LOOP;
-    CONTINUE WHEN cardinality(locks) = 0;
-    UPDATE __S__.products SET locked_fields = lf - locks, updated_at = now()
-     WHERE product_code = r.product_code;
-    INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-    VALUES (NULL, 'product_edit', 'product', v_sku, meta || jsonb_build_object(
-      'kind','unlock','product_code',r.product_code,'sku',v_sku,'changes','{}'::jsonb,
-      'before',jsonb_build_object('locked_fields',lf),
-      'after',jsonb_build_object('locked_fields',lf - locks),
-      'unlocked',to_jsonb(locks),'values',vals,'locked',false));
-    u_applied := u_applied + cardinality(locks);
-    u_products := u_products + 1;
-  END LOOP;
-
-  -- 2. 94959: undo the latest product_edit nobody undid, if it is the regression edit
-  SELECT l.log_id, l.detail INTO tl_id, tl_detail FROM __S__.admin_operator_activity_logs l
-   WHERE l.action = 'product_edit' AND l.detail->>'product_code' = '94959'
-     AND NOT EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs u
-                      WHERE u.detail->>'ref_log_id' = l.log_id::text)
-   ORDER BY l.log_id DESC LIMIT 1;
-  SELECT p.sku, COALESCE(p.locked_fields,'[]'::jsonb), to_jsonb(p) INTO v_sku, lf, sj
-    FROM __S__.products p WHERE p.product_code = 94959;
-  IF NOT FOUND THEN
-    s94959 := 'skipped_missing';
-  ELSIF tl_id IS NULL THEN
-    s94959 := 'skipped_no_open_edit';
-  ELSE
-    d := tl_detail; chg := d->'changes';
-    IF jsonb_typeof(chg) IS DISTINCT FROM 'object'
-       OR (SELECT array_agg(k ORDER BY k) FROM jsonb_object_keys(chg) k) IS DISTINCT FROM ARRAY['sale_price','status']
-       OR chg #> '{sale_price,from}' IS DISTINCT FROM '131400'::jsonb
-       OR chg #> '{status,from}' IS DISTINCT FROM '"판매중"'::jsonb
-       OR chg #> '{sale_price,to}' IS DISTINCT FROM '132400'::jsonb
-       OR chg #> '{status,to}' IS DISTINCT FROM '"품절"'::jsonb
-       OR d #> '{before,locked_fields}' IS DISTINCT FROM '[]'::jsonb
-       OR d->'locked' IS DISTINCT FROM 'true'::jsonb THEN
-      s94959 := 'skipped_not_regression_edit';
-    ELSIF sj->'sale_price' IS DISTINCT FROM chg #> '{sale_price,to}'
-       OR sj->'status' IS DISTINCT FROM chg #> '{status,to}'
-       OR NOT (lf @> '["sale_price","status"]'::jsonb AND '["sale_price","status"]'::jsonb @> lf) THEN
-      s94959 := 'skipped_changed';
-    ELSE
-      UPDATE __S__.products SET sale_price = 131400, status = '판매중',
-             locked_fields = '[]'::jsonb, updated_at = now()
-       WHERE product_code = 94959;
-      INSERT INTO __S__.product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)
-      VALUES (94959, 'sale', (chg #>> '{sale_price,to}')::bigint, 131400, 'manual', tl_id, NULL);
-      INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit_undo', 'product', v_sku, meta || jsonb_build_object(
-        'kind','restore_94959','ref_log_id',tl_id,'product_code',94959,'sku',v_sku,
-        'restored',jsonb_build_object('sale_price',131400,'status','판매중'),
-        'before',jsonb_build_object('sale_price',sj->'sale_price','status',sj->'status','locked_fields',lf),
-        'after',jsonb_build_object('locked_fields','[]'::jsonb)));
-      s94959 := 'applied';
-    END IF;
   END IF;
-
-  -- 3. 105053: specs row + 대기 reviews for the two required power specs
-  SELECT p.sku, p.part_type INTO v_sku, pt FROM __S__.products p WHERE p.product_code = 105053;
-  IF FOUND THEN
-    specs_created := false;
-    SELECT to_jsonb(s) INTO sj FROM __S__.product_specs s WHERE s.product_code = 105053;
-    IF sj IS NULL THEN
-      INSERT INTO __S__.product_specs (product_code, part_type) VALUES (105053, pt);
-      specs_created := true;
-    END IF;
-    review_ids := '[]'::jsonb;
-    FOR it IN SELECT unnest(ARRAY['rated_watt','form_factor']) AS field LOOP
-      CONTINUE WHEN sj IS NOT NULL AND (sj -> it.field) IS NOT NULL AND sj -> it.field <> 'null'::jsonb;
-      CONTINUE WHEN EXISTS (SELECT 1 FROM __S__.product_reviews x
-                             WHERE x.product_code = 105053 AND x.field_name = it.field
-                               AND x.review_status = '대기');
-      INSERT INTO __S__.product_reviews (product_code, review_type, field_name, review_status, detail)
-      VALUES (105053, 'spec_missing', it.field, '대기', '필수 사양 미확인 - 사양 행 없음(마이그레이션 0135)')
-      RETURNING review_id INTO rid;
-      review_ids := review_ids || to_jsonb(rid);
+  IF why IS NULL THEN
+    FOR r IN SELECT u.product_code, u.before, p2.locked_fields AS cur
+               FROM m0135_unlock u LEFT JOIN __S__.products p2 USING (product_code) LOOP
+      IF r.cur IS DISTINCT FROM r.before THEN
+        why := r.product_code || ': lock list differs'; EXIT;
+      END IF;
     END LOOP;
-    IF specs_created OR jsonb_array_length(review_ids) > 0 THEN
-      INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', v_sku, meta || jsonb_build_object(
-        'kind','specs_105053','product_code',105053,'sku',v_sku,'changes','{}'::jsonb,
-        'specs_row_created',specs_created,'review_ids',review_ids,'locked',false));
-      s105053 := 'applied';
-    ELSE
-      s105053 := 'skipped_already';
+  END IF;
+  IF why IS NULL THEN
+    SELECT review_required_yn, ai_candidate_yn, locked_fields, status INTO p
+      FROM __S__.products WHERE product_code = 123034;
+    IF NOT FOUND OR p.review_required_yn IS DISTINCT FROM false OR p.ai_candidate_yn IS DISTINCT FROM true
+       OR p.locked_fields IS DISTINCT FROM '[]'::jsonb OR p.status IS DISTINCT FROM '판매중' THEN
+      why := '123034: current values differ';
+    ELSIF (SELECT review_status FROM __S__.product_reviews WHERE review_id = 8193) IS DISTINCT FROM '대기' THEN
+      why := '123034: review 8193 is not pending';
     END IF;
   END IF;
 
-  -- 4. 123034: send to review and lock the flag
-  SELECT p.sku, COALESCE(p.locked_fields,'[]'::jsonb), p.review_required_yn INTO v_sku, lf, rr
-    FROM __S__.products p WHERE p.product_code = 123034;
-  IF FOUND THEN
-    IF rr IS TRUE AND lf ? 'review_required_yn' THEN
-      s123034 := 'skipped_already';
-    ELSE
-      UPDATE __S__.products
-         SET review_required_yn = true,
-             locked_fields = CASE WHEN lf ? 'review_required_yn' THEN lf ELSE lf || '["review_required_yn"]'::jsonb END,
-             updated_at = now()
-       WHERE product_code = 123034;
-      INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', v_sku, meta || jsonb_build_object(
-        'kind','review_123034','product_code',123034,'sku',v_sku,'changes','{}'::jsonb,
-        'before',jsonb_build_object('review_required_yn',rr,'locked_fields',lf),
-        'after',jsonb_build_object('review_required_yn',true,'locked_fields',
-          CASE WHEN lf ? 'review_required_yn' THEN lf ELSE lf || '["review_required_yn"]'::jsonb END),
-        'locked',true));
-      s123034 := 'applied';
-    END IF;
+  IF why IS NOT NULL THEN
+    INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+    VALUES (NULL, 'migration_0135', 'migration', '0135',
+            mark || jsonb_build_object('applied', false, 'skipped_reason', why, 'note', note));
+    RAISE NOTICE 'migration 0135: check failed, nothing applied: %', why;
+    RETURN;
   END IF;
+
+  -- ---- 1) 94959 restore (log 22137, its undo returned 409)
+  UPDATE __S__.products SET sale_price = 131400, status = '판매중', locked_fields = '[]'::jsonb, updated_at = now()
+   WHERE product_code = 94959;
+  INSERT INTO __S__.product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)
+  VALUES (94959, 'sale', 132400, 131400, 'manual', 22137, src.operator_id);
+  INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+  VALUES (src.operator_id, 'product_edit_undo', 'product', src.target_id, mark || jsonb_build_object(
+    'ref_log_id', 22137, 'product_code', 94959, 'restored', jsonb_build_object('status','판매중','sale_price',131400),
+    'note', 'regression cleanup 2026-10-09 (undo 409)')) RETURNING log_id INTO lid;
+  logs := logs || jsonb_build_object('94959', lid);
+
+  -- ---- 2) (A) 105053 ZM700-TX power: empty specs row + required spec reviews
+  SELECT locked_fields INTO v FROM __S__.products WHERE product_code = 105053;
+  INSERT INTO __S__.product_specs (product_code, part_type) VALUES (105053, 'POWER');
+  INSERT INTO __S__.product_reviews (product_code, review_type, field_name, detail, confidence) VALUES
+    (105053, 'spec_missing', 'rated_watt', 'POWER 필수 사양 ''rated_watt'' 미확인 — 사양 행 누락으로 회부(' || note || ')', 0.80),
+    (105053, 'spec_missing', 'form_factor', 'POWER 필수 사양 ''form_factor'' 미확인 — 사양 행 누락으로 회부(' || note || ')', 0.80);
+  UPDATE __S__.products SET review_required_yn = true, updated_at = now() WHERE product_code = 105053;
+  INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+  VALUES (op1, 'product_edit', 'product', '105053', mark || jsonb_build_object(
+    'sku', '105053', 'product_code', 105053, 'locked', false, 'before', jsonb_build_object('locked_fields', v),
+    'changes', jsonb_build_object('review_required_yn', jsonb_build_object('from', false, 'to', true),
+               'product_specs', jsonb_build_object('from', NULL, 'to', 'row created (part_type POWER, values empty)')),
+    'note', note || ' - core_part POWER had no product_specs row. Created empty row and referred required '
+            'specs (rated_watt, form_factor) to review; no values invented. NOTE: not in EDITABLE -- '
+            'the generic undo button will NOT revert this log.')) RETURNING log_id INTO lid;
+  logs := logs || jsonb_build_object('105053', lid);
+
+  -- ---- 3) (B) checked above, nothing written
+  -- ---- 4) unlock the 11 fields the 2026-09-30 tools locked (values and reviews unchanged)
+  FOR r IN SELECT product_code, before, drop_ FROM m0135_unlock ORDER BY ord LOOP
+    v := r.before - r.drop_;
+    UPDATE __S__.products SET locked_fields = v, updated_at = now() WHERE product_code = r.product_code;
+    INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+    VALUES (op1, 'product_edit', 'product', r.product_code::text, mark || jsonb_build_object(
+      'sku', r.product_code::text, 'product_code', r.product_code, 'locked', false,
+      'before', jsonb_build_object('locked_fields', r.before),
+      'changes', jsonb_build_object('locked_fields', jsonb_build_object('from', r.before, 'to', v)),
+      'note', note || ' - unlock spec fields locked by the 2026-09-30 spec-fill tool (not operator-verified, '
+              'verified_yn=false, pending spec_missing reviews kept). Values unchanged. NOTE: not in EDITABLE -- '
+              'the generic undo button will NOT revert this log.')) RETURNING log_id INTO lid;
+    logs := logs || jsonb_build_object(r.product_code::text, lid);
+  END LOOP;
+  SELECT count(*) INTO n FROM m0135_values t JOIN __S__.products p2 USING (product_code)
+   WHERE p2.locked_fields ? ('specs.' || t.field);
+  IF n <> 0 THEN
+    RAISE EXCEPTION 'migration 0135: % target locks left after unlock (must be 0)', n;
+  END IF;
+
+  -- ---- 5) 123034 name is a sales-condition phrase: review flag + lock
+  UPDATE __S__.products SET review_required_yn = true, locked_fields = '["review_required_yn"]'::jsonb, updated_at = now()
+   WHERE product_code = 123034;
+  INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+  VALUES (op1, 'product_edit', 'product', '123034', mark || jsonb_build_object(
+    'sku', '123034', 'product_code', 123034, 'locked', true, 'before', jsonb_build_object('locked_fields', '[]'::jsonb),
+    'changes', jsonb_build_object('review_required_yn', jsonb_build_object('from', false, 'to', true)),
+    'note', note || ' - name is a sales-condition phrase (review 8193 pending); flag for review and lock so '
+            'the next import does not clear it. NOTE: not in EDITABLE -- the generic undo button will NOT revert this log.'))
+  RETURNING log_id INTO lid;
+  logs := logs || jsonb_build_object('123034', lid);
 
   INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-  VALUES (NULL, 'migration_0135', 'migration', '0135', meta || jsonb_build_object(
-    'unlock',jsonb_build_object('fields_unlocked',u_applied,'products',u_products,
-      'skipped_already_unlocked',u_unlocked,'skipped_value_changed',u_changed,'skipped_missing',u_missing),
-    'p94959',s94959,'p105053',s105053,'p123034',s123034));
-  RAISE NOTICE 'migration 0135 up: unlocked % fields on % products (skip: % already unlocked, % value changed, % missing); 94959 %; 105053 %; 123034 %',
-    u_applied, u_products, u_unlocked, u_changed, u_missing, s94959, s105053, s123034;
+  VALUES (NULL, 'migration_0135', 'migration', '0135',
+          mark || jsonb_build_object('applied', true, 'log_ids', logs, 'note', note));
+  RAISE NOTICE 'migration 0135: applied (94959, 105053, 7 unlocks, 123034)';
 END $up$;
 '''
 
 DOWNGRADE_SQL = r'''
 DO $down$
 DECLARE
-  meta jsonb;
-  r record; lf jsonb; sj jsonb; spec jsonb; relock jsonb; d jsonb;
-  n_relocked int := 0; n_skipped int := 0; n_changed int := 0; n_reviews int := 0; n_tmp int;
+  note CONSTANT text := 'revert of regression cleanup 2026-10-09';
+  mark jsonb;
+  op1 bigint; r record; p record; n int; done jsonb := '[]'::jsonb; skipped jsonb := '[]'::jsonb;
 BEGIN
-  meta := jsonb_build_object('migration','0135','phase','down','source','migration 0135 downgrade');
+  mark := jsonb_build_object('migration','0135','phase','down');
+  SELECT operator_id INTO op1 FROM __S__.admin_operators WHERE operator_id = 1;
   PERFORM 1 FROM __S__.products
    WHERE product_code IN (SELECT (l.detail->>'product_code')::bigint FROM __S__.admin_operator_activity_logs l
                            WHERE l.detail->>'migration' = '0135' AND l.detail->>'phase' = 'up'
                              AND l.detail ? 'product_code')
    ORDER BY product_code FOR UPDATE;
 
-  -- Up rows nobody has reversed yet, newest first.
-  FOR r IN SELECT l.log_id, l.target_id, l.detail FROM __S__.admin_operator_activity_logs l
-            WHERE l.detail->>'migration' = '0135' AND l.detail->>'phase' = 'up' AND l.detail ? 'kind'
+  -- This migration's up rows that nothing has reversed yet; each item independent
+  FOR r IN SELECT l.log_id, l.operator_id, l.target_id, l.detail FROM __S__.admin_operator_activity_logs l
+            WHERE l.detail->>'migration' = '0135' AND l.detail->>'phase' = 'up' AND l.detail ? 'product_code'
               AND NOT EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs u
                                WHERE u.detail->>'ref_log_id' = l.log_id::text)
-            ORDER BY l.log_id DESC LOOP
-    d := r.detail;
-    SELECT COALESCE(p.locked_fields,'[]'::jsonb), to_jsonb(p) INTO lf, sj
-      FROM __S__.products p WHERE p.product_code = (d->>'product_code')::bigint;
-    IF NOT FOUND THEN n_skipped := n_skipped + 1; CONTINUE; END IF;
-
-    IF d->>'kind' = 'unlock' THEN
-      -- re-add only the entries this migration removed and nobody re-added since, and
-      -- only while the spec value is still the one that was unlocked (a value changed
-      -- after the upgrade belongs to whoever changed it: skipped and counted)
-      SELECT to_jsonb(s) INTO spec FROM __S__.product_specs s
-       WHERE s.product_code = (d->>'product_code')::bigint;
-      SELECT count(*) INTO n_tmp FROM jsonb_array_elements_text(d->'unlocked') e
-       WHERE NOT lf ? e AND (spec IS NULL OR (spec -> substr(e, 7)) IS DISTINCT FROM (d->'values'->substr(e, 7)));
-      n_changed := n_changed + n_tmp;
-      SELECT COALESCE(jsonb_agg(e), '[]'::jsonb) INTO relock
-        FROM jsonb_array_elements_text(d->'unlocked') e
-       WHERE NOT lf ? e AND spec IS NOT NULL AND d->'values' ? substr(e, 7)
-         AND (spec -> substr(e, 7)) IS NOT DISTINCT FROM (d->'values'->substr(e, 7));
-      IF jsonb_array_length(relock) = 0 THEN n_skipped := n_skipped + 1; CONTINUE; END IF;
-      UPDATE __S__.products SET locked_fields = lf || relock, updated_at = now()
-       WHERE product_code = (d->>'product_code')::bigint;
-      INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', r.target_id, meta || jsonb_build_object(
-        'ref_log_id',r.log_id,'product_code',d->'product_code','sku',d->'sku','changes','{}'::jsonb,
-        'before',jsonb_build_object('locked_fields',lf),
-        'after',jsonb_build_object('locked_fields',lf || relock),'relocked',relock,'locked',false));
-      n_relocked := n_relocked + jsonb_array_length(relock);
-
-    ELSIF d->>'kind' = 'restore_94959' THEN
-      IF sj->'sale_price' IS DISTINCT FROM '131400'::jsonb OR sj->>'status' IS DISTINCT FROM '판매중'
-         OR lf <> '[]'::jsonb THEN
-        n_skipped := n_skipped + 1; CONTINUE;
-      END IF;
-      UPDATE __S__.products SET sale_price = (d #>> '{before,sale_price}')::bigint,
-             status = d #>> '{before,status}', locked_fields = d #> '{before,locked_fields}', updated_at = now()
-       WHERE product_code = 94959;
+            -- same order as undo_bundle_20261009.sql blocks (1) (2) (3) (4)
+            ORDER BY CASE l.detail->>'product_code' WHEN '94959' THEN 1 WHEN '105053' THEN 2
+                                                    WHEN '123034' THEN 3 ELSE 4 END, l.log_id LOOP
+    IF r.detail->>'product_code' = '94959' THEN
+      -- (1) back to the regression test values (normally never needed)
+      UPDATE __S__.products SET sale_price = 132400, status = '품절',
+             locked_fields = '["sale_price","status"]'::jsonb, updated_at = now()
+       WHERE product_code = 94959 AND sale_price = 131400 AND status = '판매중' AND locked_fields = '[]'::jsonb;
+      GET DIAGNOSTICS n = ROW_COUNT;
+      IF n = 0 THEN skipped := skipped || '"94959"'::jsonb; CONTINUE; END IF;
       INSERT INTO __S__.product_price_history (product_code, field, old_price, new_price, reason, ref_id, changed_by)
-      VALUES (94959, 'sale', 131400, (d #>> '{before,sale_price}')::bigint, 'manual', r.log_id, NULL);
-      -- Same shape as an admin product_edit, so the admin screen can undo it again.
+      VALUES (94959, 'sale', 131400, 132400, 'manual', 22137, op1);
       INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', r.target_id, meta || jsonb_build_object(
-        'ref_log_id',r.log_id,'product_code',94959,'sku',d->'sku',
-        'changes',jsonb_build_object(
-          'sale_price',jsonb_build_object('from',131400,'to',d #> '{before,sale_price}'),
-          'status',jsonb_build_object('from','판매중','to',d #> '{before,status}')),
-        'before',jsonb_build_object('locked_fields','[]'::jsonb),'locked',true));
+      VALUES (op1, 'product_edit', 'product', '94959', mark || jsonb_build_object(
+        'sku', '94959', 'product_code', 94959, 'locked', true, 'before', jsonb_build_object('locked_fields', '[]'::jsonb),
+        'changes', jsonb_build_object('status', jsonb_build_object('from','판매중','to','품절'),
+                                      'sale_price', jsonb_build_object('from',131400,'to',132400)),
+        'ref_log_id', r.log_id, 'note', note || ' (undo 409)'));
 
-    ELSIF d->>'kind' = 'specs_105053' THEN
-      UPDATE __S__.product_reviews SET review_status = '처리', reviewed_at = now()
-       WHERE review_id IN (SELECT (e)::bigint FROM jsonb_array_elements_text(d->'review_ids') e)
-         AND review_status = '대기';
-      GET DIAGNOSTICS n_reviews = ROW_COUNT;
+    ELSIF r.detail->>'product_code' = '105053' THEN
+      -- (2) close the reviews (not deleted), drop the still-empty specs row, clear the flag
+      UPDATE __S__.product_reviews SET review_status = '처리', reviewed_at = now(),
+             detail = detail || ' [되돌림: regression cleanup 2026-10-09 사양 행 생성 취소]'
+       WHERE product_code = 105053 AND review_type = 'spec_missing' AND review_status = '대기'
+         AND field_name IN ('rated_watt','form_factor') AND detail LIKE '%regression cleanup 2026-10-09%';
+      DELETE FROM __S__.product_specs WHERE product_code = 105053 AND part_type = 'POWER'
+         AND rated_watt IS NULL AND form_factor IS NULL AND verified_yn = false;
+      UPDATE __S__.products SET review_required_yn = false, updated_at = now() WHERE product_code = 105053;
       INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', r.target_id, meta || jsonb_build_object(
-        'ref_log_id',r.log_id,'product_code',105053,'sku',d->'sku','changes','{}'::jsonb,
-        'reviews_closed',n_reviews,'specs_row_kept',true,'locked',false));
+      VALUES (op1, 'product_edit', 'product', '105053', mark || jsonb_build_object(
+        'sku', '105053', 'product_code', 105053, 'locked', false, 'before', r.detail->'before',
+        'changes', jsonb_build_object('review_required_yn', jsonb_build_object('from', true, 'to', false),
+                   'product_specs', jsonb_build_object('from', 'row created (part_type POWER, values empty)', 'to', NULL)),
+        'ref_log_id', r.log_id, 'note', note || ' (105053 spec row)'));
 
-    ELSIF d->>'kind' = 'review_123034' THEN
-      IF sj->'review_required_yn' IS DISTINCT FROM 'true'::jsonb OR NOT lf ? 'review_required_yn' THEN
-        n_skipped := n_skipped + 1; CONTINUE;
+    ELSIF r.detail->>'product_code' = '123034' THEN
+      -- (3) review flag + lock
+      UPDATE __S__.products SET review_required_yn = false, locked_fields = '[]'::jsonb, updated_at = now()
+       WHERE product_code = 123034 AND locked_fields = '["review_required_yn"]'::jsonb;
+      GET DIAGNOSTICS n = ROW_COUNT;
+      IF n = 0 THEN skipped := skipped || '"123034"'::jsonb; CONTINUE; END IF;
+      INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
+      VALUES (op1, 'product_edit', 'product', '123034', mark || jsonb_build_object(
+        'sku', '123034', 'product_code', 123034, 'locked', false,
+        'before', jsonb_build_object('locked_fields', '["review_required_yn"]'::jsonb),
+        'changes', jsonb_build_object('review_required_yn', jsonb_build_object('from', true, 'to', false),
+                   'locked_fields', jsonb_build_object('from', '["review_required_yn"]'::jsonb, 'to', '[]'::jsonb)),
+        'ref_log_id', r.log_id, 'note', note || ' (123034 review flag)'));
+
+    ELSIF r.detail #> '{changes,locked_fields}' IS NOT NULL THEN
+      -- (4) re-lock: only while the lock list is what the upgrade left and the
+      -- unlocked spec values are still the 2026-09-30 tool values
+      SELECT locked_fields INTO p FROM __S__.products WHERE product_code = (r.detail->>'product_code')::bigint;
+      IF p.locked_fields IS DISTINCT FROM r.detail #> '{changes,locked_fields,to}' OR EXISTS (
+           SELECT 1 FROM (VALUES
+             (120906,'cooler_tdp','280'::jsonb), (121011,'cooler_tdp','280'), (114514,'cooler_tdp','290'),
+             (128119,'cooler_tdp','200'), (129775,'mem_type','"DDR5"'),
+             (129552,'gpu_max_mm','240'), (129552,'cooler_height_mm','75'), (129552,'form_factor_list','["m-ATX", "mini-ITX"]'),
+             (129551,'gpu_max_mm','240'), (129551,'cooler_height_mm','75'), (129551,'form_factor_list','["m-ATX", "mini-ITX"]')
+           ) t(product_code, field, expect)
+           LEFT JOIN __S__.product_specs s ON s.product_code = t.product_code
+           WHERE t.product_code = (r.detail->>'product_code')::bigint
+             AND (to_jsonb(s) -> t.field) IS DISTINCT FROM t.expect) THEN
+        skipped := skipped || to_jsonb(r.detail->>'product_code'); CONTINUE;
       END IF;
-      UPDATE __S__.products
-         SET review_required_yn = (d #>> '{before,review_required_yn}')::boolean,
-             locked_fields = CASE WHEN (d #> '{before,locked_fields}') ? 'review_required_yn' THEN lf
-                                  ELSE lf - 'review_required_yn' END,
-             updated_at = now()
-       WHERE product_code = 123034;
+      UPDATE __S__.products SET locked_fields = r.detail #> '{before,locked_fields}', updated_at = now()
+       WHERE product_code = (r.detail->>'product_code')::bigint;
       INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-      VALUES (NULL, 'product_edit', 'product', r.target_id, meta || jsonb_build_object(
-        'ref_log_id',r.log_id,'product_code',123034,'sku',d->'sku','changes','{}'::jsonb,
-        'before',jsonb_build_object('review_required_yn',true,'locked_fields',lf),
-        'restored',d->'before','locked',false));
+      VALUES (op1, 'product_edit', 'product', r.target_id, mark || jsonb_build_object(
+        'sku', r.target_id, 'product_code', (r.detail->>'product_code')::bigint, 'locked', true,
+        'before', jsonb_build_object('locked_fields', r.detail #> '{changes,locked_fields,to}'),
+        'changes', jsonb_build_object('locked_fields', jsonb_build_object(
+            'from', r.detail #> '{changes,locked_fields,to}', 'to', r.detail #> '{changes,locked_fields,from}')),
+        'ref_log_id', r.log_id, 'note', note || ' (re-lock 2026-09-30 tool fields)'));
+    ELSE
+      CONTINUE;
     END IF;
+    done := done || to_jsonb(r.detail->>'product_code');
   END LOOP;
-  IF n_relocked + n_skipped + n_changed > 0 OR EXISTS (SELECT 1 FROM __S__.admin_operator_activity_logs
-                                             WHERE detail->>'migration' = '0135') THEN
+
+  IF jsonb_array_length(done) + jsonb_array_length(skipped) > 0 THEN
     INSERT INTO __S__.admin_operator_activity_logs (operator_id, action, target_kind, target_id, detail)
-    VALUES (NULL, 'migration_0135', 'migration', '0135', meta || jsonb_build_object(
-      'fields_relocked',n_relocked,'skipped_rows',n_skipped,'skipped_value_changed',n_changed));
+    VALUES (NULL, 'migration_0135', 'migration', '0135',
+            mark || jsonb_build_object('reverted', done, 'skipped_changed', skipped));
   END IF;
-  RAISE NOTICE 'migration 0135 down: re-locked % fields, % fields skipped (value changed), % rows skipped',
-    n_relocked, n_changed, n_skipped;
+  RAISE NOTICE 'migration 0135 down: reverted %, skipped (changed since upgrade) %', done, skipped;
 END $down$;
 '''
 
