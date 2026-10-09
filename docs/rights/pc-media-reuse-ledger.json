@@ -8,16 +8,22 @@
       "decided_at": "2026-10-09T18:35:32+09:00",
       "references": [
         "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDK2hTCfHq5dVQu9X69SAbb8",
-        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDA5QazRckoWKUdcdRG2Gkgf"
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDA5QazRckoWKUdcdRG2Gkgf",
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDHtJcY5uiKzCg1t4QfzfAoP",
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDBPkZTAxVKbarh7qztZDE7S"
       ],
       "quotes": [
         "대표이미지와 다시 생성이 필요한 이미지를 또 헷갈려서.. 다시 생성안하면 안쓰는건가? 이런 바보같은 짓거리를 왜 계속 봐야 하지..",
-        "그걸 안쓸거면 왜 만들었겠어.."
+        "그걸 안쓸거면 왜 만들었겠어..",
+        "이미지 104개 위치가 확인돼서.. 클라우드 스토리지에 업로드가 필요하면 업로드 하고.. 클라우드 스토리지도 추가로 사용해도 돼",
+        "어차피 다음달 결제시에 이용요금은 내가 결제할거니까.."
       ],
-      "interpretation": "Author's interpretation, not the owner's words: the owner-made originals in this archive may be registered and selected as representative images without regeneration.",
+      "interpretation": "Author's interpretation, not the owner's words: the owner-made originals in this archive may be uploaded to cloud storage, registered and selected as representative images without regeneration. A configuration whose revision changed but whose case is the same is selected; one whose case changed is registered but not selected and is reported.",
       "scope": {
         "reused_from": "same_archive_only",
-        "forceable_mismatch": ["revision", "case"]
+        "select_despite": [
+          "revision"
+        ]
       }
     }
   ],

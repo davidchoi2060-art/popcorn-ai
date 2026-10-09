@@ -8,9 +8,12 @@ Per item, without any generation call:
   1. archive check   PNG bytes match manifest sha256/size (a broken/mismatched file is
                      never registered or selected, only reported); QA notes exist.
   2. current check   the registered P offer is on sale and the current configuration
-                     has exactly one CASE. A later revision or a different case does NOT
-                     block registration; it withholds automatic selection unless
-                     --force-select. An open image condition is reported, never forced.
+                     has exactly one CASE. The original is always bound to the CURRENT
+                     revision/visual basis (0134 requires it) and the comparison with
+                     the revision it was made for is stored in provenance. Revision
+                     changed, case same: selected under the ledger decision. Case
+                     changed or an open image condition: registered, not selected,
+                     reported.
   3. authority       two separate checks on every write transaction (insert, right
                      before upload, ready, selection):
                      executor  bind_operator: --operator-id is still an active owner.
@@ -19,7 +22,8 @@ Per item, without any generation call:
                                pc-media-reuse-ledger.json: a decision must cover this exact
                                archive (manifest sha256), the item/hash must not be
                                withdrawn, a reused original must come from the same archive
-                               and a forced mismatch must be inside the decision's scope.
+                               and a selection despite a mismatch must be inside the
+                               decision's scope (revision only).
                      The manifest's reuse_exception text never grants reuse.
   4. apply           insert an origin_kind='existing_import' job bound to the
                      CURRENT visual/review basis, upload create-only to the private
@@ -63,7 +67,7 @@ def ledger(path=None):
         for d in data['decisions']:
             if (not re.fullmatch('[a-f0-9]{64}', d['manifest_sha256']) or not str(d['id']).strip()
                     or not d['references'] or d['scope']['reused_from'] != 'same_archive_only'
-                    or not set(d['scope']['forceable_mismatch']) <= {'revision', 'case'}):
+                    or not set(d['scope']['select_despite']) <= {'revision'}):
                 return None
             decisions[d['manifest_sha256']] = d
         gone = set()
@@ -91,7 +95,7 @@ class ArchiveReuse:
     reused_from: str | None
     reused_from_in_manifest: bool
     mismatch: tuple
-    force_select: bool
+    by_decision: bool
 
 
 def file_reason(item, raw):
@@ -175,26 +179,43 @@ def _texts(mismatch):
     return ' · '.join(text for _, text in mismatch)
 
 
-def selectable(binding, force_select, forceable=frozenset({'revision', 'case'})):
-    """'auto' | 'forced' | None. Image conditions are never forced."""
+def selectable(binding, allowed=frozenset({'revision'})):
+    """'auto' | 'by_decision' | None. A revision-only change is selected under the
+    ledger decision (the original is used as-is); a changed case or an open image
+    condition is never selected, only registered and reported."""
     kinds = {kind for kind, _ in binding['mismatch']}
     if not kinds:
         return 'auto'
-    return 'forced' if force_select and kinds <= set(forceable) else None
+    return 'by_decision' if kinds <= set(allowed) else None
 
 
-def reuse_subject(item, raw, manifest_sha, binding, force_select, manifest_skus=()):
+def comparison(item, binding):
+    """How the current configuration relates to the revision the original was made for."""
+    kinds = {kind for kind, _ in binding['mismatch']}
+    return dict(original_revision=item['db_configuration_revision'], current_revision=binding['revision'],
+                original_case=int(item['case_code']), current_case=binding['case_product_code'],
+                revision_changed='revision' in kinds, case_changed='case' in kinds)
+
+
+def compare_label(item, binding):
+    c = comparison(item, binding)
+    if not c['revision_changed']:
+        return 'revision_match'
+    return 'revision_changed_case_changed' if c['case_changed'] else 'revision_changed_case_same'
+
+
+def reuse_subject(item, raw, manifest_sha, binding, by_decision, manifest_skus=()):
     reused = item.get('reused_from') or None
     return ArchiveReuse(product_code(item), item.get('original_sha256'), manifest_sha, file_reason(item, raw),
                         reused, reused is not None and reused in manifest_skus, tuple(binding['mismatch']),
-                        force_select)
+                        by_decision)
 
 
 def owner_reuse_verifier(subject, principal, connection):
     """Approval check only (who runs it is bind_operator's job). ALLOW only when the
     ledger has a decision for this exact archive, the item/hash is not withdrawn from
     it, a reused original comes from the same archive, the file is intact and a
-    forced mismatch is inside the decision's scope. Anything else is DENY."""
+    selection despite a mismatch is inside the decision's scope. Anything else is DENY."""
     from tools.register_existing_pc_media import Decision
     if type(subject) is not ArchiveReuse or subject.file_reason or type(subject.product_code) is not int:
         return Decision.DENY
@@ -209,7 +230,7 @@ def owner_reuse_verifier(subject, principal, connection):
     if subject.reused_from is not None and not subject.reused_from_in_manifest:
         return Decision.DENY
     kinds = {kind for kind, _ in subject.mismatch}
-    if subject.force_select and not kinds <= set(decision['scope']['forceable_mismatch']):
+    if subject.by_decision and not kinds <= set(decision['scope']['select_despite']):
         return Decision.DENY
     return Decision.ALLOW
 
@@ -252,6 +273,7 @@ def provenance(item, manifest_sha, binding, principal=None, selection=None):
     return dict(version=VERSION, reuse_authority=dict(decision=decision_ref, references=decision.get('references'),
         decided_at=decision.get('decided_at'), verified_by='ServerAuthority.verify_reuse+verify_registration',
         principal=principal.actor if principal else None, selection=selection,
+        revision_comparison=comparison(item, binding),
         mismatch=[text for _, text in binding['mismatch']]), original=dict(
         source_sku=item['configuration_id'], original_revision=item['db_configuration_revision'],
         original_ref=item['generated_original'], original_sha256=item['original_sha256'],
@@ -287,7 +309,7 @@ def _row(conn, request):
     return dict(found) if found else None
 
 
-def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus, bound=None):
+def _verified(conn, auth, principal, item, raw, manifest_sha, by_decision, skus, bound=None):
     """(binding, None) or (None, reason) on this transaction: executor binding, current
     binding, then verify_reuse and verify_registration. Called before every write and
     upload."""
@@ -299,7 +321,7 @@ def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus
     binding, reason = current_binding(conn, product_code(item), item)
     if reason:
         return None, reason
-    subject = reuse_subject(item, raw, manifest_sha, binding, force_select, skus)
+    subject = reuse_subject(item, raw, manifest_sha, binding, by_decision, skus)
     try:
         auth.verify_reuse(subject, principal, conn)
         auth.verify_registration(subject, principal, conn)
@@ -308,7 +330,7 @@ def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus
     return binding, None
 
 
-def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=True, force_select=False,
+def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=True,
               new_job=uuid4, skus=()):
     """Returns (state, detail). Authority and the current binding are re-checked on
     the insert transaction, right before the upload, inside the ready transaction
@@ -332,7 +354,7 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
                 dict(j=job, r=request, id=binding['configuration_id'], v=binding['visual_basis'],
                      b=binding['review_basis'], s=canonical(binding['snapshot']), a=actor,
                      p=canonical(provenance(item, manifest_sha, binding, principal,
-                                            selectable(binding, force_select) if select else None))))
+                                            selectable(binding) if select else None))))
             row = dict(job_id=job, configuration_id=binding['configuration_id'],
                        visual_basis=binding['visual_basis'], status='running', selected=False,
                        asset=None, origin_kind='existing_import')
@@ -368,10 +390,10 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
             return 'registered', job + ' (선택 보류: ' + reason + ')'
         if binding['visual_basis'] != row['visual_basis']:
             return 'registered', job + ' (선택 보류: 구성 근거 변경)'
-        mode = selectable(binding, force_select)
+        mode = selectable(binding)
         if mode is None:
             return 'registered_unselected', job + ' (선택 보류: ' + _texts(binding['mismatch']) + ')'
-        binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, mode == 'forced', skus)
+        binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, mode == 'by_decision', skus)
         if reason:
             return 'registered_unselected', job + ' (선택 보류: ' + reason + ')'
         chosen = conn.execute(text("SELECT job_id,visual_basis,status FROM pc_media_jobs "
@@ -384,37 +406,37 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
         conn.execute(text('UPDATE pc_media_jobs SET selected=false WHERE configuration_id=:id AND selected'),
                      dict(id=binding['configuration_id']))
         conn.execute(text('UPDATE pc_media_jobs SET selected=true,updated_at=now() WHERE job_id=:j'), dict(j=job))
-    return ('selected_by_decision' if mode == 'forced' else 'selected'), job
+    return ('selected_by_decision' if mode == 'by_decision' else 'selected'), job
 
 
-def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus=()):
-    """(state, detail, already_uploaded). Read-only; rolls back."""
+def _dry(engine, item, raw, manifest_sha, auth, principal, select, skus=()):
+    """(state, detail, already_uploaded, compare_label|None). Read-only; rolls back."""
     from sqlalchemy import text
     from api.pc_existing_media_import import Denied
     with engine.connect() as conn:
         try:
             binding, reason = current_binding(conn, product_code(item), item)
             if reason:
-                return 'skipped', reason, False
-            mode = selectable(binding, force_select)
+                return 'skipped', reason, False, None
+            mode = selectable(binding)
             if auth is not None:
                 try:
                     bind_operator(conn, principal, principal.operator_id)
-                    subject = reuse_subject(item, raw, manifest_sha, binding, mode == 'forced', skus)
+                    subject = reuse_subject(item, raw, manifest_sha, binding, mode == 'by_decision', skus)
                     auth.verify_reuse(subject, principal, conn)
                     auth.verify_registration(subject, principal, conn)
                 except Denied:
-                    return 'skipped', '재사용 권한 확인 거부', False
+                    return 'skipped', '재사용 권한 확인 거부', False, compare_label(item, binding)
             existing = conn.execute(text('SELECT status FROM pc_media_jobs WHERE request_id=:r'),
                                     dict(r=request_id(manifest_sha, product_code(item), item['original_sha256']))).scalar()
         finally:
             conn.rollback()
-    uploaded = existing == 'ready'
+    uploaded, label = existing == 'ready', compare_label(item, binding)
     if not select or mode is None:
-        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함', uploaded
-    if mode == 'forced':
-        return 'would_select_by_decision', _texts(binding['mismatch']), uploaded
-    return 'would_select', binding['configuration_id'], uploaded
+        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함', uploaded, label
+    if mode == 'by_decision':
+        return 'would_select_by_decision', _texts(binding['mismatch']), uploaded, label
+    return 'would_select', binding['configuration_id'], uploaded, label
 
 
 SUMMARY = (('업로드 예정', None), ('이미 있음', None), ('대표 선택 예정', ('would_select', 'would_select_by_decision')),
@@ -432,10 +454,10 @@ def summary(counts, uploaded):
 
 
 def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
-        force_select=False, out=print):
+        out=print):
     manifest_sha, items = load_manifest(archive)
     skus = {str(i.get('configuration_id')) for i in items if isinstance(i, dict)}
-    rows, counts, uploaded = [], {}, 0
+    rows, counts, uploaded, compared = [], {}, 0, {}
     auth = principal = None
     if operator_id is not None:
         auth = authority(engine, operator_id)
@@ -455,15 +477,17 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
         raw = path.read_bytes() if code is not None and path.is_file() else None
         reason = archive_reason(item, raw)
         if reason:
-            # A broken file is reported only; it is never registered or forced.
+            # A broken file is reported only; it is never registered or selected.
             state, detail = ('file_error' if file_reason(item, raw) else 'skipped'), reason
         elif not apply:
-            state, detail, done = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus)
+            state, detail, done, label = _dry(engine, item, raw, manifest_sha, auth, principal, select, skus)
             uploaded += done
+            if label:
+                compared[label] = compared.get(label, 0) + 1
         else:
             try:
                 state, detail = apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=select,
-                                          force_select=force_select, skus=skus)
+                                          skus=skus)
             except Exception as error:   # one item must not stop the batch; reason is reported
                 state, detail = 'failed', type(error).__name__
         counts[state] = counts.get(state, 0) + 1
@@ -474,6 +498,11 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
     if not apply:
         headline = summary(counts, uploaded)
         out(' / '.join(f'{k} {v}{"장" if k in ("업로드 예정", "이미 있음") else "건"}' for k, v in headline.items()))
+        changed = compared.get('revision_changed_case_same', 0) + compared.get('revision_changed_case_changed', 0)
+        out(f"리비전 일치 {compared.get('revision_match', 0)} / 불일치 {changed}"
+            f"(케이스 동일 {compared.get('revision_changed_case_same', 0)}"
+            f"·변경 {compared.get('revision_changed_case_changed', 0)})")
+        headline['revision'] = compared
     return dict(manifest_sha256=manifest_sha, counts=counts, summary=headline, items=rows)
 
 
@@ -484,8 +513,6 @@ def main(argv=None, environment=None):
     parser.add_argument('--operator-id', type=int, help='--apply 시 활성 owner 운영자 번호')
     parser.add_argument('--only', type=int, action='append', default=[], help='이 상품번호만(반복 가능)')
     parser.add_argument('--no-select', action='store_true', help='등록만 하고 대표 선택은 하지 않음')
-    parser.add_argument('--force-select', action='store_true',
-                        help='구성 차수·케이스가 원본과 달라도 대표로 선택(기본은 등록만)')
     parser.add_argument('--report', type=Path, help='결과 JSON 저장 경로')
     args = parser.parse_args(argv)
     environment = os.environ if environment is None else environment
@@ -497,7 +524,7 @@ def main(argv=None, environment=None):
         from api.pc_existing_media_import import GcsObjects
         objects = GcsObjects()
     result = run(args.archive, engine=engine, objects=objects, apply=args.apply,
-                 operator_id=args.operator_id, only=set(args.only), select=not args.no_select, force_select=args.force_select)
+                 operator_id=args.operator_id, only=set(args.only), select=not args.no_select)
     if args.report:
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     return 0

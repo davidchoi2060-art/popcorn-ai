@@ -106,7 +106,7 @@ class ArchiveChecks(unittest.TestCase):
         ref = 'ledger:docs/rights/pc-media-reuse-ledger.json#pc-media-reuse-20261009'
         self.assertEqual(bare['original']['reuse_exception_reference'], ref)
         self.assertEqual(bare['reuse_authority']['decision'], ref)
-        self.assertEqual(len(bare['reuse_authority']['references']), 2)
+        self.assertEqual(len(bare['reuse_authority']['references']), 4)
         noted = m.provenance(item(reused_from='P113838', reuse_exception='같은 케이스'), M, binding())
         self.assertTrue(noted['original']['reuse_exception_reference'].endswith('/reuse_exception'))
 
@@ -136,19 +136,21 @@ def auth():
 
 
 REV = ('revision', '구성 차수 변경(1→2)')
+CASE = ('case', '케이스 변경(129552→129551)')
 IMG = ('image_condition', '이미지 조건: 장착 CPU 쿨러 확인 필요')
 
 
 class ReuseAuthority(unittest.TestCase):
-    def subject(self, raw=PNG, mismatch=(), force=False, sha=M, value=None, skus=()):
-        return m.reuse_subject(value or item(), raw, sha, dict(binding(), mismatch=list(mismatch)), force, skus)
+    def subject(self, raw=PNG, mismatch=(), by_decision=False, sha=M, value=None, skus=()):
+        return m.reuse_subject(value or item(), raw, sha, dict(binding(), mismatch=list(mismatch)), by_decision, skus)
 
     def test_ledger_decision_is_allowed(self):
         self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
 
     def test_denials(self):
         cases = [(self.subject(raw=PNG + b'x'), Principal(1, 'owner'), FakeDB()),
-                 (self.subject(mismatch=[IMG], force=True), Principal(1, 'owner'), FakeDB()),
+                 (self.subject(mismatch=[IMG], by_decision=True), Principal(1, 'owner'), FakeDB()),
+                 (self.subject(mismatch=[CASE], by_decision=True), Principal(1, 'owner'), FakeDB()),
                  (self.subject(sha='e' * 64), Principal(1, 'owner'), FakeDB()),
                  (self.subject(value=item(reused_from='P999999')), Principal(1, 'owner'), FakeDB())]
         for subject, principal, conn in cases:
@@ -163,7 +165,7 @@ class ReuseAuthority(unittest.TestCase):
         base = json.loads(m.LEDGER.read_text(encoding='utf-8'))
         sha = item()['original_sha256']
         w = lambda **kw: dict(base, withdrawn=[dict(dict(decision='pc-media-reuse-20261009', reference='x'), **kw)])
-        bad_scope = dict(base, decisions=[dict(base['decisions'][0], scope=dict(reused_from='any', forceable_mismatch=[]))])
+        bad_scope = dict(base, decisions=[dict(base['decisions'][0], scope=dict(reused_from='any', select_despite=[]))])
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / 'ledger.json'
             for body, expected in [(base, Decision.ALLOW),
@@ -192,15 +194,23 @@ class ReuseAuthority(unittest.TestCase):
             with self.subTest(principal=principal, operator=db.operator), self.assertRaises(Denied):
                 m.bind_operator(db, principal, bound)
 
-    def test_forced_revision_mismatch_is_allowed(self):
-        s = self.subject(mismatch=[REV], force=True)
+    def test_revision_mismatch_selection_is_allowed(self):
+        s = self.subject(mismatch=[REV], by_decision=True)
         self.assertIs(m.owner_reuse_verifier(s, Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
 
     def test_selectable(self):
-        self.assertEqual(m.selectable(binding(), False), 'auto')
-        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV]), False))
-        self.assertEqual(m.selectable(dict(binding(), mismatch=[REV, ('case', 'x')]), True), 'forced')
-        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV, IMG]), True))
+        self.assertEqual(m.selectable(binding()), 'auto')
+        self.assertEqual(m.selectable(dict(binding(), mismatch=[REV])), 'by_decision')
+        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV, CASE])))
+        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV, IMG])))
+
+    def test_comparison_labels(self):
+        b = dict(binding(), revision=2)
+        self.assertEqual(m.compare_label(item(), binding()), 'revision_match')
+        self.assertEqual(m.compare_label(item(), dict(b, mismatch=[REV])), 'revision_changed_case_same')
+        self.assertEqual(m.compare_label(item(), dict(b, mismatch=[REV, CASE])), 'revision_changed_case_changed')
+        c = m.provenance(item(), M, dict(b, mismatch=[REV]))['reuse_authority']['revision_comparison']
+        self.assertEqual((c['original_revision'], c['current_revision'], c['case_changed']), (1, 2, False))
 
 
 class Apply(unittest.TestCase):
@@ -253,18 +263,21 @@ class Apply(unittest.TestCase):
         self.assertEqual(state, 'selected')
         self.assertFalse(self.db.jobs['old']['selected'])
 
-    def test_mismatch_registers_without_selecting_unless_forced(self):
-        b = dict(binding(), mismatch=[REV])
-        state, detail = self.apply(b=b)
-        self.assertEqual(state, 'registered_unselected')
-        self.assertIn('구성 차수 변경', detail)
-        self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
-        state, job = self.apply(b=b, force_select=True)
+    def test_revision_change_with_same_case_is_selected(self):
+        state, job = self.apply(b=dict(binding(), mismatch=[REV]))
         self.assertEqual(state, 'selected_by_decision')
         self.assertTrue(self.db.jobs[job]['selected'])
+        self.assertEqual(self.db.jobs[job]['provenance']['reuse_authority']['selection'], 'by_decision')
+
+    def test_case_change_registers_without_selecting(self):
+        state, detail = self.apply(b=dict(binding(), mismatch=[REV, CASE]))
+        self.assertEqual(state, 'registered_unselected')
+        self.assertIn('케이스 변경', detail)
+        self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
+        self.assertEqual([j['status'] for j in self.db.jobs.values()], ['ready'])
 
     def test_image_condition_is_never_forced(self):
-        state, detail = self.apply(b=dict(binding(), mismatch=[IMG]), force_select=True)
+        state, detail = self.apply(b=dict(binding(), mismatch=[IMG]))
         self.assertEqual(state, 'registered_unselected')
         self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
 
@@ -331,27 +344,34 @@ class Cli(unittest.TestCase):
     def test_dry_run_reports_without_writes(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'originals').mkdir()
-            good, missing, broken = item(200001), item(200002), item(200003)
-            (Path(d) / 'originals' / 'P200001.png').write_bytes(PNG)
+            codes = (200001, 200004, 200005, 200002, 200003)
+            items = [item(c) for c in codes]
+            for c in (200001, 200004, 200005):
+                (Path(d) / 'originals' / f'P{c}.png').write_bytes(PNG)
             (Path(d) / 'originals' / 'P200003.png').write_bytes(PNG + b'cut')
-            (Path(d) / 'manifest.json').write_text(json.dumps(dict(items=[good, missing, broken])), encoding='utf-8')
+            (Path(d) / 'manifest.json').write_text(json.dumps(dict(items=items)), encoding='utf-8')
+            mismatch = {200001: [], 200004: [REV], 200005: [REV, CASE]}
+            bind = lambda conn, code, it: (dict(binding(code), revision=1 if not mismatch[code] else 2,
+                                                mismatch=mismatch[code]), None)
             db, lines = FakeDB(), []
             pinned = hashlib.sha256((Path(d) / 'manifest.json').read_bytes()).hexdigest()
-            with patch.object(m, 'current_binding', return_value=(binding(), None)), \
-                    patch.object(m, 'authority', return_value=auth()):
+            with patch.object(m, 'current_binding', bind), patch.object(m, 'authority', return_value=auth()):
                 outside = m.run(d, engine=db, operator_id=1, out=lambda _: None)
                 ledger = json.loads(m.LEDGER.read_text(encoding='utf-8'))
                 ledger['decisions'][0]['manifest_sha256'] = pinned
                 (Path(d) / 'ledger.json').write_text(json.dumps(ledger), encoding='utf-8')
                 with patch.object(m, 'LEDGER', Path(d) / 'ledger.json'):
-                    result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
-            self.assertEqual(outside['counts'], {'skipped': 1, 'file_error': 2})
-            self.assertEqual(result['counts'], {'would_select': 1, 'file_error': 2})
-            self.assertEqual(result['summary'], {'업로드 예정': 1, '이미 있음': 0, '대표 선택 예정': 1,
-                                                 '등록만(선택 보류)': 0, '보고만': 2})
-            self.assertIn('업로드 예정 1장 / 이미 있음 0장 / 대표 선택 예정 1건', lines[-1])
+                    result = m.run(d, engine=db, operator_id=1, out=lines.append)
+            self.assertEqual(outside['counts'], {'skipped': 3, 'file_error': 2})
+            self.assertEqual(result['counts'], {'would_select': 1, 'would_select_by_decision': 1,
+                                                'would_register_only': 1, 'file_error': 2})
+            summary = dict(result['summary']); summary.pop('revision')
+            self.assertEqual(summary, {'업로드 예정': 3, '이미 있음': 0, '대표 선택 예정': 2,
+                                       '등록만(선택 보류)': 1, '보고만': 2})
+            self.assertIn('업로드 예정 3장 / 이미 있음 0장 / 대표 선택 예정 2건', lines[-2])
+            self.assertEqual(lines[-1], '리비전 일치 1 / 불일치 2(케이스 동일 1·변경 1)')
             self.assertEqual(db.jobs, {})
-            self.assertIn('manifest 3건', lines[-2])
+            self.assertIn('manifest 5건', lines[-3])
 
 
 if __name__ == '__main__':
