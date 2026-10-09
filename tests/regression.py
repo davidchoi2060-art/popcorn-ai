@@ -3009,10 +3009,8 @@ def test_no_fabricated_data():
         # my-page.html의 "812,000" 항목은 2026-08-20 주문·후기를 /api/my/* 실조회로
         # 바꾸며 마크업에서 사라졌다 — 유예 대상이 없어져 항목을 지운다(위 baked_split
         # ②가 "낡은 항목"으로 잡던 바로 그 사례).
-        "my-payments.html": (
-            ["1,735,000", "3,831,000"],
-            "범위 축소로 제거될 화면 — 회원 원장은 쇼핑몰이 갖는다(HANDOFF §2). "
-            "화면이 지워지면 이 항목도 함께 지운다."),
+        # my-payments.html의 "1,735,000"·"3,831,000"은 유예 만료(2026-09-30) 후
+        # 2026-10-09에 KPI 정적 마크업을 "—"로 바꾸며 사라져 항목을 지웠다.
     }
     cx_pairs = []
     for _p3 in sorted(_g9.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))):
