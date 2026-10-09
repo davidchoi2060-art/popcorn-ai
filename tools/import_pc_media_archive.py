@@ -5,12 +5,16 @@ The archive (manifest.json + originals/P{product_code}.png) was generated on
 pc_media_jobs, so customer screens kept showing "이미지 준비 중".
 
 Per item, without any generation call:
-  1. archive check   PNG bytes match manifest sha256/size; QA notes exist;
-                     images reused from another configuration are skipped
-                     (those need an individual decision, see PR #22).
+  1. archive check   PNG bytes match manifest sha256/size; QA notes exist; an image
+                     reused from another configuration must carry its recorded
+                     reuse exception.
   2. current check   the registered P offer is on sale, image requirements are met,
-                     configuration revision == manifest db_configuration_revision,
-                     current CASE product == manifest case_code.
+                     and the current configuration has exactly one CASE.
+                     A later revision, a different case or an open image condition
+                     does NOT block registration (the existing original is used as-is,
+                     never regenerated -- 2026-10-09 owner decision); it only withholds
+                     automatic selection and the reason is reported. --force-select
+                     selects those too.
   3. apply           insert an origin_kind='existing_import' job bound to the
                      CURRENT visual/review basis, upload create-only to the private
                      bucket (same key layout as generated jobs), mark ready, and
@@ -70,15 +74,18 @@ def archive_reason(item, raw):
     notes = item.get('qa_notes')
     if not isinstance(notes, list) or not notes or not all(isinstance(n, str) and n.strip() for n in notes):
         return 'QA 기록 없음'
-    if item.get('reused_from'):
-        return '다른 구성 이미지 재사용 · 개별 확인 필요'
+    reused = item.get('reused_from')
+    if reused and (not re.fullmatch(r'P[1-9][0-9]*', str(reused)) or not str(item.get('reuse_exception') or '').strip()):
+        return '다른 구성 이미지 재사용 근거 없음'
     if type(item.get('db_configuration_revision')) is not int or not str(item.get('case_code', '')).isdigit():
         return 'manifest 구성 차수·케이스 정보 없음'
     return None
 
 
 def current_binding(conn, code, item):
-    """(binding, None) when the configuration still matches the archived image."""
+    """(binding, None) or (None, reason). binding['mismatch'] lists how the current
+    configuration differs from the one the original was made for; a mismatch does
+    not block registration, it only withholds automatic selection."""
     from fastapi import HTTPException
     from sqlalchemy import text
     from api.pc_configuration_copy import read_sold_offer_configuration
@@ -91,18 +98,20 @@ def current_binding(conn, code, item):
     except HTTPException as error:
         return None, f'구성 연결 확인 실패({error.status_code})'
     identity = bound['configuration_id']
-    if bound['revision'] != item['db_configuration_revision']:
-        return None, f"구성 차수 변경({item['db_configuration_revision']}→{bound['revision']}) · 새 이미지 필요"
     current = snapshot(conn, identity)
-    if current['errors']:
-        return None, '이미지 조건 미충족: ' + ', '.join(current['errors'])
     cases = [p for p in current['snapshot']['parts'] if p['slot'] == 'CASE']
-    if len(cases) != 1 or str(cases[0]['code']) != str(item['case_code']):
-        return None, '케이스 변경 · 새 이미지 필요'
+    if len(cases) != 1 or not str(cases[0].get('code', '')).isdigit():
+        return None, '현재 구성에 케이스 없음'
+    mismatch = []
+    if bound['revision'] != item['db_configuration_revision']:
+        mismatch.append(f"구성 차수 변경({item['db_configuration_revision']}→{bound['revision']})")
+    if str(cases[0]['code']) != str(item['case_code']):
+        mismatch.append(f"케이스 변경({item['case_code']}→{cases[0]['code']})")
+    mismatch += ['이미지 조건: ' + e for e in current['errors']]
     return dict(code=code, configuration_id=identity, offer_id=bound['offer_id'],
                 revision=bound['revision'], case_product_code=int(cases[0]['code']),
                 visual_basis=current['visual_basis'], review_basis=current['basis'],
-                snapshot=current['snapshot']), None
+                snapshot=current['snapshot'], mismatch=mismatch), None
 
 
 def provenance(item, manifest_sha, binding):
@@ -112,7 +121,9 @@ def provenance(item, manifest_sha, binding):
         original_ref=item['generated_original'], original_sha256=item['original_sha256'],
         manifest_sha256=manifest_sha,
         qa_references=[f'{reference}/qa_notes/{i}' for i in range(len(item['qa_notes']))],
-        qa_notes=list(item['qa_notes']), reused_from=None, reuse_exception_reference=None,
+        qa_notes=list(item['qa_notes']), reused_from=item.get('reused_from') or None,
+        reuse_exception_reference=f'{reference}/reuse_exception' if item.get('reused_from') else None,
+        reuse_exception_note=item.get('reuse_exception') if item.get('reused_from') else None,
         ssd_facts_reference=None, generation_model=None, generation_actor=None,
         generation_time=None, original_visual_basis=None),
         current_binding=dict(sku=f"P{binding['code']}", offer_id=binding['offer_id'],
@@ -141,7 +152,7 @@ def _row(conn, request):
     return dict(found) if found else None
 
 
-def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, new_job=uuid4):
+def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, force_select=False, new_job=uuid4):
     """Returns (state, detail). Every DB step re-reads the current binding."""
     from sqlalchemy import text
     from api.pc_media import NOTICE
@@ -166,7 +177,7 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, new_
         elif row['origin_kind'] != 'existing_import' or row['configuration_id'] != binding['configuration_id']:
             return 'skipped', '같은 요청번호의 다른 작업 존재'
         elif row['visual_basis'] != binding['visual_basis']:
-            return 'skipped', '이전 등록 이후 구성 근거 변경 · 새 이미지 필요'
+            return 'skipped', '이전 등록 이후 구성 근거 변경 · 확인 필요'
     job = str(row['job_id'])
     if row['status'] != 'ready':
         receipt = objects.create_or_verify(job, raw)
@@ -187,6 +198,8 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, new_
             return 'registered', job + ' (선택 보류: ' + reason + ')'
         if binding['visual_basis'] != row['visual_basis']:
             return 'registered', job + ' (선택 보류: 구성 근거 변경)'
+        if binding['mismatch'] and not force_select:
+            return 'registered_unselected', job + ' (선택 보류: ' + ' · '.join(binding['mismatch']) + ')'
         chosen = conn.execute(text("SELECT job_id,visual_basis,status FROM pc_media_jobs "
                                    "WHERE configuration_id=:id AND selected FOR UPDATE"),
                               dict(id=binding['configuration_id'])).mappings().first()
@@ -200,7 +213,8 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, new_
     return 'selected', job
 
 
-def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True, out=print):
+def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
+        force_select=False, out=print):
     manifest_sha, items = load_manifest(archive)
     rows, counts = [], {}
     actor = None
@@ -220,10 +234,16 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
             with engine.connect() as conn:
                 binding, reason = current_binding(conn, code, item)
                 conn.rollback()
-            state, detail = ('ready_to_import', binding['configuration_id']) if not reason else ('skipped', reason)
+            if reason:
+                state, detail = 'skipped', reason
+            elif binding['mismatch'] and not force_select:
+                state, detail = 'would_register_only', ' · '.join(binding['mismatch'])
+            else:
+                state, detail = 'would_select', binding['configuration_id']
         else:
             try:
-                state, detail = apply_one(engine, objects, item, raw, manifest_sha, actor, select=select)
+                state, detail = apply_one(engine, objects, item, raw, manifest_sha, actor, select=select,
+                                          force_select=force_select)
             except Exception as error:   # one item must not stop the batch; reason is reported
                 state, detail = 'failed', type(error).__name__
         counts[state] = counts.get(state, 0) + 1
@@ -240,6 +260,8 @@ def main(argv=None, environment=None):
     parser.add_argument('--operator-id', type=int, help='--apply 시 활성 owner 운영자 번호')
     parser.add_argument('--only', type=int, action='append', default=[], help='이 상품번호만(반복 가능)')
     parser.add_argument('--no-select', action='store_true', help='등록만 하고 대표 선택은 하지 않음')
+    parser.add_argument('--force-select', action='store_true',
+                        help='구성 차수·케이스가 원본과 달라도 대표로 선택(기본은 등록만)')
     parser.add_argument('--report', type=Path, help='결과 JSON 저장 경로')
     args = parser.parse_args(argv)
     environment = os.environ if environment is None else environment
@@ -251,7 +273,7 @@ def main(argv=None, environment=None):
         from api.pc_existing_media_import import GcsObjects
         objects = GcsObjects()
     result = run(args.archive, engine=engine, objects=objects, apply=args.apply,
-                 operator_id=args.operator_id, only=set(args.only), select=not args.no_select)
+                 operator_id=args.operator_id, only=set(args.only), select=not args.no_select, force_select=args.force_select)
     if args.report:
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
     return 0

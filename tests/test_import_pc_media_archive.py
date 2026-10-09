@@ -27,7 +27,7 @@ def item(code=200001, raw=PNG, **over):
 def binding(code=200001, visual='a' * 64):
     return dict(code=code, configuration_id=f'C{code}', offer_id=f'P{code}', revision=1,
                 case_product_code=129552, visual_basis=visual, review_basis='b' * 64,
-                snapshot={'parts': []})
+                snapshot={'parts': []}, mismatch=[])
 
 
 class Result:
@@ -87,11 +87,18 @@ class ArchiveChecks(unittest.TestCase):
     def test_rejections(self):
         cases = [(item(), None, '원본 파일 없음'), (item(), b'GIF89a' + PNG, 'PNG'),
                  (item(original_sha256='0' * 64), PNG, '해시'), (item(qa_notes=[]), PNG, 'QA'),
-                 (item(reused_from='P113838'), PNG, '재사용'), (item(configuration_id='X1'), PNG, '상품번호'),
+                 (item(reused_from='P113838'), PNG, '재사용 근거'), (item(configuration_id='X1'), PNG, '상품번호'),
                  (item(db_configuration_revision=None), PNG, '차수')]
         for value, raw, word in cases:
             with self.subTest(word=word):
                 self.assertIn(word, m.archive_reason(value, raw))
+
+    def test_reuse_with_recorded_exception_is_allowed(self):
+        value = item(reused_from='P113838', reuse_exception='같은 케이스·색상')
+        self.assertIsNone(m.archive_reason(value, PNG))
+        o = m.provenance(value, 'e' * 64, binding())['original']
+        self.assertEqual(o['reused_from'], 'P113838')
+        self.assertTrue(o['reuse_exception_reference'].endswith('/reuse_exception'))
 
     def test_request_id_is_stable_and_specific(self):
         a = m.request_id('f' * 64, 1, 'a' * 64)
@@ -138,7 +145,7 @@ class Apply(unittest.TestCase):
         self.assertEqual(len(self.objects.calls), 1)
 
     def test_stale_binding_is_skipped_without_writes(self):
-        self.assertEqual(self.apply(reason='구성 차수 변경(1→2) · 새 이미지 필요')[0], 'skipped')
+        self.assertEqual(self.apply(reason='케이스가 원본과 다름 · 확인 필요')[0], 'skipped')
         self.assertEqual(self.db.jobs, {})
         self.assertEqual(self.objects.calls, [])
 
@@ -154,6 +161,16 @@ class Apply(unittest.TestCase):
         state, job = self.apply()
         self.assertEqual(state, 'selected')
         self.assertFalse(self.db.jobs['old']['selected'])
+
+    def test_mismatch_registers_without_selecting_unless_forced(self):
+        b = dict(binding(), mismatch=['구성 차수 변경(1→2)'])
+        state, detail = self.apply(b=b)
+        self.assertEqual(state, 'registered_unselected')
+        self.assertIn('구성 차수 변경', detail)
+        self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
+        state, job = self.apply(b=b, force_select=True)
+        self.assertEqual(state, 'selected')
+        self.assertTrue(self.db.jobs[job]['selected'])
 
     def test_no_select_only_registers(self):
         state, job = self.apply(select=False)
@@ -184,7 +201,7 @@ class Cli(unittest.TestCase):
             db, lines = FakeDB(), []
             with patch.object(m, 'current_binding', return_value=(binding(), None)):
                 result = m.run(d, engine=db, out=lines.append)
-            self.assertEqual(result['counts'], {'ready_to_import': 1, 'skipped': 1})
+            self.assertEqual(result['counts'], {'would_select': 1, 'skipped': 1})
             self.assertEqual(db.jobs, {})
             self.assertIn('manifest 2건', lines[-1])
 
