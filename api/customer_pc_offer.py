@@ -21,8 +21,10 @@
   알려 주지 않는다. 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
 """
 import hashlib
+import json
 import logging
 import os
+import pathlib
 from copy import deepcopy
 from urllib.parse import quote
 
@@ -40,9 +42,12 @@ router = APIRouter()
 OFFER_PATH = "/api/customer/pc-offers/{product_code}"
 IMAGE_PATH = "/api/customer/products/{product_code}/representative-image"
 
-# 부품 사진 권리 근거(`workroom:...@vN:<sha256>`) — 비밀값이 아닌 운영 설정. 없으면 모든
-# 구성이 닫힌다(source_reader 가 publication_native_photo_ports_unconnected 로 거부).
+# 부품 사진 권리 근거(`workroom:...@vN:<sha256>`) — 비밀값이 아닌 운영 설정. 환경변수가
+# 있으면 그 값, 없으면 저장소 설정 파일(RIGHTS_FILE)의 값을 쓴다. 둘 다 없으면 모든 구성이
+# 닫힌다(source_reader 가 publication_native_photo_ports_unconnected 로 거부).
+# 2026-10-09 실사고: 서버에 환경변수가 없어 고객 화면의 부품 사진이 전부 사라졌다.
 RIGHTS_ENV = "POPCORN_PART_PHOTO_RIGHTS_REFERENCE"
+RIGHTS_FILE = pathlib.Path(__file__).resolve().parent.parent / "docs" / "rights" / "part-photo-rights-reference.json"
 MAX_PNG = 20 * 1024 * 1024
 NOT_PUBLIC = {"error": "not_public"}
 UNAVAILABLE = {"state": "unavailable", "url": None}
@@ -58,9 +63,21 @@ def _check_code(product_code: int):
         raise HTTPException(422, "customer_product_code_invalid")
 
 
+def rights_reference():
+    """환경변수 우선, 없으면 저장소 설정 파일. 읽지 못하면 None(닫힘) — 사유는 로그로."""
+    env = os.environ.get(RIGHTS_ENV, "").strip()
+    if env:
+        return env
+    try:
+        value = json.loads(RIGHTS_FILE.read_text(encoding="utf-8")).get("rights_reference")
+    except (OSError, ValueError, AttributeError) as e:
+        log.warning("part photo rights reference unreadable: %s", type(e).__name__)
+        return None
+    return value.strip() if isinstance(value, str) and value.strip() else None
+
+
 def _source_reader():
-    return make_source_reader(image_reader=read_image,
-                              business_rights_reference=os.environ.get(RIGHTS_ENV, "").strip() or None)
+    return make_source_reader(image_reader=read_image, business_rights_reference=rights_reference())
 
 
 def _public_offer(conn, product_code):
