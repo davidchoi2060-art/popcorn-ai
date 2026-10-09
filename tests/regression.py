@@ -2404,7 +2404,7 @@ def test_reprice():
     st, _ = post("/api/admin/reprice/apply", _apply_body("nope", "live"))
     check("반영도 알 수 없는 범위는 400", st == 400, 400, st)
     st, r = post("/api/admin/reprice/apply", _apply_body("live", "all"))
-    check("미리보기 확인값이 다르면 409", st == 409, 409, st)
+    check("미리보기 범위 불일치 409", st == 409, 409, st)
     st, _ = post("/api/admin/reprice/undo", {"log_id": 999999999})
     check("없는 재산정 기록 되돌리기는 404", st == 404, 404, st)
 
