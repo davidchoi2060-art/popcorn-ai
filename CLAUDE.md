@@ -113,7 +113,14 @@
 - **적재는 채우기만 하고 지우지 않는다**: `product_specs`는 `COALESCE(EXCLUDED.col, 기존)`. EAV 없이 마스터만 올렸다가 사양이 지워져 후보 -1·검수 +169가 된 사고가 있었다(슬라이스 50). 필수 사양 판정도 **새 값 ∪ 기존 값**으로 한다.
 - **드라이런은 건수가 아니라 영향을 말한다**: 신규·갱신·추천 후보 진입/이탈·검수 새로 회부(중복 뺀 실측). "검수 회부 198건"이라 말했는데 실제 증가가 0이면 헛수를 말한 것이다.
 - **카테고리 문자열이 어긋나면 상품이 `ETC`로 강등되어 후보에서 사라진다** — 드라이런의 `pool_out`이 이걸 미리 알린다(회귀로 고정).
-- **⚠ 잠금(`locked_fields`)이 지키는 것은 매입가·판매가 «둘»뿐이다**(2026-08-15 실사고). 같은 UPSERT의
+- **정정(2026-10-09): 적재 UPSERT 는 이제 잠금을 가격 둘보다 넓게 존중한다** — `part_type`·`category_group`·
+  `ai_candidate_yn`·`review_required_yn`·`product_name`·`maker`·`model_name`·`market_price`·`supplier`·
+  `danawa_code`·`spec_source_text` 도 `locked_fields ? '<컬럼>'` 이면 기존 값을 지킨다(커밋 `1ecf4df`).
+  `status`·`stock_qty`·`data_origin` 은 여전히 잠금 밖이다. **다만 잠금은 그 컬럼이 `locked_fields` 에
+  들어 있을 때만 효력이 있다** — 검수 회부가 `review_required_yn` 을 스스로 잠그지 않으면 지난 회부는
+  보호받지 못한다(123034 가 그 예다 — 회부 기록은 있는데 잠금이 없어 후보로 남았다).
+  확인법: `grep -n "locked_fields ? '" api/catalog_ingest.py`. 아래 원문은 2026-08-15 당시 기록이라 남긴다.
+- ~~**⚠ 잠금(`locked_fields`)이 지키는 것은 매입가·판매가 «둘»뿐이다**~~(2026-08-15 실사고 · 위 정정으로 낡음). 같은 UPSERT의
   `part_type`·`category_group`·`ai_candidate_yn`·`review_required_yn`·`status`·`maker`·`model_name`·
   `market_price`·`supplier`·`danawa_code`·`spec_source_text`·`data_origin` 은 전부 무조건 `EXCLUDED` 다.
   **운영자가 상품 상세에서 손으로 분류를 고쳐도 잠기지 않는다**(`change_part_type` 이 `locked_fields` 를
