@@ -71,15 +71,15 @@ class FakeEngine:
         yield SimpleNamespace()
 
 
-def call_recommend(game_context=None):
-    state = TalkState(usages=['게임', '영상편집'], budget_won=2000000, budget_bound='이하',
-                      game=GameState(names=['배틀그라운드'], grade='C', grade_src='ai_estimate'))
+def call_recommend(game_context=None, state=None, needs=()):
+    state = state or TalkState(usages=['게임', '영상편집'], budget_won=2000000, budget_bound='이하',
+                               game=GameState(names=['배틀그라운드'], grade='C', grade_src='ai_estimate'))
     dropped = [{'field': 'game.resolution', 'value': '8K', 'reason': 'not in vocab'}]
     with patch.object(G, 'engine', FakeEngine()), \
          patch.object(G, 'RECO_SOURCE', 'sold'), \
          patch.object(G, 'load_vocab', lambda conn: Vocab()), \
          patch.object(G, 'validate_state', lambda raw, vocab: (state, dropped)), \
-         patch.object(G, 'missing_for', lambda st, vocab: []), \
+         patch.object(G, 'missing_for', lambda st, vocab: list(needs)), \
          patch.object(G, 'usage_map', lambda: {}), \
          patch.object(G, '_game_context', lambda conn, names, vocab: game_context), \
          patch.object(G, '_record_estimate', lambda st: (False, DB_ERROR)), \
@@ -158,6 +158,41 @@ class RecommendPublicResponseTest(unittest.TestCase):
         with self.assertLogs('grid_public', level='INFO'):
             call_recommend()
         self.assertIn('cpu_mt', PRODUCTS[1]['spec'])
+
+
+class GameWithoutGradeTest(unittest.TestCase):
+    """2026-10-09 조정 결정: 판매 경로는 등급 없이도 추천한다 — 「게임용 250만원」이 0장이었다."""
+
+    def run_state(self, game):
+        state = TalkState(usages=['게임'], budget_won=2500000, budget_bound='이하', game=game)
+        with self.assertLogs('grid_public', level='INFO'):
+            return call_recommend(state=state, needs=['game.grade'])
+
+    def test_game_without_names_or_grade_gets_fhd_cards(self):
+        for game in (None, GameState()):
+            d = self.run_state(game)
+            self.assertEqual(len(d['card_sets']), 1)
+            cs = d['card_sets'][0]
+            self.assertEqual((cs['usage_grid'], cs['min_level']), ('게임', 'FHD'))
+            self.assertEqual([i['product_code'] for i in cs['items']], [1, 2])
+            self.assertEqual(d['needs'], ['game.grade'])
+            self.assertEqual(d['assumed'], ['game.resolution=1080p'])
+            self.assertEqual(d['ai_estimated'], [])
+            self.assertIsNone(d['game_grade'])
+
+    def test_resolution_without_grade_sets_level(self):
+        d = self.run_state(GameState(resolution='1440p'))
+        cs = d['card_sets'][0]
+        self.assertEqual(cs['min_level'], 'QHD')
+        self.assertEqual([i['product_code'] for i in cs['items']], [2])
+        self.assertEqual(d['assumed'], [])
+
+    def test_named_games_without_grade_stay_held(self):
+        # validate_state 가 「전체 게임 적합성 확인 전 추천 보류」로 등급을 비운 경우 — 보류 유지.
+        d = self.run_state(GameState(names=['목록 밖 게임']))
+        self.assertEqual(d['card_sets'], [])
+        self.assertEqual(d['needs'], ['game.grade'])
+        self.assertEqual(d['assumed'], [])
 
 
 class PickRuleTest(unittest.TestCase):
