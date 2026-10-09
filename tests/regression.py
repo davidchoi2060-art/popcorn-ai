@@ -887,19 +887,31 @@ def test_upload():
         print(f"  [SKIP] (I) 적재 분류 판정 — {e}")
 
     # 검수 큐 정합 — 이미 값이 채워진 항목이 '대기'로 남아 있으면 큐가 부풀어 보인다
-    stale = db_one("""
-        SELECT count(*) FROM product_reviews r JOIN product_specs s USING (product_code)
+    # 2026-10-09 (회귀 run #5): 그 필드가 잠긴(locked_fields) 행만 센다. 웹 제안·자동 추출로
+    # 채워지고 잠기지 않은 값은 검수 대기가 맞는 상태다(그 5건을 '처리'로 넘기지 않기로 함).
+    # 잠금은 «사람이 승인했다»는 출처 기록이 아니다 — 상품 상세 사양 입력이 잠그면서 같은
+    # 자리에서 검수 행을 닫으므로, 잠겼는데 대기가 남으면 결함이라고 보는 근사 기준일 뿐이다.
+    # 기준은 tools/prune_reviews.HUMAN_LOCKED 와 같다.
+    _stale_where = """
+          FROM product_reviews r JOIN product_specs s USING (product_code)
+          JOIN products p USING (product_code)
          WHERE r.review_status = '대기' AND r.review_type = 'spec_missing'
            AND ((r.field_name = 'socket' AND s.socket IS NOT NULL)
              OR (r.field_name = 'form_factor' AND s.form_factor IS NOT NULL)
              OR (r.field_name = 'mem_type' AND s.mem_type IS NOT NULL)
              OR (r.field_name = 'rated_watt' AND s.rated_watt IS NOT NULL)
-             OR (r.field_name = 'cooler_tdp' AND s.cooler_tdp IS NOT NULL))""")
+             OR (r.field_name = 'cooler_tdp' AND s.cooler_tdp IS NOT NULL))"""
+    _human = ("(COALESCE(p.locked_fields, '[]'::jsonb) ? r.field_name"
+              " OR COALESCE(p.locked_fields, '[]'::jsonb) ? ('specs.' || r.field_name))")
+    stale = db_one("SELECT count(*)" + _stale_where + " AND " + _human)
+    unconfirmed = db_one("SELECT count(*)" + _stale_where + " AND NOT " + _human)
     if stale is None:
         print("  [SKIP] (I) 검수 큐 정합 — DB 미연결")
     else:
-        check("검수 대기에 이미 채워진 필드가 없다(tools/prune_reviews.py)",
+        check("검수 대기에 잠긴 값으로 이미 채워진 필드가 없다(tools/prune_reviews.py)",
               stale == 0, 0, stale)
+        if unconfirmed:
+            print(f"  [INFO] 값은 있으나 잠기지 않아 검수 대기로 남은 필드 {unconfirmed}건 (값 검수 대상)")
 
 
 # ───────────────────────── 2. 호환 규칙 (DB 단일 원천) ─────────────────────────
@@ -3807,7 +3819,15 @@ def test_stock_ledger():
         # 한계(고의로 남김): `delta = a - b`처럼 뺄셈을 중간 변수에 먼저 담고
         # `"q": delta`로 참조하면 이 검사는 못 찾는다 — 그런 리팩터링을 하면
         # FAIL로 드러나므로(조용히 통과하는 것보다 낫다) 그때 이 정규식을 같이 고친다.
-        _before_m = _re16.search(r"([A-Za-z_]\w*)\s*=\s*stock_before\.get\(", ci)
+        # 2026-10-09 (회귀 run #5): e28fee1 이 같은 CSV 안 중복 행을 위해 «달리는 스냅샷»
+        # `stock_current = dict(stock_before)` 를 두고 `b = stock_current.get(...)` 로 읽게
+        # 바꿨다(동작 검사는 tests/test_catalog_ingest_write_lock_order.py 의 [1,-1] 등).
+        # 원천이 여전히 stock_before 이므로, stock_before 를 «그대로 복사한» 변수만 같은
+        # 원천으로 인정한다(다른 dict 로 바꿔치기하면 여기서 FAIL).
+        _src = ["stock_before"] + _re16.findall(
+            r"([A-Za-z_]\w*)\s*=\s*dict\(\s*stock_before\s*\)", ci)
+        _before_m = _re16.search(
+            r"([A-Za-z_]\w*)\s*=\s*(?:%s)\.get\(" % "|".join(map(_re16.escape, _src)), ci)
         _q_m = _re16.search(
             r'"q"\s*:\s*\(?\s*([A-Za-z_]\w*)\s*-\s*([A-Za-z_]\w*)\s*\)?\s*,', ci)
         _delta_ok = (bool(_before_m) and bool(_q_m)
