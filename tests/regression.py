@@ -380,7 +380,8 @@ def anon_status(path, body=None):
 
 
 def anon_call(path, body=None):
-    """anon_status 와 같되 (상태, 본문 JSON|None) 를 돌려준다 — 실패 «사유 코드»까지 본다."""
+    """anon_status 와 같되 (상태, 본문 JSON|None, 응답 헤더) 를 돌려준다 — 실패 «사유 코드»와
+    세션 발급 여부(Set-Cookie)까지 본다."""
     req = urllib.request.Request(
         BASE + path,
         data=None if body is None else json.dumps(body).encode(),
@@ -388,13 +389,13 @@ def anon_call(path, body=None):
         headers={} if body is None else {"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req) as r:
-            raw, st = r.read(), r.status
+            raw, st, hd = r.read(), r.status, r.headers
     except urllib.error.HTTPError as e:
-        raw, st = e.read(), e.code
+        raw, st, hd = e.read(), e.code, e.headers
     try:
-        return st, json.loads(raw or b"null")
+        return st, json.loads(raw or b"null"), hd
     except ValueError:
-        return st, None
+        return st, None, hd
 
 
 def customer_auth_closed():
@@ -421,10 +422,16 @@ def _check_customer_auth_closed(where):
                                {"item_id": 1, "rating": 5, "body": "회귀 닫힘 확인"}),
                               ("고객 로그인", "/api/auth/login",
                                {"email": "regress-guest@popcornpc.local", "provider": "dev"})):
-        st, d = anon_call(path, body)
+        st, d, hd = anon_call(path, body)
         code = ((d or {}).get("detail") or {}).get("code") if isinstance((d or {}).get("detail"), dict) else None
         check(f"[{where}] 고객 인증 미연결 — {label} → 503 auth_unavailable",
               st == 503 and code == "auth_unavailable", "503 auth_unavailable", (st, code))
+        # 닫힌 상태에서 세션이 새지 않는다 — 쿠키도, 본문의 토큰·세션 키도 없다.
+        leaked = [k for k in ("token", "access_token", "session", "session_id", "member_id")
+                  if isinstance(d, dict) and k in d]
+        check(f"[{where}] 고객 인증 미연결 — {label} 응답에 세션 쿠키·토큰이 없다",
+              not (hd and hd.get_all("Set-Cookie")) and not leaked,
+              "없음", {"set-cookie": bool(hd and hd.get_all("Set-Cookie")), "body": leaked})
 
 
 def login():
@@ -7961,35 +7968,72 @@ def test_omitted_variant_screen():
     #   사무·주식은 제외가 있고(고성능), 영상편집은 없다. 서버에서 직접 받아 본다.
     # 2026-10-09: 기본 추천 원천이 sold(POPCORN_RECO_SOURCE 기본값)다. sold 세트는
     #   격자 카드를 싣지 않으므로(cards=[] · omitted_variants=[]) 아래 격자 검사는
-    #   grid 원천에서만 성립한다. sold 면 그 계약만 확인하고 격자 검사는 건너뛴다 —
-    #   cards[] 가 비어 None 을 «제외 없음»으로 읽으면 검사가 아무것도 증명하지 않는다.
-    _sold_sets = []
+    #   grid 원천에서만 성립한다. 판정은 **요청마다** 한다 — 한 요청의 정상 sold 응답이
+    #   다른 요청의 500·빈 응답을 가리면 안 된다. 응답 하나를 아래 넷 중 하나로 가른다:
+    #     ("sold", None, None)    200 · 그 용도 세트가 있고 전부 sold · 빈 목록 계약 충족
+    #     ("grid", 카드, None)    200 · 그 용도 세트가 있고 전부 격자 · 카드가 있다
+    #     (None, None, 사유)      그 밖의 전부(상태 코드 · 본문 · 세트 없음 · 섞임 · 계약 위반)
+    def _classify57(st, d, usage):
+        if st != 200:
+            return None, None, f"HTTP {st}"
+        if not isinstance(d, dict) or not isinstance(d.get("card_sets"), list):
+            return None, None, "본문에 card_sets 목록이 없다"
+        mine = [x for x in d["card_sets"] if isinstance(x, dict) and x.get("usage") == usage]
+        if not mine:
+            return None, None, f"용도 {usage} 세트가 없다"
+        kinds = {x.get("kind") == "sold" for x in mine}
+        if kinds == {True, False}:
+            return None, None, "sold 와 격자 세트가 섞였다"
+        if kinds == {True}:
+            bad = [x for x in mine if x.get("cards") != [] or x.get("omitted_variants") != []]
+            if bad:
+                return None, None, "sold 세트에 cards/omitted_variants 가 비어 있지 않다"
+            return "sold", None, None
+        card = next((c for x in mine for c in (x.get("cards") or []) if isinstance(c, dict)), None)
+        if card is None:
+            return None, None, "격자 세트에 카드가 없다"
+        return "grid", card, None
 
-    def _set_with_omission(state):
-        _st, d = post("/api/grid/recommend", {"state": state})
-        for s in ((d or {}).get("card_sets") or []):
-            if s.get("kind") == "sold":
-                _sold_sets.append(s)
-                continue
-            for c in (s.get("cards") or []):
-                return c
-        return None
+    # 판정기 자기시험 — 실패 응답과 섞인 응답을 정상으로 읽지 않는다.
+    _ok_sold = {"usage": "사무용", "kind": "sold", "cards": [], "omitted_variants": []}
+    _ok_grid = {"usage": "사무용", "kind": "nongame", "cards": [{"omitted_variant_keys": ["perf"]}]}
+    for _lbl, _args in (("HTTP 500", (500, {"detail": "x"}, "사무용")),
+                        ("빈 본문", (200, None, "사무용")),
+                        ("card_sets 없음", (200, {}, "사무용")),
+                        ("다른 용도만", (200, {"card_sets": [dict(_ok_sold, usage="영상편집")]}, "사무용")),
+                        ("sold·격자 섞임", (200, {"card_sets": [_ok_sold, _ok_grid]}, "사무용")),
+                        ("sold 인데 cards 있음", (200, {"card_sets": [dict(_ok_sold, cards=[{}])]}, "사무용"))):
+        _m, _c, _why = _classify57(*_args)
+        check(f"[57] ★자기시험: {_lbl} 응답은 정상으로 읽지 않는다", _m is None, "실패 판정", _m)
+    check("[57] ★자기시험: 정상 sold 응답은 sold 로 읽는다",
+          _classify57(200, {"card_sets": [_ok_sold]}, "사무용")[0] == "sold", "sold",
+          _classify57(200, {"card_sets": [_ok_sold]}, "사무용"))
+    check("[57] ★자기시험: 정상 격자 응답은 카드를 돌려준다",
+          _classify57(200, {"card_sets": [_ok_grid]}, "사무용")[0] == "grid", "grid",
+          _classify57(200, {"card_sets": [_ok_grid]}, "사무용")[0])
+
+    def _set_with_omission(state, usage):
+        st, d = post("/api/grid/recommend", {"state": state})
+        mode, card, why = _classify57(st, d, usage)
+        check(f"[57] {usage} 추천 응답이 정상이다(200 · 그 용도 세트 · 원천 한 종류)",
+              mode is not None, "sold 또는 격자", why)
+        return mode, card
 
     # 0110 — 「단순 사무용」은 usage_floors.usage_label 어휘에서 사라졌다(「사무용」으로
     #   합침 · 사장님 확정 ④). 옛 이름을 그대로 보내면 state 경로가 어휘 밖이라
     #   dropped 로 떨구고 card_sets 가 비는데, 그건 **정상 동작**이다(어휘의 정본은 DB).
     #   여기서 보려는 것은 «제외된 구성이 사유와 함께 내려오는가»지 옛 이름의 생존이
     #   아니므로 현행 이름을 쓴다. 옛 이름의 처리는 usage_label_map 이 맡는다([60]).
-    office = _set_with_omission({"usages": ["사무용"], "budget_won": 1500000,
-                                 "budget_bound": "이하"})
-    video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
-                                "budget_bound": "이하"})
-    if _sold_sets and not office and not video:
-        check("[57] sold 세트는 격자 카드·제외 구성을 싣지 않는다(cards=[] · omitted_variants=[])",
-              all(s.get("cards") == [] and s.get("omitted_variants") == [] for s in _sold_sets),
-              "전부 빈 목록",
-              [(s.get("usage"), s.get("cards"), s.get("omitted_variants")) for s in _sold_sets
-               if s.get("cards") != [] or s.get("omitted_variants") != []][:3])
+    office_mode, office = _set_with_omission({"usages": ["사무용"], "budget_won": 1500000,
+                                              "budget_bound": "이하"}, "사무용")
+    video_mode, video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
+                                            "budget_bound": "이하"}, "영상편집")
+    if office_mode is None or video_mode is None:
+        return                      # 위에서 이미 FAIL 로 남았다
+    if office_mode != video_mode:
+        check("[57] 두 요청의 추천 원천이 같다", False, "같음", (office_mode, video_mode))
+        return
+    if office_mode == "sold":
         check("[57] 격자 카드 제외 구성 검사 — 추천 원천이 sold 라 건너뜀",
               True, "건너뜀", "sold", kind="SKIP")
         return
