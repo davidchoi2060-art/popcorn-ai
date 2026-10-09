@@ -1,0 +1,99 @@
+{
+ "shot": "floors-390-left-preview.png",
+ "head": "5a4c7b9",
+ "viewport": "390x1400",
+ "fixture": [
+  "floors.json",
+  "floor-preview.json",
+  "me.json"
+ ],
+ "errors": [],
+ "tableScroll": {
+  "scrollLeft": 0,
+  "scrollWidth": 712,
+  "clientWidth": 300
+ },
+ "editAreaRects": {
+  "input": {
+   "x": 54,
+   "y": 553,
+   "w": 138,
+   "h": 44,
+   "inViewportX": true
+  },
+  "previewBtn": {
+   "x": 54,
+   "y": 827,
+   "w": 80,
+   "h": 36,
+   "inViewportX": true
+  },
+  "previewText": {
+   "x": 69,
+   "y": 704,
+   "w": 258,
+   "h": 90,
+   "inViewportX": true
+  },
+  "saveBtn": {
+   "x": 143,
+   "y": 827,
+   "w": 143,
+   "h": 36,
+   "inViewportX": true
+  },
+  "previewTextContent": "후보가 220개 → 140개로 줄어듭니다. 0이 되지는 않아 견적은 계속 만들어집니다. 다만 이 용도의 그래픽카드 선택폭이 크게 좁아져, 예산이 낮은 요청에서는 불성립이 늘 수 있습니다."
+ },
+ "saveRawLog": [
+  {
+   "t_ms": 3578,
+   "step": "1 펼친 직후(값 550, 미리보기 전)",
+   "expr": "(()=>{const b=document.querySelector('#expSaveBtn');return {disabled:b.disabled,hasDisabledAttr:b.hasAttribute('disabled'),ariaDisabled:b.getAttribute('aria-disabled'),text:b.textContent.trim(),outerHTML:b.outerHTML};})()",
+   "value": {
+    "disabled": true,
+    "hasDisabledAttr": true,
+    "ariaDisabled": null,
+    "text": "확인했습니다 — 저장",
+    "outerHTML": "<button type=\"button\" class=\"uf-exp-btn-save\" id=\"expSaveBtn\" data-action=\"do-save\" disabled=\"\" title=\"먼저 미리보기를 실행해 지금 값으로 확인해야 합니다\">확인했습니다 — 저장</button>"
+   }
+  },
+  {
+   "t_ms": 3634,
+   "step": "2 값 650 입력 후, 미리보기 전",
+   "expr": "(()=>{const b=document.querySelector('#expSaveBtn');return {disabled:b.disabled,hasDisabledAttr:b.hasAttribute('disabled'),ariaDisabled:b.getAttribute('aria-disabled'),text:b.textContent.trim(),outerHTML:b.outerHTML};})()",
+   "value": {
+    "disabled": true,
+    "hasDisabledAttr": true,
+    "ariaDisabled": null,
+    "text": "확인했습니다 — 저장",
+    "outerHTML": "<button type=\"button\" class=\"uf-exp-btn-save\" id=\"expSaveBtn\" data-action=\"do-save\" disabled=\"\" title=\"먼저 미리보기를 실행해 지금 값으로 확인해야 합니다\">확인했습니다 — 저장</button>"
+   }
+  },
+  {
+   "t_ms": 4306,
+   "step": "3 영향 미리보기 응답 후",
+   "expr": "(()=>{const b=document.querySelector('#expSaveBtn');return {disabled:b.disabled,hasDisabledAttr:b.hasAttribute('disabled'),ariaDisabled:b.getAttribute('aria-disabled'),text:b.textContent.trim(),outerHTML:b.outerHTML};})()",
+   "value": {
+    "disabled": false,
+    "hasDisabledAttr": false,
+    "ariaDisabled": null,
+    "text": "확인했습니다 — 저장",
+    "outerHTML": "<button type=\"button\" class=\"uf-exp-btn-save\" id=\"expSaveBtn\" data-action=\"do-save\">확인했습니다 — 저장</button>"
+   }
+  },
+  {
+   "t_ms": 4519,
+   "step": "4 표 왼쪽 끝으로 스크롤한 뒤(캡처 시점)",
+   "expr": "(()=>{const b=document.querySelector('#expSaveBtn');return {disabled:b.disabled,hasDisabledAttr:b.hasAttribute('disabled'),ariaDisabled:b.getAttribute('aria-disabled'),text:b.textContent.trim(),outerHTML:b.outerHTML};})()",
+   "value": {
+    "disabled": false,
+    "hasDisabledAttr": false,
+    "ariaDisabled": null,
+    "text": "확인했습니다 — 저장",
+    "outerHTML": "<button type=\"button\" class=\"uf-exp-btn-save\" id=\"expSaveBtn\" data-action=\"do-save\">확인했습니다 — 저장</button>"
+   }
+  }
+ ],
+ "hscroll": false,
+ "collector": "tools: playwright chromium, script shot3.js (same folder)"
+}

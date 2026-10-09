@@ -1,0 +1,24 @@
+const {chromium}=require(require('child_process').execSync('npm root -g').toString().trim()+'/playwright');
+const out=process.argv[2],B='http://localhost:8767';
+// 수집식: 아래 문자열을 그대로 page.evaluate 로 실행해 원값을 받는다(가공 없음)
+const SAVE_EXPR="(()=>{const b=document.querySelector('#expSaveBtn');return {disabled:b.disabled,hasDisabledAttr:b.hasAttribute('disabled'),ariaDisabled:b.getAttribute('aria-disabled'),text:b.textContent.trim(),outerHTML:b.outerHTML};})()";
+const raw=[];const t0=Date.now();
+const rec=async(p,step)=>{const v=await p.evaluate(SAVE_EXPR);raw.push({t_ms:Date.now()-t0,step,expr:SAVE_EXPR,value:v});return v;};
+(async()=>{const b=await chromium.launch();const w=390,h=1400;
+const p=await b.newPage({viewport:{width:w,height:h}});const errs=[];
+p.on('console',m=>{if(m.type()==='error')errs.push(m.text())});p.on('pageerror',e=>errs.push('PAGEERR '+e.message));p.on('response',r=>{if(r.status()>=400)errs.push(r.status()+' '+r.url())});
+await p.goto(B+'/admin2/usage-floors');await p.waitForSelector('.uf-btn-change');await p.waitForTimeout(400);
+await p.click('.uf-btn-change[data-floor-id="1"]');await p.waitForSelector('#expValueInput');
+await rec(p,'1 펼친 직후(값 550, 미리보기 전)');
+await p.fill('#expValueInput','650');await p.dispatchEvent('#expValueInput','input');
+await rec(p,'2 값 650 입력 후, 미리보기 전');
+await p.click('#expPreviewBtn');await p.waitForTimeout(600);
+await rec(p,'3 영향 미리보기 응답 후');
+const scroll=await p.evaluate(()=>{const t=document.querySelector('.uf-tablewrap');t.scrollLeft=0;const r=document.querySelector('.uf-row.on');if(r)r.scrollIntoView({block:'start'});window.scrollBy(0,-70);return {scrollLeft:t.scrollLeft,scrollWidth:t.scrollWidth,clientWidth:t.clientWidth};});
+await p.waitForTimeout(200);
+const vis=await p.evaluate(()=>{const q=s=>{const e=document.querySelector(s);if(!e)return null;const r=e.getBoundingClientRect();return {x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),h:Math.round(r.height),inViewportX:r.left>=0&&r.right<=innerWidth};};return {input:q('#expValueInput'),previewBtn:q('#expPreviewBtn'),previewText:q('.uf-exp-preview-text'),saveBtn:q('#expSaveBtn'),previewTextContent:(document.querySelector('.uf-exp-preview-text')||{}).textContent};});
+await rec(p,'4 표 왼쪽 끝으로 스크롤한 뒤(캡처 시점)');
+await p.evaluate(t=>{const d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;left:0;right:0;bottom:0;z-index:99999;background:#222;color:#fff;font:12px/1.5 monospace;padding:4px 8px;opacity:.9';document.body.appendChild(d);},'CODE/MOCK · head 5a4c7b9 · fixture floors.json + floor-preview.json (행 1 펼침 · 550→650 미리보기 후) · viewport 390x1400 · 표 왼쪽 끝(scrollLeft 0) · 실데이터 아님');
+await p.screenshot({path:`${out}/floors-390-left-preview.png`});
+const res={shot:'floors-390-left-preview.png',head:'5a4c7b9',viewport:'390x1400',fixture:['floors.json','floor-preview.json','me.json'],errors:errs,tableScroll:scroll,editAreaRects:vis,saveRawLog:raw,hscroll:await p.evaluate(()=>document.documentElement.scrollWidth>innerWidth),collector:'tools: playwright chromium, script shot3.js (same folder)'};
+require('fs').writeFileSync(out+'/evidence-floors-390-left.json',JSON.stringify(res,null,1));console.log(JSON.stringify(res,null,1));await b.close();})();
