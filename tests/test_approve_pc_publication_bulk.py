@@ -332,7 +332,19 @@ class ApprovalLedger(unittest.TestCase):
         for approvals in (ledger(decisions=()), ledger()):
             with self.subTest(), self.assertRaises(PermissionError):
                 go(World(), apply=True, approvals=approvals, decision='abc')
-        self.assertEqual(m.parse_approvals()['decisions'], {})   # repo ledger: nothing applicable yet
+
+    def test_repo_ledger_decision(self):
+        """The recorded owner decision: three quoted messages, the #31 archive manifest,
+        copy·price only, the four steps, nothing withdrawn."""
+        found = m.parse_approvals()
+        self.assertEqual(list(found['decisions']), ['pc-publication-20261009-bundle'])
+        d = found['decisions']['pc-publication-20261009-bundle']
+        self.assertEqual(d['scope']['media_manifest_sha256'],
+                         '48b0999b276d8a2aff0152a18cb65f5e98c9833489a2edac13bf57cb536b1e39')
+        self.assertEqual((d['scope']['findings'], d['scope']['steps']), (['copy', 'price'], m.STEPS))
+        self.assertEqual(d['references'][-1], 'project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r')
+        self.assertEqual(d['quotes'][-1], '허락..')
+        self.assertEqual(found['withdrawn'], set())
 
     def test_malformed_ledger_stops_everything(self):
         bad = [dict(DECISION, references=['abc']), dict(DECISION, references=[MSG[0], None]),
@@ -532,7 +544,7 @@ class Cli(unittest.TestCase):
         for argv, env in [(base, {m.RIGHTS_ENV: RIGHTS}), (base, {m.APPLY_ENV: '1'}),
                           (base, dict(ENV, **{m.RIGHTS_ENV: other})), (base[:3], ENV),
                           (base[:1] + base[3:], ENV), (base[:5], ENV),
-                          (base[:6] + ['아무거나'], ENV), (base, ENV)]:   # last: repo ledger has no decision yet
+                          (base[:6] + ['아무거나'], ENV), (base, ENV)]:   # last: decision id not in the repo ledger
             with self.subTest(argv=argv, env=sorted(env.items())), self.assertRaises(SystemExit):
                 m.main(argv, environment=env)
 
