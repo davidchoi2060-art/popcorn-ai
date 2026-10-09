@@ -5,28 +5,30 @@ The archive (manifest.json + originals/P{product_code}.png) was generated on
 pc_media_jobs, so customer screens kept showing "이미지 준비 중".
 
 Per item, without any generation call:
-  1. archive check   PNG bytes match manifest sha256/size; QA notes exist; an image
-                     reused from another configuration must carry its recorded
-                     reuse exception.
-  2. current check   the registered P offer is on sale, image requirements are met,
-                     and the current configuration has exactly one CASE.
-                     A later revision, a different case or an open image condition
-                     does NOT block registration (the existing original is used as-is,
-                     never regenerated -- 2026-10-09 owner decision); it only withholds
-                     automatic selection and the reason is reported. --force-select
-                     selects those too.
-  3. apply           insert an origin_kind='existing_import' job bound to the
+  1. archive check   PNG bytes match manifest sha256/size (a broken/mismatched file is
+                     never registered or selected, only reported); QA notes exist.
+  2. current check   the registered P offer is on sale and the current configuration
+                     has exactly one CASE. A later revision or a different case does NOT
+                     block registration; it withholds automatic selection unless
+                     --force-select. An open image condition is reported, never forced.
+  3. reuse authority api.pc_existing_media_import.ServerAuthority.verify_reuse, wired
+                     to owner_reuse_verifier: an active owner, an intact archive file and
+                     the recorded owner decision (OWNER_DECISION: originals made by the
+                     owner, used as-is without regeneration). Reuse from another
+                     configuration and forced selection are allowed ONLY through this
+                     check, never by the manifest's reuse_exception text alone.
+  4. apply           insert an origin_kind='existing_import' job bound to the
                      CURRENT visual/review basis, upload create-only to the private
                      bucket (same key layout as generated jobs), mark ready, and
                      select it unless a current ready representative is already
                      selected (a stale selection is replaced).
 
 Default is a read-only dry run. --apply needs POPCORN_EXISTING_MEDIA_IMPORT_APPLY=1
-and --operator-id of an active owner; that owner is recorded as the actor.
+and --operator-id of an active owner; that owner is the verified principal and actor.
 Re-running is safe: the request id is derived from manifest+product+image hash.
 """
 import argparse
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 import hashlib
 import json
 import os
@@ -43,6 +45,39 @@ NAMESPACE = UUID('6f1d5a8e-3c2b-4b7e-9a51-0c4d2e8f7a19')
 PNG = b'\x89PNG\r\n\x1a\n'
 MAX_BYTES = 20 * 1024 * 1024
 VERSION = 'pc-media-existing-import-v1'
+# Owner decision recorded in the project chat (2026-10-09 18:35 / 18:41 KST): the archived
+# originals were made by the owner and are used as-is; not regenerating them is no reason
+# to discard them. This is the reuse authority basis; it is not publication permission.
+OWNER_DECISION = dict(
+    reference='project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDK2hTCfHq5dVQu9X69SAbb8'
+              '+cmsg_012k6fnspU3tgfYTTB56KTuDA5QazRckoWKUdcdRG2Gkgf',
+    decided_at='2026-10-09T18:35:32+09:00',
+    basis='owner_made_original_reuse_without_regeneration')
+# Mismatch kinds the owner decision allows to be selected with --force-select.
+FORCEABLE = frozenset({'revision', 'case'})
+
+
+@dataclass(frozen=True)
+class ArchiveReuse:
+    """What verify_reuse is asked about: one archived original for one current binding."""
+    product_code: int
+    original_sha256: str
+    manifest_sha256: str
+    file_reason: str | None
+    reused_from: str | None
+    mismatch: tuple
+    force_select: bool
+
+
+def file_reason(item, raw):
+    """None when the archived file itself is intact; otherwise a Korean reason."""
+    if raw is None:
+        return '원본 파일 없음'
+    if not raw.startswith(PNG) or not 8 < len(raw) <= MAX_BYTES:
+        return 'PNG 형식·크기 불일치'
+    if item.get('original_sha256') != hashlib.sha256(raw).hexdigest() or item.get('original_bytes') != len(raw):
+        return '원본 해시·크기가 manifest 와 다름'
+    return None
 
 
 def load_manifest(archive):
@@ -63,29 +98,26 @@ def archive_reason(item, raw):
     """None when the archived image itself is usable; otherwise a Korean reason."""
     if product_code(item) is None:
         return '상품번호 형식 불일치'
-    if raw is None:
-        return '원본 파일 없음'
-    if not raw.startswith(PNG) or not 8 < len(raw) <= MAX_BYTES:
-        return 'PNG 형식·크기 불일치'
-    if item.get('original_sha256') != hashlib.sha256(raw).hexdigest() or item.get('original_bytes') != len(raw):
-        return '원본 해시·크기가 manifest 와 다름'
+    reason = file_reason(item, raw)
+    if reason:
+        return reason
     if item.get('generated_original') != f"originals/{item['configuration_id']}.png":
         return 'manifest 원본 경로 불일치'
     notes = item.get('qa_notes')
     if not isinstance(notes, list) or not notes or not all(isinstance(n, str) and n.strip() for n in notes):
         return 'QA 기록 없음'
     reused = item.get('reused_from')
-    if reused and (not re.fullmatch(r'P[1-9][0-9]*', str(reused)) or not str(item.get('reuse_exception') or '').strip()):
-        return '다른 구성 이미지 재사용 근거 없음'
+    if reused and not re.fullmatch(r'P[1-9][0-9]*', str(reused)):
+        return '재사용 원본 번호 형식 불일치'
     if type(item.get('db_configuration_revision')) is not int or not str(item.get('case_code', '')).isdigit():
         return 'manifest 구성 차수·케이스 정보 없음'
     return None
 
 
 def current_binding(conn, code, item):
-    """(binding, None) or (None, reason). binding['mismatch'] lists how the current
-    configuration differs from the one the original was made for; a mismatch does
-    not block registration, it only withholds automatic selection."""
+    """(binding, None) or (None, reason). binding['mismatch'] lists (kind, text) of how
+    the current configuration differs from the one the original was made for; a
+    mismatch does not block registration, it only withholds automatic selection."""
     from fastapi import HTTPException
     from sqlalchemy import text
     from api.pc_configuration_copy import read_sold_offer_configuration
@@ -104,26 +136,84 @@ def current_binding(conn, code, item):
         return None, '현재 구성에 케이스 없음'
     mismatch = []
     if bound['revision'] != item['db_configuration_revision']:
-        mismatch.append(f"구성 차수 변경({item['db_configuration_revision']}→{bound['revision']})")
+        mismatch.append(('revision', f"구성 차수 변경({item['db_configuration_revision']}→{bound['revision']})"))
     if str(cases[0]['code']) != str(item['case_code']):
-        mismatch.append(f"케이스 변경({item['case_code']}→{cases[0]['code']})")
-    mismatch += ['이미지 조건: ' + e for e in current['errors']]
+        mismatch.append(('case', f"케이스 변경({item['case_code']}→{cases[0]['code']})"))
+    mismatch += [('image_condition', '이미지 조건: ' + e) for e in current['errors']]
     return dict(code=code, configuration_id=identity, offer_id=bound['offer_id'],
                 revision=bound['revision'], case_product_code=int(cases[0]['code']),
                 visual_basis=current['visual_basis'], review_basis=current['basis'],
                 snapshot=current['snapshot'], mismatch=mismatch), None
 
 
-def provenance(item, manifest_sha, binding):
+def _texts(mismatch):
+    return ' · '.join(text for _, text in mismatch)
+
+
+def selectable(binding, force_select):
+    """'auto' | 'forced' | None. Image conditions are never forced."""
+    kinds = {kind for kind, _ in binding['mismatch']}
+    if not kinds:
+        return 'auto'
+    return 'forced' if force_select and kinds <= FORCEABLE else None
+
+
+def reuse_subject(item, raw, manifest_sha, binding, force_select):
+    return ArchiveReuse(product_code(item), item.get('original_sha256'), manifest_sha, file_reason(item, raw),
+                        item.get('reused_from') or None, tuple(binding['mismatch']), force_select)
+
+
+def owner_reuse_verifier(subject, principal, connection):
+    """Reuse authority for the owner-made archive. ALLOW only for an active owner
+    (re-read on the caller's connection), an intact file and a mismatch the owner
+    decision covers. Anything else, including a missing connection, is DENY."""
+    from sqlalchemy import text
+    from tools.register_existing_pc_media import Decision
+    if type(subject) is not ArchiveReuse or subject.file_reason or connection is None:
+        return Decision.DENY
+    if getattr(principal, 'role', None) != 'owner':
+        return Decision.DENY
+    row = connection.execute(text('SELECT role,status FROM admin_operators WHERE operator_id=:o FOR SHARE'),
+                             dict(o=principal.operator_id)).mappings().first()
+    if not row or row['role'] != 'owner' or row['status'] != '활성':
+        return Decision.DENY
+    kinds = {kind for kind, _ in subject.mismatch}
+    if subject.force_select and not kinds <= FORCEABLE:
+        return Decision.DENY
+    return Decision.ALLOW
+
+
+def authority(engine, operator_id):
+    """ServerAuthority wired with the owner decision verifier; the principal is the
+    named operator, read from the DB, never from the archive."""
+    from sqlalchemy import text
+    from api.pc_existing_media_import import ServerAuthority
+
+    def operator():
+        with engine.connect() as conn:
+            row = conn.execute(text('SELECT operator_id,role,status FROM admin_operators WHERE operator_id=:o'),
+                               dict(o=operator_id)).mappings().first()
+        if not row or row['role'] != 'owner' or row['status'] != '활성':
+            return None
+        return dict(operator_id=row['operator_id'], role=row['role'])
+    return ServerAuthority(reuse_verifier=owner_reuse_verifier, operator_reader=operator)
+
+
+def provenance(item, manifest_sha, binding, principal=None, selection=None):
     reference = f"manifest:sha256:{manifest_sha}#items/{item['configuration_id']}"
-    return dict(version=VERSION, original=dict(
+    reused = item.get('reused_from') or None
+    return dict(version=VERSION, reuse_authority=dict(OWNER_DECISION, verified_by='ServerAuthority.verify_reuse',
+        principal=principal.actor if principal else None, selection=selection,
+        mismatch=[text for _, text in binding['mismatch']]), original=dict(
         source_sku=item['configuration_id'], original_revision=item['db_configuration_revision'],
         original_ref=item['generated_original'], original_sha256=item['original_sha256'],
         manifest_sha256=manifest_sha,
         qa_references=[f'{reference}/qa_notes/{i}' for i in range(len(item['qa_notes']))],
-        qa_notes=list(item['qa_notes']), reused_from=item.get('reused_from') or None,
-        reuse_exception_reference=f'{reference}/reuse_exception' if item.get('reused_from') else None,
-        reuse_exception_note=item.get('reuse_exception') if item.get('reused_from') else None,
+        qa_notes=list(item['qa_notes']), reused_from=reused,
+        # Reuse is authorised by verify_reuse/OWNER_DECISION, not by the manifest text.
+        reuse_exception_reference=(f'{reference}/reuse_exception' if item.get('reuse_exception')
+                                   else OWNER_DECISION['reference']) if reused else None,
+        reuse_exception_note=item.get('reuse_exception') if reused else None,
         ssd_facts_reference=None, generation_model=None, generation_actor=None,
         generation_time=None, original_visual_basis=None),
         current_binding=dict(sku=f"P{binding['code']}", offer_id=binding['offer_id'],
@@ -136,15 +226,6 @@ def request_id(manifest_sha, code, original_sha):
     return str(uuid5(NAMESPACE, f'{manifest_sha}:{code}:{original_sha}'))
 
 
-def owner_actor(conn, operator_id):
-    from sqlalchemy import text
-    row = conn.execute(text('SELECT role,status FROM admin_operators WHERE operator_id=:o'),
-                       dict(o=operator_id)).mappings().first()
-    if not row or row['role'] != 'owner' or row['status'] != '활성':
-        raise PermissionError('활성 owner 계정만 적용할 수 있습니다')
-    return f'operator:{operator_id}'
-
-
 def _row(conn, request):
     from sqlalchemy import text
     found = conn.execute(text('SELECT job_id,configuration_id,visual_basis,status,selected,asset,origin_kind '
@@ -152,16 +233,23 @@ def _row(conn, request):
     return dict(found) if found else None
 
 
-def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, force_select=False, new_job=uuid4):
-    """Returns (state, detail). Every DB step re-reads the current binding."""
+def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=True, force_select=False,
+              new_job=uuid4):
+    """Returns (state, detail). Every DB step re-reads the current binding and
+    re-asks auth.verify_reuse on that transaction before writing."""
     from sqlalchemy import text
     from api.pc_media import NOTICE
-    from api.pc_existing_media_import import canonical
+    from api.pc_existing_media_import import canonical, Denied
     code, request = product_code(item), request_id(manifest_sha, product_code(item), item['original_sha256'])
+    actor = principal.actor
     with engine.begin() as conn:
         binding, reason = current_binding(conn, code, item)
         if reason:
             return 'skipped', reason
+        try:
+            auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, False), principal, conn)
+        except Denied:
+            return 'skipped', '재사용 권한 확인 거부'
         row = _row(conn, request)
         if row is None:
             job = str(new_job())
@@ -170,7 +258,8 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, forc
                 "(:j,:r,:id,:v,:b,CAST(:s AS jsonb),NULL,:a,'existing_import',CAST(:p AS jsonb),'running','storage',false)"),
                 dict(j=job, r=request, id=binding['configuration_id'], v=binding['visual_basis'],
                      b=binding['review_basis'], s=canonical(binding['snapshot']), a=actor,
-                     p=canonical(provenance(item, manifest_sha, binding))))
+                     p=canonical(provenance(item, manifest_sha, binding, principal,
+                                            selectable(binding, force_select) if select else None))))
             row = dict(job_id=job, configuration_id=binding['configuration_id'],
                        visual_basis=binding['visual_basis'], status='running', selected=False,
                        asset=None, origin_kind='existing_import')
@@ -198,8 +287,13 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, forc
             return 'registered', job + ' (선택 보류: ' + reason + ')'
         if binding['visual_basis'] != row['visual_basis']:
             return 'registered', job + ' (선택 보류: 구성 근거 변경)'
-        if binding['mismatch'] and not force_select:
-            return 'registered_unselected', job + ' (선택 보류: ' + ' · '.join(binding['mismatch']) + ')'
+        mode = selectable(binding, force_select)
+        if mode is None:
+            return 'registered_unselected', job + ' (선택 보류: ' + _texts(binding['mismatch']) + ')'
+        try:
+            auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, mode == 'forced'), principal, conn)
+        except Denied:
+            return 'registered_unselected', job + ' (선택 보류: 재사용 권한 확인 거부)'
         chosen = conn.execute(text("SELECT job_id,visual_basis,status FROM pc_media_jobs "
                                    "WHERE configuration_id=:id AND selected FOR UPDATE"),
                               dict(id=binding['configuration_id'])).mappings().first()
@@ -210,17 +304,45 @@ def apply_one(engine, objects, item, raw, manifest_sha, actor, select=True, forc
         conn.execute(text('UPDATE pc_media_jobs SET selected=false WHERE configuration_id=:id AND selected'),
                      dict(id=binding['configuration_id']))
         conn.execute(text('UPDATE pc_media_jobs SET selected=true,updated_at=now() WHERE job_id=:j'), dict(j=job))
-    return 'selected', job
+    return ('selected_by_decision' if mode == 'forced' else 'selected'), job
+
+
+def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select):
+    from api.pc_existing_media_import import Denied
+    with engine.connect() as conn:
+        try:
+            binding, reason = current_binding(conn, product_code(item), item)
+            if reason:
+                return 'skipped', reason
+            mode = selectable(binding, force_select)
+            if auth is not None:
+                try:
+                    auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, mode == 'forced'),
+                                      principal, conn)
+                except Denied:
+                    return 'skipped', '재사용 권한 확인 거부'
+        finally:
+            conn.rollback()
+    if not select or mode is None:
+        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함'
+    if mode == 'forced':
+        return 'would_select_by_decision', _texts(binding['mismatch'])
+    return 'would_select', binding['configuration_id']
 
 
 def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
         force_select=False, out=print):
     manifest_sha, items = load_manifest(archive)
     rows, counts = [], {}
-    actor = None
-    if apply:
-        with engine.connect() as conn:
-            actor = owner_actor(conn, operator_id)
+    auth = principal = None
+    if operator_id is not None:
+        auth = authority(engine, operator_id)
+        try:
+            principal = auth.principal()
+        except Exception:
+            raise PermissionError('활성 owner 계정만 적용할 수 있습니다') from None
+    elif apply:
+        raise PermissionError('--operator-id 가 필요합니다')
     for item in items:
         code = product_code(item)
         if only and code not in only:
@@ -229,20 +351,13 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
         raw = path.read_bytes() if code is not None and path.is_file() else None
         reason = archive_reason(item, raw)
         if reason:
-            state, detail = 'skipped', reason
+            # A broken file is reported only; it is never registered or forced.
+            state, detail = ('file_error' if file_reason(item, raw) else 'skipped'), reason
         elif not apply:
-            with engine.connect() as conn:
-                binding, reason = current_binding(conn, code, item)
-                conn.rollback()
-            if reason:
-                state, detail = 'skipped', reason
-            elif binding['mismatch'] and not force_select:
-                state, detail = 'would_register_only', ' · '.join(binding['mismatch'])
-            else:
-                state, detail = 'would_select', binding['configuration_id']
+            state, detail = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select)
         else:
             try:
-                state, detail = apply_one(engine, objects, item, raw, manifest_sha, actor, select=select,
+                state, detail = apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=select,
                                           force_select=force_select)
             except Exception as error:   # one item must not stop the batch; reason is reported
                 state, detail = 'failed', type(error).__name__

@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools import import_pc_media_archive as m
-from api.pc_existing_media_import import ObjectReceipt
-from tools.register_existing_pc_media import BUCKET
+from api.pc_existing_media_import import ObjectReceipt, Principal, ServerAuthority
+from tools.register_existing_pc_media import BUCKET, Decision
 
 PNG = b'\x89PNG\r\n\x1a\n' + b'x' * 64
 
@@ -39,7 +39,8 @@ class Result:
 
 class FakeDB:
     """Minimal pc_media_jobs table keyed by job_id."""
-    def __init__(self): self.jobs, self.sql = {}, []
+    def __init__(self, operator=('owner', '활성')):
+        self.jobs, self.sql, self.operator = {}, [], operator
     def begin(self): return self
     def connect(self): return self
     def __enter__(self): return self
@@ -49,6 +50,8 @@ class FakeDB:
     def execute(self, clause, params=None):
         sql, p = str(clause), params or {}
         self.sql.append(sql)
+        if 'FROM admin_operators' in sql:
+            return Result([dict(operator_id=p['o'], role=self.operator[0], status=self.operator[1])])
         if sql.startswith('INSERT INTO pc_media_jobs'):
             self.jobs[p['j']] = dict(job_id=p['j'], request_id=p['r'], configuration_id=p['id'],
                 visual_basis=p['v'], status='running', selected=False, asset=None,
@@ -87,18 +90,18 @@ class ArchiveChecks(unittest.TestCase):
     def test_rejections(self):
         cases = [(item(), None, '원본 파일 없음'), (item(), b'GIF89a' + PNG, 'PNG'),
                  (item(original_sha256='0' * 64), PNG, '해시'), (item(qa_notes=[]), PNG, 'QA'),
-                 (item(reused_from='P113838'), PNG, '재사용 근거'), (item(configuration_id='X1'), PNG, '상품번호'),
+                 (item(reused_from='113838'), PNG, '재사용 원본'), (item(configuration_id='X1'), PNG, '상품번호'),
                  (item(db_configuration_revision=None), PNG, '차수')]
         for value, raw, word in cases:
             with self.subTest(word=word):
                 self.assertIn(word, m.archive_reason(value, raw))
 
-    def test_reuse_with_recorded_exception_is_allowed(self):
-        value = item(reused_from='P113838', reuse_exception='같은 케이스·색상')
-        self.assertIsNone(m.archive_reason(value, PNG))
-        o = m.provenance(value, 'e' * 64, binding())['original']
-        self.assertEqual(o['reused_from'], 'P113838')
-        self.assertTrue(o['reuse_exception_reference'].endswith('/reuse_exception'))
+    def test_reuse_reference_comes_from_owner_decision_not_text(self):
+        bare = m.provenance(item(reused_from='P113838'), 'e' * 64, binding())['original']
+        self.assertEqual(bare['reuse_exception_reference'], m.OWNER_DECISION['reference'])
+        noted = m.provenance(item(reused_from='P113838', reuse_exception='같은 케이스'), 'e' * 64, binding())
+        self.assertTrue(noted['original']['reuse_exception_reference'].endswith('/reuse_exception'))
+        self.assertEqual(noted['reuse_authority']['basis'], m.OWNER_DECISION['basis'])
 
     def test_request_id_is_stable_and_specific(self):
         a = m.request_id('f' * 64, 1, 'a' * 64)
@@ -120,19 +123,57 @@ class ArchiveChecks(unittest.TestCase):
         self.assertEqual(c['case_product_code'], 129552)
 
 
+def auth():
+    return ServerAuthority(reuse_verifier=m.owner_reuse_verifier,
+                           operator_reader=lambda: dict(operator_id=1, role='owner'))
+
+
+REV = ('revision', '구성 차수 변경(1→2)')
+IMG = ('image_condition', '이미지 조건: 장착 CPU 쿨러 확인 필요')
+
+
+class ReuseAuthority(unittest.TestCase):
+    def subject(self, raw=PNG, mismatch=(), force=False):
+        return m.reuse_subject(item(), raw, 'e' * 64, dict(binding(), mismatch=list(mismatch)), force)
+
+    def test_owner_with_intact_file_is_allowed(self):
+        self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
+
+    def test_denials(self):
+        cases = [(self.subject(raw=PNG + b'x'), Principal(1, 'owner'), FakeDB()),
+                 (self.subject(), Principal(1, 'operator'), FakeDB()),
+                 (self.subject(), Principal(1, 'owner'), FakeDB(operator=('owner', '정지'))),
+                 (self.subject(), Principal(1, 'owner'), None),
+                 (self.subject(mismatch=[IMG], force=True), Principal(1, 'owner'), FakeDB())]
+        for subject, principal, conn in cases:
+            with self.subTest(principal=principal):
+                self.assertIs(m.owner_reuse_verifier(subject, principal, conn), Decision.DENY)
+
+    def test_forced_revision_mismatch_is_allowed(self):
+        s = self.subject(mismatch=[REV], force=True)
+        self.assertIs(m.owner_reuse_verifier(s, Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
+
+    def test_selectable(self):
+        self.assertEqual(m.selectable(binding(), False), 'auto')
+        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV]), False))
+        self.assertEqual(m.selectable(dict(binding(), mismatch=[REV, ('case', 'x')]), True), 'forced')
+        self.assertIsNone(m.selectable(dict(binding(), mismatch=[REV, IMG]), True))
+
+
 class Apply(unittest.TestCase):
     def setUp(self):
         self.db, self.objects = FakeDB(), Objects()
 
-    def apply(self, b=None, reason=None, **kw):
+    def apply(self, b=None, reason=None, raw=PNG, **kw):
         with patch.object(m, 'current_binding', return_value=(b or binding(), reason)):
-            return m.apply_one(self.db, self.objects, item(), PNG, 'e' * 64, 'operator:1', **kw)
+            return m.apply_one(self.db, self.objects, item(), raw, 'e' * 64, auth(), Principal(1, 'owner'), **kw)
 
     def test_registers_uploads_and_selects(self):
         state, job = self.apply()
         self.assertEqual(state, 'selected')
         row = self.db.jobs[job]
         self.assertEqual((row['status'], row['selected'], row['actor']), ('ready', True, 'operator:1'))
+        self.assertEqual(row['provenance']['reuse_authority']['principal'], 'operator:1')
         self.assertEqual(row['asset']['key'], f'pc-configurations/{job}/representative.png')
         from api.pc_media import NOTICE
         self.assertEqual(row['asset']['notice'], NOTICE)
@@ -163,14 +204,24 @@ class Apply(unittest.TestCase):
         self.assertFalse(self.db.jobs['old']['selected'])
 
     def test_mismatch_registers_without_selecting_unless_forced(self):
-        b = dict(binding(), mismatch=['구성 차수 변경(1→2)'])
+        b = dict(binding(), mismatch=[REV])
         state, detail = self.apply(b=b)
         self.assertEqual(state, 'registered_unselected')
         self.assertIn('구성 차수 변경', detail)
         self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
         state, job = self.apply(b=b, force_select=True)
-        self.assertEqual(state, 'selected')
+        self.assertEqual(state, 'selected_by_decision')
         self.assertTrue(self.db.jobs[job]['selected'])
+
+    def test_image_condition_is_never_forced(self):
+        state, detail = self.apply(b=dict(binding(), mismatch=[IMG]), force_select=True)
+        self.assertEqual(state, 'registered_unselected')
+        self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
+
+    def test_denied_authority_writes_nothing(self):
+        self.db = FakeDB(operator=('owner', '정지'))
+        self.assertEqual(self.apply(), ('skipped', '재사용 권한 확인 거부'))
+        self.assertEqual((self.db.jobs, self.objects.calls), ({}, []))
 
     def test_no_select_only_registers(self):
         state, job = self.apply(select=False)
@@ -195,15 +246,17 @@ class Cli(unittest.TestCase):
     def test_dry_run_reports_without_writes(self):
         with tempfile.TemporaryDirectory() as d:
             (Path(d) / 'originals').mkdir()
-            good, missing = item(200001), item(200002)
+            good, missing, broken = item(200001), item(200002), item(200003)
             (Path(d) / 'originals' / 'P200001.png').write_bytes(PNG)
-            (Path(d) / 'manifest.json').write_text(json.dumps(dict(items=[good, missing])), encoding='utf-8')
+            (Path(d) / 'originals' / 'P200003.png').write_bytes(PNG + b'cut')
+            (Path(d) / 'manifest.json').write_text(json.dumps(dict(items=[good, missing, broken])), encoding='utf-8')
             db, lines = FakeDB(), []
-            with patch.object(m, 'current_binding', return_value=(binding(), None)):
-                result = m.run(d, engine=db, out=lines.append)
-            self.assertEqual(result['counts'], {'would_select': 1, 'skipped': 1})
+            with patch.object(m, 'current_binding', return_value=(binding(), None)), \
+                    patch.object(m, 'authority', return_value=auth()):
+                result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
+            self.assertEqual(result['counts'], {'would_select': 1, 'file_error': 2})
             self.assertEqual(db.jobs, {})
-            self.assertIn('manifest 2건', lines[-1])
+            self.assertIn('manifest 3건', lines[-1])
 
 
 if __name__ == '__main__':
