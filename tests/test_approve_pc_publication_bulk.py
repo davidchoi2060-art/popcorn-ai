@@ -1,7 +1,9 @@
 """Bulk publication approval: read-only precheck before any write, first-time approvals
 only, executor re-checked in every write transaction, per-step results. No real DB/GCS."""
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -16,7 +18,11 @@ from api import pc_publication_source_reader as source
 
 RIGHTS = m.RIGHTS_ATTESTATION
 ENV = {m.APPLY_ENV: '1', m.RIGHTS_ENV: RIGHTS}
-REFS = ['project-chat:cmsg_A', 'manifest:sha256:' + 'b' * 64]
+MANIFEST = 'b' * 64
+MSG = ['project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDAAAAAAAAAAAAAAAAAAAAAAAAAA',
+       'project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDBBBBBBBBBBBBBBBBBBBBBBBBBB']
+DECISION = dict(id='pc-publication-test', decided_by='owner', references=MSG, quotes=['원문 하나', '원문 둘'],
+                scope=dict(media_manifest_sha256=MANIFEST, findings=['copy', 'price'], steps=m.STEPS))
 OWNER = dict(operator_id=1, name='중헌', role='owner', status='활성')
 
 
@@ -38,6 +44,8 @@ class Conn:
                 if self.db.stop_after is not None and self.db.guards > self.db.stop_after:
                     self.db.operator = dict(OWNER, status='정지')
             return Rows([self.db.operator])
+        if 'import_provenance' in sql:
+            return Rows([(self.db.manifests.get(params['id'], MANIFEST),)])
         if 'FROM pc_media_jobs' in sql or 'FROM pc_configurations' in sql:
             return Rows([(i,) for i in self.db.configs])
         if 'FROM pc_configuration_parts' in sql:
@@ -56,7 +64,7 @@ class DB:
     def __init__(self, configs=('C1', 'C2'), parts=None, operator=OWNER, stop_after=None):
         self.configs, self.operator, self.isolation = list(configs), dict(operator), []
         self.parts = parts or {'C1': [101, 102], 'C2': [102, 103]}
-        self.guards, self.stop_after = 0, stop_after
+        self.guards, self.stop_after, self.manifests = 0, stop_after, {}
     def connect(self): return Conn(self)
 
 
@@ -129,11 +137,19 @@ class World:
         ]
 
 
-def go(world, db=None, apply=False, **kw):
+def ledger(decisions=(DECISION,), withdrawn=()):
+    d = tempfile.mkdtemp()
+    path = Path(d) / 'approvals.json'
+    path.write_text(json.dumps(dict(decisions=list(decisions), withdrawn=list(withdrawn)), ensure_ascii=False),
+                    encoding='utf-8')
+    return path
+
+
+def go(world, db=None, apply=False, approvals=None, **kw):
     lines = []
     if apply:
-        kw = dict(dict(operator_id=1, references=REFS, environment=ENV), **kw)
-    for p in world.patches(): p.start()
+        kw = dict(dict(operator_id=1, decision=DECISION['id'], environment=ENV), **kw)
+    for p in world.patches() + [patch.object(m, 'APPROVALS', approvals or ledger())]: p.start()
     try:
         kw.setdefault('note', '중헌 승인: 104개 구성 발행 승인')
         result = m.run(db or DB(), apply=apply, rights=RIGHTS, image_reader=lambda *a: b'', out=lines.append, **kw)
@@ -168,7 +184,8 @@ class Bulk(unittest.TestCase):
         self.assertTrue(all(c[2] == 0 for c in w.calls if c[0] in ('explain', 'publish')))
         photo_call = next(c for c in w.calls if c[0] == 'photo')
         self.assertEqual(photo_call[2:], (RIGHTS, 'gcs:b/products/101/x/detail.png'))
-        self.assertEqual(by_id(result, 'C2')['steps']['parts'], {102: ('committed', None), 103: ('committed', None)})
+        self.assertEqual(by_id(result, 'C2')['steps']['parts'], {102: ('committed_by_other', 'C1'), 103: ('committed', None)})
+        self.assertEqual(by_id(result, 'C2')['steps']['photos'][102], ('committed_by_other', 'C1'))
 
     def test_review_evidence_is_per_configuration_and_only_copy_price(self):
         w = World()
@@ -176,7 +193,8 @@ class Bulk(unittest.TestCase):
         evidence = next(c for c in w.calls if c[:2] == ('review', 'C1'))[2]
         self.assertEqual(set(evidence), {'copy', 'price'})
         for text in evidence.values():
-            for needle in ('구성 C1', '차수 3', 'r' * 64, *REFS, RIGHTS):
+            for needle in ('구성 C1', '차수 3', 'r' * 64, MANIFEST, '#pc-publication-test',
+                           *(r.split(':', 1)[1] for r in MSG), RIGHTS):
                 self.assertIn(needle, text)
         w = World(); w.extra_required['C1'] = {'cooler:1:2': '쿨러 · 추천 전 근거 확인'}
         result, _ = go(w, apply=True)
@@ -238,7 +256,7 @@ class Bulk(unittest.TestCase):
         result, _ = go(w, db=db, apply=True)
         self.assertEqual([c[0] for c in w.calls], ['explain', 'explain', 'photo'])
         self.assertTrue(result['summary']['stopped'])
-        self.assertEqual(by_id(result, 'C1')['precheck'][0], 'stopped')
+        self.assertEqual(by_id(result, 'C1')['interrupted'][0], 'stopped')
         self.assertEqual(by_id(result, 'C2')['precheck'][0], 'not_run')
 
     def test_owner_rechecked_right_before_review_and_publication(self):
@@ -248,14 +266,14 @@ class Bulk(unittest.TestCase):
                 w = World()
                 result, _ = go(w, db=DB(stop_after=stop_after), apply=True)
                 self.assertEqual([c[0] for c in w.calls], done)
-                self.assertEqual(by_id(result, 'C1')['precheck'][0], 'stopped')
+                self.assertEqual(by_id(result, 'C1')['interrupted'][0], 'stopped')
 
     def test_partial_failure_is_recorded_per_step(self):
         w = World(); w.fail_part[103] = (503, 'part_approval_metadata_write_mismatch')
         result, _ = go(w, apply=True)
         c1, c2 = by_id(result, 'C1'), by_id(result, 'C2')
         self.assertEqual(c1['publication'][0], 'committed')
-        self.assertEqual(c2['steps']['parts'][102], ('committed', None))
+        self.assertEqual(c2['steps']['parts'][102], ('committed_by_other', 'C1'))
         self.assertEqual(c2['steps']['parts'][103], ('failed', 'part_approval_metadata_write_mismatch'))
         self.assertEqual(c2['steps']['photos'], {})
         self.assertEqual((c2['review'][0], c2['publication'][0]), ('not_run', 'not_attempted'))
@@ -286,7 +304,7 @@ class Bulk(unittest.TestCase):
     def test_direct_run_is_guarded(self):
         for kw in [dict(environment={}), dict(environment={m.APPLY_ENV: '1'}),
                    dict(environment=dict(ENV, **{m.RIGHTS_ENV: 'workroom:x@v1:' + 'a' * 64})),
-                   dict(references=()), dict(operator_id=None)]:
+                   dict(decision=None), dict(operator_id=None)]:
             with self.subTest(kw=kw), self.assertRaises(PermissionError):
                 go(World(), apply=True, **kw)
         with self.assertRaises(PermissionError):
@@ -309,15 +327,90 @@ class Bulk(unittest.TestCase):
         self.assertEqual([r['configuration_id'] for r in result['configurations']], ['C2'])
 
 
+class ApprovalLedger(unittest.TestCase):
+    def test_unknown_or_missing_decision_is_refused(self):
+        for approvals in (ledger(decisions=()), ledger()):
+            with self.subTest(), self.assertRaises(PermissionError):
+                go(World(), apply=True, approvals=approvals, decision='abc')
+        self.assertEqual(m.parse_approvals()['decisions'], {})   # repo ledger: nothing applicable yet
+
+    def test_malformed_ledger_stops_everything(self):
+        bad = [dict(DECISION, references=['abc']), dict(DECISION, references=[MSG[0], None]),
+               dict(DECISION, quotes=['하나']), dict(DECISION, scope=dict(DECISION['scope'], findings=['copy', 'cooler'])),
+               dict(DECISION, scope=dict(DECISION['scope'], media_manifest_sha256='x')),
+               dict(DECISION, scope=dict(DECISION['scope'], steps=['review']))]
+        for d in bad:
+            with self.subTest(d=d), self.assertRaises(m.LedgerError):
+                go(World(), apply=True, approvals=ledger(decisions=[d]))
+        for approvals in (ledger(decisions=[DECISION, DECISION]),
+                          ledger(withdrawn=[dict(decision=DECISION['id'], configuration_id='C1', reference='')]),
+                          ledger(withdrawn=[dict(decision='other', configuration_id='C1', reference='x')])):
+            with self.subTest(), self.assertRaises(m.LedgerError):
+                go(World(), apply=True, approvals=approvals)
+
+    def test_configuration_outside_the_decision_is_not_touched(self):
+        for kind in ('withdrawn', 'manifest'):
+            with self.subTest(kind=kind):
+                w, db = World(), DB()
+                approvals = ledger(withdrawn=[dict(decision=DECISION['id'], configuration_id='C1', reference='x')]) \
+                    if kind == 'withdrawn' else ledger()
+                if kind == 'manifest':
+                    db.manifests['C1'] = 'c' * 64
+                result, _ = go(w, db=db, apply=True, approvals=approvals)
+                self.assertEqual(by_id(result, 'C1')['precheck'][0], 'out_of_scope')
+                self.assertNotIn(101, {c[1] for c in w.calls})
+                self.assertNotIn('C1', {c[1] for c in w.calls})
+                self.assertEqual(by_id(result, 'C2')['publication'][0], 'committed')
+
+    def test_withdrawal_after_precheck_blocks_the_review_write(self):
+        w, approvals = World(), ledger()
+        real = m.Batch.write_review
+        def withdraw_then_write(batch, identity):
+            approvals.write_text(json.dumps(dict(decisions=[DECISION], withdrawn=[
+                dict(decision=DECISION['id'], configuration_id=identity, reference='철회')])), encoding='utf-8')
+            return real(batch, identity)
+        with patch.object(m.Batch, 'write_review', withdraw_then_write):
+            result, _ = go(w, apply=True, approvals=approvals, only=['C1'])
+        self.assertEqual(by_id(result, 'C1')['review'], ('failed', 'approval_decision_missing_or_withdrawn'))
+        self.assertNotIn('review', {c[0] for c in w.calls})
+
+
+class Interrupted(unittest.TestCase):
+    def test_stop_at_publication_keeps_committed_steps(self):
+        result, _ = go(World(), db=DB(stop_after=5), apply=True)   # 4 part/photo writes + review, then stop
+        c1 = by_id(result, 'C1')
+        self.assertEqual(c1['interrupted'][0], 'stopped')
+        self.assertEqual(c1['review'], ('committed', None))
+        self.assertEqual(c1['publication'], ('not_run', None))
+        self.assertEqual(c1['steps']['parts'], {101: ('committed', None), 102: ('committed', None)})
+        self.assertEqual(result['summary']['interrupted'], {'stopped': 1})
+
+    def test_unexpected_error_keeps_committed_steps_and_batch_continues(self):
+        w = World()
+        real = m.Batch.write_publication
+        def publish(batch, identity):
+            if identity == 'C1':
+                raise RuntimeError('x')
+            return real(batch, identity)
+        with patch.object(m.Batch, 'write_publication', publish):
+            result, _ = go(w, apply=True)
+        c1 = by_id(result, 'C1')
+        self.assertEqual(c1['interrupted'], ('failed', 'RuntimeError'))
+        self.assertEqual(c1['review'], ('committed', None))
+        self.assertEqual(c1['publication'], ('not_run', None))
+        self.assertEqual(c1['steps']['photos'], {101: ('committed', None), 102: ('committed', None)})
+        self.assertEqual(by_id(result, 'C2')['publication'], ('committed', None))
+
+
 class Cli(unittest.TestCase):
     def test_apply_guards(self):
         base = ['--apply', '--operator-id', '1', '--approval-note', '중헌 승인 문장 그대로 기록',
-                '--approval-reference', REFS[0]]
+                '--approval-decision', DECISION['id']]
         other = 'workroom:x@v1:' + 'a' * 64
         for argv, env in [(base, {m.RIGHTS_ENV: RIGHTS}), (base, {m.APPLY_ENV: '1'}),
                           (base, dict(ENV, **{m.RIGHTS_ENV: other})), (base[:3], ENV),
                           (base[:1] + base[3:], ENV), (base[:5], ENV),
-                          (base[:6] + ['has space'], ENV)]:
+                          (base[:6] + ['아무거나'], ENV), (base, ENV)]:   # last: repo ledger has no decision yet
             with self.subTest(argv=argv, env=sorted(env.items())), self.assertRaises(SystemExit):
                 m.main(argv, environment=env)
 

@@ -8,9 +8,14 @@ Every step goes through the existing approval module, never a direct UPDATE:
                         photo-use attestation; the env value must equal it byte for byte)
                         and the private-bucket detail image as source_reference
   3. recommendation     api.pc_configuration_review.save_review(action='approve').
-                        Only the MANUAL findings copy/price are confirmed; each one's
-                        evidence names the configuration, revision, review basis and the
-                        --approval-reference values. Any other required key blocks it
+                        Only the MANUAL findings copy/price, and only when the owner
+                        decision named by --approval-decision in
+                        docs/rights/pc-publication-approval-ledger.json covers them and
+                        this configuration (its selected representative image comes from
+                        the decision's archive manifest; not withdrawn). Each finding's
+                        evidence names the configuration, revision, review basis, archive,
+                        decision id and its project-chat message ids. Any other required
+                        key, or a configuration outside the decision, blocks it
   4. publication        api.pc_customer_publication.approve with the native
                         source reader, in a REPEATABLE READ transaction
 
@@ -37,8 +42,9 @@ P offer. --only limits to configuration ids.
 
 Default is a read-only dry run. --apply needs POPCORN_PUBLICATION_BULK_APPROVE_APPLY=1,
 POPCORN_PART_PHOTO_RIGHTS_REFERENCE equal to RIGHTS_ATTESTATION, --operator-id,
---approval-note and at least one --approval-reference. Each step is its own
-transaction and its result is recorded as committed / already / not_run / failed.
+--approval-note and --approval-decision. Each step is its own transaction and its
+result is recorded as committed / already / committed_by_other (a shared part written
+for an earlier configuration) / not_run / failed, also when the batch stops midway.
 """
 import argparse
 from collections import Counter
@@ -60,7 +66,66 @@ RIGHTS_ENV = 'POPCORN_PART_PHOTO_RIGHTS_REFERENCE'
 RIGHTS_ATTESTATION = ('workroom:기록/팝콘AI/결정/popcorn-business-product-photo-use-attestation-20261006.md@v1:'
                       '8851f92e8e98f041f948cfcda04bfdf4d51949b14fbc4395ba69ada0c88ea6a2')
 AUTO_FINDINGS = {'copy', 'price'}
-REFERENCE = re.compile(r'[^\s]{3,300}')
+APPROVALS = ROOT / 'docs' / 'rights' / 'pc-publication-approval-ledger.json'
+APPROVALS_REF = 'ledger:docs/rights/pc-publication-approval-ledger.json'
+STEPS = ['explanation', 'photo', 'review', 'publication']
+
+
+class LedgerError(ValueError):
+    """The publication approval ledger is unreadable or one of its rows is malformed."""
+
+
+def _rows(data, key):
+    rows = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise LedgerError(f'{key} 가 배열이 아닙니다')
+    for n, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise LedgerError(f'{key} {n}번째 행이 객체가 아닙니다')
+    return rows
+
+
+def parse_approvals(path=None):
+    """Strict parse: {'decisions': {id: decision}, 'withdrawn': {(decision_id, configuration_id)}}.
+    Any malformed or duplicate row raises LedgerError naming it."""
+    try:
+        data = json.loads(Path(path or APPROVALS).read_text(encoding='utf-8'))
+    except Exception as error:
+        raise LedgerError(f'승인 원장을 읽을 수 없습니다: {type(error).__name__}') from None
+    decisions = {}
+    for n, d in enumerate(_rows(data, 'decisions'), 1):
+        scope, refs = d.get('scope'), d.get('references')
+        if (not isinstance(d.get('id'), str) or not re.fullmatch(r'[a-z0-9][a-z0-9-]{2,80}', d['id'])
+                or not isinstance(refs, list) or not refs
+                or not all(isinstance(r, str) and re.fullmatch(r'project-chat:cmsg_[A-Za-z0-9]{20,80}', r) for r in refs)
+                or not isinstance(d.get('quotes'), list) or len(d['quotes']) != len(refs)
+                or not all(isinstance(q, str) and q.strip() for q in d['quotes'])
+                or not isinstance(scope, dict)
+                or not isinstance(scope.get('media_manifest_sha256'), str)
+                or not re.fullmatch('[a-f0-9]{64}', scope['media_manifest_sha256'])
+                or not isinstance(scope.get('findings'), list) or not scope['findings']
+                or not set(scope['findings']) <= AUTO_FINDINGS
+                or scope.get('steps') != STEPS):
+            raise LedgerError(f'decisions {n}번째 행 형식 불일치')
+        if d['id'] in decisions:
+            raise LedgerError(f'decisions {n}번째 행의 id 가 앞 행과 중복')
+        decisions[d['id']] = d
+    gone = set()
+    for n, w in enumerate(_rows(data, 'withdrawn'), 1):
+        ref = w.get('reference')
+        if (w.get('decision') not in decisions or not isinstance(w.get('configuration_id'), str)
+                or not w['configuration_id'].strip() or not isinstance(ref, str) or not ref.strip()):
+            raise LedgerError(f'withdrawn {n}번째 행 형식 불일치')
+        gone.add((w['decision'], w['configuration_id']))
+    return dict(decisions=decisions, withdrawn=gone)
+
+
+def media_manifest(conn, identity):
+    """Archive manifest of the configuration's selected, ready representative image (or None)."""
+    from sqlalchemy import text
+    rows = [r[0] for r in conn.execute(text("""SELECT j.import_provenance->'original'->>'manifest_sha256'
+        FROM pc_media_jobs j WHERE j.configuration_id=:id AND j.selected AND j.status='ready'"""), dict(id=identity))]
+    return rows[0] if len(rows) == 1 else None
 
 
 class Stop(Exception):
@@ -135,20 +200,41 @@ def _first_time(cur, legacy=None):
 
 
 class Batch:
-    def __init__(self, engine, *, apply=False, operator_id=None, note='', references=(), rights=None,
+    def __init__(self, engine, *, apply=False, operator_id=None, note='', decision=None, rights=None,
                  image_reader=None, environment=None, out=print):
         self.engine, self.apply, self.operator_id, self.note = engine, apply, operator_id, note
-        self.references, self.rights, self.environment, self.out = tuple(references), rights, environment, out
+        self.decision_id, self.rights, self.environment, self.out = decision, rights, environment, out
         if apply:
             require_apply(rights, environment)
-            if operator_id is None or not note.strip() or not self.references:
-                raise PermissionError('--operator-id, --approval-note, --approval-reference 가 필요합니다')
+            if operator_id is None or not note.strip() or not decision:
+                raise PermissionError('--operator-id, --approval-note, --approval-decision 이 필요합니다')
+        # A malformed ledger stops the run before anything is read or written (LedgerError).
+        self.decision = self.current_decision() if decision else None
+        if decision and self.decision is None:
+            raise PermissionError(f'승인 원장에 결정 {decision} 이 없습니다')
+        self.row = None                             # configuration being processed (kept on stop)
+        self.part_by, self.photo_by = {}, {}        # code -> configuration that wrote it
         if image_reader is None:
             from api.product_images import read_image as image_reader
         self.image_reader = image_reader
         self.pre_parts, self.pre_photos = {}, {}    # code -> (state, detail, prior)
         self.parts, self.photos = {}, {}            # code -> (result, detail) of the write step
         self.users = {}                             # code -> configuration ids sharing it
+
+    def current_decision(self):
+        return parse_approvals()['decisions'].get(self.decision_id)
+
+    def scope_reason(self, conn, identity, decision=None):
+        """None when the owner decision covers this configuration; else the reason."""
+        if decision is None:
+            found = parse_approvals()
+            decision = found['decisions'].get(self.decision_id)
+            if decision is None or (self.decision_id, identity) in found['withdrawn']:
+                return '승인 결정 없음 또는 철회'
+        manifest = media_manifest(conn, identity)
+        if manifest != decision['scope']['media_manifest_sha256']:
+            return f'대표 이미지 묶음이 승인 범위와 다름({manifest})'
+        return None
 
     def guard(self, conn):
         """Inside the write transaction: the switch is still on and the executor is still
@@ -234,7 +320,8 @@ class Batch:
         if state['blockers'] or state['recommendation_state'] == 'hold':
             reasons = state['blockers'] or [v for k, v in state['required'].items() if k not in AUTO_FINDINGS]
             return ('hold', ' / '.join(reasons) or 'hold', info)
-        other = sorted(set(state['required']) - AUTO_FINDINGS)
+        allowed = AUTO_FINDINGS & set(self.decision['scope']['findings'] if self.decision else AUTO_FINDINGS)
+        other = sorted(set(state['required']) - allowed)
         if other:
             return ('blocked', '자동 확인 대상이 아닌 필수 항목: ' + ', '.join(other), info)
         if state['state'] != 'pending' or state.get('approved_by') or state.get('prior_review'):
@@ -274,7 +361,13 @@ class Batch:
         publication = self.pre_publication(identity)
         states = [v[0] for v in list(parts.values()) + list(photos.values())] + [review[0], publication[0]]
         missing = unlinked + sum(v[0] == 'missing' for v in parts.values())
-        if missing:
+        scope = None
+        if self.decision_id:
+            with self.engine.connect() as conn:
+                scope = self.scope_reason(conn, identity)
+        if scope:
+            verdict = ('out_of_scope', scope)
+        elif missing:
             verdict = ('missing', f'설명 없음 {missing}건')
         elif review[0] == 'hold':
             verdict = ('hold', review[1])
@@ -288,9 +381,11 @@ class Batch:
                     publication=publication, verdict=verdict)
 
     # writes -----------------------------------------------------------------
-    def write_part(self, code):
+    def write_part(self, code, identity=None):
         if code in self.parts:
-            return self.parts[code]
+            state, detail = self.parts[code]
+            return ('committed_by_other', self.part_by[code]) if state == 'committed' else (state, detail)
+        self.part_by[code] = identity
         from api import part_explanation_approval as part
         from fastapi import HTTPException
         conn = _tx(self.engine)
@@ -314,9 +409,11 @@ class Batch:
         self.parts[code] = result
         return result
 
-    def write_photo(self, code):
+    def write_photo(self, code, identity=None):
         if code in self.photos:
-            return self.photos[code]
+            state, detail = self.photos[code]
+            return ('committed_by_other', self.photo_by[code]) if state == 'committed' else (state, detail)
+        self.photo_by[code] = identity
         from api import part_explanation_approval as part
         from api import part_photo_approval as photo
         from fastapi import HTTPException
@@ -345,9 +442,14 @@ class Batch:
         self.photos[code] = result
         return result
 
-    def evidence(self, identity, revision, basis, label):
-        return (f'{label} 확인 · 구성 {identity} · 차수 {revision} · 검토 근거 {basis} · '
-                f'승인 근거 {" ".join(self.references)} · 사진 권리 {self.rights}')[:2000]
+    def evidence(self, identity, revision, basis, label, decision):
+        refs = ' '.join(r.split(':', 1)[1] for r in decision['references'])
+        text = (f'{label} 확인 · 구성 {identity} · 차수 {revision} · 검토 근거 {basis} · '
+                f"대표 이미지 묶음 {decision['scope']['media_manifest_sha256']} · "
+                f"승인 결정 {APPROVALS_REF}#{decision['id']} (원문 {refs}) · 사진 권리 {self.rights}")
+        if len(text) > 2000:
+            raise ValueError('근거 문장이 2000자를 넘습니다')
+        return text
 
     def write_review(self, identity):
         from api.pc_configuration_review import load_review, save_review, ReviewEdit, Finding
@@ -359,11 +461,18 @@ class Batch:
                 _, _, _, state = load_review(conn, identity)
                 if state['state'] == 'approved':
                     return ('already', None)
+                found = parse_approvals()
+                decision = found['decisions'].get(self.decision_id)
+                if decision is None or (self.decision_id, identity) in found['withdrawn']:
+                    return ('failed', 'approval_decision_missing_or_withdrawn')
+                if self.scope_reason(conn, identity, decision):
+                    return ('failed', 'out_of_scope')
                 if (state['blockers'] or state['recommendation_state'] == 'hold'
-                        or set(state['required']) - AUTO_FINDINGS or state['state'] != 'pending'
-                        or state.get('approved_by') or state.get('prior_review')):
+                        or set(state['required']) - (AUTO_FINDINGS & set(decision['scope']['findings']))
+                        or state['state'] != 'pending' or state.get('approved_by') or state.get('prior_review')):
                     return ('failed', 'state_changed_since_precheck')
-                findings = {k: Finding(confirmed=True, evidence=self.evidence(identity, state['revision'], state['basis'], v))
+                findings = {k: Finding(confirmed=True,
+                                       evidence=self.evidence(identity, state['revision'], state['basis'], v, decision))
                             for k, v in state['required'].items()}
                 save_review(conn, identity, ReviewEdit(revision=state['revision'], basis=state['basis'], action='approve',
                                                        findings=findings, note=self.note), actor)
@@ -407,6 +516,7 @@ class Batch:
                    issues={f'{k} {c}': v[:2] for k, group in (('part', pre['parts']), ('photo', pre['photos']))
                            for c, v in group.items() if v[0] not in ('ready', 'already')},
                    review=pre['review'][:2], publication=pre['publication'], steps=steps)
+        self.row = row
         if pre['verdict'][0] != 'ok':
             row['publication'] = ('not_attempted', pre['verdict'][0])
             return row
@@ -415,13 +525,14 @@ class Batch:
             row['publication'] = (('after_previous_steps' if pre['publication'][1] else 'would_approve'), None) \
                 if pre['publication'][0] == 'ready' else pre['publication']
             return row
+        row['review'], row['publication'] = ('not_run', None), ('not_run', None)
         for c in pre['codes']:
-            steps['parts'][c] = self.write_part(c) if pre['parts'][c][0] != 'already' else ('already', None)
+            steps['parts'][c] = self.write_part(c, identity) if pre['parts'][c][0] != 'already' else ('already', None)
         if any(v[0] == 'failed' for v in steps['parts'].values()):
             row['review'], row['publication'] = ('not_run', 'part'), ('not_attempted', 'part')
             return row
         for c in pre['codes']:
-            steps['photos'][c] = self.write_photo(c) if pre['photos'][c][0] != 'already' else ('already', None)
+            steps['photos'][c] = self.write_photo(c, identity) if pre['photos'][c][0] != 'already' else ('already', None)
         if any(v[0] == 'failed' for v in steps['photos'].values()):
             row['review'], row['publication'] = ('not_run', 'photo'), ('not_attempted', 'photo')
             return row
@@ -451,12 +562,25 @@ def rights_line(engine, rights):
     return f'권리 참조값: env 형식 일치 · 기존 사진 승인 최신 {total}건 중 env 와 바이트 일치 {same}건 · 새 승인은 env 값으로 기록'
 
 
-def run(engine, *, apply=False, operator_id=None, note='', references=(), rights=None, all_configs=False,
+def _interrupted(batch, identity, state, detail):
+    """Keep what the interrupted configuration already wrote; mark the rest not_run."""
+    if batch.row and batch.row['configuration_id'] == identity:
+        row = dict(batch.row, interrupted=(state, detail))
+    else:   # stopped before the precheck finished: nothing was written for it
+        row = dict(configuration_id=identity, precheck=(state, detail), interrupted=(state, detail),
+                   steps=dict(parts={}, photos={}, review=('not_run', None), publication=('not_run', None)))
+    for key in ('review', 'publication'):
+        if row.get(key, ('not_run',))[0] not in ('committed', 'already', 'failed', 'not_attempted'):
+            row[key] = ('not_run', None)
+    return row
+
+
+def run(engine, *, apply=False, operator_id=None, note='', decision=None, rights=None, all_configs=False,
         only=(), image_reader=None, environment=None, out=print):
     if apply or operator_id is not None:
         with engine.connect() as conn:
             owner(conn, operator_id)
-    batch = Batch(engine, apply=apply, operator_id=operator_id, note=note, references=references, rights=rights,
+    batch = Batch(engine, apply=apply, operator_id=operator_id, note=note, decision=decision, rights=rights,
                   image_reader=image_reader, environment=environment, out=out)
     out(rights_line(engine, rights))
     with engine.connect() as conn:
@@ -465,23 +589,26 @@ def run(engine, *, apply=False, operator_id=None, note='', references=(), rights
     for identity in ids:
         if stopped:
             rows.append(dict(configuration_id=identity, precheck=('not_run', stopped),
-                             review=('not_run', None), publication=('not_run', None)))
+                             review=('not_run', None), publication=('not_run', None), steps={}))
             continue
+        batch.row = None
         try:
             row = batch.configuration(identity)
         except Stop as error:      # executor no longer allowed: nothing more is written
             stopped = str(error)
-            row = dict(configuration_id=identity, precheck=('stopped', stopped),
-                       review=('not_run', None), publication=('not_run', None))
+            row = _interrupted(batch, identity, 'stopped', stopped)
+        except LedgerError:
+            raise                  # a malformed ledger stops the whole run
         except Exception as error:   # one configuration must not stop the batch
-            row = dict(configuration_id=identity, precheck=('failed', type(error).__name__),
-                       review=('not_run', None), publication=('not_attempted', None))
+            row = _interrupted(batch, identity, 'failed', type(error).__name__)
         rows.append(row)
         out(f"{identity}\t부품 {row.get('parts', '-')}\t사전검사 {row['precheck'][0]}\t검토 {row['review'][0]}"
-            f"\t발행 {row['publication'][0]}" + (f"\t{row['precheck'][1]}" if row['precheck'][0] != 'ok' else ''))
+            f"\t발행 {row['publication'][0]}" + (f"\t{row['precheck'][1]}" if row['precheck'][0] != 'ok' else '')
+            + (f"\t중단 {row['interrupted'][0]}: {row['interrupted'][1]}" if row.get('interrupted') else ''))
     shared = {c: users for c, users in batch.users.items() if len(users) > 1}
     summary = dict(configurations=len(ids), stopped=stopped,
                    precheck=dict(Counter(r['precheck'][0] for r in rows)),
+                   interrupted=dict(Counter(r['interrupted'][0] for r in rows if r.get('interrupted'))),
                    parts=dict(Counter(v[0] for v in batch.pre_parts.values())),
                    photos=dict(Counter(v[0] for v in batch.pre_photos.values())),
                    part_writes=dict(Counter(v[0] for v in batch.parts.values())),
@@ -493,7 +620,8 @@ def run(engine, *, apply=False, operator_id=None, note='', references=(), rights
         + (f' · 중단: {stopped}' if stopped else ''))
     for key in ('precheck', 'parts', 'photos', 'part_writes', 'photo_writes', 'review', 'publication'):
         out(f'  {key}: ' + ' · '.join(f'{k} {v}' for k, v in sorted(summary[key].items())))
-    return dict(mode='apply' if apply else 'dry-run', references=list(references), summary=summary,
+    return dict(mode='apply' if apply else 'dry-run',
+                decision=f'{APPROVALS_REF}#{decision}' if decision else None, summary=summary,
                 configurations=rows, shared_parts={str(c): u for c, u in shared.items()})
 
 
@@ -502,8 +630,7 @@ def main(argv=None, environment=None):
     parser.add_argument('--apply', action='store_true', help='실제 승인(기본은 조회만)')
     parser.add_argument('--operator-id', type=int, help='--apply 시 활성 owner 운영자 번호')
     parser.add_argument('--approval-note', default='', help='owner 승인 문장(--apply 시 10자 이상)')
-    parser.add_argument('--approval-reference', action='append', default=[],
-                        help='승인 근거 참조(반복 가능, 예: project-chat:cmsg_… · manifest:sha256:…)')
+    parser.add_argument('--approval-decision', help='docs/rights/pc-publication-approval-ledger.json 의 결정 id')
     parser.add_argument('--all', action='store_true', help='대표 이미지 유무와 관계없이 판매중 구성 전체')
     parser.add_argument('--only', action='append', default=[], help='이 구성 id만(반복 가능)')
     parser.add_argument('--report', type=Path, help='결과 JSON 저장 경로')
@@ -515,12 +642,18 @@ def main(argv=None, environment=None):
             require_apply(rights, environment)
         except PermissionError as error:
             parser.error(str(error))
-        if (not args.operator_id or len(args.approval_note.strip()) < 10 or not args.approval_reference
-                or not all(REFERENCE.fullmatch(r) for r in args.approval_reference)):
-            parser.error('--apply 는 --operator-id, --approval-note(10자 이상), --approval-reference(공백 없는 3~300자)가 필요합니다')
+        if not args.operator_id or len(args.approval_note.strip()) < 10 or not args.approval_decision:
+            parser.error('--apply 는 --operator-id, --approval-note(10자 이상), --approval-decision 이 필요합니다')
+    if args.apply or args.approval_decision:
+        try:
+            found = parse_approvals()
+        except LedgerError as error:
+            parser.error(f'승인 원장 {APPROVALS.name}: {error} -- 전체 실행을 중단합니다')
+        if args.approval_decision not in found['decisions']:
+            parser.error(f'승인 원장에 결정 {args.approval_decision} 이 없습니다 -- 적용하지 않습니다')
     from api.db import engine
     result = run(engine, apply=args.apply, operator_id=args.operator_id, note=args.approval_note.strip(),
-                 references=args.approval_reference, rights=rights, all_configs=args.all, only=args.only,
+                 decision=args.approval_decision, rights=rights, all_configs=args.all, only=args.only,
                  environment=environment)
     if args.report:
         args.report.write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding='utf-8')
