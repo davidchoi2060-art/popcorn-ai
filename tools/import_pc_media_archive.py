@@ -222,6 +222,12 @@ def provenance(item, manifest_sha, binding, principal=None, selection=None):
             visual_basis=binding['visual_basis'], review_basis=binding['review_basis']))
 
 
+def require_apply_env(environment=None):
+    """Every write entry point checks the apply switch, not only the CLI."""
+    if (os.environ if environment is None else environment).get('POPCORN_EXISTING_MEDIA_IMPORT_APPLY') != '1':
+        raise PermissionError('POPCORN_EXISTING_MEDIA_IMPORT_APPLY=1 이 필요합니다')
+
+
 def request_id(manifest_sha, code, original_sha):
     return str(uuid5(NAMESPACE, f'{manifest_sha}:{code}:{original_sha}'))
 
@@ -240,6 +246,7 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
     from sqlalchemy import text
     from api.pc_media import NOTICE
     from api.pc_existing_media_import import canonical, Denied
+    require_apply_env()
     code, request = product_code(item), request_id(manifest_sha, product_code(item), item['original_sha256'])
     actor = principal.actor
     with engine.begin() as conn:
@@ -343,6 +350,8 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
             raise PermissionError('활성 owner 계정만 적용할 수 있습니다') from None
     elif apply:
         raise PermissionError('--operator-id 가 필요합니다')
+    if apply:
+        require_apply_env()
     for item in items:
         code = product_code(item)
         if only and code not in only:

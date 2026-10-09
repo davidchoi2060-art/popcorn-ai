@@ -163,6 +163,13 @@ class ReuseAuthority(unittest.TestCase):
 class Apply(unittest.TestCase):
     def setUp(self):
         self.db, self.objects = FakeDB(), Objects()
+        env = patch.dict('os.environ', {'POPCORN_EXISTING_MEDIA_IMPORT_APPLY': '1'})
+        env.start(); self.addCleanup(env.stop)
+
+    def test_apply_switch_is_checked_at_the_write_entry(self):
+        with patch.dict('os.environ', {'POPCORN_EXISTING_MEDIA_IMPORT_APPLY': '0'}), self.assertRaises(PermissionError):
+            self.apply()
+        self.assertEqual((self.db.jobs, self.objects.calls), ({}, []))
 
     def apply(self, b=None, reason=None, raw=PNG, **kw):
         with patch.object(m, 'current_binding', return_value=(b or binding(), reason)):
