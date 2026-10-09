@@ -84,6 +84,7 @@ def call_recommend(game_context=None):
          patch.object(G, '_game_context', lambda conn, names, vocab: game_context), \
          patch.object(G, '_record_estimate', lambda st: (False, DB_ERROR)), \
          patch.object(S, 'load', lambda: (LEVELS, PRODUCTS)), \
+         patch.object(S, 'public_codes', lambda: frozenset()), \
          patch.object(G._PC_OFFER, 'public_item', lambda code: dict(NOT_PUBLIC_ITEM)):
         return G.recommend(G.RecommendBody(state={'usages': ['게임', '영상편집']}))
 
@@ -209,6 +210,68 @@ class PickRuleTest(unittest.TestCase):
         src = pathlib.Path(S.__file__).read_text(encoding='utf-8')
         for old in ('예산 안 최고 수준', '같은 수준 다른 구성', '가장 저렴한 선택', '한 단계 위"'):
             self.assertNotIn(old, src.split('"""', 2)[2])
+
+
+class PublicPreferenceTest(unittest.TestCase):
+    """2026-10-09 조정 결정: 같은 판정 안에서만 고객 공개 승인(사진 있음) 상품을 먼저 고른다."""
+    p = staticmethod(PickRuleTest.p)
+
+    def pick(self, items, budget, bound='이하', preferred=frozenset()):
+        return S.pick('게임', 1, budget, bound, [], {i['code']: i for i in items}, preferred)
+
+    def roles(self, res):
+        return [(i['product_code'], i['role']) for i in res['items']]
+
+    ITEMS = [(1, 900000, 1), (2, 1000000, 1), (3, 1200000, 2), (4, 1400000, 2), (5, 1600000, 3)]
+
+    def items(self):
+        return [self.p(*x) for x in self.ITEMS]
+
+    def test_empty_preference_matches_previous_rule(self):
+        for budget, bound in ((1500000, '이하'), (None, None), (1300000, '이상'), (800000, '이하')):
+            self.assertEqual(self.pick(self.items(), budget, bound),
+                             self.pick(self.items(), budget, bound, frozenset({999})))
+
+    def test_recommended_prefers_public_within_top_level(self):
+        res = self.pick(self.items(), 1500000, preferred=frozenset({4}))
+        self.assertEqual(self.roles(res), [(1, 'value'), (4, 'recommended')])
+
+    def test_public_never_beats_level_or_budget(self):
+        # 5 는 예산 밖, 1 은 수준이 낮다 — 승인돼 있어도 추천 자리를 얻지 못한다.
+        res = self.pick(self.items(), 1500000, preferred=frozenset({1, 5}))
+        self.assertEqual(self.roles(res), [(1, 'value'), (3, 'recommended')])
+
+    def test_value_prefers_public_among_cheaper_than_recommended(self):
+        res = self.pick(self.items(), 1500000, preferred=frozenset({2}))
+        self.assertEqual(self.roles(res), [(2, 'value'), (3, 'recommended')])
+
+    def test_both_cards_public_when_available(self):
+        res = self.pick(self.items(), 1500000, preferred=frozenset({2, 4}))
+        self.assertEqual(self.roles(res), [(2, 'value'), (4, 'recommended')])
+        self.assertLess(res['items'][0]['price'], res['items'][1]['price'])
+
+    def test_no_budget_prefers_public_at_each_card(self):
+        res = self.pick(self.items(), None, preferred=frozenset({2, 4}))
+        self.assertEqual(self.roles(res), [(2, 'value'), (4, 'recommended')])
+
+    def test_reference_stays_cheapest_over_budget(self):
+        res = self.pick(self.items(), 800000, preferred=frozenset({3}))
+        self.assertEqual(self.roles(res), [(1, 'reference')])
+
+    def test_card_sets_reads_public_codes_once_and_passes_them(self):
+        state = TalkState(usages=['영상편집'], budget_won=2000000, budget_bound='이하')
+        prods = {1: product(1, 1200000), 2: product(2, 1500000)}
+        with patch.object(S, 'load', lambda: (LEVELS, prods)), \
+             patch.object(S, 'public_codes', lambda: frozenset({2})):
+            sets = S.card_sets(state, [], ['영상편집'], [])
+        self.assertEqual([i['product_code'] for i in sets[0]['items']], [1, 2])
+
+    def test_public_codes_failure_is_empty(self):
+        class Broken:
+            def connect(self):
+                raise RuntimeError('db down')
+        with patch.object(S, 'engine', Broken()), self.assertLogs('sold_reco', level='ERROR'):
+            self.assertEqual(S.public_codes(), frozenset())
 
 
 class GameMinRankTest(unittest.TestCase):
