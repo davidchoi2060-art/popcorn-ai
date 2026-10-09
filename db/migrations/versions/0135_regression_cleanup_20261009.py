@@ -6,9 +6,12 @@ and cmsg_012k6fnspU3tgfYTTB56KTuDKmFfwwH2KAv7BxovsXaL7i). Specs:
 /mnt/project-files/handoff/auto-lock-20261009/unlock.sql, unlock-extra.sql and
 /mnt/project-files/handoff/regression-cleanup-20261009/README.md.
 
-1. Remove the 14 `specs.<field>` locks that tools/enrich_pc_catalog_sources.py and
+1. Remove the 11 `specs.<field>` locks (7 products) that tools/enrich_pc_catalog_sources.py and
    tools/repair_pc_audit_evidence.py added on 2026-09-30 (fixed in PR #36).
-   Spec values, spec_sources and reviews stay as they are.
+   Spec values, spec_sources and reviews stay as they are. The owner's approval
+   (docs/rights/pc-publication-approval-ledger.json, pc-publication-20261009-bundle)
+   names "7개 상품 11개 항목"; the 3 in unlock-extra.sql (114723, 128080, 128085)
+   are left for a separate approval, as the server owner's README says.
 2. 94959: undo the regression product_edit that was never undone (sale price
    +1000, status 품절, both locked) exactly like POST /products/undo/{log_id}:
    price, status and locks back, a reverse price history row, and a
@@ -38,8 +41,7 @@ down_revision = '0134'
 branch_labels = None
 depends_on = None
 
-# Shared by upgrade and downgrade. Expected values are what unlock.sql and
-# unlock-extra.sql check (to_jsonb(product_specs) -> field).
+# Expected values are what unlock.sql checks (to_jsonb(product_specs) -> field).
 COMMON_SQL = r'''
 CREATE TEMP TABLE m0135_unlock(product_code bigint, field text, expect jsonb) ON COMMIT DROP;
 INSERT INTO m0135_unlock VALUES
@@ -53,10 +55,7 @@ INSERT INTO m0135_unlock VALUES
   (129552,'form_factor_list','["m-ATX", "mini-ITX"]'),
   (129551,'gpu_max_mm','240'),
   (129551,'cooler_height_mm','75'),
-  (129551,'form_factor_list','["m-ATX", "mini-ITX"]'),
-  (114723,'socket_list','["AM4", "AM5", "LGA115(X)", "LGA1200", "LGA1700", "LGA1851"]'),
-  (128080,'gpu_power_draw_watt','140'),
-  (128085,'gpu_power_draw_watt','300');
+  (129551,'form_factor_list','["m-ATX", "mini-ITX"]');
 '''
 
 UPGRADE_SQL = COMMON_SQL + r'''
