@@ -44,6 +44,9 @@ def apply(c,source):
         assert digest(row)==digest(before_specs[code]), 'Spec changed'
         prod=dict(c.execute(text('SELECT product_code,locked_fields,product_name,spec_source_text FROM products WHERE product_code=:code FOR UPDATE'),dict(code=code)).mappings().one())
         assert prod['spec_source_text']==before_rows[code]['spec_source_text'], 'Spec source changed'
+        locked=set(prod['locked_fields'] or [])
+        # Both lock spellings (bare field and specs.field) mean a person owns the value: refuse before any write.
+        assert not any(f in locked or 'specs.'+f in locked for f in updates), 'Locked field requires review'
         backups['specs'].append(row);backups['products'].append(prod)
         sources=dict(row.get('spec_sources') or {})
         for field,value in updates.items():

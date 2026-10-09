@@ -6,8 +6,12 @@ to products.locked_fields. A lock means "a person entered this" to the
 review-queue checks, so those unconfirmed values looked confirmed. Only the
 admin spec-entry path may lock. These tests run each tool's apply() on a
 recording fake connection and check that specs are written and locks are not.
+They also check that both tools refuse a field locked as `field` or
+`specs.field` before writing anything (repair had no such check until
+2026-10-09), and the spec_sources value each tool stores.
 """
 import copy
+import json
 import unittest
 from unittest.mock import patch
 
@@ -75,6 +79,12 @@ def _fixture(code, spec):
 
 
 class NoAutoLockTests(unittest.TestCase):
+    @staticmethod
+    def saved_sources(conn):
+        saved = [p["v"] for q, p in conn.writes("product_specs") if "SET spec_sources=" in q]
+        assert len(saved) == 1, saved
+        return json.loads(saved[0])
+
     def assert_no_lock(self, conn):
         locks = [q for q, _ in conn.sql if "locked_fields" in q and not q.startswith("SELECT")]
         self.assertEqual(locks, [], "automatic source fill wrote locked_fields")
@@ -88,6 +98,8 @@ class NoAutoLockTests(unittest.TestCase):
         enrich.apply(conn, snapshot, [item])
         filled = [p for q, p in conn.writes("product_specs") if "SET cooler_tdp=" in q]
         self.assertEqual(filled, [dict(code=120906, value=280)])
+        self.assertEqual(self.saved_sources(conn),
+                         {"cooler_tdp": "manufacturer:2026-09-30:https://example.com/c"})
         self.assert_no_lock(conn)
 
     def test_enrich_still_refuses_human_locked_field(self):
@@ -108,7 +120,57 @@ class NoAutoLockTests(unittest.TestCase):
             repair.apply(conn, snapshot)
         filled = [p for q, p in conn.writes("product_specs") if "SET mem_type=" in q]
         self.assertEqual(filled, [dict(code=129775, v="DDR5")])
+        self.assertEqual(self.saved_sources(conn), {
+            "mem_type": "audit:2026-09-30:https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=129775"})
         self.assert_no_lock(conn)
+
+    def run_repair_114723(self, locked_fields):
+        # The real 114723 entry: socket_list already has a value and is overwritten when unlocked.
+        old = ["AM4", "AM5"]
+        spec = dict(product_code=114723, socket_list=old, spec_sources={})
+        explanation, product, snapshot = _fixture(114723, spec)
+        product["locked_fields"] = locked_fields
+        conn = FakeConn(explanation, product, spec)
+        with patch.object(repair, "FACT_CODES", set()), \
+             patch.object(repair, "SPEC_REPAIRS", {114723: repair.SPEC_REPAIRS[114723]}):
+            repair.apply(conn, snapshot)
+        return conn
+
+    def test_repair_overwrites_unlocked_114723_with_audit_source(self):
+        conn = self.run_repair_114723(["cost_price"])
+        filled = [json.loads(p["v"]) for q, p in conn.writes("product_specs") if "SET socket_list=" in q]
+        self.assertEqual(filled, [repair.SPEC_REPAIRS[114723]["socket_list"]])
+        self.assertEqual(self.saved_sources(conn), {"socket_list": "audit:2026-09-30:" + repair.THERMAL})
+        self.assert_no_lock(conn)
+
+    def test_repair_refuses_locked_field_in_either_spelling_and_writes_nothing(self):
+        for locks in (["specs.socket_list"], ["socket_list"]):
+            with self.subTest(locks=locks):
+                with self.assertRaises(AssertionError):
+                    self.run_repair_114723(locks)
+        # Same for a NULL-fill target, checked on the connection itself.
+        for locks in (["specs.mem_type"], ["mem_type"]):
+            with self.subTest(locks=locks):
+                spec = dict(product_code=129775, mem_type=None, spec_sources={})
+                explanation, product, snapshot = _fixture(129775, spec)
+                product["locked_fields"] = locks
+                conn = FakeConn(explanation, product, spec)
+                with patch.object(repair, "FACT_CODES", set()), \
+                     patch.object(repair, "SPEC_REPAIRS", {129775: dict(mem_type="DDR5")}):
+                    with self.assertRaises(AssertionError):
+                        repair.apply(conn, snapshot)
+                self.assertEqual([q for q, _ in conn.sql if q.startswith("UPDATE")], [])
+
+    def test_enrich_refuses_bare_field_lock_too(self):
+        spec = dict(product_code=120906, cooler_tdp=None, gpu_power_draw_watt=None, spec_sources={})
+        explanation, product, snapshot = _fixture(120906, spec)
+        product["locked_fields"] = ["cooler_tdp"]
+        item = dict(code=120906, specs=dict(cooler_tdp=280), facts=[], note="n",
+                    source=dict(id="mfr", kind="manufacturer", url="https://example.com/c"))
+        conn = FakeConn(explanation, product, spec)
+        with self.assertRaises(AssertionError):
+            enrich.apply(conn, snapshot, [item])
+        self.assertEqual(conn.writes("product_specs"), [])
 
 
 if __name__ == "__main__":
