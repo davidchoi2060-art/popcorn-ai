@@ -172,13 +172,39 @@ class ReuseAuthority(unittest.TestCase):
                                    (w(product_code=200001, original_sha256=None), Decision.DENY),
                                    (w(product_code=200001, original_sha256=sha), Decision.DENY),
                                    (w(product_code=200002, original_sha256=None), Decision.ALLOW),
-                                   (w(product_code=200001, original_sha256=None, decision='other'), Decision.ALLOW),
                                    (w(product_code='200001', original_sha256=None), Decision.DENY),
                                    (dict(base, decisions=[]), Decision.DENY), (bad_scope, Decision.DENY),
                                    ('not json', Decision.DENY)]:
                 path.write_text(body if isinstance(body, str) else json.dumps(body), encoding='utf-8')
                 with self.subTest(body=body), patch.object(m, 'LEDGER', path):
                     self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), expected)
+
+    def test_any_malformed_withdrawal_row_denies_everything_and_names_the_row(self):
+        base = json.loads(m.LEDGER.read_text(encoding='utf-8'))
+        ok = dict(decision='pc-media-reuse-20261009', product_code=200002, reference='x', original_sha256=None)
+        bad_rows = [dict(ok, product_code='200001'), dict(ok, product_code=0), dict(ok, product_code=-1),
+                    dict(ok, product_code=True), dict(ok, reference=''), dict(ok, reference='  '),
+                    {k: v for k, v in ok.items() if k != 'reference'}, dict(ok, reference=5),
+                    dict(ok, original_sha256='abc'), dict(ok, original_sha256='A' * 64), dict(ok, original_sha256=7),
+                    dict(ok, decision='other'), 'P200001', None]
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'ledger.json'
+            for bad in bad_rows:
+                # The bad row is second: a good first row must not hide it.
+                path.write_text(json.dumps(dict(base, withdrawn=[ok, bad])), encoding='utf-8')
+                with self.subTest(bad=bad), patch.object(m, 'LEDGER', path):
+                    self.assertIsNone(m.ledger())
+                    with self.assertRaisesRegex(m.LedgerError, 'withdrawn 2번째 행'):
+                        m.parse_ledger()
+                    self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.DENY)
+                    with self.assertRaises(m.LedgerError):
+                        m.run(d, engine=FakeDB())
+                    with self.assertRaises(SystemExit):
+                        m.main(['--archive', d])
+            for body in [dict(base, withdrawn={}), dict(base, decisions={}), [1]]:
+                path.write_text(json.dumps(body), encoding='utf-8')
+                with self.subTest(body=body), patch.object(m, 'LEDGER', path):
+                    self.assertIsNone(m.ledger())
 
     def test_repo_ledger_is_valid_and_pins_the_22_archive(self):
         found = m.ledger()

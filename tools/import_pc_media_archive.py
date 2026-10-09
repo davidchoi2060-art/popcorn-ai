@@ -58,25 +58,56 @@ VERSION = 'pc-media-existing-import-v1'
 LEDGER = ROOT / 'docs' / 'rights' / 'pc-media-reuse-ledger.json'
 
 
-def ledger(path=None):
-    """{'decisions': {manifest_sha: decision}, 'withdrawn': {(decision_id, code, sha|None)}}
-    or None when the ledger is unreadable or malformed (fail closed)."""
+class LedgerError(ValueError):
+    """The reuse ledger is unreadable or one of its rows is malformed."""
+
+
+def _ledger_rows(data, key):
+    rows = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        raise LedgerError(f'{key} 가 배열이 아닙니다')
+    for n, row in enumerate(rows, 1):
+        if not isinstance(row, dict):
+            raise LedgerError(f'{key} {n}번째 행이 객체가 아닙니다')
+    return rows
+
+
+def parse_ledger(path=None):
+    """Strict parse. Any malformed row raises LedgerError naming the row (1-based):
+    a withdrawal that cannot be read must never turn into "nothing withdrawn"."""
     try:
         data = json.loads(Path(path or LEDGER).read_text(encoding='utf-8'))
-        decisions = {}
-        for d in data['decisions']:
-            if (not re.fullmatch('[a-f0-9]{64}', d['manifest_sha256']) or not str(d['id']).strip()
-                    or not d['references'] or d['scope']['reused_from'] != 'same_archive_only'
-                    or not set(d['scope']['select_despite']) <= {'revision'}):
-                return None
-            decisions[d['manifest_sha256']] = d
-        gone = set()
-        for w in data['withdrawn']:
-            if type(w.get('product_code')) is not int or not str(w.get('reference', '')).strip():
-                return None
-            gone.add((w['decision'], w['product_code'], w.get('original_sha256')))
-        return dict(decisions=decisions, withdrawn=gone)
-    except Exception:
+    except Exception as error:
+        raise LedgerError(f'원장을 읽을 수 없습니다: {type(error).__name__}') from None
+    decisions, ids = {}, set()
+    for n, d in enumerate(_ledger_rows(data, 'decisions'), 1):
+        scope = d.get('scope')
+        if (not isinstance(d.get('manifest_sha256'), str) or not re.fullmatch('[a-f0-9]{64}', d['manifest_sha256'])
+                or not isinstance(d.get('id'), str) or not d['id'].strip()
+                or not isinstance(d.get('references'), list) or not d['references']
+                or not isinstance(scope, dict) or scope.get('reused_from') != 'same_archive_only'
+                or not isinstance(scope.get('select_despite'), list)
+                or not set(scope['select_despite']) <= {'revision'}):
+            raise LedgerError(f'decisions {n}번째 행 형식 불일치')
+        decisions[d['manifest_sha256']] = d
+        ids.add(d['id'])
+    gone = set()
+    for n, w in enumerate(_ledger_rows(data, 'withdrawn'), 1):
+        code, sha, ref = w.get('product_code'), w.get('original_sha256'), w.get('reference')
+        if (w.get('decision') not in ids or type(code) is not int or code <= 0
+                or not isinstance(ref, str) or not ref.strip()
+                or not (sha is None or (isinstance(sha, str) and re.fullmatch('[a-f0-9]{64}', sha)))):
+            raise LedgerError(f'withdrawn {n}번째 행 형식 불일치')
+        gone.add((w['decision'], code, sha))
+    return dict(decisions=decisions, withdrawn=gone)
+
+
+def ledger(path=None):
+    """{'decisions': {manifest_sha: decision}, 'withdrawn': {(decision_id, code, sha|None)}}
+    or None when the ledger is unreadable or any row is malformed (fail closed: DENY)."""
+    try:
+        return parse_ledger(path)
+    except LedgerError:
         return None
 
 
@@ -455,6 +486,7 @@ def summary(counts, uploaded):
 
 def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
         out=print):
+    parse_ledger()   # a malformed ledger row stops the whole run before anything is read or written
     manifest_sha, items = load_manifest(archive)
     skus = {str(i.get('configuration_id')) for i in items if isinstance(i, dict)}
     rows, counts, uploaded, compared = [], {}, 0, {}
@@ -518,6 +550,10 @@ def main(argv=None, environment=None):
     environment = os.environ if environment is None else environment
     if args.apply and (environment.get('POPCORN_EXISTING_MEDIA_IMPORT_APPLY') != '1' or not args.operator_id):
         parser.error('--apply 는 POPCORN_EXISTING_MEDIA_IMPORT_APPLY=1 과 --operator-id 가 필요합니다')
+    try:
+        parse_ledger()
+    except LedgerError as error:
+        parser.error(f'재사용 원장 {LEDGER.name}: {error} -- 전체 실행을 중단합니다')
     from api.db import engine
     objects = None
     if args.apply:
