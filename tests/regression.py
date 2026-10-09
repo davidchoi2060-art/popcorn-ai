@@ -10570,6 +10570,17 @@ def test_part_photos_open():
     if _engine is None:
         check("[66] 승인 구성 대조 — DB 없음으로 건너뜀", True, "건너뜀", _db_why, kind="DB")
         return
+    # 이미지 바이트는 서버가 비공개 버킷에서 VM 자격 증명(ADC)으로 읽는다. 로컬은 개인 자격
+    # 증명으로 읽혀서 «로컬에선 보이는데 서버에선 안 보이는» 갈래가 된다 — 503 이면 그것이다.
+    img = [r["code"] for r in db_all(
+        "SELECT source_product_code AS code FROM product_explanations"
+        " WHERE content ? 'image_asset' ORDER BY source_product_code LIMIT 3")]
+    if img:
+        got = [(c, anon_call(f"/api/product-images/{c}/detail")[0]) for c in img]
+        check("[66] 등록된 부품 이미지를 서버가 저장소에서 읽는다(503 = 저장소 권한 없음)",
+              all(st == 200 for _c, st in got), "전부 200", got)
+    else:
+        check("[66] 등록된 부품 이미지가 없어 저장소 읽기 검사를 건너뜀", True, "건너뜀", 0, kind="SKIP")
     codes = [r["code"] for r in db_all(
         "SELECT p.product_code AS code FROM pc_configuration_offers o"
         " JOIN products p ON o.offer_id = 'P' || p.product_code::text"
