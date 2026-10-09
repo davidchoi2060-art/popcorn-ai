@@ -379,6 +379,54 @@ def anon_status(path, body=None):
         return e.code
 
 
+def anon_call(path, body=None):
+    """anon_status 와 같되 (상태, 본문 JSON|None) 를 돌려준다 — 실패 «사유 코드»까지 본다."""
+    req = urllib.request.Request(
+        BASE + path,
+        data=None if body is None else json.dumps(body).encode(),
+        method="GET" if body is None else "POST",
+        headers={} if body is None else {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as r:
+            raw, st = r.read(), r.status
+    except urllib.error.HTTPError as e:
+        raw, st = e.read(), e.code
+    try:
+        return st, json.loads(raw or b"null")
+    except ValueError:
+        return st, None
+
+
+def customer_auth_closed():
+    """고객 세션 저장소·발급자가 아직 연결되지 않았는가(C4 경계 · PR #10 수용본).
+
+    판단은 응답이 아니라 **코드**에서 한다 — `api.customer_auth.RUNTIME_RESOLVER` 의 두 포트가
+    준비 안 됨(False)을 돌려주면 서버는 설계상 로그인·/api/my/* 를 전부 503 auth_unavailable
+    로 닫는다(옛 dev 어댑터는 남의 이메일로 세션을 받을 수 있어 폐기됐다). 응답을 보고 기대값을
+    정하면 무엇이 오든 통과하므로 그렇게 하지 않는다. 포트가 연결되는 날(C2/I1) 이 함수가
+    False 가 되고 아래 회원 경계 검사(401·403·404·409)가 다시 돈다.
+    """
+    try:
+        import api.customer_auth as _ca
+        r = _ca.RUNTIME_RESOLVER
+        return r.repository.schema_ready() is not True or r.issuer.ready() is not True
+    except Exception:
+        return False
+
+
+def _check_customer_auth_closed(where):
+    """닫힌 상태의 계약: 데이터 없이 503 auth_unavailable, 로그인도 세션을 주지 않는다."""
+    for label, path, body in (("미인증 회원 주문 조회", "/api/my/orders", None),
+                              ("미인증 후기 쓰기", "/api/my/reviews",
+                               {"item_id": 1, "rating": 5, "body": "회귀 닫힘 확인"}),
+                              ("고객 로그인", "/api/auth/login",
+                               {"email": "regress-guest@popcornpc.local", "provider": "dev"})):
+        st, d = anon_call(path, body)
+        code = ((d or {}).get("detail") or {}).get("code") if isinstance((d or {}).get("detail"), dict) else None
+        check(f"[{where}] 고객 인증 미연결 — {label} → 503 auth_unavailable",
+              st == 503 and code == "auth_unavailable", "503 auth_unavailable", (st, code))
+
+
 def login():
     if not ADMIN_PW:
         print("\n  ADMIN_PW가 없습니다 — `.env`에 `ADMIN_PW=...`를 넣으세요"
@@ -5295,6 +5343,14 @@ def _order_nos(items):
 # ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────
 def test_customer():
     print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30·38)")
+    if customer_auth_closed():
+        # 2026-10-09: 고객 인증이 C4 경계(PR #10)로 바뀌며 세션 저장소가 연결될 때까지
+        # 설계상 닫혀 있다. 닫힌 상태의 계약을 확인하고, 세션이 있어야 도는 경계 검사는
+        # 통과로 세지 않고 SKIP 으로 남긴다.
+        _check_customer_auth_closed("6")
+        check("[6] 회원 경계(401·타인 주문·환불 403·신규 0건) — 고객 세션 저장소 미연결(C2/I1)로 건너뜀",
+              True, "연결 후 실행", "건너뜀", kind="SKIP")
+        return
     # 슬라이스 38: 회원 경계는 **세션**이 정한다(?email= 은 더 이상 받지 않는다).
     check("미인증 회원 API 401", anon_status("/api/my/orders") == 401,
           401, anon_status("/api/my/orders"))
@@ -5643,13 +5699,18 @@ def test_swap():
 
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
-    member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
-    st, _ = post("/api/my/reviews", {"item_id": 999999,
-                                     "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
-    check("없는 주문 라인 후기 → 404", st == 404, 404, st)
-    st, _ = post("/api/my/reviews", {"item_id": 12,
-                                     "rating": 5, "body": "타인 주문 라인 테스트입니다"})
-    check("타인 주문 라인 후기 → 403", st == 403, 403, st)
+    closed = customer_auth_closed()
+    if closed:
+        check("[7] 후기 404·403 · 계정 연결 409 — 고객 세션 저장소 미연결(C2/I1)로 건너뜀",
+              True, "연결 후 실행", "건너뜀", kind="SKIP")
+    else:
+        member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
+        st, _ = post("/api/my/reviews", {"item_id": 999999,
+                                         "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
+        check("없는 주문 라인 후기 → 404", st == 404, 404, st)
+        st, _ = post("/api/my/reviews", {"item_id": 12,
+                                         "rating": 5, "body": "타인 주문 라인 테스트입니다"})
+        check("타인 주문 라인 후기 → 403", st == 403, 403, st)
     # ── 개발 전용 dev-login 은 **열려 있으면 누구나 관리자가 된다** (2026-08-11)
     #    스위치가 꺼져 있으면 404, 켜져 있어도 localhost 밖이면 403이어야 한다.
     #    회귀는 로컬에서 도니 "켜졌으면 동작"까지만 확인하고, **운영 확인은 배포 문서가 맡는다**
@@ -5669,9 +5730,10 @@ def test_guards():
     check("입고 수량 0 → 400", st == 400, 400, st)
     st, _ = post("/api/admin/sourcing/request", {"product_code": 20489103, "supplier_ids": []})
     check("공급처 미선택 견적 요청 → 400", st == 400, 400, st)
-    member_login("sy.lee@example.com")
-    st, _ = post("/api/my/account/map", {"agree": True})
-    check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
+    if not closed:
+        member_login("sy.lee@example.com")
+        st, _ = post("/api/my/account/map", {"agree": True})
+        check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 
 def test_std_schema():
@@ -7897,9 +7959,18 @@ def test_omitted_variant_screen():
 
     # ── ② 실 응답 → 실제 렌더 결과 ────────────────────────────────────────
     #   사무·주식은 제외가 있고(고성능), 영상편집은 없다. 서버에서 직접 받아 본다.
+    # 2026-10-09: 기본 추천 원천이 sold(POPCORN_RECO_SOURCE 기본값)다. sold 세트는
+    #   격자 카드를 싣지 않으므로(cards=[] · omitted_variants=[]) 아래 격자 검사는
+    #   grid 원천에서만 성립한다. sold 면 그 계약만 확인하고 격자 검사는 건너뛴다 —
+    #   cards[] 가 비어 None 을 «제외 없음»으로 읽으면 검사가 아무것도 증명하지 않는다.
+    _sold_sets = []
+
     def _set_with_omission(state):
         _st, d = post("/api/grid/recommend", {"state": state})
         for s in ((d or {}).get("card_sets") or []):
+            if s.get("kind") == "sold":
+                _sold_sets.append(s)
+                continue
             for c in (s.get("cards") or []):
                 return c
         return None
@@ -7913,6 +7984,15 @@ def test_omitted_variant_screen():
                                  "budget_bound": "이하"})
     video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
                                 "budget_bound": "이하"})
+    if _sold_sets and not office and not video:
+        check("[57] sold 세트는 격자 카드·제외 구성을 싣지 않는다(cards=[] · omitted_variants=[])",
+              all(s.get("cards") == [] and s.get("omitted_variants") == [] for s in _sold_sets),
+              "전부 빈 목록",
+              [(s.get("usage"), s.get("cards"), s.get("omitted_variants")) for s in _sold_sets
+               if s.get("cards") != [] or s.get("omitted_variants") != []][:3])
+        check("[57] 격자 카드 제외 구성 검사 — 추천 원천이 sold 라 건너뜀",
+              True, "건너뜀", "sold", kind="SKIP")
+        return
     check("[57] 사무용 카드에 제외된 구성이 내려온다(고성능)",
           bool(office) and "perf" in (office.get("omitted_variant_keys") or []),
           "perf 제외", office and office.get("omitted_variant_keys"))
