@@ -59,6 +59,8 @@ class FakeDB:
                 origin_kind='existing_import', provenance=json.loads(p['p']), actor=p['a'])
             if self.suspend_after_insert: self.operator = ('owner', '정지')
             return Result()
+        if 'WHERE request_id=:r' in sql and sql.startswith('SELECT status'):
+            return Result([j['status'] for j in self.jobs.values() if j['request_id'] == p['r']])
         if 'WHERE request_id=:r' in sql:
             return Result([dict(j) for j in self.jobs.values() if j['request_id'] == p['r']])
         if sql.startswith("UPDATE pc_media_jobs SET status='ready'"):
@@ -345,8 +347,11 @@ class Cli(unittest.TestCase):
                     result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
             self.assertEqual(outside['counts'], {'skipped': 1, 'file_error': 2})
             self.assertEqual(result['counts'], {'would_select': 1, 'file_error': 2})
+            self.assertEqual(result['summary'], {'업로드 예정': 1, '이미 있음': 0, '대표 선택 예정': 1,
+                                                 '등록만(선택 보류)': 0, '보고만': 2})
+            self.assertIn('업로드 예정 1장 / 이미 있음 0장 / 대표 선택 예정 1건', lines[-1])
             self.assertEqual(db.jobs, {})
-            self.assertIn('manifest 3건', lines[-1])
+            self.assertIn('manifest 3건', lines[-2])
 
 
 if __name__ == '__main__':

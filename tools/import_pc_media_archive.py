@@ -388,12 +388,14 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
 
 
 def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus=()):
+    """(state, detail, already_uploaded). Read-only; rolls back."""
+    from sqlalchemy import text
     from api.pc_existing_media_import import Denied
     with engine.connect() as conn:
         try:
             binding, reason = current_binding(conn, product_code(item), item)
             if reason:
-                return 'skipped', reason
+                return 'skipped', reason, False
             mode = selectable(binding, force_select)
             if auth is not None:
                 try:
@@ -402,21 +404,38 @@ def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select,
                     auth.verify_reuse(subject, principal, conn)
                     auth.verify_registration(subject, principal, conn)
                 except Denied:
-                    return 'skipped', '재사용 권한 확인 거부'
+                    return 'skipped', '재사용 권한 확인 거부', False
+            existing = conn.execute(text('SELECT status FROM pc_media_jobs WHERE request_id=:r'),
+                                    dict(r=request_id(manifest_sha, product_code(item), item['original_sha256']))).scalar()
         finally:
             conn.rollback()
+    uploaded = existing == 'ready'
     if not select or mode is None:
-        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함'
+        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함', uploaded
     if mode == 'forced':
-        return 'would_select_by_decision', _texts(binding['mismatch'])
-    return 'would_select', binding['configuration_id']
+        return 'would_select_by_decision', _texts(binding['mismatch']), uploaded
+    return 'would_select', binding['configuration_id'], uploaded
+
+
+SUMMARY = (('업로드 예정', None), ('이미 있음', None), ('대표 선택 예정', ('would_select', 'would_select_by_decision')),
+           ('등록만(선택 보류)', ('would_register_only',)), ('보고만', ('skipped', 'file_error')))
+
+
+def summary(counts, uploaded):
+    """Dry-run headline: what the apply run will upload, register/select and only report."""
+    registering = sum(counts.get(k, 0) for k in ('would_select', 'would_select_by_decision', 'would_register_only'))
+    values = {'업로드 예정': registering - uploaded, '이미 있음': uploaded}
+    for label, states in SUMMARY:
+        if states:
+            values[label] = sum(counts.get(k, 0) for k in states)
+    return values
 
 
 def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
         force_select=False, out=print):
     manifest_sha, items = load_manifest(archive)
     skus = {str(i.get('configuration_id')) for i in items if isinstance(i, dict)}
-    rows, counts = [], {}
+    rows, counts, uploaded = [], {}, 0
     auth = principal = None
     if operator_id is not None:
         auth = authority(engine, operator_id)
@@ -439,7 +458,8 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
             # A broken file is reported only; it is never registered or forced.
             state, detail = ('file_error' if file_reason(item, raw) else 'skipped'), reason
         elif not apply:
-            state, detail = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus)
+            state, detail, done = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus)
+            uploaded += done
         else:
             try:
                 state, detail = apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=select,
@@ -450,7 +470,11 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
         rows.append(dict(product_code=code, state=state, detail=detail))
         out(f'P{code}\t{state}\t{detail}')
     out('합계 ' + ' · '.join(f'{k} {v}' for k, v in sorted(counts.items())) + f' (manifest {len(items)}건)')
-    return dict(manifest_sha256=manifest_sha, counts=counts, items=rows)
+    headline = None
+    if not apply:
+        headline = summary(counts, uploaded)
+        out(' / '.join(f'{k} {v}{"장" if k in ("업로드 예정", "이미 있음") else "건"}' for k, v in headline.items()))
+    return dict(manifest_sha256=manifest_sha, counts=counts, summary=headline, items=rows)
 
 
 def main(argv=None, environment=None):
