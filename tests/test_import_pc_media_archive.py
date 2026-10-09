@@ -10,7 +10,7 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools import import_pc_media_archive as m
 from api.pc_existing_media_import import ObjectReceipt, Principal, ServerAuthority
-from tools.register_existing_pc_media import BUCKET, Decision
+from tools.register_existing_pc_media import BUCKET, Decision, MANIFEST_SHA as M
 
 PNG = b'\x89PNG\r\n\x1a\n' + b'x' * 64
 
@@ -39,8 +39,9 @@ class Result:
 
 class FakeDB:
     """Minimal pc_media_jobs table keyed by job_id."""
-    def __init__(self, operator=('owner', '활성')):
+    def __init__(self, operator=('owner', '활성'), suspend_after_insert=False):
         self.jobs, self.sql, self.operator = {}, [], operator
+        self.suspend_after_insert = suspend_after_insert
     def begin(self): return self
     def connect(self): return self
     def __enter__(self): return self
@@ -56,6 +57,7 @@ class FakeDB:
             self.jobs[p['j']] = dict(job_id=p['j'], request_id=p['r'], configuration_id=p['id'],
                 visual_basis=p['v'], status='running', selected=False, asset=None,
                 origin_kind='existing_import', provenance=json.loads(p['p']), actor=p['a'])
+            if self.suspend_after_insert: self.operator = ('owner', '정지')
             return Result()
         if 'WHERE request_id=:r' in sql:
             return Result([dict(j) for j in self.jobs.values() if j['request_id'] == p['r']])
@@ -76,9 +78,10 @@ class FakeDB:
 
 
 class Objects:
-    def __init__(self): self.calls = []
+    def __init__(self, during=None): self.calls, self.during = [], during
     def create_or_verify(self, job, raw):
         self.calls.append(job)
+        if self.during: self.during()
         return ObjectReceipt(BUCKET, f'pc-configurations/{job}/representative.png',
                              hashlib.sha256(raw).hexdigest(), len(raw), '1')
 
@@ -124,7 +127,7 @@ class ArchiveChecks(unittest.TestCase):
 
 
 def auth():
-    return ServerAuthority(reuse_verifier=m.owner_reuse_verifier,
+    return ServerAuthority(reuse_verifier=m.owner_reuse_verifier, registration_verifier=m.owner_reuse_verifier,
                            operator_reader=lambda: dict(operator_id=1, role='owner'))
 
 
@@ -133,8 +136,8 @@ IMG = ('image_condition', '이미지 조건: 장착 CPU 쿨러 확인 필요')
 
 
 class ReuseAuthority(unittest.TestCase):
-    def subject(self, raw=PNG, mismatch=(), force=False):
-        return m.reuse_subject(item(), raw, 'e' * 64, dict(binding(), mismatch=list(mismatch)), force)
+    def subject(self, raw=PNG, mismatch=(), force=False, sha=M, value=None, skus=()):
+        return m.reuse_subject(value or item(), raw, sha, dict(binding(), mismatch=list(mismatch)), force, skus)
 
     def test_owner_with_intact_file_is_allowed(self):
         self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
@@ -144,10 +147,32 @@ class ReuseAuthority(unittest.TestCase):
                  (self.subject(), Principal(1, 'operator'), FakeDB()),
                  (self.subject(), Principal(1, 'owner'), FakeDB(operator=('owner', '정지'))),
                  (self.subject(), Principal(1, 'owner'), None),
-                 (self.subject(mismatch=[IMG], force=True), Principal(1, 'owner'), FakeDB())]
+                 (self.subject(mismatch=[IMG], force=True), Principal(1, 'owner'), FakeDB()),
+                 (self.subject(sha='e' * 64), Principal(1, 'owner'), FakeDB()),
+                 (self.subject(value=item(reused_from='P999999')), Principal(1, 'owner'), FakeDB())]
         for subject, principal, conn in cases:
             with self.subTest(principal=principal):
                 self.assertIs(m.owner_reuse_verifier(subject, principal, conn), Decision.DENY)
+
+    def test_reuse_inside_the_same_archive_is_allowed(self):
+        s = self.subject(value=item(reused_from='P113838'), skus={'P113838', 'P200001'})
+        self.assertIs(m.owner_reuse_verifier(s, Principal(1, 'owner'), FakeDB()), Decision.ALLOW)
+
+    def test_withdrawal_ledger(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / 'w.json'
+            for body, expected in [(dict(withdrawn=[]), Decision.ALLOW),
+                                   (dict(withdrawn=[dict(product_code=200001, original_sha256=None, reference='x')]), Decision.DENY),
+                                   (dict(withdrawn=[dict(product_code=200001, original_sha256=item()['original_sha256'],
+                                                         reference='x')]), Decision.DENY),
+                                   (dict(withdrawn=[dict(product_code=200002, original_sha256=None, reference='x')]), Decision.ALLOW),
+                                   ('not json', Decision.DENY)]:
+                path.write_text(body if isinstance(body, str) else json.dumps(body), encoding='utf-8')
+                with self.subTest(body=body), patch.object(m, 'WITHDRAWALS', path):
+                    self.assertIs(m.owner_reuse_verifier(self.subject(), Principal(1, 'owner'), FakeDB()), expected)
+
+    def test_repo_withdrawal_ledger_is_valid_and_empty(self):
+        self.assertEqual(m.withdrawn(), set())
 
     def test_forced_revision_mismatch_is_allowed(self):
         s = self.subject(mismatch=[REV], force=True)
@@ -173,7 +198,7 @@ class Apply(unittest.TestCase):
 
     def apply(self, b=None, reason=None, raw=PNG, **kw):
         with patch.object(m, 'current_binding', return_value=(b or binding(), reason)):
-            return m.apply_one(self.db, self.objects, item(), raw, 'e' * 64, auth(), Principal(1, 'owner'), **kw)
+            return m.apply_one(self.db, self.objects, item(), raw, M, auth(), Principal(1, 'owner'), **kw)
 
     def test_registers_uploads_and_selects(self):
         state, job = self.apply()
@@ -225,6 +250,41 @@ class Apply(unittest.TestCase):
         self.assertEqual(state, 'registered_unselected')
         self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
 
+    def test_withdrawn_between_insert_and_upload_stops_before_upload(self):
+        self.db = FakeDB(suspend_after_insert=True)
+        state, detail = self.apply()
+        self.assertEqual(state, 'stopped')
+        self.assertIn('업로드 전 중단', detail)
+        self.assertEqual(self.objects.calls, [])
+        self.assertEqual([j['status'] for j in self.db.jobs.values()], ['running'])
+
+    def test_withdrawn_during_upload_is_not_marked_ready(self):
+        self.objects = Objects(during=lambda: setattr(self.db, 'operator', ('owner', '정지')))
+        state, detail = self.apply()
+        self.assertEqual(state, 'stopped')
+        self.assertIn('완료 처리 전 중단', detail)
+        self.assertEqual([(j['status'], j['selected']) for j in self.db.jobs.values()], [('running', False)])
+
+    def test_withdrawn_before_selection_is_not_selected(self):
+        calls = []
+        real = m.owner_reuse_verifier
+        def verifier(subject, principal, conn):
+            calls.append(1)
+            return real(subject, principal, conn) if len(calls) <= 6 else Decision.DENY
+        with patch.object(m, 'owner_reuse_verifier', verifier):
+            a = ServerAuthority(reuse_verifier=verifier, registration_verifier=verifier,
+                                operator_reader=lambda: dict(operator_id=1, role='owner'))
+            with patch.object(m, 'current_binding', return_value=(binding(), None)):
+                state, detail = m.apply_one(self.db, self.objects, item(), PNG, M, a, Principal(1, 'owner'))
+        self.assertEqual(state, 'registered_unselected')
+        self.assertFalse(any(j['selected'] for j in self.db.jobs.values()))
+
+    def test_other_manifest_writes_nothing(self):
+        with patch.object(m, 'current_binding', return_value=(binding(), None)):
+            result = m.apply_one(self.db, self.objects, item(), PNG, 'e' * 64, auth(), Principal(1, 'owner'))
+        self.assertEqual(result, ('skipped', '재사용 권한 확인 거부'))
+        self.assertEqual((self.db.jobs, self.objects.calls), ({}, []))
+
     def test_denied_authority_writes_nothing(self):
         self.db = FakeDB(operator=('owner', '정지'))
         self.assertEqual(self.apply(), ('skipped', '재사용 권한 확인 거부'))
@@ -258,9 +318,13 @@ class Cli(unittest.TestCase):
             (Path(d) / 'originals' / 'P200003.png').write_bytes(PNG + b'cut')
             (Path(d) / 'manifest.json').write_text(json.dumps(dict(items=[good, missing, broken])), encoding='utf-8')
             db, lines = FakeDB(), []
+            pinned = hashlib.sha256((Path(d) / 'manifest.json').read_bytes()).hexdigest()
             with patch.object(m, 'current_binding', return_value=(binding(), None)), \
                     patch.object(m, 'authority', return_value=auth()):
-                result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
+                outside = m.run(d, engine=db, operator_id=1, out=lambda _: None)
+                with patch.object(m, 'decision_manifest_sha', return_value=pinned):
+                    result = m.run(d, engine=db, operator_id=1, force_select=True, out=lines.append)
+            self.assertEqual(outside['counts'], {'skipped': 1, 'file_error': 2})
             self.assertEqual(result['counts'], {'would_select': 1, 'file_error': 2})
             self.assertEqual(db.jobs, {})
             self.assertIn('manifest 3건', lines[-1])

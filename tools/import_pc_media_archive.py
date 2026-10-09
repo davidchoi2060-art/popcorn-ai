@@ -11,12 +11,17 @@ Per item, without any generation call:
                      has exactly one CASE. A later revision or a different case does NOT
                      block registration; it withholds automatic selection unless
                      --force-select. An open image condition is reported, never forced.
-  3. reuse authority api.pc_existing_media_import.ServerAuthority.verify_reuse, wired
-                     to owner_reuse_verifier: an active owner, an intact archive file and
-                     the recorded owner decision (OWNER_DECISION: originals made by the
-                     owner, used as-is without regeneration). Reuse from another
-                     configuration and forced selection are allowed ONLY through this
-                     check, never by the manifest's reuse_exception text alone.
+  3. reuse authority api.pc_existing_media_import.ServerAuthority.verify_reuse and
+                     verify_registration, wired to owner_reuse_verifier. Scope of the
+                     owner decision (OWNER_DECISION: originals made by the owner, used
+                     as-is without regeneration): the archive pinned by #22's
+                     MANIFEST_SHA only; items listed in docs/rights/
+                     pc-media-reuse-withdrawals.json are withdrawn; a reused original must
+                     come from the same archive; a forced mismatch is revision/case only;
+                     the principal is an active owner re-read on the same transaction.
+                     Asked on the insert transaction, right before upload, inside the
+                     ready transaction and inside the selection transaction. Never
+                     granted by the manifest's reuse_exception text alone.
   4. apply           insert an origin_kind='existing_import' job bound to the
                      CURRENT visual/review basis, upload create-only to the private
                      bucket (same key layout as generated jobs), mark ready, and
@@ -55,6 +60,26 @@ OWNER_DECISION = dict(
     basis='owner_made_original_reuse_without_regeneration')
 # Mismatch kinds the owner decision allows to be selected with --force-select.
 FORCEABLE = frozenset({'revision', 'case'})
+# Scope of that decision: exactly the archive pinned by #22 (tools/register_existing_pc_media).
+# Another manifest is outside the decision and is denied.
+WITHDRAWALS = ROOT / 'docs' / 'rights' / 'pc-media-reuse-withdrawals.json'
+
+
+def decision_manifest_sha():
+    from tools.register_existing_pc_media import MANIFEST_SHA
+    return MANIFEST_SHA
+
+
+def withdrawn(path=None):
+    """Owner withdrawals of the reuse decision: {(product_code, original_sha256|None)}.
+    An unreadable or malformed file withdraws everything (fail closed)."""
+    try:
+        data = json.loads(Path(path or WITHDRAWALS).read_text(encoding='utf-8'))
+        rows = data['withdrawn']
+        return {(int(r['product_code']), r.get('original_sha256')) for r in rows
+                if type(r.get('product_code')) is int and str(r.get('reference', '')).strip()}
+    except Exception:
+        return None
 
 
 @dataclass(frozen=True)
@@ -65,6 +90,7 @@ class ArchiveReuse:
     manifest_sha256: str
     file_reason: str | None
     reused_from: str | None
+    reused_from_in_manifest: bool
     mismatch: tuple
     force_select: bool
 
@@ -158,18 +184,29 @@ def selectable(binding, force_select):
     return 'forced' if force_select and kinds <= FORCEABLE else None
 
 
-def reuse_subject(item, raw, manifest_sha, binding, force_select):
+def reuse_subject(item, raw, manifest_sha, binding, force_select, manifest_skus=()):
+    reused = item.get('reused_from') or None
     return ArchiveReuse(product_code(item), item.get('original_sha256'), manifest_sha, file_reason(item, raw),
-                        item.get('reused_from') or None, tuple(binding['mismatch']), force_select)
+                        reused, reused is not None and reused in manifest_skus, tuple(binding['mismatch']),
+                        force_select)
 
 
 def owner_reuse_verifier(subject, principal, connection):
-    """Reuse authority for the owner-made archive. ALLOW only for an active owner
-    (re-read on the caller's connection), an intact file and a mismatch the owner
-    decision covers. Anything else, including a missing connection, is DENY."""
+    """Reuse authority for the owner-made archive. ALLOW only when every scope holds:
+    the archive is the one the decision covers (pinned manifest sha256), the item
+    and its original hash are not withdrawn, a reused original comes from the same
+    archive, the file is intact, a forced mismatch is revision/case only, and the
+    principal is an active owner re-read on the caller's connection. Else DENY."""
     from sqlalchemy import text
     from tools.register_existing_pc_media import Decision
     if type(subject) is not ArchiveReuse or subject.file_reason or connection is None:
+        return Decision.DENY
+    if subject.manifest_sha256 != decision_manifest_sha() or type(subject.product_code) is not int:
+        return Decision.DENY
+    gone = withdrawn()
+    if gone is None or (subject.product_code, None) in gone or (subject.product_code, subject.original_sha256) in gone:
+        return Decision.DENY
+    if subject.reused_from is not None and not subject.reused_from_in_manifest:
         return Decision.DENY
     if getattr(principal, 'role', None) != 'owner':
         return Decision.DENY
@@ -196,7 +233,8 @@ def authority(engine, operator_id):
         if not row or row['role'] != 'owner' or row['status'] != '활성':
             return None
         return dict(operator_id=row['operator_id'], role=row['role'])
-    return ServerAuthority(reuse_verifier=owner_reuse_verifier, operator_reader=operator)
+    return ServerAuthority(reuse_verifier=owner_reuse_verifier, operator_reader=operator,
+                           registration_verifier=owner_reuse_verifier)
 
 
 def provenance(item, manifest_sha, binding, principal=None, selection=None):
@@ -239,24 +277,37 @@ def _row(conn, request):
     return dict(found) if found else None
 
 
+def _verified(conn, auth, principal, item, raw, manifest_sha, force_select, skus):
+    """(binding, None) or (None, reason) on this transaction: current binding, then
+    verify_reuse and verify_registration. Called before every write and upload."""
+    from api.pc_existing_media_import import Denied
+    binding, reason = current_binding(conn, product_code(item), item)
+    if reason:
+        return None, reason
+    subject = reuse_subject(item, raw, manifest_sha, binding, force_select, skus)
+    try:
+        auth.verify_reuse(subject, principal, conn)
+        auth.verify_registration(subject, principal, conn)
+    except Denied:
+        return None, '재사용 권한 확인 거부'
+    return binding, None
+
+
 def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=True, force_select=False,
-              new_job=uuid4):
-    """Returns (state, detail). Every DB step re-reads the current binding and
-    re-asks auth.verify_reuse on that transaction before writing."""
+              new_job=uuid4, skus=()):
+    """Returns (state, detail). Authority and the current binding are re-checked on
+    the insert transaction, right before the upload, inside the ready transaction
+    and inside the selection transaction; a change at any point stops the item."""
     from sqlalchemy import text
     from api.pc_media import NOTICE
-    from api.pc_existing_media_import import canonical, Denied
+    from api.pc_existing_media_import import canonical
     require_apply_env()
     code, request = product_code(item), request_id(manifest_sha, product_code(item), item['original_sha256'])
     actor = principal.actor
     with engine.begin() as conn:
-        binding, reason = current_binding(conn, code, item)
+        binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, False, skus)
         if reason:
             return 'skipped', reason
-        try:
-            auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, False), principal, conn)
-        except Denied:
-            return 'skipped', '재사용 권한 확인 거부'
         row = _row(conn, request)
         if row is None:
             job = str(new_job())
@@ -276,11 +327,19 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
             return 'skipped', '이전 등록 이후 구성 근거 변경 · 확인 필요'
     job = str(row['job_id'])
     if row['status'] != 'ready':
+        # No network inside a transaction: check, close, upload, then re-check before ready.
+        with engine.begin() as conn:
+            binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, False, skus)
+        if reason or binding['visual_basis'] != row['visual_basis']:
+            return 'stopped', job + ' (업로드 전 중단: ' + (reason or '구성 근거 변경') + ')'
         receipt = objects.create_or_verify(job, raw)
         if receipt.sha256 != hashlib.sha256(raw).hexdigest() or receipt.size != len(raw):
             return 'failed', '클라우드 저장 확인 불일치'
         asset = dict(asdict(receipt), notice=NOTICE)
         with engine.begin() as conn:
+            binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, False, skus)
+            if reason or binding['visual_basis'] != row['visual_basis']:
+                return 'stopped', job + ' (완료 처리 전 중단: ' + (reason or '구성 근거 변경') + ')'
             done = conn.execute(text("UPDATE pc_media_jobs SET status='ready',phase='complete',error=NULL,"
                 "asset=CAST(:a AS jsonb),updated_at=now() WHERE job_id=:j AND origin_kind='existing_import' "
                 "AND status<>'ready'"), dict(a=canonical(asset), j=job)).rowcount
@@ -297,10 +356,9 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
         mode = selectable(binding, force_select)
         if mode is None:
             return 'registered_unselected', job + ' (선택 보류: ' + _texts(binding['mismatch']) + ')'
-        try:
-            auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, mode == 'forced'), principal, conn)
-        except Denied:
-            return 'registered_unselected', job + ' (선택 보류: 재사용 권한 확인 거부)'
+        binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, mode == 'forced', skus)
+        if reason:
+            return 'registered_unselected', job + ' (선택 보류: ' + reason + ')'
         chosen = conn.execute(text("SELECT job_id,visual_basis,status FROM pc_media_jobs "
                                    "WHERE configuration_id=:id AND selected FOR UPDATE"),
                               dict(id=binding['configuration_id'])).mappings().first()
@@ -314,7 +372,7 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
     return ('selected_by_decision' if mode == 'forced' else 'selected'), job
 
 
-def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select):
+def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus=()):
     from api.pc_existing_media_import import Denied
     with engine.connect() as conn:
         try:
@@ -324,8 +382,9 @@ def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select)
             mode = selectable(binding, force_select)
             if auth is not None:
                 try:
-                    auth.verify_reuse(reuse_subject(item, raw, manifest_sha, binding, mode == 'forced'),
-                                      principal, conn)
+                    subject = reuse_subject(item, raw, manifest_sha, binding, mode == 'forced', skus)
+                    auth.verify_reuse(subject, principal, conn)
+                    auth.verify_registration(subject, principal, conn)
                 except Denied:
                     return 'skipped', '재사용 권한 확인 거부'
         finally:
@@ -340,6 +399,7 @@ def _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select)
 def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=(), select=True,
         force_select=False, out=print):
     manifest_sha, items = load_manifest(archive)
+    skus = {str(i.get('configuration_id')) for i in items if isinstance(i, dict)}
     rows, counts = [], {}
     auth = principal = None
     if operator_id is not None:
@@ -363,11 +423,11 @@ def run(archive, *, engine, objects=None, apply=False, operator_id=None, only=()
             # A broken file is reported only; it is never registered or forced.
             state, detail = ('file_error' if file_reason(item, raw) else 'skipped'), reason
         elif not apply:
-            state, detail = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select)
+            state, detail = _dry(engine, item, raw, manifest_sha, auth, principal, select, force_select, skus)
         else:
             try:
                 state, detail = apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=select,
-                                          force_select=force_select)
+                                          force_select=force_select, skus=skus)
             except Exception as error:   # one item must not stop the batch; reason is reported
                 state, detail = 'failed', type(error).__name__
         counts[state] = counts.get(state, 0) + 1
