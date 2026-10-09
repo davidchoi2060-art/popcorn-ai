@@ -2913,8 +2913,10 @@ def test_no_fabricated_data():
     # 기한을 미루려면 «왜 아직 유예인가»를 여기 적고 날짜를 옮긴다(그 자체가 기록이다).
     import datetime as _dt13
     # 2026-10-09 연장(2026-09-30 → 2026-12-31): 기한이 지나 회귀 run 37904056974 가 실패했다.
-    # 남은 유예는 관리자 `candidate-pool.html` 하나다 — P-09 동결 파일이라 고칠 대상이 아니다.
-    # 고객 `my-payments.html` 은 PR #25 가 수를 걷어 내며 따로 해소한다.
+    # 이 기한은 아래 유예 목록 «전체»에 걸린다. PR #25 가 병합되면 고객 `my-payments.html`
+    # 항목이 빠져 관리자 `candidate-pool.html`(P-09 동결 — 고칠 대상 아님) 하나만 남는다.
+    # #25 전에는 고객 항목도 이 연장을 함께 받는다.
+    # 연장은 제품 수정도 영구 면제도 아니다 — 기한이 오면 다시 판단한다.
     BAKED_EXPIRES = "2026-12-31"
     _baked_expired = _dt13.date.today().isoformat() > BAKED_EXPIRES
 
