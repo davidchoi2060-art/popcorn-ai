@@ -6873,7 +6873,8 @@ def main():
                test_game_copy_review_gate,
                test_game_context_gate,
                test_game_aliases,
-               test_market_bands_and_handling):
+               test_market_bands_and_handling,
+               test_part_photos_open):
         try:
             fn()
         except Exception as e:
