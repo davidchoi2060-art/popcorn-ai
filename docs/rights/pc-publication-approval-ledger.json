@@ -1,0 +1,5 @@
+{
+  "about": "Owner approval ledger for tools/approve_pc_publication_bulk.py. A decision names the owner's project-chat messages (references, quoted verbatim in the same order), and a scope: the archive manifest of the configuration's selected representative image, the review findings it confirms (copy and/or price only) and the four steps. --apply needs --approval-decision naming one decision here; a configuration is approved only when its selected, ready representative image comes from that manifest and it is not withdrawn. A withdrawal names a decision, a configuration_id and a non-empty reference. Any malformed or duplicate row stops the whole run. Empty decisions = nothing can be applied.",
+  "decisions": [],
+  "withdrawn": []
+}
