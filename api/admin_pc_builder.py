@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from .auth import current_operator
 from .db import engine
-from .taxonomy import SLOT_LABELS, slot_of
+from .taxonomy import SLOT_LABELS, SLOTS, slot_of
 from .part_explanations import is_current
 from .pc_configuration_copy import digest, explanation_digest
 from .pc_configuration_parts_edit import bom_hash, capacity, part_view
@@ -21,7 +21,6 @@ from .orders import ASSEMBLY_FEE
 from .timeutil import KST
 
 router = APIRouter()
-SLOTS = ('CPU', 'GPU', 'RAM', 'SSD', 'MB', 'COOLER', 'POWER', 'CASE')
 REQUIRED = {'CPU', 'RAM', 'SSD', 'MB', 'POWER', 'CASE'}
 SELECT = '''SELECT e.*,p.product_name,p.spec_source_text,p.status AS sale_status,
  p.sale_price,p.part_type,p.stock_qty FROM product_explanations e

@@ -23,6 +23,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
+
 VERSION = 'pc-customer-publication-v1'
 SOURCE_POLICY = 'pc-publication-source-v1'
 MAX_BIGINT = 2**63 - 1
@@ -166,7 +168,7 @@ def _stamp(value):
     value = value.astimezone(timezone.utc)
     if value > datetime.now(timezone.utc):
         raise _Unavailable('publication_approval_time_invalid')
-    return value.isoformat()
+    return iso(value)
 
 
 def _proof(proof, part, expected_basis, cls):

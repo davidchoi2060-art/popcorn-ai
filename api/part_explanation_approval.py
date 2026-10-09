@@ -19,6 +19,8 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import text
 
+from .timeutil import iso
+
 VERSION = 'part-explanation-approval-v1'
 SCOPE = 'internal_part_description'
 MAX_BIGINT = 2**63 - 1
@@ -69,7 +71,7 @@ def _time(value):
     value = value.astimezone(timezone.utc)
     if value > datetime.now(timezone.utc):
         _fail(503, 'part_approval_time_invalid')
-    return value.isoformat()
+    return iso(value)
 
 
 def _json(value):
