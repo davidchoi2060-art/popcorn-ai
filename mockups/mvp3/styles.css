@@ -409,3 +409,14 @@ body.live-mode.original-flow .public-bom .live-spec-grid dd{margin:0;min-width:0
  body.live-mode.original-flow .live-summary{padding:14px 18px}
  body.live-mode.original-flow .live-summary>.live-product-photo img{height:110px}
 }
+
+/* R01 results heading, condition chips and card footer. */
+.title-copy{min-width:0}.results-subtitle{margin:6px 0 0;font-size:16px;color:var(--muted)}
+.condition-chip{border-radius:8px;padding:8px 12px;gap:8px;color:var(--ink);font-size:14px}
+.condition-chip .ui-icon{width:18px;height:18px;filter:none;opacity:.75}
+.condition-chip .chip-change{color:var(--muted);font-size:16px;line-height:1}
+.condition-chip.is-assumed{border-style:dashed;color:var(--muted);cursor:default}
+body.live-mode.original-flow .live-product-card .card-detail{width:100%;margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px;height:18px;filter:brightness(0) invert(1)}
+.results-note{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0 0;font-size:14px;color:var(--muted)}
+.results-note .ui-icon{width:18px;height:18px;opacity:.7}
