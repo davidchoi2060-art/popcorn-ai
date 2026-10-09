@@ -767,7 +767,7 @@ def recommend(body: RecommendBody):
             # 게임은 등급이 있어야 수준을 정한다(needs 에 game.grade 가 남는 것은 그대로).
             others = [u for u in state.usages if not is_game_usage(u)]
             card_sets.extend(SOLD.card_sets(
-                state, game_usages if game_grade is not None else [], others, notes))
+                state, game_usages if game_grade is not None else [], others, notes, vocab))
             if game_usages and game_grade is not None:
                 game_resolution = state.game.resolution or DEFAULT_RESOLUTION
                 game_name = state.game.names[0] if state.game.names else None
