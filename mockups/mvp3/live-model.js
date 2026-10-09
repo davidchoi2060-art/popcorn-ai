@@ -37,6 +37,14 @@
     if(typeof value!=='string')return null;
     try{const url=new URL(value);return ['https:','http:'].includes(url.protocol)&&!url.username&&!url.password?url.href:null;}catch{return null;}
   }
+  // Approved registered photo of one BOM part. Only the exact server route for a
+  // product code is accepted; anything else is shown as "no photo", not rejected.
+  function partPhoto(part){
+    const none={state:'none',url:null},photo=part.photo;
+    if(part.pseudo||!object(photo)||photo.state!=='approved'||typeof photo.url!=='string')return none;
+    const match=/^\/api\/product-images\/([1-9][0-9]{0,15})\/detail$/.exec(photo.url);
+    return match&&Number.isSafeInteger(Number(match[1]))?{state:'approved',url:photo.url}:none;
+  }
   function publicConfiguration(value,productCode){
     const nullable=v=>v===null||typeof v==='string',positive=v=>Number.isSafeInteger(v)&&v>0;
     if(!object(value)||!positive(productCode)||value.product_code!==productCode||value.offer_id!=='P'+productCode||
@@ -55,7 +63,7 @@
         (p.pseudo&&(p.name!==null||p.description!==null||p.specs.length)))return null;
       ordinals.add(p.ordinal);
       parts.push({ordinal:p.ordinal,slot:p.slot,quantity:p.quantity,pseudo:p.pseudo,name:p.name,description:p.description,
-        specs:p.specs.map(x=>({label:x.label,value:x.value}))});
+        specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p)});
     }
     const price=value.price,stock=value.stock,c=value.compatibility,photo=value.photo,conditions={};
     if(!object(price)||!['confirmed','snapshot','estimated','needs_reconfirmation','unknown'].includes(price.state)||
@@ -146,6 +154,6 @@
       chips.push({icon:'monitor',label:'FHD · 임시 기준',assumed:true,note:'해상도를 정하지 않아 FHD(1080p)를 기준으로 조회했어요.'});
     return chips;
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,publicConfiguration,specRows,cardSpecRows,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);
