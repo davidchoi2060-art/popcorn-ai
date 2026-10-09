@@ -14,6 +14,9 @@ on:
       text:
         description: '상담 문장'
         default: '배그와 롤, 150만원으로 추천해줘'
+      probes:
+        description: '추가 GET 확인(경로:횟수, 쉼표 구분)'
+        default: '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1'
   workflow_run:
     workflows: ['배포']
     types: [completed]
@@ -38,6 +41,7 @@ jobs:
         env:
           BASE: https://popcornai.co.kr
           TEXT: ${{ inputs.text || '배그와 롤, 150만원으로 추천해줘' }}
+          PROBES: ${{ inputs.probes || '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1' }}
         run: python3 tools/ci/dev_screen_check.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: 일괄 작업 로그 요약 (읽을 수 있을 때만)
         shell: bash

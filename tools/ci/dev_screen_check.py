@@ -9,10 +9,13 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.request
 
 BASE = os.environ.get('BASE', 'https://popcornai.co.kr').rstrip('/')
 TEXT = os.environ.get('TEXT', '배그와 롤, 150만원으로 추천해줘')
+# 추가 확인(GET 경로:반복 횟수, 쉼표 구분). 승인 구성 응답 시간과 부품 사진 응답을 본다.
+PROBES = os.environ.get('PROBES', '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1')
 
 
 def post(path, body):
@@ -21,6 +24,36 @@ def post(path, body):
     t = time.monotonic()
     with urllib.request.urlopen(req, timeout=90) as r:
         return json.load(r), r.status, time.monotonic() - t
+
+
+def probe(path):
+    """GET 한 번 — (HTTP 코드, 초, 바이트). HTTP 오류도 코드로 돌려준다."""
+    t = time.monotonic()
+    try:
+        with urllib.request.urlopen(BASE + path, timeout=90) as r:
+            return r.status, time.monotonic() - t, len(r.read())
+    except urllib.error.HTTPError as e:
+        return e.code, time.monotonic() - t, len(e.read() or b'')
+    except Exception as e:
+        return f'{type(e).__name__}', time.monotonic() - t, 0
+
+
+def probes():
+    """PROBES 를 차례로 부른다. 추천 점검 결과(종료 코드)에는 영향을 주지 않는다."""
+    items = [x.strip() for x in PROBES.split(',') if x.strip()]
+    if not items:
+        return
+    print('### 추가 확인(GET)')
+    print('| 경로 | 회차 | HTTP | 시간 | 바이트 |')
+    print('|---|---|---|---|---|')
+    for item in items:
+        path, _, n = item.rpartition(':')
+        if not path or not n.isdigit():
+            path, n = item, '1'
+        for i in range(1, int(n) + 1):
+            code, sec, size = probe(path)
+            print(f'| {path} | {i} | {code} | {sec:.2f}s | {size} |')
+    print()
 
 
 def cards(node):
@@ -65,7 +98,9 @@ def main():
 
 if __name__ == '__main__':
     try:
-        sys.exit(main())
+        rc = main()
     except Exception as e:  # 실패도 요약에 남긴다
         print(f'- 실패: {type(e).__name__}: {e}')
-        sys.exit(1)
+        rc = 1
+    probes()
+    sys.exit(rc)
