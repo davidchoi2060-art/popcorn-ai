@@ -25,6 +25,9 @@ import json
 import logging
 import os
 import pathlib
+import re
+import threading
+from collections import OrderedDict
 from copy import deepcopy
 from urllib.parse import quote
 
@@ -76,8 +79,49 @@ def rights_reference():
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+# 2026-10-09: 부품 사진 승인이 생기자 추천·저장 견적 한 번마다 공개 판정이 부품 사진 원본(PNG)을
+# 저장소에서 순서대로 전부 내려받아 60초를 넘겼다(상품 2개 x 실부품 수). 바이트는 asset 의
+# detail_sha256 로 read_image 가 검증하므로 같은 (상품, 키, 해시)면 내용이 같다 — 프로세스 안에
+# 검증된 바이트만 담아 두고, 예산을 넘으면 오래된 것부터 버린다. 실패는 담지 않는다.
+IMAGE_CACHE_BYTES = 128 * 1024 * 1024
+_image_cache = OrderedDict()
+_image_cache_size = 0
+_image_cache_lock = threading.Lock()
+
+
+def _image_key(asset, code, variant):
+    if variant != "detail" or type(asset) is not dict:
+        return None
+    sha, key = asset.get("detail_sha256"), asset.get("detail_key")
+    if not (isinstance(sha, str) and re.fullmatch(r"[a-f0-9]{64}", sha) and isinstance(key, str)):
+        return None
+    return (code, asset.get("bucket"), key, sha)
+
+
+def cached_read_image(asset, code, variant):
+    """read_image 와 같은 계약. 검증을 통과한 detail 바이트만 재사용한다."""
+    global _image_cache_size
+    key = _image_key(asset, code, variant)
+    if key is not None:
+        with _image_cache_lock:
+            data = _image_cache.get(key)
+            if data is not None:
+                _image_cache.move_to_end(key)
+                return data
+    data = read_image(asset, code, variant)
+    if key is not None and hashlib.sha256(data).hexdigest() == key[3] and len(data) <= IMAGE_CACHE_BYTES:
+        with _image_cache_lock:
+            if key not in _image_cache:
+                _image_cache[key] = data
+                _image_cache_size += len(data)
+            while _image_cache_size > IMAGE_CACHE_BYTES:
+                _, old = _image_cache.popitem(last=False)
+                _image_cache_size -= len(old)
+    return data
+
+
 def _source_reader():
-    return make_source_reader(image_reader=read_image, business_rights_reference=rights_reference())
+    return make_source_reader(image_reader=cached_read_image, business_rights_reference=rights_reference())
 
 
 def _public_offer(conn, product_code):

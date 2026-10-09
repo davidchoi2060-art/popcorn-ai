@@ -248,7 +248,7 @@ class SourceReaderWiringTest(unittest.TestCase):
         with patch.object(m, "make_source_reader") as make, \
                 patch.dict(m.os.environ, {m.RIGHTS_ENV: " workroom:x@v1:" + "a" * 64 + " "}):
             m._source_reader()
-        make.assert_called_once_with(image_reader=m.read_image,
+        make.assert_called_once_with(image_reader=m.cached_read_image,
                                      business_rights_reference="workroom:x@v1:" + "a" * 64)
 
     def test_missing_env_uses_repository_file(self):
@@ -280,3 +280,58 @@ class SourceReaderWiringTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CachedImageReaderTest(unittest.TestCase):
+    """2026-10-09 추천 시간 초과: 같은 부품 사진을 요청마다 저장소에서 다시 받지 않는다."""
+    DATA = b"\x89PNG\r\n\x1a\npart"
+
+    def setUp(self):
+        m._image_cache.clear()
+        m._image_cache_size = 0
+
+    def asset(self, data=None, key="products/11/0123456789abcdef/detail.png"):
+        return {"bucket": m.MEDIA_BUCKET, "detail_key": key,
+                "detail_sha256": hashlib.sha256(data or self.DATA).hexdigest()}
+
+    def test_verified_detail_bytes_are_read_once(self):
+        with patch.object(m, "read_image", return_value=self.DATA) as read:
+            self.assertEqual(m.cached_read_image(self.asset(), 11, "detail"), self.DATA)
+            self.assertEqual(m.cached_read_image(self.asset(), 11, "detail"), self.DATA)
+        self.assertEqual(read.call_count, 1)
+
+    def test_changed_hash_or_key_or_code_reads_again(self):
+        with patch.object(m, "read_image", return_value=self.DATA) as read:
+            m.cached_read_image(self.asset(), 11, "detail")
+            m.cached_read_image(self.asset(b"other"), 11, "detail")
+            m.cached_read_image(self.asset(key="products/11/fedcba9876543210/detail.png"), 11, "detail")
+            m.cached_read_image(self.asset(), 12, "detail")
+        self.assertEqual(read.call_count, 4)
+
+    def test_failures_and_mismatched_bytes_are_not_cached(self):
+        with patch.object(m, "read_image", side_effect=m.HTTPException(503, "x")):
+            with self.assertRaises(m.HTTPException):
+                m.cached_read_image(self.asset(), 11, "detail")
+        with patch.object(m, "read_image", return_value=b"tampered") as read:
+            m.cached_read_image(self.asset(), 11, "detail")
+            m.cached_read_image(self.asset(), 11, "detail")
+        self.assertEqual(read.call_count, 2)
+        self.assertEqual(len(m._image_cache), 0)
+
+    def test_thumbnail_and_assets_without_hash_pass_through(self):
+        with patch.object(m, "read_image", return_value=self.DATA) as read:
+            m.cached_read_image(self.asset(), 11, "thumbnail")
+            m.cached_read_image(self.asset(), 11, "thumbnail")
+            m.cached_read_image({"bucket": m.MEDIA_BUCKET, "detail_key": "k"}, 11, "detail")
+            m.cached_read_image({"bucket": m.MEDIA_BUCKET, "detail_key": "k"}, 11, "detail")
+        self.assertEqual(read.call_count, 4)
+
+    def test_byte_budget_evicts_oldest(self):
+        with patch.object(m, "IMAGE_CACHE_BYTES", len(self.DATA) * 2), \
+                patch.object(m, "read_image", return_value=self.DATA) as read:
+            for code in (11, 12, 13):
+                m.cached_read_image(self.asset(), code, "detail")
+            self.assertLessEqual(m._image_cache_size, len(self.DATA) * 2)
+            m.cached_read_image(self.asset(), 13, "detail")
+            m.cached_read_image(self.asset(), 11, "detail")
+        self.assertEqual(read.call_count, 4)
