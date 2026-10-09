@@ -2912,7 +2912,10 @@ def test_no_fabricated_data():
     #
     # 기한을 미루려면 «왜 아직 유예인가»를 여기 적고 날짜를 옮긴다(그 자체가 기록이다).
     import datetime as _dt13
-    BAKED_EXPIRES = "2026-09-30"
+    # 2026-10-09 연장(2026-09-30 → 2026-12-31): 기한이 지나 회귀 run 37904056974 가 실패했다.
+    # 남은 유예는 관리자 `candidate-pool.html` 하나다 — P-09 동결 파일이라 고칠 대상이 아니다.
+    # 고객 `my-payments.html` 은 PR #25 가 수를 걷어 내며 따로 해소한다.
+    BAKED_EXPIRES = "2026-12-31"
     _baked_expired = _dt13.date.today().isoformat() > BAKED_EXPIRES
 
     def baked_split(found_by_file, defer, label):
@@ -2956,8 +2959,9 @@ def test_no_fabricated_data():
     BAKED_ADMIN_DEFER = {
         "candidate-pool.html": (
             ["2,457"],
-            "구 /admin/*.html 백업용 동결(P-09) — 고치는 대신 admin2 에 새로 짓는다. "
-            "이 파일이 사라지거나 admin2 로 옮겨지면 이 항목도 지운다."),
+            "구 /admin/*.html 백업용 동결(P-09) — 고칠 대상이 아니다. 고치는 대신 admin2 에 새로 짓는다. "
+            "2026-08-18 _legacy/admin-phoenix/ 로 옮겨졌고(1e27d3d) 회귀가 그 폴더도 본다. "
+            "이 파일이 지워지면 이 항목도 지운다."),
     }
     baked = baked_split(baked_by_file(screens()), BAKED_ADMIN_DEFER, "관리자 화면")
     check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], sorted(set(baked))[:8])
