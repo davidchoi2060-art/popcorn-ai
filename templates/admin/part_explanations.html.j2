@@ -1,6 +1,17 @@
 {% extends "admin/_admin2_shell.html.j2" %}
 {% block title %}부품 관리{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/parts-management.css?v=20261002-1">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/parts-management.css?v=20261002-1">
+<style>
+/* 전수 점검 L66 — 사진이 없는 부품은 깨진 그림 대신 회색 빈 칸으로 그린다(아래 스크립트가 바꿔 끼운다) */
+.pm img.pm-noimg{background:var(--rv-panel2);border-radius:4px;object-fit:contain}
+@media(max-width:850px){
+  /* 전수 점검 L66 — 390px 에서 필터 셋이 화살표만 남고 글자가 사라지던 것: 검색칸을 한 줄 다 쓰고
+     셀렉트 셋은 그 아래 한 줄에 나눠 놓는다 */
+  .pm-filters>#pm-q{flex:1 1 100%}
+  .pm-filters select{flex:1 1 0;min-width:0;padding-right:4px}
+  .pm-owned{flex:1 1 100%}
+}
+</style>{% endblock %}
 {% block content %}
 <main class="pm">
 <header class="pm-heading"><div><h1>부품 관리</h1><p>사양과 고객 설명, 보완할 정보를 한곳에서 확인합니다.</p></div><div class="pm-actions"><button class="primary" id="pm-ai-top">AI 보완 제안</button><a href="/admin2/catalog-import">자료 가져오기</a></div></header>
@@ -9,4 +20,15 @@
 <div class="pm-grid"><section class="pm-list-card"><header><h2>부품 목록</h2><span id="pm-count">불러오는 중</span></header><div class="pm-list-scroll"><table class="pm-table"><thead><tr><th><input type="checkbox" id="pm-select-page" aria-label="현재 페이지 전체 선택"></th><th>부품 · 제품명</th><th>주요 사양</th><th>판매가</th><th>설명 검토</th></tr></thead><tbody id="pm-rows"></tbody></table></div><footer class="pm-pagination"><button id="pm-batch">선택 항목 보완 제안</button><div><button id="pm-prev">이전</button><span id="pm-page"></span><button id="pm-next">다음</button></div><small>표시 수와 검색 조건 유지</small></footer></section><aside class="pm-detail-card" aria-label="부품 상세"><header><h2 id="pm-detail-title" tabindex="-1">부품 상세</h2><button id="pm-back" class="pm-back">목록으로</button></header><div id="pm-detail" class="pm-detail-body"><p class="pm-empty">목록에서 부품 선택</p></div></aside></div>
 </main>
 {% endblock %}
-{% block foot_extra %}<script src="/shared/parts-management.js?v=20261002-1"></script>{% endblock %}
+{% block foot_extra %}<script src="/shared/parts-management.js?v=20261002-1"></script>
+<script>
+// 전수 점검 L66 — 썸네일이 없으면(404) 깨진 그림 아이콘이 보였다. 이 화면 안의 그림만 회색 빈 칸으로 바꾼다.
+(function(){
+  var BLANK='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="none"/><path d="M11 27l6-7 5 5 3-3 4 5z" fill="#b9b2a4"/><circle cx="25" cy="15" r="2.5" fill="#b9b2a4"/></svg>');
+  document.addEventListener('error',function(e){
+    var t=e.target;
+    if(!t||t.tagName!=='IMG'||!t.closest||!t.closest('.pm')||t.dataset.noimg)return;
+    t.dataset.noimg='1';t.classList.add('pm-noimg');t.alt='사진 없음';t.src=BLANK;
+  },true);
+})();
+</script>{% endblock %}

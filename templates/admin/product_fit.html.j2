@@ -50,6 +50,17 @@ table.pf-items th,table.pf-items td{border-bottom:1px solid var(--outline-varian
 table.pf-items td.price{text-align:right;font-family:var(--font-num);white-space:nowrap}
 .note{color:var(--on-variant)}
 .warn{color:var(--state-fail)}
+/* 전수 점검 L69 — PC 칸 안 「최저 1,878,400원부/터」처럼 낱말이 끊기던 것: 낱말 단위로만 줄바꿈 */
+table.pf td{word-break:keep-all;overflow-wrap:break-word;min-width:96px}
+/* 왼쪽 「용도 · 수준」 열을 고정 — 옆으로 밀어도 어느 줄인지 보인다 */
+table.pf th.row{position:sticky;left:0;z-index:1;box-shadow:6px 0 6px -6px rgba(0,0,0,.18)}
+table.pf thead th:first-child{left:0;z-index:2}
+@media (max-width:768px){
+  /* 390px: 첫 열(~90만)만 보이던 것 — 행 머리를 좁혀 가격대 칸이 함께 보이게 한다 */
+  table.pf{min-width:0}
+  table.pf th.row{min-width:112px;max-width:128px;font-size:11.5px}
+  table.pf td{min-width:104px}
+}
 </style>
 {% endblock %}
 
