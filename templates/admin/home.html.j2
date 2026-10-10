@@ -69,7 +69,8 @@
 .dash-flow .metric span{font:400 10.5px/1 var(--font);color:var(--rv-ink-soft)}
 .dash-flow .arrow{color:var(--rv-dim3)}
 .dash-flow .grow{flex:1}
-.dash-flow .pending{display:flex;align-items:center;gap:7px;color:var(--rv-dim)}
+.dash-flow .pending{display:flex;align-items:center;gap:7px;color:var(--rv-dim);white-space:nowrap}
+.dash-flow .pending>span{white-space:nowrap;flex:none}
 .dash-flow .pending .tag{font:600 9.5px/1 var(--font);border:1px solid rgba(0,0,0,.16);border-radius:3px;padding:3px 6px}
 .dash-flow .stock{display:flex;align-items:center;gap:7px}
 .dash-flow .stock .lbl2{font:600 10.5px/1 var(--font);color:var(--rv-faint)}
@@ -143,7 +144,7 @@
 
     <div class="dash-todo-hd">
       <span class="t">지금 할 일</span>
-      <span class="n">admin2에서 처리 가능 <b>{{ active_total_fmt }}</b>건</span>
+      <span class="n">처리 가능 <b>{{ active_total_fmt }}</b>건</span>
       <span class="grow"></span>
       <span class="note">주문·환불 계열은 인계 확정으로 표시하지 않습니다</span>
     </div>
@@ -189,7 +190,7 @@
       </span>
       <span class="arrow">→</span>
       <span class="pending">
-        <span>몰 인계</span><span class="tag">향후 사용예정</span><span>handoffs API 재정비 후 연결</span>
+        <span>몰 인계</span><span class="tag">향후 사용예정</span>
       </span>
       <span class="grow"></span>
       <span class="stock">
@@ -245,7 +246,7 @@
           </div>
           {% endfor %}
         </div>
-        <div class="dash-foot-note">장바구니는 <b>원천 없음</b>(0이 아닙니다) · 몰 인계는 handoffs API 재정비 후 연결 — 그 전에는 숫자를 표시하지 않습니다.</div>
+        <div class="dash-foot-note">장바구니는 <b>원천 없음</b>(0이 아닙니다) · 몰 인계는 아직 숫자를 표시하지 않습니다.</div>
       </div>
 
       <div class="dash-panel">

@@ -247,6 +247,14 @@ def _toc_rows() -> list[dict]:
             })
     # 순서가 있는 것 먼저(오름차순) · 없는 것은 원래 메뉴 순서 그대로 뒤에(안정 정렬).
     rows.sort(key=lambda r: (r["order"] is None, r["order"] if r["order"] is not None else 0))
+    # 화면에 보이는 순서 번호는 1부터 빈틈없이 다시 매긴다(2026-10-10 전수 점검 L107).
+    # 화이트리스트의 order 4(구 /admin2/categories)가 메뉴에서 빠져 목차가 1,2,3,5…로
+    # 건너뛰었다 — order 값 자체(정렬 기준)는 그대로 두고 표시 번호만 연속으로 준다.
+    n = 0
+    for r in rows:
+        if r["order"] is not None:
+            n += 1
+            r["order"] = n
     return rows
 
 

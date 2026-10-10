@@ -45,6 +45,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
 from .admin_ui_common import render
+from .auth import ABSOLUTE_HOURS, IDLE_MINUTES
 
 router = APIRouter(prefix="/admin2", tags=["admin-ui"])
 
@@ -58,4 +59,7 @@ def operators_roles(request: Request) -> HTMLResponse:
     """
     return render(request, "admin/operators_roles.html.j2",
                   screen_id="ADM-SYS-020", domain="operators_roles",
-                  crumb_group="시스템", crumb_now="운영자 · 권한")
+                  crumb_group="시스템", crumb_now="운영자 · 권한",
+                  # 세션 정책 문구는 화면에 숫자를 박지 않고 코드 상수를 그대로 쓴다
+                  # (2026-10-10 전수 점검 L88 — 「30분 유휴」가 실제 480분과 어긋나 있었다).
+                  absolute_hours=ABSOLUTE_HOURS, idle_minutes=IDLE_MINUTES)

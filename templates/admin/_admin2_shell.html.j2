@@ -150,6 +150,10 @@
       <a class="a2-hub" href="/mvp1/index.html" target="_blank" rel="noopener"
          data-action="open-hub" data-keep="1"
          title="내부 접근 허브" aria-label="내부 접근 허브">허브</a>
+      {#  `a2-me` — 권한 표시와 아바타를 한 덩어리로 묶는다(2026-10-10 전수 점검 L126).
+          좁은 화면에서 헤더가 줄바꿈될 때 아바타만 혼자 다음 줄로 떨어지던 것을 막는다 —
+          줄을 넘기면 둘이 함께 넘어간다. #}
+      <span class="a2-me">
       <span class="a2-roles" id="roleBox">확인 중…</span>
       {#  「아바타」 — 「내 정보」(ADM-SYS-022 · `/admin2/my-profile`)로 가는 링크.
           `docs/design/spec-my-profile.md` §진입점(2026-08-18 사장님 확정)의 순서 규약
@@ -167,6 +171,7 @@
           · 정본 명칭은 `docs/design/req/req-my-profile.md` §②(화면 라벨 = 「내 정보」). #}
       <a class="a2-avatar" href="/admin2/my-profile" data-action="open-my-profile"
          title="내 정보" aria-label="내 정보"></a>
+      </span>
     </header>
 
     {% block content %}{% endblock %}

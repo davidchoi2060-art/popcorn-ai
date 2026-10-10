@@ -53,7 +53,7 @@
 table.mn-toc{width:100%;border-collapse:collapse;font-size:13px}
 table.mn-toc th,table.mn-toc td{border-bottom:1px solid var(--outline-variant);padding:8px 10px;text-align:left;vertical-align:middle}
 table.mn-toc th{font:600 10.5px/1 var(--font-num);color:var(--rv-faint);text-transform:uppercase;letter-spacing:.04em}
-table.mn-toc td.n{font-family:var(--font-num);color:var(--rv-faint);width:44px}
+table.mn-toc td.n{font-family:var(--font-num);color:var(--rv-faint);width:44px;white-space:nowrap}
 table.mn-toc td.grp{color:var(--rv-faint);white-space:nowrap}
 table.mn-toc td.mn-has a{color:var(--rv-link);font-weight:600;text-decoration:none}
 table.mn-toc td.mn-has a:hover{text-decoration:underline}
@@ -468,7 +468,7 @@ document.addEventListener('error', function (e) {
       <tbody>
       {% for row in toc %}
         <tr>
-          <td class="n">{{ row.order if row.order is not none else "—" }}</td>
+          <td class="n">{{ row.order if row.order is not none else "정보 없음" }}</td>
           <td class="grp">{{ row.group }}</td>
           <td>{{ row.label }}</td>
           <td class="{{ 'mn-has' if row.has_manual else '' }}">

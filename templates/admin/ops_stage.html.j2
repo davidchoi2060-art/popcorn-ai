@@ -276,6 +276,11 @@ input{font-family:var(--rv-font)}
   .os-histtable thead th:nth-child(1),.os-histtable td:nth-child(1){display:none}
   .os-confirm{width:94vw}
   .os-drawer{width:100%}
+  /* 아래 저장 단추들이 안내 글 옆에 붙어 누르기 어려웠다(2026-10-10 전수 점검 L117) —
+     안내 글을 한 줄 전부 쓰게 하고 단추 둘을 아래 줄에 넉넉한 크기로 나란히 둔다. */
+  .os-foot{padding:11px 12px;gap:10px}
+  .os-foot .note{flex:1 1 100%}
+  .os-foot .os-btn{flex:1 1 0;min-height:44px;padding:12px 15px}
 }
 </style>
 {% endblock %}

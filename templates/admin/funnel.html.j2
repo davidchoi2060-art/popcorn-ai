@@ -340,15 +340,8 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       <div style="margin-top:8px">옛 자체 결제 주문 기록으로 대신할 수 없습니다 — 인계는 애초에 거기에 쓰지 않고, 최신 기록도 인계 시작(<span id="fnOrdersFeatureDate">서버 조회 중</span>) 이전에서 멈춰 있습니다.</div>
     </div>
 
-    <details class="fn-notice a2-more">
-      <summary><b>자세히 — 아직 정해지지 않은 것 4건</b>(정해지면 화면 구조를 바꾸지 않고 그대로 반영합니다)</summary>
-      <ul class="fn-decisions">
-        <li><b>결정 1.</b> 화면 이름·주소 확정 — 지금은 후보로만 표시합니다(머리의 「확정 전 화면」 표시).</li>
-        <li><b>결정 2.</b> 기본 조회 기간 — 지금은 「인계 기능 존재 기간」을 기본값 후보로 열어 둡니다.</li>
-        <li><b>결정 3.</b> 열람 등급 — 로그인은 필수로 확정했고, 등급(조회/운영자/관리자)은 지금 로그인만 되면 무관하게 열어 둡니다.</li>
-        <li><b>결정 4.</b> (A)만으로 지금 열지, (B)(윈윈소프트 연동)를 기다릴지 — 지금은 (A)만으로 열되 (B)는 [향후 사용예정]으로 명시합니다.</li>
-      </ul>
-    </details>
+    {# 「아직 정해지지 않은 것 4건(결정 1~4)」 기획 메모는 걷어냈다(2026-10-10 전수 점검 L60).
+       원문은 docs/design/spec-funnel.md 에 그대로 있다. #}
 
     </div>
   </div>
@@ -468,7 +461,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(f.done.pct_of_sessions) + '</span><span class="fn-conn-arrow">→</span></div>'
       + '<div class="fn-stage"><div class="fn-stage-lbl">완주</div><div class="fn-stage-val num">' + fmt(f.done.n) + '</div><div class="fn-stage-sub">견적 생성</div></div>'
       + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(f.handoff.pct_of_done) + '</span><span class="fn-conn-arrow">→</span></div>'
-      + '<div class="fn-stage end"><div class="fn-stage-lbl">인계</div><div class="fn-stage-val num">세션 ' + fmt(f.handoff.sessions) + '개</div><div class="fn-stage-sub">건 ' + fmt(f.handoff.count) + '건</div></div>'
+      + '<div class="fn-stage end"><div class="fn-stage-lbl">인계</div><div class="fn-stage-val num">' + fmt(f.handoff.count) + '건</div><div class="fn-stage-sub">세션 ' + fmt(f.handoff.sessions) + '개</div></div>'
       + '<div class="fn-break"><span class="fn-break-line"></span><span class="fn-break-label">여기서 끊깁니다</span><span class="fn-break-line"></span></div>'
       + '<div class="fn-stage b"><div class="fn-stage-lbl">클릭</div><div class="fn-stage-val muted">[향후 사용예정]</div><div class="fn-stage-sub">추적 경로 없음</div></div>'
       + '<div class="fn-conn b"><span class="fn-conn-arrow">→</span></div>'

@@ -180,6 +180,10 @@
     .ms-banner-side{border-left:0;border-top:1px solid var(--rv-amber-line);padding-left:0;padding-top:10px}
     .ms-kpi-grid{grid-template-columns:1fr 1fr}
     .ms-drawer{width:100vw}
+    /* 빈 목록일 때 안내문이 940px 표 폭에 끼어 오른쪽에서 잘렸다(2026-10-10 전수 점검 L81) —
+       행이 없으면 표 머리를 감추고 안내문만 화면 폭에 맞춰 보인다. */
+    .ms-table:has(> .ms-empty){display:block;min-width:0}
+    .ms-table:has(> .ms-empty) .ms-thead{display:none}
   }
 </style>
 {% endblock %}

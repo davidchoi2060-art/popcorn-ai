@@ -159,7 +159,13 @@ a{color:inherit;text-decoration:none}
   .ex-split{flex-direction:column}
   .ex-rail{width:100%}
   .ex-stats{flex-direction:column}
-  .ex-table thead th:nth-child(3),.ex-table thead th:nth-child(4){display:none}
+  /* 열 폭(colgroup)이 고정된 채 머리만 숨겨 「대상·조건」「요청자」가 겹치고 빈 상태 글이
+     오른쪽에서 잘렸다(2026-10-10 전수 점검 L90). 좁은 화면에서는 고정 열 폭을 풀고
+     요청자·요청 시각·행 수 머리를 숨긴다. */
+  .ex-table{table-layout:auto}
+  .ex-table colgroup{display:none}
+  .ex-table thead th:nth-child(2),.ex-table thead th:nth-child(3),.ex-table thead th:nth-child(4){display:none}
+  .ex-emptywrap{padding:36px 16px}
 }
 </style>
 {% endblock %}

@@ -6,7 +6,17 @@
   const viaLabels = {email:'이메일',kakao:'카카오',naver:'네이버',google:'구글'};
   const viaLabel = raw => viaLabels[raw] || '미분류 · ' + (raw || '빈값');
   const statusLabel = raw => raw === 'active' ? '이용 가능' : (raw || '상태 미확인') + ' · 이용 불가';
-  const fmt = (value, short=false) => value ? (short ? PT.short(value) : PT.full(value)) : '기록 없음';
+  // 회원 시각은 보는 브라우저의 지역과 무관하게 한국 시간(Asia/Seoul)으로 그린다
+  // (2026-10-10 전수 점검 L96 — 지역이 UTC 인 브라우저에서 9시간 어긋나 보였다).
+  // 서버 값은 그대로(타임존이 붙은 ISO) 두고 표시에서만 바꾼다.
+  const KST = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', hourCycle:'h23'});
+  const kst = (value, short) => {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return PT.NONE;
+    const p = {}; KST.formatToParts(d).forEach(x => { p[x.type] = x.value; });
+    return (short ? '' : p.year + '-') + p.month + '-' + p.day + ' ' + p.hour + ':' + p.minute;
+  };
+  const fmt = (value, short=false) => value ? kst(value, short) : '기록 없음';
   const pill = (m, includeVia=false) => `<span class="mm-pill ${esc(m.map_state)}">${esc(states[m.map_state] || '상태 미확인')}${includeVia&&m.via_code!=='email'?' · '+esc(viaLabel(m.via_code)):''}</span>`;
   const url = new URL(location.href);
   const state = {items:[],total:0,page:1,size:20,sort:'joined_desc',q:'',via:null,status:null,map:'',
@@ -190,7 +200,7 @@
   $('prev').onclick=()=>{if(state.busy||state.page===1)return;state.page--;loadList(false);};
   $('next').onclick=()=>{if(state.busy)return;state.page++;loadList(false);};
   $('reload').onclick=()=>{if(state.busy)return;pageMessage('');loadList(true);};
-  $('displayTimezone').textContent='표시 시각: '+Intl.DateTimeFormat().resolvedOptions().timeZone;
+  $('displayTimezone').textContent='표시 시각: 한국 시간(KST)';
   $('filterToggle').onclick=()=>{if(state.busy)return;state.filtersOpen=!state.filtersOpen;syncFilters();};
   matchMedia('(max-width:1000px)').addEventListener('change',applyView);
   restore();applyView();
