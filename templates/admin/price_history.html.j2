@@ -369,7 +369,7 @@ a.ph-move{color:var(--rv-ink)}
 
         <section class="ph-panel" aria-labelledby="phTableH">
           <div class="ph-panelhd"><h2 id="phTableH">변동 이력</h2></div>
-          <div class="ph-chart-sourcing">사유 열은 담당자(누가 변경했는지)를 표시하지 않습니다 — 이 값은 원장에 기록돼 있으나 조회 API 응답에는 포함되지 않습니다.</div>
+          <div class="ph-chart-sourcing">사유 열은 담당자(누가 변경했는지)를 표시하지 않습니다 — 이 값은 기록돼 있으나 이 화면 조회에는 아직 포함되지 않습니다.</div>
           <div class="ph-tablewrap">
             <div class="ph-table" id="phTable" role="table" aria-label="가격 변동 이력"></div>
           </div>
@@ -809,8 +809,8 @@ a.ph-move{color:var(--rv-ink)}
   // ── 하단 고지 ────────────────────────────────────────────────────
   function renderFoot() {
     $('phFoot').textContent =
-      '기간을 바꾸면 좌측 상품 목록도 같은 기간으로 다시 계산됩니다 · 날짜 형식이 틀리면 400 · '
-      + '그 기간에 이력이 없는 상품을 지정하면 404 · 최근 N일은 정당하게 빈 결과입니다(오류가 아닙니다).';
+      '기간을 바꾸면 좌측 상품 목록도 같은 기간으로 다시 계산됩니다 · 날짜 형식이 틀리면 조회를 거절합니다 · '
+      + '그 기간에 이력이 없는 상품을 지정하면 「이력 없음」으로 알립니다 · 최근 N일에 이력이 없으면 빈 결과가 정상입니다.';
   }
 
   // ── 선택 상품 최신 이력(스코프를 선택 상품으로 명시 — 위 모듈 docstring 참조) ──

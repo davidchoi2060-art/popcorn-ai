@@ -89,7 +89,7 @@ def list_operators():
         "note": ("승인 전 계정은 어떤 데이터도 볼 수 없습니다 · 정지 시 진행 중 세션이 즉시 끊깁니다"
                  " · 자기 계정의 강등·정지는 막혀 있습니다(스스로 잠기는 것 방지)"
                  " · 비밀번호는 해시로만 보관합니다(원문은 저장하지 않습니다)"
-                 " · 비밀번호가 없는 계정은 로그인할 수 없습니다 — owner가 발급해야 합니다")}
+                 " · 비밀번호가 없는 계정은 로그인할 수 없습니다 — 관리자가 발급해야 합니다")}
 
 
 class ApproveBody(BaseModel):
@@ -194,7 +194,7 @@ def fix_email(operator_id: int, body: FixEmailBody):
 
     me = current_operator() or {}
     if me.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 정정할 수 있습니다")
+        raise HTTPException(403, "관리자만 정정할 수 있습니다")
     new = (body.email or "").strip().lower()
     # 형식 검사 — 느슨하게 보되 '@가 하나' 같은 최소 조건은 지킨다
     if new.count("@") != 1 or new.startswith("@") or new.endswith("@"):

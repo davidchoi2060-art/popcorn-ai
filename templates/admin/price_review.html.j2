@@ -233,7 +233,7 @@
       <div class="pr-aside-box">
         <h4>세 가지 판정과 그 결과</h4>
         <div class="pr-verdict-mini">
-          <div class="row"><b>① 승인</b><span>제안가로 확정합니다 — 이력에 margin_policy 사유로 남습니다</span></div>
+          <div class="row"><b>① 승인</b><span>제안가로 확정합니다 — 이력에 「마진 정책」 사유로 남습니다</span></div>
           <div class="row"><b>② 직접 입력</b><span>0보다 큰 값 · 1,000원 단위 강제 없음 · 판매가가 잠깁니다</span></div>
           <div class="row"><b>③ 유지</b><span>값은 비운 채 「다시 제안하지 마라」로 잠급니다 — 추천 후보에서 계속 빠집니다</span></div>
         </div>
@@ -277,7 +277,7 @@
       <div class="pr-verdict">
         <div class="row1"><span class="num">①</span><span class="lb">제안가 승인</span>
           <span class="amt" id="dwApproveAmt">—</span></div>
-        <div class="desc">이력에 margin_policy 사유로 남습니다</div>
+        <div class="desc">이력에 「마진 정책」 사유로 남습니다</div>
         <div class="act">
           <button type="button" class="pr-btn primary" id="dwApproveBtn" data-action="pr-approve">승인</button>
         </div>
@@ -422,7 +422,7 @@
         + '<span class="n">' + nLocked + '건</span></div>';
     }
     $('prReasonCond').textContent =
-      'sale_price IS NULL AND review_required_yn = false AND NOT (locked_fields @> \'["sale_price"]\'::jsonb)';
+      '판매가가 비어 있고 · 검수 대기가 아니며 · 판매가가 잠기지 않은 상품';
 
     $('prAsideNote').textContent = S.note
       || 'v1은 「첫 산정」(판매가 미산정) 유형만 실데이터입니다 — 매입가 ±15% 임계·마진 정책 위반'

@@ -35,7 +35,7 @@ FLOOR_FIELDS = {
 def _owner():
     me = current_operator() or {}
     if me.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
+        raise HTTPException(403, "관리자만 바꿀 수 있습니다")
     return me
 
 

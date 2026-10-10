@@ -201,8 +201,8 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
 
   <div class="sf-intro">
     <h1>웹 사양 채움</h1>
-    <p>미충족 사양을 웹에서 찾아 검수 큐에 제안으로만 올립니다. 정본(<code>product_specs</code>)에는
-      이 화면이 쓰지 않습니다 — 반영은 사람이 상품 사양 검수에서 승인해야 합니다.</p>
+    <p>미충족 사양을 웹에서 찾아 검수 큐에 제안으로만 올립니다. 실제 사양 값에는
+      이 화면이 직접 쓰지 않습니다 — 반영은 사람이 상품 사양 검수에서 승인해야 합니다.</p>
   </div>
 
   <!-- ① 실행 줄 -->
@@ -219,8 +219,7 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
           <input id="sfCount" type="number" min="1" max="500" value="30" aria-label="건수">
         </div>
         <button type="button" class="sf-btn-primary" id="sfRun" data-action="run" disabled>웹 사양 채움 실행</button>
-        <div class="sf-field-hint">지금은 <code>cooler_tdp</code> 하나만 대상입니다 — 목록은 사양 항목
-          정의(<code>spec_field_defs</code>)에서 읽습니다.</div>
+        <div class="sf-field-hint">지금은 쿨러 발열 한도 하나만 대상입니다 — 목록은 「상품 사양 정의」에서 읽습니다.</div>
       </div>
       <div class="sf-run-status" id="sfRunStatus" aria-live="polite"></div>
       <div class="sf-run-note" id="sfRunNote"></div>
@@ -367,7 +366,7 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
       }
       sel.innerHTML = items.map(function (f) {
         return '<option value="' + esc(f.field_key) + '">' + esc(f.label || f.field_key)
-             + ' (' + esc(f.field_key) + ')</option>';
+             + '</option>';
       }).join('');
       sel.value = items[0].field_key;
       S.field = items[0].field_key; S.fieldLabel = items[0].label || items[0].field_key; S.fieldsErr = null;

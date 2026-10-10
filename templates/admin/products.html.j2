@@ -76,7 +76,6 @@
    쓰기 operator 이상" 문구와 두 번째 a2-badge 를 확인) 확정, 짐작이 아니다. 값은 디자인
    원안 그대로(스냅샷 수치가 아니라 권한 설명 문장이라 지어낸 값이 아니다). #}
 {% block header_extra %}
-<span class="a2-badge">/admin2/products</span>
 <span class="a2-roles">조회: 모든 등급 · 쓰기: 운영자 이상</span>
 {% endblock %}
 
@@ -436,7 +435,7 @@ a.pp-btn-line{color:var(--on)}
             <option value="code">상품번호</option>
           </select>
           <input id="q" class="pp-input" type="search"
-                 placeholder="상품번호 · SKU · 상품명 (300ms 후 서버 질의)" aria-label="상품 검색">
+                 placeholder="상품번호 · SKU · 상품명 (입력하면 바로 검색)" aria-label="상품 검색">
         </div>
       </div>
       <div class="pp-sbox-field">
@@ -524,7 +523,7 @@ a.pp-btn-line{color:var(--on)}
        링크로 바꾼다. 그 화면은 다른 담당자가 같은 물결에서 짓는다 — 이 파일은 링크만 건다. #}
     <a class="pp-btn-dark" id="btnNew" href="/admin2/product-new">+ 상품 등록</a>
   </div>
-  <div class="pp-filters-note">상품 등록은 상품등록/수정 화면(/admin2/product-new)에서 진행한다 ·
+  <div class="pp-filters-note">상품 등록은 「상품 등록」 단추로 여는 상품등록/수정 화면에서 진행한다 ·
     재고상태의 '재고 없음'은 상태 탭의 '재고 없음'과 같은 기준(재고 0 또는 상태 품절)이다 ·
     매입 견적·가격 검토 이동은 대상 화면이 없어 비활성이다.</div>
   <div class="pp-soon-row" data-keep="1">
@@ -568,8 +567,8 @@ a.pp-btn-line{color:var(--on)}
     <div id="rows"></div>
   </div>
   <div class="pp-foot" id="pgBar"></div>
-  <div class="pp-legend">요청 전 KPI·배지는 「—」 · 실패는 사유를 구분해 밝힙니다(네트워크 ·
-    세션 만료 401 · 서버 오류) · 빈 결과는 "조건에 맞는 상품이 없습니다."</div>
+  <div class="pp-legend">불러오기 전 지표·배지는 「—」 · 실패는 사유를 구분해 밝힙니다(네트워크 ·
+    세션 만료 · 서버 오류) · 빈 결과는 "조건에 맞는 상품이 없습니다."</div>
 
   <div class="pp-veil" id="veil" hidden></div>
 

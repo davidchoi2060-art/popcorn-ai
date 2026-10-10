@@ -570,7 +570,7 @@
       + '<div>' + rateHtml + '</div>'
       + '<div><button type="button" class="uf-btn-change' + (expanded ? ' open' : '') + '" data-action="toggle-expand" '
       +   'data-floor-id="' + it.floor_id + '"'
-      +   (writeAllowed ? '' : ' disabled title="관리자(owner)만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '영향 미리보기') + '</button></div>'
+      +   (writeAllowed ? '' : ' disabled title="관리자만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '영향 미리보기') + '</button></div>'
       + '</div>';
     if (expanded) row += expansionHtml(it);
     return row;

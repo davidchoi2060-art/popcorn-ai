@@ -156,8 +156,8 @@ def status(field: str = "cooler_tdp", page: int = 1, size: int = 20):
             "pages": (total + size - 1) // size if total else 0,
             "latest_fetched_at": iso(latest) if latest else None,
             "items": items,
-            "note": ("spec_web_suggestions 집계입니다. product_specs 반영(승인)은"
-                     " 상품 사양 검수(ADM-PRD-020)에서만 합니다 — 이 화면은 쓰지 않습니다.")}
+            "note": ("웹 사양 제안 집계입니다. 실제 사양 값 반영(승인)은"
+                     " 「상품 사양 검수」에서만 합니다 — 이 화면은 쓰지 않습니다.")}
 
 
 @router.get("/field-context")

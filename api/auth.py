@@ -1037,7 +1037,7 @@ def _require_owner_reauth(request: Request) -> dict:
     if op is None:
         raise HTTPException(401, "로그인이 필요합니다")
     if op.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 할 수 있습니다")
+        raise HTTPException(403, "관리자만 할 수 있습니다")
     if not op.get("password_verified", True):
         raise HTTPException(401, {"error": "reauth_required",
                                   "message": "비밀번호 확인이 필요합니다"})
