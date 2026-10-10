@@ -1,0 +1,74 @@
+{
+  "base": "https://popcornai.co.kr",
+  "taken_at": "2026-10-10T14:10:04.075Z",
+  "results": [
+    {
+      "name": "발로100",
+      "text": "발로 100만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "예산을 넘는 최저가",
+          "name": "골드 RTX 3050 [12400F/16G/256GB/RTX3050]",
+          "main_photo": "loaded",
+          "main_photo_text": null,
+          "part_photos": [
+            {
+              "label": "CPU",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "그래픽카드",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "메모리",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "저장장치",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "메인보드",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "쿨러",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "파워",
+              "loaded": true,
+              "hidden": false
+            },
+            {
+              "label": "케이스",
+              "loaded": true,
+              "hidden": false
+            }
+          ],
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 3050 6GB",
+            "RAM 16GB",
+            "저장장치 256GB SSD"
+          ],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/발로100-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/발로100-모바일.png"
+      ],
+      "alert": null,
+      "overflow_px": 0
+    }
+  ]
+}
