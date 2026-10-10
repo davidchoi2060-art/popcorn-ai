@@ -250,14 +250,14 @@ a.hl-navbtn{color:var(--rv-canvas)}
     <section class="hl-panel" aria-labelledby="hlTableH">
       <div class="hl-panelhd">
         <h2 id="hlTableH">인계 건 — 최신순</h2>
-        <span class="hl-panelsub">행을 누르면 라인 상세가 열립니다</span>
+        <span class="hl-panelsub">기록을 누르면 상품별 내용을 볼 수 있습니다</span>
       </div>
       <div class="hl-table" role="table" aria-label="인계 건 목록">
         <div class="hl-thead" role="row">
           <span role="columnheader">인계 번호</span>
           <span role="columnheader">시각</span>
-          <span role="columnheader">티어</span>
-          <span role="columnheader">라인</span>
+          <span role="columnheader">가격대</span>
+          <span role="columnheader">상품 항목</span>
           <span role="columnheader">우리 총액</span>
           <span role="columnheader">몰 총액</span>
           <span role="columnheader">확인</span>
@@ -341,11 +341,11 @@ a.hl-navbtn{color:var(--rv-canvas)}
     var html = '';
     html += '<div class="hl-kpi"><span class="lbl">인계 건</span><span class="val">' + fmt(k.handoff_count) + '건</span>'
       + '<span class="sub">' + esc(period) + '</span></div>';
-    html += '<div class="hl-kpi"><span class="lbl">라인</span><span class="val">' + fmt(lines.total) + '</span>'
+    html += '<div class="hl-kpi"><span class="lbl">상품 항목</span><span class="val">' + fmt(lines.total) + '</span>'
       + '<span class="sub">부품 <b>' + fmt(lines.core_part) + '</b> · 조립비 <b>' + fmt(lines.assembly_service)
       + '</b> · 주변기기 <b>' + fmt(lines.peripheral) + '</b></span></div>';
-    html += '<div class="hl-kpi"><span class="lbl">어긋난 라인</span><span class="val">' + k.mismatch.pct.toFixed(1) + '%</span>'
-      + '<span class="sub">표본 ' + fmt(k.mismatch.sample) + '라인 중 ' + fmt(k.mismatch.n) + '라인(가격변동)</span></div>';
+    html += '<div class="hl-kpi"><span class="lbl">어긋난 상품 항목</span><span class="val">' + k.mismatch.pct.toFixed(1) + '%</span>'
+      + '<span class="sub">표본 ' + fmt(k.mismatch.sample) + '상품 항목 중 ' + fmt(k.mismatch.n) + '상품 항목(가격변동)</span></div>';
     html += '<div class="hl-kpi"><span class="lbl">우리 총액 합계</span><span class="val">' + won(k.quoted_sum.sum) + '</span>'
       + '<span class="sub"><b>표본 ' + fmt(k.quoted_sum.sample) + '건 — 객단가로 읽지 않습니다</b></span></div>';
     html += '<div class="hl-kpi"><span class="lbl">장바구니 도달</span><span class="val muted">모름</span>'
@@ -358,7 +358,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
     return '<span class="hl-tier ' + esc(t.cls) + '">' + esc(t.label) + '</span>';
   }
   function chkHtml(row) {
-    if (row.price_checked) return '<span class="hl-chk ok">✓ 전 라인</span>';
+    if (row.price_checked) return '<span class="hl-chk ok">✓ 전 상품 항목</span>';
     return '<span class="hl-chk part" title="인계 시점에 몰 가격을 확인하지 못했습니다">▲ 일부 못함</span>';
   }
   function renderRows(d) {
@@ -370,7 +370,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
     body.innerHTML = d.rows.map(function (r) {
       var mallCls = r.price_checked ? '' : 'unk';
       var mallSub = (!r.price_checked && r.unknown_count > 0)
-        ? ('<span class="sub">' + r.unknown_count + '라인 대체</span>') : '';
+        ? ('<span class="sub">' + r.unknown_count + '상품 항목 대체</span>') : '';
       return '<div class="hl-row' + (S.openId === r.handoff_id ? ' sel' : '') + '" data-keep="1" data-id="' + r.handoff_id + '" role="row" tabindex="0">'
         + '<div class="hl-cell num">' + esc(r.handoff_no) + '</div>'
         + '<div class="hl-cell num">' + fmtAt(r.created_at) + '</div>'
@@ -448,7 +448,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
     var nav = S.data.nav || {};
     var totalMallCls = row.price_checked ? '' : 'unk';
     var replNote = (!row.price_checked && row.unknown_count > 0)
-      ? ('<div class="repl">' + row.unknown_count + '라인은 우리 값으로 대체</div>') : '';
+      ? ('<div class="repl">' + row.unknown_count + '상품 항목은 우리 값으로 대체</div>') : '';
     var periphBox = (S.data.kpi.lines.peripheral === 0)
       ? ('<div class="hl-perip">주변기기를 함께 넘기는 기능은 있지만 인계 ' + fmt(S.data.kpi.handoff_count)
          + '건 중 하나도 담지 않았습니다 — 기능은 있고 실사용이 아직 없는 정상 상태입니다(오류가 아닙니다).</div>') : '';
@@ -460,7 +460,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
       + '<div class="hl-dwbody">'
       + '<div class="hl-dwmeta">'
       + '<span><b>시각</b> ' + fmtAt(row.created_at) + '</span>'
-      + '<span><b>티어</b> ' + tierHtml(row.tier) + '</span>'
+      + '<span><b>가격대</b> ' + tierHtml(row.tier) + '</span>'
       + '<span><b>세션 번호</b> ' + esc(row.session_id != null ? row.session_id : '—') + '</span>'
       + '<span><b>방문자 키</b> ' + esc(row.user_id != null ? row.user_id : '—') + '</span>'
       + '</div>'
@@ -471,7 +471,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
       + '</div>'
       + '<div class="hl-sessnav">' + navBtnHtml(nav.consult_sessions, row.session_id)
       + (sgNote ? ('<div class="hl-sessgroup">' + esc(sgNote) + '</div>') : '') + '</div>'
-      + '<div><div class="hl-panelsub" style="margin-bottom:8px">라인 목록 — 당시 표시명 그대로</div>'
+      + '<div><div class="hl-panelsub" style="margin-bottom:8px">상품 항목 목록 — 당시 표시명 그대로</div>'
       + '<div class="hl-lines">' + row.items.map(lineHtml).join('') + '</div></div>'
       + '<div class="hl-dwnote">「몰 0원」과 「확인 못함」은 다릅니다 — 0원은 팔 수 없는 값을 읽은 것이고, 확인 못함은 값을 아예 읽지 못한 것입니다. 화면이 새로 판정하지 않고 저장된 값을 그대로 씁니다.</div>'
       + periphBox

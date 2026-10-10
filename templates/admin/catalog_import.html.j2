@@ -341,7 +341,7 @@
       + '<div style="font-family:var(--font-num);font-size:10px;line-height:1.7;color:var(--rv-muted)">자체상품코드 · 상품명 · 카테고리1 · 카테고리2 · 카테고리3 · 상태값 · 매입가 · 일반회원 · 시중가 · 공급처 · 스펙 · 제조사 · 모델명 · 다나와No</div>'
       + '<div class="ci-note" style="margin-top:4px">하나라도 없으면 즉시 거부되고 무엇이 없는지 그대로 알려줍니다.</div></div>'
       + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">자체상품코드 = 쇼핑몰 상품번호</div>'
-      + '<div class="ci-note">이 코드가 정본 코드를 그대로 결정합니다 — 잘못된 코드는 쇼핑몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div></div>'
+      + '<div class="ci-note">이 코드가 상품 코드를 그대로 결정합니다 — 잘못된 코드는 쇼핑몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div></div>'
       + '<div class="ci-card"><div class="ci-note">삭제는 없습니다 — 올린다고 기존 상품이 사라지지 않습니다. 운영자가 잠근(locked) 값은 덮지 않습니다. 미리보기 후 <b style="color:var(--on)">1시간</b> 안에 적용하지 않으면 파일이 청소되어 처음부터 다시 합니다.</div></div>';
   }
 
@@ -359,7 +359,7 @@
     return '<div class="ci-lock"><span class="tag">잠김</span>'
       + '<span style="flex:1;min-width:0">'
       + '<span class="t">새 일괄 등록은 관리자 등급만 할 수 있습니다</span>'
-      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 관리자 전용입니다. 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
+      + '<span class="d">파일 하나가 실제 상품 목록 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 관리자 전용입니다. 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
       + '</span></div>';
   }
 

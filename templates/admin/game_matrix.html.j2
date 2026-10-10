@@ -37,7 +37,7 @@
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
-{% block title %}용도별 상품 매트릭스{% endblock %}
+{% block title %}용도별 상품 비교표{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -402,7 +402,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var mapRows = state.tab === 'games' ? m.game_map_rows : m.workload_map_rows;
     if (m.cell_count === 0) {
       set('blocked-title', '격자 데이터 없음');
-      set('blocked-msg', '현재 쓰는 견적이 0건입니다 — 상품 매트릭스 관리에서 먼저 생성하십시오.');
+      set('blocked-msg', '현재 쓰는 견적이 0건입니다 — 상품 비교표 관리에서 먼저 생성하십시오.');
       show('blocked', true); show('cols', false); return true;
     }
     if (mapRows === 0) {
@@ -485,9 +485,9 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var it = sel.item, isGame = sel.kind === 'game';
     set('sel-name', esc(nameOf(it)));
     set('sel-sub', esc(isGame
-      ? (it.genre || '') + ' · rec_gpu 「' + (it.rec_gpu == null ? '원천에 값 없음' : it.rec_gpu) + '」'
+      ? (it.genre || '') + ' · 권장 그래픽 카드 「' + (it.rec_gpu == null ? '기준 자료에 값 없음' : it.rec_gpu) + '」'
       : (it.model_size || '모델 크기 미상') + ' · min_vram ' +
-        (it.min_vram_gb == null ? '원천에 값 없음' : it.min_vram_gb + 'GB')));
+        (it.min_vram_gb == null ? '기준 자료에 값 없음' : it.min_vram_gb + 'GB')));
     // AI 작업 쉬운 설명(0077 ai_workloads.description) - 서버 값 그대로, 없으면 숨긴다
     set('sel-desc', esc(it.description || ''));
     show('sel-desc', !!it.description);  // 게임·AI 작업 공통(2026-09-09)
@@ -502,7 +502,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     if (it.mapped_cells === 0) {
       set('sel-unmapped-title', it.unjudgeable ? '판정 불가' : '매핑 없음');
       set('sel-unmapped-msg', it.unjudgeable
-        ? esc(it.unjudgeable_reason) + ' — 원천 데이터가 없어 배치가 판정할 수 없습니다.'
+        ? esc(it.unjudgeable_reason) + ' — 기준 자료가 없어 자동으로 판단할 수 없습니다.'
         : (it.unjudgeable_reason ? esc(it.unjudgeable_reason)
            : '사유 미제공 — 배치 로그만 확인 가능합니다.'));
       show('sel-unmapped', true); show('sel-filtered', false); show('cells-wrap', false);
@@ -544,7 +544,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
         '<td><span class="gm-tag none">' + label + '</span></td></tr>';
     }).join(''));
     set('fail-note', (it.unjudgeable
-      ? '원천 데이터가 없어 이 항목은 어느 칸에서도 판정할 수 없습니다 — 불성립(요구 사양 미달)과 구분해 표기합니다.'
+      ? '기준 자료가 없어 이 항목은 어느 칸에서도 판정할 수 없습니다 — 불성립(요구 사양 미달)과 구분해 표기합니다.'
       : '탈락 사유는 저장되지 않습니다 — 매핑 표에는 성립한 칸만 기록됩니다(배치 로그로만 확인 가능). ' +
         '칸의 GPU가 그래픽카드 서열표에 없어 배치가 그 칸 자체를 판정에서 제외한 경우도 이 목록에 함께 나올 수 있으며, 구분 정보는 저장되지 않습니다.') +
       ' 견적가 오름차순 상위 ' + num(sel.unmatched_shown) + '칸만 표시합니다.');
@@ -567,8 +567,8 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     if (isGame) {
       lines += line('GPU 칩셋', cell.gpu_used + (g ? ' · ladder_score ' + g.ladder_score : ' · 서열 미등재'));
       lines += line('VRAM', g ? g.vram_gb + 'GB (서열표 대표값)' : '서열표에 없음');
-      lines += line('rec_gpu 원문', it.rec_gpu == null ? '원천에 값 없음' : it.rec_gpu);
-      lines += line('min_gpu 원문', it.min_gpu == null ? '원천에 값 없음' : it.min_gpu);
+      lines += line('권장 그래픽 카드 원문', it.rec_gpu == null ? '기준 자료에 값 없음' : it.rec_gpu);
+      lines += line('최소 그래픽 카드 원문', it.min_gpu == null ? '기준 자료에 값 없음' : it.min_gpu);
       lines += line('요구 RAM', '권장 ' + (it.rec_ram_gb == null ? '미상' : it.rec_ram_gb + 'GB') +
         ' / 최소 ' + (it.min_ram_gb == null ? '미상' : it.min_ram_gb + 'GB'));
       // 경량충족은 서열 점수 대조로 나온 판정이 아니다 — 근거 경로를 밝힌다.

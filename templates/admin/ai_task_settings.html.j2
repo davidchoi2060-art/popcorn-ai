@@ -278,14 +278,14 @@ input{font-family:var(--rv-mono)}
 
 <div class="ats-banner">
   <span class="mk">▲ 휴면</span>
-  <span class="hd">이 설정은 지금 어떤 실행도 제어하지 않습니다</span>
-  <span class="ds">실 LLM 연동 보류(2026-07-21 결정, 별도 승인 필요) — 저장한 값은 연동이 재개되는 순간 그대로 살아납니다.</span>
+  <span class="hd">지금은 설정을 저장해도 AI가 실행되지 않습니다</span>
+  <span class="ds">AI 연결은 보류 중입니다. 별도 승인 후 연결하면 저장한 설정이 적용됩니다.</span>
 </div>
 
 <section class="ats-view on" id="viewAssign" role="tabpanel">
   <div class="ats-notready" id="notReady" hidden>
-    <div class="ti">원천 준비 중</div>
-    <div class="ds" id="notReadyMsg">설정 테이블이 아직 준비되지 않았습니다.</div>
+    <div class="ti">정보 준비 중</div>
+    <div class="ds" id="notReadyMsg">설정을 저장할 곳이 아직 준비되지 않았습니다.</div>
   </div>
   <div class="ats-notready" id="loadErrorBox" hidden>
     <div class="ti">조회 실패</div>
@@ -403,7 +403,7 @@ input{font-family:var(--rv-mono)}
   }
 
   // ── 서식 ─────────────────────────────────────────────────────────
-  function modeLabel(m) { return m === 'concurrent' ? '동시 호출·수렴' : '단일 + 폴백'; }
+  function modeLabel(m) { return m === 'concurrent' ? '함께 요청하고 결과 비교' : '한 곳에 요청 · 실패하면 대체 요청'; }
   function fmtProviders(ps) { return '[' + (ps || []).map(function (p) { return p.vendor + '(' + p.role + ')'; }).join(', ') + ']'; }
   function fmtFallback(fb) { return '[' + (fb || []).join(', ') + ']'; }
   function fmtPrompt(v) { return v || '미지정'; }
@@ -468,7 +468,7 @@ input{font-family:var(--rv-mono)}
     if (!S.data) return;
     var ready = S.data.ready;
     notReady.hidden = ready;
-    if (!ready) $('notReadyMsg').textContent = S.data.reason || '설정 테이블이 아직 준비되지 않았습니다.';
+    if (!ready) $('notReadyMsg').textContent = S.data.reason || '설정을 저장할 곳이 아직 준비되지 않았습니다.';
     body.style.display = ready ? '' : 'none';
     if (!ready) return;
     renderTaskList();
@@ -496,7 +496,7 @@ input{font-family:var(--rv-mono)}
         (dirty ? '<span class="dirty">변경됨</span>' : '') +
         '<span class="mode" style="color:' + modeColor + ';background:' + modeBg + ';border-color:' + modeColor + '55">' + esc(t.mode_label) + '</span></div>' +
         '<div class="r2"><span class="sm">' + esc(t.providers.map(function (p) { return p.vendor; }).join(' · ')) +
-        (t.fallback_order.length ? ' -&gt; 폴백 ' + t.fallback_order.length + '단' : ' · 폴백 없음') + '</span>' +
+        (t.fallback_order.length ? ' -&gt; 대체 요청 ' + t.fallback_order.length + '단' : ' · 대체 요청 없음') + '</span>' +
         '<span class="un">미적용</span></div></div>';
     }).join('');
 
@@ -551,8 +551,8 @@ input{font-family:var(--rv-mono)}
 
     // 프로바이더 집합
     html += '<div>';
-    html += '<div class="ats-cap"><span class="t">' + (d.mode === 'concurrent' ? '참여 프로바이더 — 동시 호출 후 수렴 판정' : '배정 프로바이더') + '</span>' +
-      '<span class="n">' + (d.mode === 'concurrent' ? '집합에는 순서가 없습니다 — 역할만 바꿉니다' : '주 프로바이더 1곳 + 폴백') + '</span></div>';
+    html += '<div class="ats-cap"><span class="t">' + (d.mode === 'concurrent' ? '참여 AI 업체 — 함께 요청하고 결과 비교' : '배정 AI 업체') + '</span>' +
+      '<span class="n">' + (d.mode === 'concurrent' ? '집합에는 순서가 없습니다 — 역할만 바꿉니다' : '주 AI 업체 1곳 + 대체 요청') + '</span></div>';
     html += d.providers.map(function (p, i) {
       var last = d.providers.length <= 1;
       var color = VENDOR_COLOR[p.vendor] || '#8a8377';
@@ -568,10 +568,10 @@ input{font-family:var(--rv-mono)}
           return '<div class="ats-dmenu-item" data-action="set-role" data-i="' + i + '" data-role="' + esc(r) + '">' + esc(r) + '</div>';
         }).join('') + '</div></span>' +
         '<span class="ats-rmv' + (last || !owner ? ' dis' : '') + '" data-action="remove-provider" data-i="' + i +
-        '" title="' + (last ? '최소 1개는 남아야 합니다' : '이 프로바이더 제거') + '">✕</span>' +
+        '" title="' + (last ? '최소 1개는 남아야 합니다' : '이 AI 업체 제거') + '">✕</span>' +
         '</div>';
     }).join('');
-    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addProv">+ 프로바이더</span>';
+    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addProv">+ AI 업체</span>';
     if (owner && S.openMenu === 'addProv') {
       html += '<div class="ats-catmenu">' + (S.data.provider_catalog || []).map(function (c) {
         var used = d.providers.some(function (p) { return p.model === c.model; });
@@ -585,8 +585,8 @@ input{font-family:var(--rv-mono)}
 
     // 폴백 순서
     html += '<div>';
-    html += '<div class="ats-cap"><span class="t">폴백 순서</span><span class="n">' +
-      (d.fallback_order.length ? '순서가 곧 1·2·3차입니다 — ↑↓로 바꿉니다' : '폴백을 추가하지 않으면 실패를 그대로 남깁니다') + '</span></div>';
+    html += '<div class="ats-cap"><span class="t">대체 요청 순서</span><span class="n">' +
+      (d.fallback_order.length ? '순서가 곧 1·2·3차입니다 — ↑↓로 바꿉니다' : '대체 요청을 추가하지 않으면 실패를 그대로 남깁니다') + '</span></div>';
     html += '<div class="ats-fbwrap">';
     if (d.fallback_order.length) {
       html += d.fallback_order.map(function (v, i) {
@@ -599,17 +599,17 @@ input{font-family:var(--rv-mono)}
           '<span class="rm" data-action="fb-remove" data-i="' + i + '">✕</span></span>';
       }).join('');
     } else {
-      html += '<span class="ats-fbempty">폴백 없음 — 1차가 실패하면 그대로 실패로 남깁니다</span>';
+      html += '<span class="ats-fbempty">대체 요청 없음 — 1차가 실패하면 그대로 실패로 남깁니다</span>';
     }
     html += '</div>';
-    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addFb">+ 폴백 추가</span>';
+    html += '<div class="ats-addln" data-keep="1"><span class="ats-addlink' + (owner ? '' : ' dis') + '" data-action="toggle-menu" data-menu="addFb">+ 대체 요청 추가</span>';
     if (owner && S.openMenu === 'addFb') {
       var seenV = {}; var cands = [];
       d.providers.forEach(function (p) { seenV[p.vendor] = true; });
       Object.keys(seenV).forEach(function (v) { if (d.fallback_order.indexOf(v) < 0) cands.push(v); });
       html += '<div class="ats-fbmenu">' + (cands.length
         ? cands.map(function (v) { return '<div class="ats-dmenu-item" data-action="add-fallback" data-vendor="' + esc(v) + '">' + esc(v) + '</div>'; }).join('')
-        : '<div class="ats-dmenu-item dis">추가할 프로바이더가 없습니다 — 먼저 집합에 넣으세요</div>') + '</div>';
+        : '<div class="ats-dmenu-item dis">추가할 AI 업체가 없습니다 — 먼저 집합에 넣으세요</div>') + '</div>';
     }
     html += '</div></div>';
 
@@ -698,7 +698,7 @@ input{font-family:var(--rv-mono)}
   function setMode(m) {
     if (!guard() || !S.draft) return;
     if (m === 'concurrent' && S.draft.providers.length < 2) {
-      toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다', 'warn');
+      toast('동시 호출은 AI 업체가 2곳 이상이어야 합니다', 'warn');
       return;
     }
     S.draft.mode = m;
@@ -726,7 +726,7 @@ input{font-family:var(--rv-mono)}
   function removeProvider(i) {
     if (!guard()) return;
     var d = S.draft; if (!d) return;
-    if (d.providers.length <= 1) { toast('최소 1개의 프로바이더가 필요합니다 — 지우면 이 작업이 미배정이 됩니다', 'warn'); return; }
+    if (d.providers.length <= 1) { toast('최소 1개의 AI 업체가 필요합니다 — 지우면 이 작업이 미배정이 됩니다', 'warn'); return; }
     var removedVendor = d.providers[i].vendor;
     d.providers.splice(i, 1);
     if (!d.providers.some(function (p) { return p.vendor === removedVendor; })) {
@@ -794,7 +794,7 @@ input{font-family:var(--rv-mono)}
     var diffs = diffLines(t, d, t.task_key);
     if (!diffs.length) { toast('변경 사항이 없습니다', 'warn'); return; }
     if (d.mode === 'concurrent' && d.providers.length < 2) {
-      toast('동시 호출은 프로바이더가 2곳 이상이어야 합니다 (400)', 'err');
+      toast('동시 호출은 AI 업체가 2곳 이상이어야 합니다 (400)', 'err');
       return;
     }
     apiPatch('/api/admin/ai-task-settings/tasks/' + encodeURIComponent(t.task_key), {
