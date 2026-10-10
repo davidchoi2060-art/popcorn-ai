@@ -11,6 +11,7 @@ from sqlalchemy import text
 from .pc_configuration_edit import description_complete
 from .auth import current_operator
 from .db import engine
+from .timeutil import now_iso
 from .pc_configuration_copy import digest, part_needs_review
 from .pc_review_specs import specs_for_review
 from .recommend import rule_verdict, rule_ref_value, _rule_applies
@@ -208,7 +209,7 @@ def save_review(c, identity, body, actor):
     content = copy.deepcopy(config['content'])
     content['_review'] = dict(state={'approve':'approved','draft':'pending','revoke':'revoked'}[body.action],
         basis=state['basis'],findings={k:v.model_dump() for k,v in body.findings.items()},note=body.note.strip(),
-        actor=dict(operator_id=actor['operator_id'],name=actor.get('name','')),at=datetime.now(timezone.utc).isoformat(),
+        actor=dict(operator_id=actor['operator_id'],name=actor.get('name','')),at=now_iso(),
         checks=state['checks'],scope='admin_recommendation_review')
     if content.get('_admin_bom_edit'):
         content['_admin_bom_edit']['review_required'] = body.action != 'approve'

@@ -375,6 +375,32 @@ class PublicationTests(unittest.TestCase):
         self.setUp(); self.conn.rows[11]['status']='draft'; self.restamp_review()
         self.error(422,self.core.approve,self.conn,'P10',**self.request(publication_basis='d'*64))
 
+    def assembly(self, code=11):
+        row=self.conn.rows[code]
+        row.update(product_code=None,product_name=None,spec_source_text=None,sale_status=None,sale_price=None)
+        row['content']['availability_scope']='assembly_only'
+        # As in the 2026-09-30 enrichment: BOM review facts come from the manufacturer source.
+        row['content']['sources']=[dict(id='maker',kind='manufacturer',url='https://maker.example/spec')]
+        row['content']['review_specs']=dict(fields=dict(socket='AM4'),source_id='maker',
+                                            source_fingerprint=row['source_fingerprint'])
+        for p in self.conn.parts:
+            if p['explanation_code']==code: p['explanation_hash']=self.copy.explanation_digest(row)
+
+    def test_assembly_only_part_without_retail_product_can_be_published(self):
+        # 2026-10-10 owner decision: unknown spec values are not a publication gate.
+        self.assembly(); self.restamp_review()
+        result=self.approve()
+        self.assertTrue(result['current']['allowed'])
+        self.assertTrue(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+
+    def test_assembly_only_part_still_needs_its_own_approval_and_marker(self):
+        self.assembly(); self.restamp_review(); self.approve()
+        self.conn.rows[11].update(status='draft')
+        self.assertFalse(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+        self.setUp(); self.assembly(); self.restamp_review(); self.approve()
+        self.conn.rows[11]['content'].pop('availability_scope')
+        self.assertFalse(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+
     def test_photo_byte_or_kind_or_proof_binding_failure(self):
         for changes in (dict(detail_bytes=b''),dict(detail_bytes=PNG+b'changed'),dict(kind='ai_example'),
                         dict(source_reference=''),dict(rights_reference=''),dict(basis='d'*64),dict(explanation_code=999),

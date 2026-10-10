@@ -150,12 +150,12 @@
 .uf-tablewrap{flex:1;min-height:0;overflow:auto;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
     border-radius:8px;scrollbar-gutter:stable}
 .uf-thead{position:sticky;top:0;z-index:1;display:grid;
-    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
+    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 104px;
     gap:10px;align-items:center;padding:8px 14px;background:var(--rv-panel);
-    border-bottom:1px solid rgba(0,0,0,.1);font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);min-width:888px}
+    border-bottom:1px solid rgba(0,0,0,.1);font:600 10.5px/1 var(--rv-font);color:var(--rv-muted);min-width:900px}
 .uf-row{display:grid;
-    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 92px;
-    gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);min-width:888px}
+    grid-template-columns:minmax(210px,1.3fr) minmax(150px,1fr) 108px minmax(118px,132px) minmax(132px,1fr) 104px;
+    gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.06);min-width:900px}
 .uf-row-group{background:var(--rv-panel2);border-top:1px solid rgba(0,0,0,.1)}
 .uf-row-group:first-child{border-top:none}
 .uf-row-item:hover{background:rgba(0,0,0,.02)}
@@ -174,7 +174,7 @@
 .uf-lockbtn-sm{font:500 10.5px/1 var(--rv-font);color:var(--rv-dim2);background:var(--rv-card);
     border:1px solid rgba(0,0,0,.14);border-radius:5px;padding:6px 9px;cursor:not-allowed;display:flex;
     align-items:center;gap:6px;white-space:nowrap}
-.uf-btn-change{font:600 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
+.uf-btn-change{white-space:nowrap;font:600 11px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
     border:1px solid rgba(0,0,0,.24);border-radius:5px;padding:7px 12px;cursor:pointer}
 .uf-btn-change.open{background:var(--rv-ink);color:var(--rv-canvas);border-color:var(--rv-ink)}
 .uf-btn-change:disabled{color:var(--rv-dim2);border-color:rgba(0,0,0,.1);cursor:not-allowed;background:var(--rv-card)}
@@ -236,8 +236,8 @@
 @media (max-width:768px){
   .uf-tablecol{padding:10px 12px 14px}
   .uf-thead,.uf-row{
-    grid-template-columns:minmax(150px,1.1fr) minmax(110px,.9fr) 86px minmax(96px,110px) minmax(104px,.9fr) 76px;
-    padding:8px 10px;min-width:692px}
+    grid-template-columns:minmax(150px,1.1fr) minmax(110px,.9fr) 86px minmax(96px,110px) minmax(104px,.9fr) 96px;
+    padding:8px 10px;min-width:712px}
   .uf-thead{font-size:9.5px}
   .uf-exp-inner{grid-template-columns:1fr}
   .uf-guard-list{grid-template-columns:1fr}
@@ -261,11 +261,53 @@
       overflow-wrap:anywhere;gap:2px 6px;padding:5px 6px}
   .uf-lockbtn-sm .uf-tag{white-space:normal;overflow-wrap:anywhere}
 }
+/* ── 사용·성능 자료 진입(Codex 시안 2026-10-09): 제목 · 네 화면 바로가기 · 영향 확인 순서 ── */
+.uf-hub{flex:none;padding:18px 18px 0}
+.uf-hub h1{margin:0;font:700 22px/1.35 var(--rv-font);color:var(--rv-ink)}
+.uf-hub-sub{margin:4px 0 0;font:400 13px/1.6 var(--rv-font);color:var(--rv-muted)}
+.uf-hub-links{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:14px}
+.uf-hub-links a{display:flex;flex-direction:column;gap:3px;padding:12px 14px;border:1px solid rgba(0,0,0,.12);
+    border-radius:8px;background:var(--rv-card);text-decoration:none;color:var(--rv-ink);min-width:0}
+.uf-hub-links a[aria-current=page]{border-color:var(--rv-link);box-shadow:inset 0 0 0 1px var(--rv-link)}
+.uf-hub-links b{font:700 13px/1.4 var(--rv-font);color:var(--rv-link)}
+.uf-hub-links span{font:400 11.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.uf-hub-links small{margin-top:4px;font:400 11px/1.4 var(--rv-font);color:var(--rv-faint);overflow-wrap:anywhere}
+.uf-hub-links a:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
+.uf-section{flex:none;padding:16px 18px 0}
+.uf-section h2{margin:0;font:700 17px/1.4 var(--rv-font);color:var(--rv-ink)}
+.uf-section p{margin:4px 0 0;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.uf-steps{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;margin-top:10px;padding:10px 14px;
+    border-radius:8px;background:var(--rv-panel);font:500 12px/1.5 var(--rv-font);color:var(--rv-ink)}
+.uf-steps ol{display:flex;align-items:center;gap:8px;margin:0;padding:0;list-style:none}
+.uf-steps li{display:flex;align-items:center;gap:6px}
+.uf-steps li+li::before{content:"›";color:var(--rv-faint);margin-right:2px}
+.uf-steps em{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;font-style:normal;
+    font:600 11px/1 var(--rv-font);background:var(--rv-card);color:var(--rv-link);border:1px solid rgba(0,0,0,.12)}
+.uf-steps p{margin:0;padding-left:14px;border-left:1px solid rgba(0,0,0,.14);color:var(--rv-muted)}
+@media (max-width:1050px){.uf-hub-links{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:768px){.uf-hub{padding:12px 12px 0}.uf-section{padding:12px 12px 0}
+  .uf-steps p{padding-left:0;border-left:0;flex-basis:100%}}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="uf-page" data-screen-id="ADM-ENG-040" data-domain="usage-floors">
+
+  <header class="uf-hub">
+    <h1>사용·성능 자료</h1>
+    <p class="uf-hub-sub">최소사양 확인과 변경 전 영향 검토</p>
+    <nav class="uf-hub-links" aria-label="사용·성능 자료 화면">
+      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>/admin2/usage-floors →</small></a>
+      <a href="/admin2/game-copy-review"><b>게임 근거 검수</b><span>게임 설명과 근거 검토</span><small>/admin2/game-copy-review →</small></a>
+      <a href="/admin2/talk-patterns"><b>응답 패턴 관리</b><span>질문과 응답 연결 확인</span><small>/admin2/talk-patterns →</small></a>
+      <a href="/admin2/product-fit"><b>판매 상품 적합도</b><span>용도별 판매 상품 적합도 조회</span><small>/admin2/product-fit →</small></a>
+    </nav>
+  </header>
+
+  <section class="uf-section" aria-labelledby="ufSectionTitle">
+    <h2 id="ufSectionTitle">최소사양 하한 관리</h2>
+    <p>하한과 활성 상태를 확인하고, 변경 전 추천 후보에 미치는 영향을 확인합니다.</p>
+  </section>
 
   <div class="uf-banner">
     <div class="uf-banner-t">GPU는 성능 지표가 없습니다</div>
@@ -304,11 +346,15 @@
     <div class="uf-tablewrap">
       <div class="uf-thead">
         <span>용도 · 매칭 문구</span><span>슬롯 · 필드</span><span>지금 하한</span>
-        <span>통과 · 전체</span><span>통과율</span><span>바꾸기</span>
+        <span>통과 · 전체</span><span>통과율</span><span>작업</span>
       </div>
       <div class="uf-tbody" id="ufTbody">
         <div class="uf-loading">불러오는 중…</div>
       </div>
+    </div>
+    <div class="uf-steps">
+      <ol aria-label="하한 변경 순서"><li><em>1</em>영향 미리보기</li><li><em>2</em>확인</li><li><em>3</em>저장</li></ol>
+      <p>추천 후보가 사라질 수 있는 변경은 영향을 확인한 후 저장합니다.</p>
     </div>
     <div class="uf-tablenote">
       용도 문구는 먼저 맞는 것 하나만 적용됩니다 — '고사양 게임'이 '게임'보다 앞에 있어야
@@ -510,7 +556,7 @@
       + '<div>' + rateHtml + '</div>'
       + '<div><button type="button" class="uf-btn-change' + (expanded ? ' open' : '') + '" data-action="toggle-expand" '
       +   'data-floor-id="' + it.floor_id + '"'
-      +   (writeAllowed ? '' : ' disabled title="관리자(owner)만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '바꾸기') + '</button></div>'
+      +   (writeAllowed ? '' : ' disabled title="관리자(owner)만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '영향 미리보기') + '</button></div>'
       + '</div>';
     if (expanded) row += expansionHtml(it);
     return row;

@@ -1,0 +1,4 @@
+{
+  "note": "부품 사진 권리 근거(비밀값 아님). 서버 환경변수 POPCORN_PART_PHOTO_RIGHTS_REFERENCE 가 있으면 그 값이 우선한다. 승인 원장(provenance.rights_reference)과 바이트 단위로 같아야 부품 사진이 열린다.",
+  "rights_reference": "workroom:기록/팝콘AI/결정/popcorn-business-product-photo-use-attestation-20261006.md@v1:8851f92e8e98f041f948cfcda04bfdf4d51949b14fbc4395ba69ada0c88ea6a2"
+}

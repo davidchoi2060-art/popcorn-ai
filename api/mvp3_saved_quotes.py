@@ -8,12 +8,25 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, grid_public, visitor
+from . import access_gate, customer_pc_offer, grid_public, visitor
+from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
 from .timeutil import iso
 
 router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
+
+# Each new save reruns the public recommendation, so writes get their own per-visitor
+# limit, separate from the AI call budget (rate_limit_policies key overrides these).
+SAVE_POLICY_KEY = 'visitor.mvp3_save'
+SAVE_PER_MINUTE = 10
+SAVE_PER_DAY = 100
+# Customer wording is Codex's (PR #2 comment 6057234341); copy verbatim. The day window
+# resets at KST midnight (access_gate), which is what "내일" promises.
+SAVE_LIMIT_MESSAGES = {
+    'minute': '잠시 동안 견적 저장 요청이 많았습니다. {retry_after_sec}초 후 다시 저장해 주세요.',
+    'day': '오늘 저장할 수 있는 견적 수에 도달했습니다. 내일 다시 저장해 주세요.',
+}
 
 
 class SaveBody(BaseModel):
@@ -50,16 +63,9 @@ def public_product(item):
     if type(code) is not int or type(price) is not int or price < 0:
         raise HTTPException(409, '상품 가격을 다시 확인해 주세요.')
     # Use the already public sold recommendation, never administrative rows.
-    out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'over_budget')}
-    spec = item.get('spec')
-    if isinstance(spec, dict):
-        # Public component descriptions/capacities, never evaluation internals.
-        out['spec'] = {k: v for k, v in spec.items()
-                       if (k in ('cpu', 'gpu') and isinstance(v, str))
-                       or (k in ('ram_gb', 'ssd_gb', 'vram_gb')
-                           and type(v) in (int, float) and v >= 0)}
-    else:
-        out['spec'] = spec if isinstance(spec, str) else None
+    out = {k: item.get(k) for k in ('product_code', 'name', 'price', 'price_src', 'spec', 'level', 'tag', 'role', 'over_budget')}
+    # Public component descriptions/capacities, never evaluation internals.
+    out['spec'] = public_spec(item.get('spec'))
     out['reasons'] = [v for v in item.get('reasons', []) if isinstance(v, str)]
     out['price_confirmed'] = False
     return out
@@ -78,8 +84,15 @@ def selected_product(recommendation, code, expected_price):
 
 
 def render_quote(row):
-    return {'id': str(row['quote_id']), 'product': row['product_snapshot'],
+    return {'id': str(row['quote_id']), 'product': dict(row['product_snapshot']),
             'state': row['talk_state'], 'saved_at': iso(row['saved_at'])}
+
+
+def with_live_offer(quotes):
+    # Photo and public configuration are read live at response time and never
+    # stored in the snapshot: approval or the selected photo can change later.
+    customer_pc_offer.attach([q['product'] for q in quotes if isinstance(q.get('product'), dict)])
+    return quotes
 
 
 @router.get('/saved-quotes')
@@ -93,7 +106,7 @@ def list_quotes(request: Request, response: Response, limit: int = Query(default
         rows = conn.execute(text('''SELECT quote_id,product_snapshot,talk_state,saved_at
           FROM mvp3_saved_recommendations WHERE user_id=:u AND owner_key_hash=:owner
           ORDER BY saved_at DESC,quote_id DESC LIMIT :n'''), {'u': uid, 'owner': owner, 'n': limit + 1}).mappings().all()
-    return {'ok': True, 'quotes': [render_quote(r) for r in rows[:limit]], 'has_more': len(rows) > limit}
+    return {'ok': True, 'quotes': with_live_offer([render_quote(r) for r in rows[:limit]]), 'has_more': len(rows) > limit}
 
 
 @router.post('/saved-quotes')
@@ -114,8 +127,15 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         if previous:
             if previous['request_basis'] != basis:
                 raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
-            return {'ok': True, 'quote': render_quote(previous)}
-        state, _ = validate_state(body.state, load_vocab(conn))
+            quote = render_quote(previous)
+        else:
+            # Idempotent replays above are free; only new saves count.
+            access_gate.check_rate(conn, request, what='mvp3.save', policy_key=SAVE_POLICY_KEY,
+                                   default_per_minute=SAVE_PER_MINUTE, default_per_day=SAVE_PER_DAY,
+                                   messages=SAVE_LIMIT_MESSAGES)
+            state, _ = validate_state(body.state, load_vocab(conn))
+    if previous:
+        return {'ok': True, 'quote': with_live_offer([quote])[0]}
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
     product = selected_product(public, body.product_code, body.expected_price)
     params = {'id': str(uuid4()), 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
@@ -133,4 +153,5 @@ def save_quote(body: SaveBody, request: Request, response: Response):
           FROM mvp3_saved_recommendations WHERE user_id=:u AND owner_key_hash=:owner AND request_id=:r'''), params).mappings().one()
         if row['request_basis'] != basis:
             raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
-        return {'ok': True, 'quote': render_quote(row)}
+        quote = render_quote(row)
+    return {'ok': True, 'quote': with_live_offer([quote])[0]}

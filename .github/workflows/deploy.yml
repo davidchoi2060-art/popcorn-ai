@@ -14,6 +14,19 @@ on:
     paths-ignore:
       - 'docs/**'
       - '**/*.md'
+      # Exact CI-only paths; mixed product changes still trigger deployment.
+      - '.github/workflows/unit.yml'
+      - 'requirements-test.txt'
+      - 'tests/ci_run.py'
+      - 'tests/conftest.py'
+      - 'tests/test_ci_run.py'
+      - 'tests/bundle_run.py'
+      - 'tests/test_bundle_run.py'
+      - '.github/workflows/scenarios.yml'
+      - 'tests/scenarios/definitions.py'
+      - 'tests/scenarios/meter.py'
+      - 'tests/scenarios/test_fulfillment_command.py'
+      - 'tests/scenarios/test_meter_safety.py'
   workflow_dispatch:
     inputs:
       regression:

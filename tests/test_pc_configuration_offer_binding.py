@@ -15,7 +15,9 @@ from fastapi import HTTPException
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'api' / 'pc_configuration_copy.py'
 HELPER = 'read_sold_offer_configuration'
-BEFORE_AST = '03d9fa0973ef64dfad83f1abfbdbab02cca2bbb15e08c26494246f52847fba6d'
+# 2026-10-09: checked_at 을 timeutil.now_iso() 로 바꾼 import 1줄 + 호출 1줄만 반영해 갱신
+# (회귀 「타임존 없는 isoformat() 금지」 · 갱신 전 03d9fa09…, Python 3.12 ast.dump 기준)
+BEFORE_AST = '08b525df1f58bc897c95a86e937ac128e2fcbe82216a9d5b887e88b093a0a149'
 
 
 def functions(path, names):

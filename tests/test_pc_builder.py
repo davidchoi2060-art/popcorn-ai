@@ -8,10 +8,16 @@ from api import admin_pc_builder as builder
 from api.part_explanations import fingerprint
 
 
+# 아래 시험들은 상품코드(1~8)로 슬롯을 가리킨다. 순서를 builder.SLOTS(=taxonomy.SLOTS)에
+# 기대면 어휘 순서가 바뀔 때 시험이 엉뚱한 슬롯을 건드린다 — 시험 쪽 고정 순서를 쓴다.
+FIXTURE_SLOTS=('CPU','GPU','RAM','SSD','MB','COOLER','POWER','CASE')
+
+
 class BuilderTests(unittest.TestCase):
     def setUp(self):
+        self.assertEqual(set(FIXTURE_SLOTS),set(builder.SLOTS))
         self.rows={};self.specs={};selection=[]
-        for code,slot in enumerate(builder.SLOTS,1):
+        for code,slot in enumerate(FIXTURE_SLOTS,1):
             kind='COOLER_CPU_AIR' if slot=='COOLER' else slot
             facts=[dict(label='상품 용량',value='32(GB)')] if slot=='RAM' else [dict(label='용량',value='1(TB)')] if slot=='SSD' else []
             self.rows[code]=dict(product_code=code,source_product_code=code,product_name=slot,

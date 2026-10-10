@@ -277,8 +277,26 @@ class RestoreTests(unittest.TestCase):
             elif mutation=='price_text':d['changes']['sale_price']['from']='13000'
             elif mutation=='unknown':d['changes']['unknown']={'from':1,'to':2}
             self.assert_no_write_http(lambda:self.run_undo('undo_product_edit',d),409)
-    def test_product_edit_lock_order_is_preserved_and_reordered_current_refused(self):
+    def test_product_edit_lock_order_is_ignored_but_before_order_is_restored(self):
+        # The stored `changes` is a JSONB object, so its keys come back length-sorted
+        # (status < sale_price) while the edit appended locks in request order.
+        # Comparing the lists by order refused every price+status undo (regression run #5).
         self.product_edit_current(True);self.db.products[102]['locked_fields']=['sale_price','maker','stock_qty']
+        out=self.run_undo('undo_product_edit',self.product_edit_detail(True))
+        self.assertEqual(out,{'ok':True,'restored':2})
+        update=next(p for q,p in self.db.writes if q.startswith('UPDATE products'))
+        self.assertEqual(update['lf'],'["maker"]')
+    def test_product_edit_jsonb_key_order_price_and_maker_undo(self):
+        # Edit sent sale_price then maker -> locks [sale_price, maker]; JSONB returns
+        # changes as {maker, sale_price}. Same shape as the run #5 price+status case.
+        self.db.products[102].update(sale_price=13000,maker='new',locked_fields=['sale_price','maker'])
+        d={'product_code':102,'sku':'102','changes':{'maker':{'from':'old','to':'new'},
+           'sale_price':{'from':12000,'to':13000}},'before':{'locked_fields':[]},'locked':True}
+        out=self.run_undo('undo_product_edit',d);self.assertEqual(out,{'ok':True,'restored':2})
+        update=next(p for q,p in self.db.writes if q.startswith('UPDATE products'))
+        self.assertEqual((update['sale_price'],update['maker'],update['lf']),(12000,'old','[]'))
+    def test_product_edit_extra_current_lock_still_refused(self):
+        self.product_edit_current(True);self.db.products[102]['locked_fields']=['sale_price','maker','stock_qty','status']
         self.assert_no_write_http(lambda:self.run_undo('undo_product_edit',self.product_edit_detail(True)),409)
     def test_product_edit_alias_column_and_existing_lock_not_appended_twice(self):
         self.db.products[102].update(product_name='new',locked_fields=['status','product_name'])
