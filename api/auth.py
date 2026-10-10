@@ -26,7 +26,6 @@ from starlette.concurrency import run_in_threadpool
 
 from datetime import datetime
 
-from .admin_labels import role_ko
 from .db import engine
 from .passwords import (hash_password,
                         strength_problem, verify_password)
@@ -477,6 +476,8 @@ async def auth_middleware(request: Request, call_next):
                     from .admin_ui_common import login_required_html
                     return HTMLResponse(login_required_html(), status_code=403)
                 from fastapi.responses import JSONResponse
+                # 함수 안에서 가져온다 — 이 미들웨어만 떼어 실행하는 테스트가 있다
+                from api.admin_labels import role_ko
                 return JSONResponse(
                     {"detail": f"권한이 부족합니다(필요: {role_ko(need)}, 현재: {role_ko(op['role'])})"},
                     status_code=403)

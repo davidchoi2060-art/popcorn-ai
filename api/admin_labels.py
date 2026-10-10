@@ -10,12 +10,18 @@
 
 ROLE_KO = {"viewer": "조회", "operator": "운영자", "owner": "관리자"}
 
-# 자료가 없어 비어 있는 칸의 표시 문구 (2026-10-10 사장님 결정)
+# 자료가 없어 비어 있는 칸의 표시 문구 (2026-10-10 결정)
 MISSING = "정보 없음"
 
 
-def role_ko(code: str | None) -> str:
-    """권한 등급 코드를 한국어 이름으로. 모르는 코드는 그대로 돌려준다."""
-    if not code:
+def role_ko(code) -> str:
+    """권한 등급 코드를 한국어 이름으로. 모르는 값은 글자로 바꿔 그대로 돌려준다.
+
+    권한 거부 응답(403)을 만드는 자리에서도 부르므로, 세션에 문자열이 아닌 값이
+    들어 있어도 예외를 내지 않는다 — 여기서 터지면 403 이 503 으로 바뀐다.
+    """
+    if code is None or code == "":
         return MISSING
+    if not isinstance(code, str):
+        return str(code)
     return ROLE_KO.get(code, code)
