@@ -41,6 +41,7 @@ test('approved part photo renders an image; missing photo keeps the explicit pla
   const html=render(fixture([ok(11),none,none]));
   assert.match(html,/<figure class="public-bom-photo" data-product-photo><img data-product-image src="\/api\/product-images\/11\/detail" alt="CPU 이름 부품 사진"/);
   assert.equal((html.match(/<img data-product-image/g)||[]).length,1);
-  assert.equal((html.match(/부품 사진 미확인/g)||[]).length,2);
+  assert.equal((html.match(/<div class="public-bom-photo">정보 없음<\/div>/g)||[]).length,2);
+  assert.doesNotMatch(html,/부품 사진 미확인|등록 사양 미확인|항목명 미확인|등록 설명 미확인/);
   assert.match(html,/data-product-image-status hidden>부품 사진을 불러오지 못했습니다/);
 });
