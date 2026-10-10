@@ -99,12 +99,12 @@ input{font-family:var(--rv-mono)}
 
 /* 프로바이더 표 */
 .pwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 18px 18px}
-.phead{flex:none;display:grid;grid-template-columns:196px 176px 152px 116px 132px 1fr;gap:12px;
+.phead{flex:none;display:grid;grid-template-columns:196px 168px 116px 132px 1fr;gap:12px;
       align-items:center;padding:9px 14px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
       border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:#7d7669}
 .ptable{flex:none;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-top:none;
        border-radius:0 0 7px 7px;overflow:hidden}
-.prow{display:grid;grid-template-columns:196px 176px 152px 116px 132px 1fr;gap:12px;align-items:center;
+.prow{display:grid;grid-template-columns:196px 168px 116px 132px 1fr;gap:12px;align-items:center;
      padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer;border-left:3px solid transparent;
      background:transparent;-webkit-tap-highlight-color:transparent}
 .prow:last-child{border-bottom:none}
@@ -222,6 +222,10 @@ input{font-family:var(--rv-mono)}
 @media (max-width:768px){
   .panels{flex-direction:column}
   .drawer{position:fixed;top:0;width:100%;max-width:100vw}
+  /* 좁은 화면에서 표 열이 잘리지 않고 옆으로 밀어 볼 수 있게 한다(2026-10-10 전수 점검 L85). */
+  .pwrap{overflow-x:auto;padding:12px 12px 18px}
+  .phead,.ptable{min-width:720px}
+  .ptable{overflow:visible}
 }
 </style>
 {% endblock %}
@@ -236,9 +240,9 @@ input{font-family:var(--rv-mono)}
 
     <div class="keynote">
       <span class="tag">키</span>
-      <span class="main">키 값은 서버 <code>.env</code>에만 있습니다 — 이 화면은 키를 입력받지 않습니다</span>
-      <span class="sub">CANON §2-5. 이 화면은 "그 키가 있는가"와 "얼마까지 쓰게 할 것인가"만 다룹니다.
-        연결 확인은 env 키 존재 여부만 보고 프로바이더에 호출을 보내지 않으므로,
+      <span class="main">키 값은 서버 설정에만 있습니다 — 이 화면은 키를 입력받지 않습니다</span>
+      <span class="sub">이 화면은 "그 키가 있는가"와 "얼마까지 쓰게 할 것인가"만 다룹니다.
+        연결 확인은 서버 설정의 키 존재 여부만 보고 프로바이더에 호출을 보내지 않으므로,
         이 화면을 여는 것으로 과금이 생기지 않습니다.</span>
     </div>
 
@@ -248,7 +252,7 @@ input{font-family:var(--rv-mono)}
 
     <div class="pwrap">
       <div class="phead">
-        <span>프로바이더</span><span>env 키 이름</span><span>모델</span><span>일 한도</span><span>호출 제한</span><span>상태</span>
+        <span>프로바이더</span><span>모델</span><span>일 한도</span><span>호출 제한</span><span>상태</span>
       </div>
       <div class="ptable" id="ptable">
         <div class="loading">불러오는 중…</div>
@@ -258,17 +262,17 @@ input{font-family:var(--rv-mono)}
         <div class="panel">
           <div class="cap">상태 표기 규칙 — "없음"과 "못 함"은 다르다</div>
           <div class="leg-item"><span class="chip unset">○ 미설정</span>
-            <span class="desc">env에 해당 키 항목 자체가 없습니다 — 확인 대상이 아닙니다.</span></div>
+            <span class="desc">서버 설정에 해당 키 항목 자체가 없습니다 — 확인 대상이 아닙니다.</span></div>
           <div class="leg-item"><span class="chip ok">● 설정됨</span>
-            <span class="desc">env에 키가 있습니다. 값은 화면에 오지 않습니다.</span></div>
+            <span class="desc">서버 설정에 키가 있습니다. 값은 화면에 오지 않습니다.</span></div>
           <div class="leg-item"><span class="chip fail">▲ 확인 실패</span>
             <span class="desc">키는 있는데 값이 비어 있습니다 — "없음"과 절대 같은 말로 쓰지 않습니다.</span></div>
-          <div class="foot">연결 확인은 <b>env 키 존재 여부만</b> 봅니다 — 프로바이더에 호출을 보내지 않으므로
+          <div class="foot">연결 확인은 <b>서버 설정의 키 존재 여부만</b> 봅니다 — 프로바이더에 호출을 보내지 않으므로
             이 화면을 여는 것으로 과금이 생기지 않습니다.</div>
         </div>
         <div class="panel alt">
           <div class="cap">이 화면이 하지 않는 일</div>
-          <div class="oos-item"><span class="dash">—</span><span class="t">키 값 입력·수정·삭제 — 서버 .env에만 둡니다(CANON §2-5)</span></div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">키 값 입력·수정·삭제 — 서버 설정에만 둡니다</span></div>
           <div class="oos-item"><span class="dash">—</span><span class="t">개별 호출 로그(무엇을 묻고 뭐라 답했는지) — AI 응답 기록 소관</span></div>
           <div class="oos-item"><span class="dash">—</span><span class="t">비용 추이·용도별 분석 — AI 사용량·비용 소관</span></div>
           <div class="oos-item"><span class="dash">—</span><span class="t">작업↔모델 배정·폴백 순서 — AI 작업 설정 소관</span></div>
@@ -289,7 +293,6 @@ input{font-family:var(--rv-mono)}
         <button type="button" class="close" data-action="close-drawer" aria-label="닫기">✕</button>
       </div>
       <div class="meta">
-        <span class="envk" id="dwEnvKey">—</span>
         <span class="chkat" id="dwCheckedAt">—</span>
       </div>
     </div>
@@ -487,12 +490,11 @@ input{font-family:var(--rv-mono)}
     $('ptable').innerHTML = S.data.providers.map(function (p) {
       var on = p.key === S.sel && S.drawerOpen;
       var limitTxt = p.limit.daily_usd === null ? '<span class="lim dim">미설정</span>' : '<span class="lim">' + fmtMoney(p.limit.daily_usd) + ' / 일</span>';
-      var rateTxt = (p.limit.per_minute === null && p.limit.per_day === null) ? '—'
+      var rateTxt = (p.limit.per_minute === null && p.limit.per_day === null) ? '미설정'
         : (fmtInt(p.limit.per_minute) + '/분 · ' + fmtInt(p.limit.per_day) + '/일');
       return '<div class="prow' + (on ? ' on' : '') + '" data-action="select-provider" data-key="' + esc(p.key) + '">' +
         '<span class="vend"><span class="dot" style="background:' + PROVIDER_DOT[p.key] + '"></span>' +
         '<span class="vn">' + esc(p.vendor) + '</span><span class="cp">' + esc(p.company) + '</span></span>' +
-        '<span class="envk">' + esc(p.env_key) + '</span>' +
         '<span class="mdl">' + esc(p.model) + '</span>' +
         '<span>' + limitTxt + '</span>' +
         '<span class="rate">' + esc(rateTxt) + '</span>' +
@@ -559,7 +561,6 @@ input{font-family:var(--rv-mono)}
     $('dwCompany').textContent = p.company;
     $('dwState').className = 'chip ' + p.state;
     $('dwState').textContent = (p.state === 'ok' ? '● ' : p.state === 'fail' ? '▲ ' : '○ ') + p.state_label;
-    $('dwEnvKey').textContent = p.env_key;
     $('dwCheckedAt').textContent = fmtTime(p.checked_at) + ' 확인';
     $('dwKeyNote').textContent = p.state_note;
 

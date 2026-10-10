@@ -158,7 +158,7 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 .a2-lnb-b a:hover{color:var(--on-nav);background:rgba(255,255,255,.05)}
 .a2-lnb-b a.on{color:var(--on-nav);background:rgba(255,255,255,.09);border-left-color:var(--rv-green)}
 .a2-lnb-b .off{color:var(--on-nav-muted);cursor:default}
-.a2-lnb-b .tag{font:500 9px/1 var(--font-num);padding:1px 4px;border-radius:3px;background:rgba(255,255,255,.06);
+.a2-lnb-b .tag{white-space:nowrap;flex:none;font:500 9px/1 var(--font-num);padding:1px 4px;border-radius:3px;background:rgba(255,255,255,.06);
             color:var(--on-nav-muted)}
 .a2-lnb.collapsed .a2-lnb-g .a2-t,.a2-lnb.collapsed .a2-lnb-g .a2-c,.a2-lnb.collapsed .a2-lnb-g .a2-x{display:none}
 .a2-lnb.collapsed .a2-lnb-g{justify-content:center;padding:8px 0}
@@ -210,6 +210,7 @@ body{margin:0;background:var(--bg);color:var(--on);font-family:var(--font);-webk
 .a2-hd .a2-hub:focus-visible{outline:2px solid var(--rv-link);outline-offset:1px}
 .a2-roles{display:flex;align-items:center;border:1px solid rgba(0,0,0,.16);border-radius:5px;overflow:hidden;padding:6px 10px;
        font:500 10.5px/1 var(--font);color:var(--on)}
+.a2-hd .a2-me{display:flex;align-items:center;gap:inherit;column-gap:inherit;flex:none;min-width:0;max-width:100%;margin-left:auto}
 .a2-avatar{width:26px;height:26px;border-radius:50%;background:var(--rv-dim4);border:1px solid rgba(0,0,0,.12);flex:none}
 
 /* ── 토스트 — 사용은 선택. `.a2-main`에 상대 위치, 좌하단 고정. ── */

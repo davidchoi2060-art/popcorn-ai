@@ -78,6 +78,7 @@
 .lg-hr{height:1px;background:var(--outline);margin:18px 0}
 .lg-social{display:flex;gap:10px}
 .lg-social .lg-btn{width:auto;flex:1}
+.lg-social .lg-btn:disabled{cursor:not-allowed;opacity:.55;background:var(--card);border-color:var(--outline);color:var(--on-variant)}
 .lg-foot{margin:20px 0 0;padding-top:14px;border-top:1px solid var(--outline);
          font:400 11px/1.7 var(--font);color:var(--rv-faint)}
 .lg-code{font-family:var(--font-num);font-size:11px}
@@ -162,11 +163,15 @@
 
           <div class="lg-hr"></div>
 
+          {# 소셜 계정 단추 — 「준비 중」 비활성(2026-10-10 전수 점검 L98).
+             예전에는 같은 로그인 엔드포인트에 provider 만 바꿔 비밀번호 없이 보냈는데,
+             서버는 기존 계정이면 provider 와 무관하게 비밀번호를 확인한다(api/auth.py
+             login) — 그래서 비밀번호가 있는 계정은 이 단추로 항상 실패했다. 실제 외부
+             로그인이 붙을 때까지 누를 수 없게 둔다(로그인 흐름 자체는 바꾸지 않는다). #}
           <div class="lg-social">
-            <button class="lg-btn lg-btn-2" type="button" id="lgGoogle">구글 계정</button>
-            <button class="lg-btn lg-btn-2" type="button" id="lgKakao">카카오 계정</button>
+            <button class="lg-btn lg-btn-2" type="button" id="lgGoogle" disabled aria-disabled="true" title="준비 중">구글 계정 (준비 중)</button>
+            <button class="lg-btn lg-btn-2" type="button" id="lgKakao" disabled aria-disabled="true" title="준비 중">카카오 계정 (준비 중)</button>
           </div>
-          <p class="lg-note lg-note-faint" style="margin-top:9px">지금은 실제 검증을 하지 않습니다 — 입력한 이메일을 그대로 신뢰합니다</p>
 
           <div class="lg-result" id="lgBoxLeft" role="status" aria-live="polite" hidden></div>
 
@@ -292,7 +297,7 @@
   function go(ms) { window.setTimeout(function () { window.location.assign(DASH); }, ms); }
 
   function busy(on) {
-    ["lgLoginBtn", "lgApplyBtn", "lgGoogle", "lgKakao"].forEach(function (id) {
+    ["lgLoginBtn", "lgApplyBtn"].forEach(function (id) {
       var el = $(id);
       if (el) el.disabled = on;
     });
@@ -403,18 +408,7 @@
     });
   });
 
-  /* ── 좌: 소셜 계정 — 같은 엔드포인트에 provider 만 바꿔 보낸다(dev 어댑터) ── */
-  function social(provider) {
-    var email = $("lgEmail").value.trim();
-    if (!email) {
-      box("left", "warn", "제출 안 함", SCREEN_MSG.no_email);
-      $("lgEmail").focus();
-      return;
-    }
-    submit({ email: email, provider: provider, remember_device: false });
-  }
-  $("lgGoogle").addEventListener("click", function () { social("google"); });
-  $("lgKakao").addEventListener("click", function () { social("kakao"); });
+  /* ── 좌: 소셜 계정 — 「준비 중」 비활성. 클릭 처리를 두지 않는다(위 마크업 주석) ── */
 
   /* ── 우: 계정 사용 신청 — 비밀번호를 보내지 않는다 ── */
   $("lgApplyForm").addEventListener("submit", function (ev) {

@@ -127,6 +127,14 @@
   .wr-create-row{display:flex;gap:8px;flex-wrap:wrap}
   .wr-create-field{display:flex;flex-direction:column;gap:4px}
   .wr-msg{flex:none;font:400 10.5px/1.6 var(--font);padding:8px 10px;border-radius:6px;border:1px solid}
+
+  /* 모바일 — 4열 칸반을 390px 에 그대로 끼우면 글자가 2~4자씩 쪼개지고 건수 뱃지가
+     잘렸다(2026-10-10 전수 점검 L91). 좁은 화면에서는 2열로 접는다. */
+  @media (max-width:640px){
+    .wr-lanes{flex-wrap:wrap}
+    .wr-lane{flex:1 1 calc(50% - 5px)}
+    .wr-lane-head{flex-wrap:wrap}
+  }
 </style>
 {% endblock %}
 

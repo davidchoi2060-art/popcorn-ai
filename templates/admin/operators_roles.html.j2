@@ -87,6 +87,8 @@
        (`ABSOLUTE_HOURS`·`IDLE_MINUTES`, API가 값으로 내려주지 않는다) — 코드가
        바뀌면 이 문구도 같이 고쳐야 한다(런타임 값이 아니라 정책 문서화 수준의
        표기라는 점을 제작 보고서에 남긴다).
+       → 2026-10-10: 상수가 30분에서 480분으로 바뀐 뒤에도 문구가 30분으로 남아 있었다.
+         이제 렌더 함수가 두 상수를 넘기고 `#orStats` 의 `data-session-note` 로 읽는다.
 
   ■ 2026-08-14 셸 통합 — `templates/admin/_admin2_shell.html.j2`를 상속한다. 사이드바·
     헤더·팔레트·토스트 컨테이너·서체 변수(`--rv-*`)는 셸/`admin2.css`가 그린다.
@@ -289,7 +291,10 @@ code{font-family:var(--rv-mono);font-size:.95em}
 
 @media (max-width:768px){
   .or-stats{flex-direction:column}
-  .or-thead,.or-row{grid-template-columns:minmax(140px,1fr) 84px 74px}
+  /* 390px 에서 140+84+74 열과 간격이 표 폭을 넘어 상태 열이 잘렸다(2026-10-10 전수 점검 L88).
+     계정 열을 줄어들 수 있게 하고 간격을 좁힌다. */
+  .or-thead,.or-row{grid-template-columns:minmax(0,1fr) 76px 72px;gap:8px}
+  .or-tablewrap{padding:12px 12px 18px}
   .or-thead .c-login,.or-thead .c-sessions,.or-thead .c-acts,
   .or-row .c-login,.or-row .c-sessions,.or-row .c-acts{display:none}
   .or-overlay{display:none}
@@ -326,7 +331,7 @@ code{font-family:var(--rv-mono);font-size:.95em}
     <div class="or-tabs" id="orTabs" role="tablist" aria-label="운영자 · 권한 탭"></div>
 
     <div class="or-tabpanel" id="orAccountsPanel" role="tabpanel" aria-labelledby="orTabAccounts">
-      <div class="or-stats" id="orStats"></div>
+      <div class="or-stats" id="orStats" data-session-note="{{ absolute_hours }}시간 절대 · {{ idle_minutes }}분 유휴"></div>
       <div class="or-tablewrap">
         <div class="or-thead">
           <span>계정</span><span>등급</span><span>상태</span>
@@ -495,7 +500,7 @@ code{font-family:var(--rv-mono);font-size:.95em}
       { label: '승인 대기', value: pending.length, note: pending.length ? '승인 필요' : '승인할 것 없음' },
       { label: '정지', value: suspended.length, note: '세션 전부 무효' },
       { label: '비밀번호 없음', value: noPw.length, note: '활성인데 로그인 불가', warn: noPw.length > 0 },
-      { label: '살아있는 세션', value: sessions, note: '8시간 절대 · 30분 유휴' }
+      { label: '살아있는 세션', value: sessions, note: $('orStats').getAttribute('data-session-note') || '' }
     ];
     $('orStats').innerHTML = cards.map(function (c) {
       return '<div class="or-stat' + (c.warn ? ' warn' : '') + '">' +
