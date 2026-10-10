@@ -44,6 +44,9 @@ def apply(c,source):
         assert digest(row)==digest(before_specs[code]), 'Spec changed'
         prod=dict(c.execute(text('SELECT product_code,locked_fields,product_name,spec_source_text FROM products WHERE product_code=:code FOR UPDATE'),dict(code=code)).mappings().one())
         assert prod['spec_source_text']==before_rows[code]['spec_source_text'], 'Spec source changed'
+        locked=set(prod['locked_fields'] or [])
+        # Both lock spellings (bare field and specs.field) mean a person owns the value: refuse before any write.
+        assert not any(f in locked or 'specs.'+f in locked for f in updates), 'Locked field requires review'
         backups['specs'].append(row);backups['products'].append(prod)
         sources=dict(row.get('spec_sources') or {})
         for field,value in updates.items():
@@ -53,8 +56,8 @@ def apply(c,source):
             c.execute(text(f'UPDATE product_specs SET {field}='+('CAST(:v AS jsonb)' if isinstance(value,list) else ':v')+' WHERE product_code=:code'),dict(code=code,v=json.dumps(value) if isinstance(value,list) else value))
             changes.append(dict(code=code,type='사양 보완',field=field,before=row[field],value=value,source=source_url))
         c.execute(text('UPDATE product_specs SET spec_sources=CAST(:v AS jsonb),updated_at=now() WHERE product_code=:code'),dict(code=code,v=json.dumps(sources)))
-        locks=sorted(set(prod['locked_fields'] or [])|{'specs.'+field for field in updates})
-        c.execute(text('UPDATE products SET locked_fields=CAST(:v AS jsonb) WHERE product_code=:code'),dict(code=code,v=json.dumps(locks)))
+        # Audit/source values are not human-confirmed: never add them to locked_fields
+        # (only the admin spec-entry path locks). The source is kept in spec_sources.
     ids=c.execute(text('SELECT DISTINCT configuration_id FROM pc_configuration_parts WHERE explanation_code=ANY(:codes) ORDER BY configuration_id'),dict(codes=sorted(touched))).scalars().all()
     for identity in ids:
         cfg=dict(c.execute(text('SELECT * FROM pc_configurations WHERE configuration_id=:id FOR UPDATE'),dict(id=identity)).mappings().one())

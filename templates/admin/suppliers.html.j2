@@ -1,27 +1,28 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
 {% block title %}공급처 관리{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/admin-suppliers-workspace.css?v=20261003">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/admin-suppliers-workspace.css?v=20261006">{% endblock %}
 {% block content %}
-<main id="suppliers-workspace" class="sw" data-can-write="{{ 'true' if supplier_can_write else 'false' }}">
-  <header class="sw-heading"><div><h1>공급처 관리</h1><p>거래처를 찾고, 기본 정보와 연결 기록을 확인하세요.</p></div>
+<main id="suppliers-workspace" class="sw" data-view="list" data-can-write="{{ 'true' if supplier_can_write else 'false' }}">
+  <header class="sw-heading"><div><h1>공급처 관리</h1><p>거래처를 찾고 연락한 뒤, 필요한 정보를 관리합니다.</p></div>
     {% if supplier_can_write %}<button type="button" class="sw-primary" data-action="new" id="sw-new">새 공급처 등록</button>{% endif %}
   </header>
-  <div id="sw-summary" class="sw-summary" aria-live="polite">공급처 조회 중…</div>
-  <form id="sw-search-form" class="sw-toolbar" role="search">
-    <label class="sw-search">공급처 찾기<input id="sw-search" type="search" maxlength="100" placeholder="이름 · ID · 플랫폼 · 브랜드" autocomplete="off"></label>
-    <label>상태<select id="sw-state"><option value="all">전체</option></select></label>
-    <label>표시 수<select id="sw-size"><option value="20">20곳씩</option></select></label>
-    <button type="submit">검색</button>
-  </form>
   <div id="sw-message" class="sw-message" role="status" aria-live="polite"></div>
-  <div id="sw-directory-error" class="sw-error" role="alert" hidden></div>
   <div class="sw-layout">
-    <section aria-label="공급처 목록">
-      <div class="sw-list"><div class="sw-list-heading"><h2>공급처 목록</h2><span id="sw-count"></span></div><div id="sw-rows"><p class="sw-empty">조회 중…</p></div></div>
+    <section class="sw-list" aria-label="공급처 목록">
+      <div class="sw-list-heading"><h2>공급처 목록</h2><span id="sw-count"></span></div>
+      <form id="sw-search-form" class="sw-toolbar" role="search">
+        <label class="sw-search">이름·ID·플랫폼·브랜드 검색<input id="sw-search" type="search" maxlength="100" placeholder="공급처를 찾으세요" autocomplete="off"></label>
+        <button type="submit">검색</button>
+        <details class="sw-list-options"><summary>목록 조건</summary><div class="sw-filter-fields"><label>상태<select id="sw-state"><option value="all">전체</option></select></label><label>표시 수<select id="sw-size"><option value="20">20곳씩</option></select></label></div></details>
+      </form>
+      <div id="sw-summary" class="sw-summary" aria-live="polite">공급처 조회 중…</div>
+      <div id="sw-directory-error" class="sw-error" role="alert" hidden></div>
+      <div id="sw-rows"><p class="sw-empty">조회 중…</p></div>
       <nav class="sw-pagination" aria-label="공급처 페이지"><button id="sw-prev" data-action="prev" type="button" disabled>이전</button><span id="sw-range"></span><button id="sw-next" data-action="next" type="button" disabled>다음</button></nav>
     </section>
     <section id="sw-detail" class="sw-detail" aria-label="공급처 상세" aria-live="polite"><h2>공급처를 선택하세요</h2></section>
   </div>
+  <dialog id="sw-leave" aria-labelledby="sw-leave-title"><h2 id="sw-leave-title">저장하지 않은 입력</h2><p>입력을 유지하거나 버린 뒤 이동하세요.</p><div class="sw-actions"><button type="button" class="sw-primary" data-leave-choice="keep">계속 수정</button><button type="button" data-leave-choice="discard">입력 버리고 이동</button></div></dialog>
 </main>
 {% endblock %}
-{% block foot_extra %}<script src="/shared/admin-suppliers-workspace.js?v=20261003"></script>{% endblock %}
+{% block foot_extra %}<script src="/shared/admin-suppliers-workspace.js?v=20261006"></script>{% endblock %}

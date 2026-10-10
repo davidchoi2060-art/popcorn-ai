@@ -19,7 +19,13 @@ def fingerprint(name, spec):
 
 def is_current(row):
     if row.get("product_code") is None:
-        return False
+        # Assembly-only parts have no retail product row to compare with. Their
+        # recorded source evidence is the reference; missing facts stay unknown.
+        content = row.get("content") if isinstance(row.get("content"), dict) else {}
+        source = row.get("source_snapshot")
+        return (content.get("availability_scope") == "assembly_only"
+                and isinstance(source, dict) and bool(source)
+                and row.get("source_fingerprint") == fingerprint(source.get("name"), source.get("spec")))
     if row["source_fingerprint"] == fingerprint(row.get("product_name"), row.get("spec_source_text")):
         return True
     # Catalog ingestion trims outer whitespace. Preserve the original evidence hash,

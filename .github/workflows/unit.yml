@@ -1,0 +1,103 @@
+# 단위 테스트를 GitHub 가 빌려주는 일회용 리눅스 머신에서 돌린다 — 서버(GCP VM)와 무관하다.
+#
+# ⚠ deploy.yml 의 「pull_request 트리거 절대 금지」는 **self-hosted 러너(우리 서버)** 이야기다.
+#    이 워크플로는 `ubuntu-latest`(GitHub 호스팅)에서만 돌고, 비밀값을 하나도 쓰지 않으며,
+#    권한은 읽기뿐이다. 그래서 포크에서 온 PR 이 돌아도 우리 서버·DB 에 닿을 길이 없다.
+#    **이 파일에 self-hosted 러너나 secrets 를 넣지 않는다** — 넣는 순간 위 경고가 그대로 적용된다.
+#
+# DB: 이 작업 안에서만 사는 «임시» 빈 Postgres 를 띄운다. 운영·개발 Cloud SQL 과는 완전히
+# 분리돼 있고 작업이 끝나면 사라진다. 일부 테스트가 조회는 패치해 두고 연결만 실제로 열기
+# 때문에 필요하다(개발 PC 에서는 그 연결이 .env 의 Cloud SQL 로 간다).
+#
+# 초록불은 «실제로 돌았다»일 때만 나온다: 테스트 0건 수집 · 통과 0건 · 의존성 누락(설치
+# 실패, import 오류, node 없음)은 전부 실패다(tests/ci_run.py).
+#
+# 실행 방식·알려진 실패 목록은 tests/ci_run.py · tests/conftest.py 머리 주석 참조.
+name: 단위 테스트
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: unit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg2://ci:ci@127.0.0.1:5432/ci
+      POPCORN_CI: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-test.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: 의존성 설치
+        run: pip install -r requirements-test.txt
+      - name: 단위 테스트 (파일별 격리)
+        run: python tests/ci_run.py
+
+  # PR #12 합성 CI 번들(docs/ci-candidate-20261008/) 전용. 손으로 실행(workflow_dispatch)할 때만 돈다 -
+  # push · pull_request 에서는 건너뛴다. 저장소 단위 테스트(unit job)와 프로세스 · venv 가 따로다.
+  # 번들은 이 브랜치에 복사하지 않고 고정 커밋(BUNDLE_SHA)을 별도 경로로 checkout 한다.
+  # 차단 층은 사고 방지용이며 보안 sandbox 가 아니다(tests/bundle_run.py 머리 주석).
+  bundle:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      BUNDLE_SHA: a2772616a7b7c349f1def94f06ef8d4c6e99ec87
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 번들 고정 커밋 checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BUNDLE_SHA }}
+          path: bundle-src
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 번들 대조 (8개 커밋 바이트 · 14개 파일 · 18개 method · 16개 핀, 실행 없음)
+        run: python tests/bundle_run.py verify --bundle-repo bundle-src --bundle-sha "$BUNDLE_SHA" --work "$RUNNER_TEMP/bundle"
+      - name: 핀 16개 설치 (no-deps) + pip check
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --disable-pip-version-check --no-deps -r "$RUNNER_TEMP/bundle/requirements_ci.txt"
+          "$RUNNER_TEMP/venv/bin/python" -m pip check
+      - name: 번들 18개 실행 (격리 · 차단)
+        run: python tests/bundle_run.py run --python "$RUNNER_TEMP/venv/bin/python" --work "$RUNNER_TEMP/bundle" --results "$RUNNER_TEMP/bundle-results.json" --bundle-sha "$BUNDLE_SHA"
+      - name: 결과 보관
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-results
+          path: ${{ runner.temp }}/bundle-results.json
+          if-no-files-found: warn

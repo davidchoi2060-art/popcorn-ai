@@ -17,3 +17,39 @@
 .pca-jobs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.pca-job{padding:12px;border:1px solid var(--outline-variant);border-radius:7px;min-width:0}.pca-job.selected{border-color:var(--rv-green);box-shadow:inset 0 0 0 1px var(--rv-green)}.pca-job-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.pca-job-head time{font-size:10px;color:var(--on-variant)}.pca-job img{width:100%;height:180px;object-fit:contain;background:var(--container-low);margin:10px 0;border-radius:5px}.pca-job p{font-size:11px;overflow-wrap:anywhere}.pca-job button{width:100%;margin-top:8px}.pca-job video{width:100%;aspect-ratio:16/9;background:var(--container-low);margin:10px 0;border-radius:5px}.pca-card select{width:100%;border:1px solid var(--outline-variant);padding:10px;border-radius:6px;background:var(--card);font:inherit}.pca-card audio{width:100%;display:block;margin-top:12px}
 @media(max-width:1050px){.pca-grid{grid-template-columns:minmax(0,1fr)}.pca-jobs{grid-template-columns:repeat(2,minmax(0,1fr))}.pca-top{align-items:flex-start;flex-direction:column}}
 @media(max-width:650px){.pc-assets{padding:14px}.pca-product{flex-wrap:wrap}.pca-product strong{flex-basis:65%}.pca-tags{width:100%}.pca-jobs{grid-template-columns:minmax(0,1fr)}.pca-card{padding:14px}.pca-check{flex-wrap:wrap}.pca-check span{margin-left:24px;flex-basis:100%}.pc-assets h1{font-size:22px}.pca-stage img{height:250px}}
+
+/* Approved video companion: settings, source and result gallery share the media shell. */
+.pca-video-checks{margin-top:18px}.pca-ending{border:1px dashed var(--outline);border-radius:6px;padding:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.pca-ending p{flex-basis:100%;font-size:11px}.pca-video .pca-jobs{grid-template-columns:repeat(2,minmax(0,1fr))}.pca-download{width:100%;margin-top:8px}.pca-music-source{font-size:11px}.pca-video .pca-stage img{height:330px}
+@media(max-width:650px){.pca-video .pca-jobs{grid-template-columns:minmax(0,1fr)}.pca-video .pca-stage img{height:250px}}
+
+/* Approved origin display; scoped to image manager, not shared video/audio cards. */
+#media-root .pca-job-head{justify-content:flex-start}
+#media-root .origin-import{background:color-mix(in srgb,var(--rv-link) 8%,var(--card));color:var(--rv-link)}
+#media-root .origin-unknown{background:var(--rv-amber-bg);color:var(--rv-ink-soft)}
+#media-root .origin-generated{background:var(--container-low);color:var(--on)}
+#media-root .pca-chip.status-failed{background:color-mix(in srgb,var(--rv-red) 7%,var(--card));color:var(--rv-red)}
+#media-root .origin-meta{display:grid;grid-template-columns:88px minmax(0,1fr);gap:7px 8px;margin:12px 0 0;font-size:12px;line-height:1.55}
+#media-root .origin-meta dt{color:var(--on-variant)}
+#media-root .origin-meta dd{margin:0;overflow-wrap:anywhere}
+#media-root .origin-meta .sub{display:block;color:var(--on-variant);font-size:11px}
+#media-root .origin-separation{border:0;border-top:1px solid var(--outline-variant);margin:14px 0}
+#media-root .pca-job details{padding:9px;margin-top:14px;font-size:12px}
+#media-root .pca-job .job-note{font-size:12px;margin:8px 0 12px}
+@media(max-width:650px){#media-root .origin-meta{grid-template-columns:82px minmax(0,1fr)}}
+
+/* Codex image-list redesign 2026-10-09: titled cards, larger preview, full-width select button. */
+#media-root .pca-gallery-head{margin-bottom:6px}
+#media-root .pca-gallery-note{margin:0 0 16px;font-size:12px}
+#media-root .pca-jobs{gap:16px}
+#media-root .pca-job{padding:16px;border-radius:8px}
+#media-root .pca-job-title{margin:12px 0 10px;font-size:15px;line-height:1.45}
+#media-root .pca-job img{height:220px;margin:0 0 10px}
+#media-root .pca-job-empty{display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;height:220px;margin:0 0 10px;border-radius:5px;background:var(--container-low);text-align:center;padding:12px}
+#media-root .pca-job-empty b{font-size:13px;color:var(--on)}
+#media-root .pca-job-empty span{font-size:12px;color:var(--on-variant)}
+#media-root .origin-meta{grid-template-columns:112px minmax(0,1fr)}
+#media-root .pca-job-foot{margin-top:10px;font-size:12px}
+#media-root .pca-job button{min-height:42px;font-size:13px}
+#media-root .pca-job button.primary{background:var(--rv-green);border-color:var(--rv-green);color:var(--card)}
+#media-root .pca-job button.chosen:disabled{opacity:1;background:color-mix(in srgb,var(--rv-green) 22%,var(--card));border-color:transparent;color:var(--rv-green)}
+@media(max-width:650px){#media-root .origin-meta{grid-template-columns:104px minmax(0,1fr)}#media-root .pca-job img,#media-root .pca-job-empty{height:200px}}

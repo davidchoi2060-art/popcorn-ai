@@ -1,0 +1,72 @@
+# 끝까지 시나리오 — 진척 기록
+
+협업 분담표 7번. 고객·운영자가 실제로 끝내야 하는 여정을 단계로 나누고, 단계마다 실제
+HTTP 요청을 보내 결과를 남긴다. **이 표가 「완료」의 정의다** — 기능 보고의 「완료」는
+해당 단계가 🟢 일 때만 쓴다.
+
+| 판정 | 뜻 |
+|---|---|
+| 🟢 통과 | 이번 실행에서 실제 요청이 기대대로 끝났다. **유일한 통과 근거** |
+| 🟡 미확인 | 경로는 코드에 있는데 이번에 확인하지 못했다(쓰기 금지 · 앞 단계 실패 · 대상 없이 경로만 두드림) |
+| 🔴 실패 | 실제 요청이 실패했다(상태 코드와 영문 오류 코드를 적는다) · 또는 경로 자체가 없다 |
+
+코드에 경로가 있다는 정적 확인은 🟡 가 최대치다. 🔎 표시 시나리오는 가용성 점검(목록이 열리는가)이라
+「끝까지 되는 시나리오」 수에 넣지 않는다.
+
+## 담당 경계
+
+이 측정기는 **서버 단위(API 수준) 검사**이고 Claude 담당이다(`tests/scenarios/`, CI, 이 문서).
+브라우저·화면 단위의 고객 기능 검사와 그 독립 검수, 그리고 고객에게 보이는 여정 이름·단계 문구는
+**Codex 담당**이다. 표의 시나리오·단계 이름은 측정 기록용 내부 라벨이며 고객 화면 문안이 아니다 —
+고객용 문안이 필요하면 Codex 쪽이 정하고, 이 측정기는 그 문안을 화면 문구의 근거로 삼지 않는다.
+측정기는 `mockups/`·`templates/` 를 읽거나 고치지 않는다.
+
+## 기록 두 곳
+
+| 기록 | 무엇을 재나 | 누가 갱신하나 |
+|---|---|---|
+| [`ci/status.md`](ci/status.md) | 이 저장소 코드를 **빈 DB 에 마이그레이션만 적용해** 띄웠을 때. 새로 세운 서버에서 무엇이 되는가 | GitHub Actions 「끝까지 시나리오」가 push·PR 마다 돌린다(작업 요약에 표). 이 파일은 클라우드 쪽이 PR 에서 갱신 |
+| `dev/status.md` | 실제 카탈로그가 있는 개발 서버·PC 로컬 서버 기준 | PC 쪽(DB·서버 접속이 있는 쪽) |
+
+CI 쪽은 상품이 0건이라 견적 단계는 거기서 빨강이 정상이다. 견적이 실제 카탈로그로
+되는지는 `dev/` 기록이 말한다.
+
+## 실행
+
+```bash
+# 이 저장소 앱을 프로세스 안에서 띄워 DATABASE_URL 의 DB 로 (CI 와 같은 방식)
+python tests/scenarios/meter.py --out docs/scenarios/ci
+
+# 떠 있는 서버를 두드린다 — 쓰기 단계는 기본으로 보내지 않는다
+python tests/scenarios/meter.py --base-url http://127.0.0.1:8000 --out docs/scenarios/dev
+```
+
+- `--base-url` 모드는 앱(`api`)·`.env`·DB 엔진을 불러오지 않는다. 경로 존재 확인도 서버 응답으로만 한다.
+- `--allow-writes` 가 없으면 **코드로 쓰지 않음을 확인한(`readonly`) 비로그인 단계만** 보낸다.
+  쿠키를 보내는 단계는 readonly 여도 보내지 않는다(인증 GET 도 세션 last_seen 을 쓸 수 있다).
+  원격 모드에서는 요청마다 새 세션을 쓰고 쿠키 저장·전송을 모두 막으며, 환경(.netrc·프록시 변수)을 읽지 않고 인증 머리글을 싣지 않는다.
+  켜면 견적·로그인·주문처럼 행을 만드는 단계도 보낸다. PC 의 `.env` 는 공유 Cloud SQL 이라
+  `consult_sessions`·`handoffs` 등에 행이 남는다(CLAUDE.md 「검증이 흔적을 남긴다」).
+- 기록에는 응답 원문·예외 문장·열쇠·세션 번호가 남지 않는다. 상태 코드, JSON 여부, 오류 코드
+  (`auth_unavailable` 처럼 영문 코드만), 단계가 지정한 숫자·참거짓 값, 경로의 틀만 남는다.
+- `--measured-by PC 쪽` 으로 측정 주체를 기록에 적는다. 클라우드 쪽 측정은 PC 독립 확인이 아니다.
+- 안전 검사: `python -m pytest tests/scenarios/test_meter_safety.py -q` (가짜 전송기·가짜 어댑터, 네트워크·DB 불필요 · 쿠키·.netrc 반례 포함). pytest 가 없으면 `pip install pytest`.
+- 같은 일회용 DB 에서 두 번 돌리면 관리자 로그인이 403 `password_not_set` 이 된다(부트스트랩은 첫 로그인 한 번만). CI 기록은 매번 새 DB 에서 잰다.
+- 관리자 단계: `SCENARIO_ADMIN_EMAIL` · `SCENARIO_ADMIN_PASSWORD` 환경변수. 비밀번호는
+  기록에 남지 않는다.
+- 종료 코드는 측정이 끝나면 0 이다(빨강이 있어도). 측정기가 못 돌면 2.
+
+## 운영자 출고 단계
+
+출고 준비 등록은 **빈 명령을 보내지 않는다.** 앞 단계 「출고 현황과 처리 가능 여부 보기」가 서버에서
+받은 값(최신 order_revision·expected_order_basis·order_state, `actions.prepare_shipment` 의 정책 basis·라인)으로
+합성 명령을 만들 때만 보내고, operation_id 는 매번 새 UUID 다. 오늘 서버는 `source_unconnected` 라
+그 단계에서 멈춘다. 명령 모양은 PC 쪽 fixture 사슬(prep_request → h.intent → h.command)과 대조한다:
+`python -m pytest tests/scenarios/test_fulfillment_command.py -q`. 확정 원결과 조회 성공만으로
+«중복 효과 0»을 증명하지 않으며, 잘못된 출고 정정은 계약이 없어 정책 미정이다.
+
+## 시나리오를 고칠 때
+
+정의는 [`tests/scenarios/definitions.py`](../../tests/scenarios/definitions.py) 하나다. 새 경로가
+생기면(예: 커머스 주문 생성·결제) 그 단계의 `path` 를 채우고 `missing` 을 지운다.
+**기대값을 낮춰 초록을 만들지 않는다** — 기대값은 「고객이 그 단계를 끝냈다」를 말해야 한다.

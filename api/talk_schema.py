@@ -475,7 +475,19 @@ def _validate_game(raw, vocab: Vocab, dropped: list[dict]) -> GameState | None:
     listed_unconfirmed = [m for m in matched.values() if m and m not in vocab.confirmed_games]
     unlisted = [n for n, m in matched.items() if not m]
 
-    if confirmed:
+    if confirmed and (listed_unconfirmed or unlisted):
+        # 한 게임의 확정 등급을 미확정 게임까지 충족하는 등급으로 사용하지 않는다.
+        # 기존 missing_for의 game.grade 경로로 전체 요청의 추천을 보류한다.
+        unresolved = []
+        if listed_unconfirmed:
+            unresolved.append("목록 내 등급 미확정: " + ", ".join(dict.fromkeys(listed_unconfirmed)))
+        if unlisted:
+            unresolved.append("목록 밖 게임: " + ", ".join(unlisted))
+        reason = "일부 요청 게임의 등급 미확정 — " + "; ".join(unresolved) + " — 전체 게임 적합성 확인 전 추천 보류"
+        _drop(dropped, "game.grade", grade, reason)
+        _drop(dropped, "game.grade_src", grade_src, reason)
+        grade, grade_src = None, None
+    elif confirmed:
         db_grade = _heaviest(confirmed, vocab)
         if grade is not None and grade != db_grade:
             _drop(dropped, "game.grade", grade,
