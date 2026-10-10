@@ -433,7 +433,7 @@ a.mp-link{color:var(--rv-link)}
       <div class="mp-aside-card">
         <div class="mp-aside-t">이 화면에서 안 하는 것</div>
         <div class="mp-scope-row"><span class="k">개별 상품 판매가 확정</span><span class="v" id="mpGoPriceReview">→ 가격 검토 대기</span></div>
-        <div class="mp-scope-row"><span class="k">대량 재계산 실행</span><span class="v">→ 판매가 재산정</span></div>
+        <div class="mp-scope-row"><span class="k">대량 재계산 실행</span><span class="v" id="mpGoReprice">→ 판매가 재산정</span></div>
         <div class="mp-scope-row"><span class="k">예외 잡기 · 잠금</span><span class="v" id="mpGoSalePrice">→ 판매가 관리</span></div>
         <div class="mp-scope-row"><span class="k">마진 이력 조회</span><span class="v" id="mpGoPriceHistory">→ 가격 이력</span></div>
         <div class="mp-aside-t" style="margin-top:12px">아직 정해지지 않은 것</div>
@@ -746,6 +746,7 @@ a.mp-link{color:var(--rv-link)}
     $('mpGoPriceReview').innerHTML = linkHtml('price_review', '→ 가격 검토 대기');
     $('mpGoSalePrice').innerHTML = linkHtml('sale_price', '→ 판매가 관리');
     $('mpGoPriceHistory').innerHTML = linkHtml('price_history', '→ 가격 이력');
+    $('mpGoReprice').innerHTML = linkHtml('reprice', '→ 판매가 재산정');
 
     if (S.catsErr) {
       var un = S.catsErr.status === 401;

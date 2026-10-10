@@ -304,6 +304,9 @@ a.ph-move{color:var(--rv-ink)}
   .ph-filter-right{margin-left:0;text-align:left}
 }
 @media (max-width:768px){
+  /* 「기간」 글자가 좁은 칸에서 「기/간」으로 쪼개지지 않게 한다(2026-10-10 전수 점검 L114) */
+  .ph-filter-row1 label{white-space:nowrap;flex-wrap:wrap;min-width:0}
+  .ph-filter-row1 input[type=date]{min-width:0;max-width:130px}
   .ph-grid{grid-template-columns:1fr}
   .ph-left{max-height:280px}
 }

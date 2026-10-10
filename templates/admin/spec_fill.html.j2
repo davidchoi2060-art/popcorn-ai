@@ -111,7 +111,7 @@ input,select{font-family:var(--rv-font)}
 .sf-run-status.wait{color:var(--rv-amber)}
 .sf-run-note{margin-top:5px;font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim)}
 .sf-run-note.warn{color:var(--rv-red)}
-.sf-watcher-warn{display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px 10px;
+.sf-watcher-warn{display:block;margin-top:9px;padding:8px 10px;
   border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);border-radius:6px;
   font:400 10.5px/1.5 var(--rv-font);color:oklch(0.4 0.13 55)}
 .sf-watcher-warn[hidden]{display:none}
@@ -616,7 +616,7 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
       ? '엔진이 읽는 사양 필드 ' + ctx.rank_total + '개 중 <b>결측률 1위</b>'
       : '엔진이 읽는 사양 필드 ' + ctx.rank_total + '개 중 결측률 ' + ctx.rank + '위';
     el.innerHTML = '<b>' + esc(ctx.label || ctx.field_key) + '</b> 결측 '
-      + '<span class="num">' + fmtNum(ctx.missing) + '/' + fmtNum(ctx.total) + ' (' + ctx.missing_pct + '%)</span> — '
+      + '<span class="num">' + fmtNum(ctx.missing) + '/' + fmtNum(ctx.total) + ' (' + (ctx.missing_pct == null ? '정보 없음' : ctx.missing_pct + '%') + ')</span> — '
       + rankText + '입니다. 그리고 다나와가 이 필드를 구조적으로 못 채웁니다 — 검수 대기 '
       + '<span class="num">' + fmtNum(ctx.review_pending) + '건</span> 중 다나와 제안이 붙은 것 '
       + '<span class="num">' + fmtNum(ctx.danawa_suggested_pending) + '건</span>. 웹 검색이 유일한 자동화 경로입니다. '

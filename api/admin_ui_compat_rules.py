@@ -19,9 +19,12 @@ load_compat_rules 89번째 줄 부근 `SLOTS.index(ref_slot) >= SLOTS.index(slot
 GET /api/admin/engine-rules가 알려주지 않는다. 화면은 그 열을 "확인 불가"로만 표시한다
 (지어내지 않는다 - 백엔드가 규칙별 로드 성공 여부를 추가해야 해소된다).
 """
+import json
+
 from fastapi import APIRouter, Request
 
 from .admin_ui_common import render
+from .taxonomy import PART_LABELS, SLOT_LABELS
 
 router = APIRouter(prefix="/admin2")
 
@@ -32,4 +35,6 @@ def compat_rules_page(request: Request):
         request, "admin/compat_rules.html.j2",
         screen_id="ADM-ENG-010", domain="호환",
         crumb_group="상품사양관리", crumb_now="조립 호환 규칙",
+        # 영문 자리·부품 코드를 한글로 보여 주는 이름표 — 부품 어휘 단일 원천(taxonomy)을 그대로 싣는다
+        labels_json=json.dumps({"slots": SLOT_LABELS, "parts": PART_LABELS}, ensure_ascii=False),
     )

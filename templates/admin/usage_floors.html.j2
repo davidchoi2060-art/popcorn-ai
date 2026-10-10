@@ -308,7 +308,7 @@
 <div class="uf-page" data-screen-id="ADM-ENG-040" data-domain="usage-floors">
 
   <header class="uf-hub">
-    <h1>사용·성능 자료</h1>
+    <h1>용도별 최소 사양</h1>
     <p class="uf-hub-sub">최소사양 확인과 변경 전 영향 검토</p>
     <nav class="uf-hub-links" aria-label="사용·성능 자료 화면">
       <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>여기서 보기 →</small></a>
@@ -334,10 +334,8 @@
   <div class="uf-toolbar" data-keep="1">
     <span class="uf-count" id="ufCount">—</span>
     <span class="uf-grow"></span>
-    <button type="button" class="uf-lockbtn" data-action="locked-note" disabled
-            title="향후 사용예정 — 아래 안내를 참고하세요">
-      + 용도 만들기<span class="uf-tag">향후 사용예정</span>
-    </button>
+    <!-- 「+ 용도 만들기」는 쓰기 기능이 생길 때까지 감춘다 — 눌러도 아무 일도 없는 단추였다
+         (2026-10-10 전수 점검 L63). 계획은 바로 아래 안내 띠가 말한다. -->
   </div>
   <div class="uf-locked-note">
     <b>용도 신설 · 매칭 문구 편집 · 순서 변경 — 향후 사용예정.</b>
@@ -465,8 +463,7 @@
       + '<div><div class="uf-usage-label">' + esc(g.usage_label) + '</div>'
       +   '<div class="uf-usage-terms">' + esc(terms) + '</div></div>'
       + '<div></div><div></div><div></div><div></div>'
-      + '<div><button type="button" class="uf-lockbtn-sm" data-action="locked-note" disabled '
-      +   'title="향후 사용예정 — 아래 안내를 참고하세요">문구 편집<span class="uf-tag">향후 사용예정</span></button></div>'
+      + '<div></div>'   // 「문구 편집」은 쓰기 기능이 생길 때까지 감춘다(2026-10-10 전수 점검 L63)
       + '</div>';
   }
 

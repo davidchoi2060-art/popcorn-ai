@@ -265,7 +265,7 @@
 .pi-matchorder li{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
     padding:8px 2px;border-bottom:1px solid var(--outline-variant);font:400 11.6px/1.5 var(--font)}
 .pi-matchorder li:last-child{border-bottom:none}
-.pi-matchorder li::before{counter-increment:pi-mo;content:counter(pi-mo) "  ";flex:none;font-weight:700;color:var(--on-variant)}
+/* 번호는 각 줄 글머리(①~④)가 이미 단다 — 따로 세던 번호가 1,1,1,1로 겹쳐 보였다(2026-10-10 전수 점검 L59) */
 .pi-matchorder li .t{flex:1;color:var(--on)}
 .pi-matchorder li .v{flex:none;font-family:var(--font-num);color:var(--on-variant);text-align:right}
 .pi-matchorder li.danger .v{color:var(--rv-red);font-weight:700}
@@ -627,7 +627,7 @@
       { t: '③ 이름 유사도 — 후보 제시만', v: '지금 화면 후보 ' + fmt(simCount) + '건', danger: false },
       { t: '④ 매칭 없음 — 신규 등록 필요', v: fmt(noneCount) + '건', danger: true }
     ];
-    return '<ol class="pi-matchorder" style="counter-reset:none">' + lines.map(function (l) {
+    return '<ol class="pi-matchorder">' + lines.map(function (l) {
       return '<li' + (l.danger ? ' class="danger"' : '') + ' style="list-style:none">'
         + '<span class="t">' + esc(l.t) + '</span><span class="v">' + esc(l.v) + '</span></li>';
     }).join('') + '</ol>';

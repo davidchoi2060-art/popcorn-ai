@@ -94,13 +94,14 @@ router = APIRouter(prefix="/admin2", tags=["admin-ui"])
 
 ROUND_LIMIT = 50  # 최근 N회차만 낸다 — 재산정은 드문 운영이라 실질적 제약은 아니다(§docstring)
 
-# 이 화면이 잇는 곳 — **경로**로만 판정한다(라벨 금지). "단가표 일일 반영"은 admin2
-# 라우트 자체가 없어 여기 넣지 않는다(§docstring "판단한 것").
+# 이 화면이 잇는 곳 — **경로**로만 판정한다(라벨 금지). "단가표 일일 반영"은 그 뒤
+# admin2 「단가표 반영」(/admin2/price-import)이 생겨 함께 판정한다(2026-10-10 전수 점검 L80).
 LINK_TARGETS = {
     "margin_policy": {"label": "마진 정책", "path": "/admin2/margin-policy"},
     "price_review": {"label": "가격 검토 대기", "path": "/admin2/price-review"},
     "sale_price": {"label": "판매가 관리", "path": "/admin2/sale-price"},
     "price_history": {"label": "가격 이력", "path": "/admin2/price-history"},
+    "price_import": {"label": "단가표 반영", "path": "/admin2/price-import"},
 }
 
 
