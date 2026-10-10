@@ -1,0 +1,57 @@
+{
+  "id": 26,
+  "kind": "범위 밖",
+  "turns": [
+    {
+      "text": "오늘 날씨 어때",
+      "parse": {
+        "status": 200,
+        "sec": 2.751,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [],
+          "reply": "오늘 날씨는 흐린데 쌀쌀하네요. 혹시 컴퓨터는 새로 맞추려고 하세요?",
+          "assumed": [],
+          "pc_related": false,
+          "constraints": [],
+          "note": "PC 상담 문장이 아니라고 판정했습니다(잡담 1/3회).",
+          "chat_flow": {
+            "smalltalk_turns": 1
+          },
+          "stage": "open",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 1.982,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:18:09.149Z"
+}

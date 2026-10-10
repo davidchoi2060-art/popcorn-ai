@@ -1,0 +1,89 @@
+{
+  "id": 9,
+  "kind": "용도+예산",
+  "turns": [
+    {
+      "text": "게임용 250만원",
+      "parse": {
+        "status": 200,
+        "sec": 5.632,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "게임"
+            ],
+            "budget_won": 2500000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [],
+          "evidence": [
+            "예산 250만원 명시",
+            "용도 '게임' 명시",
+            "게임명 미언급으로 등급 판정 불가"
+          ],
+          "reply": "주로 어떤 게임을 하실 계획이신가요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "250만원"
+            },
+            {
+              "l": "용도",
+              "v": "게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "게임용으로 보시는군요. 현재 자료 기준으로는 리그 오브 레전드(MOBA, 라이엇 게임즈)가 2026-09-17 게임트릭스 PC방 통계에서 점유율 1위(34.37%)이며, FC온라인(스포츠, 넥슨)이 2위(9.29%), 리니지 클래식(MMORPG, 엔씨소프트)이 3위(7.79%)입니다. 발로란트·서든어택 같은 FPS와 메이플스토리도 많이 이용됩니다. 주로 어떤 게임을 하실 예정인가요?",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [
+            "리그 오브 레전드",
+            "FC온라인",
+            "리니지 클래식",
+            "발로란트",
+            "서든어택",
+            "메이플스토리"
+          ],
+          "answer_notice": null,
+          "answer_filter": {
+            "kept": 4,
+            "replaced": [],
+            "dropped": [],
+            "gate_hit": false
+          },
+          "answer_elapsed_sec": 5.179,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.49,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:13:26.234Z"
+}

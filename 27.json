@@ -1,0 +1,147 @@
+{
+  "id": 27,
+  "kind": "연속 대화",
+  "turns": [
+    {
+      "text": "게임용 컴퓨터 추천해줘",
+      "parse": {
+        "status": 200,
+        "sec": 10.334,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "게임"
+            ],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [],
+          "evidence": [
+            "게임 용도 명시",
+            "구체적 게임명이나 사양 수준 없음"
+          ],
+          "reply": "주로 어떤 게임들을 하시려고 하세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "용도",
+              "v": "게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [
+            "리그 오브 레전드",
+            "FC온라인",
+            "리니지 클래식",
+            "발로란트",
+            "서든어택",
+            "메이플스토리"
+          ],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 9.467,
+          "answer_error": "answer_unavailable",
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.341,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    },
+    {
+      "text": "150만원이요",
+      "parse": {
+        "status": 200,
+        "sec": 2.669,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "게임"
+            ],
+            "budget_won": 1500000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [],
+          "evidence": [
+            "예산 150만원 확인",
+            "게임 계열이지만 구체적인 게임명이 없어 등급 판정 불가"
+          ],
+          "reply": "주로 어떤 게임들을 하실 예정이세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "150만원"
+            },
+            {
+              "l": "용도",
+              "v": "게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 2,
+          "elapsed_sec": 2.164,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:18:48.170Z"
+}

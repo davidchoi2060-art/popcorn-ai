@@ -1,0 +1,1008 @@
+{
+  "id": 19,
+  "kind": "띄어쓰기",
+  "turns": [
+    {
+      "text": "롤150만원으로추천",
+      "parse": {
+        "status": 200,
+        "sec": 4.018,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "캐주얼 게임"
+            ],
+            "budget_won": 1500000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [
+                "롤"
+              ],
+              "grade": "E",
+              "grade_src": "catalog",
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [],
+          "dropped": [],
+          "evidence": [
+            "'롤'(리그 오브 레전드)은 확정 목록에서 E등급",
+            "150만원으로 파악"
+          ],
+          "reply": "리그 오브 레전드 위주로 150만원대 견적을 찾아볼게요. 모니터 해상도나 다른 용도가 있으시면 말씀해 주세요.",
+          "assumed": [
+            "game.resolution=1080p"
+          ],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "150만원"
+            },
+            {
+              "l": "용도",
+              "v": "캐주얼 게임"
+            }
+          ],
+          "note": null,
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 3.252,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": {
+        "status": 200,
+        "sec": 1.529,
+        "json": {
+          "ok": true,
+          "card_sets": [
+            {
+              "usage": "캐주얼 게임",
+              "usage_grid": "게임",
+              "kind": "sold",
+              "min_level": "캐주얼",
+              "min_level_work": "롤·발로란트·피파·메이플 FHD",
+              "items": [
+                {
+                  "product_code": 93454,
+                  "name": "골드 NO.04.93454  RTX 3050 [12400F/16G/250GB/RTX3050]",
+                  "price": 1199600,
+                  "price_src": "현재 판매가",
+                  "mall_url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=93454",
+                  "spec": {
+                    "cpu": "i5-12400",
+                    "gpu": "RTX 3050 6GB",
+                    "ram_gb": 16,
+                    "ssd_gb": 256,
+                    "vram_gb": 6
+                  },
+                  "level": "캐주얼",
+                  "tag": "알뜰 구성",
+                  "role": "value",
+                  "over_budget": false,
+                  "reasons": [
+                    "게임 캐주얼 — 롤·발로란트·피파·메이플 FHD",
+                    "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+                    "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
+                  ],
+                  "photo": {
+                    "state": "available",
+                    "kind": "ai_assembly_example",
+                    "url": "/api/customer/products/93454/representative-image",
+                    "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+                  },
+                  "public_configuration": {
+                    "configuration_id": "P93454",
+                    "revision": 4,
+                    "offer_id": "P93454",
+                    "description": {
+                      "title": "일상과 게임의 시작, 설치 공간까지 따져보는 PC",
+                      "intro": "Core i5-12400F와 RTX 3050 6GB를 담아, 평소 작업과 게임을 한 PC에서 이용하려는 분께 소개합니다. 256GB SSD를 사용하며, 즐기는 게임과 동시에 켜 둘 프로그램에 맞춰 구성을 살펴볼 수 있어요. 시스템 메모리는 16GB입니다.",
+                      "scene": "공부나 업무를 마친 뒤 같은 PC로 게임에 접속하고, 일상 프로그램도 사용하는 경우.",
+                      "benefits": [
+                        [
+                          "별도 그래픽카드로 게임 화면을 처리해요",
+                          "RTX 3050가 그래픽 처리를 맡습니다. 6GB의 그래픽 전용 메모리를 탑재했으며, 게임에 맞춰 해상도와 화질을 조절해 사용하는 구성입니다."
+                        ],
+                        [
+                          "16GB 메모리를 담았어요",
+                          "실행 중인 프로그램이 쓰는 작업 공간입니다. 게임과 방송·편집을 동시에 하거나 큰 파일을 다룬다면, 사용량에 맞춰 32GB 이상 구성과 비교해 주세요."
+                        ],
+                        [
+                          "256GB SSD, 보관할 파일부터 확인해요",
+                          "운영체제와 프로그램을 설치하면 남는 공간이 줄어듭니다. 게임이나 영상 파일을 많이 보관한다면 500GB·1TB 이상 구성과 비교해 주세요."
+                        ]
+                      ],
+                      "checks": [
+                        "게임 이름과 옵션에 따라 필요한 성능이 다릅니다. 특정 게임의 프레임은 실제 구성에 대응하는 근거를 확인한 뒤 안내합니다.",
+                        "256GB 저장공간은 대용량 게임·영상 자료를 많이 보관하기에는 제한적입니다.",
+                        "모니터는 그래픽카드 출력 단자에 연결합니다. 이 CPU 모델은 내장 그래픽을 포함하지 않습니다."
+                      ],
+                      "faq": [
+                        {
+                          "question": "어떤 게임에서 몇 프레임이 나오나요?",
+                          "answer": "게임 이름·해상도·옵션·목표 프레임을 알려주세요. 이 구성에 대응하는 성능 근거를 확인한 뒤 안내하며, 부품 이름만으로 프레임을 확정하지 않습니다."
+                        },
+                        {
+                          "question": "이 PC가 저에게 알뜰 구성인가요, 추천 구성인가요?",
+                          "answer": "두 이름은 상품의 고정 등급이 아닙니다. 사용 조건을 충족하는 후보 중 비용을 줄이는 선택을 알뜰 구성으로, 추가 비용의 이점이 분명한 선택을 추천 구성으로 안내합니다."
+                        },
+                        {
+                          "question": "가격에 조립비가 들어 있나요?",
+                          "answer": "기존 완제품 표시 가격 · 제작 서비스 포함 · 조립비 중복 가산 없음"
+                        },
+                        {
+                          "question": "부품을 바꾸면 설명도 달라지나요?",
+                          "answer": "네. 메모리·그래픽카드 등 부품이 달라지면 달라진 구성의 호환성과 작업 조건을 확인한 뒤 설명과 가격을 다시 안내합니다."
+                        }
+                      ]
+                    },
+                    "parts": [
+                      {
+                        "ordinal": 0,
+                        "slot": "CPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+                        "description": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+                        "specs": [
+                          {
+                            "label": "모델",
+                            "value": "코어i5-12400F"
+                          },
+                          {
+                            "label": "코어 구성",
+                            "value": "6"
+                          },
+                          {
+                            "label": "스레드",
+                            "value": "12"
+                          },
+                          {
+                            "label": "소켓",
+                            "value": "LGA1700"
+                          },
+                          {
+                            "label": "기본 클럭",
+                            "value": "2.5(GHz)"
+                          },
+                          {
+                            "label": "최대 클럭",
+                            "value": "4.4(GHz)"
+                          },
+                          {
+                            "label": "내장그래픽",
+                            "value": "없음"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/110964/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 1,
+                        "slot": "GPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "PALIT 지포스 RTX 3050 STORM X D6 6GB 이엠텍",
+                        "description": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+                        "specs": [
+                          {
+                            "label": "GPU 모델",
+                            "value": "RTX 30"
+                          },
+                          {
+                            "label": "그래픽 메모리",
+                            "value": "6(GB)"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "GDDR6"
+                          },
+                          {
+                            "label": "카드 길이",
+                            "value": "162(mm)"
+                          },
+                          {
+                            "label": "권장 파워",
+                            "value": "정격 300(W) 이상"
+                          },
+                          {
+                            "label": "팬 개수",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "모니터 수",
+                            "value": "최대 3대"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/128419/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 2,
+                        "slot": "RAM",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+                        "description": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+                        "specs": [
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR4"
+                          },
+                          {
+                            "label": "상품 용량",
+                            "value": "16(GB)"
+                          },
+                          {
+                            "label": "표기 속도",
+                            "value": "3200(MHz),PC4-25600"
+                          },
+                          {
+                            "label": "패키지 구성",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "전압",
+                            "value": "1.20(V)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/109547/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 3,
+                        "slot": "SSD",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+                        "description": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+                        "specs": [
+                          {
+                            "label": "용량",
+                            "value": "256(GB)"
+                          },
+                          {
+                            "label": "연결 형태",
+                            "value": "M.2(NVMe)"
+                          },
+                          {
+                            "label": "M.2 크기",
+                            "value": "2280"
+                          },
+                          {
+                            "label": "플래시 종류",
+                            "value": "TLC"
+                          },
+                          {
+                            "label": "최대 읽기 (제조사 256GB 기준)",
+                            "value": "6,400 MB/s"
+                          },
+                          {
+                            "label": "최대 쓰기 (제조사 256GB 기준)",
+                            "value": "2,700 MB/s"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/110899/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 4,
+                        "slot": "MB",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+                        "description": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+                        "specs": [
+                          {
+                            "label": "CPU 소켓",
+                            "value": "LGA1700"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR4"
+                          },
+                          {
+                            "label": "보드 크기",
+                            "value": "m-ATX"
+                          },
+                          {
+                            "label": "메모리 슬롯",
+                            "value": "2(EA)"
+                          },
+                          {
+                            "label": "최대 메모리",
+                            "value": "최대 64(GB)"
+                          },
+                          {
+                            "label": "M.2 슬롯",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "유선 네트워크",
+                            "value": "기가비트"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/113685/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 5,
+                        "slot": "COOLER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+                        "description": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+                        "specs": [
+                          {
+                            "label": "냉각 방식",
+                            "value": "공랭"
+                          },
+                          {
+                            "label": "높이",
+                            "value": "150(mm)"
+                          },
+                          {
+                            "label": "히트파이프",
+                            "value": "4(EA)"
+                          },
+                          {
+                            "label": "팬 최대 회전수",
+                            "value": "1,800(RPM)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "1(년)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/123395/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 6,
+                        "slot": "POWER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "마이크로닉스 Classic II 풀체인지 600W 80PLUS BRONZE ATX3.1",
+                        "description": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+                        "specs": [
+                          {
+                            "label": "정격 출력",
+                            "value": "600(W)"
+                          },
+                          {
+                            "label": "파워 규격",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "효율 표기",
+                            "value": "BRONZE"
+                          },
+                          {
+                            "label": "팬 크기",
+                            "value": "120(mm)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "무상 7(년)"
+                          },
+                          {
+                            "label": "SATA 전원",
+                            "value": "6"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/120943/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 7,
+                        "slot": "CASE",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "DAVEN D6 MESH 강화유리 블랙 (미들타워)",
+                        "description": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+                        "specs": [
+                          {
+                            "label": "형태",
+                            "value": "미들타워"
+                          },
+                          {
+                            "label": "지원 파워",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "쿨러 높이",
+                            "value": "173(mm)"
+                          },
+                          {
+                            "label": "GPU 장착 길이",
+                            "value": "330(mm)"
+                          },
+                          {
+                            "label": "수랭 지원",
+                            "value": "최대 3열"
+                          },
+                          {
+                            "label": "팬 구성 표기",
+                            "value": "6"
+                          },
+                          {
+                            "label": "크기",
+                            "value": "너비 : 216(mm) / 높이 : 463(mm) / 깊이 : 366(mm)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/113919/detail"
+                        }
+                      }
+                    ],
+                    "price": {
+                      "state": "unknown",
+                      "amount": null,
+                      "checked_at": null,
+                      "observed_date": null,
+                      "model": null
+                    },
+                    "stock": {
+                      "state": "unknown",
+                      "checked_at": null
+                    },
+                    "compatibility": {
+                      "document_state": "unknown",
+                      "public_summary": null,
+                      "assembly_state": "unknown"
+                    },
+                    "customer_conditions": {
+                      "os": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "운영체제 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "keyboard": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "키보드 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "mouse": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "마우스 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "monitor": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "모니터 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "warranty": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "보증·AS 조건을 구매 전에 확인해 주세요."
+                      }
+                    },
+                    "product_code": 93454,
+                    "photo": {
+                      "state": "unresolved",
+                      "url": null
+                    }
+                  }
+                },
+                {
+                  "product_code": 121257,
+                  "name": "초저가 가성비짱 골드 NO.04.121257  [12400F/16G/500GB/RTX3050]",
+                  "price": 1280800,
+                  "price_src": "현재 판매가",
+                  "mall_url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=121257",
+                  "spec": {
+                    "cpu": "i5-12400",
+                    "gpu": "RTX 3050 6GB",
+                    "ram_gb": 16,
+                    "ssd_gb": 500,
+                    "vram_gb": 6
+                  },
+                  "level": "캐주얼",
+                  "tag": "추천 구성",
+                  "role": "recommended",
+                  "over_budget": false,
+                  "reasons": [
+                    "게임 캐주얼 — 롤·발로란트·피파·메이플 FHD",
+                    "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요."
+                  ],
+                  "photo": {
+                    "state": "available",
+                    "kind": "ai_assembly_example",
+                    "url": "/api/customer/products/121257/representative-image",
+                    "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+                  },
+                  "public_configuration": {
+                    "configuration_id": "P121257",
+                    "revision": 5,
+                    "offer_id": "P121257",
+                    "description": {
+                      "title": "일상에 게임 한 판을 더하고 싶다면",
+                      "intro": "Core i5-12400F와 RTX 3050 6GB를 담아, 평소 작업과 게임을 한 PC에서 이용하려는 분께 소개합니다. 500GB SSD를 사용하며, 즐기는 게임과 동시에 켜 둘 프로그램에 맞춰 구성을 살펴볼 수 있어요. 시스템 메모리는 16GB입니다.",
+                      "scene": "공부나 업무를 마친 뒤 같은 PC로 게임에 접속하고, 일상 프로그램도 사용하는 경우.",
+                      "benefits": [
+                        [
+                          "별도 그래픽카드로 게임 화면을 처리해요",
+                          "RTX 3050가 그래픽 처리를 맡습니다. 6GB의 그래픽 전용 메모리를 탑재했으며, 게임에 맞춰 해상도와 화질을 조절해 사용하는 구성입니다."
+                        ],
+                        [
+                          "16GB 메모리를 담았어요",
+                          "실행 중인 프로그램이 쓰는 작업 공간입니다. 게임과 방송·편집을 동시에 하거나 큰 파일을 다룬다면, 사용량에 맞춰 32GB 이상 구성과 비교해 주세요."
+                        ],
+                        [
+                          "프로그램과 개인 파일을 위한 500GB",
+                          "500GB SSD에 운영체제와 프로그램, 개인 파일을 저장합니다. 대용량 게임이나 영상 자료가 쌓일 예정이라면 1TB 이상 구성도 함께 살펴보세요."
+                        ]
+                      ],
+                      "checks": [
+                        "게임 이름과 옵션에 따라 필요한 성능이 다릅니다. 특정 게임의 프레임은 실제 구성에 대응하는 근거를 확인한 뒤 안내합니다.",
+                        "모니터는 그래픽카드 출력 단자에 연결합니다. 이 CPU 모델은 내장 그래픽을 포함하지 않습니다."
+                      ],
+                      "faq": [
+                        {
+                          "question": "어떤 게임에서 몇 프레임이 나오나요?",
+                          "answer": "게임 이름·해상도·옵션·목표 프레임을 알려주세요. 이 구성에 대응하는 성능 근거를 확인한 뒤 안내하며, 부품 이름만으로 프레임을 확정하지 않습니다."
+                        },
+                        {
+                          "question": "이 PC가 저에게 알뜰 구성인가요, 추천 구성인가요?",
+                          "answer": "두 이름은 상품의 고정 등급이 아닙니다. 사용 조건을 충족하는 후보 중 비용을 줄이는 선택을 알뜰 구성으로, 추가 비용의 이점이 분명한 선택을 추천 구성으로 안내합니다."
+                        },
+                        {
+                          "question": "가격에 조립비가 들어 있나요?",
+                          "answer": "기존 완제품 표시 가격 · 제작 서비스 포함 · 조립비 중복 가산 없음"
+                        },
+                        {
+                          "question": "부품을 바꾸면 설명도 달라지나요?",
+                          "answer": "네. 메모리·그래픽카드 등 부품이 달라지면 달라진 구성의 호환성과 작업 조건을 확인한 뒤 설명과 가격을 다시 안내합니다."
+                        }
+                      ]
+                    },
+                    "parts": [
+                      {
+                        "ordinal": 0,
+                        "slot": "CPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+                        "description": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+                        "specs": [
+                          {
+                            "label": "모델",
+                            "value": "코어i5-12400F"
+                          },
+                          {
+                            "label": "코어 구성",
+                            "value": "6"
+                          },
+                          {
+                            "label": "스레드",
+                            "value": "12"
+                          },
+                          {
+                            "label": "소켓",
+                            "value": "LGA1700"
+                          },
+                          {
+                            "label": "기본 클럭",
+                            "value": "2.5(GHz)"
+                          },
+                          {
+                            "label": "최대 클럭",
+                            "value": "4.4(GHz)"
+                          },
+                          {
+                            "label": "내장그래픽",
+                            "value": "없음"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/110964/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 1,
+                        "slot": "GPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "PALIT 지포스 RTX 3050 STORM X D6 6GB 이엠텍",
+                        "description": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+                        "specs": [
+                          {
+                            "label": "GPU 모델",
+                            "value": "RTX 30"
+                          },
+                          {
+                            "label": "그래픽 메모리",
+                            "value": "6(GB)"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "GDDR6"
+                          },
+                          {
+                            "label": "카드 길이",
+                            "value": "162(mm)"
+                          },
+                          {
+                            "label": "권장 파워",
+                            "value": "정격 300(W) 이상"
+                          },
+                          {
+                            "label": "팬 개수",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "모니터 수",
+                            "value": "최대 3대"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/128419/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 2,
+                        "slot": "RAM",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+                        "description": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+                        "specs": [
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR4"
+                          },
+                          {
+                            "label": "상품 용량",
+                            "value": "16(GB)"
+                          },
+                          {
+                            "label": "표기 속도",
+                            "value": "3200(MHz),PC4-25600"
+                          },
+                          {
+                            "label": "패키지 구성",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "전압",
+                            "value": "1.20(V)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/109547/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 3,
+                        "slot": "SSD",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+                        "description": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+                        "specs": [
+                          {
+                            "label": "용량",
+                            "value": "500GB"
+                          },
+                          {
+                            "label": "연결 형태",
+                            "value": "M.2(NVMe)"
+                          },
+                          {
+                            "label": "M.2 크기",
+                            "value": "2280"
+                          },
+                          {
+                            "label": "플래시 종류",
+                            "value": "QLC"
+                          },
+                          {
+                            "label": "최대 읽기",
+                            "value": "6,600(MB/s)"
+                          },
+                          {
+                            "label": "최대 쓰기",
+                            "value": "5,600(MB/s)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/128462/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 4,
+                        "slot": "MB",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+                        "description": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+                        "specs": [
+                          {
+                            "label": "CPU 소켓",
+                            "value": "LGA1700"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR4"
+                          },
+                          {
+                            "label": "보드 크기",
+                            "value": "m-ATX"
+                          },
+                          {
+                            "label": "메모리 슬롯",
+                            "value": "2(EA)"
+                          },
+                          {
+                            "label": "최대 메모리",
+                            "value": "최대 64(GB)"
+                          },
+                          {
+                            "label": "M.2 슬롯",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "유선 네트워크",
+                            "value": "기가비트"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/113685/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 5,
+                        "slot": "COOLER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+                        "description": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+                        "specs": [
+                          {
+                            "label": "냉각 방식",
+                            "value": "공랭"
+                          },
+                          {
+                            "label": "높이",
+                            "value": "150(mm)"
+                          },
+                          {
+                            "label": "히트파이프",
+                            "value": "4(EA)"
+                          },
+                          {
+                            "label": "팬 최대 회전수",
+                            "value": "1,800(RPM)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "1(년)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/123395/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 6,
+                        "slot": "POWER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+                        "description": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+                        "specs": [
+                          {
+                            "label": "파워 규격",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "팬 크기",
+                            "value": "120(mm)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "무상 5(년)"
+                          },
+                          {
+                            "label": "SATA 전원",
+                            "value": "4(개)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/129250/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 7,
+                        "slot": "CASE",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "마이크로닉스 COOLMAX 스테디 블랙 (미들타워)",
+                        "description": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+                        "specs": [
+                          {
+                            "label": "형태",
+                            "value": "미들타워"
+                          },
+                          {
+                            "label": "지원 파워",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "쿨러 높이",
+                            "value": "165(mm)"
+                          },
+                          {
+                            "label": "GPU 장착 길이",
+                            "value": "355(mm)"
+                          },
+                          {
+                            "label": "수랭 지원",
+                            "value": "최대 3열"
+                          },
+                          {
+                            "label": "팬 구성 표기",
+                            "value": "6"
+                          },
+                          {
+                            "label": "크기",
+                            "value": "너비 : 215(mm) / 높이 : 470(mm) / 깊이 : 400(mm)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/120979/detail"
+                        }
+                      }
+                    ],
+                    "price": {
+                      "state": "unknown",
+                      "amount": null,
+                      "checked_at": null,
+                      "observed_date": null,
+                      "model": null
+                    },
+                    "stock": {
+                      "state": "unknown",
+                      "checked_at": null
+                    },
+                    "compatibility": {
+                      "document_state": "unknown",
+                      "public_summary": null,
+                      "assembly_state": "unknown"
+                    },
+                    "customer_conditions": {
+                      "os": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "운영체제 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "keyboard": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "키보드 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "mouse": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "마우스 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "monitor": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "모니터 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "warranty": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "보증·AS 조건을 구매 전에 확인해 주세요."
+                      }
+                    },
+                    "product_code": 121257,
+                    "photo": {
+                      "state": "unresolved",
+                      "url": null
+                    }
+                  }
+                }
+              ],
+              "empty_reason": null,
+              "empty_note": null,
+              "cards": [],
+              "empty_cells": [],
+              "omitted_variants": [],
+              "center_band": null,
+              "center_band_key": null,
+              "bands_considered": [],
+              "center_tier": null,
+              "center_tier_key": null,
+              "tiers_considered": [],
+              "game_context": null
+            }
+          ],
+          "cards": [],
+          "assumed": [
+            "game.resolution=1080p"
+          ],
+          "ai_estimated": [],
+          "needs": [],
+          "dropped": [],
+          "platform": "인텔",
+          "budget_won": 1500000,
+          "budget_bound": null,
+          "game_grade": "E",
+          "game_resolution": "1080p",
+          "game_name": "롤"
+        },
+        "error": null,
+        "setCookie": null
+      }
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:16:15.469Z"
+}

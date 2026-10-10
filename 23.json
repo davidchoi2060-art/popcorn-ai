@@ -1,0 +1,59 @@
+{
+  "id": 23,
+  "kind": "부품 질문",
+  "turns": [
+    {
+      "text": "램 32기가면 충분해요?",
+      "parse": {
+        "status": 200,
+        "sec": 3.13,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "RAM 32GB 언급은 구체적 부품 질문이나, 용도가 명시되지 않았음"
+          ],
+          "reply": "어떤 작업이나 게임을 주로 하시려고 하나요? 그에 맞춰 구성을 찾아볼 수 있어요.",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.632,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:17:21.341Z"
+}

@@ -1,0 +1,59 @@
+{
+  "id": 25,
+  "kind": "범위 밖",
+  "turns": [
+    {
+      "text": "모니터는요?",
+      "parse": {
+        "status": 200,
+        "sec": 2.994,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "모니터 문의는 PC 견적 상담 범위(주변기기 포함)"
+          ],
+          "reply": "모니터도 함께 맞춰드릴 수 있습니다. 먼저 본체로는 주로 어떤 작업을 하실 계획이세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.493,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:17:53.389Z"
+}

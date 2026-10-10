@@ -1,0 +1,64 @@
+{
+  "id": 13,
+  "kind": "예산만",
+  "turns": [
+    {
+      "text": "150만원",
+      "parse": {
+        "status": 200,
+        "sec": 2.475,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": 1500000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "예산 150만원 언급"
+          ],
+          "reply": "감사합니다. 주로 어떤 용도로 사용하려고 하세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "150만원"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 1.988,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:14:34.203Z"
+}

@@ -1,0 +1,65 @@
+{
+  "id": 14,
+  "kind": "예산만",
+  "turns": [
+    {
+      "text": "200만원 정도로 맞춰주세요",
+      "parse": {
+        "status": 200,
+        "sec": 3.069,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": 2000000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "고객이 예산 2000000원 제시",
+            "용도가 명시되지 않음"
+          ],
+          "reply": "2백만원 정도로 찾아볼게요. 주로 어떤 용도로 사용하실 계획이세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "200만원"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.294,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:14:50.281Z"
+}

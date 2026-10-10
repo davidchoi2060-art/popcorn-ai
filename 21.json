@@ -1,0 +1,59 @@
+{
+  "id": 21,
+  "kind": "부품 질문",
+  "turns": [
+    {
+      "text": "그래픽카드 뭐가 좋아요",
+      "parse": {
+        "status": 200,
+        "sec": 2.668,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "그래픽카드 추천 요청이지만 용도·게임·예산이 없음"
+          ],
+          "reply": "어떤 용도로 컴퓨터를 쓰실 계획이세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.168,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:16:48.949Z"
+}

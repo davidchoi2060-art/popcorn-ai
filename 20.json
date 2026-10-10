@@ -1,0 +1,83 @@
+{
+  "id": 20,
+  "kind": "줄임말",
+  "turns": [
+    {
+      "text": "발로 백만원",
+      "parse": {
+        "status": 200,
+        "sec": 6.327,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "캐주얼 게임"
+            ],
+            "budget_won": 10000000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [],
+          "evidence": [
+            "발로 = 발로란트(E등급 확정 게임)",
+            "백만원 = 1000000원 예산"
+          ],
+          "reply": "발로란트 위주로 찾아볼게요. 다른 게임도 함께 하실 계획이 있나요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "1,000만원"
+            },
+            {
+              "l": "용도",
+              "v": "캐주얼 게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "발로란트 기준으로 안내드리겠습니다. 발로란트는 라이엇 게임즈가 개발·배급한 1인칭 전술 슈팅 게임이며, 부분 유료화로 서비스됩니다. 윈도우 버전은 2020년 6월 2일 출시됐습니다(방금 찾아본 위키백과). 인기도는 2026년 9월 17일 기준 PC방 점유율 5위, 6.65%로 확인됩니다(게임트릭스 PC방 통계). 게임 이용 조건이나 실행 가능 여부는 확인해서 알려드릴게요. 혹시 이 중에 마음이 가는 게임이 있으시면, 그 게임 기준으로 PC를 맞춰 보여드릴게요.",
+          "sources": [],
+          "narrowing": "narrow",
+          "answer_game_names": [
+            "발로란트"
+          ],
+          "answer_notice": null,
+          "answer_filter": {
+            "kept": 5,
+            "replaced": [],
+            "dropped": [],
+            "gate_hit": false
+          },
+          "answer_elapsed_sec": 5.867,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.885,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null
+    }
+  ],
+  "visitor": "cookie",
+  "at": "2026-10-10T06:16:33.272Z"
+}
