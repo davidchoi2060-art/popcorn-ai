@@ -316,7 +316,7 @@
    $('tp-raw').hidden=false;$('tp-keepdays').textContent=d.keep_days;$('tp-keepdays2').textContent=d.keep_days;
    $('tp-rawstats').innerHTML=[['남은 건수',d.kept+'건','마스킹을 거친 값만 남습니다'],
      ['가장 오래된 것',d.oldest_at?ago(d.oldest_at):'—','이 시각부터 '+d.keep_days+'일'],
-     ['다음 삭제 예정',d.next_purge_at?new Date(d.next_purge_at).toLocaleDateString('ko-KR'):'—','raw_text 만 NULL']]
+     ['다음 삭제 예정',d.next_purge_at?new Date(d.next_purge_at).toLocaleDateString('ko-KR'):'—','원문만 지움']]
     .map(function(s){return '<div style="display:flex;flex-direction:column;gap:2px;padding-top:6px;border-top:1px solid var(--outline-variant)">'
      +'<span style="font:500 9px/1 var(--font);color:var(--rv-faint)">'+esc(s[0])+'</span>'
      +'<span class="tp-mono" style="font-size:13px;font-weight:600">'+esc(s[1])+'</span>'
