@@ -85,7 +85,7 @@
 .dp-path-mark{font:600 11px/1.6 var(--rv-mono);flex:none}
 .dp-path-title{font:500 11px/1.6 var(--rv-font);width:110px;flex:none}
 .dp-path-desc{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:160px}
-.dp-path-where{font:400 10px/1.6 var(--rv-mono);color:var(--rv-dim)}
+.dp-path-where{font:400 10px/1.6 var(--rv-mono);color:var(--rv-link);text-decoration:underline;text-underline-offset:2px}
 .dp-empty-hist{font:400 10.5px/1.7 var(--rv-font);color:var(--rv-faint)}
 .dp-empty-link{font:500 11.5px/1 var(--rv-font);color:var(--rv-ink);border:1px solid rgba(0,0,0,.24);
                border-radius:5px;padding:9px 13px;text-decoration:none}
@@ -407,11 +407,11 @@ a.dp-empty-link{color:var(--rv-ink)}
   // ── 빈 상태(1c) ──────────────────────────────────────────────────
   var PATHS = [
     { mark: '◆', color: 'oklch(0.5 0.12 250)', title: '중복 편입',
-      desc: '닮은 상품을 원본으로 합치면 중복분이 여기로 내려옵니다', where: '상품 관리 상세' },
+      desc: '닮은 상품을 원본으로 합치면 중복분이 여기로 내려옵니다', where: '상품 관리 상세', href: '/admin2/products' },
     { mark: '●', color: '#7d7669', title: '단건 상태 수정',
-      desc: '상세에서 상태를 삭제대기·단종으로 바꾸면 여기로 옵니다', where: '상품 관리 상세' },
+      desc: '상세에서 상태를 삭제대기·단종으로 바꾸면 여기로 옵니다', where: '상품 관리 상세', href: '/admin2/products' },
     { mark: '▣', color: 'oklch(0.62 0.15 55)', title: '일괄 상태 변경',
-      desc: '목록에서 여러 건을 한 번에 내리면 여기로 옵니다', where: '상품 관리 목록' }
+      desc: '목록에서 여러 건을 한 번에 내리면 여기로 옵니다', where: '상품 관리 목록', href: '/admin2/products' }
   ];
   function renderEmpty() {
     var d = S.data;
@@ -440,7 +440,8 @@ a.dp-empty-link{color:var(--rv-ink)}
             return '<div class="dp-path-row"><span class="dp-path-mark" style="color:' + p.color + '">' + p.mark + '</span>' +
               '<span class="dp-path-title">' + esc(p.title) + '</span>' +
               '<span class="dp-path-desc">' + esc(p.desc) + '</span>' +
-              '<span class="dp-path-where">' + esc(p.where) + '</span></div>';
+              // 전수 점검 L125 — 링크처럼 보이던 회색 글자를 실제로 눌리는 링크로 만든다.
+              '<a class="dp-path-where" href="' + esc(p.href) + '">' + esc(p.where) + '</a></div>';
           }).join('') +
         '</div>' +
         '<div class="dp-empty-hist">' + esc(histLine) + '</div>' +

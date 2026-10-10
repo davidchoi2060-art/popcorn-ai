@@ -126,8 +126,10 @@ input,textarea{font-family:var(--rv-font)}
 /* 서열 사다리(1b) — 헤더·본문이 같은 스크롤 컨테이너 안에 있어야 거터가 맞는다
    (MAKER-CHECKLIST 지킬 것) — 그래서 하나로 감싼다. */
 .pg-ladder-scroll,.pg-ungraded-scroll{overflow-x:auto}
-.pg-lrow{display:grid;grid-template-columns:56px minmax(150px,1.3fr) minmax(170px,1.7fr) minmax(84px,100px) 86px minmax(140px,150px);
-        gap:10px;align-items:center;min-width:720px;padding:9px 15px;border-bottom:1px solid rgba(0,0,0,.06)}
+/* 전수 점검 L111 — PC 1440 에서 오른쪽 「동작」 열 머리가 잘리던 것: 열 하한 합(720px)이 카드 폭보다
+   컸다. 하한만 줄여 카드 안에 들어오게 한다(열 구성·순서는 그대로). */
+.pg-lrow{display:grid;grid-template-columns:52px minmax(120px,1.3fr) minmax(130px,1.7fr) minmax(76px,100px) 80px minmax(118px,150px);
+        gap:10px;align-items:center;min-width:640px;padding:9px 15px;border-bottom:1px solid rgba(0,0,0,.06)}
 .pg-lrow--head{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);background:var(--rv-panel);
               border-bottom:1px solid rgba(0,0,0,.1);padding:8px 15px}
 .pg-lrow .sc{font:600 13px/1.2 var(--rv-mono);color:var(--rv-ink)}
@@ -246,7 +248,7 @@ input,textarea{font-family:var(--rv-font)}
   .pg-body{flex-direction:column}
   /* .pg-right 만 width:100% 를 받고 있었다 — .pg-body 가 align-items:flex-start(stretch가
      아님)라 폭을 못 받은 .pg-left 는 column 모드에서 «자기 콘텐츠 폭»으로 셈해진다.
-     서열 사다리(.pg-lrow min-width:720px)가 그 콘텐츠라 .pg-left 가 720px+ 로 부풀고
+     서열 사다리(.pg-lrow min-width — 당시 720px, 지금 640px)가 그 콘텐츠라 .pg-left 가 720px+ 로 부풀고
      #pgWrap 이 통째로 가로로 밀렸다(확인자 실측 2026-08-15, 768×900: scrollWidth 788 vs
      clientWidth 761). .pg-lrow 의 min-width:720px 은 유지한다 — 표를 좁히면 못 읽는다.
      .pg-left 에도 같은 width:100% 를 줘 폭을 확정하면, 안쪽 .pg-ladder-scroll/.pg-ungraded-

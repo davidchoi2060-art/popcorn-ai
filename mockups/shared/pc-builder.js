@@ -37,7 +37,8 @@ function quantityNote(p){return ['RAM','SSD'].includes(p.slot)?`판매 패키지
 function updateSummary(){
  const subtotal=parts.reduce((sum,p)=>sum+p.unit_price*p.quantity,0);
  const amount=screen.querySelector('#builder-estimate'),base=screen.querySelector('#builder-subtotal');
- if(amount)amount.textContent=money(subtotal+assemblyFee);if(base)base.textContent=money(subtotal);
+ // 부품을 하나도 고르지 않았으면 조립비만으로 된 합계(30,000원)를 크게 보이지 않는다 — 전수 점검 L122.
+ if(amount){amount.textContent=money(subtotal+assemblyFee);amount.hidden=!parts.length;}if(base)base.textContent=money(subtotal);
  const missing=missingSlots(),hint=screen.querySelector('#builder-missing');
  if(hint)hint.innerHTML=missing.length?'선택 필요: '+missing.map(k=>`<button data-slot="${k}">${labels[k]}</button>`).join(''):'필수 부품 선택 완료 · 호환 검사 전';
  const button=screen.querySelector('#builder-preview');if(button)button.disabled=busy||missing.length>0||!title.trim()||parts.some(p=>!Number.isInteger(p.quantity)||p.quantity<1||p.quantity>16);

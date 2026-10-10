@@ -61,7 +61,8 @@
       · [초기화](B-12) · 페이지당 건수 선택(B-13, API size 상한 500 기존) · 페이지 번호
         버튼(B-14, 응답 page·pages 기존) · 되돌리기 [닫기](B-15) · 빈 상태 문구 2종 분리
         (B-16, total===0 여부로 판정 — 서버 값, 화면이 세지 않는다).
-    배지만 남김(넣지 않음 — 신설 필요, `.pp-badge-future` 파란 배지 "[향후 사용예정]"):
+    배지만 남김 → 2026-10-10 걷음(전수 점검 L61 — 눌러도 아무 일 없는 배지 5개였다).
+    아래 다섯은 기능이 생기면 그때 단추로 단다(배지 줄 .pp-soon-row 는 마크업에서 뺐다):
       CSV 내려받기(B-1) · 일괄 삭제(B-2, 일괄 엔드포인트 없음) · 일괄 노출/숨김(B-3, 노출
       컬럼 자체가 없음) · 행 복사(B-4) · 서버 정렬(B-8, 지금 정렬은 여전히 "이 페이지
       안에서만" — 그 사실을 배지 옆에 함께 밝힌다).
@@ -366,6 +367,20 @@ a.pp-btn-line{color:var(--on)}
        padding:11px 13px;margin-top:8px;font:400 11px/1.6 var(--font);color:var(--on)}
 
 @media (max-width:768px){
+  /* 전수 점검 L62 — 390px 에서 탭 「재고 없음」이 오른쪽에서 잘리던 것: 줄바꿈으로 모두 보인다 */
+  .pp-tabs{flex-wrap:wrap;column-gap:14px;overflow-x:visible}
+  .pp-tabs-note{margin-left:0;padding-left:0;white-space:normal}
+  /* 전수 점검 L62 — 상품명이 잘리고 나머지 열은 옆으로 밀어야 보이던 것: 상품명을 체크 바로
+     옆으로 당겨 왼쪽에 고정하고 두 줄까지 보이게 한다. 상품번호는 상품명 뒤로 간다. */
+  .pp-row-head,.pp-row{grid-template-columns:30px 168px 84px 100px 82px 56px 86px 104px 36px;gap:8px;
+     min-width:800px;padding-left:10px;padding-right:10px}
+  .pp-row-head>:nth-child(n+2),.pp-row>:nth-child(n+2){order:2}
+  .pp-row-head>:nth-child(3),.pp-row>:nth-child(3){order:1;position:sticky;left:0;z-index:1;
+     background:inherit;align-self:stretch;display:flex;flex-direction:column;justify-content:center;
+     box-shadow:6px 0 6px -6px rgba(0,0,0,.18)}
+  .pp-row{background:var(--card)}
+  .pp-row>:nth-child(3) .pp-name{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;
+     -webkit-box-orient:vertical}
   .pp-filters{align-items:stretch}
   .pp-input,.pp-mfr{width:100%}
   .pp-drawer{width:100%;max-width:100%}
@@ -526,14 +541,6 @@ a.pp-btn-line{color:var(--on)}
   <div class="pp-filters-note">상품 등록은 「상품 등록」 단추로 여는 상품등록/수정 화면에서 진행한다 ·
     재고상태의 '재고 없음'은 상태 탭의 '재고 없음'과 같은 기준(재고 0 또는 상태 품절)이다 ·
     매입 견적·가격 검토 이동은 대상 화면이 없어 비활성이다.</div>
-  <div class="pp-soon-row" data-keep="1">
-    <span class="lb">향후 지원 예정</span>
-    <span class="pp-badge-future">[향후 사용예정] CSV 내려받기</span>
-    <span class="pp-badge-future">[향후 사용예정] 일괄 삭제</span>
-    <span class="pp-badge-future">[향후 사용예정] 일괄 노출 / 숨김</span>
-    <span class="pp-badge-future">[향후 사용예정] 행 복사</span>
-    <span class="pp-badge-future">[향후 사용예정] 서버 정렬(현재는 이 페이지 안에서만 정렬)</span>
-  </div>
 
   <div class="pp-bulk" data-keep="1">
     <div id="bulkHintWrap"><span class="pp-bulk-hint">행을 선택하면 상태를 한 번에 바꿀 수 있습니다.</span></div>

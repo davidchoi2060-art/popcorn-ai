@@ -9,6 +9,15 @@
 <link rel="stylesheet" href="/shared/pc-parts-editor.css">
 <link rel="stylesheet" href="/shared/pc-review-editor.css">
 <link rel="stylesheet" href="/shared/pc-dialogs.css">
+<style>
+/* 전수 점검 L68 — 390px 에서 목록 칸 높이 제한(320px) 아래로 「AI 일괄 보완」「전체 조립PC 제품군 보기」
+   링크가 잘려 사라지던 것. 칸 전체 대신 작업 목록만 높이를 제한해 두 링크가 늘 보이게 한다. */
+@media(max-width:760px){
+  .pcw-queue{max-height:none}
+  #pcw-tasks{max-height:320px;overflow:auto}
+  .pcw-list-link{margin-top:14px}
+}
+</style>
 {% endblock %}
 {% block content %}
 <main class="pcw">
