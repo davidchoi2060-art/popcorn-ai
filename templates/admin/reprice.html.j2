@@ -231,7 +231,7 @@ a.rp-link{color:var(--rv-link)}
   <div class="rp-permnote">
     <span class="rp-permnote-i">권한</span>
     <span><b>미리보기</b>는 로그인한 운영자 누구나 조회할 수 있습니다 ·
-      <b>실행·되돌리기</b>는 <b>관리자(owner)</b>만 할 수 있습니다.</span>
+      <b>실행·되돌리기</b>는 <b>관리자</b>만 할 수 있습니다.</span>
   </div>
 
   <div class="rp-layout">
@@ -244,8 +244,8 @@ a.rp-link{color:var(--rv-link)}
           <span class="rp-badge" id="rpRoundBadge">불러오는 중…</span>
         </div>
         <div id="rpRoundsArea"></div>
-        <p class="rp-card-note2">되돌림은 삭제가 아니라 <b>역방향 이력 행</b>입니다
-          (<code>margin_policy_undo</code>) — 값이 원래대로 돌아가고 두 행이 함께 남습니다.</p>
+        <p class="rp-card-note2">되돌림은 삭제가 아니라 <b>반대 방향 이력</b>을 하나 더 남기는 방식입니다
+          — 값이 원래대로 돌아가고 두 행이 함께 남습니다.</p>
       </section>
 
       <!-- ① 범위 -->
@@ -282,8 +282,8 @@ a.rp-link{color:var(--rv-link)}
         <div class="rp-aside-t">공식 · 안 바뀌는 것</div>
         <p class="rp-aside-p">제안가 = 매입가 × (1 + 카드수수료 + 마진) → 1,000원 단위 반올림. 분류별
           예외가 실제로 걸리는 유일한 경로가 이 화면의 재산정입니다.</p>
-        <p class="rp-aside-p"><b>이미 만든 견적은 그대로입니다</b> — <code>quote_snapshots.items</code>를
-          고치는 코드가 저장소 전체 0건입니다.</p>
+        <p class="rp-aside-p"><b>이미 만든 견적은 그대로입니다</b> — 견적은 만들 때의 판매가를 함께 저장해 두고,
+          나중에 그 값을 고치는 기능은 없습니다.</p>
         <p class="rp-aside-p">한 번에 반영하는 상한은 <b>20,000건</b>입니다(오름+내림 기준). 넘으면
           거부하지 않고 앞 20,000건만 반영한 뒤 남은 건수를 알립니다 — 자동 재처리는 없습니다.</p>
       </div>
@@ -291,7 +291,7 @@ a.rp-link{color:var(--rv-link)}
       <div class="rp-aside-card">
         <div class="rp-aside-t">권한</div>
         <div class="rp-risk-row"><span class="k">미리보기</span><span class="v" style="font-family:var(--rv-font)">로그인한 운영자 누구나</span></div>
-        <div class="rp-risk-row"><span class="k">실행 · 되돌리기</span><span class="v" style="font-family:var(--rv-font)">관리자(owner)만</span></div>
+        <div class="rp-risk-row"><span class="k">실행 · 되돌리기</span><span class="v" style="font-family:var(--rv-font)">관리자만</span></div>
       </div>
 
       <div class="rp-aside-card">
@@ -301,15 +301,15 @@ a.rp-link{color:var(--rv-link)}
         <div class="rp-risk-row"><span class="k">예외 잡기 · 잠금</span><span class="v" id="rpGoSale" style="font-family:var(--rv-font)"></span></div>
         <div class="rp-risk-row"><span class="k">이력 읽기</span><span class="v" id="rpGoHistory" style="font-family:var(--rv-font)"></span></div>
         <div class="rp-risk-row"><span class="k">매입가 바꾸기</span><span class="v" style="font-family:var(--rv-font)">
-          <span class="rp-link-off" title="아직 admin2 화면이 없습니다 — 구 화면(/admin/price-import.html)만 있습니다">단가표 일일 반영</span></span></div>
+          <span class="rp-link-off" title="매입가는 「단가표 반영」 화면에서 바꿉니다">단가표 일일 반영</span></span></div>
       </div>
     </aside>
   </div>
 
   <div class="rp-footnote">
-    미리보기 요청에는 공용 진행 배너가 뜨지 않습니다 — 버튼 비활성 + 인라인 「미리보기 중…」 ·
-    조회·실행·되돌리기 실패는 사유를 갈라 그대로 보입니다(401은 「세션이 만료됐습니다」) ·
-    owner 미만이면 실행·되돌리기 버튼이 비활성이고 사유를 title로 병기합니다.
+    미리보기 중에는 단추가 잠기고 「미리보기 중…」이 표시됩니다 ·
+    조회·실행·되돌리기에 실패하면 사유를 구분해 보여 줍니다 ·
+    관리자 등급이 아니면 실행·되돌리기 단추가 잠기고, 단추에 마우스를 올리면 사유가 보입니다.
   </div>
 </div>
 {% endblock %}
@@ -446,13 +446,13 @@ a.rp-link{color:var(--rv-link)}
     } else {
       var can = canUndo();
       actionCell = '<button type="button" class="rp-btn rp-btn-sm" data-action="undo-arm" data-log="' + r.log_id + '"'
-        + (can ? '' : ' disabled title="관리자(owner)만 되돌릴 수 있습니다"') + '>되돌리기</button>';
+        + (can ? '' : ' disabled title="관리자만 되돌릴 수 있습니다"') + '>되돌리기</button>';
     }
     var errHtml = S.undoErr[r.log_id] ? '<div class="rp-row-err">' + esc(S.undoErr[r.log_id]) + '</div>' : '';
 
     return '<tr>'
       + '<td class="rp-c-round">' + badge + '<div class="rp-round-no">#' + esc(r.log_id) + '</div></td>'
-      + '<td>' + fmtAt(r.at) + '<div class="rp-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + fmtAt(r.at) + '<div class="rp-muted">' + esc(r.operator || '정보 없음') + '</div></td>'
       + '<td>' + esc(r.scope_label) + '</td>'
       + '<td>' + policyCell + '</td>'
       + '<td class="num">' + fmt(r.changed) + '<div class="rp-muted">오름 ' + fmt(r.up) + ' · 내림 ' + fmt(r.down) + '</div></td>'
@@ -617,7 +617,7 @@ a.rp-link{color:var(--rv-link)}
 
     var can = canExecute();
     var title = '';
-    if (!canOwner()) title = '관리자(owner)만 실행할 수 있습니다';
+    if (!canOwner()) title = '관리자만 실행할 수 있습니다';
     else if (S.applyBusy) title = '요청을 처리하는 중입니다';
     html += '<div class="rp-actions"><button type="button" class="rp-btn rp-btn-danger" data-action="do-apply"'
       + (can ? '' : ' disabled') + (title ? ' title="' + esc(title) + '"' : '') + '>'

@@ -339,7 +339,7 @@ a.dp-empty-link{color:var(--rv-ink)}
   function guard() {
     if (!window.Admin2Shell || !window.Admin2Shell.canWrite('operator')) {
       var cur = S.me ? S.me.role : '(로그인 필요)';
-      toast('권한이 부족합니다 (필요: operator, 현재: ' + cur + ')', 'err');
+      toast('권한이 부족합니다 (필요: 운영자, 현재: ' + cur + ')', 'err');
       return false;
     }
     return true;
@@ -518,7 +518,7 @@ a.dp-empty-link{color:var(--rv-ink)}
 
     var decisionColor = it.color, decisionBg = it.bg;
     var decisionBody = it.log_id
-      ? (fmtAt(it.at) + ' · ' + esc(it.operator || '—') + ' · 활동 로그 <span style="font-family:var(--rv-mono)">log_id ' + it.log_id + '</span>. ' + esc(it.note))
+      ? (fmtAt(it.at) + ' · ' + esc(it.operator || '정보 없음') + ' · 작업 기록 ' + it.log_id + '번. ' + esc(it.note))
       : esc(it.note);
     var into = it.into
       ? '<div class="dw-decision-link">옮겨간 원본 → <a href="/admin2/products">' + esc(it.into.sku) + ' ' + esc(Admin2Text.stripHtml(it.into.name) || '') + ' (상품 관리에서 확인)</a></div>'
@@ -590,13 +590,13 @@ a.dp-empty-link{color:var(--rv-ink)}
       title = '완전 삭제 — 지울 수 없습니다';
       body = '<div class="dm-text">' + esc(d.blocked) + '</div>' +
         '<div class="dm-alt">주문 이력이 있으면 <span style="font-family:var(--rv-mono)">force</span>와 무관하게 항상 막힙니다(과거 주문서 보호) — 편입하거나 상태만 바꿔 두는 방법이 있습니다.</div>';
-      foot = '<span class="dm-note">operator 등급이면 여기까지 실행됩니다</span>' +
+      foot = '<span class="dm-note">운영자 등급이면 여기까지 실행됩니다</span>' +
         '<button type="button" class="btn-cancel" data-action="cancel-delete">확인</button>';
     } else if (d.step === 1) {
       title = '완전 삭제 확인';
       body = '<div class="dm-text">' + esc(d.sku) + ' «' + esc(Admin2Text.stripHtml(d.name)) + '» 을 완전히 지웁니다. <b>되돌릴 수 없습니다.</b></div>' +
         '<div class="dm-alt">먼저 서버에서 참조 현황(재고 원장·가격 이력·찜 등)을 확인합니다. 참조가 없으면 바로 삭제됩니다.</div>';
-      foot = '<span class="dm-note">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>' +
+      foot = '<span class="dm-note">운영자 등급이면 실행됩니다</span>' +
         '<button type="button" class="btn-cancel" data-action="cancel-delete">취소</button>' +
         '<button type="button" class="btn-danger" id="dmGo" data-action="delete-step1"' + (d.busy ? ' disabled' : '') + '>참조 확인</button>';
     } else {
@@ -609,7 +609,7 @@ a.dp-empty-link{color:var(--rv-ink)}
         (hasStock ? '<div class="dm-refs-warn"><b>재고 원장까지 함께 사라집니다</b> — 이 프로젝트에서 원장을 실제로 지우는 유일한 경로입니다.</div>' : '') +
         '</div>' +
         '<div class="dm-alt">1단계에서 서버가 참조 목록(409)을 돌려줬고, 지금 확인하면 <span style="font-family:var(--rv-mono)">force=true</span>로 재요청합니다. 대안: 지우지 않고 이 상태로 계속 두거나, 다른 상품으로 편입하는 방법이 있습니다.</div>';
-      foot = '<span class="dm-note">operator 등급이면 실행됩니다 — 권한 강화는 하지 않기로 확정(2026-08-14)</span>' +
+      foot = '<span class="dm-note">운영자 등급이면 실행됩니다</span>' +
         '<button type="button" class="btn-cancel" data-action="cancel-delete">그냥 두기</button>' +
         '<button type="button" class="btn-danger" id="dmGo" data-action="delete-step2"' + (d.busy ? ' disabled' : '') + '>참조까지 지우고 완전 삭제</button>';
     }

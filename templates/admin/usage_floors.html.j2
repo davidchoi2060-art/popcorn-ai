@@ -311,10 +311,10 @@
     <h1>사용·성능 자료</h1>
     <p class="uf-hub-sub">최소사양 확인과 변경 전 영향 검토</p>
     <nav class="uf-hub-links" aria-label="사용·성능 자료 화면">
-      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>/admin2/usage-floors →</small></a>
-      <a href="/admin2/game-copy-review"><b>게임 근거 검수</b><span>게임 설명과 근거 검토</span><small>/admin2/game-copy-review →</small></a>
-      <a href="/admin2/talk-patterns"><b>응답 패턴 관리</b><span>질문과 응답 연결 확인</span><small>/admin2/talk-patterns →</small></a>
-      <a href="/admin2/product-fit"><b>판매 상품 적합도</b><span>용도별 판매 상품 적합도 조회</span><small>/admin2/product-fit →</small></a>
+      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>여기서 보기 →</small></a>
+      <a href="/admin2/game-copy-review"><b>게임 근거 검수</b><span>게임 설명과 근거 검토</span><small>열기 →</small></a>
+      <a href="/admin2/talk-patterns"><b>응답 패턴 관리</b><span>질문과 응답 연결 확인</span><small>열기 →</small></a>
+      <a href="/admin2/product-fit"><b>판매 상품 적합도</b><span>용도별 판매 상품 적합도 조회</span><small>열기 →</small></a>
     </nav>
   </header>
 
@@ -570,7 +570,7 @@
       + '<div>' + rateHtml + '</div>'
       + '<div><button type="button" class="uf-btn-change' + (expanded ? ' open' : '') + '" data-action="toggle-expand" '
       +   'data-floor-id="' + it.floor_id + '"'
-      +   (writeAllowed ? '' : ' disabled title="관리자(owner)만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '영향 미리보기') + '</button></div>'
+      +   (writeAllowed ? '' : ' disabled title="관리자만 바꿀 수 있습니다"') + '>' + (expanded ? '닫기' : '영향 미리보기') + '</button></div>'
       + '</div>';
     if (expanded) row += expansionHtml(it);
     return row;

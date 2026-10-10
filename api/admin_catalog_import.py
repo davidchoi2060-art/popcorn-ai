@@ -260,7 +260,7 @@ def job_files(job_id: int):
     """이 배치에 보관된 파일 목록. 화면이 내려받기 단추를 그릴지 이걸로 정한다."""
     op = current_operator() or {}
     if op.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 적재 원본을 볼 수 있습니다")
+        raise HTTPException(403, "관리자만 적재 원본을 볼 수 있습니다")
     meta_p = _archive_path(job_id, "meta")
     if not os.path.exists(meta_p):
         return {"job_id": job_id, "items": [],
@@ -282,7 +282,7 @@ def job_files(job_id: int):
 def job_file_download(job_id: int, kind: str):
     op = current_operator() or {}
     if op.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 적재 원본을 내려받을 수 있습니다")
+        raise HTTPException(403, "관리자만 적재 원본을 내려받을 수 있습니다")
     if kind not in ARCHIVE_KINDS:
         raise HTTPException(400, "잘못된 파일 종류")
     path = _archive_path(job_id, kind)

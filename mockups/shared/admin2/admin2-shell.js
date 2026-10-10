@@ -203,6 +203,9 @@
     meReady: meReady,
     getMe: function () { return me; },
     canWrite: canWrite,
+    // 권한 등급 코드(viewer·operator·owner)를 화면 표시용 한국어로 바꾼다.
+    // 서버 쪽 같은 표는 api/admin_labels.py ROLE_KO — 두 곳의 값을 같게 둔다.
+    roleKo: function (code) { return code ? (ROLE_KO[code] || code) : '로그인 필요'; },
     isKeepClick: function (target) { return !!(target && target.closest && target.closest('[data-keep]')); },
     toast: toast
   };

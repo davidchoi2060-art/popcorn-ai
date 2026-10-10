@@ -172,7 +172,7 @@ input{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="pv-permhint">조회 viewer 이상 · 쓰기 operator 이상</span>
+<span class="pv-permhint">조회: 모든 등급 · 쓰기: 운영자 이상</span>
 {% endblock %}
 
 {% block content %}
@@ -189,7 +189,7 @@ input{font-family:var(--rv-font)}
     <div class="pv-banner">
       <span class="mk">경계</span>
       <span class="hd">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
-      <span class="ds">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면은 대분류 → 중분류 → 소분류 → 세분류를 한 화면에서 이어서 관리하는 신규 시안입니다(ADM-CAT-011 가칭) — 기존 「상품 분류 관리」와 같은 데이터를 씁니다.</span>
+      <span class="ds">부품 종류(견적 엔진이 쓰는 정해진 분류)와는 다른 기준입니다. 이 화면은 대분류 → 중분류 → 소분류 → 세분류를 한 화면에서 이어서 관리하는 새 화면입니다 — 기존 「상품 분류 관리」와 같은 데이터를 씁니다.</span>
     </div>
 
     <div class="pv-toolbar">
@@ -275,14 +275,14 @@ input{font-family:var(--rv-font)}
   function guard() {
     if (!canWrite()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
   }
   function permTitle() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
   function disAttrs(disabled) {
     return disabled ? (' disabled title="' + esc(permTitle()) + '"') : '';

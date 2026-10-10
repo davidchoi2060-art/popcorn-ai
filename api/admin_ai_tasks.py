@@ -49,6 +49,7 @@ from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
 from .timeutil import iso
+from .admin_labels import role_ko
 
 router = APIRouter(prefix="/api/admin")
 
@@ -84,10 +85,10 @@ ROLE_OPTIONS = ["기준 해석", "교차 확인", "주", "폴백 전용"]
 # "문서 간 불일치" 패널 — A-35가 실제로 해소한 두 결정을 그대로 보여준다(지어낸 문구
 # 아님, decision-log.md A-35 원문 발췌·요약).
 CONFLICTS = [
-    {"date": "2026-07-21", "title": "LLM 실연동 파일럿 보류", "badge": "프로바이더 1개",
+    {"date": "2026-07-21", "title": "LLM 실연동 파일럿 보류", "badge": "AI 업체 1곳",
      "desc": "Claude Opus 4.8 단일, 팝콘톡 파일럿 한정. 별도 승인 전까지 실행 없음.",
      "adopted": False},
-    {"date": "2026-08-09", "title": "UX-34 부속 · AI 축", "badge": "프로바이더 3개 - A-35가 채택",
+    {"date": "2026-08-09", "title": "AI 업체 역할 나누기", "badge": "AI 업체 3곳 - 채택",
      "desc": "Codex·Claude·Gemini 역할분담 + 폴백. 교차 검증은 주목적이 아님.",
      "adopted": True},
 ]
@@ -114,7 +115,7 @@ def _owner() -> dict:
     me = current_operator() or {}
     if me.get("role") != "owner":
         raise HTTPException(
-            403, f"권한이 부족합니다 (필요: owner, 현재: {me.get('role') or '(로그인 필요)'})")
+            403, f"권한이 부족합니다 (필요: 관리자, 현재: {role_ko(me.get('role')) if me.get('role') else '(로그인 필요)'})")
     return me
 
 

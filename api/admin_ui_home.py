@@ -263,7 +263,7 @@ def _mall_sync_view(st: dict | None, err) -> dict:
 
     if st["state"] == "never":
         return {"status": "error", "text": "몰 갱신 — 아직 실행된 적 없습니다",
-                "reason": "mall_sync_runs 에 실행 기록이 없습니다"
+                "reason": "몰 갱신 실행 기록이 없습니다"
                           "(타이머가 아직 등록 전이거나 첫 실행 전일 수 있습니다)"}
 
     when = "—"

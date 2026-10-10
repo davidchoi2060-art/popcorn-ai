@@ -449,7 +449,7 @@ input{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="cm-permhint">조회 viewer 이상 · 이동·되돌리기 operator 이상</span>
+<span class="cm-permhint">조회: 모든 등급 · 이동·되돌리기: 운영자 이상</span>
 <div class="cm-recentpush" data-keep="1">
   <button type="button" class="cm-recentbtn" id="cmRecentBtn" data-action="toggle-recent"
           aria-haspopup="true" aria-expanded="false">최근 이동 <span id="cmRecentCount"></span></button>
@@ -471,7 +471,7 @@ input{font-family:var(--rv-font)}
     <div class="cm-banner">
       <span class="mk">경계</span>
       <span class="hd">이 화면은 상품을 옮기기만 합니다 — 분류 자체는 고치지 않습니다</span>
-      <span class="ds">이름·구조·허용 부품 종류·마진은 "상품 분류 관리" 소관입니다. 카탈로그 적재는 category_id를 다루지 않으므로, 카테고리 배정은 오직 이 화면의 이동으로만 일어납니다.</span>
+      <span class="ds">이름·구조·허용 부품 종류·마진은 "상품 분류 관리" 소관입니다. 카탈로그 일괄 적재는 분류를 정하지 않으므로, 카테고리 배정은 오직 이 화면의 이동으로만 일어납니다.</span>
       <span class="meta" id="cmBannerMeta"></span>
     </div>
 
@@ -609,14 +609,14 @@ input{font-family:var(--rv-font)}
   function guard() {
     if (!owner()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다 (필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
   }
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다 (필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
 
   // ── 트리 헬퍼(/api/admin/categories) ────────────────────────────────
@@ -715,7 +715,7 @@ input{font-family:var(--rv-font)}
     if (needsCat) {
       var catRaw = sp.get('category_id');
       if (!catRaw || !/^\d+$/.test(catRaw)) {
-        out.invalidReason = 'scope=' + rawScope + '인데 category_id가 없습니다';
+        out.invalidReason = 'scope=' + rawScope + '인데 분류 번호가 없습니다';
         return out;
       }
       out.catId = Number(catRaw);
@@ -762,7 +762,7 @@ input{font-family:var(--rv-font)}
         notices.push('요청한 조건을 이해할 수 없어 기본 범위로 엽니다 — ' + parsed.invalidReason);
       } else if (parsed.fromUrl) {
         if (S.treeErr) {
-          notices.push('카테고리 목록을 불러오지 못해 요청한 범위(category_id ' + parsed.catId + ')를 확인할 수 없습니다 — 기본 범위로 엽니다');
+          notices.push('카테고리 목록을 불러오지 못해 요청한 범위(분류 번호 ' + parsed.catId + ')를 확인할 수 없습니다 — 기본 범위로 엽니다');
         } else if (parsed.catId != null && !nodeById(parsed.catId)) {
           notices.push('요청한 카테고리(id ' + parsed.catId + ')를 찾을 수 없어 기본 범위로 엽니다');
         } else {
@@ -863,9 +863,9 @@ input{font-family:var(--rv-font)}
     var openAt = S.list.open_at;
     var etcOnlyN = treeItems().filter(isEtcOnlyCat).length;
     var TABS = [
-      { key: 'unmapped', mark: '○', label: '미매핑', note: 'category_id 없음' },
+      { key: 'unmapped', mark: '○', label: '미매핑', note: '분류 지정 없음' },
       { key: 'violation', mark: '▲', label: '허용 종류 위반', note: '막지 않고 알리기만' },
-      { key: 'unclassified', mark: '◆', label: etcLabel(), note: "part_type = 'ETC' 기준 · 카테고리 축과 다름" },
+      { key: 'unclassified', mark: '◆', label: etcLabel(), note: '부품 종류가 기타인 상품 · 분류와는 다른 기준' },
       { key: 'category', mark: '●', label: '카테고리',
         note: S.catId == null ? '트리에서 고르세요' : catPath(S.catId) + (S.treeMode === 'subtree' ? ' · 하위 포함' : ' · 직속') },
       { key: 'all', mark: '·', label: '전체', note: '상품 전량' }
@@ -1004,8 +1004,8 @@ input{font-family:var(--rv-font)}
           '<span class="cm-check' + (on ? ' on' : '') + '" aria-hidden="true">' + (on ? '✓' : '') + '</span>' +
           '<span class="nm">' + esc(nm) + '</span>' +
           '<span class="cd num">' + esc(p.product_code) + '</span>' +
-          '<span class="pt' + (etc ? ' etc' : '') + '"' + (etc ? ' title="부품 종류 축: ' + esc(etcLabel()) + ' (part_type=ETC)"' : '') + '>' + esc(p.part_label) + '</span>' +
-          '<span class="ct' + (bad ? ' warn' : '') + '">' + esc(p.category_id == null ? '(없음)' : p.category) +
+          '<span class="pt' + (etc ? ' etc' : '') + '"' + (etc ? ' title="부품 종류 축: ' + esc(etcLabel()) + '"' : '') + '>' + esc(p.part_label) + '</span>' +
+          '<span class="ct' + (bad ? ' warn' : '') + '">' + esc(p.category_id == null ? '정보 없음' : p.category) +
             (p.violates ? ' <span title="이 카테고리의 허용 부품 종류와 다릅니다">▲</span>' : '') + '</span>' +
           '<span class="pr num">' + fmt(p.sale_price) + '</span>' +
           '<span class="sk num' + (p.stock_qty ? ' has' : '') + '">' + fmt(p.stock_qty) + '</span>' +
@@ -1023,7 +1023,7 @@ input{font-family:var(--rv-font)}
       unmapped: ['미매핑이 0건입니다', '이 범위에 남은 일이 없다는 뜻일 뿐, 처리할 일이 전혀 없다는 뜻은 아닙니다 — 다른 범위(위반·' + etcLabel() + ')에 남아 있을 수 있습니다.'],
       violation: ['허용 종류 위반이 0건입니다', '지금 조건에서 이 카테고리들의 허용 부품 종류를 어기는 매핑이 없습니다.' +
         (etcOnlyN ? ' 허용 종류가 ' + etcLabel() + '뿐인 소분류가 ' + etcOnlyN + '개 있습니다 — 그 안에서는 이 판정으로 서로 구분되지 않습니다.' : '')],
-      unclassified: [etcLabel() + '가 0건입니다', "part_type='ETC'인 상품이 지금 조건에 없습니다."],
+      unclassified: [etcLabel() + '가 0건입니다', '부품 종류가 기타인 상품이 지금 조건에 없습니다.'],
       category: [S.catId == null ? '카테고리를 고르지 않았습니다' : '이 분류에 상품이 없습니다',
         S.catId == null ? '왼쪽 트리에서 분류를 누르면 그 분류의 상품을 봅니다.'
           : (S.treeMode === 'subtree' ? '하위 전체 기준입니다 — 직속만 보려면 트리 위 토글을 바꾸세요.' : '직속 기준입니다 — 하위까지 보려면 트리 위 토글을 바꾸세요.')],

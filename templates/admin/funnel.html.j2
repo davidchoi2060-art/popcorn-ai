@@ -232,7 +232,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
 {% block header_extra %}
 <span class="fn-hdsub">넘긴 견적이 실제로 얼마나 팔렸는지 — 지금 잴 수 있는 절반만</span>
 <span class="fn-ro">조회 전용</span>
-<span class="fn-pathbadge" title="화면 ID·경로 미확정 — 사장님 결정 대기">/admin2/funnel-performance</span>
+<span class="fn-pathbadge" title="화면 이름·주소는 아직 확정 전입니다">확정 전 화면</span>
 <button type="button" class="fn-refresh" data-action="refresh">새로고침</button>
 {% endblock %}
 
@@ -296,7 +296,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       <div class="fn-card">
         <h3>근거 클릭 · 부품 교체와의 결합</h3>
         <div id="fnSignals"></div>
-        <div class="fn-card-foot">조인할 축은 <code class="num">user_id</code>·<code class="num">session_id</code>입니다 — 이미 있습니다.</div>
+        <div class="fn-card-foot">방문자와 상담을 이어 볼 연결 고리는 이미 있습니다.</div>
       </div>
     </div>
 
@@ -323,7 +323,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
           <div class="dep">윈윈소프트 API(주문 결과 회신) — 간접 전환도 이 회신 없이는 못 잽니다</div>
         </div>
       </div>
-      <div class="fn-notice">리드타임은 <b>미정</b>입니다(회신 대기) — 지어내지 않습니다. 윈윈소프트 API 요청서는 <code>docs/design/winwin-api-request-2026-08-11.md</code>.</div>
+      <div class="fn-notice">리드타임은 <b>미정</b>입니다(윈윈소프트 회신 대기) — 지어내지 않습니다.</div>
     </section>
 
     <!-- 하단 고지 -->
@@ -335,20 +335,20 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
         <li>인계 개별 건 상세 — <span id="fnHandoffLogLink2">「인계 기록」</span>이 담당입니다(여기서 다시 나열하지 않습니다).</li>
         <li>몰 가격 동기화 상세 — <span id="fnMallSyncLink2">「쇼핑몰 동기화」</span>가 담당입니다(요약치만 인용합니다).</li>
         <li>채널별(검색·SNS·직접 유입 등) 유입 분석 — 리퍼러·UTM을 기록하는 테이블 자체가 없습니다.</li>
-        <li>회원 단위 전환 분석 — 인계 건의 <code class="num">member_id</code>가 비어 있습니다(비로그인 세션).</li>
+        <li>회원 단위 전환 분석 — 인계 건에 회원 정보가 없습니다(로그인하지 않은 상담).</li>
       </ul>
-      <div style="margin-top:8px">옛 자체 결제 원장(<code class="num">orders</code>)으로 대신할 수 없습니다 — 인계는 애초에 거기에 쓰지 않고, 최신 기록도 인계 시작(<span id="fnOrdersFeatureDate">서버 조회 중</span>) 이전에서 멈춰 있습니다.</div>
+      <div style="margin-top:8px">옛 자체 결제 주문 기록으로 대신할 수 없습니다 — 인계는 애초에 거기에 쓰지 않고, 최신 기록도 인계 시작(<span id="fnOrdersFeatureDate">서버 조회 중</span>) 이전에서 멈춰 있습니다.</div>
     </div>
 
-    <div class="fn-notice">
-      <b>아직 정해지지 않은 것 — 사장님 결정 대기 4건</b>(정해지면 화면 구조를 바꾸지 않고 그대로 반영합니다)
+    <details class="fn-notice a2-more">
+      <summary><b>자세히 — 아직 정해지지 않은 것 4건</b>(정해지면 화면 구조를 바꾸지 않고 그대로 반영합니다)</summary>
       <ul class="fn-decisions">
-        <li><b>결정 1.</b> 화면 ID·경로 확정 — 지금은 <code class="num">ADM-HND-030</code>·<code class="num">/admin2/funnel-performance</code> 후보로만 표시합니다(헤더 배지 점선 참조).</li>
+        <li><b>결정 1.</b> 화면 이름·주소 확정 — 지금은 후보로만 표시합니다(머리의 「확정 전 화면」 표시).</li>
         <li><b>결정 2.</b> 기본 조회 기간 — 지금은 「인계 기능 존재 기간」을 기본값 후보로 열어 둡니다.</li>
-        <li><b>결정 3.</b> 열람 등급 — 미로그인 401은 확정이고, 등급(조회/운영자/관리자)은 지금 로그인만 되면 무관하게 열어 둡니다.</li>
-        <li><b>결정 4.</b> (A)만으로 지금 열지, (B)(윈윈 API)를 기다릴지 — 지금은 (A)만으로 열되 (B)는 [향후 사용예정]으로 명시합니다.</li>
+        <li><b>결정 3.</b> 열람 등급 — 로그인은 필수로 확정했고, 등급(조회/운영자/관리자)은 지금 로그인만 되면 무관하게 열어 둡니다.</li>
+        <li><b>결정 4.</b> (A)만으로 지금 열지, (B)(윈윈소프트 연동)를 기다릴지 — 지금은 (A)만으로 열되 (B)는 [향후 사용예정]으로 명시합니다.</li>
       </ul>
-    </div>
+    </details>
 
     </div>
   </div>
@@ -370,6 +370,14 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     });
   }
   function fmt(n) { return (n == null) ? '0' : Number(n).toLocaleString('ko-KR'); }
+  // 서버 시각(ISO·UTC)을 한국 시간 「YYYY-MM-DD HH:mm」으로. 날짜만 오면 그대로 둔다.
+  function kst(s) {
+    if (!s) return '정보 없음';
+    if (String(s).length <= 10) return s;
+    var d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    return new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace('T', ' ');
+  }
   function won(n) { return (n == null) ? '알 수 없음' : fmt(n) + '원'; }
   function pctText(n) { return (n == null) ? '—' : (String(n) + '%'); }
 
@@ -424,8 +432,8 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     // A-81 — 기존 fnTabNote 자리(인계 기능 시작일 안내)에 시험 운영 기간 경계를 이어 붙인다.
     // 두 경계는 서로 다른 개념이라(위 renderTabs 상단 주석) 문장을 나눈다.
     $('fnTabNote').textContent =
-      ((d && d.feature) ? ('인계 기능은 ' + d.feature.start_date + '부터') : '') +
-      ((d && d.scope) ? ' · ' + d.scope.start_date + ' 이후만 집계(그 이전은 「' + d.scope.label + '」)' : '');
+      ((d && d.feature) ? ('인계 기능은 ' + kst(d.feature.start_date) + '부터') : '') +
+      ((d && d.scope) ? ' · ' + kst(d.scope.start_date) + ' 이후만 집계(그 이전은 「' + d.scope.label + '」)' : '');
     $('fnCustomRow').hidden = (S.period.preset !== 'custom');
     if (d && d.period) {
       $('fnPeriodLabel').textContent = d.period.label + ' (' + (d.period.from || '처음') + ' ~ ' + (d.period.to || '오늘') + ')';
@@ -510,7 +518,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     var s = d.signals;
     var html;
     if (s.promo_click.matched_handoffs === 0 && s.swap.matched_handoffs === 0) {
-      html = '<p>조인할 축(<code class="num">user_id</code>·<code class="num">session_id</code>)은 이미 있지만, 지금 표본(인계 '
+      html = '<p>방문자와 상담을 이어 볼 연결 고리는 이미 있지만, 지금 표본(인계 '
         + fmt(s.promo_click.scoped_handoffs) + '건)에는 근거를 클릭하고 인계까지 간 사람도, 부품을 바꾸고 인계까지 간 사람도 <b>없습니다.</b></p>'
         + '<p>상관을 보여줄 데이터 자체가 아직 없다는 뜻입니다 — <b>0을 성과로도 실패로도 쓰지 않습니다.</b></p>'
         + '<p class="fn-signal-sub">근거 클릭 기록 전체 ' + fmt(s.promo_click.total_rows) + '건 · 부품 교체 기록 전체 ' + fmt(s.swap.total_rows)
@@ -571,7 +579,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     // ⚠ 2026-08-15 확인자 실측 결함 수정 — 이 줄만 "2026-08-11" 리터럴이었다(나머지는
     // 전부 d.feature.start_date). handoffs 가 재구축되면 화면 상단은 새 날짜를 보여주는데
     // 이 문장만 옛 날짜를 계속 주장해 화면이 스스로와 모순되는 사고였다.
-    $('fnOrdersFeatureDate').textContent = d.feature.start_date;
+    $('fnOrdersFeatureDate').textContent = kst(d.feature.start_date);
 
     var orphanBox = $('fnOrphanNote');
     var orphanN = (d.integrity && d.integrity.orphan_handoffs) || 0;

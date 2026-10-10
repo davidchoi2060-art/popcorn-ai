@@ -103,7 +103,7 @@ def _owner() -> dict:
     """
     me = _me()
     if me["role"] != "owner":
-        raise HTTPException(403, "판정 · 처리 · 승인 · 반려 · 보류는 사장님(owner)만 할 수 있다")
+        raise HTTPException(403, "판정 · 처리 · 승인 · 반려 · 보류는 관리자만 할 수 있다")
     return me
 
 

@@ -290,7 +290,7 @@
   function partLabel(pt) { return PART_LABELS[pt] || pt; }
   function friendlyErr(e) {
     if (e && e.status === 401) return '세션이 만료되었습니다 — 새로고침 후 다시 로그인해 주세요.';
-    if (e && e.status === 403) return '권한이 없습니다 — owner 등급만 할 수 있습니다.';
+    if (e && e.status === 403) return '권한이 없습니다 — 관리자 등급만 할 수 있습니다.';
     if (e && e.status) return e.message || ('오류 ' + e.status);
     return '네트워크 오류 — 연결을 확인하고 다시 시도하세요.';
   }
@@ -326,8 +326,8 @@
     var el = $('ciScope');
     if (!S.meLoaded) { el.textContent = '권한 확인 중…'; return; }
     el.innerHTML = S.canUpload
-      ? '업로드·적용은 <b>owner</b> 등급만 가능합니다 · 이력·오류 조회는 로그인한 모든 등급에 열려 있습니다.'
-      : '조회 전용입니다 — 업로드·적용은 <b>owner</b> 등급만 가능합니다. 아래 이력·오류 조회는 그대로 이용할 수 있습니다.';
+      ? '업로드·적용은 <b>관리자</b> 등급만 가능합니다 · 이력·오류 조회는 로그인한 모든 등급에 열려 있습니다.'
+      : '조회 전용입니다 — 업로드·적용은 <b>관리자</b> 등급만 가능합니다. 아래 이력·오류 조회는 그대로 이용할 수 있습니다.';
   }
 
   // ── 좌측 aside — 국면과 무관한 고정 계약 참고 카드 ──────────────────
@@ -340,8 +340,8 @@
       + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">헤더 14열이 정확히 있어야 합니다 — 열 매핑 기능 없음</div>'
       + '<div style="font-family:var(--font-num);font-size:10px;line-height:1.7;color:var(--rv-muted)">자체상품코드 · 상품명 · 카테고리1 · 카테고리2 · 카테고리3 · 상태값 · 매입가 · 일반회원 · 시중가 · 공급처 · 스펙 · 제조사 · 모델명 · 다나와No</div>'
       + '<div class="ci-note" style="margin-top:4px">하나라도 없으면 즉시 거부되고 무엇이 없는지 그대로 알려줍니다.</div></div>'
-      + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">자체상품코드 = 쇼핑몰 상품코드(pd_no)</div>'
-      + '<div class="ci-note">이 코드가 정본 코드를 그대로 결정합니다 — 잘못된 코드는 라이브 몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div></div>'
+      + '<div class="ci-card"><div style="font-weight:600;font-size:11px;margin-bottom:4px">자체상품코드 = 쇼핑몰 상품번호</div>'
+      + '<div class="ci-note">이 코드가 정본 코드를 그대로 결정합니다 — 잘못된 코드는 쇼핑몰 상품과 충돌하거나 엉뚱한 상품을 덮어씁니다.</div></div>'
       + '<div class="ci-card"><div class="ci-note">삭제는 없습니다 — 올린다고 기존 상품이 사라지지 않습니다. 운영자가 잠근(locked) 값은 덮지 않습니다. 미리보기 후 <b style="color:var(--on)">1시간</b> 안에 적용하지 않으면 파일이 청소되어 처음부터 다시 합니다.</div></div>';
   }
 
@@ -358,8 +358,8 @@
   function lockedHtml() {
     return '<div class="ci-lock"><span class="tag">잠김</span>'
       + '<span style="flex:1;min-width:0">'
-      + '<span class="t">새 일괄 등록은 owner 등급만 할 수 있습니다</span>'
-      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 owner 전용입니다(시도 시 403). 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
+      + '<span class="t">새 일괄 등록은 관리자 등급만 할 수 있습니다</span>'
+      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 관리자 전용입니다. 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
       + '</span></div>';
   }
 
@@ -390,10 +390,10 @@
           + '</div>'))
       + '<input type="file" id="ciMasterInput" accept=".csv,text/csv" hidden>'
       + '<div class="ci-eav">'
-      + '<div class="lb">사양 EAV 세트 (선택 · 2파일 함께)</div>'
-      + '<div class="d">db_products + db_specs — 둘 중 하나만 올리면 그 자리에서 막힙니다. 안 올리면 사양은 "스펙" 열에서만 추출되고 기존 확인값은 유지됩니다.</div>'
-      + eavRowHtml('db_products (상품 매핑)', 'eavp', eavP)
-      + eavRowHtml('db_specs (사양 값)', 'eavs', eavS)
+      + '<div class="lb">사양 파일 세트 (선택 · 2파일 함께)</div>'
+      + '<div class="d">상품 매핑 파일과 사양 값 파일 — 둘 중 하나만 올리면 그 자리에서 막힙니다. 안 올리면 사양은 "스펙" 열에서만 추출되고 기존 확인값은 유지됩니다.</div>'
+      + eavRowHtml('상품 매핑 파일 (db_products)', 'eavp', eavP)
+      + eavRowHtml('사양 값 파일 (db_specs)', 'eavs', eavS)
       + (eavMismatch ? '<div class="ci-err">두 파일을 모두 선택하거나 모두 비워야 합니다.</div>' : '')
       + '</div>'
       + '<input type="file" id="ciEavPInput" hidden>'
@@ -403,13 +403,13 @@
       + '<button type="button" class="' + (S.origin === 'real' ? 'on' : '') + '" data-action="ci-origin-real">실데이터</button>'
       + '<button type="button" class="' + (S.origin === 'demo' ? 'on' : '') + '" data-action="ci-origin-demo">데모</button>'
       + '</div>'
-      + '<div class="ci-warn"><b>적용 후 되돌리기가 없습니다.</b> 자체상품코드는 라이브 몰 상품코드(pd_no)와 같은 값입니다 — 잘못된 코드로 올리면 다른 상품을 덮어쓸 수 있습니다.</div>'
+      + '<div class="ci-warn"><b>적용 후 되돌리기가 없습니다.</b> 자체상품코드는 쇼핑몰 상품번호와 같은 값입니다 — 잘못된 코드로 올리면 다른 상품을 덮어쓸 수 있습니다.</div>'
       + '<span class="ci-grow"></span>'
       + '<div class="ci-foot-row">'
       + '<span class="ci-grow"></span>'
       + (S.dryrunError ? ('<span class="ci-err" style="flex:none;max-width:360px">' + esc(S.dryrunError) + '</span>') : '')
       + (S.dryrunLoading ? '<span class="ci-note">확인하는 중…</span>' : '')
-      + '<button type="button" class="ci-btn" data-action="ci-preview" ' + (canGo ? '' : 'disabled') + '>미리보기(드라이런)</button>'
+      + '<button type="button" class="ci-btn" data-action="ci-preview" ' + (canGo ? '' : 'disabled') + '>미리보기</button>'
       + '</div>';
   }
 
@@ -435,12 +435,12 @@
       ? ('<div class="ci-note" style="margin-top:3px">표본 ' + fmt(sampleShown) + '건 기준(총 ' + fmt(s.error) + '건) — 전량은 적용 후 배치 상세에서 확인합니다.</div>')
       : '';
     return ''
-      + '<div class="ci-cap">드라이런 보고 — DB는 아직 그대로입니다 · staging ' + esc(st.staging_id) + '</div>'
+      + '<div class="ci-cap">미리보기 결과 — 아직 아무것도 바뀌지 않았습니다 · 임시 번호 ' + esc(st.staging_id) + '</div>'
       + '<div class="ci-verdict">' + rich(st.verdict || '') + '</div>'
       + (distHtml ? ('<div class="ci-dist"><span class="k">부품 종류별 분포</span><span class="v">' + distHtml + '</span></div>') : '')
       + '<div class="ci-chip"><span class="k">제외 ' + fmt(s.skipped_total) + '</span><span class="v">' + skipHtml + (s.skipped_total ? ' — <b style="color:oklch(0.5 0.14 55)">이 사유는 적용 후 다시 볼 수 없습니다. 지금 확인하세요.</b>' : '') + '</span></div>'
       + '<div class="ci-chip err"><span class="k">오류 ' + fmt(s.error) + '</span><span class="v">' + errHtml + (s.error ? ' — 반영되지 않고 원본·사유가 저장됩니다.' : '') + errSampleNote + '</span></div>'
-      + '<div class="ci-chip"><span class="k">사양</span><span class="v">' + (st.eav_included ? '사양 EAV 파일을 반영합니다.' : '사양 파일이 없어 "스펙" 열에서만 추출합니다 — 이미 확인된 기존 사양값은 유지됩니다.') + '</span></div>'
+      + '<div class="ci-chip"><span class="k">사양</span><span class="v">' + (st.eav_included ? '사양 파일을 반영합니다.' : '사양 파일이 없어 "스펙" 열에서만 추출합니다 — 이미 확인된 기존 사양값은 유지됩니다.') + '</span></div>'
       + '<div class="ci-chip"><span class="k">잠금</span><span class="v">운영자가 손으로 고쳐 잠근 값(locked_fields)은 파일 내용과 무관하게 덮지 않습니다.</span></div>'
       + (st.warning ? ('<div class="ci-warn">' + rich(st.warning) + '</div>') : '')
       + (st.note ? ('<div class="ci-note">' + esc(st.note) + '</div>') : '')
@@ -470,7 +470,7 @@
       + '<div class="ci-done">'
       + '<div class="t">✓ 배치 #' + fmt(ap.job_id) + '로 반영되었습니다</div>'
       + '<div class="d">' + rich(ap.verdict || '') + '</div>'
-      + '<div class="ci-note">' + (S.lastSkipTotal ? ('제외 ' + fmt(S.lastSkipTotal) + '건의 사유는 저장되지 않았습니다 — 드라이런 화면에서만 볼 수 있었습니다. ') : '') + '반영 행의 원본 셀도 보관하지 않습니다(원본 CSV가 정본). 되돌리기는 없습니다 — 고친 CSV를 다시 올려 upsert로 바로잡습니다.</div>'
+      + '<div class="ci-note">' + (S.lastSkipTotal ? ('제외 ' + fmt(S.lastSkipTotal) + '건의 사유는 저장되지 않았습니다 — 미리보기 화면에서만 볼 수 있었습니다. ') : '') + '반영 행의 원본 셀도 보관하지 않습니다(원본 CSV가 정본). 되돌리기는 없습니다 — 고친 CSV를 다시 올려 덮어써서 바로잡습니다.</div>'
       + '<span class="ci-grow"></span>'
       + '<div style="display:flex;gap:9px;flex-wrap:wrap">'
       + '<button type="button" class="ci-btn" data-action="ci-open-applied">배치 #' + fmt(ap.job_id) + ' 상세</button>'
@@ -479,7 +479,7 @@
       + '</div>'
       + '<div class="ci-stats">'
       + statCard('카탈로그 전체', a.catalog, (im.new !== undefined ? im.new : null), '실데이터 · 데모 합계')
-      + statCard('추천 후보', a.pool, (im.pool_in !== undefined ? (im.pool_in - im.pool_out) : null), (im.pool_in !== undefined ? ('진입 ' + fmt(im.pool_in) + ' · 이탈 ' + fmt(im.pool_out) + ' — 드라이런 예고와 일치') : ''))
+      + statCard('추천 후보', a.pool, (im.pool_in !== undefined ? (im.pool_in - im.pool_out) : null), (im.pool_in !== undefined ? ('진입 ' + fmt(im.pool_in) + ' · 이탈 ' + fmt(im.pool_out) + ' — 미리보기 예고와 일치') : ''))
       + statCard('검수 대기', a.review, (im.review_new !== undefined ? im.review_new : null), '상품 사양 검수 화면에서 처리합니다')
       + '</div>'
       + '</div>';
@@ -508,7 +508,7 @@
     return '<div class="ci-row ci-row-body' + (S.drawerJobId === it.job_id ? ' on' : '') + '" data-jobid="' + it.job_id + '" data-action="ci-open-job">'
       + '<span class="no">#' + it.job_id + '</span>'
       + '<span class="at">' + fmtDate(it.at) + '</span>'
-      + '<span class="who">' + esc(it.operator || '—') + '</span>'
+      + '<span class="who">' + esc(it.operator || '정보 없음') + '</span>'
       + '<span class="file">' + esc(it.file || '—') + '</span>'
       + '<span class="ci-origin-tag ' + (it.origin === 'demo' ? 'demo' : 'real') + '">' + esc(it.origin_label || it.origin || '—') + '</span>'
       + '<span class="num">' + fmt(it.total) + '</span>'
@@ -542,7 +542,7 @@
   // ── 미리보기 / 적용 / 초기화 ────────────────────────────────────────
   function runPreview() {
     if (!S.masterFile || S.dryrunLoading) return;
-    if (!!S.eavProducts !== !!S.eavSpecs) { S.dryrunError = '사양 EAV는 두 파일을 함께 올리거나 모두 비워야 합니다.'; renderPanel(); return; }
+    if (!!S.eavProducts !== !!S.eavSpecs) { S.dryrunError = '사양 파일은 두 파일을 함께 올리거나 모두 비워야 합니다.'; renderPanel(); return; }
     S.dryrunLoading = true; S.dryrunError = null; renderPanel();
     var fd = new FormData();
     fd.append('master', S.masterFile);

@@ -17,7 +17,7 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
-ROLE_KO = {"owner": "관리자", "operator": "운영자", "viewer": "조회"}
+from .admin_labels import ROLE_KO  # 단일 원천 — 화면 표시용 한국어 등급 이름
 ROLE_NOTE = ("권한 3단계(조회/운영자/관리자)는 확정된 정책이지만 실제 권한 검사는 아직 없습니다"
              " — 현재 모든 쓰기는 시드 운영자(operator_id=1)로 기록됩니다(실 인증 이관).")
 

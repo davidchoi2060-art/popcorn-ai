@@ -58,14 +58,14 @@ MODELS = [p["model"] for p in PROVIDERS]
 BUILT_AT = date(2026, 7, 23)
 DECISION_AT = "2026-07-21"
 
-REASON = (f"실제 LLM 연동이 보류 상태({DECISION_AT} 결정)라 사용량·비용 기록이 없습니다."
-          " 착수하면 이 화면이 실값으로 채워집니다(컬럼은 이미 있어 행만 쌓이면 됩니다).")
-SCHEMA_REASON = ("이 분해는 데이터가 쌓여도 계산되지 않습니다 — api_cost_logs에 작업 종류"
-                  " 컬럼을 먼저 추가해야 합니다(스키마 변경 필요).")
+REASON = (f"AI 실제 연결을 미뤄 둔 상태({DECISION_AT} 결정)라 사용량·비용 기록이 없습니다."
+          " 연결을 시작하면 이 화면에 실제 값이 채워집니다.")
+SCHEMA_REASON = ("이 분해는 데이터가 쌓여도 계산되지 않습니다 — AI 비용 기록에 작업 종류"
+                  " 항목이 아직 없습니다.")
 
 NOSOURCE_STYLE_NOTE = {
-    "per_consult": "분모(상담)·분자(비용) 모두 없음",
-    "per_batch": "배치는 세션 비용 구역 참조",
+    "per_consult": "상담 수·비용 기록 모두 없음",
+    "per_batch": "아래 「Claude Code 세션 비용」 칸 참고",
 }
 
 
@@ -176,31 +176,31 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
     def money_kpi(key, label, agg):
         if source_exists:
             return {"key": key, "label": label, "kind": "value", "unit": "USD",
-                    "value": round(agg["cost"], 2), "note": f"api_cost_logs {total_rows}행"}
+                    "value": round(agg["cost"], 2), "note": f"AI 비용 기록 {total_rows}건"}
         return {"key": key, "label": label, "kind": "nosource", "unit": "USD",
-                "value": "원천 없음", "note": f"api_cost_logs {total_rows}행"}
+                "value": "정보 없음", "note": f"AI 비용 기록 {total_rows}건"}
 
     kpis = [
         money_kpi("today_cost", "오늘 사용액", today_agg),
         money_kpi("month_cost", "이번 달 누계", month_agg),
         {"key": "per_consult", "label": "상담 1건당 평균", "kind": "nosource", "unit": "USD",
-         "value": "원천 없음", "note": NOSOURCE_STYLE_NOTE["per_consult"]},
+         "value": "정보 없음", "note": NOSOURCE_STYLE_NOTE["per_consult"]},
         {"key": "per_batch", "label": "배치당 평균", "kind": "nosource", "unit": "USD",
-         "value": "원천 없음", "note": NOSOURCE_STYLE_NOTE["per_batch"]},
+         "value": "정보 없음", "note": NOSOURCE_STYLE_NOTE["per_batch"]},
         {"key": "by_task", "label": "작업 종류별 분해", "kind": "noschema", "unit": "",
-         "value": "스키마 없음", "note": "api_cost_logs에 작업 종류 컬럼 없음"},
+         "value": "정보 없음", "note": "AI 비용 기록에 작업 종류 항목 없음"},
     ]
 
     # ── 게이지 ──
     if limit_total is None and not source_exists:
         gauge = {"available": False, "limit_usd": None, "used_usd": None,
-                 "note": "한도도 사용액도 원천이 없습니다 — 게이지를 그릴 근거가 없습니다"}
+                 "note": "한도도 사용액도 정보 없음"}
     elif limit_total is None:
         gauge = {"available": False, "limit_usd": None, "used_usd": round(today_agg["cost"], 2),
                  "note": "일 한도가 아직 설정되지 않았습니다 — AI 연동 설정에서 정하면 채워집니다"}
     elif not source_exists:
         gauge = {"available": False, "limit_usd": round(limit_total, 2), "used_usd": None,
-                 "note": f"일 한도는 설정돼 있으나(${limit_total:g}/일) 오늘 사용액 원천이 아직 없습니다"}
+                 "note": f"일 한도는 설정돼 있으나(${limit_total:g}/일) 오늘 사용액 기록이 아직 없습니다"}
     else:
         used = round(today_agg["cost"], 2)
         pct = round(used / limit_total * 100, 1) if limit_total else None
@@ -223,13 +223,13 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
                                      "tokens": int(r["tokens"]), "cost": round(float(r["cost"]), 2)})
 
     breakdowns = {
-        "provider": {"available": source_exists, "source": "api_cost_logs.provider",
+        "provider": {"available": source_exists, "source": "AI 비용 기록 · 업체별",
                       "reason": None if source_exists else REASON, "rows": prov_breakdown_rows},
-        "task": {"available": False, "schema_missing": True, "source": "컬럼 없음",
+        "task": {"available": False, "schema_missing": True, "source": "항목 없음",
                   "reason": SCHEMA_REASON,
                   # 원안(dc-ai-usage-cost.html TASKS)은 작업 키 자체를 행 아래 보조
                   # 라벨로 함께 보여준다 — 프로바이더 분해의 "company" 보조 라벨과 같은 자리.
-                  "rows": [{"key": t["key"], "name": t["label"], "sub": t["key"],
+                  "rows": [{"key": t["key"], "name": t["label"], "sub": "",
                             "tokens": None, "cost": None} for t in TASKS]},
     }
 
@@ -254,7 +254,7 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
         "filters": {"providers": [{"key": p["key"], "label": p["vendor"]} for p in PROVIDERS],
                     "models": [{"key": p["model"], "label": p["vendor"] + " · " + p["model"]}
                                for p in PROVIDERS]},
-        "scope_note": f"이 화면은 우리 서버가 프로바이더에 직접 호출한 비용만 셉니다 · 범위 {period_label}",
+        "scope_note": f"이 화면은 우리 서버가 AI 업체에 직접 요청한 비용만 셉니다 · 범위 {period_label}",
         "source": {
             "api_cost_logs_rows": total_rows, "cost_thresholds_rows": threshold_rows,
             "built_at": iso(BUILT_AT), "decision_at": DECISION_AT,
@@ -270,27 +270,24 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
         "breakdowns": breakdowns,
         "claude_code_session": {
             "rows": [
-                {"name": "웹 사양 채움 배치(specfiller)", "tokens_label": "세션 전사본 기준",
+                {"name": "웹 사양 채움 일괄 작업", "tokens_label": "작업 기록 기준",
                  "cost_label": "환산 기준 없음"},
-                {"name": "개발 세션(maker·checker 등)", "tokens_label": "세션 전사본 기준",
+                {"name": "개발 작업", "tokens_label": "작업 기록 기준",
                  "cost_label": "환산 기준 없음"},
-                {"name": "합계", "tokens_label": "세션 전사본 기준", "cost_label": "환산 기준 없음"},
+                {"name": "합계", "tokens_label": "작업 기록 기준", "cost_label": "환산 기준 없음"},
             ],
-            "note": ("specfiller 같은 배치는 Claude Code 세션 안에서 돕니다 — 우리 서버가 프로바이더에"
-                      " 직접 호출한 것이 아니므로 api_cost_logs에 잡히지 않습니다."
-                      " 위 지표와 절대 합산하지 않습니다."),
-            "note2": ("원천은 세션 전사본(작업 현황판 ADM-AI-010과 같은 원천)입니다 — 토큰은 셀 수"
-                       " 있지만 금액 환산 기준이 없어 비용은 비워 둡니다."),
+            "note": ("웹 사양 채움 같은 일괄 작업은 개발용 AI 도구 안에서 돕니다 — 우리 서버가 AI 업체에"
+                      " 직접 요청한 것이 아니므로 위 비용 기록에 잡히지 않습니다."
+                      " 위 지표와 합산하지 않습니다."),
+            "note2": ("토큰 수는 개발 작업 기록에서 셀 수 있지만 금액 환산 기준이 없어"
+                       " 비용은 「정보 없음」으로 둡니다."),
         },
         "legend": [
             {"chip": "0", "desc": "원천은 있는데 값이 0 — 실제로 아무도 쓰지 않았다는 뜻입니다."
                                     " 지금은 이 상태가 아닙니다." if not source_exists else
                                     "원천은 있는데 값이 0 — 실제로 아무도 쓰지 않았다는 뜻입니다."},
-            {"chip": "원천 없음", "desc": "쌓이는 경로 자체가 없어 셀 대상이 없습니다."
-                                          " 오늘 이 화면 전 구간이 이 상태입니다(LLM 연동 보류)."
-                                          if not source_exists else
-                                          "쌓이는 경로 자체가 없어 셀 대상이 없습니다."},
-            {"chip": "스키마 없음", "desc": "데이터가 쌓여도 계산되지 않습니다 — 컬럼을 먼저"
-                                            " 추가해야 합니다(작업 종류별 분해)."},
+            {"chip": "정보 없음", "desc": "기록이 쌓이는 경로가 없거나(AI 연동 보류), 계산에 필요한"
+                                          " 항목이 없어(작업 종류별 분해) 값을 낼 수 없습니다."
+                                          + (" 오늘 이 화면 전 구간이 이 상태입니다." if not source_exists else "")},
         ],
     }

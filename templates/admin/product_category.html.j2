@@ -506,7 +506,7 @@ input{font-family:var(--rv-mono)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="pc-permhint">조회 viewer 이상 · 쓰기 operator 이상</span>
+<span class="pc-permhint">조회: 모든 등급 · 쓰기: 운영자 이상</span>
 <button type="button" class="pc-undo-hd" disabled
         title="카테고리 변경 되돌리기 API가 아직 없습니다 — 변경 이력에는 남지만 역방향으로 되돌리는 엔드포인트가 없습니다">
   되돌리기 (미구현)
@@ -518,7 +518,7 @@ input{font-family:var(--rv-mono)}
   <div class="pc-banner">
     <span class="mk">경계</span>
     <span class="hd">엔진은 이 트리를 읽지 않습니다 — 분류를 옮겨도 견적 결과는 바뀌지 않습니다</span>
-    <span class="ds" id="pcNote">부품 종류(part_type, 엔진이 읽는 닫힌 집합)와 다른 축입니다. 이 화면이 하는 일은 판매 탐색·오분류 경고입니다.</span>
+    <span class="ds" id="pcNote">부품 종류(견적 엔진이 쓰는 정해진 분류)와는 다른 기준입니다. 이 화면이 하는 일은 판매 탐색·오분류 경고입니다.</span>
   </div>
 
   <div class="pc-loading" id="pcLoading"><div>불러오는 중…</div></div>
@@ -557,11 +557,11 @@ input{font-family:var(--rv-mono)}
           </div>
           <div class="pc-blind-item">
             <div class="hd">"미배정 상품" 수는 정의가 하나가 아닙니다</div>
-            <div class="ds">위 지표의 "분류 미배정 상품"은 <span style="font-family:var(--rv-mono)">category_id</span>가 아예 없는 상품만 셉니다. "미분류" 이름의 노드에 배정된 상품이나, 부품 종류 자체를 못 정한(<span style="font-family:var(--rv-mono)">part_type=ETC</span>) 상품은 다른 개념이라 이 화면은 그 수를 세지 않습니다.</div>
+            <div class="ds">위 지표의 "분류 미배정 상품"은 분류가 아예 지정되지 않은 상품만 셉니다. "미분류" 이름의 분류에 배정된 상품이나, 부품 종류 자체를 못 정한(기타) 상품은 다른 개념이라 이 화면은 그 수를 세지 않습니다.</div>
           </div>
           <div class="pc-blind-item">
             <div class="hd">노출 토글은 지금 효과가 없습니다</div>
-            <div class="ds"><span style="font-family:var(--rv-mono)">is_visible</span>을 읽어 걸러내는 소비처가 코드에 없습니다(실측: 목록 API가 값과 무관하게 전 노드를 돌려줍니다) — 꺼도 관리자 화면에서 사라지지 않습니다. 값은 저장되고 이력에 남습니다.</div>
+            <div class="ds">「노출」 값을 실제로 반영하는 화면이 아직 없습니다 — 꺼도 관리자 화면에서 사라지지 않습니다. 값은 저장되고 이력에 남습니다.</div>
           </div>
         </div>
 
@@ -670,7 +670,7 @@ input{font-family:var(--rv-mono)}
   function guard() {
     if (!owner()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
@@ -684,7 +684,7 @@ input{font-family:var(--rv-mono)}
   // 쓰던 disabled+title 방식을 그대로 따른다.
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
   function disAttrs(disabled, title) {
     return disabled ? (' disabled title="' + esc(title) + '"') : '';
@@ -824,7 +824,7 @@ input{font-family:var(--rv-mono)}
       { lb: '분류', v: fmt(total), nt: '대분류 ' + fmt(top) + ' · 소분류 ' + fmt(total - top), warn: false },
       { lb: '허용 종류 위반', v: fmt(violTotal), nt: '경고이지 금지가 아닙니다', warn: violTotal > 0 },
       { lb: '분류 미배정 상품', v: fmt(S.data.unmapped),
-        nt: 'category_id 미지정 기준 · 재고 있음 ' + fmt(S.data.unmapped_in_stock) + '건 포함', warn: false }
+        nt: '분류 미지정 기준 · 재고 있음 ' + fmt(S.data.unmapped_in_stock) + '건 포함', warn: false }
     ];
     $('pcStats').innerHTML = cards.map(function (c) {
       return '<div class="pc-stat' + (c.warn ? ' warn' : '') + '"><div class="lb">' + esc(c.lb) + '</div>' +
@@ -998,7 +998,7 @@ input{font-family:var(--rv-mono)}
         return '<span class="pc-chip' + (isOn ? ' on' : '') + '" data-action="toggle-type" data-t="' + esc(t.key) + '" role="checkbox" aria-checked="' + (isOn ? 'true' : 'false') + '">' + esc(t.label) + '</span>';
       }).join('') + '</div>';
     } else {
-      html += '<div style="font:400 10.5px/1.5 var(--rv-font);color:var(--rv-dim)">선택지를 불러오지 못했습니다 — part_types 응답이 비어 있습니다.</div>';
+      html += '<div style="font:400 10.5px/1.5 var(--rv-font);color:var(--rv-dim)">선택지를 불러오지 못했습니다 — 부품 종류 목록이 비어 있습니다.</div>';
     }
     html += '</div>';
 
@@ -1006,8 +1006,8 @@ input{font-family:var(--rv-mono)}
     html += '<div class="pc-field"><span class="lb">노출</span>' +
       '<button type="button" class="pc-visbox" data-action="toggle-visible" role="switch" aria-checked="' + (d.is_visible ? 'true' : 'false') + '"' + (own ? '' : ' disabled') + '>' +
       '<span class="pc-vismark ' + (d.is_visible ? 'on' : 'off') + '">' + (d.is_visible ? '●' : '○') + '</span>' +
-      '<span class="pc-vistxt"><span class="lb2">' + (d.is_visible ? '노출 켜짐 (is_visible=true)' : '노출 꺼짐 (is_visible=false)') + '</span>' +
-      '<span class="ds">지금은 이 값을 읽는 소비처가 없어 꺼도 목록에서 사라지지 않습니다 — 값과 이력만 남습니다.</span></span></button></div>';
+      '<span class="pc-vistxt"><span class="lb2">' + (d.is_visible ? '노출 켜짐' : '노출 꺼짐') + '</span>' +
+      '<span class="ds">지금은 이 값을 반영하는 화면이 없어 꺼도 목록에서 사라지지 않습니다 — 값과 이력만 남습니다.</span></span></button></div>';
 
     // 위반 안내
     if (n.violations) {
@@ -1020,7 +1020,7 @@ input{font-family:var(--rv-mono)}
     html += '</div>'; // dw-body
 
     var footNoteText = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
-      : ('권한이 부족합니다(필요: operator, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+      : ('권한이 부족합니다(필요: 운영자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '(로그인 필요)') + ') — 조회만 가능합니다');
     var delDis = !own;
     var revDis = !dirty;
     var saveDis = !(own && dirty);
@@ -1067,7 +1067,7 @@ input{font-family:var(--rv-mono)}
     if (diffArea) diffArea.innerHTML = diffBoxHtml(diffs);
     if (footNote) {
       footNote.textContent = own ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다' : '변경 사항이 없습니다')
-        : ('권한이 부족합니다(필요: operator, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+        : ('권한이 부족합니다(필요: 운영자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '(로그인 필요)') + ') — 조회만 가능합니다');
       footNote.classList.toggle('warn', !own);
     }
   }

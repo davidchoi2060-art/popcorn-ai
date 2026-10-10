@@ -282,7 +282,7 @@ input{font-family:var(--rv-font)}
 
 {% block header_extra %}
 <span class="os-stagechip">현재 단계 MVP1 — 팝콘PC 인계로 판매</span>
-<span class="os-verdictnote" title="{{ verdict_source }}">판정 기준일 {{ verdict_at }} · 자동 판정 아님</span>
+<span class="os-verdictnote" title="승인된 화면 설계 기준">판정 기준일 {{ verdict_at }} · 자동 판정 아님</span>
 {% endblock %}
 
 {% block content %}
@@ -325,7 +325,7 @@ input{font-family:var(--rv-font)}
             <span class="ti" id="osBuildTitle">구축 축</span>
             <span class="sub">진척 현황 — 지어야 바뀝니다, 여기서 켜고 끌 수 없습니다</span>
             <span class="grow"></span>
-            <span class="mono sub">정본 api/admin_nav.py</span>
+            <span class="mono sub">왼쪽 메뉴 목록 기준</span>
           </div>
 
           <div class="os-buildmsg" data-tabpanel="mvp1" hidden>
@@ -333,7 +333,7 @@ input{font-family:var(--rv-font)}
           </div>
 
           <div class="os-hints" data-tabpanel="mvp2" hidden>
-            <div class="note">admin_nav.py에 있는 미구축 {{ nav_counts.todo }}항목은 아직 어느 단계에도 배정되지 않았습니다. 아래는 admin_nav.py 모듈 docstring에서 읽히는 "정황상 대응"이며 확정이 아닙니다.</div>
+            <div class="note">메뉴 목록의 미구축 {{ nav_counts.todo }}항목은 아직 어느 단계에도 배정되지 않았습니다. 아래는 개발 기록에서 읽히는 "정황상 대응"이며 확정이 아닙니다.</div>
             {% for h in hints_by_stage.mvp2 %}
             <div class="hint">
               <span class="chip">정황상 대응 · 확정 아님</span>
@@ -390,7 +390,7 @@ input{font-family:var(--rv-font)}
                   <td colspan="4">
                     <span class="ti">합계 {{ nav_counts.groups }}그룹 {{ nav_counts.total }}항목</span>
                     <span class="mono">구축 {{ nav_counts.new }} · 미구축 {{ nav_counts.todo }}</span>
-                    <span class="ds">단계 구분이 코드에 없어 "MVP1 잔여 N건"을 셀 수 없습니다 — {{ nav_counts.todo }}건 전체만 보여줍니다.{% if not self_built %} 이 화면 자신도 아직 미구축 {{ nav_counts.todo }}건 중 하나입니다(admin_nav.py가 href를 아직 갖고 있지 않습니다).{% endif %}</span>
+                    <span class="ds">단계 구분이 코드에 없어 "MVP1 잔여 N건"을 셀 수 없습니다 — {{ nav_counts.todo }}건 전체만 보여줍니다.{% if not self_built %} 이 화면 자신도 아직 미구축 {{ nav_counts.todo }}건 중 하나입니다(메뉴에 아직 연결되지 않았습니다).{% endif %}</span>
                   </td>
                 </tr>
               </tfoot>
@@ -402,7 +402,7 @@ input{font-family:var(--rv-font)}
           <div class="os-panel-hd">
             <span class="ti" id="osHistTitle">최근 변경 이력 — 전환 축만</span>
             <span class="grow"></span>
-            <span class="mono sub">admin_operator_activity_logs · target_kind=ops · 최근 20건</span>
+            <span class="mono sub">작업 기록 중 운영 전환 · 최근 20건</span>
           </div>
           <table class="os-histtable">
             <thead>
@@ -428,7 +428,7 @@ input{font-family:var(--rv-font)}
             <div class="row"><span class="os-badge live">● 동작 중</span><span class="ds">전환 축 — 값을 읽는 코드가 있고 처리가 갈립니다. 환불은 문구만 갈리지만 소비는 되므로 여기에 셉니다.</span></div>
             <div class="row"><span class="os-badge dormant">◆ 잠듦</span><span class="ds">전환 축 — 축은 살아 있으나 이 단계에서 쓰지 않습니다.</span></div>
             <div class="row"><span class="os-badge missing">○ 미구현</span><span class="ds">전환 축 — 스위치는 있는데 읽는 코드가 없습니다. 켜도 서버는 아무 일도 하지 않습니다.</span></div>
-            <div class="row"><span class="os-chip done">■ 구축됨</span><span class="ds">구축 축 — 화면이 지어져 라우트가 있습니다(admin_nav.py의 href 유무로 판정).</span></div>
+            <div class="row"><span class="os-chip done">■ 구축됨</span><span class="ds">구축 축 — 화면이 지어져 메뉴에 연결돼 있습니다.</span></div>
             <div class="row"><span class="os-chip none">□ 미구축</span><span class="ds">구축 축 — 아직 짓지 않았습니다. 여기서 켜고 끌 수 없고, 지어야 바뀝니다.</span></div>
           </div>
         </div>
@@ -437,14 +437,14 @@ input{font-family:var(--rv-font)}
           <div class="lbl">이 화면이 감추지 않는 사실</div>
           <div class="os-facts">
             <div class="fact"><div class="ti">두 축은 성격이 다릅니다</div><div class="ds">전환 축은 사람이 켜고 끄는 정책 스위치, 구축 축은 지어야 바뀌는 진척입니다. 구축 축에 스위치를 붙이면 "켰는데 아무 일이 없다"가 되돌아옵니다 — 그래서 조회만 합니다.</div></div>
-            <div class="fact"><div class="ti">구축 축 목록은 여기서 정의하지 않습니다</div><div class="ds">정본은 api/admin_nav.py이고 이 화면은 파생해 읽습니다. 목록을 화면에 복제하면 2026-08-05 사고(메뉴가 36화면에 갈라짐)가 재현됩니다.</div></div>
+            <div class="fact"><div class="ti">구축 축 목록은 여기서 정의하지 않습니다</div><div class="ds">왼쪽 메뉴와 같은 목록을 그대로 읽습니다. 목록을 화면마다 따로 두면 서로 어긋나기 때문입니다.</div></div>
             {% if not self_built %}
-            <div class="fact"><div class="ti">이 화면 자신도 미구축입니다</div><div class="ds">admin_nav.py가 아직 이 화면의 href를 갖고 있지 않아, {{ nav_counts.todo }}건 미구축 중 하나로 잡힙니다 — 자기 이름도 가리지 않습니다.</div></div>
+            <div class="fact"><div class="ti">이 화면 자신도 미구축입니다</div><div class="ds">메뉴에 아직 이 화면이 연결되지 않아, {{ nav_counts.todo }}건 미구축 중 하나로 잡힙니다 — 자기 이름도 가리지 않습니다.</div></div>
             {% else %}
-            <div class="fact"><div class="ti">이 화면은 이제 구축됨으로 잡힙니다</div><div class="ds">admin_nav.py에 이 화면의 href가 등록되어 {{ nav_counts.new }}건 구축 안에 포함됩니다.</div></div>
+            <div class="fact"><div class="ti">이 화면은 이제 구축됨으로 잡힙니다</div><div class="ds">메뉴에 이 화면이 연결되어 {{ nav_counts.new }}건 구축 안에 포함됩니다.</div></div>
             {% endif %}
-            <div class="fact"><div class="ti">MVP1 잔여는 아직 셀 수 없습니다</div><div class="ds">NAV 튜플에 단계 필드가 없어 {{ nav_counts.todo }}건 중 무엇이 MVP1인지 코드로 판정할 방법이 없습니다. "{{ nav_counts.todo }}개 미구축"까지만 말하고 임의로 나누지 않습니다.</div></div>
-            <div class="fact warn"><div class="ti">판정은 자동이 아니라 스냅샷입니다</div><div class="ds">동작 중/잠듦/미구현 판정과 단계 배정은 {{ verdict_at }} 코드 감사를 그대로 옮긴 값입니다 — 서버가 매 요청 다시 판정하지 않습니다. 근거: {{ verdict_source }}</div></div>
+            <div class="fact"><div class="ti">MVP1 잔여는 아직 셀 수 없습니다</div><div class="ds">메뉴 목록에 단계 정보가 없어 {{ nav_counts.todo }}건 중 무엇이 MVP1인지 코드로 판정할 방법이 없습니다. "{{ nav_counts.todo }}개 미구축"까지만 말하고 임의로 나누지 않습니다.</div></div>
+            <div class="fact warn"><div class="ti">판정은 자동이 아니라 스냅샷입니다</div><div class="ds">동작 중/잠듦/미구현 판정과 단계 배정은 {{ verdict_at }} 점검 결과를 그대로 옮긴 값입니다 — 서버가 매번 다시 판정하지 않습니다. 근거: 승인된 화면 설계와 요구사항 정의서</div></div>
           </div>
         </div>
       </div>
@@ -581,7 +581,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
   function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다 (필요: 관리자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
   function guard() {
     if (!owner()) { toast(permText(), 'err'); return false; }
@@ -733,7 +733,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
         : (h.action !== 'ops_change' ? '되돌림 기록은 다시 되돌릴 수 없습니다' : (!owner() ? permText() : ''));
       return '<tr>' +
         '<td class="num">' + esc(h.at || '—') + '</td>' +
-        '<td>' + esc(h.operator || '—') + '</td>' +
+        '<td>' + esc(h.operator || '정보 없음') + '</td>' +
         '<td class="what"><span class="txt">' + esc(what) + '</span>' +
           (h.undone ? '<span class="undone">되돌려짐</span>' : '') + '</td>' +
         '<td><button type="button" class="os-undobtn" data-action="undo" data-logid="' + h.log_id + '"' +

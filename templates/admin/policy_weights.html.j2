@@ -232,11 +232,11 @@ code{font-family:var(--rv-mono)}
   // 문구를 상수로 박아 두고 있었다("1.5배" 리터럴 포함) — 상수가 서버에 생겼으니
   // 걷어내고 서버 값을 그대로 쓴다(아래 tplTiers의 r.total_handling).
   var TAG_FOOTNOTE = {
-    tag_silent: '스코프 밖 부품(CPU·메모리·SSD 등)은 무조건 통과합니다.',
+    tag_silent: '적용 범위 밖 부품(CPU·메모리·SSD 등)은 무조건 통과합니다.',
     tag_white: '다른 부품 색상은 판정하지 않습니다.'
   };
-  var LOCK_TITLE = '배분율·티어 정렬 기준 편집은 향후 사용예정입니다 — 값을 코드에서 DB로' +
-    " 옮기고 '바꿔도 이미 만든 견적은 그대로'라는 원칙(용도 하한과 동일)을 새 API에 적용해야 합니다.";
+  var LOCK_TITLE = '배분율·티어 정렬 기준 편집은 향후 사용예정입니다 — 값을 프로그램에서 저장소로' +
+    " 옮기고 '바꿔도 이미 만든 견적은 그대로'라는 원칙(용도 하한과 동일)을 적용해야 합니다.";
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -306,14 +306,13 @@ code{font-family:var(--rv-mono)}
     return '<div class="pw-banner"><span class="tag">▲ 가중치 아님</span>' +
       '<div class="pw-bannertext">' +
       '<div class="main">지금 추천은 「가중치」가 아닙니다</div>' +
-      '<div class="sub">policy_weights 표는 실존하지만 <code>' + n + '행</code>입니다 —' +
-      ' <b>추천 엔진(recommend.py)이 이 값을 읽지 않습니다.</b> 지금 이 표를 읽는 코드는' +
-      ' 이 화면의 조회 API뿐입니다(그 사실을 보여주려고 조회합니다 — 견적에는 반영하지 않습니다).' +
-      ' ' + n + '행은 오류가 아니라 지금의 정상 상태입니다 — 이 화면은 표가 비어 있다는 사실 자체를' +
-      ' 결과로 보여줍니다. 추천은 실제로 이 넷이 결정합니다 — 티어별 정렬 규칙 · 총액 가지치기 ·' +
+      '<div class="sub">추천 가중치 저장소는 있지만 <b>' + n + '건</b>입니다 —' +
+      ' <b>추천 엔진이 이 값을 읽지 않습니다.</b> 이 화면은 그 사실을 보여 주려고 조회만 하며,' +
+      ' 견적에는 반영하지 않습니다. ' + n + '건은 오류가 아니라 지금의 정상 상태입니다.' +
+      ' 추천은 실제로 이 넷이 결정합니다 — 티어별 정렬 규칙 · 총액 가지치기 ·' +
       ' 예산 배분율 · 태그 스코프.</div>' +
       '<div class="name">화면 이름을 「추천 기준 보기」로 표시합니다 — 지금 이 화면에서 바꿀 수 있는' +
-      ' 값은 하나도 없습니다(전부 코드 상수). 좌측 메뉴의 정본 라벨은 사장님 확정 전이라' +
+      ' 값은 하나도 없습니다(전부 프로그램에 고정된 값). 좌측 메뉴의 이름은 확정 전이라' +
       ' 「추천 기준 설정」 그대로입니다.</div>' +
       '</div></div>';
   }
@@ -323,7 +322,7 @@ code{font-family:var(--rv-mono)}
     var rules = (d.tiers && d.tiers.rules) || [];
     var head = rules.map(function (r) {
       return '<th scope="col"><span class="tn">' + esc(r.label) + '</span>' +
-        '<code class="tk">' + esc(r.key) + '</code></th>';
+        '</th>';
     }).join('');
     function row(rowLabel, get) {
       return '<tr><th scope="row">' + esc(rowLabel) + '</th>' +
@@ -336,7 +335,7 @@ code{font-family:var(--rv-mono)}
       }) +
       row('총액 처리', function (r) { return esc(r.total_handling || '—'); });
     return '<div class="pw-card"><div class="pw-cardhd"><span class="t">티어별 정렬 · 예산 상한 · 총액 처리</span>' +
-      '<span class="src">GET /api/admin/engine-rules → tiers</span></div>' +
+      '</div>' +
       '<div class="pw-tablewrap"><table class="pw-tiertable"><thead><tr>' +
       '<th scope="col" class="lbl"><span class="pw-vh">구분</span></th>' + head + '</tr></thead>' +
       '<tbody>' + body + '</tbody></table></div>' +
@@ -368,7 +367,7 @@ code{font-family:var(--rv-mono)}
     var body = scopes.map(function (s) {
       var names = (s.scope || []).map(label).join(' · ');
       return '<div class="pw-tagrow"><div class="hd"><span class="nm">' + esc(s.tag) + '</span>' +
-        '<code class="fk">' + esc(s.field) + '</code></div>' +
+        '</div>' +
         '<div class="scope">적용 범위 — ' + esc(names || '(대상 없음)') + '</div>' +
         '<div class="ft">' + esc(TAG_FOOTNOTE[s.field] || '') + '</div></div>';
     }).join('');
@@ -383,7 +382,7 @@ code{font-family:var(--rv-mono)}
       '동률이면 상품코드 오름차순으로 정합니다 — 같은 입력·같은 재고면 항상 같은 결과입니다(재현성).',
       '벤치마크 원천이 없어 가격을 성능의 대리 지표로 씁니다 — 부품 등급 축이 엔진에 연결되면 교체될 예정입니다.',
       '가성비형에서 최소 구성이 예산을 넘으면 세 티어 전부 불성립입니다 — 성립한 척하지 않습니다.',
-      'policy_weights는 ' + n + '행이며 추천 엔진이 읽지 않습니다 — 오류가 아니라 지금의 정상 상태입니다.',
+      '추천 가중치는 ' + n + '건이며 추천 엔진이 읽지 않습니다 — 오류가 아니라 지금의 정상 상태입니다.',
       '배분율은 예산 상한이 있는 견적에만 적용됩니다 — 숫자 없는 예산 표현에는 적용되지 않습니다.'
     ];
     return '<div class="pw-card"><div class="pw-cardhd"><span class="t">이 화면이 밝히는 사실</span></div>' +
@@ -392,9 +391,9 @@ code{font-family:var(--rv-mono)}
 
   // ── 하단 고지 ────────────────────────────────────────────────────
   function tplFoot() {
-    return '<div class="pw-foot">마진율 · 카드 수수료(pricing)는 같은 API 응답에 있어도 <b>「판매가」</b>' +
-      ' 그룹 소관입니다 · 호환 규칙(compat)은 <b>「조립 호환 규칙」</b> 소관입니다 · 부품 등급' +
-      '(part_grades)은 아직 엔진에 연결되지 않았습니다 · 조회 실패 시 사유를 그대로 밝힙니다.</div>';
+    return '<div class="pw-foot">마진율 · 카드 수수료는 <b>「판매가」</b>' +
+      ' 메뉴에서 다룹니다 · 호환 규칙은 <b>「조립 호환 규칙」</b>에서 다룹니다 · 부품 등급' +
+      '은 아직 엔진에 연결되지 않았습니다 · 조회 실패 시 사유를 그대로 밝힙니다.</div>';
   }
 
   document.addEventListener('click', function (ev) {

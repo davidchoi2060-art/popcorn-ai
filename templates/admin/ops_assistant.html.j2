@@ -233,7 +233,7 @@ input,textarea{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="scopechip">편집 owner 전용 · 열람 viewer 이상</span>
+<span class="scopechip">편집: 관리자 전용 · 열람: 모든 등급</span>
 {% endblock %}
 
 {% block content %}
@@ -244,7 +244,7 @@ input,textarea{font-family:var(--rv-font)}
   </div>
   <div class="info-card warn">
     <div class="t">이 화면에서 AI에게 직접 물어볼 수 있습니다 — 실제 위젯과는 별개입니다</div>
-    <div class="d">오른쪽 "AI 질의응답" 패널이 실제로 질문을 받아 답합니다(아래 답할 범위·FAQ를 그대로 씁니다). 다만 방문자가 보는 실제 도우미 위젯(admin-helper.js)에는 아직 연결돼 있지 않습니다 — 위젯은 여전히 FAQ 문자열 매칭만 합니다.</div>
+    <div class="d">오른쪽 "AI 질의응답" 패널이 실제로 질문을 받아 답합니다(아래 답할 범위·FAQ를 그대로 씁니다). 다만 화면 구석의 실제 도우미 창에는 아직 연결돼 있지 않습니다 — 도우미 창은 여전히 FAQ 문구 맞추기만 합니다.</div>
   </div>
 </div>
 
@@ -279,7 +279,7 @@ input,textarea{font-family:var(--rv-font)}
     <div class="card audit-card">
       <div class="audit-cap">바로가기 점검</div>
       <div id="auditRows"></div>
-      <div class="audit-foot">위젯은 admin2 공통 레이아웃이 아니라 구 관리자 화면(<code>templates/admin/_layout.html.j2</code>)에 실려 있습니다. 옛 링크는 상대경로라 admin2에서 열리면 없는 주소로 풀립니다 — 서랍에서 실제 admin2 경로로 바꾸세요.</div>
+      <div class="audit-foot">도우미 창은 새 관리자 화면이 아니라 구 관리자 화면에 실려 있습니다. 옛 바로가기는 새 관리자 화면에서 열면 없는 주소가 됩니다 — 오른쪽 편집 창에서 새 화면 주소로 바꾸세요.</div>
     </div>
 
     <div class="card preview-card">
@@ -297,7 +297,7 @@ input,textarea{font-family:var(--rv-font)}
           <button type="button" class="chat-send" id="chatSendBtn" data-action="chat-send">보내기</button>
         </div>
       </div>
-      <div class="preview-note" id="previewNote">지금 저장된 답할 범위·FAQ를 프롬프트에 실어 실제로 AI를 호출합니다. 다만 방문자가 보는 실제 위젯(admin-helper.js)에는 연결돼 있지 않습니다 — 그 위젯은 여전히 자체 코드 상수를 씁니다. 이 대화는 저장되지 않습니다 — 새로고침하면 사라집니다.</div>
+      <div class="preview-note" id="previewNote">지금 저장된 답할 범위·FAQ를 AI에게 함께 보내 실제로 답을 받습니다. 다만 화면 구석의 실제 도우미 창에는 연결돼 있지 않습니다 — 그 창은 여전히 자체 문구를 씁니다. 이 대화는 저장되지 않습니다 — 새로고침하면 사라집니다.</div>
     </div>
   </div>
 </div>
@@ -383,7 +383,7 @@ input,textarea{font-family:var(--rv-font)}
   function guard() {
     if (!canWrite()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '로그인 필요') + ')', 'err');
+      toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '로그인 필요') + ')', 'err');
       return false;
     }
     return true;
@@ -592,7 +592,7 @@ input,textarea{font-family:var(--rv-font)}
     var blocked = S.chat.asking || !owner;
     inp.disabled = blocked; btn.disabled = blocked;
     inp.placeholder = owner ? '운영 관련 질문을 입력하세요'
-      : '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ')';
+      : '권한이 부족합니다 (필요: 관리자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '로그인 필요') + ')';
     $('chatTag').textContent = S.chat.asking ? '응답 대기 중' : '질문 · 답변';
   }
 
@@ -677,7 +677,7 @@ input,textarea{font-family:var(--rv-font)}
     $('saveBtn').disabled = !owner || !dl.length;
     $('revertBtn').disabled = !dl.length;
     var foot = $('dwFoot');
-    if (!owner) { foot.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ') — 조회만 가능합니다'; foot.classList.add('warn'); }
+    if (!owner) { foot.textContent = '권한이 부족합니다 (필요: 관리자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '로그인 필요') + ') — 조회만 가능합니다'; foot.classList.add('warn'); }
     else { foot.textContent = dl.length ? (S.widgetSyncNote || '저장하면 DB에 즉시 반영됩니다.') : '변경 사항이 없습니다'; foot.classList.remove('warn'); }
   }
 

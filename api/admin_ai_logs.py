@@ -78,17 +78,17 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
     reasons = [
         {
             "key": "api_cost_logs",
-            "name": "api_cost_logs",
+            "name": "AI 비용 기록",
             "chip": "컬럼 없음",
-            "measured": f"실측 {cost_rows}행 · provider·model·tokens_in/out·cost_usd",
-            "why": ("비용 집계 전용 스키마입니다. 질문·답변 텍스트를 담을 컬럼이 아예 "
+            "measured": f"현재 {cost_rows}건 · 업체·모델·토큰 수·비용만 기록",
+            "why": ("비용 집계 전용 기록입니다. 질문·답변 내용을 담을 칸이 아예 "
                     "없어 행이 쌓여도 감사에는 못 씁니다."),
         },
         {
             "key": "spec_web_suggestions",
-            "name": "spec_web_suggestions",
+            "name": "웹 사양 제안 기록",
             "chip": "결과만 남음",
-            "measured": f"실측 {web_rows}행 · source_url·confidence·note",
+            "measured": f"현재 {web_rows}건 · 출처 주소·신뢰도·메모만 기록",
             "why": ("최종 채택된 값 하나만 남깁니다. 무엇을 검색했고 어떤 후보를 "
                     "버렸는지는 기록되지 않아 \"무엇을 물었나\"를 복원할 수 없습니다."),
         },
@@ -96,15 +96,15 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
             "key": "ops_helper_chat",
             "name": "운영 도우미 대화",
             "chip": "서버 미전송",
-            "measured": "코드 확인 · sessionStorage['popcorn-admin-helper']",
+            "measured": "코드 확인 · 브라우저에만 임시 저장",
             "why": ("브라우저 세션에만 저장되고 서버로 보내지 않습니다(코드 주석에 "
                     "명시). 서버가 애초에 받지 않는 내용입니다."),
         },
         {
             "key": "llm_calls",
-            "name": "S1·S2 LLM 호출",
+            "name": "고객 상담 화면 AI 호출",
             "chip": "호출 경로 없음",
-            "measured": "코드 확인 · api/·tools/ 호출 경로 0건",
+            "measured": "코드 확인 · 호출하는 곳 없음",
             "why": ("연동 보류(2026-07-21 결정)로 호출 코드 자체가 없습니다. 호출이 "
                     "없으니 남길 응답도 없습니다."),
         },

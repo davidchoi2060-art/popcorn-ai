@@ -284,7 +284,7 @@
               </div>
               <div class="mp-lock-i">
                 <div class="mp-lock-f">상태</div>
-                <div class="mp-lock-w">자기 정지 해제를 막는다. 동봉해 보내면 조용히 무시하지 않고 422 로 거절한다.</div>
+                <div class="mp-lock-w">자기 계정의 정지를 스스로 풀 수 없다. 함께 보내면 저장을 거절하고 사유를 알린다.</div>
               </div>
             </div>
           </div>
@@ -302,8 +302,7 @@
       <section class="mp-card mp-sec" data-domain="profile-edit">
         <div class="mp-hd">
           <span class="mp-hd-t">정보 수정</span>
-          <span class="mp-hd-d" id="mpEditableNote">수정 가능 항목은 서버 <code>editable</code> 이 정한다</span>
-          <span class="mp-api">PATCH /api/admin/my-profile</span>
+          <span class="mp-hd-d" id="mpEditableNote">수정 가능 항목은 서버가 정한다</span>
         </div>
         <div class="mp-frow">
           <div class="mp-f">
@@ -321,7 +320,7 @@
           <button type="button" class="mp-btn" id="mpSave" data-action="profile-save" disabled>저장</button>
           <button type="button" class="mp-btn2" id="mpRevert" data-action="profile-revert" disabled>되돌리기</button>
         </div>
-        <div class="mp-note">「되돌리기」는 서버 값 재적용이다 — 저장 전 입력 취소이지 원장 되돌림이 아니다. 연락처·직무를 비우면 NULL 로 저장한다. 이름을 바꾸면 지난 작업 기록의 표시 이름도 함께 바뀐다.</div>
+        <div class="mp-note">「되돌리기」는 서버 값 재적용이다 — 저장 전 입력 취소이지 원장 되돌림이 아니다. 연락처·직무를 비우면 빈 값으로 저장한다. 이름을 바꾸면 지난 작업 기록의 표시 이름도 함께 바뀐다.</div>
         <div class="mp-res" id="mpResEdit" hidden>
           <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
           <div class="mp-res-m" data-bind="message"></div>
@@ -335,7 +334,6 @@
           <div class="mp-pw-l">
             <div class="mp-pw-hd">
               <span class="mp-hd-t">비밀번호 규칙</span>
-              <span class="mp-api">GET /api/admin/auth/password-policy</span>
             </div>
             <div class="mp-rules" id="mpRules" data-repeat="password-rules">
               <div class="mp-rule"><i>·</i><span>규칙 조회 중</span></div>
@@ -362,11 +360,11 @@
                 <div class="mp-warn">변경하면 이 기기를 뺀 모든 세션과 기억된 기기 전부가 철회된다 — 다른 기기에서는 다시 로그인한다. 되돌리기는 없다. 비밀번호 원문은 어디에도 저장하지 않는다.</div>
                 <button type="button" class="mp-btn" id="mpPwBtn" data-action="password-change">비밀번호 변경</button>
               </div>
-              <div class="mp-fn2" style="margin-top:9px">세 칸 모두 <code>type="password"</code> — 화면에 보이지 않는다.</div>
+              <div class="mp-fn2" style="margin-top:9px">세 칸 모두 입력한 글자가 화면에 보이지 않는다.</div>
             </div>
             <div class="mp-nopw" id="mpNoPw" hidden>
               <div class="mp-nopw-t">이 계정에는 비밀번호가 설정돼 있지 않다</div>
-              <div class="mp-nopw-x">판정 근거는 서버 <code>has_password</code>다. 이 화면에는 발급 수단이 없다 — 임시 비밀번호는 관리자가 「운영자·권한」(ADM-SYS-020)에서 발급해 직접 전달한다. 스스로 푸는 「비밀번호 찾기」 경로는 없다.</div>
+              <div class="mp-nopw-x">이 화면에는 발급 수단이 없다 — 임시 비밀번호는 관리자가 「운영자·권한」에서 발급해 직접 전달한다. 스스로 푸는 「비밀번호 찾기」 경로는 없다.</div>
             </div>
             <div class="mp-res" id="mpResPw" hidden style="margin-top:9px">
               <div class="mp-res-h"><span class="mp-res-c" data-bind="code"></span><span class="mp-res-s">서버가 준 문구를 그대로</span></div>
@@ -413,7 +411,6 @@
         <div class="mp-hd">
           <span class="mp-hd-t">기억된 기기</span>
           <span class="mp-hd-d">비밀번호 없이 로그인할 수 있는 기기다({{ remember_days }}일) · 등록은 로그인 화면의 체크박스 소관이고 이 화면은 목록 조회와 개별 철회만 한다</span>
-          <span class="mp-api">GET /api/admin/my-profile/devices</span>
         </div>
         <div id="mpDevRows" data-repeat="devices"></div>
         <div class="mp-note" id="mpDevNote" data-bind="devices_note">기기 조회 중</div>
@@ -677,13 +674,13 @@ setTimeout(function () {
     var pwVal, pwNote;
     if (!d.has_password) {
       pwVal = '설정 안 됨';
-      pwNote = 'has_password=false — 이 값으로 판정한다';
+      pwNote = '비밀번호 미설정';
     } else if (d.password_set_at) {
       pwVal = null;
-      pwNote = '표시용 시각이다 — 판정 근거는 has_password다';
+      pwNote = '마지막 설정 시각';
     } else {
       pwVal = null;
-      pwNote = '설정돼 있으나 시각 기록이 없다 — 판정 근거는 has_password다';
+      pwNote = '설정돼 있으나 시각 기록이 없다';
     }
 
     $('mpGrid').innerHTML =
@@ -716,13 +713,13 @@ setTimeout(function () {
       el.value = d[f[0]] == null ? '' : d[f[0]];
       var can = ed.indexOf(f[0]) >= 0;
       el.disabled = !can;
-      el.title = can ? '' : '서버 editable 목록에 없어 이 화면에서 고칠 수 없다';
+      el.title = can ? '' : '이 화면에서 고칠 수 없는 항목이다';
     });
     $('mpSave').disabled = ed.length === 0;
     $('mpRevert').disabled = ed.length === 0;
     $('mpEditableNote').textContent = ed.length
-      ? ('수정 가능 항목: ' + ed.map(editableLabel).join(' · ') + ' — 서버 editable 이 정한다')
-      : '수정 가능 항목이 없다 — 서버 editable 이 비어 있다';
+      ? ('수정 가능 항목: ' + ed.map(editableLabel).join(' · '))
+      : '수정 가능 항목이 없다';
   }
   function saveProfile() {
     if (S.busy) return;

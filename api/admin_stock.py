@@ -594,7 +594,7 @@ def stock_inbound_history(page: int = 1, size: int = 20, product_code: int | Non
         # 화면 폴백과 다르게 적으면 **응답 전후로 같은 자리의 문구가 바뀐다**
         # (화면 폴백은 처음부터 계약 원문이었고 여기만 등급 이름을 달리 불렀다).
         "can_write_note": ("" if role in ("operator", "owner")
-                           else "viewer 등급은 입고 확정·되돌리기를 할 수 없습니다"),
+                           else "조회 등급은 입고 확정·되돌리기를 할 수 없습니다"),
         "scope_note": HISTORY_SCOPE,
     }
 

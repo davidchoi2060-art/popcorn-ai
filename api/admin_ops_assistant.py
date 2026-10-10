@@ -81,6 +81,7 @@ from . import llm
 from .admin_nav import NAV
 from .auth import current_operator, current_operator_id
 from .db import engine
+from .admin_labels import role_ko
 
 router = APIRouter(prefix="/api/admin", tags=["ops-assistant"])
 
@@ -121,7 +122,7 @@ def _require_owner() -> dict:
     op = current_operator()
     role = (op or {}).get("role")
     if role != "owner":
-        raise HTTPException(403, f"권한이 부족합니다(필요: owner, 현재: {role or '(로그인 필요)'})")
+        raise HTTPException(403, f"권한이 부족합니다(필요: 관리자, 현재: {role_ko(role) if role else '(로그인 필요)'})")
     return op
 
 

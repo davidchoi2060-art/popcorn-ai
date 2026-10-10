@@ -322,13 +322,13 @@
   <div class="pi-noticebar">
     ⚠⚠ <b>「선택 반영」을 누르는 그 클릭이 승인입니다.</b> 파일을 올려도 아무것도 바뀌지 않습니다 — 자동 집행이
     아닙니다. 결과는 <b>반영 시도 · 실제로 가격이 바뀐 것 · 판매가가 잠겨 건너뛴 것</b> 셋으로 나눠 보여줍니다.
-    고른 행에 매칭 안 된 것이나 이미 반영된 것이 하나라도 섞이면 <b>전체를 400으로 거부</b>합니다(부분 성공 없음).
+    고른 행에 매칭 안 된 것이나 이미 반영된 것이 하나라도 섞이면 <b>전체를 거부</b>합니다(부분 성공 없음).
     가격지도(단가 단속) 시트는 적용하지 않습니다 — 단품을 외부에 노출하지 않기 때문입니다.
   </div>
 
   <div class="pi-permnote">
     조회는 로그인한 운영자 누구나 볼 수 있습니다 · <b>업로드 · 선택 반영 · 되돌리기</b>는
-    <b>운영자(operator) 이상</b>만 할 수 있습니다.
+    <b>운영자 이상</b>만 할 수 있습니다.
   </div>
 
   <div class="pi-loading" id="piLoading">불러오는 중…</div>
@@ -623,7 +623,7 @@
     });
     var lines = [
       { t: '① 기억된 모델명 ↔ 상품코드 매핑', v: fmt(MATCH_STATS.remembered_map) + '건 기억됨', danger: false },
-      { t: '② danawa_code 일치 — 자동', v: '상품 ' + fmt(MATCH_STATS.danawa_products) + '건에 다나와코드 보유', danger: false },
+      { t: '② 다나와코드 일치 — 자동', v: '상품 ' + fmt(MATCH_STATS.danawa_products) + '건에 다나와코드 보유', danger: false },
       { t: '③ 이름 유사도 — 후보 제시만', v: '지금 화면 후보 ' + fmt(simCount) + '건', danger: false },
       { t: '④ 매칭 없음 — 신규 등록 필요', v: fmt(noneCount) + '건', danger: true }
     ];
@@ -670,7 +670,7 @@
   }
   function recentRowHtml(r) {
     return '<tr>'
-      + '<td>' + fmtAt(r.at) + '<div class="pi-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + fmtAt(r.at) + '<div class="pi-muted">' + esc(r.operator || '정보 없음') + '</div></td>'
       + '<td>' + esc(r.supplier || '—') + '<div class="pi-muted">' + esc(r.file_name || '') + '</div></td>'
       + '<td class="num">' + fmt(r.attempted) + '건</td>'
       + '<td>' + (r.undone
@@ -789,7 +789,7 @@
       + matchOrderHtml() + '</section>'
       + '<section class="pi-section"><div class="pi-section-hd"><h3>결과 · 되돌리기</h3></div>'
       + '<div class="pi-undonote">반영 이후 그 상품 가격이 다른 경로에서 바뀌면(매입 견적 확정 · 손으로 고침 등)'
-      + ' 되돌리기는 <b>409</b>로 막고 어느 상품인지 목록으로 보여줍니다 — 조용히 넘어가지 않습니다.</div>'
+      + ' 되돌리기는 막고 어느 상품인지 목록으로 보여줍니다 — 조용히 넘어가지 않습니다.</div>'
       + resultHtml()
       + '<div class="pi-recent-hd">지난 반영 이력(참고용, 최근 ' + fmt(RECENT.length) + '건)</div>'
       + recentHtml()

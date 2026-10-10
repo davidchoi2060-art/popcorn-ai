@@ -165,43 +165,41 @@ a{color:inherit;text-decoration:none}
 {% endblock %}
 
 {% block header_extra %}
-<span class="ex-statuschip">스키마 없음</span>
-<span class="ex-verdictnote" title="비동기 처리 수단(큐 · 워커) 0종 · 조회 API 없음 · 관련 테이블 없음 — api/ 전수 검색과 DB information_schema 조회로 확인">실측 2026-08-14</span>
+<span class="ex-statuschip">기능 준비 중</span>
 {% endblock %}
 
 {% block content %}
 <div class="ex-root">
 
   <div class="ex-banner">
-    <span class="mk">스키마 없음</span>
-    <span class="hd">이 목록을 채울 큐 테이블과 조회 API가 없습니다</span>
-    <span class="ds">요청 0건이 아니라 요청을 기록할 표 자체가 없는 상태입니다. 비동기 처리 수단(큐 · 워커) 0종, 파일을 만들어 응답하는 코드 0건(Workbook 쓰기 · StreamingResponse · FileResponse 전수 검색), "내보내기" 발신 버튼이 붙은 화면도 0개입니다.</span>
-    <span class="meta">실측 2026-08-14 · api/ 전수 검색 · DB information_schema 조회</span>
+    <span class="mk">준비 중</span>
+    <span class="hd">엑셀 다운로드 기능은 아직 준비 중입니다</span>
+    <span class="ds">요청이 0건인 것이 아니라, 다운로드 요청을 받아 기록하고 파일을 만드는 기능이 아직 없습니다. 다른 화면에도 「내보내기」 단추가 아직 없습니다.</span>
   </div>
 
   <div class="ex-stats" role="group" aria-label="요청 상태 집계">
     <div class="ex-stat">
       <div class="row1"><span class="lbl">처리 중</span><span class="val">—</span></div>
-      <div class="note">스키마 없음 — 집계 불가</div>
+      <div class="note">기능 준비 중 — 정보 없음</div>
     </div>
     <div class="ex-stat">
       <div class="row1"><span class="lbl">받을 수 있음</span><span class="val">—</span></div>
-      <div class="note">스키마 없음 — 집계 불가</div>
+      <div class="note">기능 준비 중 — 정보 없음</div>
     </div>
     <div class="ex-stat">
       <div class="row1"><span class="lbl">실패</span><span class="val">—</span></div>
-      <div class="note">스키마 없음 — 집계 불가</div>
+      <div class="note">기능 준비 중 — 정보 없음</div>
     </div>
     <div class="ex-stat">
       <div class="row1"><span class="lbl">만료</span><span class="val">—</span></div>
-      <div class="note">스키마 없음 — 집계 불가</div>
+      <div class="note">기능 준비 중 — 정보 없음</div>
     </div>
   </div>
 
   <div class="ex-split">
     <div class="ex-listcol">
       <table class="ex-table">
-        <caption class="sr-only">다운로드 요청 목록 — 큐 테이블이 없어 항상 비어 있습니다</caption>
+        <caption class="sr-only">다운로드 요청 목록 — 기능 준비 중이라 비어 있습니다</caption>
         <colgroup>
           <col>
           <col style="width:130px">
@@ -224,9 +222,9 @@ a{color:inherit;text-decoration:none}
           <tr>
             <td colspan="6">
               <div class="ex-emptywrap">
-                <span class="mk">스키마 없음</span>
+                <span class="mk">준비 중</span>
                 <span class="ti">표시할 요청이 없습니다</span>
-                <span class="ds">요청이 0건이라서가 아니라, 이 목록을 채울 조회 API와 테이블이 아직 없어서입니다 — 서버에 실제 건수를 물어볼 방법 자체가 없습니다. 큐 테이블 · 조회 API · 파일 생성 기능이 갖춰지면 이 화면이 실제 요청을 표시합니다.</span>
+                <span class="ds">요청이 0건이라서가 아니라 다운로드 기능이 아직 준비 중이기 때문입니다. 기능이 갖춰지면 이 화면에 실제 요청이 표시됩니다.</span>
               </div>
             </td>
           </tr>
@@ -236,49 +234,45 @@ a{color:inherit;text-decoration:none}
 
     <div class="ex-rail">
       <div class="ex-panel">
-        <div class="lbl">이 화면이 따를 규칙 — 큐가 생기면 적용됩니다</div>
+        <div class="lbl">이 화면이 따를 규칙 — 기능이 생기면 적용됩니다</div>
         <div class="ex-rules">
           <div class="ex-rule"><span class="mk">—</span><span class="tx">내 요청만 보입니다 — 다른 운영자의 파일은 목록에도 나오지 않습니다.</span></div>
-          <div class="ex-rule"><span class="mk">—</span><span class="tx">받기 링크는 한 번만 쓰는 서명 URL입니다 — 정적 경로를 공유해 세션 없이 내려받는 일을 막습니다.</span></div>
+          <div class="ex-rule"><span class="mk">—</span><span class="tx">받기 링크는 한 번만 쓸 수 있습니다 — 링크를 공유해 로그인 없이 내려받는 일을 막습니다.</span></div>
           <div class="ex-rule"><span class="mk">—</span><span class="tx">완료 파일은 30일 보관 후 지워집니다 — 만료는 "완료"와 다른 상태로 표시합니다.</span></div>
           <div class="ex-rule"><span class="mk">—</span><span class="tx">실패한 요청은 재시도 동작으로 같은 조건을 다시 넣습니다 — 자동 재시도는 없습니다.</span></div>
           <div class="ex-rule"><span class="mk">—</span><span class="tx">요청 조건은 접수 시점에 고정됩니다 — 이후 원본 데이터가 바뀌어도 만든 파일은 그대로입니다.</span></div>
         </div>
-        <div class="foot">승인된 화면 설계(docs/design/dc-excel-export.html)가 정한 목표 정책입니다 — 큐 테이블 · API · 파일 생성 기능이 서기 전까지는 어느 항목도 적용되지 않습니다.</div>
+        <div class="foot">승인된 화면 설계가 정한 목표 규칙입니다 — 다운로드 기능이 갖춰지기 전까지는 어느 항목도 적용되지 않습니다.</div>
       </div>
 
-      <div class="ex-panel">
-        <div class="lbl">왜 비동기인가 — 실측 근거</div>
+      <details class="ex-panel a2-more">
+        <summary class="lbl">자세히 — 파일을 따로 만드는 이유</summary>
         <div class="ex-reasons">
           <div class="ex-reason">
             <div class="ti">전 행 반환 금지 원칙과 충돌하지 않으려면</div>
-            <div class="ds">다운로드는 정의상 필터에 맞는 전 행을 한 파일로 묶어야 해서, 목록 페이지네이션 방식(요청마다 일부만 반환)으로는 풀리지 않습니다. 접수는 즉시, 파일 생성은 따로 처리해야 합니다.</div>
-            <div class="src">CLAUDE.md · 슬라이스 54</div>
+            <div class="ds">다운로드는 정의상 필터에 맞는 전 행을 한 파일로 묶어야 해서, 목록처럼 나눠서 보여 주는 방식으로는 풀리지 않습니다. 접수는 즉시, 파일 생성은 따로 처리해야 합니다.</div>
           </div>
           <div class="ex-reason">
-            <div class="ti">API 프로세스가 1개뿐입니다</div>
-            <div class="ds">uvicorn을 --workers 지정 없이 띄우고, 관리자 · 고객 API를 전부 같은 FastAPI 인스턴스에 올립니다. 동기로 대용량 파일을 만들면 그 시간 동안 고객 견적 · 결제 요청까지 함께 멈춥니다.</div>
-            <div class="src">deploy/popcorn-api.service · api/main.py</div>
+            <div class="ti">서버 한 대가 모든 요청을 처리합니다</div>
+            <div class="ds">관리자 화면과 고객 화면을 같은 서버가 처리합니다. 큰 파일을 그 자리에서 만들면 그동안 고객 견적 · 결제 요청까지 함께 멈춥니다.</div>
           </div>
           <div class="ex-reason">
-            <div class="ti">nginx가 120초에서 끊습니다</div>
-            <div class="ds">120초를 넘기는 동기 요청은 클라이언트가 타임아웃을 받는데, 서버(단일 프로세스)는 이미 시작한 작업을 계속 붙잡고 있어 다른 요청까지 막힙니다.</div>
-            <div class="src">deploy/nginx-popcorn.conf · proxy_read_timeout 120s</div>
+            <div class="ti">120초가 넘는 요청은 끊깁니다</div>
+            <div class="ds">120초를 넘기면 화면은 시간 초과를 받지만, 서버는 이미 시작한 작업을 계속 붙잡고 있어 다른 요청까지 막힙니다.</div>
           </div>
           <div class="ex-reason">
             <div class="ti">쓸 수 있는 폴더가 한 곳뿐입니다</div>
-            <div class="ds">systemd 강화 옵션으로 앱이 파일을 쓸 수 있는 경로가 .cache 한 곳으로 제한됩니다 — 생성 파일 저장 위치도 이 제약 안에서 정해야 합니다.</div>
-            <div class="src">deploy/popcorn-api.service · ProtectSystem=strict · ReadWritePaths</div>
+            <div class="ds">보안 설정상 서버가 파일을 저장할 수 있는 곳이 한 곳으로 제한됩니다 — 만든 파일의 저장 위치도 이 안에서 정해야 합니다.</div>
           </div>
         </div>
-      </div>
+      </details>
 
       <div class="ex-panel">
         <div class="lbl">이 화면이 감추지 않는 사실</div>
         <div class="ex-facts">
           <div class="ex-fact">
-            <div class="ti">0건이 아니라 표가 없습니다</div>
-            <div class="ds">목록이 비어 보이는 것은 조회 결과가 0건이어서가 아니라, 요청을 기록할 테이블 · 조회 API가 아예 없기 때문입니다. 두 상태는 다른 사실이라 구분해 표시합니다.</div>
+            <div class="ti">0건이 아니라 기능이 없습니다</div>
+            <div class="ds">목록이 비어 보이는 것은 요청이 0건이어서가 아니라, 요청을 기록하는 기능이 아직 없기 때문입니다. 두 상태는 다른 사실이라 구분해 표시합니다.</div>
           </div>
           <div class="ex-fact">
             <div class="ti">받기 버튼을 임의로 붙이지 않았습니다</div>
@@ -286,7 +280,7 @@ a{color:inherit;text-decoration:none}
           </div>
           <div class="ex-fact">
             <div class="ti">규칙 패널은 아직 적용되지 않습니다</div>
-            <div class="ds">위 "이 화면이 따를 규칙" 패널은 승인된 설계가 정한 목표 정책입니다. 뒷단(큐 테이블 · API · 워커)이 서야 실제로 지켜지는 규칙이 됩니다.</div>
+            <div class="ds">위 "이 화면이 따를 규칙" 패널은 승인된 설계가 정한 목표 정책입니다. 다운로드 기능이 갖춰져야 실제로 지켜지는 규칙이 됩니다.</div>
           </div>
         </div>
       </div>

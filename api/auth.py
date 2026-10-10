@@ -476,8 +476,10 @@ async def auth_middleware(request: Request, call_next):
                     from .admin_ui_common import login_required_html
                     return HTMLResponse(login_required_html(), status_code=403)
                 from fastapi.responses import JSONResponse
+                # 함수 안에서 가져온다 — 이 미들웨어만 떼어 실행하는 테스트가 있다
+                from api.admin_labels import role_ko
                 return JSONResponse(
-                    {"detail": f"권한이 부족합니다(필요: {need}, 현재: {op['role']})"},
+                    {"detail": f"권한이 부족합니다(필요: {role_ko(need)}, 현재: {role_ko(op['role'])})"},
                     status_code=403)
             # 기기 기억(비밀번호 생략)으로 만든 세션이 «정책 발행급 쓰기»를 시도하면
             # 한 번 더 확인한다(2026-08-15 사장님 지시 — "민감한 일엔 다시 묻는다").
@@ -1036,7 +1038,7 @@ def _require_owner_reauth(request: Request) -> dict:
     if op is None:
         raise HTTPException(401, "로그인이 필요합니다")
     if op.get("role") != "owner":
-        raise HTTPException(403, "관리자(owner)만 할 수 있습니다")
+        raise HTTPException(403, "관리자만 할 수 있습니다")
     if not op.get("password_verified", True):
         raise HTTPException(401, {"error": "reauth_required",
                                   "message": "비밀번호 확인이 필요합니다"})

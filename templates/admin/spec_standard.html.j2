@@ -287,8 +287,7 @@ input,select,textarea{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="ss-hint">조회 viewer · 추가·수정 operator</span>
-<span class="ss-hint ss-mono">std.spec_defs</span>
+<span class="ss-hint">조회: 모든 등급 · 추가·수정: 운영자 이상</span>
 {% endblock %}
 
 {% block content %}
@@ -432,7 +431,7 @@ input,select,textarea{font-family:var(--rv-font)}
     var btn = $('ssAddBtn');
     if (!btn) return;
     btn.disabled = !can;
-    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '권한 부족 — operator 이상 필요');
+    if (can) btn.removeAttribute('title'); else btn.setAttribute('title', '권한 부족 — 운영자 이상 필요');
   }
 
   function reload(keepKey) {
@@ -640,7 +639,7 @@ input,select,textarea{font-family:var(--rv-font)}
     var canWrite = window.Admin2Shell.canWrite('operator');
     var ps = promoStatus(d);
     var typeLabel = (S.meta.types && S.meta.types[d.data_type]) || d.data_type;
-    var writeTitle = canWrite ? '' : ' title="권한 부족 — operator 이상 필요"';
+    var writeTitle = canWrite ? '' : ' title="권한 부족 — 운영자 이상 필요"';
     var busy = S.patchingKey === d.field_key;
     var allParts = (S.meta.part_types || []);
     var chips = allParts.map(function (p) {
@@ -659,7 +658,7 @@ input,select,textarea{font-family:var(--rv-font)}
     var fieldsLocked = !canWrite || savingEdit;
     var fieldsAttr = (fieldsLocked ? ' disabled' : '') + (!canWrite ? writeTitle : '');
     var canSave = canWrite && !savingEdit && !!(draft.label || '').trim();
-    var saveTitle = !canWrite ? '권한 부족 — operator 이상 필요' : (canSave ? '' : '이름을 입력하세요');
+    var saveTitle = !canWrite ? '권한 부족 — 운영자 이상 필요' : (canSave ? '' : '이름을 입력하세요');
     return ''
       + '<div class="ss-modal-hd"><div class="ss-modal-hdrow">'
       + '<span class="ss-modal-title">' + esc(d.label) + '</span>'
@@ -694,11 +693,11 @@ input,select,textarea{font-family:var(--rv-font)}
       + '<div class="ss-card-title-row"><span class="ss-card-title" id="ssEditPartsLabel">적용 부품 — 비우면 감춰집니다(값은 남습니다)</span></div>'
       + '<div class="ss-chiprow" role="group" aria-labelledby="ssEditPartsLabel">' + (chips || '<span class="ss-chiphint">선택 가능한 부품 종류가 없습니다.</span>') + '</div>'
       + '<div class="ss-chiphint">클릭하면 즉시 반영되고 문장으로 응답합니다 — "적용 대상 변경 — 추가 SSD · 제외 HDD (값은 남습니다)"'
-      + (canWrite ? '' : ' · 지금 등급으로는 바꿀 수 없습니다(operator 이상 필요)') + '</div>'
+      + (canWrite ? '' : ' · 지금 등급으로는 바꿀 수 없습니다(운영자 이상 필요)') + '</div>'
       + '</div>'
       + '<div class="ss-card ss-card-blue">'
       + '<div class="ss-card-title">정본으로 승격 — 엔진이 읽게 하려면</div>'
-      + '<div class="ss-promo-body">이 항목은 <b>실험 표준(std.spec_defs)</b>에 있습니다. 견적·추천 엔진은 '
+      + '<div class="ss-promo-body">이 항목은 <b>실험 표준</b>에 있습니다. 견적·추천 엔진은 '
       + '<b>public.product_specs</b>만 읽으므로, 항목을 만들었다고 판정이 바뀌지는 않습니다. 값이 쌓이고 판정 축으로 '
       + '쓸 만하다고 판단되면 <b>상품 사양 정의(정본)</b>로 승격해야 합니다 — 두 표준은 결국 하나로 합류합니다.</div>'
       + '<div class="ss-promo-condrow">'

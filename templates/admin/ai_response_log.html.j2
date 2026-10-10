@@ -188,7 +188,7 @@ button{font-family:inherit}
 {% endblock %}
 
 {% block header_extra %}
-<span class="scopechip">열람 viewer 이상 · 쓰기는 플래그뿐</span>
+<span class="scopechip">열람: 모든 등급 · 쓰기: 표시(플래그)만</span>
 <div class="modeswitch" id="modeSwitch" data-keep="1">
   <button type="button" data-action="set-mode" data-mode="measured" id="modeMeasured" class="on">실측 현재 · 0건</button>
   <button type="button" data-action="set-mode" data-mode="preview" id="modePreview">연동 후 미리보기</button>
@@ -197,7 +197,7 @@ button{font-family:inherit}
 
 {% block content %}
 <div class="banner" id="banner" data-keep="1">
-  <span class="mark" id="bannerMark">▲ 원천 없음</span>
+  <span class="mark" id="bannerMark">▲ 기록 없음</span>
   <span class="ti" id="bannerTitle">감사할 대상이 아직 생성되지 않습니다</span>
   <span class="ds" id="bannerDesc">AI 호출·응답 텍스트를 남기는 계측 지점이 저장소 어디에도 없습니다.</span>
 </div>
@@ -223,7 +223,7 @@ button{font-family:inherit}
   </div>
   <button type="button" class="pill-filter" id="pillFlagged" data-action="toggle-flagged">플래그된 것만</button>
   <span class="grow"></span>
-  <span class="scopenote" id="scopeNote">0건 · 전문 열람은 viewer 이상</span>
+  <span class="scopenote" id="scopeNote">0건 · 전문 열람: 모든 등급</span>
 </div>
 
 <div class="listwrap">
@@ -415,7 +415,7 @@ button{font-family:inherit}
   function renderBanner() {
     var b = $('banner'), preview = S.mode === 'preview';
     b.classList.toggle('preview', preview);
-    $('bannerMark').textContent = preview ? '● 가상 데이터' : '▲ 원천 없음';
+    $('bannerMark').textContent = preview ? '● 가상 데이터' : '▲ 기록 없음';
     $('bannerTitle').textContent = preview
       ? '실제 기록이 아닙니다 — 연동 후 이 화면이 어떻게 보일지 검토하기 위한 예시입니다'
       : '감사할 대상이 아직 생성되지 않습니다';
@@ -432,7 +432,7 @@ button{font-family:inherit}
     $('pillModel').classList.toggle('on', !!S.f.model);
     $('pillFlagged').classList.toggle('on', S.flaggedOnly);
     if (S.mode === 'measured') {
-      $('scopeNote').textContent = '0건 · 전문 열람은 viewer 이상';
+      $('scopeNote').textContent = '0건 · 전문 열람: 모든 등급';
     } else {
       $('scopeNote').textContent = visibleDemo().length + '건 (예시) · 전문은 자르지 않습니다';
     }
