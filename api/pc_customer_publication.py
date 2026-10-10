@@ -241,9 +241,13 @@ def _evidence(conn, config, parts, offers, review, source_reader):
         ORDER BY e.source_product_code''', codes=[p['explanation_code'] for p in real]).mappings()}
     for p in real:
         row = rows.get(p['explanation_code'])
-        if (not row or type(row.get('content')) is not dict or not _integer(row.get('product_code'))
+        # Assembly-only parts are sold only inside the PC: no retail product/sale status.
+        assembly = (row is not None and row.get('product_code') is None and type(row.get('content')) is dict
+                    and row['content'].get('availability_scope') == 'assembly_only')
+        if (not row or type(row.get('content')) is not dict
+                or not (assembly or _integer(row.get('product_code')))
                 or row.get('status') != 'approved' or not _integer(row.get('approved_by'))
-                or row.get('approved_at') is None or row.get('sale_status') != '판매중'
+                or row.get('approved_at') is None or (not assembly and row.get('sale_status') != '판매중')
                 or row['content'].get('review_issues') or not is_current(row)
                 or p['explanation_hash'] != explanation_digest(row)):
             raise _Unavailable('publication_part_not_current')

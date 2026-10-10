@@ -179,6 +179,40 @@ class PartApprovalTests(unittest.TestCase):
         self.assertEqual(result['current']['explanation_hash'],self.copy.explanation_digest(row))
         self.assertNotIn('customer_publishable',result['current'])
 
+    def assembly(self,code=11):
+        e=self.conn.explanations[code]; e['product_code']=None; e['content']['availability_scope']='assembly_only'
+
+    def test_assembly_only_part_without_retail_product_is_approved_with_history(self):
+        # 2026-10-10 owner decision: spec values are not a gate; BOM-only parts are approvable.
+        self.assembly()
+        self.assertTrue(self.part.is_current(self.conn.row(11)))
+        result=self.approve()
+        self.assertTrue(result['current']['allowed']); self.assertEqual(result['current']['state'],'approved')
+        self.assertIsNone(result['event']['snapshot']['product_code'])
+        self.assertEqual(result['event']['operator_id'],self.conn.actor['operator_id'])
+        self.assertEqual(len(self.conn.events),1)
+        self.assertNotIn('product_lock',[q.split('*/',1)[0].split(':',1)[1] for q,p in self.conn.calls])
+        # Not an individual retail page: the legacy public part GET stays closed.
+        self.assertFalse(self.part.can_publish(self.conn.row(11)))
+        self.conn.now=NOW+timedelta(seconds=1); r=self.revoke()
+        self.assertEqual(r['current']['state'],'revoked'); self.assertTrue(r['event']['metadata_reset'])
+
+    def test_assembly_only_still_requires_source_evidence_review_and_marker(self):
+        self.assembly(); self.conn.explanations[11]['source_fingerprint']='0'*64
+        self.assertFalse(self.part.is_current(self.conn.row(11)))
+        self.assertEqual(self.error(422,self.approve),'part_approval_source_stale')
+        self.setUp(); self.assembly(); self.conn.explanations[11]['content']['review_issues']=['확인 필요']
+        self.assertEqual(self.error(422,self.approve),'part_approval_review_issues')
+        self.setUp(); self.conn.explanations[11]['product_code']=None
+        self.assertFalse(self.part.is_current(self.conn.row(11)))
+        self.assertEqual(self.error(422,self.approve),'part_approval_unlinked')
+        self.assertEqual(self.conn.events,[])
+
+    def test_assembly_only_content_change_after_approval_is_stale(self):
+        self.assembly(); self.approve()
+        self.conn.explanations[11]['content']['role']='changed'
+        self.assertEqual(self.core.read_current(self.conn,11)['state'],'stale')
+
     def test_native_public_get_effect_requires_separate_activation_review(self):
         self.assertFalse(self.part.can_publish(self.conn.row(11)))
         self.approve(); self.assertTrue(self.part.can_publish(self.conn.row(11)))

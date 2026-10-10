@@ -61,6 +61,11 @@ test('pseudo and multiple SSD rows use ordinal keys and quantities without guess
   assert.equal((html.match(/class="final-part-price">미확인/g)||[]).length,5);assert.match(html,/900,000원/);
   assert.doesNotMatch(html,/100원|fake\.png|<img[^>]+(?:merchant|photo)/);assert.match(html,/disabled aria-describedby="bom-unavailable-/);
 });
+test('missing spec values and parts without specs read 정보 없음 (2026-10-10 owner decision)',()=>{
+  const f=fixture();f.parts[0].specs=[{label:'소켓',value:'LGA1851'},{label:'기본 전력',value:'  '}];f.parts[1].specs=[];
+  const html=render(f);assert.match(html,/<dt>소켓<\/dt><dd>LGA1851<\/dd>/);assert.match(html,/<dt>기본 전력<\/dt><dd>정보 없음<\/dd>/);
+  assert.match(html,/<div class="public-bom-specs"><p>정보 없음<\/p><\/div>/);assert.doesNotMatch(html,/등록 사양 미확인/);
+});
 test('part text/specs are escaped and cannot insert executable markup',()=>{
   const f=fixture();f.parts[0].name='<img src=x onerror=alert(1)>';f.parts[0].description='<script>alert(1)</script>';f.parts[0].specs=[{label:'<svg>',value:'" onclick="bad'}];
   const html=render(f);assert.match(html,/&lt;script&gt;/);assert.match(html,/&lt;svg&gt;/);assert.match(html,/&quot; onclick=&quot;bad/);assert.doesNotMatch(html,/<script>|<img src=x|<svg>/);
