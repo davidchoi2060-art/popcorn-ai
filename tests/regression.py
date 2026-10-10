@@ -379,6 +379,25 @@ def anon_status(path, body=None):
         return e.code
 
 
+# ── 준비 실패 — 검사를 하나도 돌리지 못한 경우 (2026-10-08) ─────────────────────
+# 종료 코드: 0 = 전 항목 통과 · 1 = 회귀 실패(검사가 돌았고 FAIL 이 있다) · 2 = 준비 실패.
+# 왜 나눴나: 2026-09-23 서버 회귀(run 35804371636)가 ADMIN_PW 없이 멈췄는데 Actions 에는
+# 그냥 「실패」로만 남아, 기능 회귀처럼 읽혔다. 실제로는 번호 붙은 검사가 0건이었다.
+# 준비 실패는 첫 줄을 `[준비 실패] <설정 이름>` 으로 찍는다 — 워크플로가 이 줄로 가른다
+# (.github/workflows/regression.yml · deploy.yml 「회귀 세트」 단계).
+PREP_FAIL = 2
+
+
+def prep_fail(setting, why, *fix):
+    """검사 시작 전 사전조건이 빠졌다. 회귀 실패와 섞이지 않게 표시하고 2로 끝낸다."""
+    print(f"\n[준비 실패] {setting} — {why}")
+    print("  회귀 검사는 시작하지 않았다(실행 0건). 기능 회귀가 아니라 실행 준비 문제다.")
+    for line in fix:
+        print("  " + line)
+    print()
+    sys.exit(PREP_FAIL)
+
+
 def anon_call(path, body=None):
     """anon_status 와 같되 (상태, 본문 JSON|None, 응답 헤더) 를 돌려준다 — 실패 «사유 코드»와
     세션 발급 여부(Set-Cookie)까지 본다."""
@@ -436,11 +455,12 @@ def _check_customer_auth_closed(where):
 
 def login():
     if not ADMIN_PW:
-        print("\n  ADMIN_PW가 없습니다 — `.env`에 `ADMIN_PW=...`를 넣으세요"
-              " (리포에는 적지 않습니다).\n"
-              "  비밀번호 발급·변경: .venv/Scripts/python tools/set_admin_password.py"
-              f" {ADMIN_EMAIL}\n")
-        sys.exit(2)
+        prep_fail("ADMIN_PW", f"시드 owner({ADMIN_EMAIL})의 비밀번호 설정이 없다.",
+                  "PC: 리포 루트 `.env` 에 `ADMIN_PW=...` (리포에는 적지 않는다)",
+                  "서버(popcorn-ci regression): `/etc/popcorn-ai.env` 에 `ADMIN_PW=...`"
+                  " — popcorn-ci 가 이 파일만 읽는다. Actions 시크릿은 닿지 않는다.",
+                  "비밀번호 발급·변경: .venv/Scripts/python tools/set_admin_password.py"
+                  f" {ADMIN_EMAIL}")
     return post("/api/admin/auth/login",
                 {"email": ADMIN_EMAIL, "password": ADMIN_PW, "provider": "dev"})
 
@@ -6803,19 +6823,18 @@ def main():
     try:
         get("/api/health")
     except Exception as e:
-        print(f"\n서버에 연결할 수 없습니다({BASE}). API를 먼저 띄우세요.\n  {e}")
-        return 2
+        prep_fail("REGRESSION_BASE", f"서버에 연결할 수 없다({BASE}).",
+                  "API를 먼저 띄우거나 REGRESSION_BASE 를 실행 중인 서버로 맞춘다.", str(e))
 
     # 관리자 인증(슬라이스 37) — 로그인 없이는 관리자 항목 전부가 401이 된다
     try:
         st, d = login()
     except Exception as e:
-        print("\n관리자 로그인 실패: " + repr(e))
-        return 2
+        prep_fail("ADMIN_PW", "관리자 로그인 요청이 실패했다.", repr(e))
     if (d or {}).get("state") != "active":
-        print("\n관리자 로그인이 활성 세션을 만들지 못했습니다: " + repr(d))
-        print("  시드 owner(" + ADMIN_EMAIL + ")가 '활성' 상태인지 확인하세요.")
-        return 2
+        prep_fail("ADMIN_EMAIL/ADMIN_PW", "관리자 로그인이 활성 세션을 만들지 못했다.",
+                  f"시드 owner({ADMIN_EMAIL})가 '활성'인지, ADMIN_PW 가 현재 비밀번호인지 확인한다.",
+                  "응답: " + repr(d))
     print("\n로그인: " + str(d["operator"].get("name")) + " · 권한 " + d["operator"]["role"])
 
     for fn in (test_engine, test_tier_cascade_exhaustive, test_compat, test_gates, test_consistency,
