@@ -15,7 +15,8 @@ from unittest.mock import patch
 from fastapi import HTTPException
 from sqlalchemy import text
 from api.pricing_write_guard_core import lock_products, ProductScopeChanged, _LOCK_PRODUCTS_SQL
-from api.pricing_reprice_core import reprice
+from api.pricing_reprice_core import reprice, product_margin
+from api.pricing_policy_guard_core import lock_pricing_policy_shared, _SHARED_SQL
 from api.html_text import strip_html_display
 
 SOURCE=Path(__file__).resolve().parents[1]/'api/admin_price_import.py'
@@ -27,7 +28,7 @@ def routes():
    n.decorator_list=[];nodes.append(n)
  env={'text':text,'HTTPException':HTTPException,'json':json,'current_operator_id':lambda:21,
       'lock_products':lock_products,'ProductScopeChanged':ProductScopeChanged,
-      '_reprice_core':reprice,'strip_html_display':strip_html_display,'ApplyBody':object}
+      '_reprice_core':reprice,'product_margin':product_margin,'lock_pricing_policy_shared':lock_pricing_policy_shared,'strip_html_display':strip_html_display,'ApplyBody':object}
  exec(compile(ast.Module(body=nodes,type_ignores=[]),str(SOURCE),'exec'),env)
  return env
 
@@ -48,6 +49,7 @@ class Database:
   self.products={101:{'purchase_price':12000,'sale_price':13000,'locked_fields':[]},102:{'purchase_price':16000,'sale_price':17000,'locked_fields':[]},103:{'purchase_price':18000,'sale_price':19000,'locked_fields':[]}}
   self.psp={(101,11):(12000,'불가'),(102,11):(16000,'불가'),(103,11):(18000,'불가')}
   self.maps={'a':102,'b':101};self.rows={1:{'row_id':1,'model_name':'a','danawa_code':None,'prices':{},'cost_price':14000,'supply_state':'가능','memo':None},2:{'row_id':2,'model_name':'b','danawa_code':None,'prices':{},'cost_price':10000,'supply_state':'가능','memo':None}}
+  self.categories=[];self.margin_policies=[];self.product_category={}
   self.eligible={1,2};self.logs={};self.history=[];self.connections=[];self.events=[];self.commits=0;self.rollbacks=0
   self.after_product_lock=None;self.lock_guard=threading.Lock();self.pause_first=False;self.first_locked=threading.Event();self.second_entered=threading.Event();self.release_first=threading.Event();self.stale_context=None
  def begin(self):return Transaction(self)
@@ -69,6 +71,10 @@ class Connection:
  def __init__(self,db):self.db=db;self.calls=[];self.snapshot=db.snapshot();self.wrote=False;self.guard_held=False;self.closed=False
  def execute(self,statement,params=None):
   q=str(statement);params={} if params is None else params;d=self.db;self.calls.append((q,deepcopy(params)));d.events.append((threading.current_thread().name,q,deepcopy(params)))
+  if q==_SHARED_SQL:return Result([None])
+  if q=='SELECT category_id FROM products WHERE product_code=:pc':return Result([d.product_category.get(params['pc'])])
+  if q=='SELECT category_id, parent_id FROM categories':return Result(d.categories)
+  if q=='SELECT category_id, margin_rate FROM category_margin_policies':return Result(d.margin_policies)
   if q==_LOCK_PRODUCTS_SQL:
    result=[pc for pc in params['codes'] if pc in d.products]
    if d.after_product_lock:d.after_product_lock(d);d.after_product_lock=None
@@ -181,7 +187,7 @@ class PriceImportTests(unittest.TestCase):
    self.assertEqual(caught.exception.status_code,status);self.assertEqual(self.mutations(),[])
  def test_undo_log_guard_products_file_PSP_full_scan_then_restore(self):
   out=self.apply();before=len(self.db.events);result=self.undo(out['undo_id']);calls=self.db.connections[-1].calls
-  self.assertIn('FOR UPDATE',calls[0][0]);locks=[i for i,(q,p) in enumerate(calls) if q==_LOCK_PRODUCTS_SQL];self.assertEqual(len(locks),1);self.assertEqual(calls[locks[0]][1],{'codes':[101,102]})
+  self.assertEqual(calls[0][0],_SHARED_SQL);self.assertIn('FOR UPDATE',calls[1][0]);locks=[i for i,(q,p) in enumerate(calls) if q==_LOCK_PRODUCTS_SQL];self.assertEqual(len(locks),1);self.assertEqual(calls[locks[0]][1],{'codes':[101,102]})
   filelock=next(i for i,(q,p) in enumerate(calls) if 'supplier_price_files' in q);psplocks=[i for i,(q,p) in enumerate(calls) if 'product_supplier_prices' in q and 'FOR UPDATE' in q];firstwrite=next(i for i,(q,p) in enumerate(calls) if q.startswith(('UPDATE ','DELETE ','INSERT ')))
   self.assertLess(locks[0],filelock);self.assertTrue(all(filelock<i<firstwrite for i in psplocks));self.assertEqual(len(psplocks),2);self.assertEqual(result,{'ok':True,'restored':2});self.assertEqual(self.db.products[101]['purchase_price'],12000);self.assertEqual(self.db.products[101]['sale_price'],13000)
  def test_undo_conflicts_list_all_before_any_mutation(self):
@@ -207,6 +213,15 @@ class PriceImportTests(unittest.TestCase):
     if not first:done.set()
   first=threading.Thread(target=run,args=(True,),name='undo-first');second=threading.Thread(target=run,args=(False,),name='undo-second');first.start();self.assertTrue(self.db.first_locked.wait(2));second.start();self.assertTrue(self.db.second_entered.wait(2));self.assertFalse(done.is_set());self.db.release_first.set();first.join(3);second.join(3)
   self.assertFalse(first.is_alive());self.assertFalse(second.is_alive());self.assertEqual(values,[{'ok':True,'restored':2}]);self.assertEqual(len(errors),1);self.assertIsInstance(errors[0],HTTPException);self.assertEqual(errors[0].status_code,409);self.assertEqual(sum(log['action']=='price_import_undo' for log in self.db.logs.values()),1)
+ def test_policy_shared_lock_is_first_in_apply_and_undo(self):
+  self.apply();self.assertEqual(self.db.connections[0].calls[0][0],_SHARED_SQL)
+  self.undo(1);self.assertEqual(self.db.connections[1].calls[0][0],_SHARED_SQL)
+ def test_apply_uses_category_margin_with_global_fallback(self):
+  # 101: 분류 5(부모 4 에 마진 20%) -> 상속. 102: 미분류 -> 전역 3%. 수수료 2%(가짜 _settings).
+  self.db.categories=[(4,None),(5,4)];self.db.margin_policies=[(4,0.20)];self.db.product_category={101:5}
+  self.apply()
+  self.assertEqual(self.db.products[101]['sale_price'],12000)   # 10,000 x 1.22 = 12,200 -> 12,000
+  self.assertEqual(self.db.products[102]['sale_price'],15000)   # 14,000 x 1.05 = 14,700 -> 15,000
  def test_owned_route_extraction_never_imported_db_or_main(self):
   self.assertNotIn('api.db',sys.modules);self.assertNotIn('api.main',sys.modules)
 if __name__=='__main__':unittest.main()

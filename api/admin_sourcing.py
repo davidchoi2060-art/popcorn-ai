@@ -28,6 +28,7 @@ from .admin_products import PART_TYPE_LABELS
 from .admin_stock import pending_where
 from .db import engine
 from .sourcing_confirm_core import confirm_quote_tx as _confirm_quote_core
+from .pricing_policy_guard_core import lock_pricing_policy_shared
 from .pricing_write_guard_core import lock_products, ProductScopeChanged
 
 router = APIRouter(prefix="/api/admin")
@@ -355,6 +356,7 @@ def _confirm_quote_tx(quote_id: int):
     confirm_quote()의40P01→409 경계 및 기존 callback 구현은 유지한다.
     """
     with engine.begin() as conn:
+        lock_pricing_policy_shared(conn)   # 마진 정책을 읽어 판매가를 쓴다 — 상품 잠금보다 먼저
         return _confirm_quote_core(
             conn, quote_id, settings=_settings, reprice=_reprice,
             log=_log, confirmed_at_ready=_confirmed_at_ready)

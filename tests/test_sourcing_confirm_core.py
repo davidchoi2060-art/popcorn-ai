@@ -165,7 +165,8 @@ def adapter_namespace(fixture, **engine_options):
                      _confirm_quote_core=core.confirm_quote_tx, _settings=fixture.settings,
                      _reprice=fixture.reprice, _log=fixture.log,
                      _confirmed_at_ready=fixture.confirmed_at_ready,
-                     HTTPException=HTTPException, OperationalError=OperationalError)
+                     HTTPException=HTTPException, OperationalError=OperationalError,
+                     lock_pricing_policy_shared=lambda conn: fixture.trace.append(("policy_shared",)))
     exec(compile(ast.Module(body=functions, type_ignores=[]), str(ADAPTER), "exec"), namespace)
     return namespace
 
@@ -304,7 +305,8 @@ class SourcingAdapterTests(unittest.TestCase):
         namespace = adapter_namespace(fixture)
         result = namespace["_confirm_quote_tx"](77)
         self.assertEqual(result["undo_id"], 901)
-        self.assertEqual(fixture.trace[:3], [("begin",), ("enter",), ("sql", 0)])
+        # 마진 정책 공유 잠금이 트랜잭션 첫 동작이다(상품 잠금보다 먼저)
+        self.assertEqual(fixture.trace[:4], [("begin",), ("enter",), ("policy_shared",), ("sql", 0)])
         self.assertEqual(fixture.trace[-2:], [("log",), ("exit", None)])
 
     def test_adapter_does_not_preflight_ready_outside_transaction(self):

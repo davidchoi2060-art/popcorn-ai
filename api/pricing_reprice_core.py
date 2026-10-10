@@ -7,7 +7,31 @@ from typing import Callable
 
 from sqlalchemy import text
 
-from .pricing import sale_from_purchase
+from .pricing import resolve_margins, sale_from_purchase
+
+_NODES_SQL = "SELECT category_id, parent_id FROM categories"
+_POLICIES_SQL = "SELECT category_id, margin_rate FROM category_margin_policies"
+_PRODUCT_CATEGORY_SQL = "SELECT category_id FROM products WHERE product_code=:pc"
+
+
+def margin_map(conn, default: float) -> dict:
+    """{category_id: 적용 마진}. 대량 재산정(`admin_reprice._margin_map`)과 같은 규칙이다 —
+    자기 노드 -> 조상 -> 전역. 상속 계산은 `pricing.resolve_margins` 한 곳에만 있다."""
+    nodes = conn.execute(text(_NODES_SQL)).all()
+    own = {r[0]: float(r[1]) for r in conn.execute(text(_POLICIES_SQL)).all()}
+    return {cid: m for cid, (m, _src) in resolve_margins(nodes, own, default).items()}
+
+
+def product_margin(conn, pc: int, default: float) -> float:
+    """상품 하나에 적용할 마진. 분류가 없거나 트리에 없는 분류면 전역(`default`)이다.
+
+    2026-10-08: 단가표 반영·가격 검토 승인·소싱 확정이 전역 마진만 쓰고 대량 재산정만
+    분류별 마진을 써서, 분류 예외가 걸린 상품은 매입가가 바뀔 때마다 판매가가 오갔다.
+    네 경로가 이 규칙 하나로 같은 값을 낸다(tests/test_margin_unification.py)."""
+    cid = conn.execute(text(_PRODUCT_CATEGORY_SQL), {"pc": pc}).scalar()
+    if cid is None:
+        return default
+    return margin_map(conn, default).get(cid, default)
 
 
 def reprice(conn, pc: int, fee: float, margin: float, reason: str, ref_id: int,
