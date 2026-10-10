@@ -290,7 +290,7 @@
   function partLabel(pt) { return PART_LABELS[pt] || pt; }
   function friendlyErr(e) {
     if (e && e.status === 401) return '세션이 만료되었습니다 — 새로고침 후 다시 로그인해 주세요.';
-    if (e && e.status === 403) return '권한이 없습니다 — owner 등급만 할 수 있습니다.';
+    if (e && e.status === 403) return '권한이 없습니다 — 관리자 등급만 할 수 있습니다.';
     if (e && e.status) return e.message || ('오류 ' + e.status);
     return '네트워크 오류 — 연결을 확인하고 다시 시도하세요.';
   }
@@ -326,8 +326,8 @@
     var el = $('ciScope');
     if (!S.meLoaded) { el.textContent = '권한 확인 중…'; return; }
     el.innerHTML = S.canUpload
-      ? '업로드·적용은 <b>owner</b> 등급만 가능합니다 · 이력·오류 조회는 로그인한 모든 등급에 열려 있습니다.'
-      : '조회 전용입니다 — 업로드·적용은 <b>owner</b> 등급만 가능합니다. 아래 이력·오류 조회는 그대로 이용할 수 있습니다.';
+      ? '업로드·적용은 <b>관리자</b> 등급만 가능합니다 · 이력·오류 조회는 로그인한 모든 등급에 열려 있습니다.'
+      : '조회 전용입니다 — 업로드·적용은 <b>관리자</b> 등급만 가능합니다. 아래 이력·오류 조회는 그대로 이용할 수 있습니다.';
   }
 
   // ── 좌측 aside — 국면과 무관한 고정 계약 참고 카드 ──────────────────
@@ -358,8 +358,8 @@
   function lockedHtml() {
     return '<div class="ci-lock"><span class="tag">잠김</span>'
       + '<span style="flex:1;min-width:0">'
-      + '<span class="t">새 일괄 등록은 owner 등급만 할 수 있습니다</span>'
-      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 owner 전용입니다(시도 시 403). 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
+      + '<span class="t">새 일괄 등록은 관리자 등급만 할 수 있습니다</span>'
+      + '<span class="d">파일 하나가 정본 카탈로그 전체를 되돌리기 없이 덮을 수 있어 업로드·적용은 관리자 전용입니다. 아래 이력·거부 행 조회는 등급 무관하게 열려 있습니다 — 의도된 비대칭입니다.</span>'
       + '</span></div>';
   }
 
@@ -508,7 +508,7 @@
     return '<div class="ci-row ci-row-body' + (S.drawerJobId === it.job_id ? ' on' : '') + '" data-jobid="' + it.job_id + '" data-action="ci-open-job">'
       + '<span class="no">#' + it.job_id + '</span>'
       + '<span class="at">' + fmtDate(it.at) + '</span>'
-      + '<span class="who">' + esc(it.operator || '—') + '</span>'
+      + '<span class="who">' + esc(it.operator || '정보 없음') + '</span>'
       + '<span class="file">' + esc(it.file || '—') + '</span>'
       + '<span class="ci-origin-tag ' + (it.origin === 'demo' ? 'demo' : 'real') + '">' + esc(it.origin_label || it.origin || '—') + '</span>'
       + '<span class="num">' + fmt(it.total) + '</span>'

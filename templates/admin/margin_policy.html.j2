@@ -294,8 +294,8 @@ a.mp-link{color:var(--rv-link)}
 
   <div class="mp-permnote">
     <span class="mp-permnote-i">권한</span>
-    <span>카드수수료·전역 마진 수정은 <b>관리자(owner)</b>만 · 분류별 예외 등록·수정·삭제는
-    <b>관리자·운영자(owner+operator)</b> — 같은 화면 안에서 등급이 다릅니다.</span>
+    <span>카드수수료·전역 마진 수정은 <b>관리자</b>만 · 분류별 예외 등록·수정·삭제는
+    <b>관리자·운영자</b> — 같은 화면 안에서 등급이 다릅니다.</span>
   </div>
 
   <div class="mp-layout">
@@ -576,7 +576,7 @@ a.mp-link{color:var(--rv-link)}
     var inp = $('mpCardInput');
     if (document.activeElement !== inp) inp.value = (S.input.cardFee === null ? '' : S.input.cardFee);
     inp.disabled = !canOwner();
-    inp.title = canOwner() ? '' : '관리자(owner)만 바꿀 수 있습니다';
+    inp.title = canOwner() ? '' : '관리자만 바꿀 수 있습니다';
     $('mpCardSaved').textContent = pctStr(S.saved.cardFee);
     $('mpCardImpact').innerHTML = impactHtml(S.cardImpact, S.cardErr, S.cardBusy,
       '전 상품(매입가 있는 상품) 전체 기준');
@@ -596,7 +596,7 @@ a.mp-link{color:var(--rv-link)}
     var inp = $('mpMarginInput');
     if (document.activeElement !== inp) inp.value = (S.input.marginRate === null ? '' : S.input.marginRate);
     inp.disabled = !canOwner();
-    inp.title = canOwner() ? '' : '관리자(owner)만 바꿀 수 있습니다';
+    inp.title = canOwner() ? '' : '관리자만 바꿀 수 있습니다';
     $('mpMarginSaved').textContent = pctStr(S.saved.marginRate);
     var cf = S.input.cardFee, mr = S.input.marginRate;
     if (cf !== null && mr !== null && !isNaN(cf) && !isNaN(mr)) {
@@ -628,7 +628,7 @@ a.mp-link{color:var(--rv-link)}
     var previewed = S.previewedFor === pricingSig();
     var can = owner && !S.pricingBusy && pricingChanged() && pricingValid() && previewed;
     save.disabled = !can;
-    if (!owner) save.title = '관리자(owner)만 저장할 수 있습니다';
+    if (!owner) save.title = '관리자만 저장할 수 있습니다';
     else if (!pricingChanged()) save.title = '고친 값이 없습니다';
     else if (!pricingValid()) save.title = '0% 이상 100% 미만의 숫자를 입력하세요(음수는 거부됩니다)';
     else if (!previewed) save.title = '먼저 카드수수료 또는 전역 마진 미리보기를 눌러 지금 값으로 확인해야 합니다';
@@ -807,7 +807,7 @@ a.mp-link{color:var(--rv-link)}
       + '<span class="mp-cat-src' + (hasOwn ? ' own' : '') + '">' + pctStr(node.margin_effective * 100)
       +   '% · ' + esc(node.margin_source) + '</span>'
       + '<button type="button" class="mp-cat-btn" data-action="open-drawer" data-cid="' + node.category_id + '"'
-      +   (writeOk ? '' : ' disabled title="관리자·운영자(owner+operator)만 바꿀 수 있습니다"') + '>'
+      +   (writeOk ? '' : ' disabled title="관리자·운영자만 바꿀 수 있습니다"') + '>'
       +   (hasOwn ? '수정' : '예외 걸기') + '</button>'
       + '</div>';
   }
@@ -880,7 +880,7 @@ a.mp-link{color:var(--rv-link)}
     body += '<div class="mp-field"><label class="mp-field-label" for="mpDrawerValueInput">새 마진율(%)</label>';
     body += '<div class="mp-field-row"><input type="number" id="mpDrawerValueInput" class="mp-input" min="0"'
       + ' max="99.999" step="0.001" value="' + (S.drawer.value === null ? '' : S.drawer.value) + '"'
-      + (writeOk ? '' : ' disabled title="관리자·운영자(owner+operator)만 바꿀 수 있습니다"') + '>'
+      + (writeOk ? '' : ' disabled title="관리자·운영자만 바꿀 수 있습니다"') + '>'
       + '<span class="mp-field-unit">%</span></div>';
     body += '<div class="mp-hint">스키마 허용 0% 이상 100% 미만 · 음수는 거부(역마진) · 화면이 더 좁힐지는 미정</div></div>';
 
@@ -933,7 +933,7 @@ a.mp-link{color:var(--rv-link)}
     foot += '<button type="button" class="mp-btn mp-btn-ghost" data-action="close-drawer">취소</button>';
     foot += '<button type="button" class="mp-btn mp-btn-primary" data-action="confirm-save"'
       + (can ? '' : ' disabled title="' + (writeOk ? (drawerValid() ? '고친 값이 없습니다' : '0% 이상 100% 미만의 숫자를 입력하세요')
-          : '관리자·운영자(owner+operator)만 저장할 수 있습니다') + '"') + '>확인하고 저장</button>';
+          : '관리자·운영자만 저장할 수 있습니다') + '"') + '>확인하고 저장</button>';
     foot += '</div>';
     if (S.drawer.busy) foot += '<span class="mp-busy" role="status" aria-live="polite"><span class="mp-busy-sp"></span>저장하는 중…</span>';
     if (S.drawer.err) foot += '<div class="mp-saveerr">' + esc(S.drawer.err) + '</div>';

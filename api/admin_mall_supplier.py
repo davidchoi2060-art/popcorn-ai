@@ -65,6 +65,7 @@ from sqlalchemy import bindparam, text
 
 from .admin_orders import _log
 from .auth import current_operator
+from .admin_labels import role_ko
 from .db import engine
 from .mall_supplier_write_guard import lock_mall_write_scope
 from .mall_supplier_parse import (
@@ -102,7 +103,7 @@ def _require_owner() -> dict:
     op = current_operator()
     if op is None or op.get("role") != "owner":
         raise HTTPException(
-            403, f"권한이 부족합니다 (필요: owner, 현재: {op['role'] if op else '로그인 필요'})")
+            403, f"권한이 부족합니다 (필요: 관리자, 현재: {role_ko(op['role']) if op else '로그인 필요'})")
     return op
 
 

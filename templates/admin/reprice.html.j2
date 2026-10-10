@@ -231,7 +231,7 @@ a.rp-link{color:var(--rv-link)}
   <div class="rp-permnote">
     <span class="rp-permnote-i">권한</span>
     <span><b>미리보기</b>는 로그인한 운영자 누구나 조회할 수 있습니다 ·
-      <b>실행·되돌리기</b>는 <b>관리자(owner)</b>만 할 수 있습니다.</span>
+      <b>실행·되돌리기</b>는 <b>관리자</b>만 할 수 있습니다.</span>
   </div>
 
   <div class="rp-layout">
@@ -291,7 +291,7 @@ a.rp-link{color:var(--rv-link)}
       <div class="rp-aside-card">
         <div class="rp-aside-t">권한</div>
         <div class="rp-risk-row"><span class="k">미리보기</span><span class="v" style="font-family:var(--rv-font)">로그인한 운영자 누구나</span></div>
-        <div class="rp-risk-row"><span class="k">실행 · 되돌리기</span><span class="v" style="font-family:var(--rv-font)">관리자(owner)만</span></div>
+        <div class="rp-risk-row"><span class="k">실행 · 되돌리기</span><span class="v" style="font-family:var(--rv-font)">관리자만</span></div>
       </div>
 
       <div class="rp-aside-card">
@@ -446,13 +446,13 @@ a.rp-link{color:var(--rv-link)}
     } else {
       var can = canUndo();
       actionCell = '<button type="button" class="rp-btn rp-btn-sm" data-action="undo-arm" data-log="' + r.log_id + '"'
-        + (can ? '' : ' disabled title="관리자(owner)만 되돌릴 수 있습니다"') + '>되돌리기</button>';
+        + (can ? '' : ' disabled title="관리자만 되돌릴 수 있습니다"') + '>되돌리기</button>';
     }
     var errHtml = S.undoErr[r.log_id] ? '<div class="rp-row-err">' + esc(S.undoErr[r.log_id]) + '</div>' : '';
 
     return '<tr>'
       + '<td class="rp-c-round">' + badge + '<div class="rp-round-no">#' + esc(r.log_id) + '</div></td>'
-      + '<td>' + fmtAt(r.at) + '<div class="rp-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + fmtAt(r.at) + '<div class="rp-muted">' + esc(r.operator || '정보 없음') + '</div></td>'
       + '<td>' + esc(r.scope_label) + '</td>'
       + '<td>' + policyCell + '</td>'
       + '<td class="num">' + fmt(r.changed) + '<div class="rp-muted">오름 ' + fmt(r.up) + ' · 내림 ' + fmt(r.down) + '</div></td>'
@@ -617,7 +617,7 @@ a.rp-link{color:var(--rv-link)}
 
     var can = canExecute();
     var title = '';
-    if (!canOwner()) title = '관리자(owner)만 실행할 수 있습니다';
+    if (!canOwner()) title = '관리자만 실행할 수 있습니다';
     else if (S.applyBusy) title = '요청을 처리하는 중입니다';
     html += '<div class="rp-actions"><button type="button" class="rp-btn rp-btn-danger" data-action="do-apply"'
       + (can ? '' : ' disabled') + (title ? ' title="' + esc(title) + '"' : '') + '>'

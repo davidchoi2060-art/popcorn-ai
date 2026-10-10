@@ -49,6 +49,7 @@ from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
 from .timeutil import iso
+from .admin_labels import role_ko
 
 router = APIRouter(prefix="/api/admin")
 
@@ -114,7 +115,7 @@ def _owner() -> dict:
     me = current_operator() or {}
     if me.get("role") != "owner":
         raise HTTPException(
-            403, f"권한이 부족합니다 (필요: owner, 현재: {me.get('role') or '(로그인 필요)'})")
+            403, f"권한이 부족합니다 (필요: 관리자, 현재: {role_ko(me.get('role')) if me.get('role') else '(로그인 필요)'})")
     return me
 
 

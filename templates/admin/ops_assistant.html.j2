@@ -233,7 +233,7 @@ input,textarea{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="scopechip">편집 owner 전용 · 열람 viewer 이상</span>
+<span class="scopechip">편집: 관리자 전용 · 열람: 모든 등급</span>
 {% endblock %}
 
 {% block content %}
@@ -383,7 +383,7 @@ input,textarea{font-family:var(--rv-font)}
   function guard() {
     if (!canWrite()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '로그인 필요') + ')', 'err');
+      toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '로그인 필요') + ')', 'err');
       return false;
     }
     return true;
@@ -592,7 +592,7 @@ input,textarea{font-family:var(--rv-font)}
     var blocked = S.chat.asking || !owner;
     inp.disabled = blocked; btn.disabled = blocked;
     inp.placeholder = owner ? '운영 관련 질문을 입력하세요'
-      : '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ')';
+      : '권한이 부족합니다 (필요: 관리자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '로그인 필요') + ')';
     $('chatTag').textContent = S.chat.asking ? '응답 대기 중' : '질문 · 답변';
   }
 
@@ -677,7 +677,7 @@ input,textarea{font-family:var(--rv-font)}
     $('saveBtn').disabled = !owner || !dl.length;
     $('revertBtn').disabled = !dl.length;
     var foot = $('dwFoot');
-    if (!owner) { foot.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '로그인 필요') + ') — 조회만 가능합니다'; foot.classList.add('warn'); }
+    if (!owner) { foot.textContent = '권한이 부족합니다 (필요: 관리자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '로그인 필요') + ') — 조회만 가능합니다'; foot.classList.add('warn'); }
     else { foot.textContent = dl.length ? (S.widgetSyncNote || '저장하면 DB에 즉시 반영됩니다.') : '변경 사항이 없습니다'; foot.classList.remove('warn'); }
   }
 

@@ -115,6 +115,7 @@ from .admin_orders import _log
 from .auth import current_operator
 from .db import engine
 from .timeutil import iso, now_iso
+from .admin_labels import role_ko
 
 router = APIRouter(prefix="/api/admin/ai-integration")
 
@@ -249,7 +250,7 @@ def set_limit(provider: str, body: LimitBody):
     op = current_operator()
     if op is None or op.get("role") != "owner":
         raise HTTPException(
-            403, f"권한이 부족합니다 (필요: owner, 현재: {op['role'] if op else '로그인 필요'})")
+            403, f"권한이 부족합니다 (필요: 관리자, 현재: {role_ko(op['role']) if op else '로그인 필요'})")
     if provider not in PROVIDER_MAP:
         raise HTTPException(404, f"알 수 없는 프로바이더입니다: {provider}")
     if body.daily_usd is None or body.daily_usd <= 0:
@@ -332,7 +333,7 @@ def clear_limit(provider: str):
     op = current_operator()
     if op is None or op.get("role") != "owner":
         raise HTTPException(
-            403, f"권한이 부족합니다 (필요: owner, 현재: {op['role'] if op else '로그인 필요'})")
+            403, f"권한이 부족합니다 (필요: 관리자, 현재: {role_ko(op['role']) if op else '로그인 필요'})")
     if provider not in PROVIDER_MAP:
         raise HTTPException(404, f"알 수 없는 프로바이더입니다: {provider}")
 

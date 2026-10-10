@@ -299,7 +299,7 @@ code{font-family:var(--rv-mono);font-size:.95em}
 {% endblock %}
 
 {% block header_extra %}
-<span class="or-permhint">조회조차 owner 전용 · 승인·등급 변경·정지·비밀번호 발급도 owner만</span>
+<span class="or-permhint">조회·승인·등급 변경·정지·비밀번호 발급 모두 관리자 전용</span>
 {% endblock %}
 
 {% block content %}
@@ -419,7 +419,7 @@ code{font-family:var(--rv-mono);font-size:.95em}
     $('orDeniedTitle').textContent = err.message || '접근할 수 없습니다';
     $('orDeniedDesc').textContent = isAuth
       ? '로그인 후 다시 시도하세요.'
-      : '계정 목록은 민감해서 조회조차 관리자(owner)만 허용됩니다. 이 화면은 목록을 캐시해 두거나 일부만 보여주지 않습니다 — 권한이 없으면 아무것도 보여주지 않습니다.';
+      : '계정 목록은 민감해서 조회조차 관리자만 허용됩니다. 이 화면은 목록을 캐시해 두거나 일부만 보여주지 않습니다 — 권한이 없으면 아무것도 보여주지 않습니다.';
   }
 
   function loadOperators(keepSel) {
@@ -578,7 +578,7 @@ code{font-family:var(--rv-mono);font-size:.95em}
       return '<button type="button" class="or-pill' + (on ? ' on' : '') + '" data-action="pick-approve-role" data-r="' + r + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + ROLE_LABELS[r] + '</button>';
     }).join('');
     var warn = S.approveRole === 'owner'
-      ? '<div class="or-ownerwarn">관리자(owner)로 승인하면 계정 관리 · 운영 전환 설정까지 전부 열립니다 — 승인자 한 명의 선택으로 즉시 부여됩니다.</div>' : '';
+      ? '<div class="or-ownerwarn">관리자로 승인하면 계정 관리 · 운영 전환 설정까지 전부 열립니다 — 승인자 한 명의 선택으로 즉시 부여됩니다.</div>' : '';
     return '<div><div class="or-label">' + (reactivate ? '정지 해제 — 활성 계정 관리' : '승인 · 신원 확인') + '</div>' +
       '<div class="or-approvebox">' +
         '<div class="or-boxtitle">' + (reactivate ? '정지 해제 — 등급을 정해서 다시 활성화합니다' : '승인 — 등급을 정해서 승인합니다') + '</div>' +

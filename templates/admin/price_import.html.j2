@@ -328,7 +328,7 @@
 
   <div class="pi-permnote">
     조회는 로그인한 운영자 누구나 볼 수 있습니다 · <b>업로드 · 선택 반영 · 되돌리기</b>는
-    <b>운영자(operator) 이상</b>만 할 수 있습니다.
+    <b>운영자 이상</b>만 할 수 있습니다.
   </div>
 
   <div class="pi-loading" id="piLoading">불러오는 중…</div>
@@ -670,7 +670,7 @@
   }
   function recentRowHtml(r) {
     return '<tr>'
-      + '<td>' + fmtAt(r.at) + '<div class="pi-muted">' + esc(r.operator || '—') + '</div></td>'
+      + '<td>' + fmtAt(r.at) + '<div class="pi-muted">' + esc(r.operator || '정보 없음') + '</div></td>'
       + '<td>' + esc(r.supplier || '—') + '<div class="pi-muted">' + esc(r.file_name || '') + '</div></td>'
       + '<td class="num">' + fmt(r.attempted) + '건</td>'
       + '<td>' + (r.undone

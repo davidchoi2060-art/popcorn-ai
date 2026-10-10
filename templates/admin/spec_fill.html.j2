@@ -59,7 +59,7 @@
   ■ 권한 — 서버가 이미 강제한다(`api/auth.py` `required_role()`, 이 파일 밖 · 무변경).
     GET은 viewer, POST(`/dash/say`)는 기본 규칙으로 operator 이상이 자동으로 걸린다.
     이 화면은 **추가로** 클라이언트 쪽에서 선제 차단(버튼 비활성 + 사유 표시)만 얹는다
-    — 서버 403(`권한이 부족합니다(필요: operator, 현재: …)`)이 최종 방어선이다.
+    — 서버 403(`권한이 부족합니다(필요: 운영자, 현재: …)`)이 최종 방어선이다.
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -406,7 +406,7 @@ a.sf-src-link{color:var(--rv-link);text-decoration:underline}
     }
     if (me && !can) {
       btn.disabled = true;
-      btn.title = '권한이 부족합니다(필요: operator, 현재: ' + me.role + ')';
+      btn.title = '권한이 부족합니다(필요: 운영자, 현재: ' + window.Admin2Shell.roleKo(me.role) + ')';
       return;
     }
     btn.disabled = false; btn.removeAttribute('title');

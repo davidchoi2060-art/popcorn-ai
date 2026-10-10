@@ -196,7 +196,7 @@
          서버에서 렌더되지 않는다(요청·승인 결함① 수정, 2026-08-27 — `api/admin_ui_requests.py`
          가 role 을 판정해 넘긴다). #}
       <div class="wr-decision" id="wr-verdict-box" hidden>
-        <span class="wr-decision-title">하네스 판정 · 처리 <span style="font-weight:400;font-size:9.5px;color:var(--rv-muted)">(owner 세션 — 결정 5가 미정이라 하네스 전용 로그인이 없다)</span></span>
+        <span class="wr-decision-title">하네스 판정 · 처리</span>
         <div id="wr-verdict-step1">
           <span class="wr-decision-note">읽어 보고 「작은 것」이면 바로 고치고 처리로, 「큰 것」이면 결재대기로 올린다. 판정 근거는 필수다.</span>
           <div class="wr-inline-form" data-open="1" style="margin-top:6px">
@@ -330,7 +330,7 @@
    var lane=document.createElement('div');
    lane.className='wr-lane';
    if(hot)lane.setAttribute('data-hot','1');
-   var ownerChip=def.ownerOnly?chip('owner만','warn'):'';
+   var ownerChip=def.ownerOnly?chip('관리자만','warn'):'';
    lane.innerHTML='<div class="wr-lane-head"><span class="wr-lane-title">'+esc(def.title)+'</span>'
     +chip(cards.length+'건',hot?'warn':'none')+'<span style="flex:1"></span>'+ownerChip+'</div>'
     +'<span class="wr-lane-sub">'+esc(def.sub)+'</span>'

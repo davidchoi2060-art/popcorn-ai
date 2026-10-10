@@ -581,7 +581,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
   function toast(msg, kind) { window.Admin2Shell.toast(msg, kind); }
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다 (필요: 관리자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
   function guard() {
     if (!owner()) { toast(permText(), 'err'); return false; }
@@ -733,7 +733,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
         : (h.action !== 'ops_change' ? '되돌림 기록은 다시 되돌릴 수 없습니다' : (!owner() ? permText() : ''));
       return '<tr>' +
         '<td class="num">' + esc(h.at || '—') + '</td>' +
-        '<td>' + esc(h.operator || '—') + '</td>' +
+        '<td>' + esc(h.operator || '정보 없음') + '</td>' +
         '<td class="what"><span class="txt">' + esc(what) + '</span>' +
           (h.undone ? '<span class="undone">되돌려짐</span>' : '') + '</td>' +
         '<td><button type="button" class="os-undobtn" data-action="undo" data-logid="' + h.log_id + '"' +

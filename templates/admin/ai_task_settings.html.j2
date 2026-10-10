@@ -396,7 +396,7 @@ input{font-family:var(--rv-mono)}
   function guard() {
     if (!canWrite()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: owner, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
@@ -625,7 +625,7 @@ input{font-family:var(--rv-mono)}
 
     var note = owner
       ? (dirty ? '저장하면 즉시 반영되고 이력에 남습니다 — 다만 연동 보류라 호출은 아직 없습니다' : '변경 사항이 없습니다')
-      : ('권한이 부족합니다 (필요: owner, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.getMe().role : '(로그인 필요)') + ') — 조회만 가능합니다');
+      : ('권한이 부족합니다 (필요: 관리자, 현재: ' + (window.Admin2Shell.getMe() ? window.Admin2Shell.roleKo(window.Admin2Shell.getMe().role) : '(로그인 필요)') + ') — 조회만 가능합니다');
     html += '<div class="ats-detfoot">' +
       '<span class="nt' + (owner ? '' : ' warn') + '">' + esc(note) + '</span>' +
       '<button type="button" class="ats-btn-revert' + (dirty ? '' : ' dis') + '" data-action="revert">되돌리기</button>' +

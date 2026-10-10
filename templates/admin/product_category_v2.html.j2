@@ -172,7 +172,7 @@ input{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="pv-permhint">조회 viewer 이상 · 쓰기 operator 이상</span>
+<span class="pv-permhint">조회: 모든 등급 · 쓰기: 운영자 이상</span>
 {% endblock %}
 
 {% block content %}
@@ -275,14 +275,14 @@ input{font-family:var(--rv-font)}
   function guard() {
     if (!canWrite()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
   }
   function permTitle() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다(필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다(필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
   function disAttrs(disabled) {
     return disabled ? (' disabled title="' + esc(permTitle()) + '"') : '';

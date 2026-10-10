@@ -26,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 
 from datetime import datetime
 
+from .admin_labels import role_ko
 from .db import engine
 from .passwords import (hash_password,
                         strength_problem, verify_password)
@@ -477,7 +478,7 @@ async def auth_middleware(request: Request, call_next):
                     return HTMLResponse(login_required_html(), status_code=403)
                 from fastapi.responses import JSONResponse
                 return JSONResponse(
-                    {"detail": f"권한이 부족합니다(필요: {need}, 현재: {op['role']})"},
+                    {"detail": f"권한이 부족합니다(필요: {role_ko(need)}, 현재: {role_ko(op['role'])})"},
                     status_code=403)
             # 기기 기억(비밀번호 생략)으로 만든 세션이 «정책 발행급 쓰기»를 시도하면
             # 한 번 더 확인한다(2026-08-15 사장님 지시 — "민감한 일엔 다시 묻는다").

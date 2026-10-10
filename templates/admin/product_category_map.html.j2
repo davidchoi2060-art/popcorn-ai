@@ -449,7 +449,7 @@ input{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="cm-permhint">조회 viewer 이상 · 이동·되돌리기 operator 이상</span>
+<span class="cm-permhint">조회: 모든 등급 · 이동·되돌리기: 운영자 이상</span>
 <div class="cm-recentpush" data-keep="1">
   <button type="button" class="cm-recentbtn" id="cmRecentBtn" data-action="toggle-recent"
           aria-haspopup="true" aria-expanded="false">최근 이동 <span id="cmRecentCount"></span></button>
@@ -609,14 +609,14 @@ input{font-family:var(--rv-font)}
   function guard() {
     if (!owner()) {
       var me = window.Admin2Shell.getMe();
-      toast('권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')', 'err');
+      toast('권한이 부족합니다 (필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')', 'err');
       return false;
     }
     return true;
   }
   function permText() {
     var me = window.Admin2Shell.getMe();
-    return '권한이 부족합니다 (필요: operator, 현재: ' + (me ? me.role : '(로그인 필요)') + ')';
+    return '권한이 부족합니다 (필요: 운영자, 현재: ' + (me ? window.Admin2Shell.roleKo(me.role) : '(로그인 필요)') + ')';
   }
 
   // ── 트리 헬퍼(/api/admin/categories) ────────────────────────────────

@@ -21,7 +21,7 @@ from .db import engine
 
 router = APIRouter(prefix="/api/admin")
 
-ROLE_KO = {"viewer": "조회", "operator": "운영자", "owner": "관리자"}
+from .admin_labels import ROLE_KO  # 단일 원천 — 화면 표시용 한국어 등급 이름
 
 
 def _pending_note(rows) -> str:

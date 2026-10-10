@@ -227,7 +227,7 @@ input{font-family:var(--rv-mono)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="hint" id="ownerHint">한도 변경은 owner 등급만 가능합니다</span>
+<span class="hint" id="ownerHint">한도 변경은 관리자 등급만 가능합니다</span>
 {% endblock %}
 
 {% block content %}
@@ -409,8 +409,8 @@ input{font-family:var(--rv-mono)}
     window.Admin2Shell.meReady.then(function (me) {
       S.me = me;
       $('ownerHint').textContent = me
-        ? ('한도 변경은 owner 등급만 가능합니다 · 현재 ' + (me.role === 'owner' ? 'owner' : me.role))
-        : '한도 변경은 owner 등급만 가능합니다 · 로그인 필요';
+        ? ('한도 변경은 관리자 등급만 가능합니다 · 현재 ' + window.Admin2Shell.roleKo(me.role))
+        : '한도 변경은 관리자 등급만 가능합니다 · 로그인 필요';
       renderFoot();
     });
     load();
@@ -629,7 +629,7 @@ input{font-family:var(--rv-mono)}
     $('dwClear').disabled = !(owner && !dirty && !nothingSet);
     var note = $('dwFootNote');
     if (!owner) {
-      note.textContent = '권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ') — 연결 상태 조회만 가능합니다';
+      note.textContent = '권한이 부족합니다 (필요: 관리자, 현재: ' + (S.me ? window.Admin2Shell.roleKo(S.me.role) : '로그인 필요') + ') — 연결 상태 조회만 가능합니다';
       note.className = 'note warn';
     } else if (dirty) {
       note.textContent = '저장하면 즉시 반영되고 이력에 남습니다';
@@ -652,7 +652,7 @@ input{font-family:var(--rv-mono)}
   }
 
   function pickAction(key) {
-    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (S.me ? window.Admin2Shell.roleKo(S.me.role) : '로그인 필요') + ')', 'err'); return; }
     S.draft.action = key;
     Array.prototype.forEach.call(document.querySelectorAll('.actrow'), function (row) {
       var on = row.getAttribute('data-key') === key;
@@ -676,7 +676,7 @@ input{font-family:var(--rv-mono)}
    * confirm() 확인을 거쳐야만 실행된다(입력칸을 비우고 저장하는 것만으로는 지워지지
    * 않는다 — 의도치 않은 삭제 방지, api/admin_ai_integration.py 모듈 docstring 참고). */
   function doClear() {
-    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (S.me ? window.Admin2Shell.roleKo(S.me.role) : '로그인 필요') + ')', 'err'); return; }
     if (diffOf().length) { toast('저장하지 않은 변경이 있습니다 — 저장하거나 되돌린 뒤 초기화하세요', 'warn'); return; }
     if (isUnset(S.saved)) { toast('이미 미설정 상태입니다', 'warn'); return; }
     var p = findProvider(S.sel);
@@ -695,7 +695,7 @@ input{font-family:var(--rv-mono)}
   }
 
   function doSave() {
-    if (!canWrite()) { toast('권한이 부족합니다 (필요: owner, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')', 'err'); return; }
+    if (!canWrite()) { toast('권한이 부족합니다 (필요: 관리자, 현재: ' + (S.me ? window.Admin2Shell.roleKo(S.me.role) : '로그인 필요') + ')', 'err'); return; }
     var diffs = diffOf();
     if (!diffs.length) { toast('변경 사항이 없습니다', 'warn'); return; }
     var daily = parseNum(S.draft.daily);

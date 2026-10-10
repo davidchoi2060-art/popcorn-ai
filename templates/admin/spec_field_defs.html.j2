@@ -253,7 +253,7 @@ input,select,textarea{font-family:var(--rv-font)}
 {% endblock %}
 
 {% block header_extra %}
-<span class="sd-hint">열람 등급 무관 · 추가 owner 전용(스키마 변경)</span>
+<span class="sd-hint">열람: 모든 등급 · 항목 추가: 관리자 전용</span>
 <span class="sd-tag">spec_field_defs · product_specs</span>
 {% endblock %}
 
@@ -426,7 +426,7 @@ input,select,textarea{font-family:var(--rv-font)}
     if (!btn) return;
     btn.disabled = !can;
     if (can) btn.removeAttribute('title');
-    else btn.setAttribute('title', '권한 부족 — owner 등급 필요(스키마를 바꾸는 작업입니다)');
+    else btn.setAttribute('title', '권한 부족 — 관리자 등급 필요(저장 구조를 바꾸는 작업입니다)');
   }
 
   // ── 건강 상태 배너 ───────────────────────────────────────────────
@@ -670,7 +670,7 @@ input,select,textarea{font-family:var(--rv-font)}
       + '<div class="sd-modal-card" role="document">'
       + '<div class="sd-modal-hd">'
       + '<span class="sd-modal-title">사양 항목 만들기 — 스키마가 실제로 바뀝니다</span>'
-      + '<span class="sd-modal-ownertag">owner 전용</span>'
+      + '<span class="sd-modal-ownertag">관리자 전용</span>'
       + '<button type="button" class="sd-modal-close" data-action="close-modal" aria-label="닫기">✕</button>'
       + '</div>'
       + '<div class="sd-modal-body">'

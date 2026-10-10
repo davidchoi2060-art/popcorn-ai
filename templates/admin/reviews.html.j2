@@ -615,7 +615,7 @@ input{font-family:var(--rv-mono)}
   function guard() {
     if (!canWrite()) {
       var cur = S.me ? S.me.role : '(로그인 필요)';
-      toast('권한이 부족합니다 (필요: operator, 현재: ' + cur + ')', 'err');
+      toast('권한이 부족합니다 (필요: 운영자, 현재: ' + cur + ')', 'err');
       return false;
     }
     return true;
@@ -1213,7 +1213,7 @@ input{font-family:var(--rv-mono)}
     document.querySelectorAll('.dw-foot button').forEach(function (b) { b.classList.toggle('dis-btn', viewer); });
     var sibOn = (S.siblings || []).filter(function (s, i) { return S.sibChecked[i]; }).length;
     var note;
-    if (viewer) { note = '권한이 부족합니다 (필요: operator, 현재: ' + (S.me ? S.me.role : '로그인 필요') + ')'; }
+    if (viewer) { note = '권한이 부족합니다 (필요: 운영자, 현재: ' + (S.me ? window.Admin2Shell.roleKo(S.me.role) : '로그인 필요') + ')'; }
     else if (isIdentity) { note = '기각(보류)만 가능합니다 — 정체성 문제는 상품 관리에서 고칩니다'; }
     else if (sibOn) { note = '형제 포함 ' + (1 + sibOn) + '건이 한 번에 적용되고, 되돌리기도 함께 묶입니다'; }
     else { note = '되돌리기는 값·잠금·게이트·검수상태를 전부 되돌립니다'; }
