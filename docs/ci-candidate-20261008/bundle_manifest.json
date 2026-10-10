@@ -1,0 +1,215 @@
+{
+  "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+  "files": [
+    {
+      "path": "api/__init__.py",
+      "checkout_raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "git_blob_bytes": 0,
+      "git_blob_raw_equal": true,
+      "crlf": 0,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "api/admin_existing_pc_media.py",
+      "checkout_raw_sha256": "af6a066742ae0ca5aeaf00b186a076bdc0446e688b9f116ae46e4bbcd7694cba",
+      "bytes": 11758,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "af6a066742ae0ca5aeaf00b186a076bdc0446e688b9f116ae46e4bbcd7694cba",
+      "git_blob_bytes": 11758,
+      "git_blob_raw_equal": true,
+      "crlf": 246,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "api/pc_existing_media_authority.py",
+      "checkout_raw_sha256": "c3f978b3a52ba951059c83405910af33db66f5585cc9e5232789f4cd70cddbd7",
+      "bytes": 12607,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "c3f978b3a52ba951059c83405910af33db66f5585cc9e5232789f4cd70cddbd7",
+      "git_blob_bytes": 12607,
+      "git_blob_raw_equal": true,
+      "crlf": 179,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "api/pc_existing_media_import.py",
+      "checkout_raw_sha256": "c7e8f2de6575e3eece33e3805bc0d4b4532c9dc758c711b016996e003477462a",
+      "bytes": 28127,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "c7e8f2de6575e3eece33e3805bc0d4b4532c9dc758c711b016996e003477462a",
+      "git_blob_bytes": 28127,
+      "git_blob_raw_equal": true,
+      "crlf": 543,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "api/pc_existing_media_refresh.py",
+      "checkout_raw_sha256": "dfd46f10b99c268110b49f42da246c30b8ef03ee99dda18cd1a224d4d46b6b77",
+      "bytes": 12750,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "dfd46f10b99c268110b49f42da246c30b8ef03ee99dda18cd1a224d4d46b6b77",
+      "git_blob_bytes": 12750,
+      "git_blob_raw_equal": true,
+      "crlf": 299,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "tools/register_existing_pc_media.py",
+      "checkout_raw_sha256": "9ab648ad44480d4cb45504ff631a76bd0b58c36feca0f01c1ea962ff752324ff",
+      "bytes": 7902,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": "2baa016ae6f5fc47a6933d91ed4028f83a74f456",
+      "git_blob_sha256": "c0c10a816993cb61f3ab8fe1c0bb0b776a6ab499da32a0a6dbc6b0aab70f0b74",
+      "git_blob_bytes": 7691,
+      "git_blob_raw_equal": false,
+      "crlf": 211,
+      "origin": "baseline_checkout_raw"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "checkout_raw_sha256": "904c11f3c11c12a4ef8cdef64a2db40f287cf0fe3d1296335c500314695df879",
+      "bytes": 12618,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": null,
+      "git_blob_sha256": null,
+      "git_blob_bytes": null,
+      "git_blob_raw_equal": null,
+      "crlf": 182,
+      "origin": "accepted_new_test"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "checkout_raw_sha256": "c7e323d939511e97479b43be329e11cbd21ba11e595d71aa9a3cf95a1b27af40",
+      "bytes": 11459,
+      "bundle_copy_raw_match": true,
+      "baseline_commit": null,
+      "git_blob_sha256": null,
+      "git_blob_bytes": null,
+      "git_blob_raw_equal": null,
+      "crlf": 177,
+      "origin": "accepted_new_test"
+    }
+  ],
+  "expected_method_count": 18,
+  "methods": [
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_whole_route_case_session_refresh_final_provenance_then_ready_retry"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_http_expected_mismatch_never_replaces_server_scope_or_reserves"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_valid_refresh_and_local_case_cannot_replace_missing_actual_grant"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_session_revoked_after_reservation_blocks_final_ack"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_CASE_changed_after_reservation_is_denied_by_real_case_adapter"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_fresh_coverage_withdrawal_unknown_after_reservation_is_not_SHA_allow"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_final_unknown_whole_route_new_round_sameconn_exact_job_ack"
+    },
+    {
+      "path": "tests/test_existing_media_admin_flow_integration.py",
+      "class": "AdminFlow",
+      "method": "test_final_unknown_different_valid_job_whole_route_cannot_ack"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_success_both_codes_real_capture_returns_actual_plan_provenance"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_unmodified_production_pins_reject_synthetic_source_before_grant"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_changed_original_bytes_rejected_by_real_sha_check"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_changed_manifest_bytes_rejected_by_real_sha_check"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_manifest_internal_bytes_path_CASE_revision_checked_after_valid_SHA"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_white_reuse_exception_missing_rejected_by_actual_original_validation"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_actual_CASE_adapter_rejects_changed_current_content"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_grant_unknown_rejected_inside_actual_planner"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_second_planner_reuse_call_rechecks_actual_session_adapter"
+    },
+    {
+      "path": "tests/test_existing_media_pg_capture_plan_integration.py",
+      "class": "CapturePlanTests",
+      "method": "test_readonly_fake_explicitly_refuses_write"
+    }
+  ],
+  "test_execution": 0,
+  "cloud_execution": 0,
+  "cloud_READY": false,
+  "commit_bytes_checked": false,
+  "closure_exclusions": {
+    "api.db": "scoped test mock; DBconfig not copied",
+    "api.auth": "scoped mock IDLE; real auth dependency path unselected",
+    "api.admin_pc_builder": "route dependency overridden",
+    "api.pc_configuration_copy": "test scoped module mock",
+    "api.pc_media": "test scoped snapshot mock",
+    "google.auth": "GcsObjects mocked; network native path unselected"
+  },
+  "planner_raw_pin_authority": "PM explicit accepted checkout raw; LF semantic equality separately confirmed",
+  "runner_requirements": [
+    "manifest exact path/hash allowlist",
+    "mandatory unittest methods18, collection0/skip/expectedFailure/error/failure fail closed",
+    "socket/subprocess deny except local ASGI and synthetic temp files",
+    "Linux OUTPUT constant adapter without test source modification",
+    "results JSON and summary",
+    "future PR commit-byte manifest separately verified"
+  ]
+}

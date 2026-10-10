@@ -1,0 +1,16 @@
+fastapi==0.141.1
+pydantic==2.13.5
+httpx==0.28.1
+starlette==1.6.0
+anyio==4.14.2
+sqlalchemy==2.0.52
+pydantic-core==2.46.5
+annotated-types==0.8.0
+typing-extensions==4.16.0
+typing-inspection==0.4.4
+httpcore==1.0.9
+h11==0.16.0
+certifi==2026.7.22
+idna==3.19
+annotated-doc==0.0.5
+greenlet==3.5.5
