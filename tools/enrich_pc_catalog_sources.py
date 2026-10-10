@@ -88,8 +88,8 @@ def apply(c, snapshot, plan):
                 c.execute(text(f'UPDATE product_specs SET {field}=:value WHERE product_code=:code'),dict(code=code,value=value))
                 sources[field] = source['kind'] + ':2026-09-30:' + source['url']
             c.execute(text('UPDATE product_specs SET spec_sources=CAST(:v AS jsonb),updated_at=now() WHERE product_code=:code'),dict(code=code,v=json.dumps(sources)))
-            locks = sorted(set(prod['locked_fields'] or []) | {'specs.'+f for f in item['specs']})
-            c.execute(text('UPDATE products SET locked_fields=CAST(:v AS jsonb) WHERE product_code=:code'),dict(code=code,v=json.dumps(locks)))
+            # Automatic source values are not human-confirmed: never add them to locked_fields
+            # (only the admin spec-entry path locks). The source is kept in spec_sources.
         backups['explanations'].append(row)
         content.setdefault('resolved_issues',[]).append(dict(date='2026-09-30', resolution=item.get('resolution',verification+' · 누락 사양 보완'), source_id=source['id']))
         c.execute(text('UPDATE product_explanations SET content=CAST(:v AS jsonb),updated_at=now() WHERE source_product_code=:code'),dict(code=code,v=json.dumps(content,ensure_ascii=False)))

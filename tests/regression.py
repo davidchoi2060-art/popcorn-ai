@@ -379,6 +379,61 @@ def anon_status(path, body=None):
         return e.code
 
 
+def anon_call(path, body=None):
+    """anon_status 와 같되 (상태, 본문 JSON|None, 응답 헤더) 를 돌려준다 — 실패 «사유 코드»와
+    세션 발급 여부(Set-Cookie)까지 본다."""
+    req = urllib.request.Request(
+        BASE + path,
+        data=None if body is None else json.dumps(body).encode(),
+        method="GET" if body is None else "POST",
+        headers={} if body is None else {"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req) as r:
+            raw, st, hd = r.read(), r.status, r.headers
+    except urllib.error.HTTPError as e:
+        raw, st, hd = e.read(), e.code, e.headers
+    try:
+        return st, json.loads(raw or b"null"), hd
+    except ValueError:
+        return st, None, hd
+
+
+def customer_auth_closed():
+    """고객 세션 저장소·발급자가 아직 연결되지 않았는가(C4 경계 · PR #10 수용본).
+
+    판단은 응답이 아니라 **코드**에서 한다 — `api.customer_auth.RUNTIME_RESOLVER` 의 두 포트가
+    준비 안 됨(False)을 돌려주면 서버는 설계상 로그인·/api/my/* 를 전부 503 auth_unavailable
+    로 닫는다(옛 dev 어댑터는 남의 이메일로 세션을 받을 수 있어 폐기됐다). 응답을 보고 기대값을
+    정하면 무엇이 오든 통과하므로 그렇게 하지 않는다. 포트가 연결되는 날(C2/I1) 이 함수가
+    False 가 되고 아래 회원 경계 검사(401·403·404·409)가 다시 돈다.
+    """
+    try:
+        import api.customer_auth as _ca
+        r = _ca.RUNTIME_RESOLVER
+        return r.repository.schema_ready() is not True or r.issuer.ready() is not True
+    except Exception:
+        return False
+
+
+def _check_customer_auth_closed(where):
+    """닫힌 상태의 계약: 데이터 없이 503 auth_unavailable, 로그인도 세션을 주지 않는다."""
+    for label, path, body in (("미인증 회원 주문 조회", "/api/my/orders", None),
+                              ("미인증 후기 쓰기", "/api/my/reviews",
+                               {"item_id": 1, "rating": 5, "body": "회귀 닫힘 확인"}),
+                              ("고객 로그인", "/api/auth/login",
+                               {"email": "regress-guest@popcornpc.local", "provider": "dev"})):
+        st, d, hd = anon_call(path, body)
+        code = ((d or {}).get("detail") or {}).get("code") if isinstance((d or {}).get("detail"), dict) else None
+        check(f"[{where}] 고객 인증 미연결 — {label} → 503 auth_unavailable",
+              st == 503 and code == "auth_unavailable", "503 auth_unavailable", (st, code))
+        # 닫힌 상태에서 세션이 새지 않는다 — 쿠키도, 본문의 토큰·세션 키도 없다.
+        leaked = [k for k in ("token", "access_token", "session", "session_id", "member_id")
+                  if isinstance(d, dict) and k in d]
+        check(f"[{where}] 고객 인증 미연결 — {label} 응답에 세션 쿠키·토큰이 없다",
+              not (hd and hd.get_all("Set-Cookie")) and not leaked,
+              "없음", {"set-cookie": bool(hd and hd.get_all("Set-Cookie")), "body": leaked})
+
+
 def login():
     if not ADMIN_PW:
         print("\n  ADMIN_PW가 없습니다 — `.env`에 `ADMIN_PW=...`를 넣으세요"
@@ -887,19 +942,31 @@ def test_upload():
         print(f"  [SKIP] (I) 적재 분류 판정 — {e}")
 
     # 검수 큐 정합 — 이미 값이 채워진 항목이 '대기'로 남아 있으면 큐가 부풀어 보인다
-    stale = db_one("""
-        SELECT count(*) FROM product_reviews r JOIN product_specs s USING (product_code)
+    # 2026-10-09 (회귀 run #5): 그 필드가 잠긴(locked_fields) 행만 센다. 웹 제안·자동 추출로
+    # 채워지고 잠기지 않은 값은 검수 대기가 맞는 상태다(그 5건을 '처리'로 넘기지 않기로 함).
+    # 잠금은 «사람이 승인했다»는 출처 기록이 아니다 — 상품 상세 사양 입력이 잠그면서 같은
+    # 자리에서 검수 행을 닫으므로, 잠겼는데 대기가 남으면 결함이라고 보는 근사 기준일 뿐이다.
+    # 기준은 tools/prune_reviews.HUMAN_LOCKED 와 같다.
+    _stale_where = """
+          FROM product_reviews r JOIN product_specs s USING (product_code)
+          JOIN products p USING (product_code)
          WHERE r.review_status = '대기' AND r.review_type = 'spec_missing'
            AND ((r.field_name = 'socket' AND s.socket IS NOT NULL)
              OR (r.field_name = 'form_factor' AND s.form_factor IS NOT NULL)
              OR (r.field_name = 'mem_type' AND s.mem_type IS NOT NULL)
              OR (r.field_name = 'rated_watt' AND s.rated_watt IS NOT NULL)
-             OR (r.field_name = 'cooler_tdp' AND s.cooler_tdp IS NOT NULL))""")
+             OR (r.field_name = 'cooler_tdp' AND s.cooler_tdp IS NOT NULL))"""
+    _human = ("(COALESCE(p.locked_fields, '[]'::jsonb) ? r.field_name"
+              " OR COALESCE(p.locked_fields, '[]'::jsonb) ? ('specs.' || r.field_name))")
+    stale = db_one("SELECT count(*)" + _stale_where + " AND " + _human)
+    unconfirmed = db_one("SELECT count(*)" + _stale_where + " AND NOT " + _human)
     if stale is None:
         print("  [SKIP] (I) 검수 큐 정합 — DB 미연결")
     else:
-        check("검수 대기에 이미 채워진 필드가 없다(tools/prune_reviews.py)",
+        check("검수 대기에 잠긴 값으로 이미 채워진 필드가 없다(tools/prune_reviews.py)",
               stale == 0, 0, stale)
+        if unconfirmed:
+            print(f"  [INFO] 값은 있으나 잠기지 않아 검수 대기로 남은 필드 {unconfirmed}건 (값 검수 대상)")
 
 
 # ───────────────────────── 2. 호환 규칙 (DB 단일 원천) ─────────────────────────
@@ -2385,10 +2452,26 @@ def test_reprice():
         check("알 수 없는 범위는 400", False, 400, 200)
     except urllib.error.HTTPError as e:
         check("알 수 없는 범위는 400", e.code == 400, 400, e.code)
-    st, _ = post("/api/admin/reprice/apply", {"scope": "nope", "expect_changed": 1})
+    # 반영 요청은 e28fee1 부터 작업 영수증 필드(operation_id·operation_context·
+    # request_fingerprint·expected)가 필수다. 그것이 빠진 요청은 가드에 닿기 전에
+    # 422 로 끝나므로, 형식은 온전하고 «내용만» 틀린 요청으로 가드를 겨눈다.
+    # 두 가드 모두 영수증 준비(prepare_reprice_operation)보다 앞이라 아무것도 남기지 않는다.
+    def _apply_body(scope, expected_scope):
+        zero = "0" * 64
+        return {"scope": scope, "expect_changed": 1,
+                "expected": {"version": "reprice_basis_v2", "scope": expected_scope,
+                             "fingerprint": zero},
+                "operation_id": "00000000-0000-4000-8000-000000000000",
+                "operation_context": {"contract_version": "admin_operation_v1",
+                                      "canonical_version": "reprice_request_v1",
+                                      "actor_id": 1,
+                                      "environment": "00000000-0000-4000-8000-000000000000",
+                                      "action": "reprice_apply"},
+                "request_fingerprint": zero}
+    st, _ = post("/api/admin/reprice/apply", _apply_body("nope", "live"))
     check("반영도 알 수 없는 범위는 400", st == 400, 400, st)
-    st, r = post("/api/admin/reprice/apply", {"scope": "live", "expect_changed": -1})
-    check("미리보기 확인값이 다르면 409", st == 409, 409, st)
+    st, r = post("/api/admin/reprice/apply", _apply_body("live", "all"))
+    check("미리보기 범위 불일치 409", st == 409, 409, st)
     st, _ = post("/api/admin/reprice/undo", {"log_id": 999999999})
     check("없는 재산정 기록 되돌리기는 404", st == 404, 404, st)
 
@@ -2912,7 +2995,12 @@ def test_no_fabricated_data():
     #
     # 기한을 미루려면 «왜 아직 유예인가»를 여기 적고 날짜를 옮긴다(그 자체가 기록이다).
     import datetime as _dt13
-    BAKED_EXPIRES = "2026-09-30"
+    # 2026-10-09 연장(2026-09-30 → 2026-12-31): 기한이 지나 회귀 run 37904056974 가 실패했다.
+    # 이 기한은 아래 유예 목록 «전체»에 걸린다. PR #25 가 병합되면 고객 `my-payments.html`
+    # 항목이 빠져 관리자 `candidate-pool.html`(P-09 동결 — 고칠 대상 아님) 하나만 남는다.
+    # #25 전에는 고객 항목도 이 연장을 함께 받는다.
+    # 연장은 제품 수정도 영구 면제도 아니다 — 기한이 오면 다시 판단한다.
+    BAKED_EXPIRES = "2026-12-31"
     _baked_expired = _dt13.date.today().isoformat() > BAKED_EXPIRES
 
     def baked_split(found_by_file, defer, label):
@@ -2956,8 +3044,9 @@ def test_no_fabricated_data():
     BAKED_ADMIN_DEFER = {
         "candidate-pool.html": (
             ["2,457"],
-            "구 /admin/*.html 백업용 동결(P-09) — 고치는 대신 admin2 에 새로 짓는다. "
-            "이 파일이 사라지거나 admin2 로 옮겨지면 이 항목도 지운다."),
+            "구 /admin/*.html 백업용 동결(P-09) — 고칠 대상이 아니다. 고치는 대신 admin2 에 새로 짓는다. "
+            "2026-08-18 _legacy/admin-phoenix/ 로 옮겨졌고(1e27d3d) 회귀가 그 폴더도 본다. "
+            "이 파일이 지워지면 이 항목도 지운다."),
     }
     baked = baked_split(baked_by_file(screens()), BAKED_ADMIN_DEFER, "관리자 화면")
     check("마크업에 콤마 숫자를 박아두지 않는다", baked == [], [], sorted(set(baked))[:8])
@@ -2975,10 +3064,8 @@ def test_no_fabricated_data():
         # my-page.html의 "812,000" 항목은 2026-08-20 주문·후기를 /api/my/* 실조회로
         # 바꾸며 마크업에서 사라졌다 — 유예 대상이 없어져 항목을 지운다(위 baked_split
         # ②가 "낡은 항목"으로 잡던 바로 그 사례).
-        "my-payments.html": (
-            ["1,735,000", "3,831,000"],
-            "범위 축소로 제거될 화면 — 회원 원장은 쇼핑몰이 갖는다(HANDOFF §2). "
-            "화면이 지워지면 이 항목도 함께 지운다."),
+        # my-payments.html의 "1,735,000"·"3,831,000"은 유예 만료(2026-09-30) 후
+        # 2026-10-09에 KPI 정적 마크업을 "—"로 바꾸며 사라져 항목을 지웠다.
     }
     cx_pairs = []
     for _p3 in sorted(_g9.glob(os.path.join(ROOT, "mockups", "mvp1", "*.html"))):
@@ -3785,7 +3872,15 @@ def test_stock_ledger():
         # 한계(고의로 남김): `delta = a - b`처럼 뺄셈을 중간 변수에 먼저 담고
         # `"q": delta`로 참조하면 이 검사는 못 찾는다 — 그런 리팩터링을 하면
         # FAIL로 드러나므로(조용히 통과하는 것보다 낫다) 그때 이 정규식을 같이 고친다.
-        _before_m = _re16.search(r"([A-Za-z_]\w*)\s*=\s*stock_before\.get\(", ci)
+        # 2026-10-09 (회귀 run #5): e28fee1 이 같은 CSV 안 중복 행을 위해 «달리는 스냅샷»
+        # `stock_current = dict(stock_before)` 를 두고 `b = stock_current.get(...)` 로 읽게
+        # 바꿨다(동작 검사는 tests/test_catalog_ingest_write_lock_order.py 의 [1,-1] 등).
+        # 원천이 여전히 stock_before 이므로, stock_before 를 «그대로 복사한» 변수만 같은
+        # 원천으로 인정한다(다른 dict 로 바꿔치기하면 여기서 FAIL).
+        _src = ["stock_before"] + _re16.findall(
+            r"([A-Za-z_]\w*)\s*=\s*dict\(\s*stock_before\s*\)", ci)
+        _before_m = _re16.search(
+            r"([A-Za-z_]\w*)\s*=\s*(?:%s)\.get\(" % "|".join(map(_re16.escape, _src)), ci)
         _q_m = _re16.search(
             r'"q"\s*:\s*\(?\s*([A-Za-z_]\w*)\s*-\s*([A-Za-z_]\w*)\s*\)?\s*,', ci)
         _delta_ok = (bool(_before_m) and bool(_q_m)
@@ -5295,6 +5390,14 @@ def _order_nos(items):
 # ──────────────────── 6. 고객 축 계약 (구매 인증·회원 경계) ────────────────────
 def test_customer():
     print("\n[6] 고객 축 계약 — 회원 경계·구매 인증 (슬라이스 10·12·30·38)")
+    if customer_auth_closed():
+        # 2026-10-09: 고객 인증이 C4 경계(PR #10)로 바뀌며 세션 저장소가 연결될 때까지
+        # 설계상 닫혀 있다. 닫힌 상태의 계약을 확인하고, 세션이 있어야 도는 경계 검사는
+        # 통과로 세지 않고 SKIP 으로 남긴다.
+        _check_customer_auth_closed("6")
+        check("[6] 회원 경계(401·타인 주문·환불 403·신규 0건) — 고객 세션 저장소 미연결(C2/I1)로 건너뜀",
+              True, "연결 후 실행", "건너뜀", kind="SKIP")
+        return
     # 슬라이스 38: 회원 경계는 **세션**이 정한다(?email= 은 더 이상 받지 않는다).
     check("미인증 회원 API 401", anon_status("/api/my/orders") == 401,
           401, anon_status("/api/my/orders"))
@@ -5643,13 +5746,18 @@ def test_swap():
 
 def test_guards():
     print("\n[7] 가드 — 상태 전이·권한 (슬라이스 7·11·19·30·35)")
-    member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
-    st, _ = post("/api/my/reviews", {"item_id": 999999,
-                                     "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
-    check("없는 주문 라인 후기 → 404", st == 404, 404, st)
-    st, _ = post("/api/my/reviews", {"item_id": 12,
-                                     "rating": 5, "body": "타인 주문 라인 테스트입니다"})
-    check("타인 주문 라인 후기 → 403", st == 403, 403, st)
+    closed = customer_auth_closed()
+    if closed:
+        check("[7] 후기 404·403 · 계정 연결 409 — 고객 세션 저장소 미연결(C2/I1)로 건너뜀",
+              True, "연결 후 실행", "건너뜀", kind="SKIP")
+    else:
+        member_login("mj.kim@example.com")        # 가드도 세션 주체로 확인(슬라이스 38)
+        st, _ = post("/api/my/reviews", {"item_id": 999999,
+                                         "rating": 5, "body": "존재하지 않는 라인 테스트입니다"})
+        check("없는 주문 라인 후기 → 404", st == 404, 404, st)
+        st, _ = post("/api/my/reviews", {"item_id": 12,
+                                         "rating": 5, "body": "타인 주문 라인 테스트입니다"})
+        check("타인 주문 라인 후기 → 403", st == 403, 403, st)
     # ── 개발 전용 dev-login 은 **열려 있으면 누구나 관리자가 된다** (2026-08-11)
     #    스위치가 꺼져 있으면 404, 켜져 있어도 localhost 밖이면 403이어야 한다.
     #    회귀는 로컬에서 도니 "켜졌으면 동작"까지만 확인하고, **운영 확인은 배포 문서가 맡는다**
@@ -5669,9 +5777,10 @@ def test_guards():
     check("입고 수량 0 → 400", st == 400, 400, st)
     st, _ = post("/api/admin/sourcing/request", {"product_code": 20489103, "supplier_ids": []})
     check("공급처 미선택 견적 요청 → 400", st == 400, 400, st)
-    member_login("sy.lee@example.com")
-    st, _ = post("/api/my/account/map", {"agree": True})
-    check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
+    if not closed:
+        member_login("sy.lee@example.com")
+        st, _ = post("/api/my/account/map", {"agree": True})
+        check("요청 없는 계정 연결 동의 → 409", st == 409, 409, st)
 
 
 def test_std_schema():
@@ -6625,10 +6734,25 @@ def test_supplier_scale():
     if st == 200:
         check("[49] data-screen-id=ADM-SRC-030", 'data-screen-id="ADM-SRC-030"' in html,
               True, 'data-screen-id="ADM-SRC-030"' in html)
-        check("[49] 목록 렌더가 항목을 자르지 않는다(전체를 그대로 그린다 — slice 없음)",
-              "S.data.items.map(rowHtml)" in html and ".slice(" not in html,
+        # 2026-10-06(#10)부터 목록은 서버 페이지네이션이고 렌더는 템플릿이 싣는 외부
+        # 스크립트에 있다. 그래서 «템플릿 HTML 안의 글자»가 아니라 **템플릿이 실제로
+        # 싣는 스크립트**를 따라가 본다 — 증명할 것은 그대로다: 서버가 준 행을 화면이
+        # 자르지 않고 전부 그린다, 범위 문구는 서버 total 로 말한다.
+        _srcs = re.findall(r'<script[^>]+src="/shared/([^"?]+)', html)
+        _js = ""
+        for _s in _srcs:
+            _p = os.path.join(ROOT, "mockups", "shared", _s)
+            if os.path.isfile(_p):
+                _js += io.open(_p, encoding="utf-8").read()
+        _code = html + _js
+        _has_map = "S.data.items.map(rowHtml)" in _code or "j.items.map(" in _code
+        _has_slice = ".slice(" in _code
+        check("[49] 목록 렌더가 항목을 자르지 않는다(서버가 준 행을 전부 그린다 — slice 없음)",
+              _has_map and not _has_slice,
               "전체 렌더·slice 없음",
-              {"map 있음": "S.data.items.map(rowHtml)" in html, "slice 있음": ".slice(" in html})
+              {"스크립트": _srcs, "map 있음": _has_map, "slice 있음": _has_slice})
+        check("[49] 목록 범위 문구가 서버 total 로 말한다(화면이 세지 않는다)",
+              "j.total" in _js, "j.total 사용", {"스크립트": _srcs})
 
 
 def test_alloc_capped_uncapped():
@@ -6749,7 +6873,9 @@ def main():
                test_game_copy_review_gate,
                test_game_context_gate,
                test_game_aliases,
-               test_market_bands_and_handling):
+               test_market_bands_and_handling,
+               test_sold_game_floor,
+               test_part_photos_open):
         try:
             fn()
         except Exception as e:
@@ -7234,8 +7360,8 @@ def test_talk_grid_contract():
            if _re.search(r"\bnotes?\b", m.group(0))]
     check("[54] app.js 의 addMessage 인자에 note/notes 가 없다(내부 사유 차단)",
           len(bad) == 0, 0, bad[:3])
-    check("[54] recommend 응답의 notes 는 배열이다(옛 화면이 문자열로 못 쓰게)",
-          isinstance(d.get("notes"), list), list, type(d.get("notes")).__name__)
+    check("[54] recommend 응답에 notes 가 없다(내부 사유·예외 원문은 서버 로그로만, 협업 6번)",
+          "notes" not in d, "없음", sorted(d)[:20])
 
     # ── ④ card_sets 수 == 게임 계열을 하나로 합친 usages 수 ────────────────
     # 이 검사가 실패하려면: 용도별 반복이 빠지거나(카드 한 벌만 나옴) 게임 계열을
@@ -7897,22 +8023,77 @@ def test_omitted_variant_screen():
 
     # ── ② 실 응답 → 실제 렌더 결과 ────────────────────────────────────────
     #   사무·주식은 제외가 있고(고성능), 영상편집은 없다. 서버에서 직접 받아 본다.
-    def _set_with_omission(state):
-        _st, d = post("/api/grid/recommend", {"state": state})
-        for s in ((d or {}).get("card_sets") or []):
-            for c in (s.get("cards") or []):
-                return c
-        return None
+    # 2026-10-09: 기본 추천 원천이 sold(POPCORN_RECO_SOURCE 기본값)다. sold 세트는
+    #   격자 카드를 싣지 않으므로(cards=[] · omitted_variants=[]) 아래 격자 검사는
+    #   grid 원천에서만 성립한다. 판정은 **요청마다** 한다 — 한 요청의 정상 sold 응답이
+    #   다른 요청의 500·빈 응답을 가리면 안 된다. 응답 하나를 아래 넷 중 하나로 가른다:
+    #     ("sold", None, None)    200 · 그 용도 세트가 있고 전부 sold · 빈 목록 계약 충족
+    #     ("grid", 카드, None)    200 · 그 용도 세트가 있고 전부 격자 · 카드가 있다
+    #     (None, None, 사유)      그 밖의 전부(상태 코드 · 본문 · 세트 없음 · 섞임 · 계약 위반)
+    def _classify57(st, d, usage):
+        if st != 200:
+            return None, None, f"HTTP {st}"
+        if not isinstance(d, dict) or not isinstance(d.get("card_sets"), list):
+            return None, None, "본문에 card_sets 목록이 없다"
+        mine = [x for x in d["card_sets"] if isinstance(x, dict) and x.get("usage") == usage]
+        if not mine:
+            return None, None, f"용도 {usage} 세트가 없다"
+        kinds = {x.get("kind") == "sold" for x in mine}
+        if kinds == {True, False}:
+            return None, None, "sold 와 격자 세트가 섞였다"
+        if kinds == {True}:
+            bad = [x for x in mine if x.get("cards") != [] or x.get("omitted_variants") != []]
+            if bad:
+                return None, None, "sold 세트에 cards/omitted_variants 가 비어 있지 않다"
+            return "sold", None, None
+        card = next((c for x in mine for c in (x.get("cards") or []) if isinstance(c, dict)), None)
+        if card is None:
+            return None, None, "격자 세트에 카드가 없다"
+        return "grid", card, None
+
+    # 판정기 자기시험 — 실패 응답과 섞인 응답을 정상으로 읽지 않는다.
+    _ok_sold = {"usage": "사무용", "kind": "sold", "cards": [], "omitted_variants": []}
+    _ok_grid = {"usage": "사무용", "kind": "nongame", "cards": [{"omitted_variant_keys": ["perf"]}]}
+    for _lbl, _args in (("HTTP 500", (500, {"detail": "x"}, "사무용")),
+                        ("빈 본문", (200, None, "사무용")),
+                        ("card_sets 없음", (200, {}, "사무용")),
+                        ("다른 용도만", (200, {"card_sets": [dict(_ok_sold, usage="영상편집")]}, "사무용")),
+                        ("sold·격자 섞임", (200, {"card_sets": [_ok_sold, _ok_grid]}, "사무용")),
+                        ("sold 인데 cards 있음", (200, {"card_sets": [dict(_ok_sold, cards=[{}])]}, "사무용"))):
+        _m, _c, _why = _classify57(*_args)
+        check(f"[57] ★자기시험: {_lbl} 응답은 정상으로 읽지 않는다", _m is None, "실패 판정", _m)
+    check("[57] ★자기시험: 정상 sold 응답은 sold 로 읽는다",
+          _classify57(200, {"card_sets": [_ok_sold]}, "사무용")[0] == "sold", "sold",
+          _classify57(200, {"card_sets": [_ok_sold]}, "사무용"))
+    check("[57] ★자기시험: 정상 격자 응답은 카드를 돌려준다",
+          _classify57(200, {"card_sets": [_ok_grid]}, "사무용")[0] == "grid", "grid",
+          _classify57(200, {"card_sets": [_ok_grid]}, "사무용")[0])
+
+    def _set_with_omission(state, usage):
+        st, d = post("/api/grid/recommend", {"state": state})
+        mode, card, why = _classify57(st, d, usage)
+        check(f"[57] {usage} 추천 응답이 정상이다(200 · 그 용도 세트 · 원천 한 종류)",
+              mode is not None, "sold 또는 격자", why)
+        return mode, card
 
     # 0110 — 「단순 사무용」은 usage_floors.usage_label 어휘에서 사라졌다(「사무용」으로
     #   합침 · 사장님 확정 ④). 옛 이름을 그대로 보내면 state 경로가 어휘 밖이라
     #   dropped 로 떨구고 card_sets 가 비는데, 그건 **정상 동작**이다(어휘의 정본은 DB).
     #   여기서 보려는 것은 «제외된 구성이 사유와 함께 내려오는가»지 옛 이름의 생존이
     #   아니므로 현행 이름을 쓴다. 옛 이름의 처리는 usage_label_map 이 맡는다([60]).
-    office = _set_with_omission({"usages": ["사무용"], "budget_won": 1500000,
-                                 "budget_bound": "이하"})
-    video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
-                                "budget_bound": "이하"})
+    office_mode, office = _set_with_omission({"usages": ["사무용"], "budget_won": 1500000,
+                                              "budget_bound": "이하"}, "사무용")
+    video_mode, video = _set_with_omission({"usages": ["영상편집"], "budget_won": 2500000,
+                                            "budget_bound": "이하"}, "영상편집")
+    if office_mode is None or video_mode is None:
+        return                      # 위에서 이미 FAIL 로 남았다
+    if office_mode != video_mode:
+        check("[57] 두 요청의 추천 원천이 같다", False, "같음", (office_mode, video_mode))
+        return
+    if office_mode == "sold":
+        check("[57] 격자 카드 제외 구성 검사 — 추천 원천이 sold 라 건너뜀",
+              True, "건너뜀", "sold", kind="SKIP")
+        return
     check("[57] 사무용 카드에 제외된 구성이 내려온다(고성능)",
           bool(office) and "perf" in (office.get("omitted_variant_keys") or []),
           "perf 제외", office and office.get("omitted_variant_keys"))
@@ -10370,6 +10551,103 @@ process.stdout.write(JSON.stringify(out));
           re.findall(r"#[0-9a-fA-F]{3,8}\b", seg)[:3])
     check("[61] 긴 답이 좁은 화면에서 넘치지 않는다(overflow-wrap)",
           "overflow-wrap:anywhere" in seg, "있음", "없음")
+
+
+def test_sold_game_floor():
+    """[65] 판매 상품 추천 — 게임 최소 수준 밑으로 내려가지 않는다 (2026-10-09 실사고).
+
+    배그·롤을 함께 적으면 둘 다 E 등급이라 캐주얼 수준(롤·발로란트·피파·메이플)으로
+    내려가, 배그를 FHD 로 못 돌리는 PC 가 「추천 구성」으로 나갔다. 캐주얼은 말한 게임
+    «전부»가 캐주얼 대상일 때만 쓴다(api/sold_reco.game_min_rank).
+
+    이 검사가 실패하려면: 최소 수준을 등급만 보고 정하거나, 고른 상품의 도달 수준이
+    최소 수준보다 낮아야 한다. 수준 rank 는 DB(product_fit_levels)에서 읽는다.
+    """
+    print(chr(10) + "[65] 판매 상품 추천 — 게임 최소 수준 (여러 게임은 가장 까다로운 쪽)")
+    st, d = post("/api/grid/recommend", {"state": {
+        "usages": ["게임"], "budget_won": 1500000, "budget_bound": "이하",
+        "game": {"names": ["배그", "롤"], "grade": "E", "grade_src": "catalog",
+                 "resolution": "1080p"}}})
+    sets = [x for x in ((d or {}).get("card_sets") or []) if isinstance(x, dict)
+            and x.get("usage_grid") == "게임"] if st == 200 else []
+    check("[65] 배그·롤 요청이 게임 세트를 돌려준다", st == 200 and len(sets) == 1,
+          "200 · 게임 세트 1", (st, len(sets)))
+    if not sets:
+        return
+    gs = sets[0]
+    if gs.get("kind") != "sold":
+        check("[65] 추천 원천이 sold 가 아니라 건너뜀", True, "건너뜀", gs.get("kind"), kind="SKIP")
+        return
+    rank_of = {r["level"]: r["level_rank"] for r in db_all(
+        "SELECT level, level_rank FROM product_fit_levels WHERE usage = '게임'")}
+    if not rank_of:
+        check("[65] 수준 대조 — DB 없음으로 건너뜀", True, "건너뜀", _db_why, kind="DB")
+        return
+    floor = rank_of.get(gs.get("min_level"))
+    check("[65] 배그·롤의 최소 수준이 FHD 이상이다(캐주얼로 내려가지 않는다)",
+          floor is not None and floor >= rank_of.get("FHD", 2), "FHD 이상", gs.get("min_level"))
+    low = [(i.get("product_code"), i.get("level")) for i in gs.get("items") or []
+           if rank_of.get(i.get("level"), 0) < (floor or 0)]
+    check("[65] 고른 상품 전부가 최소 수준 이상이다", not low, [], low)
+    over = [i.get("product_code") for i in gs.get("items") or []
+            if i.get("role") != "reference" and isinstance(i.get("price"), int)
+            and i["price"] > 1500000]
+    check("[65] 예산을 넘는 상품은 참고(reference)로만 나온다", not over, [], over)
+
+
+def test_part_photos_open():
+    """[66] 승인된 완제품 구성이 있으면 고객 응답에 부품 사진이 실제로 실린다 (2026-10-09 실사고).
+
+    부품 사진은 권리 근거값(POPCORN_PART_PHOTO_RIGHTS_REFERENCE)이 승인 원장의 값과 바이트
+    단위로 같을 때만 열린다. 서버에 환경변수가 없어 그 값이 None 이 됐고, 모든 구성이 조용히
+    닫혀 고객 화면의 부품 사진이 전부 사라졌다 — 에러도 500 도 없이 404 로만.
+    지금은 환경변수가 없으면 저장소 설정 파일(docs/rights/part-photo-rights-reference.json)을 쓴다.
+
+    이 검사가 실패하려면: 권리 근거값을 읽지 못하거나, 발행 승인된 판매중 구성이 있는데
+    고객 응답의 부품 사진이 하나도 approved 가 아니어야 한다.
+    """
+    print(chr(10) + "[66] 부품 사진 — 승인된 구성이 있으면 고객 응답이 비지 않는다")
+    from api import customer_pc_offer as _cpo
+    ref = _cpo.rights_reference()
+    check("[66] 부품 사진 권리 근거값을 읽는다(환경변수 또는 저장소 설정)",
+          bool(ref), "값 있음", ref)
+    if _engine is None:
+        check("[66] 승인 구성 대조 — DB 없음으로 건너뜀", True, "건너뜀", _db_why, kind="DB")
+        return
+    # 이미지 바이트는 서버가 비공개 버킷에서 VM 자격 증명(ADC)으로 읽는다. 로컬은 개인 자격
+    # 증명으로 읽혀서 «로컬에선 보이는데 서버에선 안 보이는» 갈래가 된다 — 503 이면 그것이다.
+    img = [r["code"] for r in db_all(
+        "SELECT source_product_code AS code FROM product_explanations"
+        " WHERE content ? 'image_asset' ORDER BY source_product_code LIMIT 3")]
+    if img:
+        got = [(c, anon_call(f"/api/product-images/{c}/detail")[0]) for c in img]
+        check("[66] 등록된 부품 이미지를 서버가 저장소에서 읽는다(503 = 저장소 권한 없음)",
+              all(st == 200 for _c, st in got), "전부 200", got)
+    else:
+        check("[66] 등록된 부품 이미지가 없어 저장소 읽기 검사를 건너뜀", True, "건너뜀", 0, kind="SKIP")
+    codes = [r["code"] for r in db_all(
+        "SELECT p.product_code AS code FROM pc_configuration_offers o"
+        " JOIN products p ON o.offer_id = 'P' || p.product_code::text"
+        " JOIN LATERAL (SELECT action FROM pc_customer_publication_events e"
+        "   WHERE e.configuration_id = o.configuration_id ORDER BY event_seq DESC LIMIT 1) l ON true"
+        " WHERE l.action = 'approve' AND p.status = '판매중' ORDER BY p.product_code LIMIT 5")]
+    if not codes:
+        check("[66] 발행 승인된 판매중 구성이 없어 건너뜀(판정 불가)", True, "건너뜀", 0, kind="SKIP")
+        return
+    opened, photos, why = [], 0, []
+    for code in codes:
+        st, d, _h = anon_call(f"/api/customer/pc-offers/{code}")
+        if st != 200 or not isinstance(d, dict):
+            why.append((code, st))
+            continue
+        parts = ((d.get("public_configuration") or {}).get("parts") or [])
+        n = sum(1 for x in parts if isinstance(x, dict)
+                and (x.get("photo") or {}).get("state") == "approved")
+        opened.append(code)
+        photos += n
+    check("[66] 승인 구성 중 하나 이상이 고객 응답으로 열린다",
+          bool(opened), f"{len(codes)}건 중 1건 이상", why)
+    check("[66] 열린 구성의 부품 사진이 비어 있지 않다", photos > 0, "1장 이상", photos)
 
 
 if __name__ == "__main__":

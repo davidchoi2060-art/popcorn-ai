@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import text
 from .db import engine
+from .timeutil import now_iso
 from .pc_configuration_edit import description_complete
 from .part_explanations import is_current
 from .taxonomy import SLOT_LABELS
@@ -256,7 +257,7 @@ def list_configurations(offset:int=Query(0,ge=0),limit:int=Query(20,ge=1,le=104)
     return dict(total=len(rows),catalog_total=len(all_rows),offset=offset,limit=limit,
                 items=rows[offset:offset+limit],customer_publishable=False,
                 summary=queue_counts(base),summary_total=len(base),issue_groups=issue_groups(base),
-                changed_count=sum(bool(r.get('market_alerts')) for r in base),checked_at=datetime.now(timezone.utc).isoformat())
+                changed_count=sum(bool(r.get('market_alerts')) for r in base),checked_at=now_iso())
 
 
 def export_workbook(rows):

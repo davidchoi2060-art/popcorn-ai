@@ -1,0 +1,63 @@
+# 개발 서버(popcorn-app) 고객 화면 점검 — 읽기 전용.
+#
+# 사람이 화면을 열지 않아도 「배그와 롤, 150만원」 추천 결과에 사진이 실리는지
+# 클라우드 작업 세션이 run 요약으로 확인하려고 둔다. DB 접속·비밀값 사용 없음.
+# 공개 고객 API 두 개(/api/talk/parse → /api/grid/recommend)를 화면과 같은 본문으로
+# 부르고 응답을 요약할 뿐이다.
+#
+# ⚠ pull_request 트리거는 넣지 않는다(self-hosted 러너 — deploy.yml 머리말 참조).
+name: 개발 서버 화면 점검
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: '상담 문장'
+        default: '배그와 롤, 150만원으로 추천해줘'
+      probes:
+        description: '추가 GET 확인(경로:횟수, 쉼표 구분)'
+        default: '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1'
+  workflow_run:
+    workflows: ['배포']
+    types: [completed]
+
+concurrency:
+  group: dev-screen-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: [self-hosted, popcorn-vm]
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
+      - name: 추천 API 점검
+        shell: bash
+        env:
+          BASE: https://popcornai.co.kr
+          TEXT: ${{ inputs.text || '배그와 롤, 150만원으로 추천해줘' }}
+          PROBES: ${{ inputs.probes || '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1' }}
+        run: python3 tools/ci/dev_screen_check.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: 일괄 작업 로그 요약 (읽을 수 있을 때만)
+        shell: bash
+        run: |
+          {
+            echo '### 서버 /tmp 작업 로그'
+            for f in /tmp/import-apply.json /tmp/approve-apply.log; do
+              if [ -r "$f" ]; then
+                echo "**$f** ($(wc -c <"$f") bytes, $(date -r "$f" '+%F %T %Z'))"
+                echo '```'
+                grep -E '구성|합계|total|summary|selected|uploaded|committed|failed' "$f" | head -20 || true
+                echo '... (마지막 8줄)'
+                tail -n 8 "$f"
+                echo '```'
+              else
+                echo "- $f: 읽을 수 없음(없거나 권한 없음)"
+              fi
+            done
+          } | tee -a "$GITHUB_STEP_SUMMARY"

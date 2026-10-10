@@ -68,6 +68,51 @@
     if (collapsed) { collapsed = false; applyCollapse(); }
   }
 
+  // NEW mobile disclosure is RAM-only: desktop/group session keys keep their meaning.
+  function initMobileLnb() {
+    var button = document.getElementById('lnbMobileToggle');
+    var menu = document.getElementById('lnbMenu');
+    if (!lnb || !button || !menu || document.body.getAttribute('data-admin-mode') !== 'new') return;
+    var media = window.matchMedia('(max-width:768px)');
+    var mobileOpen = false;
+    function applyMobile() {
+      var active = document.activeElement;
+      var closingFocus = media.matches && !mobileOpen && menu.contains(active);
+      menu.hidden = media.matches && !mobileOpen;
+      button.setAttribute('aria-expanded', String(media.matches && mobileOpen));
+      button.setAttribute('aria-label', mobileOpen ? '메뉴 닫기' : '메뉴 열기');
+      document.getElementById('lnbMobileLabel').textContent = mobileOpen ? '메뉴 닫기' : '메뉴 열기';
+      lnb.setAttribute('data-mobile-open', String(media.matches && mobileOpen));
+      if (media.matches) {
+        lnb.classList.remove('collapsed');
+        document.getElementById('lnbBrand').textContent = '팝콘 AI';
+        if (closingFocus || active === document.getElementById('lnbToggle')) button.focus({ preventScroll: true });
+      } else {
+        applyCollapse();
+        if (active === button) document.getElementById('lnbToggle').focus({ preventScroll: true });
+      }
+    }
+    button.addEventListener('click', function () {
+      if (!media.matches) return;
+      mobileOpen = !mobileOpen;
+      applyMobile();
+    });
+    lnb.addEventListener('keydown', function (ev) {
+      if (!media.matches || !mobileOpen || ev.key !== 'Escape' || !lnb.contains(ev.target)) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      mobileOpen = false;
+      applyMobile();
+    });
+    function changeMobile() {
+      mobileOpen = false;
+      applyMobile();
+    }
+    if (media.addEventListener) media.addEventListener('change', changeMobile);
+    else media.addListener(changeMobile);
+    applyMobile();
+  }
+
   if (lnb) {
     lnb.addEventListener('click', function (ev) {
       var toggle = ev.target.closest('[data-action="toggle-lnb"]');
@@ -76,6 +121,7 @@
       if (grp) { toggleGroup(grp); }
     });
     initLnb();
+    initMobileLnb();
   }
 
   // ── 권한 표시 — `/api/admin/auth/me`를 화면마다 다시 부르지 않는다 ──────────

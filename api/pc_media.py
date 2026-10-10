@@ -52,6 +52,35 @@ def visual_snapshot(real,rows,cooling):
     return copy.deepcopy(dict(parts=visual,cooling=cooling,notice=NOTICE))
 
 
+def _optional_image_check(check,parts):
+    if check.get('state') not in ('pass','fail','unknown','not_applicable'):return False
+    if check.get('stage') not in ('none','recommendation','assembly'):return False
+    key=check.get('key')
+    if key=='gpu_len':return True
+    if not isinstance(key,str) or re.fullmatch(r'gpu_len:[0-9]+:[0-9]+',key) is None:return False
+    _,left,right=key.split(':')
+    if str(int(left))!=left or str(int(right))!=right:return False
+    return (any(p['ordinal']==int(left) and p['slot']=='GPU' and not p['pseudo'] for p in parts)
+            and any(p['ordinal']==int(right) and p['slot']=='CASE' and not p['pseudo'] for p in parts))
+
+
+def _blocking_image_check(check,parts):
+    if check.get('stage')=='assembly' or check['state']=='pass':return False
+    return not _optional_image_check(check,parts)
+
+
+def _image_blockers(review,parts):
+    # Remove only a GPU-length rule's uniquely attributable failure message.
+    # Review/recommendation state and the original warnings stay unchanged.
+    optional_errors=set()
+    for check in review['checks']:
+        label=check.get('label')
+        if (_optional_image_check(check,parts) and check['state']=='fail' and isinstance(label,str)
+                and sum(x.get('label')==label for x in review['checks'])==1):
+            optional_errors.add(label+' · 현재 DB 사양 불일치')
+    return [message for message in review['blockers'] if message not in optional_errors]
+
+
 def snapshot(c,identity,lock=False):
     config,parts,offers,review=load_review(c,identity,lock=lock)
     real=[p for p in parts if not p['pseudo']]
@@ -59,21 +88,44 @@ def snapshot(c,identity,lock=False):
     rows={r['source_product_code']:dict(r) for r in c.execute(text('SELECT * FROM product_explanations WHERE source_product_code=ANY(:codes)'),dict(codes=codes)).mappings()}
     visual=visual_snapshot(real,rows,review['cooling_plan'])['parts']
     case=next((p for p in visual if p['slot']=='CASE'),None)
-    errors=list(review['blockers'])
+    errors=_image_blockers(review,parts)
     if not {'CPU','MB','RAM','SSD','POWER','CASE'}.issubset({p['slot'] for p in real}):errors.append('전체 필수 부품 구성 필요')
     if not case or not case['image']:errors.append('케이스 기준 사진 등록 필요')
     if not review['checks']:errors.append('활성 호환성 검사 필요')
-    if any(x['state']!='pass' and x.get('stage')!='assembly' for x in review['checks']):errors.append('호환 규격 불일치·미확인 항목 보완 필요')
+    if any(_blocking_image_check(x,parts) for x in review['checks']):errors.append('호환 규격 불일치·미확인 항목 보완 필요')
     if review['cooling_plan'].get('installed')=='unknown':errors.append('장착 CPU 쿨러 확인 필요')
     result=dict(parts=visual,cooling=review['cooling_plan'],notice=NOTICE)
     visual_basis=digest(result)
     return dict(title=config['content'].get('title',identity),snapshot=result,visual_basis=visual_basis,
         basis=digest(dict(review=review['basis'],visual=visual_basis)),errors=errors,
-        assembly_checks=review['assembly_checks'],configuration_id=identity)
+        assembly_checks=review['assembly_checks'],configuration_id=identity,
+        optional_checks=copy.deepcopy([x for x in review['checks'] if _optional_image_check(x,parts)]))
+
+
+def _display_job(row):
+    # Read-only display metadata, not a reuse/publication authority source.
+    result={k:row[k] for k in ('job_id','status','phase','visual_basis','model',
+        'selected','created_at','updated_at','staged_available')}
+    origin=row.get('origin_kind')
+    result['origin_kind']=origin if origin in ('generated','existing_import') else None
+    if origin=='existing_import':result['model']=None
+    # Never expose exception/raw actor/provenance or substitute registration
+    # identity/time for original generation history. No verified sources wired.
+    result.update(registration_actor_label=None,original_created_at=None,
+        original_creator_label=None,reuse_approval_status=None,publication_status=None)
+    errors={'generated':{'generation':'이미지 생성 실패','storage':'생성 이미지 저장 실패'},
+            'existing_import':{'import_failed':'원본 등록 실패'}}
+    fallback={'generated':'생성 처리 실패 · 단계 확인 필요',
+              'existing_import':'원본 등록 처리 실패 · 단계 확인 필요'}
+    result['error']=(errors.get(origin,{}).get(row['phase'],fallback.get(origin,'처리 실패'))
+        if row['status']=='failed' else None)
+    return result
 
 
 def jobs(c,identity):
-    return [dict(r) for r in c.execute(text('SELECT job_id,status,phase,error,visual_basis,model,selected,created_at,updated_at,staged_png IS NOT NULL AS staged_available FROM pc_media_jobs WHERE configuration_id=:id ORDER BY created_at DESC LIMIT 20'),dict(id=identity)).mappings()]
+    # to_jsonb projection is also safe on pre-0134 rows: absent origin is NULL,
+    # never inferred from model/date/status or substituted with 'generated'.
+    return [_display_job(dict(r)) for r in c.execute(text("SELECT j.job_id,j.status,j.phase,j.visual_basis,j.model,j.selected,j.created_at,j.updated_at,j.staged_png IS NOT NULL AS staged_available,to_jsonb(j)->>'origin_kind' AS origin_kind FROM pc_media_jobs j WHERE j.configuration_id=:id ORDER BY j.created_at DESC LIMIT 20"),dict(id=identity)).mappings()]
 
 @router.get('/api/admin/pc-media/{identity}')
 def state(identity:str):
@@ -172,10 +224,15 @@ def upload(job,raw):
 
 
 def work(job_id,storage_only=False):
+    # 0134 backfills existing rows with origin_kind='generated'. Missing origin
+    # (including a pre-0134 schema) is unknown, never an implicit generated row.
+    # Resolve origin OUTSIDE the failure handler: an unreadable/import row must
+    # not be rewritten as a general generation/storage failure.
+    with engine.connect() as c:job=dict(c.execute(text('SELECT * FROM pc_media_jobs WHERE job_id=:j'),dict(j=job_id)).mappings().one())
+    if job.get('origin_kind')!='generated':return
     path=SPOOL/(str(UUID(job_id))+'.png')
     phase='storage' if storage_only else 'generation'
     try:
-        with engine.connect() as c:job=dict(c.execute(text('SELECT * FROM pc_media_jobs WHERE job_id=:j'),dict(j=job_id)).mappings().one())
         if job['status']!='running':return
         if storage_only:raw=bytes(job['staged_png']) if job.get('staged_png') is not None else path.read_bytes()
         else:
@@ -196,7 +253,7 @@ def retry_storage(identity:str,job_id:UUID,request:Request,background:Background
     permission(request)
     with engine.begin() as c:
         row=c.execute(text('SELECT * FROM pc_media_jobs WHERE job_id=:j AND configuration_id=:id FOR UPDATE'),dict(j=job_id,id=identity)).mappings().first()
-        if not row or row['status']!='failed' or row['phase']!='storage':raise HTTPException(409,'저장 재시도 대상 없음')
+        if not row or row.get('origin_kind')!='generated' or row['status']!='failed' or row['phase']!='storage':raise HTTPException(409,'저장 재시도 대상 없음')
         if row.get('staged_png') is None and not (SPOOL/(str(job_id)+'.png')).exists():raise HTTPException(409,'생성 원본 없음 · 다시 생성 필요')
         c.execute(text("UPDATE pc_media_jobs SET status='running',error=NULL,updated_at=now() WHERE job_id=:j"),dict(j=job_id))
     background.add_task(work,str(job_id),True)

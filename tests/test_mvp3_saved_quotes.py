@@ -21,12 +21,16 @@ PRODUCT = {'product_code': 17, 'name': 'real stored product', 'price': 1500000,
            'price_src': 'current database price', 'spec': {'cpu': 'actual stored model', 'ram_gb': 32,
              'cpu_mt': 12345, 'operator_note': 'private', 'vram_gb': True},
            'reasons': ['stored reason'], 'operator_id': 9, 'purchase_price': 42}
-RECO = {'card_sets': [{'kind': 'sold', 'items': [PRODUCT]}]}
+RECO = {'card_sets': [{'kind': 'sold', 'items': [dict(PRODUCT, photo={'state': 'available', 'url': 'stale'},
+                                                      public_configuration={'stale': True})]}]}
+LIVE = {'photo': {'state': 'available', 'kind': 'ai_assembly_example',
+                  'url': '/api/customer/products/17/representative-image', 'notice': 'n'},
+        'public_configuration': {'product_code': 17}}
 
 
 def body(**kwargs):
-    return m.SaveBody(request_id=UUID(int=1), product_code=17, expected_price=1500000,
-                      state={'usages': ['게임']}, **kwargs)
+    return m.SaveBody(**{'request_id': UUID(int=1), 'product_code': 17, 'expected_price': 1500000,
+                         'state': {'usages': ['게임']}, **kwargs})
 
 
 class Result:
@@ -43,6 +47,8 @@ class Store:
     def begin(self): yield self
     def execute(self, sql, p):
         sql = str(sql); self.executed.append((sql, p))
+        if 'rate_limit_policies' in sql:
+            return Result([])
         if 'INSERT INTO' in sql:
             import json
             if not any(r['user_id'] == p['u'] and r['owner_key_hash'] == p['owner'] and r['request_id'] == p['r'] for r in self.rows):
@@ -58,10 +64,13 @@ class Store:
 class SavedQuotesTest(unittest.TestCase):
     def setUp(self):
         self.store = Store()
+        m.access_gate._reset_for_test()
+        self.addCleanup(m.access_gate._reset_for_test)
         self.patches = [patch.object(m, 'engine', self.store),
                         patch.object(m.visitor, 'resolve', return_value=11),
                         patch.object(m, 'load_vocab', return_value=None),
                         patch.object(m, 'validate_state', return_value=(SimpleNamespace(model_dump=lambda: {'usages': ['게임']}), [])),
+                        patch.object(m.customer_pc_offer, 'public_item', side_effect=lambda code: dict(LIVE)),
                         patch.object(m.grid_public, 'recommend', return_value=RECO)]
         self.mocks = [p.start() for p in self.patches]
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
@@ -73,6 +82,20 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertNotIn('purchase_price', q['product'])
         self.assertFalse(q['product']['price_confirmed'])
         self.assertEqual(q['product']['spec'], {'cpu': 'actual stored model', 'ram_gb': 32})
+
+    def test_photo_and_configuration_are_live_not_snapshotted(self):
+        q = m.save_quote(body(), request(), Response())['quote']
+        self.assertEqual((q['product']['photo'], q['product']['public_configuration']),
+                         (LIVE['photo'], LIVE['public_configuration']))
+        stored = self.store.rows[0]['product_snapshot']
+        self.assertNotIn('photo', stored)
+        self.assertNotIn('public_configuration', stored)
+        # 승인·선택이 바뀌면 다음 조회가 바로 따른다
+        LIVE_NOW = {'photo': {'state': 'unavailable', 'url': None}, 'public_configuration': None}
+        self.mocks[4].side_effect = lambda code: dict(LIVE_NOW)
+        listed = m.list_quotes(request(), Response(), limit=20)['quotes'][0]['product']
+        self.assertEqual((listed['photo'], listed['public_configuration']), (LIVE_NOW['photo'], None))
+        self.assertNotIn('photo', self.store.rows[0]['product_snapshot'])
 
     def client(self):
         app = FastAPI()
@@ -119,6 +142,57 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertEqual(first, m.save_quote(body(), request(), Response()))
         self.assertEqual(len(self.store.rows), 1)
 
+    def test_new_saves_are_rate_limited_per_visitor(self):
+        for i in range(m.SAVE_PER_MINUTE):
+            m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+        with self.assertRaises(HTTPException) as ex:
+            m.save_quote(body(request_id=UUID(int=999)), request(), Response())
+        self.assertEqual(ex.exception.status_code, 429)
+        d = ex.exception.detail
+        self.assertEqual((d['error'], d['window']), ('rate_limited', 'minute'))
+        self.assertIsInstance(d['retry_after_sec'], int)
+        self.assertEqual(ex.exception.headers['Retry-After'], str(d['retry_after_sec']))
+        self.assertEqual(d['detail'], f"잠시 동안 견적 저장 요청이 많았습니다. {d['retry_after_sec']}초 후 다시 저장해 주세요.")
+        self.assertEqual(len(self.store.rows), m.SAVE_PER_MINUTE)
+
+    def test_daily_limit_uses_day_message(self):
+        with patch.object(m, 'SAVE_PER_MINUTE', 100), patch.object(m, 'SAVE_PER_DAY', 3):
+            for i in range(3):
+                m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+            with self.assertRaises(HTTPException) as ex:
+                m.save_quote(body(request_id=UUID(int=999)), request(), Response())
+        d = ex.exception.detail
+        self.assertEqual((ex.exception.status_code, d['window']), (429, 'day'))
+        self.assertEqual(d['detail'], '오늘 저장할 수 있는 견적 수에 도달했습니다. 내일 다시 저장해 주세요.')
+        # "내일" is only true because the day window ends at the next KST midnight.
+        self.assertLessEqual(d['retry_after_sec'], 24 * 3600)
+        self.assertEqual(len(self.store.rows), 3)
+
+    def test_replay_still_wins_while_limited(self):
+        first = m.save_quote(body(), request(), Response())
+        for i in range(m.SAVE_PER_MINUTE - 1):
+            m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+        with self.assertRaises(HTTPException):
+            m.save_quote(body(request_id=UUID(int=999)), request(), Response())
+        self.assertEqual(m.save_quote(body(), request(), Response()), first)
+
+    def test_replay_does_not_count_toward_limit(self):
+        for _ in range(m.SAVE_PER_MINUTE + 5):
+            m.save_quote(body(), request(), Response())
+        m.save_quote(body(request_id=UUID(int=2)), request(), Response())
+        self.assertEqual(len(self.store.rows), 2)
+
+    def test_save_limit_does_not_spend_ai_call_budget(self):
+        for i in range(m.SAVE_PER_MINUTE):
+            m.save_quote(body(request_id=UUID(int=100 + i)), request(), Response())
+        # AI parse/explain still has its own full per-minute allowance.
+        for _ in range(m.access_gate.DEFAULT_PER_MINUTE):
+            m.access_gate.check_rate(self.store, request(), what='talk.parse')
+        # ...and keeps its own, unchanged wording when exhausted.
+        with self.assertRaises(HTTPException) as ex:
+            m.access_gate.check_rate(self.store, request(), what='talk.parse')
+        self.assertTrue(ex.exception.detail['detail'].startswith('방문자별 AI 호출 한도 초과 - 분당'))
+
     def test_changed_request_id_content_is_rejected(self):
         m.save_quote(body(), request(), Response())
         changed = body(); changed.expected_price = 1
@@ -160,7 +234,8 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertEqual(self.store.executed, [])
 
     def test_owner_change_before_insert_is_rejected(self):
-        self.mocks[1].side_effect = [11, 22]
+        # owner lookup, rate-limit subject lookup, then the changed owner at insert time
+        self.mocks[1].side_effect = [11, 11, 22]
         with self.assertRaises(HTTPException) as ex: m.save_quote(body(), request(), Response())
         self.assertEqual(ex.exception.status_code, 403)
         self.assertEqual(self.store.rows, [])

@@ -160,6 +160,15 @@ class SoldReadTests(unittest.TestCase):
         self.assertIsNone(result['price']['amount'])
         self.assertEqual(result['stock'], dict(state='unknown', checked_at=None))
 
+    def test_missing_fact_value_is_shown_as_unknown_not_dropped(self):
+        parts = [dict(ordinal=0, slot='CPU', quantity=1, pseudo=False, explanation_code=11)]
+        rows = {11: dict(content=dict(name='CPU', role='역할', facts=[
+            dict(label='소켓', value='LGA1851'), dict(label='기본 전력', value=None),
+            dict(label='최대 클럭', value='  '), dict(label=3, value='x'), 'broken']))}
+        self.assertEqual(self.adapter._public_parts(parts, rows)[0]['specs'],
+                         [dict(label='소켓', value='LGA1851'), dict(label='기본 전력', value='정보 없음'),
+                          dict(label='최대 클럭', value='정보 없음')])
+
     def test_private_false_and_all_source_inputs_remain_unchanged(self):
         original = deepcopy((self.conn.config, self.conn.parts, self.conn.offers, self.conn.rows, self.conn.events))
         self.assertEqual(self.read()['status'], 200)

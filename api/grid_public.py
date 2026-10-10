@@ -27,6 +27,8 @@
   · `notes[]` 는 서버 내부 사유(로그·디버그용)다. 화면은 이것을 고객 말풍선에 싣지
     않는다(되묻기는 AI 의 reply 만) — 옛 화면이 실수로 못 쓰게 필드명을 `note`(문자열)
     에서 `notes`(배열)로 바꿨다.
+    2026-10-08(협업 6번): 응답에서 아예 뺐다. 공개 경로라 누구나 읽을 수 있는데
+    DB 예외 원문(`insert failed: {err}`)까지 실렸다. 이제 서버 로그에만 남는다.
 
 ■ 스키마 대전환(0091·0092, 이 재작성의 배경 — A-135)
   옛 판(0072~0082): grid_cells.tier 는 브랜드명 문자열이고 budget_min/max 가
@@ -91,6 +93,7 @@ from sqlalchemy import text
 from . import game_copy as GC
 from .db import engine
 from . import sold_reco as SOLD
+from . import customer_pc_offer as _PC_OFFER
 
 # 고객 추천 원천 스위치(2026-09-25 재설계 4단계). 기본 「sold」= 판매 중인 몰 조립PC.
 # 「grid」로 두면 옛 조합 격자(grid_quotes)로 돌아간다 — 격자 코드·표는 지우지 않았다.
@@ -712,7 +715,6 @@ def recommend(body: RecommendBody):
           dropped[]        validate_state 가 접은 값 [{field, value, reason}] 그대로 — 화면이
                            '반영하지 못한 조건'(예: resolution=8K → 1080p)을 고객에게 말할 수
                            있게 싣는다(parse 응답의 dropped 와 같은 모양). legacy 경로는 [],
-          notes[]          서버 내부 사유(로그·디버그) — 고객 문구 아님,
           platform, budget_won, budget_bound, game_grade, game_resolution, game_name}
 
       cards[].quotes = {value, reco, perf} — 칸 하나의 3종 구성. 각 안에 {quote_id,
@@ -762,18 +764,24 @@ def recommend(body: RecommendBody):
         game_resolution = game_name = None
         if RECO_SOURCE == "sold":
             # 2026-09-25 재설계 4단계 — 조합 격자 대신 판매 중인 몰 조립PC 최대 2개(api/sold_reco).
-            # 게임은 등급이 있어야 수준을 정한다(needs 에 game.grade 가 남는 것은 그대로).
+            # 판매 경로의 수준은 등급이 아니라 게임명·해상도가 정한다(sold_reco.game_min_rank).
+            # 게임명이 «없으면» 해상도 기준(기본 FHD)으로 등급 없이 추천한다(2026-10-09 조정 결정:
+            # 「게임용 250만원」이 0장이었다). 게임명이 «있는데» 등급이 없으면 validate_state 가
+            # 「전체 게임 적합성 확인 전 추천 보류」로 막은 것이라 그대로 보류한다.
+            # needs 의 game.grade 는 어느 쪽이든 그대로.
+            named = bool(state.game and state.game.names)
+            sold_games = game_usages if (game_grade is not None or not named) else []
             others = [u for u in state.usages if not is_game_usage(u)]
-            card_sets.extend(SOLD.card_sets(
-                state, game_usages if game_grade is not None else [], others, notes))
-            if game_usages and game_grade is not None:
-                game_resolution = state.game.resolution or DEFAULT_RESOLUTION
-                game_name = state.game.names[0] if state.game.names else None
-                if state.game.resolution is None:
+            card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab))
+            if sold_games:
+                g = state.game
+                game_resolution = (g.resolution if g else None) or DEFAULT_RESOLUTION
+                game_name = g.names[0] if g and g.names else None
+                if g is None or g.resolution is None:
                     assumed.append(ASSUMED_RESOLUTION)
-                if state.game.grade_src == "ai_estimate":
-                    ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
-                ctx = _game_context(conn, state.game.names, vocab)
+                if g is not None and game_grade is not None and g.grade_src == "ai_estimate":
+                    ai_estimated.append({"game_names": list(g.names), "grade": game_grade})
+                ctx = _game_context(conn, g.names if g else [], vocab)
                 for cs in card_sets:
                     if cs["usage_grid"] == "게임":
                         cs["game_context"] = ctx
@@ -797,6 +805,10 @@ def recommend(body: RecommendBody):
             if state.game.grade_src == "ai_estimate":
                 ai_estimated.append({"game_names": list(state.game.names), "grade": game_grade})
 
+    # ── 판매 상품 카드에 공개 구성·대표 사진 (PR #2 댓글 6059780234 매핑) ──
+    # 판정은 customer_pc_offer 한 곳 — 공개가 아니면 photo=unavailable, public_configuration=None.
+    _PC_OFFER.attach([it for cs in card_sets if cs.get("kind") == "sold" for it in cs.get("items") or []])
+
     # ── §6 ② 추정 기록 — 카드를 낸 시점, 별도 트랜잭션, 실패해도 응답은 그대로 ──
     # ⚠ G-5 (2026-09-16 사장님 확정): **게임명이 빈 추정은 기록하지 않는다.**
     #   "요즘 대작 다 돌리고 싶어요" 처럼 이름 없이 등급만 추정된 경우 원장에 남겨도
@@ -809,6 +821,10 @@ def recommend(body: RecommendBody):
     elif ai_estimated:
         notes.append("ai_estimate without game names - not recorded (G-5)")
 
+    # 내부 사유는 응답에 싣지 않는다 — 공개 경로라 예외 원문이 고객에게 간다(협업 6번).
+    if notes:
+        log.info("[grid_public] recommend notes: %r", notes)
+
     return {
         "ok": True,
         "card_sets": card_sets,
@@ -817,7 +833,6 @@ def recommend(body: RecommendBody):
         "ai_estimated": ai_estimated,
         "needs": needs,
         "dropped": dropped,
-        "notes": notes,
         "platform": platform,
         "budget_won": state.budget_won,
         "budget_bound": state.budget_bound,

@@ -275,3 +275,163 @@ body.live-mode #chat-form textarea:focus-visible{outline:none}
  .gateway-root .purpose-layout{width:100%;max-width:1320px;margin:0 auto;padding:0 40px 58px}
  .gateway-root>.route-back{align-self:flex-start;margin:28px 0 28px max(40px,calc((100% - 1240px)/2))}
 }
+
+/* Server-bound AI assembly examples retain their notice in every state. */
+.live-product-photo{margin:0 0 16px;border:1px solid var(--line);border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden}
+.live-product-photo img{display:block;width:100%;height:180px;object-fit:contain}
+.live-product-photo.is-unavailable{min-height:72px;padding:12px;border-style:dashed;color:var(--muted);font-size:14px;text-align:center}
+.live-summary{grid-template-columns:140px minmax(0,1fr) 200px}
+.live-summary>.live-product-photo{margin:0}
+.live-summary>.live-product-photo img{height:140px}
+@media(max-width:1100px){.live-summary{grid-template-columns:1fr}.live-summary>.live-product-photo{width:100%;margin-bottom:8px}.live-summary>.live-product-photo img{height:160px}}
+
+.live-product-photo-notice{padding:8px 10px;color:var(--muted);font-size:12px;line-height:1.5;text-align:center;overflow-wrap:anywhere}
+.live-product-photo .live-product-image-status{margin:0;font-size:14px;line-height:1.5;color:var(--muted)}
+
+/* Approved results/detail hierarchy, populated only by public sold-product data. */
+body.live-mode.original-flow .live-product-card{gap:10px;padding:24px;min-width:0}
+body.live-mode.original-flow .live-card-heading{display:grid;grid-template-columns:minmax(0,1fr) 38%;gap:16px;width:100%;align-items:start}
+body.live-mode.original-flow .live-card-copy{min-width:0}
+body.live-mode.original-flow .live-product-card h3{font-size:22px;line-height:1.4;color:var(--green);margin:20px 0 12px;overflow-wrap:anywhere}
+body.live-mode.original-flow .live-card-intro{font-size:16px;line-height:1.7;color:var(--muted);margin:0}
+body.live-mode.original-flow .live-product-name{font-size:14px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+body.live-mode.original-flow .live-card-heading>.live-product-photo{width:100%;margin:0;border:0;background:#fff;align-self:center}
+body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:185px;object-fit:contain}
+body.live-mode.original-flow .live-card-heading>.live-product-photo.is-unavailable{border:1px dashed var(--line);min-height:120px;padding:10px}
+body.live-mode.original-flow .live-product-card .price{display:block;width:100%;border-top:1px solid var(--line);padding-top:12px;margin-top:10px;font-size:30px;line-height:1.3}
+body.live-mode.original-flow .live-card-spec{width:100%;margin:0}
+body.live-mode.original-flow .live-reasons:empty{display:none}
+body.live-mode.original-flow .live-price-difference{font-size:14px;color:var(--muted);margin:0}
+body.live-mode.original-flow .public-bom-empty{font-size:14px;line-height:1.6;margin:12px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px;background:var(--tint);color:var(--muted)}
+body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 205px 150px;gap:18px;align-items:center;padding:20px 18px;margin-bottom:18px}
+body.live-mode.original-flow .live-summary-copy{min-width:0}
+body.live-mode.original-flow .live-summary h3{font-size:26px;line-height:1.4;letter-spacing:-.5px;color:var(--green)}
+body.live-mode.original-flow .live-summary p{font-size:16px;line-height:1.6}
+body.live-mode.original-flow .live-summary .live-product-name{font-size:14px}
+body.live-mode.original-flow .live-summary>.live-product-photo{width:100%;margin:0;border:0}
+body.live-mode.original-flow .live-summary>.live-product-photo img{height:140px}
+body.live-mode.original-flow .live-summary>.live-product-photo.is-unavailable{border:1px dashed var(--line);min-height:110px}
+body.live-mode.original-flow .live-summary .final-summary-price{padding:0;border:0;min-width:0}
+body.live-mode.original-flow .live-summary .final-summary-price strong{font-size:30px;white-space:normal;overflow-wrap:anywhere}
+body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:170px minmax(0,1fr) minmax(170px,.95fr);gap:18px;background:var(--tint);border-left:3px solid var(--green)}
+body.live-mode.original-flow .public-bom .public-bom-role{grid-column:auto;border-left:1px solid #d5e6de;padding-left:18px}
+body.live-mode.original-flow .public-bom .public-bom-role h5{font-size:16px;color:var(--green)}
+body.live-mode.original-flow .public-bom .public-bom-role p{font-size:14px;line-height:1.6}
+body.live-mode.original-flow .public-bom .public-bom-photo{min-height:150px}
+body.live-mode.original-flow .public-bom .live-spec-grid{margin:0}
+body.live-mode.original-flow .public-bom .live-spec-grid>div{grid-template-columns:minmax(80px,.8fr) minmax(0,1.2fr);gap:8px;font-size:14px;padding:7px 4px}
+@media(max-width:1250px){
+ body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 160px;gap:14px}
+ body.live-mode.original-flow .live-summary>.live-product-photo{grid-column:2;grid-row:1/3}
+ body.live-mode.original-flow .live-summary .final-summary-price{grid-column:1}
+ body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:110px minmax(0,1fr)}
+ body.live-mode.original-flow .public-bom .public-bom-role{grid-column:1/-1;border:0;padding-left:0}
+}
+@media(max-width:760px){
+ body.live-mode.original-flow .live-product-card{padding:18px}
+ body.live-mode.original-flow .live-card-heading{grid-template-columns:minmax(0,1fr) 34%;gap:12px}
+ body.live-mode.original-flow .live-product-card h3{font-size:20px;margin:14px 0 10px}
+ body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:145px}
+ body.live-mode.original-flow .live-card-intro{font-size:15px;line-height:1.6}
+ body.live-mode.original-flow .live-product-card .price{font-size:28px}
+ body.live-mode.original-flow .live-summary{grid-template-columns:minmax(0,1fr) 105px;padding:16px;gap:12px}
+ body.live-mode.original-flow .live-summary h3{font-size:22px}
+ body.live-mode.original-flow .live-summary p{font-size:15px}
+ body.live-mode.original-flow .live-summary>.live-product-photo img{height:120px}
+ body.live-mode.original-flow .live-summary .final-summary-price strong{font-size:27px}
+ body.live-mode.original-flow .public-bom .public-bom-expanded{grid-template-columns:80px minmax(0,1fr);gap:12px;padding:12px}
+ body.live-mode.original-flow .public-bom .public-bom-photo{min-height:100px}
+ body.live-mode.original-flow .public-bom .public-bom-role{grid-column:1/-1}
+ body.live-mode.original-flow .public-bom .live-spec-grid>div{grid-template-columns:minmax(0,1fr);gap:3px}
+ body.live-mode.original-flow .live-product-photo-notice{font-size:12px;padding:6px 0}
+ body.live-mode.original-flow .footer-buttons button{min-width:0}
+}
+
+
+/* Final-only information inside the existing specification disclosure. */
+body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities){font-size:16px;color:#0a121c}
+body.live-mode.original-flow[data-screen="final"] .final-part-expanded .live-explanation{line-height:1.6;margin-top:18px}
+body.live-mode.original-flow[data-screen="final"] .final-part-expanded .live-capabilities{line-height:1.5}
+body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities) p{font-size:14px;line-height:1.5;color:var(--muted)}
+@media(max-width:760px){
+ body.live-mode.original-flow[data-screen="final"] .final-part-expanded :is(.live-explanation,.live-capabilities){color:#15305c}
+}
+
+/* Public BOM: preserve the approved detail table; unavailable data stays explicit. */
+.live-mode .public-bom .public-bom-quantity{font-size:14px;color:var(--muted);font-weight:400}
+.live-mode .public-bom .public-bom-expanded{display:grid;grid-template-columns:100px minmax(0,1fr);gap:16px}
+.live-mode .public-bom .public-bom-photo{min-height:100px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px solid var(--line);border-radius:12px;font-size:14px;color:var(--muted);background:#fff}
+.live-mode .public-bom .public-bom-photo{margin:0;overflow:hidden}
+.live-mode .public-bom .public-bom-photo img{display:block;width:100%;height:100%;max-height:150px;object-fit:contain}
+.live-mode .public-bom .public-bom-photo.is-unavailable img{display:none}
+.live-mode .public-bom .public-bom-photo .live-product-image-status{margin:0;padding:8px;font-size:14px;line-height:1.5;color:var(--muted)}
+.live-mode .public-bom .public-bom-role{grid-column:1/-1}
+.live-mode .public-bom .public-bom-role h5{font-size:14px;margin:0 0 6px}
+.live-mode .public-bom .public-bom-role p{margin:0 0 12px}
+.live-mode .public-bom .public-bom-unavailable{font-size:14px;color:var(--muted);margin-top:8px}
+.live-mode .public-bom .final-part-change button{white-space:nowrap}
+.live-mode .public-bom-information{margin:16px 0}
+.live-mode .public-bom-information>summary{cursor:pointer;font-size:14px;padding:12px 0}
+@media(max-width:760px){
+  .live-mode .public-bom .public-bom-expanded{grid-template-columns:80px minmax(0,1fr);gap:12px}
+  .live-mode .public-bom .public-bom-photo{min-height:80px}
+  .live-mode .public-bom .final-part-description>div{min-width:0;flex:1}
+  .live-mode .public-bom .part-name,.live-mode .public-bom .live-spec-grid dd{overflow-wrap:anywhere}
+}
+
+/* Native disclosure spans the approved table width, keeping its three column header. */
+body.live-mode.original-flow .public-bom-disclosure>summary{display:grid;grid-template-columns:65% 20% 15%;list-style:none;cursor:pointer;align-items:stretch}
+body.live-mode.original-flow .public-bom-disclosure>summary::-webkit-details-marker{display:none}
+body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-description{min-height:72px;padding:8px 16px}
+body.live-mode.original-flow .public-bom-disclosure>summary>span{display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line);font-size:14px}
+body.live-mode.original-flow .public-bom-toggle{display:flex;align-items:center;gap:4px;font-size:14px;line-height:1.5;color:var(--muted);padding:4px 0}
+body.live-mode.original-flow .public-bom-toggle .ui-icon{width:14px;height:14px}
+body.live-mode.original-flow .public-bom-disclosure[open] .public-bom-toggle .ui-icon{transform:rotate(180deg)}
+body.live-mode.original-flow .public-bom-disclosure>.public-bom-expanded{margin:0 16px 10px;min-width:0}
+body.live-mode.original-flow .public-bom-specs,body.live-mode.original-flow .public-bom-role{min-width:0;overflow-wrap:anywhere}
+body.live-mode.original-flow .public-bom .live-spec-grid dd{margin:0;min-width:0;overflow-wrap:anywhere}
+@media(max-width:760px){
+ body.live-mode.original-flow .public-bom-disclosure>summary{grid-template-columns:minmax(0,1fr) auto}
+ body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-description{grid-column:1/-1;min-height:0;padding:0}
+ body.live-mode.original-flow .public-bom-disclosure>summary>span{border:0;justify-content:flex-start;padding:6px 0}
+ body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-change{justify-content:flex-end}
+ body.live-mode.original-flow .public-bom-disclosure>.public-bom-expanded{margin:8px 0 0}
+}
+
+/* Desktop density keeps the supplied comparison data and actions within normal scrolling. */
+@media(min-width:761px){
+ body.live-mode.original-flow .live-product-card{gap:6px}
+ body.live-mode.original-flow .live-product-card h3{margin:14px 0 8px}
+ body.live-mode.original-flow .live-card-heading>.live-product-photo img{height:160px}
+ body.live-mode.original-flow .live-card-spec dt,body.live-mode.original-flow .live-card-spec dd{padding:6px 12px}
+ body.live-mode.original-flow .live-product-card .live-reasons{font-size:14px;line-height:1.5;margin:4px 0}
+ body.live-mode.original-flow .live-product-card .live-reasons li{margin:3px 0}
+ body.live-mode.original-flow .live-product-card>p{margin:4px 0}
+ body.live-mode.original-flow .live-result-group{margin:14px 0}
+ body.live-mode.original-flow .live-result-group>h3{font-size:16px;margin-bottom:8px}
+ body.live-mode.original-flow .live-result-group .quote-cards{margin:14px 0}
+ body.live-mode.original-flow .live-summary{padding:14px 18px}
+ body.live-mode.original-flow .live-summary>.live-product-photo img{height:110px}
+}
+
+/* R01 results heading, condition chips and card footer. */
+.title-copy{min-width:0}.results-subtitle{margin:6px 0 0;font-size:16px;color:var(--muted)}
+.condition-chip{border-radius:8px;padding:8px 12px;gap:8px;color:var(--ink);font-size:14px}
+.condition-chip .ui-icon{width:18px;height:18px;filter:none;opacity:.75}
+.condition-chip .chip-change{color:var(--muted);font-size:16px;line-height:1}
+.condition-chip.is-assumed{border-style:dashed;color:var(--muted);cursor:default}
+body.live-mode.original-flow .live-product-card .card-detail{width:100%;margin-top:auto;display:inline-flex;align-items:center;justify-content:center;gap:8px}
+body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px;height:18px;filter:brightness(0) invert(1)}
+.results-note{display:flex;align-items:center;justify-content:center;gap:8px;margin:18px 0 0;font-size:14px;color:var(--muted)}
+.results-note .ui-icon{width:18px;height:18px;opacity:.7}
+/* Card part photos: approved thumbnails only, shown on the first results view. */
+.card-part-photos{list-style:none;margin:12px 0 4px;padding:0;width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.card-part-photos li{min-width:0}.card-part-photos li[hidden]{display:none}
+.card-part-photos figure{margin:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:6px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.card-part-photos img{display:block;width:100%;height:64px;object-fit:contain}
+.card-part-photos figcaption{font-size:13px;line-height:1.3;color:var(--muted);text-align:center;overflow-wrap:anywhere}
+@media(max-width:760px){.card-part-photos{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.card-part-photos img{height:52px}.card-part-photos figcaption{font-size:12px}}
+/* 대화가 길어져 기록이 위로 밀리면 경계선과 옅은 가림을 둔다 — 잘린 말풍선이 안내문에 붙어 보이지 않게(2026-10-10 전수 점검) */
+.chat-body .chat-intro{padding-bottom:10px;border-bottom:1px solid transparent;transition:border-color .15s}
+.chat-body.log-scrolled .chat-intro{border-bottom-color:var(--line)}
+.chat-body .messages.is-scrolled{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}

@@ -1,0 +1,51 @@
+{
+  "about": "Owner approval ledger for tools/approve_pc_publication_bulk.py. A decision names the owner's project-chat messages (references, quoted verbatim in the same order), and a scope: the archive manifest of the configuration's selected representative image, the review findings it confirms (copy and/or price only) and the four steps. --apply needs --approval-decision naming one decision here; a configuration is approved only when its selected, ready representative image comes from that manifest and it is not withdrawn. A withdrawal names a decision, a configuration_id and a non-empty reference. Any malformed or duplicate row stops the whole run. Empty decisions = nothing can be applied.",
+  "decisions": [
+    {
+      "id": "pc-publication-20261009-bundle",
+      "decided_by": "중헌 (owner)",
+      "references": [
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDAYMwpvuex9RYjcAVonBcNy",
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDFEqfeh8HrEBQk3Mdf75JMa",
+        "project-chat:cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r"
+      ],
+      "quotes": [
+        "다음을 허락합니다: 상품 94959 복원, 상품 105053 사양 행 생성, 상품 123034 검수 표시와 잠금, 9월 30일 도구가 잠근 7개 상품 11개 항목 잠금 해제, 대표 이미지 104장 업로드와 등록·선택, 104개 구성의 설명·사진·추천 검토·발행 승인 처리, 사진 권리 근거값 설정과 서비스 재시작.",
+        "상품 94959 복원, 데이터 정리, 대표 이미지 104장 등록, 구성 발행 승인, 사진 권리 근거값 설정과 서비스 재시작 허락",
+        "허락.."
+      ],
+      "sources": [
+        {
+          "message": "cmsg_012k6fnspU3tgfYTTB56KTuDAYMwpvuex9RYjcAVonBcNy",
+          "at": "2026-10-09 19:02 KST",
+          "role": "허락 요청 문장(진행 담당 작성, 중헌 님께 그대로 붙여 달라고 한 묶음)"
+        },
+        {
+          "message": "cmsg_012k6fnspU3tgfYTTB56KTuDFEqfeh8HrEBQk3Mdf75JMa",
+          "at": "2026-10-09 23:34 KST",
+          "role": "서버 회귀·배포 점검 스레드의 항목 목록 답글(진행 담당 작성, 19:01 문장과 같은 묶음)"
+        },
+        {
+          "message": "cmsg_012k6fnspU3tgfYTTB56KTuDQBjRx7dbZSdUEDaVjHQA5r",
+          "at": "2026-10-09 23:37 KST",
+          "role": "중헌 님 본인 답: 위 묶음 허락"
+        }
+      ],
+      "scope": {
+        "media_manifest_sha256": "48b0999b276d8a2aff0152a18cb65f5e98c9833489a2edac13bf57cb536b1e39",
+        "findings": [
+          "copy",
+          "price"
+        ],
+        "steps": [
+          "explanation",
+          "photo",
+          "review",
+          "publication"
+        ]
+      },
+      "covers": "대표 이미지가 위 묶음(#31 등록분)에서 선택된 구성만. #31 조회 기준 선택 79개가 대상이고, 등록만 된 10개는 그 묶음 이미지가 대표로 선택될 때만 들어온다. 판매 상품 연결이 없는 N 코드 15개는 대표 이미지가 등록되지 않아 대상이 아니다."
+    }
+  ],
+  "withdrawn": []
+}

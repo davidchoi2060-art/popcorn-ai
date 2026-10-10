@@ -262,6 +262,8 @@ CREATE INDEX idx_reviews_queue ON product_reviews (review_status, created_at);
 
 ### 3.6 v_recommendation_candidates — 추천 후보 뷰 (유일한 정의처)
 
+**재구성 계약(0133):** 아래 `p.*, ps.*`는 후보 조건을 설명하는 개념 예시다. 실제 migration 뷰는 중복 컬럼을 피하려고 사양 컬럼을 명시한다. `0083`·`0084`가 테이블에 추가한 `vram_gb`·`cpu_cores`는 추천 `_load_pool`이 함께 조회하므로 신규 설치에도 뷰에 노출되어야 한다. `0133`은 현재 `pg_get_viewdef`의 SELECT 목록 끝에 누락된 두 컬럼만 추가한다. 기존 컬럼의 순서·타입·별칭, JOIN, 후보 필터, 기존 의존 객체를 보존하며 전체 정의를 하드코딩하거나 DROP/CASCADE하지 않는다. 테이블의 두 필드와 이미 존재하는 뷰 필드가 INTEGER 타입인지 확인하며, 둘이 이미 올바른 타입이면 아무 작업도 하지 않는다. 단순 명시 SELECT만 처리하고 중첩 SELECT나 예상하지 않은 FROM/ps 별칭은 거절한다. 이 형상 확인은 일반 SQL parser가 아니며 동명 INTEGER 계산식의 원천까지 검증하지 않는다. downgrade는 no-op이며 뷰 컬럼·사양 데이터·메타를 삭제하거나 과거 정의로 복원하지 않는다. 실제 PostgreSQL 신규 설치/의존뷰 검증은 별도로 수행한다.
+
 ```sql
 CREATE VIEW v_recommendation_candidates AS
 SELECT p.*, ps.*
@@ -1801,3 +1803,37 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 이 저장본은 추천상품/당시 참고가격 보관이며 주문·인계·부품변경 적용·구매 가격확정이 아니다. 기존 quote_snapshots/pc_customer_quotes의 계약에 완제품 보관을 끼워 넣지 않는다. 견적 본문은 DB에서 조회하며 소유자 쿠키가 다른 저장본은 반환하지 않는다. 가격은 참고 스냅샷이며 price_confirmed=false, 포함조건/성능근거가 없으면 만들지 않는다. 대화 원문·회원 개인정보·관리자 근거·비밀키는 이 신규 표에 넣지 않는다. 새 빈 테이블 추가만 하며 기존 자료는 변경하지 않는다. 자료가 들어 있으면 downgrade를 거부한다.
 
 공개 사양 spec의 현재 원천은 product_fit_products의 JSONB다. 서버 보관은 cpu/gpu 문자열과 ram_gb/ssd_gb/vram_gb 용량 값만 허용하며 CPU/GPU 평가 점수나 임의 내부 필드는 제외한다. 부품별 구매가격·옵션 차액·게임 FPS를 이 값에서 생성하지 않는다.
+
+### 26. 0124 ~ 0132 소급 등재 (2026-10-04 · 10-07 마이그레이션 · 2026-10-08 기록)
+
+⚠ **순서가 거꾸로다.** 이 프로젝트 규칙은 「ERD 개정 → 새 마이그레이션」인데, 아래 아홉 개는 마이그레이션이 먼저 main 에 들어가고 ERD 가 비어 있었다. 2026-10-08 클라우드 쪽이 마이그레이션 파일에서 표 이름과 머리 주석만 옮겼다. **컬럼 · 제약 · 트리거의 정본은 각 마이그레이션 파일**이고, 아래는 어느 표가 어디서 생겼는지 찾는 목록이다. 서버 DB 에 실제로 적용됐는지는 배포 실행 기록으로 추정했을 뿐 직접 조회하지 않았다(결정 로그 「기록 따라잡기」 절).
+
+아홉 개 모두 **downgrade 를 거부한다**(자료가 있으면 거부하거나 무조건 거부).
+
+| 리비전 | 파일 | 커밋 | 새 표 · 바뀐 컬럼 | 머리 주석 요지 |
+|---|---|---|---|---|
+| 0124 | `0124_admin_operation_receipts.py` | `e28fee1` | `admin_operation_receipts` | 일괄 재계산 결과를 가격·이력·로그 쓰기와 같은 트랜잭션에 불변으로 남긴다 |
+| 0125 | `0125_pricing_basis_revisions.py` | `e28fee1` | `pricing_basis_policy_revision` · 시퀀스 `pricing_basis_revision_seq`. 컬럼 추가: `products.pricing_basis_revision`(NOT NULL). 정책·상품 리비전 트리거 | 미리보기와 적용 사이 변경을 가려내는 토큰. 토큰을 버리면 옛 미리보기가 통과할 수 있어(ABA) 되돌리지 않는다 |
+| 0126 | `0126_opening_commerce.py` | `c8487e0` | `commerce_order_details` · `commerce_owner_contexts` · `commerce_payment_operations` · `commerce_payment_events` · 시퀀스 `commerce_stock_revision_seq`. 컬럼 추가: `products.commerce_stock_revision` · `payments.commerce_operation_id/commerce_effect_key` · `stock_movements.commerce_operation_id/commerce_effect_key` · `stock_reservations.commerce_order_id` | 커머스 저장 구조만. 옛 소유권·결제 자료를 옮기지 않는다 |
+| 0127 | `0127_commerce_fulfillment_persistence.py` | `c8487e0` | `commerce_shipments` · `commerce_shipment_lines` · `commerce_physical_operations` | 출고 기록만. 금액·재고 효과 없음 |
+| 0128 | `0128_commerce_support.py` | `c8487e0` | `commerce_support_cases` · `commerce_support_events` | 고객 지원 기록만 |
+| 0129 | `0129_pc_customer_publication.py` | `c8487e0` | `pc_customer_publication_events` | 조립PC 고객 공개 이력(추가만 가능). 이 이력을 쓰는 라우트는 아직 없다 |
+| 0130 | `0130_part_explanation_approval.py` | `c8487e0` | `part_explanation_approval_events`. `product_explanations.approved_by` 정수 폭 확대 | 부품 설명 승인 이력(불변) |
+| 0131 | `0131_part_photo_approval.py` | `c8487e0` | `part_photo_approval_events` | 등록된 부품 사진 승인 근거(불변) |
+| 0132 | `0132_commerce_physical_return_persistence.py` | `c8487e0` | `commerce_return_cases` · `commerce_return_lines` · `commerce_return_operations` · `commerce_return_restoration_effects`. 컬럼 추가: `stock_movements.physical_return_operation_id` | 실물 반품 저장. 금액·배송 기록은 보존한다 |
+
+확인법: `grep -oE 'CREATE TABLE (__S(CHEMA)?__\.)?[a-z_]+' db/migrations/versions/01{24,25,26,27,28,29,30,31,32}_*.py`
+
+### 27. 대표 이미지 작업의 출처 구분 (2026-10-08, 0134)
+
+`pc_media_jobs`에 두 컬럼을 더한다. `origin_kind` TEXT NOT NULL DEFAULT 'generated'(값은 `generated` 또는 `existing_import`), `import_provenance` JSONB NULL. `model`은 NOT NULL을 푼다. CHECK `pc_media_jobs_origin_provenance_check`가 두 경우만 허용한다: `generated`는 model 있음·provenance 없음, `existing_import`는 model 없음·provenance 있음이며 함수 `pc_media_import_provenance_valid(provenance, configuration_id, visual_basis, review_basis)`가 v1 형태와 현재 작업 행의 구성·근거 일치를 확인한다. 기존 행은 기본값으로 `generated`가 된다.
+
+`import_provenance.original`은 원본 SKU·원본 해시·manifest 해시·QA 근거를 담고 원본 생성 모델·생성자·생성 시각은 null로 둔다. `current_binding`은 현재 SKU·구성·revision·케이스 상품 코드·근거를 담는다. 현재 등록 주체와 시각은 기존 `actor`·`created_at` 컬럼이며 원본 생성 이력으로 쓰지 않는다. 이 컬럼들은 재사용 승인·대표 선택·고객 공개의 근거가 아니다.
+
+일반 생성 worker와 저장 재시도는 `origin_kind='generated'`인 행만 처리하고, 컬럼이 없거나 값이 다르면 아무것도 쓰지 않는다. 그래서 이 마이그레이션 적용 전에는 새 코드를 배포하지 않는다. downgrade는 `generated`가 아닌 행, provenance가 있는 행, model이 null인 행이 하나라도 있으면 거부한다. 같은 번호 0133은 추천 뷰 VRAM·CPU 코어 개정이 이미 쓰고 있어 이 개정은 0134다.
+
+### 28. 조립 전용 부품의 설명·사진 승인 (2026-10-10, 0136)
+
+0130·0131의 승인 이력은 판매 상품(`products`) 연결을 전제로 했다. 조립 전용 부품(`product_explanations.product_code` NULL · `content.availability_scope='assembly_only'`, 현재 127201·127203)은 단품 판매 상품이 없어 승인 이력을 남길 수 없었고, 이 부품을 쓰는 조립PC 5종이 발행 승인에서 막혔다. 2026-10-10 사장님 결정: 사양 수치 확인은 발행을 막는 조건이 아니며, 자료가 없는 항목은 「정보 없음」으로 표시한다.
+
+0136은 표를 새로 만들지 않고 두 이력 표의 snapshot CHECK 와 가드 함수 세 개(`part_explanation_approval_guard` · `part_explanation_metadata_guard` · `part_photo_approval_guard`)만 고친다. 조립 전용 행에 한해 snapshot 의 `product_code` 가 JSON null 이어도 되고, 판매 상품 존재·`판매중`·판매 원문 일치 검사를 건너뛴다. 사진 권리 참조값 형식·자산 키·해시·이력 불변·순번·승인자·같은 트랜잭션 기록 검사는 그대로다. downgrade 는 거부한다(조립 전용 승인 이력이 이미 있을 수 있다).

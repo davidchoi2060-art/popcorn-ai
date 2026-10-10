@@ -74,9 +74,11 @@ def _public_parts(parts, rows):
         facts = content.get('facts')
         result.append(dict(ordinal=part['ordinal'], name=name if isinstance(name, str) else None,
                            description=role if isinstance(role, str) else None,
-                           specs=[dict(label=f['label'], value=f['value']) for f in facts
+                           # A missing value is shown as unknown, never dropped or guessed.
+                           specs=[dict(label=f['label'], value=f['value'] if isinstance(f.get('value'), str)
+                                       and f['value'].strip() else '정보 없음') for f in facts
                                   if isinstance(f, dict) and isinstance(f.get('label'), str)
-                                  and isinstance(f.get('value'), str)] if isinstance(facts, list) else []))
+                                  and (f.get('value') is None or isinstance(f.get('value'), str))] if isinstance(facts, list) else []))
     return result
 
 
