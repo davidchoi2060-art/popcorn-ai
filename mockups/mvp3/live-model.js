@@ -154,6 +154,15 @@
       chips.push({icon:'monitor',label:'FHD · 임시 기준',assumed:true,note:'해상도를 정하지 않아 FHD(1080p)를 기준으로 조회했어요.'});
     return chips;
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
+  const CARD_PART_LABELS={CPU:'CPU',GPU:'그래픽카드',RAM:'메모리',SSD:'저장장치',HDD:'저장장치',MB:'메인보드',
+    COOLER:'쿨러',POWER:'파워',PSU:'파워',CASE:'케이스'};
+  // Card thumbnails: only parts the public configuration already approved. No placeholder for the rest.
+  function cardPartPhotos(product){
+    const parts=product?.public_configuration?.parts;
+    if(!Array.isArray(parts))return [];
+    return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
+      .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
+  }
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);
