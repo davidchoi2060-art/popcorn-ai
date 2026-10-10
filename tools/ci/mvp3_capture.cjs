@@ -95,5 +95,10 @@ async function capture(browser,c){
   const text=lines.join('\n');
   console.log(text);
   if(process.env.GITHUB_STEP_SUMMARY)fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,text+'\n');
+  // 작업 로그·artifact 를 못 받는 곳(클라우드 작업 세션)도 check-run 주석으로 요약을 읽게 한다.
+  if(process.env.GITHUB_ACTIONS){
+    const blocks=text.split('\n\n').slice(1).filter(b=>b.trim());
+    for(const b of blocks){const [head,...rest]=b.split('\n');console.log('::notice title='+head.replace(/[*,:]/g,'').trim()+'::'+rest.join('\n').replace(/%/g,'%25').replace(/\r/g,'%0D').replace(/\n/g,'%0A'));}
+  }
   process.exit(results.every(r=>r.cards.length)?0:1);
 })();
