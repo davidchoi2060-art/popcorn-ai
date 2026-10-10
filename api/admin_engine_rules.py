@@ -143,16 +143,18 @@ def engine_rules():
             "checks": checks,
             "slots": SLOTS,
             "required": required,
-            "note": ("견적을 만들 때마다 이 표의 규칙으로 호환 여부를 판정합니다."
-                     " 값을 모르는 부품은 호환으로 보지 않습니다 · 규칙 편집 화면은 준비 중입니다."),
-            "required_note": ("필수 사양은 「상품 사양 정의」 화면의 목록을 그대로 씁니다. '읽는 규칙'이 비어 있으면"
+            "note": ("호환 규칙은 compat_rules 테이블이 단일 원천입니다(슬라이스 34) —"
+                     " 엔진이 매 견적마다 이 표를 읽어 판정합니다. NULL 값은 불통과(값을 모르는"
+                     " 부품을 호환으로 판정하지 않음) · 규칙 편집 UI·버전 발행은 이관."),
+            "required_note": ("필수 사양은 spec_field_defs 메타가 단일 원천입니다 —"
+                              " 게이트가 읽는 그 목록입니다. '읽는 규칙'이 비어 있으면"
                               " 어떤 호환 검사도 그 값을 쓰지 않는다는 뜻입니다"
                               " — 근거 없이 상품을 검수 대기로 묶고 있는 것입니다."),
         },
         "tiers": {
             "rules": TIER_RULES,
-            "tie_break": "동일 조건이면 상품코드 오름차순 — 같은 입력·같은 재고면 항상 같은 결과",
-            "performance_proxy": "성능 지표는 벤치마크 자료가 없어 가격을 대신 씁니다(점수 방식 도입 시 교체)",
+            "tie_break": "동일 조건이면 product_code 오름차순 — 같은 입력·같은 재고면 항상 같은 결과(A-02)",
+            "performance_proxy": "성능 지표는 벤치마크 원천이 없어 가격을 대리값으로 씁니다(정직 명기 — 스코어 엔진 도입 시 교체)",
             "pool_size": pool,
             # UX-31 — highend 티어의 "추천형 총액의 1.5배" 사실을 상수 그대로 노출한다.
             # 화면이 이 숫자를 하드코딩하지 않고 여기서 읽게 한다(recommend.HIGHEND_CAP_X 원본).
@@ -161,12 +163,12 @@ def engine_rules():
         "budget": {
             "alloc": [{"part_type": k, "pct": round(v * 100, 1)} for k, v in BUDGET_ALLOC.items()],
             "note": ("부품별 상한 배분율(휴리스틱) — '이상'·숫자 없는 예산 표현에는 적용하지 않습니다."
-                     " 견적 엔진 배분 방식으로 대체 예정."),
+                     " S2 엔진 배분 로직으로 대체 예정(이관)."),
             "tag_scope": [
                 {"tag": "저소음", "field": "tag_silent", "scope": sorted(SILENT_SCOPE)},
                 {"tag": "화이트", "field": "tag_white", "scope": sorted(WHITE_SCOPE)},
             ],
-            "tag_note": "적용 범위 밖 부품은 무조건 통과 — 표시가 없는 부품이 모두 빠지는 것을 막기 위한 규칙",
+            "tag_note": "스코프 밖 부품은 무조건 통과 — 미태깅 부품이 전멸하는 것을 막기 위한 규칙",
         },
         "pricing": {
             # 소수 셋째 자리까지 낸다 — 2.585%를 2.59%로 줄여 보이면 사용자가 정한 값이
@@ -181,11 +183,11 @@ def engine_rules():
                            for c in cat_rows],
             "category_note": ("카테고리별 마진 정책은 아직 등록된 행이 없습니다 —"
                               " 현재는 전 카테고리에 위 기본값이 적용됩니다(끝자리 규칙·최소 마진·"
-                              "정책 버전 발행은 추후)."),
+                              "정책 버전 발행은 이관)."),
         },
         "weights": {
             "rows": [{"key": w["key"], "weight": float(w["weight"])} for w in weights],
-            "note": ("추천 가중치 저장소는 비어 있습니다 — 현재 추천은"
+            "note": ("추천 가중치 저장소(policy_weights)는 비어 있습니다 — 현재 추천은"
                      " 가중치 스코어가 아니라 티어별 정렬 + 호환 제약으로 결정됩니다."
                      " 스코어 엔진 도입 시 이 표가 실값으로 채워집니다."),
         },
@@ -215,7 +217,7 @@ def save_pricing(body: PricingBody):
 
     me = current_operator() or {}
     if me.get("role") != "owner":
-        raise HTTPException(403, "관리자만 바꿀 수 있습니다")
+        raise HTTPException(403, "관리자(owner)만 바꿀 수 있습니다")
     # 비율은 0~1로 받는다. 13을 넣으면 1300%가 되어 가격이 폭주한다.
     for name, v in (("카드 수수료율", body.card_fee_rate), ("마진율", body.margin_rate)):
         if not (0 <= v < 1):

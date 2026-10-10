@@ -76,7 +76,7 @@ SCOPES = {
 def _owner():
     me = current_operator() or {}
     if me.get("role") != "owner":
-        raise HTTPException(403, "관리자만 판매가를 재산정할 수 있습니다")
+        raise HTTPException(403, "관리자(owner)만 판매가를 재산정할 수 있습니다")
     return me
 
 
