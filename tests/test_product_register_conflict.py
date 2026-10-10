@@ -13,8 +13,8 @@ from tests.test_catalog_ingest_write_lock_order import integrity, selected, Resu
 
 
 class Database:
-    def __init__(self, error=None, fail_at='INSERT INTO products', mapping=44):
-        self.error=error; self.fail_at=fail_at; self.mapping=mapping
+    def __init__(self, error=None, fail_at='INSERT INTO products', mapping=44, categories=(7,)):
+        self.error=error; self.fail_at=fail_at; self.mapping=mapping; self.categories=categories
         self.calls=[]; self.writes=[]; self.commits=0; self.rollbacks=0
     def begin(self): return self
     def __enter__(self): return self
@@ -25,6 +25,8 @@ class Database:
     def execute(self, statement, params=None):
         q=str(statement); self.calls.append((q,params))
         if q.startswith('SELECT 1 FROM suppliers'): return SimpleNamespace(first=lambda:(1,))
+        if q.startswith('SELECT 1 FROM categories'):
+            return SimpleNamespace(first=lambda:(1,) if params['c'] in self.categories else None)
         if q.startswith('SELECT sku'): return Result()
         if q.startswith('SELECT COALESCE(MAX'): return Result([12])
         if q.startswith(self.fail_at) and self.error: raise self.error
@@ -37,7 +39,8 @@ class Database:
 def register(db):
     def log(conn,*args,**kwargs): conn.writes.append('log')
     body=SimpleNamespace(part_type='CPU',part_label=None,name='테스트 상품',supplier_id=None,
-        model_name=None,cost_price=None,danawa_code=None,confirm_similar=True,supplier=None,maker=None)
+        model_name=None,cost_price=None,danawa_code=None,confirm_similar=True,supplier=None,maker=None,
+        category_id=None)
     env=dict(__name__='api.admin_products',__package__='api',PART_TYPE_LABELS={'CPU':'CPU'},RegisterBody=object,engine=db,text=text,
         HTTPException=HTTPException,IntegrityError=IntegrityError,is_product_key_conflict=is_product_key_conflict)
     fn=selected(Path(__file__).resolve().parents[1]/'api/admin_products.py','register_product',env)
@@ -72,6 +75,17 @@ class RegisterTests(unittest.TestCase):
         self.assertTrue(db.writes[1].startswith('INSERT INTO product_specs'))
         self.assertFalse(any('FOR UPDATE' in q for q,p in db.calls))
         self.assertFalse(any('product_price_history' in q or 'product_supplier_prices' in q for q,p in db.calls))
+    def test_category_is_saved_with_the_product(self):
+        # 2026-10-10 전수 점검: 등록 화면의 필수 카테고리가 잠겨 등록을 끝낼 수 없었다.
+        db=Database(); fn,body,module=register(db); body.category_id=7
+        with patch.dict(sys.modules,{'api.admin_orders':module}): fn(body)
+        params=next(p for q,p in db.calls if q.startswith('INSERT INTO products'))
+        self.assertEqual(params['cat'],7)
+        self.assertIn('category_id',next(q for q,p in db.calls if q.startswith('INSERT INTO products')))
+    def test_unknown_category_rejected_before_any_write(self):
+        db=Database(); fn,body,module=register(db); body.category_id=999
+        with patch.dict(sys.modules,{'api.admin_orders':module}),self.assertRaises(HTTPException) as caught: fn(body)
+        self.assertEqual(caught.exception.status_code,400); self.assertEqual(db.writes,[])
     def test_late_failure_rolls_back_parent_without_409_conversion(self):
         error=integrity('product_specs_product_code_fkey','23503')
         db=Database(error,fail_at='INSERT INTO product_specs')

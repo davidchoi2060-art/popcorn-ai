@@ -283,9 +283,23 @@ class SupplierWorkspaceTests(unittest.TestCase):
         self.assertEqual(401,self.client.get('/api/admin/suppliers').status_code)
         self.assertEqual(401,self.client.get('/admin2/suppliers').status_code)
 
-    def test_new_page_and_viewer_write_controls(self):
+    def test_menu_follows_operator_choice_and_is_not_rewritten(self):
+        # 2026-10-10 전수 점검: 기존 메뉴에서 공급처를 누르면 메뉴 선택 쿠키가 new 로 바뀌어
+        # 그 뒤 모든 화면이 신 관리자 메뉴로 열렸다. 공급처는 기존 메뉴(NAV)에도 있는 화면이라
+        # 들어온 메뉴를 그대로 따라야 하고, 선택을 다시 쓰지 않아야 한다.
         r=self.client.get('/admin2/suppliers');html=r.text
+        self.assertEqual(200,r.status_code);self.assertIn('class="a2-lnb-grp"',html);self.assertNotIn('a2-new-secondary',html)
+        self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
+        self.client.cookies.set('admin_ui_mode','legacy');r=self.client.get('/admin2/suppliers')
+        self.assertIn('class="a2-lnb-grp"',r.text);self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
+        self.client.cookies.set('admin_ui_mode','new');r=self.client.get('/admin2/suppliers')
+        self.assertIn('a2-new-secondary',r.text);self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
+        self.client.cookies.delete('admin_ui_mode')
+
+    def test_new_page_and_viewer_write_controls(self):
+        r=self.client.get('/admin2/suppliers?admin=new');html=r.text
         self.assertEqual(200,r.status_code);self.assertIn('a2-new-secondary',html);self.assertIn('admin_ui_mode=new',r.headers['set-cookie'])
+        self.client.cookies.delete('admin_ui_mode')
         self.assertIn('id="sw-new"',html);self.assertIn('data-can-write="true"',html)
         self.assertNotIn('가온컴퍼니',html);self.assertNotIn('시안용',html);self.assertNotIn('가상 데이터',html)
         self.client.cookies.set(auth.COOKIE,'viewer');html=self.client.get('/admin2/suppliers').text
