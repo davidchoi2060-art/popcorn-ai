@@ -63,12 +63,14 @@ def _model_reason(row):
     if row.get('status') not in ('draft', 'approved'):
         return 'photo_model_retired_or_invalid'
     source = row.get('source_snapshot')
-    if (not original._integer(row.get('product_code')) or type(source) is not dict or not source
+    assembly = original._assembly_only(row)
+    if ((not assembly and not original._integer(row.get('product_code'))) or type(source) is not dict or not source
             or not original._hash(row.get('source_fingerprint'))
             or row['source_fingerprint'] != fingerprint(source.get('name'), source.get('spec'))
-            or not isinstance(row.get('product_name'), str) or not row['product_name'].strip()
-            or not isinstance(row.get('spec_source_text'), str) or not row['spec_source_text'].strip()
-            or row.get('sale_status') != '판매중' or not is_current(row)):
+            or (not assembly and (not isinstance(row.get('product_name'), str) or not row['product_name'].strip()
+                                  or not isinstance(row.get('spec_source_text'), str) or not row['spec_source_text'].strip()
+                                  or row.get('sale_status') != '판매중'))
+            or not is_current(row)):
         return 'photo_model_missing_or_stale'
     return None
 
@@ -127,7 +129,9 @@ def _verify(conn, row, provenance_reader, image_reader, business_rights_referenc
     if original._transaction(conn) is not transaction:
         original._fail(503, 'photo_transaction_changed')
     if (type(proof) is not PhotoProvenance or not original._integer(proof.source_product_code)
-            or not original._integer(proof.product_code) or proof.source_product_code != row['source_product_code']
+            or not (original._integer(proof.product_code)
+                    or (proof.product_code is None and original._assembly_only(row)))
+            or proof.source_product_code != row['source_product_code']
             or proof.product_code != row['product_code'] or proof.basis != basis(row)
             or proof.kind != SCOPE or not _reference(proof.source_reference)
             or proof.rights_reference != business_rights_reference):
@@ -160,6 +164,11 @@ def _event(row):
         event['request_id'] = str(UUID(str(event['request_id'])))
         event['recorded_at'] = original._time(event['recorded_at'])
         snapshot = event['snapshot']; model = snapshot['model']; proof = snapshot['provenance']
+        # Assembly-only (no retail product): no product code and no retail fields.
+        linked = original._integer(model['product_code'])
+        unlinked = (model['product_code'] is None and proof['product_code'] is None
+                    and model['product_name'] is None and model['spec_source_text'] is None
+                    and model['sale_status'] is None)
         if (not original._integer(event.get('source_product_code')) or not original._integer(event.get('event_seq'))
                 or not original._integer(event.get('operator_id')) or not original._integer(event.get('write_txid'))
                 or event.get('action') not in ('approve','revoke') or type(event.get('note')) is not str
@@ -169,10 +178,10 @@ def _event(row):
                 or snapshot['scope'] != SCOPE or type(model) is not dict or type(proof) is not dict
                 or not original._integer(model['source_product_code'])
                 or model['source_product_code'] != event['source_product_code']
-                or not original._integer(model['product_code'])
+                or not (linked or unlinked)
                 or proof['source_product_code'] != model['source_product_code']
                 or type(proof['source_product_code']) is not int or proof['product_code'] != model['product_code']
-                or type(proof['product_code']) is not int or proof['basis'] != event['source_basis']
+                or (linked and type(proof['product_code']) is not int) or proof['basis'] != event['source_basis']
                 or proof['kind'] != SCOPE or not _reference(proof['source_reference'])
                 or not _reference(proof['rights_reference'], rights=True)
                 or original._digest(dict(version=VERSION,scope=SCOPE,model=model)) != event['source_basis']

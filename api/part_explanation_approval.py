@@ -135,13 +135,22 @@ def _actor(conn, actor):
     return actor['operator_id']
 
 
+def _assembly_only(row):
+    """BOM-only part with no retail product row. Spec facts may be unknown; that
+    never blocks approval (unknown values are shown as unknown)."""
+    content = row.get('content')
+    return (row.get('product_code') is None and type(content) is dict
+            and content.get('availability_scope') == 'assembly_only')
+
+
 def _source_reason(row):
     from .part_explanations import is_current, fingerprint
     if row.get('status') == 'retired':
         return 'part_approval_retired'
     if row.get('status') not in ('draft','approved') or type(row.get('content')) is not dict:
         return 'part_approval_source_invalid'
-    if not _integer(row.get('product_code')):
+    assembly = _assembly_only(row)
+    if not assembly and not _integer(row.get('product_code')):
         return 'part_approval_unlinked'
     issues = row['content'].get('review_issues', [])
     if type(issues) is not list or issues:
@@ -149,9 +158,10 @@ def _source_reason(row):
     source = row.get('source_snapshot')
     if (type(source) is not dict or not source or not _hash(row.get('source_fingerprint'))
             or row['source_fingerprint'] != fingerprint(source.get('name'),source.get('spec'))
-            or type(row.get('product_name')) is not str or not row['product_name'].strip()
-            or type(row.get('spec_source_text')) is not str or not row['spec_source_text'].strip()
-            or row.get('sale_status') != '판매중' or not is_current(row)):
+            or (not assembly and (type(row.get('product_name')) is not str or not row['product_name'].strip()
+                                  or type(row.get('spec_source_text')) is not str or not row['spec_source_text'].strip()
+                                  or row.get('sale_status') != '판매중'))
+            or not is_current(row)):
         return 'part_approval_source_stale'
     return None
 
@@ -172,7 +182,8 @@ def _event(row):
             or type(event.get('note')) is not str or not event['note'].strip() or len(event['note'])>3000
             or not _hash(event.get('request_digest')) or not _hash(event.get('approval_basis'))
             or type(snapshot) is not dict or snapshot.get('source_product_code') != event['source_product_code']
-            or not _integer(snapshot.get('source_product_code')) or not _integer(snapshot.get('product_code'))
+            or not _integer(snapshot.get('source_product_code'))
+            or not (_integer(snapshot.get('product_code')) or _assembly_only(snapshot))
             or snapshot.get('status') != 'approved' or not _integer(snapshot.get('approved_by'))
             or not _hash(snapshot.get('source_fingerprint')) or basis(snapshot) != event['approval_basis']):
         _fail(503, 'part_approval_event_invalid')

@@ -244,6 +244,22 @@ class PhotoTests(unittest.TestCase):
         self.conn.explanations[11]['status']='draft';self.conn.products[101]['status']='품절';self.error(422,self.approve)
         self.conn.products[101]['status']='판매중';self.conn.products[101]['spec_source_text']='NEW';self.error(422,self.approve)
 
+    def test_assembly_only_photo_keeps_rights_and_bytes_checks(self):
+        e=self.conn.explanations[11]; e['product_code']=None; e['content']['availability_scope']='assembly_only'
+        self.assertIsNone(self.core._model_reason(self.conn.row(11)))
+        for reference in (None,'https://merchant.example/rights'):
+            with self.subTest(reference=reference): self.error(503,self.approve,business_rights_reference=reference)
+        self.bytes=PNG+b'changed'; self.error(422,self.approve); self.bytes=PNG
+        self.assertEqual(self.conn.photo_events,[])
+        result=self.approve()
+        self.assertTrue(result['current']['allowed'])
+        snapshot=result['event']['snapshot']
+        self.assertIsNone(snapshot['model']['product_code']); self.assertIsNone(snapshot['provenance']['product_code'])
+        self.assertEqual(snapshot['provenance']['rights_reference'],RIGHTS)
+        self.assertTrue(self.read()['allowed'])
+        e['content']['availability_scope']='retail'
+        self.assertEqual(self.read()['state'],'stale')
+
     def test_missing_explanation_is_404(self):
         self.error(404,self.read,99)
 

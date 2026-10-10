@@ -1831,3 +1831,9 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 `import_provenance.original`은 원본 SKU·원본 해시·manifest 해시·QA 근거를 담고 원본 생성 모델·생성자·생성 시각은 null로 둔다. `current_binding`은 현재 SKU·구성·revision·케이스 상품 코드·근거를 담는다. 현재 등록 주체와 시각은 기존 `actor`·`created_at` 컬럼이며 원본 생성 이력으로 쓰지 않는다. 이 컬럼들은 재사용 승인·대표 선택·고객 공개의 근거가 아니다.
 
 일반 생성 worker와 저장 재시도는 `origin_kind='generated'`인 행만 처리하고, 컬럼이 없거나 값이 다르면 아무것도 쓰지 않는다. 그래서 이 마이그레이션 적용 전에는 새 코드를 배포하지 않는다. downgrade는 `generated`가 아닌 행, provenance가 있는 행, model이 null인 행이 하나라도 있으면 거부한다. 같은 번호 0133은 추천 뷰 VRAM·CPU 코어 개정이 이미 쓰고 있어 이 개정은 0134다.
+
+### 28. 조립 전용 부품의 설명·사진 승인 (2026-10-10, 0136)
+
+0130·0131의 승인 이력은 판매 상품(`products`) 연결을 전제로 했다. 조립 전용 부품(`product_explanations.product_code` NULL · `content.availability_scope='assembly_only'`, 현재 127201·127203)은 단품 판매 상품이 없어 승인 이력을 남길 수 없었고, 이 부품을 쓰는 조립PC 5종이 발행 승인에서 막혔다. 2026-10-10 사장님 결정: 사양 수치 확인은 발행을 막는 조건이 아니며, 자료가 없는 항목은 「정보 없음」으로 표시한다.
+
+0136은 표를 새로 만들지 않고 두 이력 표의 snapshot CHECK 와 가드 함수 세 개(`part_explanation_approval_guard` · `part_explanation_metadata_guard` · `part_photo_approval_guard`)만 고친다. 조립 전용 행에 한해 snapshot 의 `product_code` 가 JSON null 이어도 되고, 판매 상품 존재·`판매중`·판매 원문 일치 검사를 건너뛴다. 사진 권리 참조값 형식·자산 키·해시·이력 불변·순번·승인자·같은 트랜잭션 기록 검사는 그대로다. downgrade 는 거부한다(조립 전용 승인 이력이 이미 있을 수 있다).
