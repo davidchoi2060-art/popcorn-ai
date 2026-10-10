@@ -261,6 +261,20 @@
       overflow-wrap:anywhere;gap:2px 6px;padding:5px 6px}
   .uf-lockbtn-sm .uf-tag{white-space:normal;overflow-wrap:anywhere}
 }
+/* 휴대폰 폭(560px 이하): 표를 옆으로 밀지 않고 행마다 두 칸 카드로 접는다. 712px 표를 390px
+   화면에 두면 하한 값이 「1,0」「32 G」로 잘리고 「영향 미리보기」 단추가 화면 밖에 있어
+   스크롤해야 보였다(2026-10-10 점검). 칸 순서는 그대로 — 슬롯|하한 · 통과|통과율 · 단추. */
+@media (max-width:560px){
+  .uf-tablewrap{overflow-x:hidden}
+  .uf-thead{display:none}
+  .uf-row{min-width:0;grid-template-columns:minmax(0,1fr) auto;gap:6px 12px;padding:10px 12px}
+  .uf-row > div:empty{display:none}
+  .uf-row-item .uf-c4::before{content:"통과 · 전체 ";font:400 10.5px/1 var(--rv-font);color:var(--rv-muted)}
+  .uf-row-item > div:nth-child(3),.uf-row-item > div:nth-child(5){text-align:right}
+  .uf-row-item > div:nth-child(5) .uf-rate-track{width:96px;margin-left:auto}
+  .uf-row-item > div:last-child{grid-column:1/-1}
+  .uf-row-item .uf-btn-change{width:100%}
+}
 /* ── 사용·성능 자료 진입(Codex 시안 2026-10-09): 제목 · 네 화면 바로가기 · 영향 확인 순서 ── */
 .uf-hub{flex:none;padding:18px 18px 0}
 .uf-hub h1{margin:0;font:700 22px/1.35 var(--rv-font);color:var(--rv-ink)}

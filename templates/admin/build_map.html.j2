@@ -101,6 +101,7 @@ a{color:inherit;text-decoration:none}
                 padding:1px 4px}
 
 /* ── 1a 지도형 ───────────────────────────────────────────────── */
+.map-scroll{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
 .map-area{flex:1;min-height:0;position:relative;overflow:hidden}
 .map-area svg{position:absolute;inset:0;width:100%;height:100%}
 .elabel{position:absolute;transform:translate(-50%,-50%);font:600 10px/1 var(--font-num);
@@ -145,6 +146,15 @@ a{color:inherit;text-decoration:none}
   .split,.lanes{flex-direction:column!important}
   .map-area{height:520px;flex:none}
 }
+/* 휴대폰 폭: 요약 카드는 두 장씩 접고, 지도는 원래 비율(960:640)을 지킨 채 옆으로 밀어 본다.
+   화면 폭에 억지로 맞추면 상자 위치(%)와 선(SVG)이 서로 어긋나 상자가 잘리고 이름이 겹친다. */
+@media (max-width:768px){
+  .bm-stats{flex-wrap:wrap}
+  .bm-stats .stat{flex:1 1 140px;min-width:0}
+  .bm-stats .stat > div:last-child{flex-wrap:wrap}
+  .map-scroll{flex:none;overflow-x:auto}
+  .map-area{width:100%;min-width:600px;height:auto;aspect-ratio:3/2;flex:none}
+}
 </style>
 {% endblock %}
 
@@ -167,8 +177,9 @@ a{color:inherit;text-decoration:none}
 
     {# ── 1a 지도형 ─────────────────────────────────────────── #}
     <section class="view" data-view-panel="map" role="tabpanel" aria-label="지도형">
-      <div style="display:flex;gap:10px;margin-bottom:12px;flex:none" data-repeat="stats"></div>
+      <div class="bm-stats" style="display:flex;gap:10px;margin-bottom:12px;flex:none" data-repeat="stats"></div>
       <div class="split" style="flex:1;min-height:0;display:flex;gap:12px">
+        <div class="map-scroll">
         <div class="card map-area">
           <svg viewBox="0 0 960 640" preserveAspectRatio="xMidYMid meet" role="img"
                aria-label="부품 간 호환 관계 지도">
@@ -181,6 +192,7 @@ a{color:inherit;text-decoration:none}
           <div data-repeat="edge-labels"></div>
           <div data-repeat="nodes"></div>
           <div class="legend" data-repeat="legend"></div>
+        </div>
         </div>
         <aside class="rail card">
           <div style="padding:12px 14px 10px;border-bottom:1px solid var(--outline-variant);flex:none">

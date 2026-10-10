@@ -176,6 +176,11 @@ button{font-family:inherit}
 .btn-flag.on{color:var(--rv-ink);background:oklch(0.93 0.06 70);border-color:var(--rv-amber)}
 
 @media (max-width:768px){
+  /* 휴대폰 폭: 안내 띠를 여러 줄로 접는다. 한 줄에 두면 설명 칸이 한 글자 폭으로 눌린다. */
+  .banner{flex-wrap:wrap;align-items:flex-start;margin:10px 12px 0;row-gap:4px}
+  .banner .ds{flex-basis:100%}
+  .reasons-empty{padding:16px 14px}
+  .reason-grid{grid-template-columns:minmax(0,1fr)}
   .thead{display:none}
   .drawer{position:fixed;top:0;width:100%}
 }

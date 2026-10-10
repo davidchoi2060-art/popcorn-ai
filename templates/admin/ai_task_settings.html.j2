@@ -254,6 +254,9 @@ input{font-family:var(--rv-mono)}
 .ats-hist-empty .ds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-dim);margin-top:5px}
 
 @media (max-width:768px){
+  /* 휴대폰 폭: 안내 띠를 여러 줄로 접는다. 한 줄에 두면 설명 칸이 한 글자 폭으로 눌린다. */
+  .ats-banner{flex-wrap:wrap;align-items:flex-start;margin:10px 12px 0;row-gap:4px}
+  .ats-banner .ds{flex-basis:100%}
   .ats-body{flex-direction:column}
   .ats-left{width:100%}
   .ats-histhd,.ats-histrow{grid-template-columns:120px 80px 1fr}

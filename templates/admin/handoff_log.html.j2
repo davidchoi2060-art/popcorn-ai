@@ -86,7 +86,9 @@ code{font-family:var(--rv-mono);background:var(--rv-panel2);padding:1px 4px;bord
 .hl-banner{border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
   border-left:3px solid var(--rv-amber);border-radius:8px;padding:13px 16px;
   display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
-.hl-bannertxt{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1}
+/* flex-basis 280px: 폭이 모자라면 오른쪽 알약이 아래 줄로 내려간다. basis 0 이면 줄바꿈이
+   일어나지 않아 휴대폰에서 글이 한두 단어 폭으로 세로로 늘어졌다(2026-10-10 점검). */
+.hl-bannertxt{display:flex;flex-direction:column;gap:5px;min-width:0;flex:1 1 280px}
 .hl-bannerhd{font:600 13.5px/1.5 var(--rv-font);color:var(--rv-ink)}
 .hl-bannerds{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-ink-soft)}
 .hl-bannerpill{flex:none;font:600 10.5px/1.4 var(--rv-font);color:var(--rv-ink);
@@ -205,6 +207,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
   .hl-kpis{grid-template-columns:repeat(2,minmax(140px,1fr))}
   .hl-totals{grid-template-columns:1fr}
   .hl-drawer{width:100vw}
+  .hl-bannerpill{white-space:normal}
 }
 @media (max-width:520px){
   .hl-kpis{grid-template-columns:1fr}
