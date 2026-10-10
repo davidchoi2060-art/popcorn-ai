@@ -178,6 +178,7 @@ input{font-family:var(--rv-mono)}
 .fstat-row.on .fstat-bar{background:var(--rv-ink)}
 
 .listcol{flex:1;min-width:0;display:flex;flex-direction:column}
+.tablewrap{flex:1;min-height:0;display:flex;flex-direction:column}
 .filterbar{flex:none;padding:12px 16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;
           border-bottom:1px solid rgba(0,0,0,.09);background:var(--rv-card);position:relative;z-index:9}
 .searchbox{display:flex;align-items:center;gap:7px;background:var(--rv-card);border:1px solid rgba(0,0,0,.16);
@@ -369,8 +370,16 @@ input{font-family:var(--rv-mono)}
 .toast .cx{font:400 12px/1 var(--rv-font);opacity:.55;cursor:pointer;background:none;border:0;color:inherit}
 
 @media (max-width:768px){
-  .review-body{flex-direction:column}
+  /* 휴대폰 폭: 표 최소 폭이 화면 전체를 밀어내지 않게 min-width:0 을 주고, 표는 칸 안에서
+     옆으로 밀어 본다. 화면 폭에 끼워 넣으면 상품명 칸이 한 글자(「A」「삼」)로 찌그러진다. */
+  .review-body{flex-direction:column;min-width:0}
   .qside{width:100%}
+  .filterbar{padding:10px 12px}
+  .searchbox{flex:1 1 100%}
+  .searchbox input{width:auto;flex:1;min-width:0}
+  .tablewrap{flex:none;overflow-x:auto}
+  .tablewrap .thead,.tablewrap .row{min-width:780px;grid-template-columns:32px minmax(170px,1fr) 120px 92px 118px 116px 78px}
+  .tablewrap .tbody{overflow:visible}
   .drawer{position:fixed;top:0;width:100%}
 }
 </style>
@@ -450,6 +459,7 @@ input{font-family:var(--rv-mono)}
             <span class="grow"></span>
           </div>
 
+          <div class="tablewrap">
           <div class="thead">
             <span class="chk" id="checkAll" data-action="toggle-all"></span>
             <span>상품</span><span>사양 필드</span><span>원문값</span><span>제안값</span><span>신뢰 신호</span><span>상태</span>
@@ -457,6 +467,7 @@ input{font-family:var(--rv-mono)}
 
           <div class="tbody" id="tbody">
             <div class="loading">불러오는 중…</div>
+          </div>
           </div>
 
           <div class="pager" id="pager">

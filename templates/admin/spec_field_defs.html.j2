@@ -233,7 +233,12 @@ input,select,textarea{font-family:var(--rv-font)}
   justify-content:flex-end;background:var(--rv-panel);flex:none}
 
 @media (max-width:768px){
-  .sd-grid-head,.sd-row{grid-template-columns:minmax(140px,1fr) 70px 96px}
+  /* 휴대폰 폭: 첫 칸 최소 140px 를 풀어 세 칸이 화면 안에 들어오게 한다(채움 칸이 오른쪽에서 잘렸다) */
+  .sd-grid-head,.sd-row{grid-template-columns:minmax(0,1fr) 62px 84px;gap:8px}
+  /* 건강 상태 띠: 제목·본문·시각을 위아래로 쌓는다. 한 줄에 두면 본문이 좁은 칸에 몰려 세로로 늘어진다 */
+  .sd-health{margin:10px 12px 0}
+  .sd-health.ok{flex-direction:column;align-items:flex-start;gap:4px}
+  .sd-health-title{white-space:normal}
   .sd-h-key,.sd-h-type,.sd-h-unit,.sd-h-parts,.sd-h-req,
   .sd-row-key,.sd-row-type,.sd-row-unit,.sd-row-parts,.sd-row-req{display:none}
   .sd-modal{padding:0}

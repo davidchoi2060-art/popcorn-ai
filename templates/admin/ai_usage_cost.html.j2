@@ -141,8 +141,8 @@ button{font-family:inherit}
 .brow{display:grid;grid-template-columns:1fr 96px 88px;gap:10px;align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.05)}
 .brow .nm{display:flex;align-items:center;gap:8px;min-width:0}
 .brow .dot{width:8px;height:8px;flex:none;border-radius:50%}
-.brow .name{font:500 11.5px/1.3 var(--rv-font)}
-.brow .sub{font:400 10px/1.3 var(--rv-mono);color:#a09889;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .name{font:500 11.5px/1.3 var(--rv-font);flex:none;white-space:nowrap}
+.brow .sub{font:400 10px/1.3 var(--rv-mono);color:#a09889;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
 .brow .tok{font:400 11px/1.3 var(--rv-mono);color:#b3ac9e;text-align:right}
 .brow .cost{font:400 11px/1.3 var(--rv-mono);color:#b3ac9e;text-align:right}
 .brow .tok.real,.brow .cost.real{color:var(--rv-ink);font-weight:500}
@@ -196,8 +196,13 @@ button{font-family:inherit}
           color:var(--rv-canvas);font:500 12px/1 var(--rv-font);border:0;cursor:pointer}
 
 @media (max-width:768px){
-  .kpis{grid-template-columns:repeat(2,1fr)}
-  .breakdowns,.bottom2{grid-template-columns:1fr}
+  /* minmax(0,…): 칸 안 글이 길어도 칸이 화면 폭을 넘지 않게 한다(1fr 만 쓰면 내용 폭이 최소값이 된다) */
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .breakdowns,.bottom2{grid-template-columns:minmax(0,1fr)}
+  .au-scroll{padding:10px 12px 14px}
+  .brow{grid-template-columns:minmax(0,1fr) 76px 68px;gap:8px}
+  .ccrow{grid-template-columns:minmax(0,1fr) auto;gap:4px 8px}
+  .ccrow .cost{grid-column:1/-1;text-align:left}
 }
 </style>
 {% endblock %}

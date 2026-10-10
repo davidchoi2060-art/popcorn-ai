@@ -56,6 +56,18 @@
          padding:0 9px;font:400 11px/1 var(--font-num,monospace);width:100%}
   .tp-lbl{font:600 9.5px/1 var(--font);color:var(--rv-ink-soft)}
   .tp-note{font:400 9px/1.55 var(--font);color:var(--rv-ink-soft)}
+  .tp-list{flex:1;min-height:0;overflow:auto}
+  .tp-split{flex:1;min-height:0;display:flex;gap:10px}
+  .tp-rail{flex:none;width:392px;display:flex;flex-direction:column;gap:8px;overflow:auto}
+  /* 휴대폰 폭: 목록과 오른쪽 레일을 위아래로 쌓는다. 나란히 두면 392px 레일이 화면을
+     다 차지해 목록 칸이 한 글자 폭으로 눌린다(2026-10-10 점검). 표는 칸 안에서 옆으로 민다. */
+  @media (max-width:768px){
+    .tp-split{flex-direction:column}
+    .tp-rail{width:auto;overflow:visible}
+    .tp-table{overflow-x:auto}
+    .tp-table .tp-row{min-width:560px}
+    .tp-table .tp-list{overflow:visible}
+  }
 </style>
 {% endblock %}
 
@@ -79,7 +91,7 @@
   </section>
 
   {# ── ② 목록(전면) + 오른쪽 레일 ── #}
-  <div style="flex:1;min-height:0;display:flex;gap:10px">
+  <div class="tp-split">
 
     <section class="tp-card" style="flex:1;min-width:0;padding:11px 14px;display:flex;flex-direction:column;gap:8px;overflow:hidden">
       <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
@@ -99,16 +111,18 @@
         <input id="tp-q" class="tp-in" style="flex:1;min-width:120px;height:27px;font-family:var(--font)"
                placeholder="의도명 · 어휘로 검색" data-keep="1">
       </div>
+      <div class="tp-table" style="flex:1;min-height:0;display:flex;flex-direction:column">
       <div class="tp-row" style="font:600 9px/1 var(--font);color:var(--rv-faint);padding:0 0 5px;border-bottom:1px solid var(--outline-variant)">
         <span>의도명</span><span>어휘 (match_terms)</span><span>답변 종류</span>
         <span style="text-align:right">걸린 횟수</span><span style="text-align:center">상태</span>
         <span style="text-align:right">마지막 사용</span>
       </div>
-      <div id="tp-list" style="flex:1;min-height:0;overflow:auto"></div>
+      <div id="tp-list" class="tp-list"></div>
+      </div>
       <div id="tp-res" hidden></div>
     </section>
 
-    <aside style="flex:none;width:392px;display:flex;flex-direction:column;gap:8px;overflow:auto">
+    <aside class="tp-rail">
 
       {# 패턴 등록 — 저장하면 «대기». 아직 고객에게 안 나간다 #}
       <section class="tp-card" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" data-keep="1">
