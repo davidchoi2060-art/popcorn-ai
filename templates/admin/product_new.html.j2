@@ -36,7 +36,9 @@
                                                         `/part-type` 는 이 화면
                                                         허용 API 목록 밖 — 안 쓴다)
       판매상태    ✕ INSERT 가 '판매중' 고정             됨(EDITABLE.status)
-      카테고리    ✕ RegisterBody·INSERT 모두 없음       ✕ EDITABLE·조회 SELECT 모두 없음
+      카테고리    됨(category_id, 2026-10-10 추가)      표시만(조회 SELECT 에 포함 · 변경은
+                                                        「상품 분류 매핑」 — 이동 기록·되돌리기가
+                                                        거기 있다)
       판매가      ✕ RegisterBody 없음(NULL 유지 정책)   됨(EDITABLE.sale_price)
       매입가      됨(cost_price → purchase_price)      됨(EDITABLE.purchase_price)
       재고수량    ✕ INSERT 가 0 고정                    됨(EDITABLE.stock_qty)
@@ -44,8 +46,12 @@
     11항목을 전부 화면에 그대로 두되(지시서 요구), 서버가 실제로 주고받지 않는
     자리는 **`disabled` + `title`/안내문으로 사유를 병기**한다(MAKER-CHECKLIST
     "비활성은 진짜 disabled + 이유를 title로" 그대로) — 입력하면 저장되는 것처럼
-    가장하지 않는다. 브랜드·카테고리는 두 모드 모두 비활성(서버가 아예 다루지
-    않는다), 나머지는 모드별로 갈린다(표 그대로).
+    가장하지 않는다. 브랜드는 두 모드 모두 비활성(서버가 아예 다루지 않는다),
+    나머지는 모드별로 갈린다(표 그대로).
+    ⚠ 카테고리(2026-10-10 개정): 섹션이 「필수」인데 선택칸이 잠겨 있어 등록을 끝낼
+    수 없다는 점검 결과(전수점검-20261010 · 높음)에 따라 등록 API 가 category_id 를
+    받게 했다. 등록 모드에서는 고를 수 있고, 카테고리 목록이 있으면 고르기 전에는
+    등록하지 않는다. 목록이 비었거나 못 읽으면 막지 않고 미분류로 등록한다.
 
   ■ 12섹션 — 원안 12개 접이식 섹션(spec-product-unified.md §1) 중 정의서 ○ 판정
     11항목을 담는 3섹션(01 기본정보·02 카테고리·03 판매가격·재고)만 실제 입력을
@@ -300,13 +306,12 @@
           <div class="pn-card-body">
             <div class="pn-grid">
               <div class="pn-field span2">
-                <label for="pnCategory">카테고리</label>
+                <label for="pnCategory">카테고리 <span class="pn-req-mark" id="pnCategoryReq">*</span></label>
                 <select id="pnCategory" class="pn-select" disabled data-bind="category">
                   <option value="">불러오는 중</option>
                 </select>
-                <div class="pn-fnote warn">이 API(등록·수정)는 카테고리(category_id)를 조회·저장하지
-                  않습니다 — 선택해도 반영되지 않고 기존 값도 표시되지 않습니다. 카테고리 변경은
-                  <a href="/admin2/category-mapping" target="_blank" rel="noopener">상품 분류 매핑</a>에서 처리하세요.</div>
+                <div class="pn-fnote err" id="pnCategoryErr" hidden></div>
+                <div class="pn-fnote" id="pnCategoryNote"></div>
               </div>
             </div>
           </div>
@@ -605,8 +610,12 @@
     $('pnStatus').disabled = !edit || !S.meta;
     $('pnStatusNote').hidden = edit;
     if (!edit) $('pnStatusNote').textContent = "등록하면 '판매중'으로 고정됩니다(서버 정책) — 등록 후 수정에서 변경하세요.";
-    // 카테고리 — 항상 비활성(머리말 표)
-    $('pnCategory').disabled = true;
+    // 카테고리 — 등록은 선택(목록이 있을 때 필수), 수정은 현재 값 표시 + 매핑 화면 안내
+    $('pnCategory').disabled = edit || !S.categories;
+    $('pnCategoryReq').hidden = edit || (!!S.categories && !hasCategories());
+    $('pnCategoryNote').innerHTML = edit
+      ? '카테고리 변경은 <a href="/admin2/category-mapping" target="_blank" rel="noopener">상품 분류 매핑</a>에서 합니다(이동 기록과 되돌리기가 그 화면에 있습니다).'
+      : '등록 후 변경은 <a href="/admin2/category-mapping" target="_blank" rel="noopener">상품 분류 매핑</a>에서 합니다.';
     // 판매가 — 등록 시 저장 안 됨(NULL 유지), 수정 시 저장됨
     $('pnSalePrice').disabled = !edit;
     $('pnSalePriceNote').hidden = edit;
@@ -619,7 +628,7 @@
     if (!edit) $('pnStockQtyNote').textContent = '등록 시 재고수량은 0으로 시작합니다(서버 정책) — 등록 후 수정에서 입력하세요.';
 
     if (!writable()) {
-      ['pnName', 'pnMaker', 'pnModel', 'pnStatus', 'pnSalePrice', 'pnPurchasePrice', 'pnStockQty'].forEach(function (id) {
+      ['pnName', 'pnMaker', 'pnModel', 'pnStatus', 'pnCategory', 'pnSalePrice', 'pnPurchasePrice', 'pnStockQty'].forEach(function (id) {
         var el = $(id); el.disabled = true; el.title = writeNote();
       });
       if (S.partTypeSel !== undefined) {
@@ -667,15 +676,24 @@
     });
   }
 
-  // ── 카테고리 — 표시 전용(저장 불가, 머리말 표 참조) ──
+  // ── 카테고리 — 등록은 고른 값을 저장, 수정은 현재 값 표시(머리말 표 참조) ──
+  function hasCategories() { return !!(S.categories && (S.categories.items || []).length); }
   function loadCategories() {
     var sel = $('pnCategory');
     return apiGet(API + '/categories').then(function (j) {
       S.categories = j;
-      sel.innerHTML = '<option value="">표시 안 됨 — 조회 API에 카테고리 값이 없습니다</option>' + buildCategoryOptions(j.items || []);
+      var items = j.items || [];
+      var head = MODE === 'edit'
+        ? '<option value="">미분류</option>'
+        : (items.length ? '<option value="">카테고리를 선택하세요</option>'
+                        : '<option value="">등록된 카테고리 없음 — 미분류로 등록합니다</option>');
+      sel.innerHTML = head + buildCategoryOptions(items);
+      if (MODE === 'edit' && S.baseline && S.baseline.category_id != null) sel.value = String(S.baseline.category_id);
+      applyModeGates();
     }).catch(function (e) {
-      sel.innerHTML = '<option value="">카테고리 목록을 불러오지 못했습니다</option>';
+      sel.innerHTML = '<option value="">카테고리 목록을 불러오지 못했습니다 — 미분류로 등록합니다</option>';
       sel.title = e.message || '';
+      $('pnCategoryReq').hidden = true;
     });
   }
 
@@ -705,6 +723,7 @@
     var s1 = $('pnPartType1'); if (s1) s1.value = '';
     var s2 = $('pnPartType2'); if (s2) { s2.value = ''; s2.style.display = 'none'; }
     S.partTypeSel = null;
+    $('pnCategory').value = ''; $('pnCategoryErr').hidden = true;
     hideSimilar();
     clearResult();
   }
@@ -720,6 +739,7 @@
       name: $('pnName').value.trim(),
       part_type: S.partTypeSel || null,
       maker: $('pnMaker').value.trim() || null,
+      category_id: $('pnCategory').value ? Number($('pnCategory').value) : null,
       cost_price: numOrNull($('pnPurchasePrice').value)
     };
   }
@@ -730,6 +750,13 @@
   }
   function checkSimilarThenRegister() {
     var body = collectRegisterBody();
+    var catErr = $('pnCategoryErr');
+    if (hasCategories() && body.category_id == null) {
+      catErr.hidden = false; catErr.textContent = '카테고리를 선택하세요';
+      setSectionOpen('cat', true); $('pnCategory').focus();
+      return;
+    }
+    catErr.hidden = true;
     S.busy = true; $('pnSubmitBtn').disabled = true;
     var url = API + '/product-similar?name=' + encodeURIComponent(body.name)
       + '&part_type=' + encodeURIComponent(body.part_type || '');

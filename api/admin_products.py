@@ -368,6 +368,11 @@ class RegisterBody(BaseModel):
     # 몰 CSV가 주는 값을 그대로 담는 별개 저장소다(둘을 합치지 않는다 — 사장님 지시).
     # 선택 입력 — 비워도 등록된다.
     supplier: str | None = None
+    # 판매 카테고리(`categories` 탐색 축 — part_type 과 다른 축이다). 등록 화면의
+    # 「02 카테고리」가 «필수»라 적혀 있는데 받을 칸이 없어 선택칸이 잠겨 있었다
+    # (2026-10-10 전수 점검). 선택 입력 — 비우면 NULL(미분류)로 등록되고, 나중에
+    # 「상품 분류 매핑」에서 옮길 수 있다.
+    category_id: int | None = None
     # 닮은 상품이 있어도 "다른 상품이다"라고 확인했으면 그대로 등록한다(슬라이스 68)
     confirm_similar: bool = False
 
@@ -400,6 +405,10 @@ def register_product(body: RegisterBody):
                     text("SELECT 1 FROM suppliers WHERE supplier_id=:s"),
                     {"s": body.supplier_id}).first() is None:
                 raise HTTPException(404, "공급처가 없습니다")
+            if body.category_id is not None and conn.execute(
+                    text("SELECT 1 FROM categories WHERE category_id=:c"),
+                    {"c": body.category_id}).first() is None:
+                raise HTTPException(400, "카테고리를 찾을 수 없습니다 — 목록을 새로 불러와 다시 선택하세요")
             if body.danawa_code:
                 dup = conn.execute(text(
                     "SELECT sku FROM products WHERE danawa_code=:d"), {"d": body.danawa_code}).scalar()
@@ -425,10 +434,11 @@ def register_product(body: RegisterBody):
             conn.execute(text(
                 "INSERT INTO products (product_code, sku, product_name, part_type, category_group,"
                 " status, ai_candidate_yn, review_required_yn, purchase_price, stock_qty, danawa_code,"
-                " supplier)"
-                " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d, :sup)"),
+                " supplier, category_id)"
+                " VALUES (:pc, :sku, :n, :pt, 'core_part', '판매중', false, true, :cost, 0, :d, :sup, :cat)"),
                 {"pc": pc, "sku": sku, "n": body.name.strip(), "pt": pt,
-                 "cost": body.cost_price, "d": body.danawa_code, "sup": sup_val})
+                 "cost": body.cost_price, "d": body.danawa_code, "sup": sup_val,
+                 "cat": body.category_id})
             if body.maker and body.maker.strip():
                 conn.execute(text("UPDATE products SET maker=:m WHERE product_code=:pc"),
                              {"m": body.maker.strip()[:60], "pc": pc})
@@ -439,6 +449,7 @@ def register_product(body: RegisterBody):
                 # 공급처 없는 직접 등록 — 매핑·매입가 원장은 만들지 않는다(없는 사실을 적지 않는다)
                 _log(conn, "product_register", sku,
                      {"product_code": pc, "sku": sku, "part_type": pt,
+                      "category_id": body.category_id,
                       "supplier_id": None, "source": "manual"}, kind="product")
                 return {"ok": True, "sku": sku, "product_code": pc,
                         "note": ("등록됐습니다 — 검수 대기 상태이고 추천 풀에는 들어가지 않습니다."
@@ -596,6 +607,8 @@ def get_product(product_code: int):
             " p.category_group, p.status, p.ai_candidate_yn, p.review_required_yn,"
             " p.purchase_price, p.sale_price, p.market_price, p.stock_qty, p.supplier,"
             " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text,"
+            " p.category_id, (SELECT c.name FROM categories c WHERE c.category_id = p.category_id)"
+            "   AS category_name,"
             " p.created_at, p.updated_at, to_jsonb(ps) AS specs"
             " FROM products p LEFT JOIN product_specs ps USING (product_code)"
             " WHERE p.product_code = :pc"), {"pc": product_code}).mappings().first()
@@ -756,6 +769,7 @@ def get_product(product_code: int):
         "maker": r["maker"], "model_name": r["model_name"],
         "part_type": r["part_type"], "cat": PART_TYPE_LABELS.get(r["part_type"], r["part_type"]),
         "category_group": r["category_group"], "status": r["status"],
+        "category_id": r["category_id"], "category_name": r["category_name"],
         # 목록(items[].status_key)과 같은 값·같은 판정 함수 — 결함 ⓐ-3
         "status_key": status_key,
         "purchase_price": r["purchase_price"], "sale_price": r["sale_price"],
