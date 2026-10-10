@@ -373,11 +373,44 @@ class Apply(unittest.TestCase):
         self.assertEqual(state, 'registered')
         self.assertFalse(self.db.jobs[job]['selected'])
 
-    def test_basis_change_after_registration_is_not_reused(self):
-        self.apply(select=False)
-        state, reason = self.apply(b=binding(visual='c' * 64))
-        self.assertEqual(state, 'skipped')
-        self.assertIn('근거 변경', reason)
+    def test_basis_change_after_registration_registers_again_on_the_new_basis(self):
+        # 2026-10-10: P127206 and three others were selected, then a CPU part's content
+        # changed, so the customer photo turned unavailable and a re-run only skipped.
+        state, old = self.apply()
+        self.assertEqual(state, 'selected')
+        state, new = self.apply(b=dict(binding(visual='c' * 64), mismatch=[REV]))
+        self.assertEqual(state, 'selected_by_decision')
+        self.assertNotEqual(old, new)
+        self.assertEqual((self.db.jobs[old]['visual_basis'], self.db.jobs[old]['selected']), ('a' * 64, False))
+        self.assertEqual((self.db.jobs[new]['visual_basis'], self.db.jobs[new]['status'], self.db.jobs[new]['selected']),
+                         ('c' * 64, 'ready', True))
+        self.assertEqual(self.db.jobs[new]['request_id'],
+                         m.request_id(M, 200001, item()['original_sha256'], 'c' * 64))
+        self.assertEqual(self.objects.calls, [old, new])
+        # idempotent on the new basis too
+        self.assertEqual(self.apply(b=dict(binding(visual='c' * 64), mismatch=[REV])), ('selected', new))
+        self.assertEqual((len(self.db.jobs), len(self.objects.calls)), (2, 2))
+
+    def test_basis_change_never_forces_a_case_change(self):
+        self.apply()
+        state, detail = self.apply(b=dict(binding(visual='c' * 64), mismatch=[REV, CASE]))
+        self.assertEqual(state, 'registered_unselected')
+        self.assertEqual([j['selected'] for j in self.db.jobs.values()], [True, False])
+
+    def test_dry_run_reports_a_stale_registration_as_a_new_upload(self):
+        self.apply()
+        with patch.object(m, 'current_binding', return_value=(dict(binding(visual='c' * 64), mismatch=[REV]), None)):
+            state, detail, uploaded, _ = m._dry(self.db, item(), PNG, M, None, None, True)
+        self.assertEqual((state, uploaded), ('would_select_by_decision', False))
+        self.assertIn('새 근거로 다시 등록', detail)
+        with patch.object(m, 'current_binding', return_value=(binding(), None)):
+            self.assertEqual(m._dry(self.db, item(), PNG, M, None, None, True)[:3], ('would_select', 'C200001', True))
+
+    def test_job_of_another_configuration_is_not_rebound(self):
+        self.apply()
+        state, detail = self.apply(b=dict(binding(visual='c' * 64), configuration_id='C999999'))
+        self.assertEqual((state, detail), ('skipped', '같은 요청번호의 다른 작업 존재'))
+        self.assertEqual(len(self.db.jobs), 1)
 
 
 class Cli(unittest.TestCase):

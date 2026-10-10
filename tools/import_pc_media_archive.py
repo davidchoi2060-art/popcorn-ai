@@ -34,6 +34,9 @@ Per item, without any generation call:
 Default is a read-only dry run. --apply needs POPCORN_EXISTING_MEDIA_IMPORT_APPLY=1
 and --operator-id of an active owner; that owner is the verified principal and actor.
 Re-running is safe: the request id is derived from manifest+product+image hash.
+When a configuration changed after its original was registered (stale visual basis),
+the same original is registered again under an id that also carries the current basis
+and selected under the same rules; the stale job is left untouched.
 """
 import argparse
 from dataclasses import asdict, dataclass
@@ -334,15 +337,34 @@ def require_apply_env(environment=None):
         raise PermissionError('POPCORN_EXISTING_MEDIA_IMPORT_APPLY=1 이 필요합니다')
 
 
-def request_id(manifest_sha, code, original_sha):
-    return str(uuid5(NAMESPACE, f'{manifest_sha}:{code}:{original_sha}'))
+def request_id(manifest_sha, code, original_sha, visual_basis=None):
+    """The first registration of an original uses the plain id. A re-registration for a
+    later visual basis (the configuration changed after the first one) adds that basis."""
+    key = f'{manifest_sha}:{code}:{original_sha}' + (f':{visual_basis}' if visual_basis else '')
+    return str(uuid5(NAMESPACE, key))
 
 
-def _row(conn, request):
+def _row(conn, request, lock=True):
     from sqlalchemy import text
     found = conn.execute(text('SELECT job_id,configuration_id,visual_basis,status,selected,asset,origin_kind '
-                              'FROM pc_media_jobs WHERE request_id=:r FOR UPDATE'), dict(r=request)).mappings().first()
+                              'FROM pc_media_jobs WHERE request_id=:r' + (' FOR UPDATE' if lock else '')),
+                         dict(r=request)).mappings().first()
     return dict(found) if found else None
+
+
+def _request_for(conn, manifest_sha, code, original_sha, binding, lock=True):
+    """(request_id, existing row or None) for this original on the CURRENT visual basis.
+    An earlier import of the same original whose basis went stale (a part's name, facts or
+    photo changed after it was registered) is left as it is; the original is registered
+    again under a basis-specific id, so it can be uploaded, marked ready and selected for
+    the current configuration. Re-running stays idempotent per basis."""
+    base = request_id(manifest_sha, code, original_sha)
+    row = _row(conn, base, lock)
+    if (row is None or row['visual_basis'] == binding['visual_basis']
+            or row['origin_kind'] != 'existing_import' or row['configuration_id'] != binding['configuration_id']):
+        return base, row
+    rebind = request_id(manifest_sha, code, original_sha, binding['visual_basis'])
+    return rebind, _row(conn, rebind, lock)
 
 
 def _verified(conn, auth, principal, item, raw, manifest_sha, by_decision, skus, bound=None):
@@ -375,13 +397,13 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
     from api.pc_media import NOTICE
     from api.pc_existing_media_import import canonical
     require_apply_env()
-    code, request = product_code(item), request_id(manifest_sha, product_code(item), item['original_sha256'])
+    code = product_code(item)
     actor = principal.actor
     with engine.begin() as conn:
         binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, False, skus)
         if reason:
             return 'skipped', reason
-        row = _row(conn, request)
+        request, row = _request_for(conn, manifest_sha, code, item['original_sha256'], binding)
         if row is None:
             job = str(new_job())
             conn.execute(text('INSERT INTO pc_media_jobs(job_id,request_id,configuration_id,visual_basis,review_basis,'
@@ -463,16 +485,18 @@ def _dry(engine, item, raw, manifest_sha, auth, principal, select, skus=()):
                     auth.verify_registration(subject, principal, conn)
                 except Denied:
                     return 'skipped', '재사용 권한 확인 거부', False, compare_label(item, binding)
-            existing = conn.execute(text('SELECT status FROM pc_media_jobs WHERE request_id=:r'),
-                                    dict(r=request_id(manifest_sha, product_code(item), item['original_sha256']))).scalar()
+            request, existing = _request_for(conn, manifest_sha, product_code(item), item['original_sha256'],
+                                             binding, lock=False)
+            rebind = request != request_id(manifest_sha, product_code(item), item['original_sha256'])
         finally:
             conn.rollback()
-    uploaded, label = existing == 'ready', compare_label(item, binding)
+    uploaded, label = bool(existing) and existing['status'] == 'ready', compare_label(item, binding)
+    note = ' · 이전 등록 이후 구성 근거 변경, 새 근거로 다시 등록' if rebind else ''
     if not select or mode is None:
-        return 'would_register_only', _texts(binding['mismatch']) or '선택 안 함', uploaded, label
+        return 'would_register_only', (_texts(binding['mismatch']) or '선택 안 함') + note, uploaded, label
     if mode == 'by_decision':
-        return 'would_select_by_decision', _texts(binding['mismatch']), uploaded, label
-    return 'would_select', binding['configuration_id'], uploaded, label
+        return 'would_select_by_decision', _texts(binding['mismatch']) + note, uploaded, label
+    return 'would_select', binding['configuration_id'] + note, uploaded, label
 
 
 SUMMARY = (('업로드 예정', None), ('이미 있음', None), ('대표 선택 예정', ('would_select', 'would_select_by_decision')),
