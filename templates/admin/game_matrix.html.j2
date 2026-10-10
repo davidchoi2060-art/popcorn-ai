@@ -167,8 +167,8 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       <span>견적 있는 칸 <b data-bind="m-cells">—</b></span>
       <span>그래픽카드 서열표 <b data-bind="m-ladder">—</b>개</span>
       <span class="tail gm-tools">
-        <button type="button" class="gm-btn" disabled title="향후 사용예정 — 배치 로그 조회 API가 아직 없습니다">배치 로그</button>
-        <button type="button" class="gm-btn" disabled title="향후 사용예정 — 내려받기 API가 아직 없습니다">CSV 내려받기</button>
+        <button type="button" class="gm-btn" disabled title="배치 로그 조회가 아직 연결되지 않았습니다">배치 로그</button>
+        <button type="button" class="gm-btn" disabled title="내려받기가 아직 연결되지 않았습니다">CSV 내려받기</button>
       </span>
     </div>
 
@@ -402,7 +402,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var mapRows = state.tab === 'games' ? m.game_map_rows : m.workload_map_rows;
     if (m.cell_count === 0) {
       set('blocked-title', '격자 데이터 없음');
-      set('blocked-msg', '현재 쓰는 견적이 0건입니다 — 상품 매트릭스 관리에서 먼저 생성하십시오.');
+      set('blocked-msg', '현재 쓰는 견적이 없습니다. 상품 매트릭스 관리에서 생성 상태를 확인해 주세요.');
       show('blocked', true); show('cols', false); return true;
     }
     if (mapRows === 0) {

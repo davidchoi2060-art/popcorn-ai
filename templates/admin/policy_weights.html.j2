@@ -243,8 +243,8 @@ code{font-family:var(--rv-mono)}
     tag_silent: '적용 범위 밖 부품(CPU·메모리·SSD 등)은 무조건 통과합니다.',
     tag_white: '다른 부품 색상은 판정하지 않습니다.'
   };
-  var LOCK_TITLE = '배분율·티어 정렬 기준 편집은 향후 사용예정입니다 — 값을 프로그램에서 저장소로' +
-    " 옮기고 '바꿔도 이미 만든 견적은 그대로'라는 원칙(용도 하한과 동일)을 적용해야 합니다.";
+  var LOCK_TITLE = '배분율·유형별 정렬 기준은 아직 수정할 수 없습니다 — 설정 저장 기능과' +
+    ' 이미 만든 견적을 유지하는 보호 기능이 연결되어야 합니다.';
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -317,11 +317,11 @@ code{font-family:var(--rv-mono)}
       '<div class="sub">추천 가중치 저장소는 있지만 <b>' + n + '건</b>입니다 —' +
       ' <b>추천 엔진이 이 값을 읽지 않습니다.</b> 이 화면은 그 사실을 보여 주려고 조회만 하며,' +
       ' 견적에는 반영하지 않습니다. ' + n + '건은 오류가 아니라 지금의 정상 상태입니다.' +
-      ' 추천은 실제로 이 넷이 결정합니다 — 티어별 정렬 규칙 · 총액 가지치기 ·' +
-      ' 예산 배분율 · 태그 스코프.</div>' +
+      ' 추천에 적용되는 기준은 네 가지입니다 — 유형별 정렬 기준 · 예산 초과 구성 제외 ·' +
+      ' 예산 배분율 · 태그 적용 범위.</div>' +
       '<div class="name">화면 이름을 「추천 기준 보기」로 표시합니다 — 지금 이 화면에서 바꿀 수 있는' +
-      ' 값은 하나도 없습니다(전부 프로그램에 고정된 값). 좌측 메뉴의 이름은 확정 전이라' +
-      ' 「추천 기준 설정」 그대로입니다.</div>' +
+      ' 값은 하나도 없습니다(전부 프로그램에 고정된 값). 좌측 메뉴에서도' +
+      ' 「추천 기준 보기」로 찾을 수 있습니다.</div>' +
       '</div></div>';
   }
 
@@ -342,7 +342,7 @@ code{font-family:var(--rv-mono)}
         return '<span class="capword">' + esc(r.cap) + '</span><div class="capnote">' + esc(r.note) + '</div>';
       }) +
       row('총액 처리', function (r) { return esc(r.total_handling || '—'); });
-    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">티어별 정렬 · 예산 상한 · 총액 처리</span>' +
+    return '<div class="pw-card"><div class="pw-cardhd"><span class="t">유형별 정렬 · 예산 상한 · 총액 처리</span>' +
       '</div>' +
       '<div class="pw-tablewrap"><table class="pw-tiertable"><thead><tr>' +
       '<th scope="col" class="lbl"><span class="pw-vh">구분</span></th>' + head + '</tr></thead>' +
@@ -365,7 +365,7 @@ code{font-family:var(--rv-mono)}
         '<span class="pct num">' + fmtPct(a.pct) + '</span></div>';
     }).join('');
     return '<div class="pw-card"><div class="pw-cardhd"><span class="t">부품별 예산 배분율</span>' +
-      '<span class="pw-lock" title="' + esc(LOCK_TITLE) + '">편집 — 향후 사용예정</span></div>' +
+      '<span class="pw-lock" title="' + esc(LOCK_TITLE) + '">수정 기능 미연결</span></div>' +
       '<div class="pw-bars">' + rows + '</div>' +
       '<div class="pw-cardnote">' + esc((d.budget && d.budget.note) || '') + '</div></div>';
   }
@@ -390,7 +390,7 @@ code{font-family:var(--rv-mono)}
     var items = [
       '동률이면 상품코드 오름차순으로 정합니다 — 같은 입력·같은 재고면 항상 같은 결과입니다(재현성).',
       '벤치마크 원천이 없어 가격을 성능의 대리 지표로 씁니다 — 부품 등급 축이 엔진에 연결되면 교체될 예정입니다.',
-      '가성비형에서 최소 구성이 예산을 넘으면 세 티어 전부 불성립입니다 — 성립한 척하지 않습니다.',
+      '가성비형에서 최소 구성이 예산을 넘으면 세 유형 모두 구성할 수 없습니다 — 성립한 척하지 않습니다.',
       '추천 가중치는 ' + n + '건이며 추천 엔진이 읽지 않습니다 — 오류가 아니라 지금의 정상 상태입니다.',
       '배분율은 예산 상한이 있는 견적에만 적용됩니다 — 숫자 없는 예산 표현에는 적용되지 않습니다.'
     ];

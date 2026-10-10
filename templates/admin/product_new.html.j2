@@ -235,7 +235,7 @@
         <section class="pn-card" id="pnSec-copy" data-open="n" data-sec="copy">
           <div class="pn-card-hd" data-action="toggle-section" data-sec="copy">
             <span class="pn-kicker">00</span><h3>상품복사</h3>
-            <span class="pn-badge-stub">API 미연결 — 향후 사용예정</span>
+            <span class="pn-badge-stub">조회·저장 기능 미연결</span>
             <span class="pn-chev">▾</span>
           </div>
           <div class="pn-card-body">
@@ -277,8 +277,8 @@
               <div class="pn-field">
                 <label for="pnBrand">브랜드</label>
                 <input id="pnBrand" class="pn-input" type="text" disabled placeholder="" data-bind="brand">
-                <div class="pn-fnote warn">이 API(등록·수정)는 브랜드 필드를 조회·저장하지 않습니다 —
-                  products.brand 컬럼은 있으나 응답에 포함되지 않습니다.</div>
+                <div class="pn-fnote warn">현재 상품 등록·수정에서는 브랜드를 조회하거나 저장할 수 없습니다 —
+                  브랜드 저장 항목은 있지만 이 화면에 전달되지 않습니다.</div>
               </div>
               <div class="pn-field">
                 <label for="pnModel">모델명<span class="pn-lock" id="pnLockModel" hidden title="다음 자동 적재가 이 값을 덮지 않습니다">잠김</span></label>
@@ -344,26 +344,26 @@
                 <div class="pn-fnote warn" id="pnStockQtyNote" hidden></div>
               </div>
             </div>
-            <div class="pn-fnote">재고수량을 고치면 서버가 재고 원장(stock_movements)에 함께 남깁니다 —
+            <div class="pn-fnote">재고수량을 고치면 서버가 재고 변경 기록에 함께 남깁니다 —
               화면이 재고를 다시 계산하지 않습니다.</div>
           </div>
         </section>
 
         {% set stubs = [
-          ("04", "image", "상품이미지 · 동영상", "대표 이미지 1건 · 추가 이미지 최대 9건 · 동영상 URL. 저장 표(product_media)는 마이그레이션 0081로 이미 만들어졌지만, 이 화면이 부르는 API에는 읽기·쓰기 엔드포인트가 없습니다."),
-          ("05", "opt", "옵션 · 추가상품", "옵션 사용 여부 · 옵션 행(옵션명·옵션값·추가금액·재고) · 추가상품. 저장 표(product_options·product_addons)는 있지만 이 화면이 부르는 API에는 엔드포인트가 없습니다."),
-          ("06", "desc", "상세설명", "상품 특징 · 사양 · 구성품 본문(마크다운). 저장 컬럼(products.description_html)은 있지만 이 화면이 부르는 API에는 엔드포인트가 없습니다."),
-          ("07", "ship", "배송 · 반품/교환", "배송방법 · 배송비 · 무료배송 기준금액 · 반품/교환 배송비 · 반품/교환 안내 — 몰 반출용 값의 보관처입니다(본 시스템이 배송을 수행한다는 뜻이 아닙니다). 저장 표(product_shipping_policy)는 있지만 API 엔드포인트가 없습니다."),
-          ("08", "tags", "검색 태그 · 채널 키워드", "공통 키워드 · 네이버 태그 · 쿠팡 검색어. 저장 표(product_channel_keywords)는 있지만 API 엔드포인트가 없습니다."),
-          ("09", "notice", "상품정보제공고시 · A/S", "품목군 · 제조국 · 품질보증기준 · A/S 책임자 · A/S 연락처 · 특이사항. 저장 표(product_notice)는 있지만 API 엔드포인트가 없습니다."),
-          ("10", "benefit", "구매 · 리뷰 혜택", "구매 적립 포인트 · 리뷰 적립 포인트. 저장 컬럼(products.point_buy·point_review)은 있지만 API 엔드포인트가 없습니다."),
-          ("11", "channel", "노출 채널", "자사몰 · 네이버 스마트스토어 · 쿠팡 노출 설정 — 몰 반출 대상 채널을 고르는 자리입니다. 저장 표(product_channels)는 있지만 API 엔드포인트가 없습니다."),
+          ("04", "image", "상품이미지 · 동영상", "대표 이미지 1건 · 추가 이미지 최대 9건 · 동영상 주소. 저장 공간은 마련되어 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("05", "opt", "옵션 · 추가상품", "옵션 사용 여부 · 옵션 행(옵션명·옵션값·추가금액·재고) · 추가상품. 저장 공간은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("06", "desc", "상세설명", "상품 특징 · 사양 · 구성품 본문(마크다운). 저장 항목은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("07", "ship", "배송 · 반품/교환", "배송방법 · 배송비 · 무료배송 기준금액 · 반품/교환 배송비 · 반품/교환 안내 — 몰 반출용 값의 보관처입니다(본 시스템이 배송을 수행한다는 뜻이 아닙니다). 저장 공간은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("08", "tags", "검색 태그 · 채널 키워드", "공통 키워드 · 네이버 태그 · 쿠팡 검색어. 저장 공간은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("09", "notice", "상품정보제공고시 · A/S", "품목군 · 제조국 · 품질보증기준 · A/S 책임자 · A/S 연락처 · 특이사항. 저장 공간은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("10", "benefit", "구매 · 리뷰 혜택", "구매 적립 포인트 · 리뷰 적립 포인트. 저장 항목은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
+          ("11", "channel", "노출 채널", "자사몰 · 네이버 스마트스토어 · 쿠팡 노출 설정 — 몰 반출 대상 채널을 고르는 자리입니다. 저장 공간은 있지만 이 화면의 조회·저장 기능은 연결되지 않았습니다."),
         ] %}
         {% for num, key, label, note in stubs %}
         <section class="pn-card" id="pnSec-{{ key }}" data-open="n" data-sec="{{ key }}">
           <div class="pn-card-hd" data-action="toggle-section" data-sec="{{ key }}">
             <span class="pn-kicker">{{ num }}</span><h3>{{ label }}</h3>
-            <span class="pn-badge-stub">API 미연결 — 향후 사용예정</span>
+            <span class="pn-badge-stub">조회·저장 기능 미연결</span>
             <span class="pn-chev">▾</span>
           </div>
           <div class="pn-card-body">

@@ -246,7 +246,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
       </div>
       <div class="grd-stat">
         <span class="lbl">마지막 배치</span>
-        <span class="v" data-bind="last-batch-at" style="font-size:14px">—</span>
+        <span class="v" data-bind="last-batch-at" style="font-size:14px">정보 없음</span>
       </div>
       <div class="grd-stat">
         <span class="lbl">배치 상태</span>
@@ -558,7 +558,7 @@ table.grd-items tfoot td{border-top:2px solid var(--outline-variant);background:
     var eb = $('empty-banner'), pb = $('partial-banner');
     if (!d.last_batch) {
       eb.hidden = false; pb.hidden = true;
-      set('last-batch-at', '—');
+      set('last-batch-at', '정보 없음');
       set('batch-status', '기록 없음');
       $('batch-dot').style.background = 'var(--state-wait)';
     } else {
