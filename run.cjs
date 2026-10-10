@@ -65,8 +65,10 @@ async function checkCards(items){
     turnsSinceVisitor+=c.turns.length;
     let talk=null,chatFlow=null,history=[];const turns=[];
     for(const text of c.turns){
+      const wait0=lastParse+13000-Date.now();if(wait0>0)await sleep(wait0);
+      const sentAt=new Date().toISOString();
       const p=await parse({text,state:talk,chat_flow:chatFlow,history:history.slice(-6)});
-      const turn={text,parse:p,recommend:null,cards:null};
+      const turn={text,sent_at:sentAt,parse:p,recommend:null,cards:null};
       const j=p.json;
       if(p.status===200&&j&&j.ok===true&&j.state){
         talk=j.state;chatFlow=j.chat_flow||null;history.push({role:'user',text});
@@ -80,7 +82,7 @@ async function checkCards(items){
       }
       turns.push(turn);
     }
-    const rec={id:c.id,kind:c.kind,turns,visitor:cookie?'cookie':'ip',at:new Date().toISOString()};
+    const rec={id:c.id,kind:c.kind,turns,visitor:cookie||'ip',access_key_sha256:crypto.createHash('sha256').update(accessKey).digest('hex'),at:new Date().toISOString()};
     const last=turns[turns.length-1];
     if(c.save){
       const items=soldItems(last.recommend);
