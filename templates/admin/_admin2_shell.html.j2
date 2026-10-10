@@ -65,7 +65,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>팝콘PC 관리자 · {% block title %}{% endblock %}</title>
 <link rel="stylesheet" href="/shared/fonts/fonts.css">
-<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261005-mobile">
+<link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261011-intro">
 {% block head_extra %}{% endblock %}
 </head>
 <body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" data-admin-mode="{{ 'new' if new_admin else 'legacy' }}" {% block body_attrs_extra %}{% endblock %}>
@@ -174,6 +174,37 @@
       </span>
     </header>
 
+    {% if page_intro %}
+    {#  화면 머리말 — 2026-10-11 「관리자 나머지 화면 개편」. 문구·바로가기 원천은
+        `api/admin_page_intro.py`(이 파일에 문구를 적지 않는다). 본문은 건드리지 않고
+        위에만 얹는다. 바로가기 줄은 접을 수 있다(`data-action="toggle-intro"`, 기억은
+        admin2-shell.js 가 브라우저에만 둔다). #}
+    <section class="a2-intro" id="a2Intro" data-keep="1" aria-labelledby="a2IntroTitle">
+      <div class="a2-intro-head">
+        <div class="a2-intro-text">
+          <h1 id="a2IntroTitle">{{ page_intro.title }}</h1>
+          {% if page_intro.desc %}<p class="a2-intro-sub">{{ page_intro.desc }}</p>{% endif %}
+        </div>
+        {% if page_intro.links %}
+        <button type="button" class="a2-intro-toggle" id="a2IntroToggle" data-action="toggle-intro"
+                aria-controls="a2IntroLinks" aria-expanded="true">바로가기 접기</button>
+        {% endif %}
+      </div>
+      {% if page_intro.links %}
+      <nav class="a2-intro-links" id="a2IntroLinks" aria-label="{{ page_intro.group }} 화면 바로가기">
+        {% for l in page_intro.links %}
+        <a href="{{ l.href }}" {% if l.current %}aria-current="page"{% endif %}><b>{{ l.label }}</b>{% if l.short %}<span>{{ l.short }}</span>{% endif %}</a>
+        {% endfor %}
+      </nav>
+      {% endif %}
+      {% if page_intro.steps %}
+      <div class="a2-intro-steps">
+        <ol aria-label="작업 순서">{% for st in page_intro.steps %}<li><em>{{ loop.index }}</em>{{ st }}</li>{% endfor %}</ol>
+        {% if page_intro.note %}<p>{{ page_intro.note }}</p>{% endif %}
+      </div>
+      {% endif %}
+    </section>
+    {% endif %}
     {% block content %}{% endblock %}
 
     <div class="a2-toasts" id="toasts"></div>
@@ -182,7 +213,7 @@
 </div>
 
 <script src="/shared/ui-progress.js"></script>
-<script src="/shared/admin2/admin2-shell.js?v=20261005-mobile"></script>
+<script src="/shared/admin2/admin2-shell.js?v=20261011-intro"></script>
 <script src="/shared/admin2/admin2-text.js"></script>
 {% block foot_extra %}{% endblock %}
 </body>

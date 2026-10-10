@@ -38,7 +38,7 @@ class MobileShellTemplateTests(unittest.TestCase):
         for item in expected:
             a=d.links(item['href'])[0];self.assertEqual(a['title'],item['label']);self.assertEqual(a.get('aria-current')=='page',item['active'])
     def test_actual_orders_template_preserves_body_and_shared_assets(self):
-        s=render(page='commerce_orders.html.j2');d=dom(s);self.assertEqual(len(d.byid('commerce-orders')),1);self.assertIn('admin-commerce-support.js',s);self.assertIn('admin2-shell.js?v=20261005-mobile',s);self.assertIn('admin2.css?v=20261005-mobile',s)
+        s=render(page='commerce_orders.html.j2');d=dom(s);self.assertEqual(len(d.byid('commerce-orders')),1);self.assertIn('admin-commerce-support.js',s);self.assertIn('admin2-shell.js?v=20261011-intro',s);self.assertIn('admin2.css?v=20261011-intro',s)
     def test_direct_shell_caller_static_census_without_business_imports(self):
         # Inherited shell blocks only; do not execute page business code/context.
         names=[]
