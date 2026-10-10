@@ -53,6 +53,7 @@
 .sp-trust{flex:0 0 320px;border-radius:10px;background:var(--rv-nav);color:var(--rv-nav-ink);
   padding:18px 20px;display:flex;flex-direction:column;gap:8px}
 .sp-trust .rate{font:700 40px/1 var(--rv-mono)}
+.sp-trust .rate.empty,.sp-kpi .v.empty{font:600 20px/1.2 var(--rv-font)}
 .sp-trust .headline{font:500 13px/1.5 var(--rv-font)}
 .sp-trust .sample-note{font:400 11px/1.6 var(--rv-font);color:var(--rv-nav-muted);border-top:1px solid rgba(255,255,255,.14);padding-top:8px}
 .sp-kpis{flex:1;min-width:0;display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:12px}
@@ -97,6 +98,8 @@
 .sp-card-meta{grid-column:1/3;font:400 10px/1.3 var(--rv-mono);color:var(--rv-dim2)}
 
 .sp-aside{flex:0 0 400px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+/* 상자가 높이에 눌려 안쪽 목록이 잘리지 않게 한다(2026-10-10 전수 점검 L112) */
+.sp-aside>*{flex-shrink:0}
 .sp-abox{border:1px solid rgba(0,0,0,.1);border-radius:9px;background:var(--rv-card);padding:14px 16px}
 .sp-acap{font:600 11px/1.2 var(--rv-font);color:var(--rv-faint);letter-spacing:.02em;margin-bottom:8px}
 .sp-abox p{margin:0;font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
@@ -174,8 +177,7 @@
 {% if not new_admin %}
 <div class="sp-toggle" role="group" aria-label="가격 구분" data-keep="1">
   <button type="button" class="sp-toggle-btn on" data-action="axis" data-axis="sale">판매가</button>
-  <button type="button" class="sp-toggle-btn" data-action="axis" data-axis="purchase" disabled
-          title="향후 사용예정 — 몰에는 매입가 개념이 없어 비교 대상이 없습니다">매입가</button>
+  {# 「매입가」는 몰에 비교할 매입가가 없어 눌러도 동작하지 않는 단추라 감춘다(2026-10-10 전수 점검 L52) #}
 </div>
 {% endif %}
 {% endblock %}
@@ -374,9 +376,9 @@
   function renderTrust() {
     var t = S.summary.trust;
     var box = $('spTrust');
-    var rate = (t.mismatch_rate === null || t.mismatch_rate === undefined) ? '—' : t.mismatch_rate + '%';
+    var rate = (t.mismatch_rate === null || t.mismatch_rate === undefined) ? '정보 없음' : t.mismatch_rate + '%';
     box.innerHTML =
-      '<div class="rate num">' + esc(rate) + '</div>' +
+      '<div class="rate num' + (rate === '정보 없음' ? ' empty' : '') + '">' + esc(rate) + '</div>' +
       '<div class="headline">' + esc(t.headline) + '</div>' +
       '<div class="sample-note">' + esc(t.sample_note) + '</div>';
   }
@@ -393,9 +395,10 @@
         '</div><div class="note">' + esc(k.locked.note) + '</div></div>' +
       '<div class="sp-kpi unk"><div class="lb">확인 못함</div><div class="v num">' + k.unknown.value +
         '</div><div class="note">' + esc(k.unknown.note) + '</div></div>' +
-      '<div class="sp-kpi"><div class="lb">최근 확인</div><div class="v num">' + esc(lastDate || '—') +
+      '<div class="sp-kpi"><div class="lb">최근 확인</div><div class="v num' + (lastDate ? '' : ' empty') + '">' + esc(lastDate || '정보 없음') +
         '</div><div class="note">' + esc(recent.note) + '</div>' +
-        '<div class="sub">✓ ' + recent.stale_30d + ' · ◐ ' + recent.mid_8_30d + ' · ? ' + recent.no_history.toLocaleString('ko-KR') + '</div></div>';
+        // 기호만으로는 뜻을 알 수 없어 오른쪽 「낡은값」 설명과 같은 말을 함께 적는다(L52)
+        '<div class="sub">✓ 30일 이상 ' + recent.stale_30d + ' · ◐ 8~30일 ' + recent.mid_8_30d + ' · ? 모름 ' + recent.no_history.toLocaleString('ko-KR') + '</div></div>';
   }
 
   // 큐 카드는 alert/unknown/locked 셋뿐이다. 서랍은 카드 없이 임의 상품코드로도 열릴 수

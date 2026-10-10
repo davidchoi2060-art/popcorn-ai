@@ -150,17 +150,20 @@ input,select,textarea{font-family:var(--rv-font)}
 /* ── 표 — 항목 축(31행 실측) ──
    1fr 열이 0px로 붕괴하지 않게 minmax()로 최소 폭을 준다(MAKER-CHECKLIST §3).
    헤더·본문 둘 다 스크롤 컨테이너 + scrollbar-gutter로 거터를 맞춘다. */
-.sd-grid-head{flex:none;display:grid;grid-template-columns:146px minmax(210px,1fr) 78px 60px 130px 100px 76px 108px;
+.sd-grid-head{flex:none;display:grid;grid-template-columns:minmax(250px,1fr) 78px 60px 130px 100px 76px 108px;
   gap:10px;align-items:center;padding:8px 13px;margin:10px 18px 0;background:var(--rv-panel);
   border:1px solid rgba(0,0,0,.1);border-radius:7px 7px 0 0;font:600 10px/1 var(--rv-font);color:var(--rv-faint);
   overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
 .sd-grid-body{flex:1;min-height:0;margin:0 18px 12px;background:var(--rv-card);border:1px solid rgba(0,0,0,.1);
   border-top:none;border-radius:0 0 7px 7px;overflow:auto;scrollbar-gutter:stable}
-.sd-row{display:grid;grid-template-columns:146px minmax(210px,1fr) 78px 60px 130px 100px 76px 108px;gap:10px;
+.sd-row{display:grid;grid-template-columns:minmax(250px,1fr) 78px 60px 130px 100px 76px 108px;gap:10px;
   align-items:center;padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06)}
 .sd-row.zero{background:oklch(0.985 0.008 30)}
 .sd-row-key{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap}
 .sd-row-keytx{font:500 10.5px/1.3 var(--rv-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* 영문 키 칸은 숨기고 표시 이름에 마우스를 올리면 키가 보이게 한다(2026-10-10 전수 점검 L74) */
+.sd-h-key,.sd-row-key{display:none}
+.sd-row-labeltop{display:flex;align-items:center;gap:6px;min-width:0}
 .sd-badge-custom{font:600 8.5px/1 var(--rv-font);color:var(--rv-green);background:oklch(0.95 0.03 165);
   border:1px solid rgba(0,0,0,.06);border-radius:3px;padding:3px 4px;white-space:nowrap}
 .sd-badge-risk{font:600 8.5px/1 var(--rv-font);color:var(--rv-red);background:oklch(0.96 0.02 30);
@@ -281,7 +284,7 @@ input,select,textarea{font-family:var(--rv-font)}
 
     <div class="sd-grid-head">
       <span class="sd-h-key">키</span>
-      <span class="sd-h-label">표시 이름 · 이 값을 읽는 곳</span>
+      <span class="sd-h-label">이름 · 이 값을 읽는 곳</span>
       <span class="sd-h-type">자료형</span>
       <span class="sd-h-unit">단위</span>
       <span class="sd-h-parts">적용 부품</span>
@@ -313,7 +316,7 @@ input,select,textarea{font-family:var(--rv-font)}
   var GROUP_ORDER = ['core', 'built', 'peripheral'];
 
   var S = {
-    meta: null, items: [], ghosts: [], unrecorded: [],
+    meta: null, items: [], ghosts: [], unrecorded: [], ruleLabels: {},
     usedByMap: {}, fillMap: {}, partGroup: {}, partLabelMap: {}, loadedAt: null,
     filter: '',
     modalOpen: false, draft: null, err: null, submitting: false
@@ -399,7 +402,14 @@ input,select,textarea{font-family:var(--rv-font)}
 
   function boot() {
     setView('loading');
-    Promise.all([apiGet('/api/admin/spec-fields'), window.Admin2Shell.meReady]).then(function (res) {
+    // 규칙 이름은 읽기 전용 조회 — 실패해도 화면은 키로 보여 주고 계속 연다
+    var rulesP = apiGet('/api/admin/engine-rules').then(function (r) {
+      var m = {};
+      ((r && r.compat && r.compat.checks) || []).forEach(function (c) { if (c.key && c.label) m[c.key] = c.label; });
+      return m;
+    }).catch(function () { return {}; });
+    Promise.all([apiGet('/api/admin/spec-fields'), window.Admin2Shell.meReady, rulesP]).then(function (res) {
+      S.ruleLabels = res[2] || {};
       applyResp(res[0]);
       setView('body');
       renderAll();
@@ -448,14 +458,14 @@ input,select,textarea{font-family:var(--rv-font)}
     if (u.length) marks.push('▲ 코드 이력 없음 ' + u.length + '건 — 서버를 다시 세우면 이 항목이 사라집니다');
     if (g.length) marks.push('▲ 등록만 되고 실제 저장 칸이 없음 ' + g.length + '건');
     var keys = [];
-    if (u.length) keys.push('unrecorded=[' + u.join(', ') + ']');
-    if (g.length) keys.push('ghosts=[' + g.join(', ') + ']');
+    if (u.length) keys.push(u.map(keyLabel).join(', '));
+    if (g.length) keys.push(g.join(', '));
     var detail = u.map(function (key) {
       var it = fieldByKey(key);
       var label = it ? it.label : key;
-      return '<div class="sd-health-item"><b>' + esc(key) + ' «' + esc(label) + '»</b> — 컬럼·메타·추천 뷰는 '
+      return '<div class="sd-health-item"><b>«' + esc(label) + '»</b> — 컬럼·메타·추천 뷰는 '
         + '이미 반영됐지만 마이그레이션 파일 기록이 실패했습니다(배포 서버는 리포 폴더에 파일을 쓸 수 '
-        + '없습니다). <b>조치:</b> 개발 PC에서 <span class="sd-mono">db/migrations/versions/</span>에 이 컬럼 '
+        + '없습니다). <b>조치:</b> 개발 PC에서 이 컬럼 '
         + '추가 마이그레이션을 만들고 버전을 스탬프해야 합니다. 그때까지 이 배너와 항목의 위험 표시는 '
         + '사라지지 않습니다.</div>';
     }).concat(g.map(function (key) {
@@ -481,7 +491,7 @@ input,select,textarea{font-family:var(--rv-font)}
     });
     var engineNote = engineItems.length === 0 ? '엔진 사양 없음'
       : (allCore ? '전부 8슬롯 부품 필드' : '▲ 주변기기 대상 포함 — 컴패니언 뷰 확인 필요');
-    var customNote = customItems.length ? customItems.map(function (i) { return i.field_key; }).join(', ') : '없음';
+    var customNote = customItems.length ? customItems.map(function (i) { return i.label; }).join(', ') : '없음';
     var cards = [
       { label: '전체 항목', value: String(items.length), note: '자료형 ' + typeCount + '종', cls: '' },
       { label: '엔진이 읽는 항목', value: String(engineItems.length), note: engineNote, cls: 'blue' },
@@ -546,9 +556,12 @@ input,select,textarea{font-family:var(--rv-font)}
     if (!m || m.live <= 0) return null;
     return Math.round(100 * m.filled / m.live);
   }
+  // 규칙 키(cooler_socket 등)를 조립 호환 규칙의 한글 이름으로 보여 준다. 이름을 못 받으면 키 그대로.
+  function ruleName(k) { return S.ruleLabels[k] || k; }
+  function keyLabel(k) { var it = fieldByKey(k); return it ? it.label : k; }
   function usedLine(item) {
     var names = S.usedByMap[item.field_key] || [];
-    if (names.length) return '이 값을 읽는 규칙: ' + names.join(', ');
+    if (names.length) return '이 값을 읽는 규칙: ' + names.map(ruleName).join(', ');
     if (item.is_engine) return '엔진 후보에는 실리지만 이 값을 직접 읽는 규칙은 없습니다.';
     return '표시용 — 규칙·하한 어디에도 쓰이지 않습니다.';
   }
@@ -573,11 +586,12 @@ input,select,textarea{font-family:var(--rv-font)}
     return '<div class="' + cls + '">'
       + '<span class="sd-row-key">'
       + '<span class="sd-row-keytx">' + esc(item.field_key) + '</span>'
+      + '</span>'
+      + '<span class="sd-row-labelwrap">'
+      + '<span class="sd-row-labeltop"><span class="sd-row-label" title="' + esc(item.field_key) + '">' + esc(item.label) + '</span>'
       + (item.is_custom ? '<span class="sd-badge-custom">커스텀</span>' : '')
       + (risky ? '<span class="sd-badge-risk" title="코드 이력 없음 — 서버 재구축·복구 시 사라집니다">▲ 미기록</span>' : '')
       + '</span>'
-      + '<span class="sd-row-labelwrap">'
-      + '<span class="sd-row-label">' + esc(item.label) + '</span>'
       + '<span class="sd-row-used" title="' + esc(used) + '">' + esc(used) + '</span>'
       + '</span>'
       + '<span class="sd-row-type num" title="' + esc(typeHelp) + '">' + esc(TYPE_KO[item.data_type] || item.data_type) + '</span>'

@@ -110,6 +110,8 @@ code{font-family:var(--rv-mono)}
 
 /* ── 스크롤 컨테이너 ── */
 .pw-scroll{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:12px 18px 18px}
+/* 스크롤 안의 카드가 높이에 눌려 안쪽이 잘리지 않게 한다(2026-10-10 전수 점검 L51) */
+.pw-scroll>*{flex-shrink:0}
 
 /* ── 상단 배너(앰버 — 실패가 아니라 항상 뜨는 설명) ── */
 .pw-banner{flex:none;border:1px solid var(--rv-amber-line);background:var(--rv-amber-bg);
@@ -201,6 +203,12 @@ code{font-family:var(--rv-mono)}
   .a2-hd .poolinfo{white-space:normal}
   .pw-lower-l,.pw-lower-r{flex-basis:100%;min-width:0}
   .pw-barrow{grid-template-columns:96px 1fr 44px;gap:7px}
+  /* 휴대폰 폭: 세 티어 열이 화면 안에 들어오게 최소 폭을 풀고 칸 여백을 줄인다(L51) */
+  .pw-scroll{padding:12px 10px 18px}
+  .pw-tiertable{min-width:0;table-layout:fixed}
+  .pw-tiertable thead th.lbl{width:52px}
+  .pw-tiertable th,.pw-tiertable td{padding:9px 6px;word-break:keep-all;overflow-wrap:anywhere}
+  .pw-tiertable tbody td{font-size:10.5px}
 }
 </style>
 {% endblock %}
@@ -339,7 +347,8 @@ code{font-family:var(--rv-mono)}
       '<div class="pw-tablewrap"><table class="pw-tiertable"><thead><tr>' +
       '<th scope="col" class="lbl"><span class="pw-vh">구분</span></th>' + head + '</tr></thead>' +
       '<tbody>' + body + '</tbody></table></div>' +
-      '<div class="pw-cardnote">' + esc((d.tiers && d.tiers.tie_break) || '') + ' · ' +
+      // 서버 문구 속 내부 이름만 한글로 바꾼다(문장은 그대로 — 2026-10-10 전수 점검)
+      '<div class="pw-cardnote">' + esc(((d.tiers && d.tiers.tie_break) || '').replace(/product_code/g, '상품코드').replace(/\(A-02\)/g, '')) + ' · ' +
       esc((d.tiers && d.tiers.performance_proxy) || '') + '</div>' +
       '</div>';
   }
