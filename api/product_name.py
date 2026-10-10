@@ -143,7 +143,8 @@ def display_name(raw):
 #   앞머리 광고: 실측된 두 문구만(지어낸 규칙으로 진짜 이름을 지우지 않는다)
 _CARD_AD_BRACKET = re.compile(r"\[[^\[\]]*(?:\d\s*위|인기|베스트|BEST|특가|이벤트|한정|할인|추천)[^\[\]]*\]", re.I)
 _CARD_AD_PHRASE = re.compile(r"초저가\s*가성비짱|견적왕\s*추천\s*PC", re.I)
-_CARD_INTERNAL_NO = re.compile(r"\bNO\.\s*\d+\.\d+\b", re.I)
+# 번호 뒤 몰 접미사(「90926MW」 · 「101269M」)와 점 앞 공백(「NO.04 .123380」)도 번호에 포함한다.
+_CARD_INTERNAL_NO = re.compile(r"\bNO\.\s*\d+\s*\.\s*\d+[A-Z]{0,3}\b", re.I)
 
 
 def card_name(raw):
@@ -157,3 +158,48 @@ def card_name(raw):
     cut = re.sub(r"\s+", " ", cut).strip()
     cut = re.sub(r"\s+(\[)", r" \1", cut)
     return cut if len(cut) >= _MIN_LEN else base
+
+
+
+# ── 카드 이름의 저장장치 용량을 사양표와 맞춘다 (2026-10-10 상품 자료 용량 표기 확인) ───────
+# 몰 이름의 사양 대괄호는 몰이 줄여 적은 요약이다. 256GB SSD 를 「250GB」, 512GB 를 「500GB」로
+# 적는다. 카드의 사양표(spec.ssd_gb)는 기본 구성 부품 이름에서 읽은 실제 용량이라, 한 카드에
+# 「250GB」와 「256GB SSD」가 함께 보였다(93454 실사례). 같은 부품을 두 숫자로 말하는 경우만
+# 사양표 값으로 바꾼다. 줄임 표기로 설명되지 않는 차이(250GB 대 500GB 등)는 어느 쪽이 맞는지
+# 여기서 알 수 없으므로 바꾸지 않는다 — 몰 자료 확인 대상이다.
+_SPEC_BRACKET = re.compile(r"\[([^\[\]]*/[^\[\]]*)\]")
+_SIZE = re.compile(r"(\d+(?:\.\d+)?)\s*(TB|T|GB|G)", re.I)
+# 몰 줄임 표기 -> 실제 용량(GB). 1TB 는 사양표도 1000 으로 적으므로 차이가 없다.
+_SHORTHAND = {120: 128, 240: 256, 250: 256, 480: 512, 500: 512}
+
+
+def _storage_label(gb):
+    return f"{gb // 1000}TB" if gb >= 1000 and gb % 1000 == 0 else f"{gb}GB"
+
+
+def match_storage_shorthand(name, spec):
+    """사양 대괄호의 저장장치 칸이 사양표 용량의 줄임 표기면 사양표 용량으로 바꾼다.
+
+    대괄호 첫 칸(CPU)은 「8500G」처럼 크기 모양일 수 있어 보지 않는다. 나머지 칸 중 크기 칸이
+    둘 이상이면 두 번째가 저장장치다(몰 표기 순서 CPU/램/저장장치/그래픽). spec 이 없거나
+    용량을 모르면 그대로 둔다.
+    """
+    have = spec.get("ssd_gb") if isinstance(spec, dict) else None
+    if not name or type(have) is not int or have <= 0:
+        return name
+
+    def fix(m):
+        tokens = m.group(1).split("/")
+        sizes = [i for i, t in enumerate(tokens) if i > 0 and _SIZE.fullmatch(t.strip())]
+        if len(sizes) < 2:
+            return m.group(0)
+        i = sizes[1]
+        size = _SIZE.fullmatch(tokens[i].strip())
+        if size.group(2).upper().startswith("T") or "." in size.group(1):
+            return m.group(0)
+        if _SHORTHAND.get(int(size.group(1))) != have:
+            return m.group(0)
+        tokens[i] = _storage_label(have)
+        return "[" + "/".join(tokens) + "]"
+
+    return _SPEC_BRACKET.sub(fix, name)

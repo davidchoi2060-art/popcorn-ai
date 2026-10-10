@@ -15,7 +15,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from api import talk, talk_rules as TR, talk_schema as TS, talk_answer as TA
-from api.product_name import card_name
+from api.product_name import card_name, match_storage_shorthand
 
 
 def vocab():
@@ -173,6 +173,37 @@ class CardNameTest(unittest.TestCase):
     def test_plain_names_untouched(self):
         for n in ('PC 1', '조립PC 3', 'ASUS ROG STRIX [WHITE EDITION]'):
             self.assertEqual(card_name(n), n)
+
+    def test_internal_no_with_suffix_removed(self):
+        self.assertEqual(card_name('골드 NO.04.90926MW [14400F/16G/250GB/RTX5060]'),
+                         '골드 [14400F/16G/250GB/RTX5060]')
+        self.assertEqual(card_name('엠에스파워 골드 NO.04 .123380 RTX 3050 [13500/16G/1TB/RTX3050]'),
+                         '엠에스파워 골드 RTX 3050 [13500/16G/1TB/RTX3050]')
+
+
+class StorageShorthandTest(unittest.TestCase):
+    """카드 이름의 「250GB」와 사양표의 「256GB SSD」가 한 카드에 함께 보이던 문제(93454)."""
+
+    def test_shorthand_follows_spec(self):
+        spec = {'cpu': 'i5-12400', 'ram_gb': 16, 'ssd_gb': 256}
+        self.assertEqual(match_storage_shorthand('골드 RTX 3050 [12400F/16G/250GB/RTX3050]', spec),
+                         '골드 RTX 3050 [12400F/16G/256GB/RTX3050]')
+        self.assertEqual(match_storage_shorthand('오피스 [12100/8G/250G/UHD 730]', {'ssd_gb': 256}),
+                         '오피스 [12100/8G/256GB/UHD 730]')
+        self.assertEqual(match_storage_shorthand('[7500F/16G/500GB/RTX5060]', {'ssd_gb': 512}),
+                         '[7500F/16G/512GB/RTX5060]')
+
+    def test_unexplained_difference_untouched(self):
+        # 250GB 대 500GB 는 줄임 표기가 아니다 — 어느 쪽이 맞는지 몰라 바꾸지 않는다.
+        for name, spec in (('골드 [9600/16G/250GB/RTX3050]', {'ssd_gb': 500}),
+                           ('[14700KF/64G/1TB/RTX5070 TI]', {'ssd_gb': 2000}),
+                           ('[12400F/16G/500GB/RTX5060]', {'ssd_gb': 500}),
+                           # CPU 칸이 크기 모양이어도 저장장치로 보지 않는다
+                           ('[8500G/250G/Radeon 7]', {'ssd_gb': 256}),
+                           ('[12400F/16G/250GB/RTX3050]', None),
+                           ('[12400F/16G/250GB/RTX3050]', {'ssd_gb': None}),
+                           ('ASUS ROG STRIX [WHITE EDITION]', {'ssd_gb': 256})):
+            self.assertEqual(match_storage_shorthand(name, spec), name)
 
 
 if __name__ == '__main__':
