@@ -23,7 +23,7 @@
   function cardSpecRows(spec){
     if(!object(spec))return [];
     const NONE='정보 없음',val=key=>{const v=spec[key];return v===null||v===undefined||(typeof v==='string'&&!v.trim())?'':v;};
-    const cpu=val('cpu'),gpu=val('gpu')?String(val('gpu')):'',vram=val('vram_gb')!==''?val('vram_gb')+'GB':'',ram=val('ram_gb'),ssd=val('ssd_gb');
+    const cpu=val('cpu'),gpu=val('gpu')?String(val('gpu')):'',vram=Number(val('vram_gb'))>0?val('vram_gb')+'GB':'',ram=val('ram_gb'),ssd=val('ssd_gb');
     return [
       ['CPU',cpu!==''?cpu:NONE],
       ['GPU',gpu&&vram&&!gpu.replace(/\s+/g,'').toUpperCase().includes(vram.toUpperCase())?gpu+' · '+vram:gpu||(vram?vram+' 그래픽카드':NONE)],
