@@ -340,7 +340,10 @@ input{font-family:var(--rv-font)}
       `#cmTbody` 의 `scroll` 이벤트에서 헤더의 `scrollLeft` 를 맞춰야 한다(하단 스크립트,
       "가로 스크롤 동기화" 참고). **열 구성·순서·고정폭 값(30·116·92·176·84·54·66)은
       그대로다** — 바뀐 것은 이름 열의 하한뿐이다. */
-.cm-thead{flex:none;display:grid;grid-template-columns:30px minmax(180px,1fr) 116px 92px 176px 84px 54px 66px;gap:10px;
+/* 2026-10-10 전수 점검 L48 — 1440 에서도 맨 오른쪽 「상태」 열이 잘렸다(셸 확대 1.15 때문에 실제
+   목록 폭이 약 709px). 이름 열 하한 180px 는 지키고 나머지 고정 열만 줄였다
+   (116·92·176·84·54·66 -> 72·60·96·68·40·50). 줄어든 열은 말줄임으로 남는다. */
+.cm-thead{flex:none;display:grid;grid-template-columns:30px minmax(180px,1fr) 72px 60px 96px 68px 40px 50px;gap:10px;
   align-items:center;padding:9px 13px 9px 16px;background:var(--rv-panel);border:1px solid rgba(0,0,0,.1);
   border-radius:7px 7px 0 0;font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);
   overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
@@ -350,7 +353,7 @@ input{font-family:var(--rv-font)}
 .cm-selectbar .tx{font:400 10.5px/1.4 var(--rv-font);color:var(--rv-ink-soft);flex:1;min-width:0}
 .cm-selectbar button{font:600 10.5px/1 var(--rv-font);color:var(--rv-ink);background:var(--rv-card);
   border:1px solid rgba(0,0,0,.22);border-radius:5px;padding:7px 10px;cursor:pointer;white-space:nowrap}
-.cm-row{display:grid;grid-template-columns:30px minmax(180px,1fr) 116px 92px 176px 84px 54px 66px;gap:10px;align-items:center;
+.cm-row{display:grid;grid-template-columns:30px minmax(180px,1fr) 72px 60px 96px 68px 40px 50px;gap:10px;align-items:center;
   padding:8px 13px;border-bottom:1px solid rgba(0,0,0,.05);cursor:pointer;background:transparent;
   border-left:3px solid transparent;width:100%;min-width:min-content;text-align:left;border-top:0;border-right:0;border-radius:0}
 .cm-row.on{background:#f6f2e8}
@@ -444,6 +447,13 @@ input{font-family:var(--rv-font)}
   .cm-thead span:nth-child(3),.cm-thead span:nth-child(4),.cm-thead span:nth-child(5),
   .cm-thead span:nth-child(6),.cm-thead span:nth-child(7),
   .cm-row .cd,.cm-row .pt,.cm-row .ct,.cm-row .pr,.cm-row .sk{display:none}
+  /* 390px: 상품명이 한 줄 말줄임으로 잘리던 것 — 두 줄까지 감싼다 */
+  .cm-row .nm{white-space:normal;word-break:keep-all;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  /* 390px: 이전/다음 단추가 세로로 찌그러지던 것 — 쪽 안내를 윗줄로 보내고 단추는 줄바꿈 금지 */
+  .cm-pager{flex-wrap:wrap;row-gap:6px}
+  .cm-pager .rg,.cm-pager .nt{flex:1 1 100%}
+  .cm-pager .sp{display:none}
+  .cm-pager button{white-space:nowrap;flex:none}
 }
 </style>
 {% endblock %}
@@ -708,14 +718,14 @@ input{font-family:var(--rv-font)}
       fromUrl: false, invalidReason: null, scope: null, catId: null, treeMode: 'subtree' };
     if (!rawScope) return out;
     if (VALID_SCOPES.indexOf(rawScope) < 0) {
-      out.invalidReason = '알 수 없는 범위(scope=' + rawScope + ')입니다';
+      out.invalidReason = '알 수 없는 범위입니다';
       return out;
     }
     var needsCat = (rawScope === 'category' || rawScope === 'subtree');
     if (needsCat) {
       var catRaw = sp.get('category_id');
       if (!catRaw || !/^\d+$/.test(catRaw)) {
-        out.invalidReason = 'scope=' + rawScope + '인데 분류 번호가 없습니다';
+        out.invalidReason = '분류 번호가 없습니다';
         return out;
       }
       out.catId = Number(catRaw);
@@ -918,7 +928,7 @@ input{font-family:var(--rv-font)}
     // `_common_filters()`). 지금은 탭 배지·`total`이 같은 정의를 쓴다는 사실만 말한다.
     $('cmFilterNote').textContent = narrowed
       ? '지금 조건(검색어·부품 종류·재고 필터)이 이 범위와 위 탭 배지 숫자에 모두 반영됩니다.'
-      : '탭 배지는 페이지가 아니라 각 범위 전체 기준입니다 · 목록은 서버 페이지네이션';
+      : '탭 배지는 페이지가 아니라 각 범위 전체 기준입니다';
   }
 
   function renderTree() {
@@ -927,8 +937,8 @@ input{font-family:var(--rv-font)}
     $('cmModeSub').classList.toggle('on', S.treeMode === 'subtree');
     $('cmModeSub').setAttribute('aria-pressed', S.treeMode === 'subtree' ? 'true' : 'false');
     $('cmTreeNote').textContent = S.treeMode === 'subtree'
-      ? '노드를 누르면 그 분류와 하위 전체(scope=subtree)를 봅니다.'
-      : '노드를 누르면 그 분류 직속만(scope=category) 봅니다.';
+      ? '노드를 누르면 그 분류와 하위 전체를 봅니다.'
+      : '노드를 누르면 그 분류 직속만 봅니다.';
 
     var box = $('cmTreeBody');
     if (S.treeErr) {
@@ -1041,7 +1051,7 @@ input{font-family:var(--rv-font)}
     var total = S.list.total || 0, size = S.list.size || S.pageSize, page = S.list.page || 1, pages = S.list.pages || 1;
     $('cmPageRange').textContent = total ? (((page - 1) * size + 1).toLocaleString('ko-KR') + '–' +
       Math.min(page * size, total).toLocaleString('ko-KR') + ' / ' + fmt(total)) : '0 / 0';
-    $('cmPageNote').textContent = '서버 페이지네이션 · ' + size + '건/페이지';
+    $('cmPageNote').textContent = size + '건/페이지';
     $('cmPageLabel').textContent = page + ' / ' + pages;
     $('cmPrevBtn').disabled = page <= 1;
     $('cmPrevBtn').title = page <= 1 ? '첫 페이지입니다' : '';
@@ -1183,7 +1193,7 @@ input{font-family:var(--rv-font)}
       case 'retry-tree': S.treeErr = null; renderTree(); loadTree().then(function () { renderTree(); renderBar(); }); break;
       case 'pick-tab': {
         var scope = t.getAttribute('data-scope');
-        if (scope === 'category' && S.catId == null) { toast('scope=category에는 category_id가 필요합니다 — 왼쪽 트리에서 분류를 고르세요', 'warn'); break; }
+        if (scope === 'category' && S.catId == null) { toast('분류를 고르지 않았습니다 — 왼쪽 트리에서 분류를 고르세요', 'warn'); break; }
         setScope(scope); break;
       }
       case 'toggle-part': e.stopPropagation(); S.partOpen = !S.partOpen; S.targetOpen = false; S.recentOpen = false; renderFilters(); break;

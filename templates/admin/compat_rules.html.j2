@@ -41,7 +41,7 @@
   .cr-table-region{flex:1;min-height:0;display:flex;flex-direction:column;
     border:1px solid rgba(0,0,0,.1);border-radius:8px;overflow:hidden;background:var(--card)}
   .cr-table-scroll{flex:1;min-height:0;overflow:auto;position:relative}
-  .cr-grid{display:grid;grid-template-columns:44px 96px minmax(150px,1.3fr) 56px
+  .cr-grid{display:grid;grid-template-columns:44px 130px minmax(150px,1.3fr) 56px
     minmax(150px,1.3fr) 126px 70px 70px 108px;column-gap:10px;align-items:center}
   .cr-row--head{position:sticky;top:0;z-index:2;background:var(--container);
     padding:8px 13px;font:600 10px/1.2 var(--font);color:var(--on-variant);
@@ -56,6 +56,8 @@
   .cr-mono{font-family:var(--font-num);font-size:11px;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap}
   .cr-key{font-weight:600}
+  /* 한글 이름표로 바뀐 세 칸은 고정폭 글꼴 대신 본문 글꼴로 쓴다 */
+  .cr-row [data-f="key"],.cr-row [data-f="target"],.cr-row [data-f="ref"]{font-family:var(--font);font-size:11.5px}
   .cr-op{text-align:center;font-weight:600}
   .cr-part{font:400 10px/1.3 var(--font);color:var(--on-variant)}
   .cr-part--limited{font-weight:600;color:var(--tertiary)}
@@ -154,6 +156,13 @@
     .cr-wrap{padding:12px 12px 10px}
     .cr-kpi{flex-basis:140px}
     .cr-drawer{width:100%}
+    /* 휴대폰 폭: 표가 오른쪽에서 잘리지 않게 규칙·대상·연산·비교 대상·판정 다섯 칸만 남긴다
+       (나머지는 행을 눌러 여는 상세에서 본다) */
+    .cr-grid{grid-template-columns:minmax(64px,1fr) minmax(64px,1fr) 24px minmax(64px,1fr) 46px;column-gap:6px}
+    .cr-grid > :nth-child(7){min-width:0;padding-left:2px;padding-right:2px}
+    .cr-row--head,.cr-row{min-width:0;padding-left:10px;padding-right:10px}
+    .cr-grid > :nth-child(1),.cr-grid > :nth-child(6),.cr-grid > :nth-child(8),.cr-grid > :nth-child(9){display:none}
+    .cr-row .cr-mono{white-space:normal;word-break:keep-all}
   }
 
   /* ── 1b: 탭 줄 + 「필수 사양」 구역 (2026-08-15, spec-compat-required.md) ─────────
@@ -213,10 +222,10 @@
 
   .cr-req-table{margin-top:11px;border:1px solid rgba(0,0,0,.08);border-radius:6px;overflow:hidden}
   .cr-req-thead{display:grid;grid-template-columns:minmax(88px,.8fr) minmax(150px,1.4fr)
-    minmax(110px,1fr) minmax(140px,1fr);gap:10px;background:var(--container);
+    minmax(140px,1fr);gap:10px;background:var(--container);
     padding:8px 12px;font:600 10px/1.3 var(--font);color:var(--on-variant)}
   .cr-req-row{display:grid;grid-template-columns:minmax(88px,.8fr) minmax(150px,1.4fr)
-    minmax(110px,1fr) minmax(140px,1fr);gap:10px;padding:8px 12px;font:400 11.5px/1.4 var(--font);
+    minmax(140px,1fr);gap:10px;padding:8px 12px;font:400 11.5px/1.4 var(--font);
     border-top:1px solid rgba(0,0,0,.06);align-items:center}
   .cr-req-row .part{color:var(--on-variant);font-size:10.5px}
   .cr-req-row .key{font-family:var(--font-num);font-size:11px;font-weight:600}
@@ -233,6 +242,8 @@
   .cr-req-field-label{color:var(--on);flex:1;min-width:0;word-break:keep-all;
     overflow-wrap:break-word}
   .cr-req-field-key{font-family:var(--font-num);font-size:10px;color:var(--on-variant);flex:none}
+  /* 영문 키는 숨기고 사양 이름에 마우스를 올리면 보이게 한다(2026-10-10 전수 점검 L75) */
+  .cr-req-field-key{display:none}
   .cr-req-field-used{font-size:10.5px;color:var(--on-variant);flex:1;min-width:0;text-align:right}
   .cr-req-field-used--none{color:var(--error);font-weight:700}
 
@@ -248,7 +259,7 @@
     .cr-req-grid{grid-template-columns:1fr}
     .cr-req-foot2{grid-template-columns:1fr;gap:10px}
     .cr-req-thead,.cr-req-row{grid-template-columns:minmax(64px,.7fr) minmax(110px,1.3fr)
-      minmax(80px,.9fr) minmax(90px,1fr)}
+      minmax(90px,1fr)}
     .cr-req-banner{flex-direction:column}
     .cr-req-banner-cta{align-items:flex-start}
     .cr-tabsbar{padding:0 12px}
@@ -327,9 +338,9 @@
   <div class="cr-table-region">
     <div class="cr-table-scroll" data-keep="1">
       <div class="cr-grid cr-row--head">
-        <span>순서</span><span>규칙 키</span><span>대상(슬롯.필드)</span><span>연산</span>
+        <span>순서</span><span>규칙</span><span>대상(자리 · 사양)</span><span>연산</span>
         <span>비교 대상</span><span>부품 한정</span><span>판정</span><span>활성</span>
-        <span title="ref_slot이 slot보다 탐색 순서상 뒤면 엔진이 조용히 건너뜁니다 - 정상이면 이 칸은 비어 있고, 건너뛰면 사유와 함께 배지가 뜹니다">로드</span>
+        <span title="비교 대상 자리가 탐색 순서상 뒤면 엔진이 조용히 건너뜁니다 - 정상이면 「정상」, 건너뛰면 사유와 함께 배지가 뜹니다">로드</span>
       </div>
       <div id="cr-rows" data-repeat="rule"></div>
       <div class="cr-state" id="cr-state-loading" hidden>불러오는 중입니다</div>
@@ -344,7 +355,7 @@
 
   <div class="cr-foot">
     꺼 둔 규칙은 읽지 않습니다 · 비교 대상 부품이 아직 고르기 전 순서인 규칙은 기록만 남기고 건너뜁니다 - 「로드」 열이 규칙별로 그 결과를
-    보여줍니다(정상이면 빈 칸, 건너뛰면 사유와 함께 배지가 뜹니다) ·
+    보여줍니다(정상이면 「정상」, 건너뛰면 사유와 함께 배지가 뜹니다) ·
     규칙을 바꾸면 견적 결과가 바뀌므로 회귀 검증 대상입니다 · 필수 사양 자체를 고치는 일은
     상품 사양 정의 소관 · 「조립 호환 지도」는 다른 저장소이며 엔진 판정은
     이 표가 합니다.
@@ -492,16 +503,13 @@
         <div class="cr-req-section-head">
           <b>읽는 규칙이 없는 필수 사양</b>
           <span class="cr-req-count" id="cr-req-problem-count">0개</span>
-          <span class="cr-req-section-note">
-            응답의 <code>used_by</code> 가 빈 것만 모았습니다 - 세지 않고 응답에서 걸러 온 목록입니다
-          </span>
         </div>
         <div class="cr-req-common-note" id="cr-req-common-note" hidden>
           필수라서 값이 없으면 상품이 검수 대기에 묶이는데, 이 값을 읽는 호환 검사가 하나도 없습니다.
         </div>
         <div class="cr-req-table" id="cr-req-problem-table" hidden data-repeat="requiredUnread">
           <div class="cr-req-thead">
-            <span>부품군</span><span>필수 사양</span><span>키</span><span>읽는 규칙</span>
+            <span>부품군</span><span>필수 사양</span><span>읽는 규칙</span>
           </div>
           <div id="cr-req-problem-rows"></div>
         </div>
@@ -514,9 +522,6 @@
       <div class="cr-req-section">
         <div class="cr-req-section-head">
           <b>부품군 <span id="cr-req-group-count">0</span>개 - 전체 목록</b>
-          <span class="cr-req-section-note">
-            부품 이름은 <code>part_label</code> 그대로 씁니다(다시 정의하지 않습니다)
-          </span>
         </div>
         <div class="cr-req-grid" id="cr-req-groups" data-repeat="requiredGroup"></div>
       </div>
@@ -568,6 +573,31 @@
   "use strict";
   var API_URL = "/api/admin/engine-rules";
   var LOGIN_URL = "/admin2/login";
+  // 영문 코드 -> 한글 이름표(2026-10-10 전수 점검 L54·L75). 자리·부품은 서버가 부품 어휘
+  // 단일 원천에서 실어 주고, 사양 이름은 상품 사양 정의(GET /api/admin/spec-fields)에서 받는다.
+  var LABELS = {{ labels_json | safe }};
+  var FIELD_KO = {};
+  var RULE_KO = {};   // 규칙 키 -> 규칙 이름(같은 응답의 compat.checks 에서 채운다)
+  function slotKo(c){ return (LABELS.slots && LABELS.slots[c]) || (LABELS.parts && LABELS.parts[c]) || c; }
+  function partKo(c){ return (LABELS.parts && LABELS.parts[c]) || c; }
+  function fieldKo(k){ return FIELD_KO[k] || k; }
+  // "SLOT.field" 또는 "SLOT.field + 200" -> "메인보드 소켓" / "그래픽카드 권장 전원 + 200W"
+  function sideKo(expr){
+    var m = /^([A-Z_]+)\.([a-z0-9_]+)(.*)$/.exec((expr || "").trim());
+    if (!m) return expr || "";
+    var rest = m[3].trim();
+    if (/^\+\s*\d+$/.test(rest)) rest = rest + "W";
+    return slotKo(m[1]) + " " + fieldKo(m[2]) + (rest ? " " + rest : "");
+  }
+  // 서버 안내문 속 내부 이름·개발 메모만 걷는다(문장은 고치지 않는다)
+  function cleanNote(t){
+    return String(t || "")
+      .replace(/compat_rules 테이블/g, "호환 규칙 표")
+      .replace(/\(슬라이스 \d+\)/g, "")
+      .replace(/NULL 값은/g, "빈 값은")
+      .replace(/\s*·\s*규칙 편집 UI·버전 발행은 이관\.?/g, "")
+      .replace(/\s{2,}/g, " ").trim();
+  }
 
   var els = {
     zeroBanner: document.getElementById("cr-zero-banner"),
@@ -660,10 +690,11 @@
   // 처럼 온다). 클라이언트 patch는 중복이라 걷어냈다(API 제작자 지적).
   function parseRule(ruleStr){
     var parts = (ruleStr || "").trim().split(/\s+/);
-    if (parts.length !== 3) {
+    if (parts.length < 3) {
       return { target: ruleStr || "", op: "", ref: "" };
     }
-    return { target: parts[0], op: parts[1], ref: parts[2] };
+    // 비교 대상 뒤에 여유값(예: "+ 200")이 붙는 규칙이 있다 - 셋째 칸 이후를 비교 대상으로 묶는다
+    return { target: parts[0], op: parts[1], ref: parts.slice(2).join(" ") };
   }
 
   function resetKpis(text){
@@ -736,7 +767,7 @@
       ord: ord, total: total, key: check.key, label: check.label,
       target: parsed.target, op: parsed.op, ref: parsed.ref,
       partTypes: partTypes,
-      partDisp: partTypes.length ? partTypes.join(", ") : "슬롯 전체",
+      partDisp: partTypes.length ? partTypes.map(partKo).join(", ") : "슬롯 전체",
       blocking: !!check.blocking, active: !!check.active,
       // UX-28(2026-08-15) - load_skipped가 boolean이 아니면(옛 캐시·API 변경 등)
       // false로 단정하지 않는다. 지어내면 실제로 건너뛴 규칙을 "정상"으로 오인시킬
@@ -758,7 +789,7 @@
       return { text: "건너뜀", cls: "cr-badge cr-badge--skip",
         title: row.loadSkipReason || "탐색 순서 위반으로 엔진이 이 규칙을 건너뜁니다" };
     }
-    return { text: "", cls: "", title: "" };
+    return { text: "정상", cls: "cr-badge cr-badge--on", title: "엔진이 이 규칙을 정상으로 읽습니다" };
   }
 
   function renderRows(rows){
@@ -769,16 +800,17 @@
       var loadSuffix = row.loadSkipped === true ? ", 로드 건너뜀(" + (row.loadSkipReason || "사유 없음") + ")"
         : row.loadSkipped === null ? ", 로드 확인 불가" : "";
       rootBtn.setAttribute("aria-label",
-        row.ord + "번째 규칙 " + row.key + " 자세히 보기 - 판정 " +
+        row.ord + "번째 규칙 " + (row.label || row.key) + " 자세히 보기 - 판정 " +
         (row.blocking ? "막음" : "경고") + ", 활성 " + (row.active ? "켜짐" : "꺼짐") + loadSuffix);
       rootBtn.addEventListener("click", function(){ openDrawer(row); });
 
       frag.querySelector('[data-f="ord"]').textContent = row.ord;
-      frag.querySelector('[data-f="key"]').textContent = row.key;
-      frag.querySelector('[data-f="target"]').textContent = row.target;
+      frag.querySelector('[data-f="key"]').textContent = row.label || row.key;
+      frag.querySelector('[data-f="key"]').title = row.key;
+      frag.querySelector('[data-f="target"]').textContent = sideKo(row.target);
       frag.querySelector('[data-f="target"]').title = row.target;
       frag.querySelector('[data-f="op"]').textContent = row.op;
-      frag.querySelector('[data-f="ref"]').textContent = row.ref;
+      frag.querySelector('[data-f="ref"]').textContent = sideKo(row.ref);
       frag.querySelector('[data-f="ref"]').title = row.ref;
 
       var partEl = frag.querySelector('[data-f="part"]');
@@ -832,7 +864,7 @@
       els.drawerLoadBox.className = "cr-note-box cr-note-box--warn";
       els.drawerLoadTitle.textContent = "로드 진단 - 확인 불가";
       els.drawerLoadDetail.textContent =
-        "이 규칙의 load_skipped 값을 응답에서 찾지 못했습니다 - 지어내지 않고 확인 불가로 남깁니다.";
+        "이 규칙의 로드 결과를 응답에서 찾지 못했습니다 - 지어내지 않고 확인 불가로 남깁니다.";
       return;
     }
     if (row.loadSkipped) {
@@ -843,23 +875,22 @@
       els.drawerLoadBox.className = "cr-note-box cr-note-box--warn";
       els.drawerLoadTitle.textContent = "▲ 로드에서 건너뜁니다";
       els.drawerLoadDetail.textContent = row.loadSkipReason ||
-        "탐색 순서(ref_slot이 slot보다 앞이어야 함) 위반으로 엔진이 이 규칙을 건너뜁니다.";
+        "탐색 순서(비교 대상 자리가 대상 자리보다 앞이어야 함) 위반으로 엔진이 이 규칙을 건너뜁니다.";
       return;
     }
     els.drawerLoadBadge.hidden = true;
     els.drawerLoadBox.className = "cr-note-box cr-note-box--neutral";
     els.drawerLoadTitle.textContent = "로드 진단 - 정상";
     els.drawerLoadDetail.textContent =
-      "이 규칙은 탐색 순서 조건(ref_slot이 slot보다 앞)을 만족해 엔진에 정상 로드됩니다" +
-      "(recommend.load_compat_rules()와 같은 판정 - UX-28).";
+      "이 규칙은 탐색 순서 조건(비교 대상 자리가 대상 자리보다 앞)을 만족해 엔진에 정상 로드됩니다.";
   }
 
   function openDrawer(row){
     lastFocusEl = document.activeElement;
-    els.drawerKey.textContent = row.key;
+    els.drawerKey.textContent = row.label || row.key;
     els.drawerSentence.textContent = row.label || "";
-    els.drawerRaw.textContent = row.target + " " + row.op + " " + row.ref +
-      " · part_types=" + JSON.stringify(row.partTypes) +
+    els.drawerRaw.textContent = sideKo(row.target) + " " + row.op + " " + sideKo(row.ref) +
+      " · 부품 한정 " + row.partDisp +
       " · 현재 순서 " + row.ord + "/" + row.total;
     renderLoadDiagnosis(row);
 
@@ -878,7 +909,7 @@
         var chip = document.createElement("button");
         chip.type = "button";
         chip.className = "cr-chip cr-chip--on";
-        chip.textContent = pt;
+        chip.textContent = partKo(pt);
         chip.addEventListener("click", function(){ chip.classList.toggle("cr-chip--on"); });
         els.editParts.appendChild(chip);
       });
@@ -906,7 +937,7 @@
       var tag = document.createElement("span");
       tag.className = "cr-fieldlist-tag"; tag.textContent = f.tag;
       var val = document.createElement("span");
-      val.className = "cr-fieldlist-val"; val.textContent = f.val;
+      val.className = "cr-fieldlist-val"; val.textContent = fieldKo(f.val); val.title = f.val;
       r.appendChild(tag); r.appendChild(val);
       els.fieldlist.appendChild(r);
     });
@@ -1028,12 +1059,10 @@
       var part = document.createElement("span");
       part.className = "part"; part.textContent = row.partLabel;
       var field = document.createElement("span");
-      field.textContent = row.fieldLabel;
-      var key = document.createElement("span");
-      key.className = "key"; key.textContent = row.key;
+      field.textContent = row.fieldLabel; field.title = row.key;
       var used = document.createElement("span");
       used.className = "cr-req-none"; used.textContent = "없음 ✕";
-      r.appendChild(part); r.appendChild(field); r.appendChild(key); r.appendChild(used);
+      r.appendChild(part); r.appendChild(field); r.appendChild(used);
       els.reqProblemRows.appendChild(r);
     });
   }
@@ -1058,7 +1087,7 @@
         row.className = "cr-req-field-row";
         var label = document.createElement("span");
         label.className = "cr-req-field-label";
-        label.textContent = f.label;
+        label.textContent = f.label; label.title = f.key;
         var key = document.createElement("span");
         key.className = "cr-req-field-key";
         key.textContent = f.key;
@@ -1066,7 +1095,7 @@
         var usedBy = Array.isArray(f.used_by) ? f.used_by : [];
         if (usedBy.length) {
           used.className = "cr-req-field-used";
-          used.textContent = usedBy.join(", ");
+          used.textContent = usedBy.map(function(k){ return RULE_KO[k] || k; }).join(", ");
         } else {
           used.className = "cr-req-field-used cr-req-field-used--none";
           used.textContent = "없음 ✕";
@@ -1083,6 +1112,7 @@
     var compat = data.compat || {};
     var checks = Array.isArray(compat.checks) ? compat.checks : [];
     lastSlots = Array.isArray(compat.slots) ? compat.slots : [];
+    checks.forEach(function(c){ if (c.key && c.label) RULE_KO[c.key] = c.label; });
 
     var total = checks.length;
     var activeCount = checks.filter(function(c){ return !!c.active; }).length;
@@ -1095,7 +1125,7 @@
     renderSkipBanner(skipRows, total);
 
     if (compat.note) {
-      els.principleText.textContent = compat.note;
+      els.principleText.textContent = cleanNote(compat.note);
       els.principle.hidden = false;
     } else {
       els.principle.hidden = true;
@@ -1156,9 +1186,18 @@
     }).join(" · ");
   }
 
+  // 사양 이름표(읽기 전용) - 실패해도 화면은 영문 이름으로 계속 그린다
+  function loadFieldLabels(){
+    return fetch("/api/admin/spec-fields", { credentials: "same-origin" }).then(function(r){
+      return r.ok ? r.json() : null;
+    }).then(function(j){
+      ((j && j.items) || []).forEach(function(it){ if (it.field_key && it.label) FIELD_KO[it.field_key] = it.label; });
+    }).catch(function(){});
+  }
+
   function load(){
     setState("loading");
-    fetch(API_URL, { credentials: "same-origin" }).then(function(res){
+    loadFieldLabels().then(function(){ return fetch(API_URL, { credentials: "same-origin" }); }).then(function(res){
       if (res.status === 401) {
         setState("error", { kind: "auth" });
         return null;

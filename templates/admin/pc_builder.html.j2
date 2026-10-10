@@ -1,6 +1,7 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
 {% block title %}신규 조립PC 생성{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/pc-builder.css?v=20261002-redesign3">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/pc-builder.css?v=20261002-redesign3">
+<style>#builder-estimate[hidden]{display:none}</style>{% endblock %}
 {% block content %}
 <main class="pc-builder">
  <header class="builder-top"><div><small>조립PC 제품군 / 신규 생성</small><h1>신규 조립PC 생성</h1><p>부품 선택부터 구성 확인까지, 한 화면에서 준비합니다.</p></div><a href="/admin2/pc-configurations">제품군 목록</a></header>
@@ -10,4 +11,4 @@
  <p class="builder-note">대표 이미지·영상은 구성 확정과 호환 검토 후 별도로 생성합니다. 검토 대기 등록은 재고 예약·차감 또는 고객 공개·추천 승인이 아닙니다.</p>
 </main>
 {% endblock %}
-{% block foot_extra %}<script src="/shared/assembly-fee.js"></script><script src="/shared/pc-builder.js?v=20261002-draft1"></script>{% endblock %}
+{% block foot_extra %}<script src="/shared/assembly-fee.js"></script><script src="/shared/pc-builder.js?v=20261010-total"></script>{% endblock %}

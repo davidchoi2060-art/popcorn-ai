@@ -300,7 +300,7 @@ a.rp-link{color:var(--rv-link)}
         <div class="rp-risk-row"><span class="k">개별 상품 확정</span><span class="v" id="rpGoReview" style="font-family:var(--rv-font)"></span></div>
         <div class="rp-risk-row"><span class="k">예외 잡기 · 잠금</span><span class="v" id="rpGoSale" style="font-family:var(--rv-font)"></span></div>
         <div class="rp-risk-row"><span class="k">이력 읽기</span><span class="v" id="rpGoHistory" style="font-family:var(--rv-font)"></span></div>
-        <div class="rp-risk-row"><span class="k">매입가 바꾸기</span><span class="v" style="font-family:var(--rv-font)">
+        <div class="rp-risk-row"><span class="k">매입가 바꾸기</span><span class="v" id="rpGoImport" style="font-family:var(--rv-font)">
           <span class="rp-link-off" title="매입가는 「단가표 반영」 화면에서 바꿉니다">단가표 일일 반영</span></span></div>
       </div>
     </aside>
@@ -652,6 +652,7 @@ a.rp-link{color:var(--rv-link)}
     $('rpGoReview').innerHTML = linkHtml('price_review', '가격 검토 대기');
     $('rpGoSale').innerHTML = linkHtml('sale_price', '판매가 관리');
     $('rpGoHistory').innerHTML = linkHtml('price_history', '가격 이력');
+    $('rpGoImport').innerHTML = linkHtml('price_import', '단가표 일일 반영');
   }
 
   function renderAll() {

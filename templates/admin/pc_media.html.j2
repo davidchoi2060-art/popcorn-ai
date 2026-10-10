@@ -1,5 +1,53 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
 {% block title %}대표 이미지 관리{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/pc-assets.css?v=20261009-redesign">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/pc-assets.css?v=20261009-redesign">
+<style>
+/* 전수 점검 L93·L94 — 제품 고르기 목록(?id 없이 열었을 때만 나온다) */
+.pca-pick-note{margin:0 0 12px}
+.pca-pick{display:flex;gap:8px;max-width:520px;margin-bottom:12px}
+.pca-pick label{flex:1;min-width:0}
+.pca-pick input{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid var(--outline-variant);border-radius:6px;font:inherit;background:var(--card)}
+.pca-pick button{padding:9px 14px;border:1px solid var(--outline);border-radius:6px;background:var(--card);font:inherit;cursor:pointer}
+.pca-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pca-pick-table{width:100%;max-width:880px;border-collapse:collapse;background:var(--card);border:1px solid var(--outline-variant);font-size:13px}
+.pca-pick-table th,.pca-pick-table td{padding:9px 10px;border-bottom:1px solid var(--outline-variant);text-align:left;vertical-align:top}
+.pca-pick-table th{background:var(--container);font-weight:500;color:var(--on-variant)}
+.pca-pick-table td:last-child,.pca-pick-table th:last-child{text-align:right;white-space:nowrap}
+.pca-pick-table a{color:inherit}
+.pca-pick-empty,.pca-pick-more{color:var(--on-variant);font-size:12.5px}
+</style>{% endblock %}
 {% block content %}<main class="pc-assets"><header class="pca-top"><div><h1>대표 이미지 생성·관리</h1><p>구성 확인부터 생성, 대표 선택까지 한 화면에서 관리</p></div><nav aria-label="제품 관련 화면"><a id="media-back" href="/admin2/pc-configurations">제품군 목록</a><a id="media-video" href="/admin2/pc-configurations">영상 관리</a></nav></header><p id="media-message" class="pca-message" role="status" aria-live="polite"></p><div id="media-root" aria-live="polite">구성·검사 자료 조회 중</div></main>{% endblock %}
-{% block foot_extra %}<script src="/shared/pc-media.js?v=20261009-redesign"></script>{% endblock %}
+{% block foot_extra %}<script src="/shared/pc-media.js?v=20261009-redesign"></script>
+<script>
+// 전수 점검 L93·L94 — 메뉴에서 바로 열면(?id 없음) 제품을 고를 방법이 화면에 없었다.
+// 제품군 목록과 같은 조회(GET /api/admin/pc-configurations)로 고를 목록을 붙인다.
+(function(){
+  if(new URLSearchParams(location.search).get('id'))return;
+  var root=document.querySelector('#media-root');if(!root)return;
+  var esc=function(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+  var won=function(n){return n==null?'정보 없음':Number(n).toLocaleString('ko-KR')+'원';};
+  var note=root.textContent;
+  root.innerHTML='<p class="pca-pick-note">'+esc(note)+'</p>'+
+    '<form class="pca-pick" role="search"><label><span class="pca-sr">상품명·구성 ID 검색</span>'+
+    '<input type="search" name="q" maxlength="100" autocomplete="off" placeholder="상품명, 구성 ID 검색"></label>'+
+    '<button type="submit">검색</button></form>'+
+    '<div class="pca-pick-list" aria-live="polite">불러오는 중</div>';
+  var list=root.querySelector('.pca-pick-list'),form=root.querySelector('form');
+  function load(q){
+    list.textContent='불러오는 중';
+    fetch('/api/admin/pc-configurations?limit=20&q='+encodeURIComponent(q||''),{credentials:'same-origin'})
+      .then(function(r){if(!r.ok)throw new Error('오류 '+r.status);return r.json();})
+      .then(function(d){
+        var items=d.items||[];
+        if(!items.length){list.innerHTML='<p class="pca-pick-empty">조건에 맞는 제품군이 없습니다.</p>';return;}
+        list.innerHTML='<table class="pca-pick-table"><thead><tr><th>구성 ID</th><th>상품명</th><th>기준 가격</th></tr></thead><tbody>'+
+          items.map(function(p){var href='/admin2/pc-media?id='+encodeURIComponent(p.configuration_id);
+            return '<tr><td><a href="'+href+'">'+esc(p.configuration_id)+'</a></td><td><a href="'+href+'">'+esc(p.title)+'</a></td><td>'+won(p.price)+'</td></tr>';}).join('')+
+          '</tbody></table>'+(d.total>items.length?'<p class="pca-pick-more">전체 '+Number(d.total).toLocaleString('ko-KR')+'개 중 '+items.length+'개 · 검색으로 좁혀 고릅니다.</p>':'');
+      })
+      .catch(function(e){list.innerHTML='<p class="pca-pick-empty">불러오기 실패 — '+esc(e.message)+'</p>';});
+  }
+  form.addEventListener('submit',function(e){e.preventDefault();load(form.q.value.trim());});
+  load('');
+})();
+</script>{% endblock %}

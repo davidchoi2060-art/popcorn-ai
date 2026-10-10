@@ -130,8 +130,12 @@ table.grid td.nolink{color:var(--on-variant);cursor:default}
 .err-card{margin:auto;max-width:460px;padding:22px 24px;text-align:center}
 
 @media (max-width:768px){
-  .split{flex-direction:column}
+  .split{flex-direction:column;align-items:stretch}
+  .main{width:100%}
   .rail{width:100%}
+  /* 390px: 표가 카드 밖으로 밀려 오른쪽 열이 잘리던 것 — 카드 안에서 옆으로 밀고, 분류 열은 고정 */
+  table.grid th:first-child,table.grid td:first-child{position:sticky;left:0;background:var(--card);z-index:1}
+  table.grid tfoot td:first-child{background:var(--container-low)}
   .pass-card{flex-basis:100%}
 }
 </style>
@@ -260,20 +264,22 @@ table.grid td.nolink{color:var(--on-variant);cursor:default}
     // target = {label, href|null} | undefined(정본에 그 라벨 자체가 없음 — 이론상 발생 안 함)
     if (!target) return '<span class="go-btn">이동</span>';
     if (!target.href) {
-      return '<span class="go-btn" title="' + esc(target.label) + ' — admin2 미구축(신설 예정)">이동</span>';
+      return '<span class="go-btn" title="' + esc(target.label) + '">이동</span>';
     }
     return '<a class="go-btn" href="' + esc(target.href) + '" title="' + esc(target.label) + '로 이동">이동</a>';
   }
 
   function reasonCell(count, key) {
-    // "0 은 — 로, 커서를 바꾸지 않는다(누를 것이 없다)" — 본표 칸에만 적용되는 규칙.
-    if (!count) return '<td class="r0">—</td>';
+    // 0 은 0 으로 적고(전수 점검 L55 — 「—」는 0인지 자료가 없는지 구분이 안 됐다),
+    // 커서를 바꾸지 않는다(누를 것이 없다). 값이 아예 없을 때만 「정보 없음」.
+    if (count == null) return '<td class="r0">정보 없음</td>';
+    if (!count) return '<td class="r0">0</td>';
     var t = window.REASON_TARGETS[key];
     if (t && t.href) {
       return '<td><a class="cell-link" href="' + esc(t.href) + '" title="' + esc(t.label) + '(으)로 이동">' +
         num(count) + '</a></td>';
     }
-    return '<td class="nolink" title="' + esc(t ? t.label : '') + ' — admin2 미구축(신설 예정)">' +
+    return '<td class="nolink" title="' + esc(t ? t.label : '') + '">' +
       num(count) + '</td>';
   }
 

@@ -96,6 +96,7 @@ LINK_TARGETS = {
     "categories": {"label": "상품 분류 관리", "path": "/admin2/categories"},
     "policy_weights": {"label": "추천 기준 보기", "path": "/admin2/policy-weights"},
     "sale_price": {"label": "판매가 관리", "path": "/admin2/sale-price"},
+    "reprice": {"label": "판매가 재산정", "path": "/admin2/reprice"},
 }
 
 

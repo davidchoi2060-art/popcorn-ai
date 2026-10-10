@@ -286,7 +286,7 @@
 
   <section class="si-panel" id="siPanel" data-keep="1" aria-label="작업 패널">
     <div class="si-empty" id="siPanelEmpty">
-      <b>대상 선택 대기</b> — 좌측 목록에서 상품을 선택하면 게이트 판정 · 확정 · 그 상품의 입고 이력이 여기 선다.
+      <b>대상 선택 대기</b> — 좌측 목록에서 상품을 선택하면 판정 · 확정 · 그 상품의 입고 이력이 여기 선다.
       목록 행의 「바로 확정」도 같은 서버 동작이며 결과는 여기에 표시된다.
     </div>
 
@@ -328,7 +328,7 @@
     <div class="si-result" id="siResult" data-bind="result">
       <div class="body">
         <div class="top"><span class="code" id="siResCode">—</span><span class="msg" id="siResMsg">확정하면 여기에 서버 응답이 그대로 섭니다</span></div>
-        <div class="nt" id="siResNote">화면이 재고를 다시 계산하지 않습니다 — <code>stock_before · stock_after · status_changed · pool_entered · undo_id · sku</code> 를 그대로 표시합니다.</div>
+        <div class="nt" id="siResNote">화면이 재고를 다시 계산하지 않습니다.</div>
       </div>
       <div class="act" id="siResAct"></div>
     </div>
@@ -347,7 +347,7 @@
     <div class="si-foot">
       <b>입고 확정 즉시 견적 반영</b> — 되돌릴 수 있지만 그 사이 나간 견적은 그 재고로 나갔다. 되돌리기는 「없던 일」이 아니다 ·
       <b>인계 — 재고 차감 없음</b> — 재고를 줄이는 경로는 자체 주문과 실사 조정뿐 ·
-      <b>안전재고 기준은 읽기 전용</b> — 변경은 상품 관리(ADM-PRD-010) · 「오늘 입고」는 서버 집계가 없어 표시하지 않는다.
+      <b>안전재고 기준은 읽기 전용</b> — 변경은 상품 관리 · 「오늘 입고」는 서버 집계가 없어 표시하지 않는다.
     </div>
   </section>
 
@@ -521,7 +521,7 @@
     var held = !!it.hold;
     var w = writable();
     var poolHtml = !it.pool_state
-      ? '<span class="v">판정 없음</span><span class="w">서버 응답에 후보 진입 판정(pool_state)이 없다 — 확정 후 pool_entered 로 확인</span>'
+      ? '<span class="v">판정 없음</span><span class="w">서버 응답에 후보 진입 판정이 없다 — 확정 후 확인</span>'
       : '<span class="v ' + (POOL_TONE[it.pool_state] || '') + '">' + esc(it.pool_label || '') + '</span>'
         + '<span class="w" title="' + esc(it.pool_note || '') + '">' + esc(it.pool_note || '') + '</span>';
     var actHtml;
@@ -576,11 +576,13 @@
   function pagerBtns(page, pages, action) {
     if (!pages || pages < 1) return '';
     var out = [];
-    function b(n, label, on, dis, gap) {
+    // 글자 없는 화살표 단추(‹ › …)에 이름을 붙인다 — 전수 점검 L79.
+    function b(n, label, on, dis, gap, name) {
       return '<button type="button" class="si-pg' + (on ? ' on' : '') + (gap ? ' gap' : '') + '" data-action="' + action + '" data-page="' + n + '"'
+        + (name ? ' aria-label="' + name + '" title="' + name + '"' : '')
         + (dis || gap ? ' disabled' : '') + '>' + label + '</button>';
     }
-    out.push(b(page - 1, '‹', false, page <= 1));
+    out.push(b(page - 1, '‹', false, page <= 1, false, '이전 쪽'));
     var nums = [];
     var i;
     if (pages <= 7) { for (i = 1; i <= pages; i++) nums.push(i); }
@@ -593,10 +595,10 @@
       nums.push(pages);
     }
     nums.forEach(function (n) {
-      if (n === '…') out.push(b(0, '…', false, true, true));
+      if (n === '…') out.push(b(0, '…', false, true, true, '생략된 쪽'));
       else out.push(b(n, String(n), n === page, false));
     });
-    out.push(b(page + 1, '›', false, page >= pages));
+    out.push(b(page + 1, '›', false, page >= pages, false, '다음 쪽'));
     return out.join('');
   }
   function renderPager() {
@@ -721,7 +723,7 @@
         ? '서버 판정: <b>' + esc(p.pool_label || '') + '</b> — ' + esc(p.pool_note || '')
         : '서버 판정 없음 — 응답에 <code>pool_state</code> 가 없다')
       + (p.note ? ' · 대기 유형: ' + esc(p.note) : '')
-      + ' · <b>입고만으로 추천에 들어가지 않는다</b> — 확정 뒤 <code>pool_entered</code> 를 실측으로 표시한다.';
+      + ' · <b>입고만으로 추천에 들어가지 않는다</b> — 확정 뒤 실측으로 표시한다.';
   }
   function renderHold() {
     var p = S.sel;
@@ -754,7 +756,7 @@
   // ── 결과 행 — 서버 응답이 온 뒤에만 채운다(공통 전제 ①) ─────────────────
   var RESULT_IDLE = {
     tone: 'none', code: '—', msg: '확정하면 여기에 서버 응답이 그대로 섭니다',
-    note: '화면이 재고를 다시 계산하지 않습니다 — <code>stock_before · stock_after · status_changed · pool_entered · undo_id · sku</code> 를 그대로 표시합니다.',
+    note: '화면이 재고를 다시 계산하지 않습니다.',
     act: ''
   };
   function showResult(r) {
@@ -777,7 +779,7 @@
         act: '<a class="si-b" href="' + LOGIN + '">로그인 화면으로 이동</a>' + retryBtn(ctx) };
     }
     if (st === 403) {
-      return { tone: 'err', code: '403', msg: 'viewer 등급은 입고 확정·되돌리기를 할 수 없습니다',
+      return { tone: 'err', code: '403', msg: '조회 등급은 입고 확정·되돌리기를 할 수 없습니다',
         note: '서버 사유: ' + esc(detail) + ' — 조회는 viewer · 쓰기는 operator 이상(owner 전용 아님). 단추는 감추지 않고 비활성 + 사유 병기.', act: '' };
     }
     if (st === 400) {
@@ -817,7 +819,7 @@
       return;
     }
     if (why !== 'inbound' && why !== 'adjust') {
-      showResult({ tone: 'err', code: '입력', msg: '알 수 없는 사유입니다', note: '허용값 <code>inbound · adjust</code> 둘뿐.', act: '' });
+      showResult({ tone: 'err', code: '입력', msg: '알 수 없는 사유입니다', note: '허용값은 입고 · 조정 둘뿐.', act: '' });
       return;
     }
     // 결과는 패널에 선다 — 목록에서 확정해도 그 상품을 패널에 올린다(같은 결과 표시 함수)
@@ -834,9 +836,9 @@
         ? '입고 완료 — 재고 ' + fmt(r.stock_before) + ' → ' + fmt(r.stock_after) + (r.status_changed ? ' · 품절 해제' : '') + ' · 추천 후보 진입'
         : '입고 완료 — 재고 ' + fmt(r.stock_before) + ' → ' + fmt(r.stock_after) + (r.status_changed ? ' · 품절 해제' : '') + ' · 다만 추천 후보에는 들어가지 않았습니다';
       var note = pool
-        ? '<code>status_changed=' + String(!!r.status_changed) + ' · pool_entered=true</code> · SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 이 순간부터 견적에 쓰인다 — 되돌려도 그 사이 나간 견적은 이 재고로 나갔다.'
-        : '<code>pool_entered=false</code> · SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 확정 전 서버 판정 사유' + (selNote ? ': ' + esc(selNote) : ' 없음') + '. 화면이 사유를 새로 판정하지 않는다.';
-      showResult({ tone: pool ? 'ok' : 'warn', code: pool ? '200' : '200 · pool_entered=false', msg: msg, note: note,
+        ? 'SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 이 순간부터 견적에 쓰인다 — 되돌려도 그 사이 나간 견적은 이 재고로 나갔다.'
+        : 'SKU ' + esc(r.sku) + ' · 기록 #' + r.undo_id + '. 확정 전 서버 판정 사유' + (selNote ? ': ' + esc(selNote) : ' 없음') + '. 화면이 사유를 새로 판정하지 않는다.';
+      showResult({ tone: pool ? 'ok' : 'warn', code: pool ? '200' : '200 · 후보 미진입', msg: msg, note: note,
         act: writable() ? '<button type="button" class="si-b" data-action="undo" data-log="' + r.undo_id + '">되돌리기</button>' : '' });
       if (S.sel && S.sel.product_code === code) {
         S.sel.stock = r.stock_after;
@@ -965,7 +967,8 @@
     } else {
       box.innerHTML = j.items.map(histRow).join('');
     }
-    $('siHistScope').textContent = j.scope_note || '';
+    // 서버 문장 안의 내부 표기 「(작업 기록 action='…' 계열)」만 걷어내 보인다 — 전수 점검 L79.
+    $('siHistScope').textContent = (j.scope_note || '').replace(/\s*\(작업 기록 action=[^)]*\)/, '');
     var cnt = j.items.length;
     var a = cnt ? (j.page - 1) * j.size + 1 : 0, z = cnt ? a + cnt - 1 : 0;
     $('siHistTxt').innerHTML = cnt

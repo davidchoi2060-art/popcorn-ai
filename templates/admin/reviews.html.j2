@@ -935,7 +935,7 @@ input{font-family:var(--rv-mono)}
   function confOf(row) {
     var sig = row.signal;
     var c = sig ? sig.confidence : null;
-    if (c === null || c === undefined) return { c: '#a09889', label: '—', tier: null };
+    if (c === null || c === undefined) return { c: '#a09889', label: '정보 없음', tier: null };
     var tier = c < 0.5 ? 'low' : (c < 0.8 ? 'mid' : 'high');
     var color = tier === 'low' ? 'oklch(0.62 0.15 55)' : (tier === 'mid' ? '#6f6a61' : 'oklch(0.5 0.11 165)');
     var mark = tier === 'low' ? '▲ ' : (tier === 'mid' ? '◆ ' : '● ');
@@ -956,7 +956,7 @@ input{font-family:var(--rv-mono)}
         : (S.f.keyword ? '"' + S.f.keyword + '"와 맞는 검수 건이 없습니다' : '이 필터에는 없습니다');
       var desc = totalWaiting === 0 ? '지금 큐가 비어 있습니다 — 새 수집 결과가 들어오면 여기에 쌓입니다.'
         : (S.f.keyword
-          ? '상품명·product_code·사양 필드명으로만 찾습니다. 검색어를 지우면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.'
+          ? '상품명·상품코드·사양 필드명으로만 찾습니다. 검색어를 지우면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.'
           : '필터 범위를 넓히면 대기 ' + fmt(totalWaiting) + '건이 다시 나타납니다.');
       tbody.innerHTML = '<div class="emptystate"><div class="ti">' + esc(title) + '</div>' +
         '<div class="ds">' + esc(desc) + '</div>' +
@@ -974,9 +974,9 @@ input{font-family:var(--rv-mono)}
         // 몰 원문 HTML 태그(<font>·<P> 등)가 글자로 새지 않도록 표시 직전에만 벗긴다.
         '<span class="rname"><span class="nm">' + esc(Admin2Text.stripHtml(r.name)) + '</span>' +
         (r.live ? '<span class="live">●</span>' : '') + '</span>' +
-        '<span class="fld">' + esc(r.field || '—') + '</span>' +
-        '<span class="ov' + (ov ? '' : ' noval') + '">' + esc(ov || '없음') + '</span>' +
-        '<span class="sv' + (sv ? '' : ' noval') + '">' + esc(sv || '—') + '</span>' +
+        '<span class="fld" title="' + esc(r.field || '') + '">' + esc(r.field ? fieldLabel(r.field) : '정보 없음') + '</span>' +
+        '<span class="ov' + (ov ? '' : ' noval') + '">' + esc(ov || '정보 없음') + '</span>' +
+        '<span class="sv' + (sv ? '' : ' noval') + '">' + esc(sv || '정보 없음') + '</span>' +
         '<span class="cf" style="color:' + cd.c + '">' + esc(cd.label) + '</span>' +
         // 목록은 항상 한 status로만 서버 필터링된다(currentQuery().status) — 그래서
         // "지금 보는 필터가 자동승인인가"만으로 이 페이지의 모든 행을 판정해도 안전하다
@@ -1129,14 +1129,14 @@ input{font-family:var(--rv-mono)}
 
     var html = '';
     html += '<div><div class="compare-cap">대조 — ' + esc(fieldLabel(row.field || '')) +
-      ' <span class="fk">' + esc(row.field || '—') + '</span>' +
+      ' <span class="fk" hidden>' + esc(row.field || '') + '</span>' +
       '<span class="risk-badge" style="color:' + riskColor + ';background:' + riskColor + '1a;border:1px solid ' + riskColor + '55">' +
       esc(row.risk || '') + '</span></div>' +
       '<div class="compare-grid">' +
-      '<div class="cbox"><div class="lb">원문 추출값</div><div class="vv' + (ov ? '' : ' noval') + '">' + esc(ov || '없음') + '</div></div>' +
+      '<div class="cbox"><div class="lb">원문 추출값</div><div class="vv' + (ov ? '' : ' noval') + '">' + esc(ov || '정보 없음') + '</div></div>' +
       '<div class="cbox suggest' + (cd.tier === 'low' ? ' low' : '') + '"><div class="lb">' +
       (row.suggested_value ? '제안값 · ' + esc(labelForSource(row.suggest_source)) : '제안 없음 — 사람이 찾아 입력') + '</div>' +
-      '<div class="vv' + (sv ? '' : ' noval') + '">' + esc(sv || '값 없음') + '</div></div></div></div>';
+      '<div class="vv' + (sv ? '' : ' noval') + '">' + esc(sv || '정보 없음') + '</div></div></div></div>';
 
     if (row.suggested_value) {
       var sig = row.signal;

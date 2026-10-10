@@ -1,6 +1,11 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
 {% block title %}AI 일괄 보완{% endblock %}
-{% block head_extra %}<link rel="stylesheet" href="/shared/pc-workspace.css?v=20261002-scroll"><link rel="stylesheet" href="/shared/pc-batch.css?v=20261010-mobile">{% endblock %}
+{% block head_extra %}<link rel="stylesheet" href="/shared/pc-workspace.css?v=20261002-scroll"><link rel="stylesheet" href="/shared/pc-batch.css?v=20261010-mobile">
+<style>
+/* 전수 점검 L121 — PC 에서 「부품명·코드 검색」 입력칸이 왼쪽 카드(280px) 밖으로 삐져나오던 것:
+   입력칸 기본 폭(글자 20자)이 카드보다 넓었다. 카드 폭에 맞춘다. */
+#batch-group-search{display:block;width:100%;min-width:0;max-width:100%}
+</style>{% endblock %}
 {% block content %}
 <main class="batch">
  <header class="top"><div><h1>AI 일괄 보완</h1><p class="muted">공통 부품으로 묶고, 각 제품의 차이를 반영한 설명을 비교합니다.</p></div><a class="tag" href="/admin2/pc-workspace">개별 작업으로 돌아가기</a></header>
