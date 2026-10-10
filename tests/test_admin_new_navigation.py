@@ -16,7 +16,7 @@ class NewNavigationTests(unittest.TestCase):
 
     def test_default_is_legacy_with_entry(self):
         r=self.page(request('/admin2/'))
-        self.assertIn('관리자-NEW',r.body.decode())
+        self.assertIn('신 관리자',r.body.decode())
         self.assertNotIn('class="a2-new-secondary"',r.body.decode())
 
     def test_entry_and_followup_share_new_profile(self):

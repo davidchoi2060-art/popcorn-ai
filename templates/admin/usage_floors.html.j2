@@ -311,7 +311,7 @@
     <h1>용도별 최소 사양</h1>
     <p class="uf-hub-sub">최소사양 확인과 변경 전 영향 검토</p>
     <nav class="uf-hub-links" aria-label="사용·성능 자료 화면">
-      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>여기서 보기 →</small></a>
+      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 최소 사양 확인</span><small>여기서 보기 →</small></a>
       <a href="/admin2/game-copy-review"><b>게임 근거 검수</b><span>게임 설명과 근거 검토</span><small>열기 →</small></a>
       <a href="/admin2/talk-patterns"><b>응답 패턴 관리</b><span>질문과 응답 연결 확인</span><small>열기 →</small></a>
       <a href="/admin2/product-fit"><b>판매 상품 적합도</b><span>용도별 판매 상품 적합도 조회</span><small>열기 →</small></a>
@@ -319,8 +319,8 @@
   </header>
 
   <section class="uf-section" aria-labelledby="ufSectionTitle">
-    <h2 id="ufSectionTitle">최소사양 하한 관리</h2>
-    <p>하한과 활성 상태를 확인하고, 변경 전 추천 후보에 미치는 영향을 확인합니다.</p>
+    <h2 id="ufSectionTitle">최소 사양 관리</h2>
+    <p>최소 기준과 적용 상태를 확인하고, 변경 전에 추천 후보에 미치는 영향을 살펴봅니다.</p>
   </section>
 
   <div class="uf-banner">
@@ -338,9 +338,9 @@
          (2026-10-10 전수 점검 L63). 계획은 바로 아래 안내 띠가 말한다. -->
   </div>
   <div class="uf-locked-note">
-    <b>용도 신설 · 매칭 문구 편집 · 순서 변경 — 향후 사용예정.</b>
-    열기로 확정했지만 쓰기 API가 아직 없습니다. 순서를 바꾸면 어느 용도 문구가 이기는지
-    뒤바뀌므로, 붙일 때 그 경고를 함께 넣습니다.
+    <b>용도 추가 · 연결 문구 수정 · 순서 변경 기능은 아직 연결되지 않았습니다.</b>
+    수정 기능은 아직 연결되지 않았습니다. 순서를 바꾸면 먼저 적용되는 용도 문구가
+    달라지므로, 기능을 연결할 때 이 영향을 함께 안내해야 합니다.
   </div>
 
   <div class="uf-guard">
@@ -537,7 +537,7 @@
     html += '</div>';
     html += '<div class="uf-exp-savenote">저장하면 다음 견적부터 적용됩니다 — 이미 만든 견적은 그대로입니다. '
           + '미리보기 없이 바로 저장하는 경로는 없습니다.</div>';
-    html += '<div class="uf-exp-apinote">음수는 400으로 막힙니다 · 없는 하한은 404 · 후보 0은 오류가 아니라 강한 '
+    html += '<div class="uf-exp-apinote">음수는 저장할 수 없습니다 · 없는 최소 기준은 수정할 수 없습니다 · 추천 후보 0건은 오류가 아니라 강한 '
           + '경고로 옵니다 · 하한이 비면 그 용도의 필터링이 통째로 사라집니다</div>';
     html += '</div>';
 
@@ -587,8 +587,8 @@
     if (!S.groups) return;
     if (!S.groups.length) {
       box.innerHTML = '<div class="uf-errbox"><div class="t">규칙이 비어 있습니다</div>'
-        + '<div class="d">용도별 하한이 0건입니다 — 정상 상태가 아닙니다(부트스트랩이 21행을 심어야 '
-        + '합니다). 이 상태에서는 용도 필터링이 전부 빠진 채 견적이 나갑니다 — 마이그레이션 적용 '
+        + '<div class="d">용도별 최소 기준이 없습니다 — 정상 상태가 아닙니다. 초기 기준이 등록되어야 '
+        + '합니다. 이 상태에서는 용도별 조건이 적용되지 않은 채 견적이 나갑니다 — 초기 기준 등록 '
         + '여부를 확인해야 합니다.</div></div>';
       return;
     }
@@ -641,7 +641,7 @@
     if (!canOwnerWrite() || S.exp.busy || !S.exp.floorId) return;
     var v = S.exp.value;
     if (v === null || v === undefined || !Number.isInteger(v) || v < 0) {
-      S.exp.preview = null; S.exp.previewErr = '정수 0 이상을 입력하세요(음수는 서버도 400으로 막습니다)';
+      S.exp.preview = null; S.exp.previewErr = '0 이상의 정수를 입력하세요. 음수는 저장할 수 없습니다.';
       renderTable();
       return;
     }

@@ -446,7 +446,7 @@
     </div>
 
     <div class="cr-drawer-foot">
-      <span class="cr-drawer-foot-note">쓰기 API가 붙기 전까지 저장은 막혀 있습니다</span>
+      <span class="cr-drawer-foot-note">저장 기능이 연결되기 전까지는 저장할 수 없습니다</span>
       <button type="button" class="cr-btn cr-btn--ghost" data-action="close-drawer">취소</button>
       <button type="button" class="cr-btn cr-btn--locked" disabled
               title="규칙 저장 기능은 아직 준비 중입니다">저장 - 기능 준비 중</button>
@@ -1158,7 +1158,7 @@
   function renderLoadKpi(total, skipCount, unknownCount){
     if (unknownCount === total && total > 0) {
       els.kpiLoad.textContent = "확인 불가";
-      els.kpiLoadNote.textContent = "API 응답에 load_skipped 값이 없습니다";
+      els.kpiLoadNote.textContent = "부하 검사 생략 여부가 전달되지 않아 확인할 수 없습니다";
       els.kpiLoadCard.classList.remove("cr-kpi--gap");
       return;
     }

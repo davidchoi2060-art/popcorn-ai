@@ -279,8 +279,8 @@
 
  var LANES=[
   {title:'접수 · 검토',keys:['접수','검토'],sub:'아직 아무도 안 봤거나 하네스가 읽는 중이다',empty:'새로 올라온 것이 없다'},
-  {title:'결재 대기',keys:['결재대기'],sub:'하네스가 「큰 것」으로 보고 올린 것 — 사장님 차례다',empty:'올라온 결재가 없다',ownerOnly:true},
-  {title:'처리 · 승인',keys:['처리','승인'],sub:'하네스가 고쳤거나 고치는 중이다',empty:'진행 중인 것이 없다'},
+  {title:'결재 대기',keys:['결재대기'],sub:'자동 검토에서 관리자 확인이 필요하다고 판단한 요청',empty:'올라온 결재가 없다',ownerOnly:true},
+  {title:'처리 · 승인',keys:['처리','승인'],sub:'자동 처리했거나 처리 중인 요청',empty:'진행 중인 것이 없다'},
   {title:'닫힘',keys:['완료','반려','보류','취소'],sub:'완료 · 반려 · 보류 · 취소가 여기 모인다',empty:'닫힌 것이 없다'}
  ];
 
@@ -379,8 +379,8 @@
   if(r.status==='반려')return '반려 — '+(r.reject_reason||'');
   if(r.status==='보류')return r.hold_reason?('보류 — '+r.hold_reason):'보류 — 나중에 다시 본다';
   if(r.status==='완료')return r.result_note?('완료 — '+r.result_note):'완료';
-  if(r.status==='결재대기')return r.verdict_note?('하네스: 큰 것 — '+r.verdict_note):'하네스가 큰 것으로 봤다';
-  if(r.status==='처리')return r.verdict_note?('하네스: 작은 것 — '+r.verdict_note):'하네스가 작은 것으로 봤다';
+  if(r.status==='결재대기')return r.verdict_note?('자동 검토: 관리자 확인 필요 — '+r.verdict_note):'자동 검토에서 관리자 확인이 필요하다고 판단했습니다';
+  if(r.status==='처리')return r.verdict_note?('자동 검토: 처리 가능 — '+r.verdict_note):'자동 검토에서 처리 가능하다고 판단했습니다';
   if(r.status==='접수')return r.idle_days>0?(r.idle_days+'일째 아무도 보지 않았다'):'등록됨';
   if(r.status==='취소')return '요청자가 취소했다';
   return '검토 중이다';}
@@ -475,7 +475,7 @@
     +esc(m[0])+'</span><span class="wr-meta-v">'+esc(m[1])+'</span></span>';}).join('');
 
   var notes=[];
-  if(d.verdict_note)notes.push(['하네스 판정: '+d.verdict,d.verdict_note,'warn']);
+  if(d.verdict_note)notes.push(['자동 검토 결과: '+d.verdict,d.verdict_note,'warn']);
   if(d.result_note)notes.push(['처리 결과',d.result_note,'ok']);
   if(d.reject_reason)notes.push(['반려 사유',d.reject_reason,'err']);
   if(d.hold_reason)notes.push(['보류 사유',d.hold_reason,'warn']);

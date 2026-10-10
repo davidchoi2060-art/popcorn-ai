@@ -191,8 +191,8 @@ def games_from_text(text: str, vocab, match_game) -> list[str]:
 
 
 # ── ③ 게임 이름 없는 게임 질문 ─────────────────────────────────────────────
-UNNAMED_GAME_REPLY = ("게임 이름이 없어서 보통 모니터(FHD) 기준으로 골라 봤어요. "
-                      "하시는 게임을 알려 주시면 더 맞춰 드릴게요.")
+UNNAMED_GAME_REPLY = ("즐겨 하시는 게임을 알려 주시면 "
+                      "용도와 예산에 맞춰 안내하겠습니다.")
 
 
 def unnamed_game(state) -> bool:
@@ -220,7 +220,7 @@ def release_unnamed_game(missing: list[str], state, prev_state, is_game_usage,
 
 
 # ── ④ 노트북 ─────────────────────────────────────────────────────────────
-LAPTOP_NOTICE = "노트북은 팔지 않아요. 데스크톱(조립 PC)으로 안내해 드릴게요."
+LAPTOP_NOTICE = "노트북은 판매하지 않습니다. 조립 PC를 안내해 드릴게요."
 _LAPTOP = re.compile(r"노트북|랩탑|랩톱|laptop|notebook", re.I)
 # 「노트북 램」처럼 부품 이야기면 안내하지 않는다.
 _LAPTOP_PART = re.compile(r"(노트북|랩탑)\s*(용\s*)?(램|메모리|ssd|SSD|충전기|어댑터|거치대|가방)")

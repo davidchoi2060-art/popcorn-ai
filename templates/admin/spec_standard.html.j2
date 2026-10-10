@@ -705,7 +705,7 @@ input,select,textarea{font-family:var(--rv-font)}
       + '<span class="ss-promo-cond">승격 조건 — 값 ≥ 1건 · 적용 부품 ≥ 1종 · 관계 지정됨<br>'
       + (ps.ok ? '지금: 조건을 충족합니다.' : ('지금: ' + esc(ps.missing.join(' · ')) + ' → 아직 승격 불가')) + '</span>'
       + '<button type="button" class="ss-promo-btn" disabled title="'
-      + (ps.ok ? '조건은 충족했지만 이관 화면(상품 사양 정의)과 승격 API가 아직 없어 요청을 접수할 수 없습니다.'
+      + (ps.ok ? '조건은 충족했지만 상품 사양 정의로 옮기는 기능은 아직 연결되지 않아 요청할 수 없습니다.'
                 : esc('승격 조건 미달: ' + ps.missing.join(' · ')))
       + '">' + (ps.ok ? '승격 요청 — 이관 기능 준비 중' : '승격 요청 — ' + esc(ps.missing.join(' · ')) + '이라 잠김') + '</button>'
       + '</div>'

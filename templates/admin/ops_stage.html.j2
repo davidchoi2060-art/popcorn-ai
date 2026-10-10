@@ -334,7 +334,7 @@ input{font-family:var(--rv-font)}
           </div>
 
           <div class="os-buildmsg" data-tabpanel="mvp1" hidden>
-            <div class="ds">이 단계에 배정된 관리자 화면 목록이 아직 없습니다 — 단계 매핑 원천이 정해지지 않아 {{ nav_counts.total }}항목 전부가 "단계 미정"에 있습니다. 지어진 화면은 그 탭에서 확인하세요.</div>
+            <div class="ds">이 단계에 배정된 관리자 화면 목록이 아직 없습니다 — 단계별 배정 기준이 정해지지 않아 {{ nav_counts.total }}항목 전부가 "단계 미정"에 있습니다. 구현된 화면은 해당 탭에서 확인하세요.</div>
           </div>
 
           <div class="os-hints" data-tabpanel="mvp2" hidden>
@@ -665,7 +665,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
       : (tab === 'mvp2' ? 'MVP2는 아직 오지 않은 단계입니다'
       : (tab === 'mvp3' ? 'MVP3은 입점 포털 단계입니다' : '아직 단계가 배정되지 않은 항목들입니다'));
     var desc = tab === 'mvp1' ? '이 탭의 항목이 지금 급한 것입니다. 다른 탭의 미구축은 "빠뜨린 것"이 아니라 "지금 안 해도 되는 것"입니다.'
-      : (tab === 'unmapped' ? '단계 매핑의 원천(코드 필드 vs 별도 표)이 아직 정해지지 않아, 임의로 어느 탭에도 밀어 넣지 않았습니다.'
+      : (tab === 'unmapped' ? '단계별 배정 기준이 아직 정해지지 않아, 임의로 탭에 배정하지 않았습니다.'
       : '여기 미구축은 경고가 아닙니다 — 지금 단계가 아니어서 비어 있는 것이 정상입니다.');
     box.innerHTML = '<span class="mark">' + esc(mark) + '</span><span class="ti">' + esc(title) + '</span><span class="ds">' + esc(desc) + '</span>';
   }
@@ -681,7 +681,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
     var label = val === 'own' ? (ax.own_label || '자체') : (ax.mall_label || '쇼핑몰');
     var lockedSettle = key === 'settle';
     var disabled = lockedSettle || !owner();
-    var title = lockedSettle ? '정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다'
+    var title = lockedSettle ? '정산은 결제 설정을 따릅니다 — 서버가 같은 값으로 보정합니다'
       : (!owner() ? permText() : '');
     return '<button type="button" class="os-axisopt' + (on ? ' on' : '') + '" data-action="set-mode" data-key="' + key + '" data-val="' + val + '"' +
       (disabled ? ' disabled' : '') + (title ? ' title="' + esc(title) + '"' : '') + '>' + esc(label) + '</button>';
@@ -797,7 +797,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
       var desc = val === 'own' ? ax.own_desc : ax.mall_desc;
       var lockedSettle = ax.key === 'settle';
       var disabled = lockedSettle || !owner();
-      var title = lockedSettle ? '정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다' : (!owner() ? permText() : '');
+      var title = lockedSettle ? '정산은 결제 설정을 따릅니다 — 서버가 같은 값으로 보정합니다' : (!owner() ? permText() : '');
       return '<button type="button" class="os-optcard' + (on ? ' on' : '') + '" data-action="set-mode" data-key="' + ax.key + '" data-val="' + val + '"' +
         (disabled ? ' disabled' : '') + (title ? ' title="' + esc(title) + '"' : '') + '>' +
         '<span class="row1"><span class="mark">' + (on ? '●' : '○') + '</span><span class="lb">' + esc(label) + '</span></span>' +
@@ -914,7 +914,7 @@ var STAGE_LABEL = {{ stage_label_json | safe }};
   }
   function setMode(key, val) {
     if (!guard()) return;
-    if (key === 'settle') { toast('정산은 결제(pay)를 따릅니다 — 서버가 같은 값으로 보정합니다', 'warn'); return; }
+    if (key === 'settle') { toast('정산은 결제 설정을 따릅니다 — 서버가 같은 값으로 보정합니다', 'warn'); return; }
     S.draft[key] = val;
     renderAxes(); renderDrawer(); renderFoot();
   }

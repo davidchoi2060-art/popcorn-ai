@@ -469,9 +469,9 @@ input{font-family:var(--rv-font)}
         <div class="d" id="alDStateDesc"></div>
       </div>
       <div class="al-block">
-        <div class="lbl">detail (jsonb) — 원문</div>
-        <div class="al-detailnote">이 목록 API(<span class="num">GET /api/admin/activity-logs</span>)는 detail 원문을 내려주지
-          않습니다 — 위 요약 문장은 서버(<span class="num">api/admin_activity_logs.py::_summary</span>)가 detail을 해석해
+        <div class="lbl">상세 기록 원문</div>
+        <div class="al-detailnote">이 목록 조회에는 <span class="num">상세 기록 원문</span>이 포함되지
+          않습니다 — 위 요약 문장은 서버가 <span class="num">상세 기록</span>을 해석해
           만든 결과이고, 이 화면은 없는 원문을 지어내 보여주지 않습니다.</div>
       </div>
     </div>
@@ -604,7 +604,7 @@ input{font-family:var(--rv-font)}
     items.forEach(function (r) {
       var raw = keyFn(r);
       var k = raw == null ? '__none__' : String(raw);
-      if (!map[k]) { map[k] = { key: k, label: labelFn(r) || '(없음)', count: 0 }; order.push(k); }
+      if (!map[k]) { map[k] = { key: k, label: labelFn(r) || '정보 없음', count: 0 }; order.push(k); }
       map[k].count++;
     });
     return order.map(function (k) { return map[k]; }).sort(function (a, b) { return b.count - a.count; });
@@ -682,7 +682,7 @@ input{font-family:var(--rv-font)}
 
     var items = (S.data && S.data.items) || [];
     var opOpts = optsFor(items, function (r) { return r.operator; }, function (r) { return r.operator; });
-    var kindOpts = optsFor(items, function (r) { return r.kind; }, function (r) { return r.kind_label || '(없음)'; });
+    var kindOpts = optsFor(items, function (r) { return r.kind; }, function (r) { return r.kind_label || '정보 없음'; });
     var actOpts = optsFor(items, function (r) { return r.action_label; }, function (r) { return r.action_label; });
     var undoneOpts = [
       { key: 'undone', label: '되돌려짐', count: items.filter(function (r) { return r._state === 'undone'; }).length },
@@ -739,7 +739,7 @@ input{font-family:var(--rv-font)}
     empty.hidden = true;
     box.innerHTML = pageRows.map(function (r) {
       var on = S.sel === r.log_id;
-      var kindLabel = r.kind_label || '(없음)';
+      var kindLabel = r.kind_label || '정보 없음';
       return '<button type="button" class="al-row' + (on ? ' on' : '') + '" data-action="open-drawer" data-id="' + r.log_id +
         '" aria-label="' + esc(fmtAt(r.at) + ' ' + r.operator + ' ' + kindLabel + ' ' + r.action_label + ' ' + r.summary) + '">' +
         '<span class="at num">' + esc(fmtAt(r.at)) + '</span>' +
@@ -793,7 +793,7 @@ input{font-family:var(--rv-font)}
     var r = (S.sel != null && S.data) ? (S.data.items || []).filter(function (x) { return x.log_id === S.sel; })[0] : null;
     wrap.hidden = !r;
     if (!r) return;
-    var kindLabel = r.kind_label || '(없음)';
+    var kindLabel = r.kind_label || '정보 없음';
     $('alDKind').textContent = kindLabel;
     $('alDAction').textContent = r.action_label;
     var label = r._state === 'undone' ? '되돌려짐' : (r._state === 'unknown' ? '판정 불가' : '되돌려지지 않음');
@@ -802,7 +802,7 @@ input{font-family:var(--rv-font)}
     $('alDId').textContent = 'log_id ' + r.log_id;
     $('alDAt').textContent = fmtAt(r.at);
     $('alDWho').textContent = r.operator;
-    $('alDTarget').textContent = r.target || '(없음)';
+    $('alDTarget').textContent = r.target || '정보 없음';
     $('alDSummary').textContent = r.summary;
     var sc = stateCopy(r);
     var box = $('alDStateBox'); box.className = 'al-statebox' + (sc.cls === 'none' ? '' : ' ' + sc.cls);
