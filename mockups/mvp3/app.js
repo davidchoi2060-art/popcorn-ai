@@ -100,18 +100,37 @@ function syncChat(){
   body.hidden=!open;toggle.setAttribute('aria-expanded',String(open));$('#chat-toggle-label').textContent=open?'상담 접기 ▴':'상담 내용 보기 ▾';
   $('#chat-summary').textContent=M.conditions(state.talk).join(' · ')||'게임과 예산을 알려주세요';
 }
+// Quick replies follow what the consultation is asking for: the server's `missing`
+// (usages → 용도, game.grade → 게임). Game-only options stay for game talk.
+function quickPrompts(){
+  const missing=Array.isArray(state.missing)?state.missing:[];
+  if(state.screen==='welcome'&&missing.includes('usages'))return ['게임용이에요','영상 편집용이에요','사무용이에요'];
+  if(state.screen==='welcome'&&missing.includes('game.grade'))return ['배그를 해요','롤을 해요','배그와 롤 둘 다 해요'];
+  return state.screen==='welcome'?['QHD로 해줘요','예산을 좀 더 낮춰줘요','다른 게임도 추가할게요']:['예산을 바꿀게요','용도를 바꿀게요'];
+}
+// Show the newest message from its first line; a long answer that does not fit
+// starts at its top instead of being cut mid-sentence at the top of the log.
+function scrollToLatest(){
+  const log=$('#messages'),last=log.lastElementChild;
+  if(!last){log.scrollTop=0;return;}
+  const top=last.getBoundingClientRect().top-log.getBoundingClientRect().top+log.scrollTop-8;
+  log.scrollTop=last.offsetHeight>log.clientHeight-16?Math.max(0,top):log.scrollHeight;
+  markScroll();
+}
+// A scrolled log gets an upper edge so the clipped bubble does not look stuck to the intro.
+function markScroll(){const log=$('#messages'),on=log.scrollTop>0;log.classList.toggle('is-scrolled',on);$('#chat-body').classList.toggle('log-scrolled',on);}
 function renderMessages(){
   const key=JSON.stringify(state.messages);
   if(key!==lastMessages){
     $('#messages').innerHTML=state.messages.map(x=>'<div class="message '+(x.who==='user'?'user':'ai')+'"><span class="avatar">'+(x.who==='user'?uiIcon('user'):'<img class="avatar-mark" src="assets/popcorn-mark.png" alt="팝콘AI">')+'</span><div class="message-content"><p>'+(
       x.text==='안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.'&&state.screen==='welcome'?
       '안녕하세요! 즐기는 게임과 예산을<br>알려주시면 나에게 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
-    $('#messages').scrollTop=$('#messages').scrollHeight;lastMessages=key;
+    scrollToLatest();lastMessages=key;
   }
   const examples=$('#start-examples');examples.hidden=state.screen!=='welcome';
   if(!examples.hidden)examples.innerHTML=[['game-controller','배그와 롤, 150만원으로 추천해줘'],['video-camera','영상 편집용 PC가 필요해요'],['question','아직 잘 모르겠어요']].map(pair=>
     button(uiIcon(pair[0])+'<span>'+pair[1]+'</span>'+uiIcon('caret-right','example-chevron'),'prompt','start-example','data-text="'+pair[1]+'" '+(state.phase?'disabled':''))).join('');
-  const prompts=state.screen==='welcome'?['QHD로 해줘요','예산을 좀 더 낮춰줘요','다른 게임도 추가할게요']:['예산을 바꿀게요','용도를 바꿀게요'];
+  const prompts=quickPrompts();
   $('#suggestions').innerHTML=prompts.map(text=>button(text,'prompt','chip','data-text="'+text+'" '+(state.phase?'disabled':''))).join('');
   $('#request').disabled=!!state.phase;$('#chat-form .send').disabled=!!state.phase;
   const label={talk:'AI가 조건과 답변을 확인하고 있어요.',recommend:'조건에 맞는 판매 중 PC를 조회하고 있어요.',save:'서버에서 최신 상품과 가격을 확인해 보관하고 있어요.',list:'이 브라우저의 보관 기록을 불러오고 있어요.'};
@@ -349,7 +368,8 @@ document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captur
 $('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
 $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;captureDraft();void submit(draft.draft_text,{fromInput:true});});
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
-$('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
+$('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();if(!$('#chat-body').hidden)scrollToLatest();});
+$('#messages').addEventListener('scroll',markScroll,{passive:true});
 mobile.addEventListener('change',syncChat);
 for(const type of ['load','error'])document.addEventListener(type,e=>{
   const image=e.target;if(!(image instanceof HTMLImageElement))return;

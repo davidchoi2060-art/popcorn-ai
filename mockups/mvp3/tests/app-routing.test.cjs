@@ -117,3 +117,13 @@ test('consultation never shows removed source labels or web notice, including ol
   for(const phrase of removed)assert.ok(!box.textContent.includes(phrase),phrase);
   assert.equal(box.querySelectorAll('.message-sources,.answer-notice,a[href*="wikipedia"]').length,0);
 });
+test('quick replies follow what the consultation asks: usage question gets usage choices, game question gets games',async()=>{
+  const chips=h=>[...h.w.document.querySelectorAll('#suggestions button')].map(b=>b.dataset.text);
+  const usage={ok:true,state:{usages:[]},missing:['usages'],assumed:[],reply:'어떤 용도로 쓰실 PC인가요?'};
+  const grade={ok:true,state:{usages:['게임'],budget_won:1000000},missing:['game.grade'],assumed:[],reply:'어떤 게임을 하실 예정인가요?'};
+  const a=harness({respond:url=>url==='/api/talk/parse'?usage:empty});await a.flow.submit('최저가 PC');await until(()=>a.flow.state.phase===null);
+  assert.deepEqual(chips(a),['게임용이에요','영상 편집용이에요','사무용이에요']);
+  const b=harness({respond:url=>url==='/api/talk/parse'?grade:empty});await b.flow.submit('게임 100만원');await until(()=>b.flow.state.phase===null);
+  assert.deepEqual(chips(b),['배그를 해요','롤을 해요','배그와 롤 둘 다 해요']);
+  const c=harness();assert.ok(chips(c).includes('QHD로 해줘요'));
+});
