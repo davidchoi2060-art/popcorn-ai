@@ -1,12 +1,12 @@
 {% extends "admin/_admin2_shell.html.j2" %}
-{% block title %}조립PC 상담 검토{% endblock %}
+{% block title %}추천 테스트{% endblock %}
 {% block head_extra %}
 <style>
 .cc-body *{box-sizing:border-box}.cc-body{padding:var(--sp-lg,1.5rem);overflow:auto}.cc-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(320px,1.3fr);gap:1.5rem}.cc-panel,.cc-card{background:var(--card);border:1px solid var(--outline-variant);border-radius:.7rem;padding:1rem;margin-bottom:1rem}.cc-body textarea{width:100%;font:inherit;padding:.8rem;background:var(--card);color:var(--on);border:1px solid var(--outline);border-radius:.4rem}.cc-body button{font:inherit;padding:.6rem 1rem;border:1px solid var(--outline);border-radius:.4rem;background:var(--card);color:var(--on);cursor:pointer}.cc-body button:disabled{opacity:.5;cursor:wait}.cc-body :focus-visible{outline:3px solid var(--primary);outline-offset:2px}.cc-actions{display:flex;gap:.7rem;margin-top:.7rem}.cc-log{max-height:38vh;overflow:auto}.cc-message{padding:.7rem;border-bottom:1px solid var(--outline-variant);white-space:pre-wrap}.cc-muted{color:var(--on-variant)}.cc-price{font-size:1.5rem;font-weight:700}.cc-body pre{white-space:pre-wrap;overflow-wrap:anywhere}.cc-body summary{cursor:pointer}.cc-body h1{margin-top:0}.cc-body table{width:100%;border-collapse:collapse}.cc-body td{border-bottom:1px solid var(--outline-variant);padding:.5rem;vertical-align:top}@media(max-width:850px){.cc-grid{grid-template-columns:1fr}}
 </style>
 {% endblock %}
 {% block content %}
-<div class="cc-body"><h1>조립PC 상담 검토</h1><p>실제 AI API로 사용 조건을 확인하고, 등록된 조립PC 구성에서 비교 후보를 조회합니다.</p><p class="cc-muted">관리자 검토용 · 가격은 관측값 · 고객 공개 및 출고 확정 전</p>
+<div class="cc-body"><h1>추천 테스트</h1><p>AI에 요청해 사용 조건을 확인하고, 등록된 조립PC 구성에서 비교 후보를 조회합니다.</p><p class="cc-muted">관리자 검토용 · 가격은 관측값 · 고객 공개 및 출고 확정 전</p>
 <div class="cc-grid"><section class="cc-panel"><h2>어떻게 쓰실 건가요?</h2><div id="cc-log" class="cc-log" role="log" aria-live="polite"></div>
 <form id="cc-form"><label for="cc-message">사용할 작업과 예산</label><textarea id="cc-message" rows="4" maxlength="4000" required placeholder="예: 문서와 인터넷용 본체를 100만원 안에서 찾고 있어요."></textarea><div class="cc-actions"><button id="cc-send" type="submit">상담 보내기</button><button id="cc-reset" type="button">새 상담</button></div></form><p id="cc-status" role="status" aria-live="polite"></p>
 <details><summary>확인한 조건</summary><pre id="cc-conditions">아직 입력된 조건이 없습니다.</pre></details></section>

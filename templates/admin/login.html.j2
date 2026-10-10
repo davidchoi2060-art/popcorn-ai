@@ -215,8 +215,8 @@
       </div>
 
       {# ★ 이 문장을 빼면 화면이 거짓이 된다 — 계약 §「갈라 보이지만 갈라지지 않는다」 #}
-      <p class="lg-same"><b>같은 엔드포인트를 씁니다</b> — 갈라 보이지만 제출은 둘 다
-        <code>POST /api/admin/auth/login</code> 이고, 무엇이 일어날지는 서버가 판정합니다.
+      <p class="lg-same"><b>두 입력란은 같은 로그인 절차를 사용합니다</b> — 어느 쪽에 입력해도
+        <code>동일한 로그인 확인</code>을 거치며, 로그인 결과는 서버가 판정합니다.
         <b>잘못된 쪽에 넣어도 결과는 같습니다.</b></p>
 
     </div>
@@ -367,7 +367,7 @@
            * 세션은 이미 발급됐고 「내 정보」(ADM-SYS-022)는 admin2 에 아직 없어서
            * 여기 머물게 하면 막다른 길이 된다(구화면으로 보내는 것은 P-09 금지).
            * 문구를 읽을 시간을 두려고 성공(0.9초)보다 길게 잡는다. */
-          box("left", "warn", "HTTP 200 · must_change_password", SCREEN_MSG.must_change);
+          box("left", "warn", "비밀번호 변경 필요", SCREEN_MSG.must_change);
           go(1600);
           return;
         }
@@ -446,7 +446,7 @@
     })
     .then(function (r) {
       if (r.ok && r.j && r.j.authenticated) {
-        box("left", "wait", "GET /auth/me · authenticated", SCREEN_MSG.already, DASH);
+        box("left", "wait", "로그인 상태 확인", SCREEN_MSG.already, DASH);
         return null;
       }
       if (!r.ok) {

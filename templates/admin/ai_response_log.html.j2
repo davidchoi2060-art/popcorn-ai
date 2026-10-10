@@ -248,7 +248,7 @@ button{font-family:inherit}
   <div class="dw-body" id="dwBody"></div>
   <div class="dw-foot">
     <span class="note" id="dwFoot">—</span>
-    <button type="button" class="btn-ghost" data-action="go-task-settings">AI 작업 설정으로 →</button>
+    <button type="button" class="btn-ghost" data-action="go-task-settings">AI 작업 설정 안내</button>
     <button type="button" class="btn-flag" id="dwFlagBtn" data-action="toggle-flag">⚑ 플래그</button>
   </div>
 </aside>
@@ -581,7 +581,7 @@ button{font-family:inherit}
       case 'open-row': openRow(Number(t.getAttribute('data-idx'))); break;
       case 'close-drawer': closeDrawer(); break;
       case 'toggle-flag': toggleFlag(); break;
-      case 'go-task-settings': toast('AI 작업 설정(ADM-AI-030)으로 이동 — 이 작업의 모델·폴백을 바꿀 수 있습니다', 'ok'); break;
+      case 'go-task-settings': toast('AI 작업 설정에서 모델·대체 요청 설정을 확인해 주세요. 이 버튼은 안내만 표시하며 화면을 이동하지 않습니다.', 'ok'); break;
       case 'retry-measured': loadMeasured(); break;
       default: break;
     }
