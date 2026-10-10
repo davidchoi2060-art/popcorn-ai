@@ -84,8 +84,8 @@
         <b>서로 다른 방문자 <span id="tp-threshold">5</span>명</b>이 자동 승격 임계입니다</span>
       <span style="flex:1"></span>
       {# ② 회귀분을 뺐다는 사실을 «항상» 말한다 — 조용히 감추지 않는다 #}
-      <button type="button" id="tp-regress" class="tp-chip" aria-pressed="false" data-keep="1">회귀분 제외됨</button>
-      <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">intent_key IS NULL</span>
+      <button type="button" id="tp-regress" class="tp-chip" aria-pressed="false" data-keep="1">점검용 접속 제외됨</button>
+      <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">의도 미지정 질문</span>
     </div>
     <div id="tp-queue"></div>
   </section>
@@ -113,7 +113,7 @@
       </div>
       <div class="tp-table" style="flex:1;min-height:0;display:flex;flex-direction:column">
       <div class="tp-row" style="font:600 9px/1 var(--font);color:var(--rv-faint);padding:0 0 5px;border-bottom:1px solid var(--outline-variant)">
-        <span>의도명</span><span>어휘 (match_terms)</span><span>답변 종류</span>
+        <span>의도명</span><span>어휘</span><span>답변 종류</span>
         <span style="text-align:right">걸린 횟수</span><span style="text-align:center">상태</span>
         <span style="text-align:right">마지막 사용</span>
       </div>
@@ -151,19 +151,19 @@
         <div style="display:flex;flex-direction:column;gap:5px">
           <span class="tp-lbl">답변 종류</span>
           <div style="display:flex;gap:5px" id="f-kinds" data-keep="1">
-            <button type="button" class="tp-chip" data-k="text" aria-pressed="true">text</button>
-            <button type="button" class="tp-chip" data-k="band_cards">band_cards</button>
-            <button type="button" class="tp-chip" data-k="constraint_parse">constraint_parse</button>
-            <button type="button" class="tp-chip" data-k="handoff">handoff</button>
+            <button type="button" class="tp-chip" data-k="text" aria-pressed="true">문구</button>
+            <button type="button" class="tp-chip" data-k="band_cards">가격대 카드</button>
+            <button type="button" class="tp-chip" data-k="constraint_parse">조건 읽기</button>
+            <button type="button" class="tp-chip" data-k="handoff">상담 연결</button>
           </div>
         </div>
         {# ⑤ text 가 아니면 문구 칸 대신 API 경로 칸 #}
         <label style="display:flex;flex-direction:column;gap:4px">
           <span class="tp-lbl" id="f-anslbl">답변 문구</span>
           <input id="f-ans" class="tp-in" style="font-family:var(--font)">
-          <span class="tp-note">답변 종류가 <span class="tp-mono">text</span>가 아니면 문구 칸 대신
-            <b>API 경로 칸</b>을 씁니다 — <b>수가 필요한 답은 서버가 셉니다</b>.
-            답 없는 「사용」은 DB가 거부합니다(<span class="tp-mono">ck_talk_intents_answer</span>) — 화면이 그 전에 막습니다.</span>
+          <span class="tp-note">답변 종류가 「문구」가 아니면 문구 칸 대신
+            <b>답변 연결 칸</b>을 씁니다 — <b>수가 필요한 답은 서버가 셉니다</b>.
+            답이 없는 패턴은 「사용」으로 저장할 수 없습니다 — 화면이 미리 막습니다.</span>
         </label>
         <div style="display:flex;gap:7px;align-items:center;flex-wrap:wrap">
           <button type="button" class="tp-btn" id="f-save">저장 → 대기</button>
@@ -181,14 +181,14 @@
       <section class="tp-card" id="tp-raw" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" hidden>
         <div style="display:flex;align-items:baseline;gap:8px">
           <span style="font:600 13px/1.3 var(--font)">원문 보관</span>
-          <span class="tp-badge" style="color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)">owner 전용</span>
+          <span class="tp-badge" style="color:var(--rv-amber);background:var(--rv-amber-bg);border:1px solid var(--rv-amber-line)">관리자 전용</span>
           <span style="flex:1"></span>
-          <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">raw_text · <span id="tp-keepdays">90</span>일</span>
+          <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">원문 보관 <span id="tp-keepdays">90</span>일</span>
         </div>
         <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px" id="tp-rawstats"></div>
         <div class="tp-note"><b>원문 내용은 목록에 펼치지 않습니다</b> — 대량으로 읽히면 마스킹이 있어도
           사실상 대화 열람입니다. 저장 <b>전</b> 마스킹 · <span id="tp-keepdays2">90</span>일 뒤
-          <span class="tp-mono">raw_text</span>만 NULL(행은 남습니다) · 고객 경로에서는 반환하지 않습니다.</div>
+          원문만 지웁니다(기록 자체는 남습니다) · 고객 경로에서는 반환하지 않습니다.</div>
         {# ㉢ 미정 — 단건 열람 경로를 «만들지 않았다». 화면이 그 사실을 말한다 #}
         <div class="tp-note" style="border-left:3px solid var(--rv-red);padding-left:9px;color:var(--rv-red)">
           <b>미정 ㉢</b> — 원문 <b>단건 열람</b>은 아직 정해지지 않아 경로를 만들지 않았습니다.
@@ -199,8 +199,8 @@
       <section class="tp-card" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:6px">
         <span style="font:600 13px/1.3 var(--font)">자동 승격은 무엇을 올리고 무엇을 안 올리나</span>
         <span class="tp-note">· 서로 다른 방문자 <b>5명</b>이 같은 것을 물으면 올라갑니다 — 한 사람이 5번 물은 것은 1로 셉니다</span>
-        <span class="tp-note">· 회귀 트래픽(<span class="tp-mono">data_origin='test'</span>)은 세지 않습니다</span>
-        <span class="tp-note">· <b><span class="tp-mono">text</span>(자유 문구)는 자동 승격하지 않습니다</b> — 검증 없는 문장이 고객에게 나가는 유일한 경로입니다</span>
+        <span class="tp-note">· 자동 점검용 접속은 세지 않습니다</span>
+        <span class="tp-note">· <b>「문구」(자유 문구) 답변은 자동 승격하지 않습니다</b> — 검증 없는 문장이 고객에게 나가는 유일한 경로입니다</span>
         <span class="tp-note">· 올라간 것은 <b>자동</b> 상태로 들어가 사람 승인분과 구분되고, 사람이 내릴 수 있습니다</span>
         <span style="font:600 12px/1.3 var(--font);padding-top:5px;border-top:1px solid var(--outline-variant)">상태는 전이지 삭제가 아니다</span>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 10px">
@@ -227,7 +227,11 @@
  var state={filter:'all',q:'',kind:'text',regress:false,rows:[],picked:null};
  var $=function(id){return document.getElementById(id);};
  function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
- function ago(iso){if(!iso)return '—';var d=new Date(iso),m=Math.floor((Date.now()-d)/60000);
+ /* 답변 종류 코드 → 화면 이름 (2026-10-10) */
+ var KIND_KO={text:'문구',band_cards:'가격대 카드',constraint_parse:'조건 읽기',handoff:'상담 연결'};
+ function kindKo(k){return KIND_KO[k]||k;}
+ function intentKo(key){var r=(state.rows||[]).filter(function(x){return x.key===key;})[0];return r&&r.label?r.label:key;}
+ function ago(iso){if(!iso)return '정보 없음';var d=new Date(iso),m=Math.floor((Date.now()-d)/60000);
   if(m<60)return m+'분 전';if(m<1440)return Math.floor(m/60)+'시간 전';return Math.floor(m/1440)+'일 전';}
 
  /* 상태 색 — ① 「자동」을 「사용」과 «섞지 않는다». 배경으로 갈라 한눈에 보이게 한다. */
@@ -284,14 +288,13 @@
    /* ⑥ 어휘 충돌은 «경고»다 — 막지 않는다. 누구와 겹치는지까지 말한다. */
    var warn=r.conflicts.length
     ?'<span style="font:400 9px/1.3 var(--font);color:var(--rv-amber)">어휘 겹침: '
-      +esc(r.conflicts.map(function(c){return c.term+'→'+c.with.join(',');}).join(' · '))+'</span>':'';
+      +esc(r.conflicts.map(function(c){return c.term+'→'+c.with.map(intentKo).join(',');}).join(' · '))+'</span>':'';
    return '<div class="tp-row" data-key="'+esc(r.key)+'" data-keep="1" style="cursor:pointer'+(state.picked===r.key?';background:var(--rv-panel)':'')+'">'
     +'<span style="display:flex;flex-direction:column;gap:2px;min-width:0">'
-     +'<span class="tp-mono" style="font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.key)+'</span>'
-     +'<span style="font:400 9px/1.2 var(--font);color:var(--rv-faint)">'+esc(r.label)+'</span></span>'
+     +'<span style="font:600 11.5px/1.3 var(--font);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.key)+'">'+esc(r.label||r.key)+'</span></span>'
     +'<span style="display:flex;flex-direction:column;gap:2px;min-width:0">'
      +'<span style="font:400 10.5px/1.4 var(--font);color:var(--rv-ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.terms.join(' · '))+'</span>'+warn+'</span>'
-    +'<span class="tp-mono" style="font-size:10px;color:var(--rv-muted)">'+esc(r.kind)+(r.has_pack?' <span title="조건팩 있음">+팩</span>':'')+'</span>'
+    +'<span class="tp-mono" style="font-size:10px;color:var(--rv-muted)">'+esc(kindKo(r.kind))+(r.has_pack?' <span title="조건팩 있음">+팩</span>':'')+'</span>'
     +'<span class="tp-mono" style="font-size:11.5px;text-align:right">'+r.hits+'</span>'
     +'<span style="display:flex;justify-content:center">'+statusHtml(r.status)+'</span>'
     +'<span style="font:400 9.5px/1.3 var(--font);color:var(--rv-faint);text-align:right">'+ago(r.last_at)+'</span>'
@@ -309,7 +312,7 @@
    if(d.ok)renderQueue(d);}).catch(function(){});
   /* 원문 카드는 owner 에게만 «존재»한다 — 403 이면 카드 자체를 그리지 않는다. */
   fetch(API+'/raw-stats').then(function(r){return r.ok?r.json():null;}).then(function(d){
-   if(!d||!d.ok){$('f-grade').textContent='조회 권한으로 보고 있습니다 — 등록·승인은 owner 몫입니다';return;}
+   if(!d||!d.ok){$('f-grade').textContent='조회 권한으로 보고 있습니다 — 등록·승인은 관리자 몫입니다';return;}
    $('tp-raw').hidden=false;$('tp-keepdays').textContent=d.keep_days;$('tp-keepdays2').textContent=d.keep_days;
    $('tp-rawstats').innerHTML=[['남은 건수',d.kept+'건','마스킹을 거친 값만 남습니다'],
      ['가장 오래된 것',d.oldest_at?ago(d.oldest_at):'—','이 시각부터 '+d.keep_days+'일'],
@@ -363,7 +366,7 @@
   state.kind=b.getAttribute('data-k');
   $('f-kinds').querySelectorAll('[data-k]').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
   var isText=state.kind==='text';
-  $('f-anslbl').textContent=isText?'답변 문구':'API 경로';
+  $('f-anslbl').textContent=isText?'답변 문구':'답변 연결';
   $('f-ans').placeholder=isText?'고객에게 보일 문구':'/api/talk/monitor-bands';});
 
  $('tp-new').addEventListener('click',function(){$('f-key').focus();});

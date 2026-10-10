@@ -343,11 +343,10 @@
   </div>
 
   <div class="cr-foot">
-    active=false 규칙은 로드되지 않습니다 · 탐색 순서를 어긴 규칙(ref_slot이 slot보다
-    탐색 순서상 뒤)은 경고 로그만 남기고 건너뜁니다 - 「로드」 열이 규칙별로 그 결과를
+    꺼 둔 규칙은 읽지 않습니다 · 비교 대상 부품이 아직 고르기 전 순서인 규칙은 기록만 남기고 건너뜁니다 - 「로드」 열이 규칙별로 그 결과를
     보여줍니다(정상이면 빈 칸, 건너뛰면 사유와 함께 배지가 뜹니다) ·
     규칙을 바꾸면 견적 결과가 바뀌므로 회귀 검증 대상입니다 · 필수 사양 자체를 고치는 일은
-    상품 사양 정의 소관 · 「조립 호환 지도」(std.compat_pairs)는 다른 저장소이며 엔진 판정은
+    상품 사양 정의 소관 · 「조립 호환 지도」는 다른 저장소이며 엔진 판정은
     이 표가 합니다.
   </div>
 
@@ -439,7 +438,7 @@
       <span class="cr-drawer-foot-note">쓰기 API가 붙기 전까지 저장은 막혀 있습니다</span>
       <button type="button" class="cr-btn cr-btn--ghost" data-action="close-drawer">취소</button>
       <button type="button" class="cr-btn cr-btn--locked" disabled
-              title="compat_rules 쓰기 API가 아직 없습니다 - 백엔드 신설 후 저장할 수 있습니다">저장 - 서버 API 대기 중</button>
+              title="규칙 저장 기능은 아직 준비 중입니다">저장 - 기능 준비 중</button>
     </div>
   </aside>
 </div>
@@ -468,7 +467,7 @@
           <div class="cr-req-banner-title">어떤 호환 검사도 읽지 않습니다</div>
           <div class="cr-req-banner-text">
             <b>근거 없이 상품을 검수 대기로 묶고 있다는 뜻입니다.</b> 필수 사양은
-            <code>spec_field_defs</code> 메타가 단일 원천이고 게이트가 읽는 그 목록입니다 -
+            「상품 사양 정의」 화면의 목록을 그대로 씁니다 -
             읽는 규칙이 비어 있으면 그 값을 쓰는 호환 검사가 하나도 없다는 뜻입니다.
           </div>
         </div>

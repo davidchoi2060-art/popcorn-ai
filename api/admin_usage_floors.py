@@ -30,6 +30,9 @@ FLOOR_FIELDS = {
     "capacity_gb": {"label": "용량", "unit": "GB",
                     "slots": ["RAM", "SSD", "HDD"], "note": ""},
 }
+# 화면 표시 전용 이름 — 위 FLOOR_FIELDS(편집 대상 목록)는 늘리지 않고, 표에 나오는
+# 다른 하한 항목이 영문 키 그대로 보이지 않게만 한다(2026-10-10).
+_DISPLAY_ONLY = {"vram_gb": {"label": "그래픽 메모리", "unit": "GB"}}
 
 
 def _owner():
@@ -73,8 +76,8 @@ def list_floors():
             "slot_label": SLOT_KO.get(r["slot"], r["slot"]),
             "field": r["field"], "op": r["op"], "value": r["value"],
             "label": r["label"], "active": r["active"],
-            "field_label": FLOOR_FIELDS.get(r["field"], {}).get("label", r["field"]),
-            "unit": FLOOR_FIELDS.get(r["field"], {}).get("unit", ""),
+            "field_label": (FLOOR_FIELDS.get(r["field"]) or _DISPLAY_ONLY.get(r["field"], {})).get("label", r["field"]),
+            "unit": (FLOOR_FIELDS.get(r["field"]) or _DISPLAY_ONLY.get(r["field"], {})).get("unit", ""),
             "pass_count": c.get("pass"), "slot_total": c.get("total"),
             "at": iso(r["created_at"]),
         })

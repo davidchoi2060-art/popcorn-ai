@@ -254,7 +254,6 @@ input,select,textarea{font-family:var(--rv-font)}
 
 {% block header_extra %}
 <span class="sd-hint">열람: 모든 등급 · 항목 추가: 관리자 전용</span>
-<span class="sd-tag">spec_field_defs · product_specs</span>
 {% endblock %}
 
 {% block content %}
@@ -294,7 +293,7 @@ input,select,textarea{font-family:var(--rv-font)}
 
     <div class="sd-footnote">채움률 분모는 판매중·재고&gt;0 상품입니다(전체 카탈로그를 분모로
     하면 품절 때문에 영원히 낮게 보입니다) · 이 화면은 값을 넣지 않습니다 — 값 입력은
-    상품 상세, 검수는 상품 사양 검수 소관 · 「조립 사양 표준」(std.spec_defs)은 다른
+    상품 상세, 검수는 상품 사양 검수 소관 · 「조립 사양 표준」은 다른
     저장소이고 엔진이 아직 읽지 않습니다 · 항목 삭제·이름 변경은 없습니다(적용 부품을
     비우면 값은 남고 판정·화면에서만 빠집니다)</div>
   </div>
@@ -439,15 +438,15 @@ input,select,textarea{font-family:var(--rv-font)}
     if (!bad) {
       box.innerHTML = ''
         + '<span class="sd-health-title">✓ 건강 상태 정상</span>'
-        + '<span class="sd-health-body">메타는 있는데 실제 컬럼이 없는 항목(ghosts) <b>0건</b> · '
-        + '코드 이력이 없는 커스텀 항목(unrecorded) <b>0건</b>. 둘 중 하나라도 생기면 이 자리가 '
-        + '붉은 경고로 바뀌고 해당 항목에 위험 표시가 붙습니다 — 재구축·복구 시 그 컬럼이 사라지기 때문입니다.</span>'
+        + '<span class="sd-health-body">등록만 되고 실제 저장 칸이 없는 항목 <b>0건</b> · '
+        + '코드 기록이 없는 직접 추가 항목 <b>0건</b>. 둘 중 하나라도 생기면 이 자리가 '
+        + '붉은 경고로 바뀌고 해당 항목에 위험 표시가 붙습니다 — 서버를 다시 세우면 그 항목이 사라지기 때문입니다.</span>'
         + '<span class="sd-health-time num">방금 계산 ' + time + '</span>';
       return;
     }
     var marks = [];
     if (u.length) marks.push('▲ 코드 이력 없음 ' + u.length + '건 — 서버를 다시 세우면 이 항목이 사라집니다');
-    if (g.length) marks.push('▲ 메타는 있는데 실제 컬럼이 없음 ' + g.length + '건');
+    if (g.length) marks.push('▲ 등록만 되고 실제 저장 칸이 없음 ' + g.length + '건');
     var keys = [];
     if (u.length) keys.push('unrecorded=[' + u.join(', ') + ']');
     if (g.length) keys.push('ghosts=[' + g.join(', ') + ']');
@@ -486,7 +485,7 @@ input,select,textarea{font-family:var(--rv-font)}
     var cards = [
       { label: '전체 항목', value: String(items.length), note: '자료형 ' + typeCount + '종', cls: '' },
       { label: '엔진이 읽는 항목', value: String(engineItems.length), note: engineNote, cls: 'blue' },
-      { label: '필수 판정에 쓰이는 항목', value: String(reqItems.length), note: 'required_for 비어있지 않음', cls: '' },
+      { label: '필수 판정에 쓰이는 항목', value: String(reqItems.length), note: '필수 판정 부품이 지정된 항목', cls: '' },
       { label: '사람이 만든 항목', value: String(customItems.length), note: customNote, cls: 'green' }
     ];
     $('sdKpis').innerHTML = cards.map(function (c) {
@@ -559,14 +558,15 @@ input,select,textarea{font-family:var(--rv-font)}
       + Math.max(p, 2) + '%;background:' + barColor(p) + '"></span></span>'
       + '<span class="sd-pct-tx num" style="color:' + pctColor(p) + '">' + p + '%</span></span>';
   }
+  var TYPE_KO = { VARCHAR: '글자', TEXT: '글자', INTEGER: '정수', NUMERIC: '숫자', BOOLEAN: '예/아니오', JSONB: '목록' };
   function rowHtml(item) {
     var p = pctOf(item);
     var cls = 'sd-row' + (p === 0 ? ' zero' : '');
     var partsRaw = item.part_types || [];
-    var partsTx = partsRaw.length ? partsRaw.join('·') : '없음';
+    var partsTx = partsRaw.length ? partsRaw.map(function (pt) { return S.partLabelMap[pt] || pt; }).join('·') : '없음';
     var partsTitle = partsRaw.length ? partsRaw.map(function (pt) { return S.partLabelMap[pt] || pt; }).join(', ') : '없음';
     var reqRaw = item.required_for || [];
-    var reqTx = reqRaw.length ? reqRaw.join('·') : '없음';
+    var reqTx = reqRaw.length ? reqRaw.map(function (pt) { return S.partLabelMap[pt] || pt; }).join('·') : '없음';
     var used = usedLine(item);
     var risky = S.unrecorded.indexOf(item.field_key) >= 0;
     var typeHelp = (S.meta.data_type_help || {})[item.data_type] || '';
@@ -580,7 +580,7 @@ input,select,textarea{font-family:var(--rv-font)}
       + '<span class="sd-row-label">' + esc(item.label) + '</span>'
       + '<span class="sd-row-used" title="' + esc(used) + '">' + esc(used) + '</span>'
       + '</span>'
-      + '<span class="sd-row-type num" title="' + esc(typeHelp) + '">' + esc(item.data_type) + '</span>'
+      + '<span class="sd-row-type num" title="' + esc(typeHelp) + '">' + esc(TYPE_KO[item.data_type] || item.data_type) + '</span>'
       + '<span class="sd-row-unit num">' + esc(item.unit || '—') + '</span>'
       + '<span class="sd-row-parts" title="' + esc(partsTitle) + '">' + esc(partsTx) + '</span>'
       + '<span class="sd-row-req" title="' + esc(reqTx) + '">' + esc(reqTx) + '</span>'
