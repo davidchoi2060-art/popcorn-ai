@@ -431,3 +431,7 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 .card-part-photos img{display:block;width:100%;height:64px;object-fit:contain}
 .card-part-photos figcaption{font-size:13px;line-height:1.3;color:var(--muted);text-align:center;overflow-wrap:anywhere}
 @media(max-width:760px){.card-part-photos{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.card-part-photos img{height:52px}.card-part-photos figcaption{font-size:12px}}
+/* 대화가 길어져 기록이 위로 밀리면 경계선과 옅은 가림을 둔다 — 잘린 말풍선이 안내문에 붙어 보이지 않게(2026-10-10 전수 점검) */
+.chat-body .chat-intro{padding-bottom:10px;border-bottom:1px solid transparent;transition:border-color .15s}
+.chat-body.log-scrolled .chat-intro{border-bottom-color:var(--line)}
+.chat-body .messages.is-scrolled{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}

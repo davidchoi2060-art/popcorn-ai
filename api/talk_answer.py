@@ -283,6 +283,32 @@ class Evidence:
         return bool(self.db_lines or self.web_lines)
 
 
+# 인기 스냅샷 출처의 «고객용 이름». DB 의 `source` 는 적재 도구가 붙인 내부 키라
+# (`tools/game_catalog_load.py`) 그대로 프롬프트에 실으면 모델이 「출처는 steam_api」처럼
+# 고객에게 옮겨 적는다(2026-10-10 전수 점검). 모르는 키는 이름 대신 「공개 자료」로 둔다.
+PUBLIC_SOURCE_LABELS: dict[str, str] = {
+    "gametrics": "게임트릭스 PC방 통계",
+    "gametrics_secondary": "공개된 PC방 통계",
+    "steam_api": "Steam 공개 통계",
+}
+PUBLIC_SOURCE_FALLBACK = "공개 자료"
+
+
+def public_source_label(key: str | None) -> str:
+    return PUBLIC_SOURCE_LABELS.get((key or "").strip(), PUBLIC_SOURCE_FALLBACK)
+
+
+def scrub_internal_source_names(body: str) -> str:
+    """모델이 그래도 내부 키를 옮겨 적었을 때의 안전망 -- 고객용 이름으로 바꾼다.
+
+    긴 키부터 바꾼다(`gametrics_secondary` 를 `gametrics` 가 먼저 먹지 않게).
+    """
+    for key in sorted(PUBLIC_SOURCE_LABELS, key=len, reverse=True):
+        body = re.sub(r"(?i)(?<![A-Za-z0-9_])%s(?![A-Za-z0-9_])" % re.escape(key),
+                      PUBLIC_SOURCE_LABELS[key], body)
+    return body
+
+
 def _fact_lines(f: GameFacts) -> list[str]:
     """한 게임의 DB 사실 -> 근거 줄. **없는 것은 적지 않는다.**"""
     bits = []
@@ -295,7 +321,7 @@ def _fact_lines(f: GameFacts) -> list[str]:
     lines = ["%s: %s" % (f.name, " · ".join(bits))] if bits else []
     pop = f.popularity_line()
     if pop:
-        lines.append("%s 인기도: %s (출처 %s)" % (f.name, pop, f.snapshot_source or "-"))
+        lines.append("%s 인기도: %s (출처 %s)" % (f.name, pop, public_source_label(f.snapshot_source)))
     # 검수를 통과한 copy 만 실린다(게이트는 `api/game_copy.py` 한 곳).
     if f.copy_spec:
         lines.append("%s 안내: %s" % (f.name, f.copy_spec))
@@ -378,7 +404,7 @@ def build_answer_prompt(sentence: str, ev: Evidence, narrowing: str,
         "",
         "[근거] **아래 적힌 것만 쓴다.** 적히지 않은 수치·날짜·순위를 지어내지 않는다.",
         "근거에 없는 내용은 \"확인해서 알려드릴게요\" 로 넘긴다.",
-        "수치를 말할 때는 근거에 적힌 **날짜와 출처를 함께** 말한다.",
+        "수치를 말할 때는 근거에 적힌 **날짜와 출처를 함께** 말한다. 출처는 근거에 적힌 이름 그대로 쓴다.",
         "",
         "[저희 자료]",
     ]
@@ -498,7 +524,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
 
         # ★ 필터 — LLM 이 자유롭게 쓴 것을 우리 DB 기준으로 거른다.
         fr = TF.apply_filter(raw, floors, _grade_of(ev))
-        body = fr.text[:ANSWER_MAX_LEN]
+        body = scrub_internal_source_names(fr.text)[:ANSWER_MAX_LEN]
         res.filter_report = {
             "kept": fr.kept, "replaced": fr.replaced, "dropped": fr.dropped,
             "gate_hit": fr.gate_hit,
