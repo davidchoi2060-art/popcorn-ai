@@ -29,6 +29,7 @@ test('cardSpecRows: four R01 rows from server fields only',()=>{
   assert.deepEqual(M.cardSpecRows({gpu:'RTX 4060',vram_gb:8,ssd_gb:1024}),[['CPU','정보 없음'],['GPU','RTX 4060 · 8GB'],['RAM','정보 없음'],['저장장치','1TB SSD']]);
   assert.deepEqual(M.cardSpecRows({vram_gb:8,ssd_gb:2000}),[['CPU','정보 없음'],['GPU','8GB 그래픽카드'],['RAM','정보 없음'],['저장장치','2TB SSD']]);
   assert.deepEqual(M.cardSpecRows('문자열 사양'),[]);assert.deepEqual(M.cardSpecRows(null),[]);
+  assert.deepEqual(M.cardSpecRows({cpu:'i3-12100',gpu:'인텔 UHD(내장)',vram_gb:0,ram_gb:8,ssd_gb:256})[1],['GPU','인텔 UHD(내장)']);
   assert.deepEqual(M.cardSpecRows({cpu:'',gpu:null,ram_gb:null}),[['CPU','정보 없음'],['GPU','정보 없음'],['RAM','정보 없음'],['저장장치','정보 없음']]);
 });
 test('conditionChips: one chip per game, budget, usage; FHD only as a provisional assumption',()=>{
