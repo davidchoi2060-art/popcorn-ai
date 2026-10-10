@@ -9,8 +9,12 @@
 ■ 고르는 규칙 (용도마다 최대 2개 · 승인 시안 R01 「알뜰 구성 / 추천 구성」 2026-10-09)
   items 순서가 화면 순서다 — 싼 「알뜰 구성」이 앞(왼쪽), 강조하는 「추천 구성」이 뒤.
   강조 여부는 문구가 아니라 role 로 말한다(value · recommended · reference).
-  예산 있음   추천 구성 = 예산 안에서 도달 수준이 가장 높은 상품 중 최저가
-              알뜰 구성 = 예산 안 최저가 상품, 추천 구성보다 쌀 때만(같으면 추천 1장)
+  예산 있음   추천 구성 = 예산 안에서 도달 수준이 가장 높은 상품 중, 다음 수준에 가장 가까운 것
+              (다음 수준 조건 중 못 채운 항목 blocked 가 가장 적은 것) — 같으면 최저가
+              알뜰 구성 = 예산 안 최저가 상품, 추천 구성보다 싸고 추천 구성이 분명히 나을 때만
+              (수준이 낮거나, 다음 수준까지 못 채운 항목이 추천 구성보다 적지 않을 때). 없으면 추천 1장
+              ※ 2026-10-10 조정: 예산 안 상품이 모두 같은 수준이면 예전 규칙은 가장 싼 1대만
+                남겼다(「영상 편집 300만원」→158만원 1장 · 「배그 200만원」도 같은 1장).
   예산 없음   알뜰 구성 = 최소 수준을 충족하는 최저가
               추천 구성 = 한 단계 위 수준의 최저가(없으면 앞의 1장이 추천 구성)
   예산 안에 없음  추천 카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
@@ -194,9 +198,13 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
                 "empty_reason": "예산 안 상품 없음",
                 "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
     top = max(rank(p) for p in within)
-    best = _prefer([p for p in within if rank(p) == top], preferred)
+    gap = lambda p: len(p["fit"][usage].get("blocked") or [])  # noqa: E731 - 다음 수준까지 못 채운 조건 수
+    best = min((p for p in within if rank(p) == top),
+               key=lambda p: (p["code"] not in preferred, gap(p), p["price"]))
     rec = _item(best, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)
-    cheaper = [p for p in within if p["price"] < best["price"]]
+    # 알뜰 구성은 추천 구성보다 싸고, 추천 구성이 수준이나 다음 수준까지의 거리로 분명히 나을 때만.
+    cheaper = [p for p in within if p["price"] < best["price"]
+               and (rank(p) < top or gap(p) >= gap(best))]
     if cheaper:
         return {"items": [_item(_prefer(cheaper, preferred), usage, levels_by, TAG_VALUE, budget_won, bound), rec]}
     return {"items": [rec]}
