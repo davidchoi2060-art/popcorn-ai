@@ -311,7 +311,7 @@
     <h1>사용·성능 자료</h1>
     <p class="uf-hub-sub">최소사양 확인과 변경 전 영향 검토</p>
     <nav class="uf-hub-links" aria-label="사용·성능 자료 화면">
-      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 사양 하한 확인</span><small>여기서 보기 →</small></a>
+      <a href="/admin2/usage-floors" aria-current="page"><b>최소사양 확인</b><span>추천에 사용할 최소 사양 확인</span><small>여기서 보기 →</small></a>
       <a href="/admin2/game-copy-review"><b>게임 근거 검수</b><span>게임 설명과 근거 검토</span><small>열기 →</small></a>
       <a href="/admin2/talk-patterns"><b>응답 패턴 관리</b><span>질문과 응답 연결 확인</span><small>열기 →</small></a>
       <a href="/admin2/product-fit"><b>판매 상품 적합도</b><span>용도별 판매 상품 적합도 조회</span><small>열기 →</small></a>
@@ -319,8 +319,8 @@
   </header>
 
   <section class="uf-section" aria-labelledby="ufSectionTitle">
-    <h2 id="ufSectionTitle">최소사양 하한 관리</h2>
-    <p>하한과 활성 상태를 확인하고, 변경 전 추천 후보에 미치는 영향을 확인합니다.</p>
+    <h2 id="ufSectionTitle">최소 사양 관리</h2>
+    <p>최소 기준과 활성 상태를 확인하고, 변경 전 추천 후보에 미치는 영향을 확인합니다.</p>
   </section>
 
   <div class="uf-banner">
@@ -352,14 +352,14 @@
       <li>후보 0은 오류가 아니라 정상 응답 안의 강한 경고입니다 — 일반 안내와 같은 톤으로 흐리지 않습니다.</li>
       <li>저장은 다음 견적부터 적용됩니다 — 이미 만든 견적(스냅샷)은 소급 변경되지 않습니다.</li>
       <li>후보 카운터(S1)와 견적 엔진이 같은 표를 읽습니다 — 저장 직후 캐시를 비워 다음 견적에 반영합니다.</li>
-      <li>하한을 걸 수 있는 필드는 지금 2종(GPU 권장 전원 W · 용량 GB)뿐입니다 — CPU 등급 같은 축은 아직 없습니다.</li>
+      <li>최소 기준을 걸 수 있는 필드는 지금 2종(GPU 권장 전원 W · 용량 GB)뿐입니다 — CPU 등급 같은 축은 아직 없습니다.</li>
     </ol>
   </div>
 
   <div class="uf-tablecol">
     <div class="uf-tablewrap">
       <div class="uf-thead">
-        <span>용도 · 매칭 문구</span><span>슬롯 · 필드</span><span>지금 하한</span>
+        <span>용도 · 찾을 문구</span><span>부품 · 사양 항목</span><span>지금 최소 기준</span>
         <span>통과 · 전체</span><span>통과율</span><span>작업</span>
       </div>
       <div class="uf-tbody" id="ufTbody">
@@ -367,13 +367,13 @@
       </div>
     </div>
     <div class="uf-steps">
-      <ol aria-label="하한 변경 순서"><li><em>1</em>영향 미리보기</li><li><em>2</em>확인</li><li><em>3</em>저장</li></ol>
+      <ol aria-label="최소 기준 변경 순서"><li><em>1</em>영향 미리보기</li><li><em>2</em>확인</li><li><em>3</em>저장</li></ol>
       <p>추천 후보가 사라질 수 있는 변경은 영향을 확인한 후 저장합니다.</p>
     </div>
     <div class="uf-tablenote">
       용도 문구는 먼저 맞는 것 하나만 적용됩니다 — '고사양 게임'이 '게임'보다 앞에 있어야
-      이깁니다(순서를 바꾸면 어느 문구가 이기는지 조용히 뒤바뀝니다) · 하한이 비면 그 용도의
-      필터링이 통째로 사라집니다 · 디자인·개발·사무는 GPU 하한이 없습니다(그래픽 성능이
+      이깁니다(순서를 바꾸면 어느 문구가 이기는지 조용히 뒤바뀝니다) · 최소 기준이 비면 그 용도의
+      필터링이 통째로 사라집니다 · 디자인·개발·사무는 GPU 최소 기준이 없습니다(그래픽 성능이
       기준이 아닌 용도)
     </div>
   </div>
@@ -448,7 +448,7 @@
   function renderToolbar() {
     if (!S.groups) { $('ufCount').textContent = '—'; return; }
     var items = S.groups.reduce(function (a, g) { return a + g.items.length; }, 0);
-    $('ufCount').textContent = '용도 ' + S.groups.length + '종 · 하한 ' + items + '건';
+    $('ufCount').textContent = '용도 ' + S.groups.length + '종 · 최소 기준 ' + items + '건';
   }
 
   // ── 표 ──────────────────────────────────────────────────────────
@@ -475,7 +475,7 @@
   // 계약에 예시가 없어 같은 원칙(정직·실측)으로 대칭 문구를 만들었다 — 검증 대상.
   function previewSentence(impact) {
     if (impact.pass_after === 0) {
-      return '후보가 0이 되어 이 용도로는 견적을 만들 수 없습니다. 사무용 RAM 하한을 잘못 올려 '
+      return '후보가 0이 되어 이 용도로는 견적을 만들 수 없습니다. 사무용 RAM 최소 기준을 잘못 올려 '
         + '최저가 메모리를 전부 걸러 견적이 불성립했던 전례가 있습니다 — 그때는 이 경고가 없었습니다.';
     }
     if (impact.pass_after < impact.pass_before) {
@@ -485,7 +485,7 @@
     }
     if (impact.pass_after > impact.pass_before) {
       return '후보가 ' + fmt(impact.pass_before) + '개 → ' + fmt(impact.pass_after) + '개로 늘어납니다. '
-        + '하한을 완화해 이 용도의 ' + esc(impact.slot) + ' 선택폭이 넓어집니다.';
+        + '최소 기준을 완화해 이 용도의 ' + esc(impact.slot) + ' 선택폭이 넓어집니다.';
     }
     return '변경해도 후보 수는 ' + fmt(impact.pass_after) + '개로 그대로입니다(전체 ' + fmt(impact.slot_total) + '개 중).';
   }
@@ -508,13 +508,13 @@
     var html = '<div class="uf-exp" data-floor-id="' + it.floor_id + '"><div class="uf-exp-inner">';
 
     html += '<div class="uf-exp-col">';
-    html += '<label class="uf-exp-label" for="expValueInput">새 하한 값' + (it.unit ? ' (' + esc(it.unit) + ')' : '') + '</label>';
+    html += '<label class="uf-exp-label" for="expValueInput">새 최소 기준 값' + (it.unit ? ' (' + esc(it.unit) + ')' : '') + '</label>';
     html += '<div class="uf-exp-inrow"><input type="number" min="0" step="1" id="expValueInput" class="uf-exp-input" value="'
           + (S.exp.value === null || S.exp.value === undefined ? '' : S.exp.value) + '">'
           + '<span class="uf-exp-unit">' + esc(it.unit || '') + '</span></div>';
     html += '<label class="uf-exp-toggle"><input type="checkbox" id="expActiveInput"'
           + (S.exp.active ? ' checked' : '') + '> 활성</label>';
-    html += '<div class="uf-exp-togglenote">끄면 이 하한이 판정에서 빠집니다 — 값은 남습니다</div>';
+    html += '<div class="uf-exp-togglenote">끄면 이 최소 기준이 판정에서 빠집니다 — 값은 남습니다</div>';
     html += '</div>';
 
     html += '<div class="uf-exp-col">';
@@ -540,8 +540,8 @@
     html += '</div>';
     html += '<div class="uf-exp-savenote">저장하면 다음 견적부터 적용됩니다 — 이미 만든 견적은 그대로입니다. '
           + '미리보기 없이 바로 저장하는 경로는 없습니다.</div>';
-    html += '<div class="uf-exp-apinote">음수는 400으로 막힙니다 · 없는 하한은 404 · 후보 0은 오류가 아니라 강한 '
-          + '경고로 옵니다 · 하한이 비면 그 용도의 필터링이 통째로 사라집니다</div>';
+    html += '<div class="uf-exp-apinote">음수는 저장할 수 없습니다 · 없는 기준은 찾을 수 없습니다 · 후보가 없으면 강한 '
+          + '경고로 옵니다 · 최소 기준이 비면 그 용도의 사양 제한이 사라집니다</div>';
     html += '</div>';
 
     html += '</div></div>';
@@ -590,8 +590,8 @@
     if (!S.groups) return;
     if (!S.groups.length) {
       box.innerHTML = '<div class="uf-errbox"><div class="t">규칙이 비어 있습니다</div>'
-        + '<div class="d">용도별 하한이 0건입니다 — 정상 상태가 아닙니다(부트스트랩이 21행을 심어야 '
-        + '합니다). 이 상태에서는 용도 필터링이 전부 빠진 채 견적이 나갑니다 — 마이그레이션 적용 '
+        + '<div class="d">용도별 최소 기준이 없습니다. 초기 기준 21건이 필요'
+        + '합니다. 이 상태에서는 용도별 사양 제한 없이 견적이 나갑니다. 초기 기준 반영 '
         + '여부를 확인해야 합니다.</div></div>';
       return;
     }

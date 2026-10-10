@@ -1,13 +1,13 @@
 {% extends 'admin/_admin2_shell.html.j2' %}
-{% block title %}AI 일괄 보완{% endblock %}
+{% block title %}AI로 설명 한꺼번에 보완{% endblock %}
 {% block head_extra %}<link rel="stylesheet" href="/shared/pc-workspace.css?v=20261002-scroll"><link rel="stylesheet" href="/shared/pc-batch.css?v=20261010-mobile">{% endblock %}
 {% block content %}
 <main class="batch">
- <header class="top"><div><h1>AI 일괄 보완</h1><p class="muted">공통 부품으로 묶고, 각 제품의 차이를 반영한 설명을 비교합니다.</p></div><a class="tag" href="/admin2/pc-workspace">개별 작업으로 돌아가기</a></header>
+ <header class="top"><div><h1>AI로 설명 한꺼번에 보완</h1><p class="muted">같은 부품을 쓰는 PC를 묶어 설명을 비교합니다.</p></div><a class="tag" href="/admin2/pc-workspace">개별 작업으로 돌아가기</a></header>
  <nav class="steps" aria-label="일괄 보완 단계"><button data-step="1" aria-current="step"><b>1</b>대상 선택<small>공통 부품 · 보완 사유</small></button><button data-step="2"><b>2</b>AI 제안 비교<small>제품별 · 항목별 선택</small></button><button data-step="3"><b>3</b>저장 내용 확인<small>검토 작업으로 연결</small></button></nav>
  <p id="batch-message" class="batch-note" role="status" aria-live="polite"></p>
  <section id="batch-screen"><p>작업을 불러오는 중입니다.</p></section>
- <aside class="next-feature"><b>후속 필수 기능 · 신규 조립PC 생성</b>운영자가 보유 부품을 빈 구성에 추가 → 호환·수량·가격 확인 → 설명 작성 → 검토 대기 제품군 등록. 기존 PC 복사·수정과 별도 흐름으로 진행합니다.</aside>
+ <aside class="next-feature"><b>준비 중 · 새 조립 PC 만들기</b>운영자가 보유 부품을 빈 구성에 추가 → 호환·수량·가격 확인 → 설명 작성 → 검토 대기 제품군 등록. 기존 PC 복사·수정과 별도 흐름으로 진행합니다.</aside>
 </main>
 {% endblock %}
 {% block foot_extra %}<script src="/shared/pc-batch.js"></script>{% endblock %}

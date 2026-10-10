@@ -310,7 +310,7 @@ button{font-family:inherit}
     var periods = (d.periods || []).map(function (p) {
       return '<span class="' + (S.period === p.key ? 'on' : '') + '" data-action="set-period" data-v="' + esc(p.key) + '">' + esc(p.label) + '</span>';
     }).join('');
-    var provLabel = S.provider ? ('프로바이더: ' + (d.filters.providers.filter(function (x) { return x.key === S.provider; })[0] || {}).label) : '프로바이더: 전체';
+    var provLabel = S.provider ? ('AI 업체: ' + (d.filters.providers.filter(function (x) { return x.key === S.provider; })[0] || {}).label) : 'AI 업체: 전체';
     var modelLabel = S.model ? ('모델: ' + S.model) : '모델: 전체';
     return '<div class="filterbar" data-keep="1">' +
       '<span class="pillgroup">' + periods + '</span>' +

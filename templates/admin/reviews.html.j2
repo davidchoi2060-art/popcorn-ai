@@ -1235,7 +1235,7 @@ input{font-family:var(--rv-mono)}
     renderUndoBtn();
     var gateNote = res.pool_added > 0
       ? '추천 후보 풀에 들어갔습니다(ai_candidate_yn: true)'
-      : (statusKind === '기각' ? '' : '다른 필수 사양이 비어 있어 후보 승격은 아직입니다');
+      : (statusKind === '기각' ? '' : '다른 필수 사양이 비어 있어 후보 반영은 아직입니다');
     toast(label + (gateNote ? ' · ' + gateNote : ''), statusKind === '기각' ? 'warn' : 'ok', '되돌리기',
       function () { undoOne(res.undo_id, 'review'); });
     loadList();
