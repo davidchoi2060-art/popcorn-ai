@@ -149,6 +149,12 @@ function productImage(product){
 }
 // The emphasized card is the server's "recommended" role (normalized in live-model.js).
 function recommendedCard(product){return product.role==='recommended';}
+// Approved part photos on the card itself; parts without one are simply left out (no placeholder).
+function cardPartPhotos(product){
+  const photos=M.cardPartPhotos(product);
+  if(!photos.length)return '';
+  return '<ul class="card-part-photos" aria-label="부품 사진">'+photos.map(x=>'<li><figure data-card-part-photo><img data-card-part-image src="'+esc(x.url)+'" alt="'+esc(x.name||x.label)+' 부품 사진" loading="lazy" decoding="async"><figcaption>'+esc(x.label)+'</figcaption></figure></li>').join('')+'</ul>';
+}
 function productCard(product,action='detail',id=product.index,comparison=null){
   const rows=M.cardSpecRows(product.spec),strong=recommendedCard(product),description=product.public_configuration?.description;
   const spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'등록된 상세 사양이 없어요.')+'</p>';
@@ -158,7 +164,7 @@ function productCard(product,action='detail',id=product.index,comparison=null){
   const difference=delta===null?'':delta===0?'다른 구성과 같은 금액이에요.':(comparison.tag||'다른 구성')+'보다 '+money(Math.abs(delta))+(delta>0?' 높아요.':' 낮아요.');
   return '<section class="quote-card live-product-card"><div class="live-card-heading"><div class="live-card-copy"><span class="pill '+(strong?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
     '<h3>'+esc(title)+'</h3>'+(title!==product.name?'<p class="live-product-name">'+esc(product.name)+'</p>':'')+(intro?'<p class="live-card-intro">'+esc(intro)+'</p>':'')+'</div>'+productImage(product)+'</div>'+
-    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+
+    '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+cardPartPhotos(product)+
     (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+
     // Full reasons stay on the detail screen; the card keeps only the over-budget verdict.
     (product.over_budget?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
@@ -346,7 +352,10 @@ $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();});
 mobile.addEventListener('change',syncChat);
 for(const type of ['load','error'])document.addEventListener(type,e=>{
-  const image=e.target;if(!(image instanceof HTMLImageElement)||!image.hasAttribute('data-product-image'))return;
+  const image=e.target;if(!(image instanceof HTMLImageElement))return;
+  // A card thumbnail that fails to load disappears instead of showing a placeholder.
+  if(image.hasAttribute('data-card-part-image')){if(type==='error'){const item=image.closest('li');if(item)item.hidden=true;}return;}
+  if(!image.hasAttribute('data-product-image'))return;
   const photo=image.closest('[data-product-photo]');if(!photo)return;
   const failed=type==='error';image.hidden=failed;photo.classList.toggle('is-unavailable',failed);
   photo.dataset.imageState=failed?'temporarily_unavailable':'loaded';photo.querySelector('[data-product-image-status]').hidden=!failed;
