@@ -58,14 +58,14 @@ MODELS = [p["model"] for p in PROVIDERS]
 BUILT_AT = date(2026, 7, 23)
 DECISION_AT = "2026-07-21"
 
-REASON = (f"실제 LLM 연동이 보류 상태({DECISION_AT} 결정)라 사용량·비용 기록이 없습니다."
-          " 착수하면 이 화면이 실값으로 채워집니다(컬럼은 이미 있어 행만 쌓이면 됩니다).")
+REASON = (f"AI 실제 연결을 미뤄 둔 상태({DECISION_AT} 결정)라 사용량·비용 기록이 없습니다."
+          " 연결을 시작하면 이 화면에 실제 값이 채워집니다.")
 SCHEMA_REASON = ("이 분해는 데이터가 쌓여도 계산되지 않습니다 — AI 비용 기록에 작업 종류"
-                  " 항목이 아직 없습니다(저장 구조 변경 필요).")
+                  " 항목이 아직 없습니다.")
 
 NOSOURCE_STYLE_NOTE = {
-    "per_consult": "분모(상담)·분자(비용) 모두 없음",
-    "per_batch": "배치는 세션 비용 구역 참조",
+    "per_consult": "상담 수·비용 기록 모두 없음",
+    "per_batch": "아래 「Claude Code 세션 비용」 칸 참고",
 }
 
 
@@ -194,7 +194,7 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
     # ── 게이지 ──
     if limit_total is None and not source_exists:
         gauge = {"available": False, "limit_usd": None, "used_usd": None,
-                 "note": "한도도 사용액도 정보 없음 — 게이지를 그릴 근거가 없습니다"}
+                 "note": "한도도 사용액도 정보 없음"}
     elif limit_total is None:
         gauge = {"available": False, "limit_usd": None, "used_usd": round(today_agg["cost"], 2),
                  "note": "일 한도가 아직 설정되지 않았습니다 — AI 연동 설정에서 정하면 채워집니다"}
