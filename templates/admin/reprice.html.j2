@@ -543,7 +543,7 @@ a.rp-link{color:var(--rv-link)}
     html += '</div>';
     html += '<div class="rp-impact-sum">오름 총액 <b class="up">+' + fmtWon(p.up_sum) + '</b> · 내림 총액 '
       + '<b class="down">' + fmtWon(p.down_sum) + '</b></div>';
-    html += '<div class="rp-impact-na-note">「해당 없음」(공급처 0곳이라 정책을 바꿔도 안 움직이는 상품)은 이 API가'
+    html += '<div class="rp-impact-na-note">「해당 없음」(공급처 0곳이라 정책을 바꿔도 안 움직이는 상품)은 현재 조회가'
       + ' 세지 않습니다 — <code>/reprice/preview</code>는 <code>product_supplier_prices</code>를 읽지 않고'
       + ' 매입가를 <code>products.purchase_price</code>에서 바로 씁니다. 대상(' + fmt(p.target) + ')은 이미'
       + ' 오름·내림·변화없음·잠김의 합과 같아(남는 몫 없음) 0으로 위장하지 않고 못 셈으로 둡니다.</div>';
@@ -604,7 +604,7 @@ a.rp-link{color:var(--rv-link)}
     }
     var p = S.preview;
     var html = '<div class="rp-field"><label class="rp-field-label" for="rpNoteInput">메모</label>'
-      + '<input type="text" id="rpNoteInput" class="rp-input" maxlength="200" placeholder="예: 슬라이스 E 검증"'
+      + '<input type="text" id="rpNoteInput" class="rp-input" maxlength="200" placeholder="예: 판매가 변경 검토"'
       + ' value="' + esc(S.note) + '">'
       + '<div class="rp-hint">다음 사람이 왜 실행했는지 알 수 있도록 남깁니다 — 「지난 회차」 표의 메모 열에'
       + ' 그대로 남습니다(선택 입력이지만 남기기를 권합니다).</div></div>';

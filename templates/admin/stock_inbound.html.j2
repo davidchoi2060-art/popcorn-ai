@@ -400,7 +400,7 @@
     return !!(window.Admin2Shell && window.Admin2Shell.canWrite('operator'));
   }
   function writeNote() {
-    return S.canWriteNote || 'viewer 등급은 입고 확정·되돌리기를 할 수 없습니다';
+    return S.canWriteNote || '조회 권한으로는 입고 확정·되돌리기를 할 수 없습니다';
   }
 
   // ── API — 실패를 삼키지 않는다. 401 은 status 로 갈라 세션 만료 안내로 간다 ──
@@ -677,7 +677,7 @@
     $('siPMeta').textContent = p.sku + ' · ' + p.cat
       + ' · 상태 ' + (p.status || '조회 안 됨') + ' · 현재고 ' + fmt(p.stock)
       + (p.safety_stock != null ? ' · 안전재고 ' + fmt(p.safety_stock) + '(읽기 전용)' : '')
-      + ' · 매입가 ' + (p.purchase == null ? '미등록' : fmt(p.purchase) + '원')
+      + ' · 매입가 ' + (p.purchase == null ? '정보 없음' : fmt(p.purchase) + '원')
       + (p.supplier && p.supplier !== '—' ? ' · 공급처 ' + p.supplier : '');
     document.querySelectorAll('[data-action="why"]').forEach(function (b) {
       b.setAttribute('aria-pressed', String(b.getAttribute('data-why') === S.why));
@@ -780,7 +780,7 @@
     }
     if (st === 403) {
       return { tone: 'err', code: '403', msg: '조회 등급은 입고 확정·되돌리기를 할 수 없습니다',
-        note: '서버 사유: ' + esc(detail) + ' — 조회는 viewer · 쓰기는 operator 이상(owner 전용 아님). 단추는 감추지 않고 비활성 + 사유 병기.', act: '' };
+        note: '서버 사유: ' + esc(detail) + ' — 조회 권한으로 볼 수 있으며, 운영자 이상이 변경할 수 있습니다. 사용할 수 없는 단추에는 사유가 표시됩니다.', act: '' };
     }
     if (st === 400) {
       return { tone: 'err', code: '400', msg: detail,

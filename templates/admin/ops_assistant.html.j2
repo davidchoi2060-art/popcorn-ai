@@ -249,8 +249,8 @@ input,textarea{font-family:var(--rv-font)}
 </div>
 
 <div class="notready" id="notReady" hidden data-keep="1">
-  <div class="t">▲ 원천 준비 중</div>
-  <div class="d" id="notReadyMsg">FAQ 원천이 아직 준비되지 않았습니다.</div>
+  <div class="t">▲ 정보 준비 중</div>
+  <div class="d" id="notReadyMsg">자주 묻는 질문 정보가 아직 준비되지 않았습니다.</div>
 </div>
 
 <div class="body-cols">
@@ -440,7 +440,7 @@ input,textarea{font-family:var(--rv-font)}
       return;
     }
     box.hidden = S.ready !== false;
-    if (S.ready === false) $('notReadyMsg').textContent = S.note || 'FAQ 원천이 아직 준비되지 않았습니다.';
+    if (S.ready === false) $('notReadyMsg').textContent = S.note || '자주 묻는 질문 정보가 아직 준비되지 않았습니다.';
   }
 
   // ── FAQ 목록 ─────────────────────────────────────────────────────
@@ -459,7 +459,7 @@ input,textarea{font-family:var(--rv-font)}
     }
     if (!S.faqs.length) {
       $('faqList').innerHTML = '<div class="faq-empty">' +
-        (S.ready === false ? '원천이 준비되면 FAQ가 여기 나타납니다.' : 'FAQ가 없습니다 — 위젯이 답할 것이 없는 상태입니다.') + '</div>';
+        (S.ready === false ? '정보가 준비되면 자주 묻는 질문이 여기 나타납니다.' : '자주 묻는 질문이 없습니다 — 도우미가 답할 내용이 없는 상태입니다.') + '</div>';
       return;
     }
     $('faqList').innerHTML = S.faqs.map(function (f, i) {
@@ -522,7 +522,7 @@ input,textarea{font-family:var(--rv-font)}
       var hint = s.locked ? (s.lock_note || '잠긴 항목입니다') : (s.enabled ? '답변에 쓸 수 있음' : '답변에 쓰지 않음');
       return '<span class="scope-chip ' + cls + '" data-action="toggle-scope" data-key="' + esc(s.scope_key) + '" title="' + esc(hint) + '">' +
         '<span class="mark">' + mark + '</span><span>' + esc(s.label) + '</span></span>';
-    }).join('') || '<span style="font:400 11px/1.5 var(--rv-font);color:var(--rv-muted)">원천이 준비되면 목록이 나타납니다.</span>';
+    }).join('') || '<span style="font:400 11px/1.5 var(--rv-font);color:var(--rv-muted)">정보가 준비되면 목록이 나타납니다.</span>';
   }
   function toggleScope(key) {
     var s = S.scopes.filter(function (x) { return x.scope_key === key; })[0];

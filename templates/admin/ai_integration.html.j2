@@ -242,7 +242,7 @@ input{font-family:var(--rv-mono)}
       <span class="tag">키</span>
       <span class="main">키 값은 서버 설정에만 있습니다 — 이 화면은 키를 입력받지 않습니다</span>
       <span class="sub">이 화면은 "그 키가 있는가"와 "얼마까지 쓰게 할 것인가"만 다룹니다.
-        연결 확인은 서버 설정의 키 존재 여부만 보고 프로바이더에 호출을 보내지 않으므로,
+        연결 확인은 서버 설정의 키 존재 여부만 보고 AI 업체에 요청을 보내지 않으므로,
         이 화면을 여는 것으로 과금이 생기지 않습니다.</span>
     </div>
 
@@ -252,7 +252,7 @@ input{font-family:var(--rv-mono)}
 
     <div class="pwrap">
       <div class="phead">
-        <span>프로바이더</span><span>모델</span><span>일 한도</span><span>호출 제한</span><span>상태</span>
+        <span>AI 업체</span><span>모델</span><span>일 한도</span><span>호출 제한</span><span>상태</span>
       </div>
       <div class="ptable" id="ptable">
         <div class="loading">불러오는 중…</div>
@@ -267,7 +267,7 @@ input{font-family:var(--rv-mono)}
             <span class="desc">서버 설정에 키가 있습니다. 값은 화면에 오지 않습니다.</span></div>
           <div class="leg-item"><span class="chip fail">▲ 확인 실패</span>
             <span class="desc">키는 있는데 값이 비어 있습니다 — "없음"과 절대 같은 말로 쓰지 않습니다.</span></div>
-          <div class="foot">연결 확인은 <b>서버 설정의 키 존재 여부만</b> 봅니다 — 프로바이더에 호출을 보내지 않으므로
+          <div class="foot">연결 확인은 <b>서버 설정의 키 존재 여부만</b> 봅니다 — AI 업체에 요청을 보내지 않으므로
             이 화면을 여는 것으로 과금이 생기지 않습니다.</div>
         </div>
         <div class="panel alt">
@@ -275,7 +275,7 @@ input{font-family:var(--rv-mono)}
           <div class="oos-item"><span class="dash">—</span><span class="t">키 값 입력·수정·삭제 — 서버 설정에만 둡니다</span></div>
           <div class="oos-item"><span class="dash">—</span><span class="t">개별 호출 로그(무엇을 묻고 뭐라 답했는지) — AI 응답 기록 소관</span></div>
           <div class="oos-item"><span class="dash">—</span><span class="t">비용 추이·용도별 분석 — AI 사용량·비용 소관</span></div>
-          <div class="oos-item"><span class="dash">—</span><span class="t">작업↔모델 배정·폴백 순서 — AI 작업 설정 소관</span></div>
+          <div class="oos-item"><span class="dash">—</span><span class="t">작업별 모델 배정·대체 요청 순서 — AI 작업 설정 소관</span></div>
         </div>
       </div>
     </div>
@@ -300,7 +300,7 @@ input{font-family:var(--rv-mono)}
       <div class="keybox" id="dwKeyNote">—</div>
 
       <div class="sect">
-        <div class="schead"><span class="cap">프로바이더 한도</span><span class="src">cost_thresholds · rate_limit_policies</span></div>
+        <div class="schead"><span class="cap">AI 업체 한도</span><span class="src">비용 한도 · 호출 제한 설정</span></div>
         <div class="lfields">
           <div class="lfield">
             <div class="lb">일 한도</div>
@@ -609,12 +609,12 @@ input{font-family:var(--rv-mono)}
       bar.style.background = overSub ? 'var(--rv-red)' : PROVIDER_DOT[S.sel];
     });
 
-    $('dwSubSum').textContent = '합계 ' + fmtMoney(subTotal) + ' / 프로바이더 한도 ' + (daily === null ? '미설정' : fmtMoney(daily));
+    $('dwSubSum').textContent = '합계 ' + fmtMoney(subTotal) + ' / AI 업체 한도 ' + (daily === null ? '미설정' : fmtMoney(daily));
     $('dwSubSum').style.color = overSub ? 'var(--rv-red)' : '';
     $('dwSubNote').textContent = overSub
-      ? '부분 한도 합계가 프로바이더 한도를 넘습니다 — 이대로 저장하면 400을 받습니다'
+      ? '작업별 한도 합계가 AI 업체 한도를 넘습니다 — 이 상태로는 저장할 수 없습니다'
       : (daily === null ? '일 한도를 먼저 정하면 배분 여유가 표시됩니다'
-        : '부분 한도는 프로바이더 한도 안에서만 배분됩니다 (남은 여유 ' + fmtMoney(daily - subTotal) + ')');
+        : '작업별 한도는 AI 업체 한도 안에서만 나눌 수 있습니다 (남은 여유 ' + fmtMoney(daily - subTotal) + ')');
     $('dwSubNote').style.color = overSub ? 'var(--rv-red)' : '#8a8377';
 
     var owner = canWrite();
@@ -704,7 +704,7 @@ input{font-family:var(--rv-mono)}
     var sub = {};
     (S.data.tasks || []).forEach(function (t) { sub[t.key] = parseNum(S.draft.sub[t.key]); });
     var subTotal = Object.keys(sub).reduce(function (s, k) { return s + (sub[k] || 0); }, 0);
-    if (subTotal > daily) { toast('부분 한도 합계 $' + subTotal + '가 프로바이더 한도 $' + daily + '를 넘습니다', 'err'); return; }
+    if (subTotal > daily) { toast('부분 한도 합계 $' + subTotal + '가 AI 업체 한도 $' + daily + '를 넘습니다', 'err'); return; }
     var body = { daily_usd: daily, per_minute: parseNum(S.draft.perMin), per_day: parseNum(S.draft.perDay),
       action: S.draft.action, sub: sub };
     apiPost('/api/admin/ai-integration/limits/' + encodeURIComponent(S.sel), body).then(function (j) {
