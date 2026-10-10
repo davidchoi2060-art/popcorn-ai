@@ -124,6 +124,28 @@
     initMobileLnb();
   }
 
+  // ── 화면 머리말 바로가기 접기 (2026-10-11) — 셸이 그린 `.a2-intro` 만 다룬다.
+  //    접힘 여부는 이 브라우저에만 기억한다(값이 없거나 저장소가 막혀도 펼친 채로 그린다).
+  (function initIntro() {
+    var intro = document.getElementById('a2Intro');
+    var btn = document.getElementById('a2IntroToggle');
+    if (!intro || !btn) return;
+    var KEY = 'a2.introLinks.collapsed';
+    function apply(collapsed) {
+      intro.setAttribute('data-collapsed', collapsed ? 'y' : 'n');
+      btn.setAttribute('aria-expanded', String(!collapsed));
+      btn.textContent = collapsed ? '바로가기 펼치기' : '바로가기 접기';
+    }
+    var saved = false;
+    try { saved = window.localStorage.getItem(KEY) === 'y'; } catch (e) { saved = false; }
+    apply(saved);
+    btn.addEventListener('click', function () {
+      var next = intro.getAttribute('data-collapsed') !== 'y';
+      apply(next);
+      try { window.localStorage.setItem(KEY, next ? 'y' : 'n'); } catch (e) { /* 기억 못 해도 동작은 같다 */ }
+    });
+  })();
+
   // ── 권한 표시 — `/api/admin/auth/me`를 화면마다 다시 부르지 않는다 ──────────
   var me = null;
   var resolveReady;
