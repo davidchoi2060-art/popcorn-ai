@@ -132,3 +132,28 @@ def display_name(raw):
     stripped = strip_html_display(raw)
     cut = _TAIL.sub("", stripped).strip()
     return cut if len(cut) >= _MIN_LEN else raw
+
+
+# ── 판매 조립PC 카드 이름 (2026-10-10 상담 품질 점검 · 공통 문제 1) ──────────────
+# 몰의 조립PC 이름에는 광고 문구가 붙어 있다: 「[인기상품1위]」 · 「[화이트상품 1위] [13세대
+# 판매 2위] [게이밍 3위]」 · 「초저가 가성비짱」 · 「견적왕 추천PC」 · 내부 번호 「NO.04.98149」.
+# 고객 카드에서만 뗀다 — 원천(`products.product_name`)은 그대로 둔다(위 「두 얼굴」 원칙).
+# 사양 대괄호(「[12400F/16G/500GB/RTX5060]」)는 부품 정보라 남긴다.
+#   대괄호 광고: 안에 「N위」 · 인기 · 베스트 · BEST · 특가 · 이벤트 · 한정 · 할인 · 추천 이 있는 것만
+#   앞머리 광고: 실측된 두 문구만(지어낸 규칙으로 진짜 이름을 지우지 않는다)
+_CARD_AD_BRACKET = re.compile(r"\[[^\[\]]*(?:\d\s*위|인기|베스트|BEST|특가|이벤트|한정|할인|추천)[^\[\]]*\]", re.I)
+_CARD_AD_PHRASE = re.compile(r"초저가\s*가성비짱|견적왕\s*추천\s*PC", re.I)
+_CARD_INTERNAL_NO = re.compile(r"\bNO\.\s*\d+\.\d+\b", re.I)
+
+
+def card_name(raw):
+    """판매 조립PC 카드에 보일 이름 — 광고 대괄호·광고 문구·내부 번호를 뗀다. 못 떼면 원천 그대로."""
+    base = display_name(raw)
+    if not base:
+        return base
+    cut = _CARD_AD_BRACKET.sub(" ", base)
+    cut = _CARD_AD_PHRASE.sub(" ", cut)
+    cut = _CARD_INTERNAL_NO.sub(" ", cut)
+    cut = re.sub(r"\s+", " ", cut).strip()
+    cut = re.sub(r"\s+(\[)", r" \1", cut)
+    return cut if len(cut) >= _MIN_LEN else base

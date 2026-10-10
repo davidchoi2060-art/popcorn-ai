@@ -40,6 +40,7 @@ from sqlalchemy import text
 
 from .admin_product_fit import load
 from .db import engine
+from .product_name import card_name   # 카드 이름에서 광고 문구를 뗀다(원천은 그대로)
 from .talk_schema import match_game
 
 log = logging.getLogger("sold_reco")
@@ -137,7 +138,7 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     if p.get("includes"):
         reasons.append(f"판매가에 {p['includes']} 포함")
     return {
-        "product_code": p["code"], "name": p["name"], "price": p["price"],
+        "product_code": p["code"], "name": card_name(p["name"]), "price": p["price"],
         "price_src": p["price_src"], "mall_url": p["url"], "spec": public_spec(p["spec"]),
         "level": f["level"], "tag": tag, "role": ROLE_OF[tag],
         "over_budget": over, "reasons": reasons,
