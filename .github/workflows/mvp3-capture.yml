@@ -1,0 +1,61 @@
+# 개발 서버(popcorn-app) mvp3 고객 화면 캡처 — 읽기 전용.
+#
+# 상담 문장을 실제 화면에 넣어 추천 카드를 띄우고 PC(1440px)·모바일(390px) 캡처를
+# artifact 로 올린다. 클라우드 작업 세션은 popcornai.co.kr 에 직접 접속할 수 없어서,
+# 실서버 화면을 사진으로 남기려고 둔다. 화면이 부르는 공개 고객 API만 쓰고
+# 비밀값·DB 접속·서버 변경은 없다.
+#
+# ⚠ GitHub 호스팅 러너(ubuntu-latest)에서만 돈다. self-hosted 러너나 secrets 를 넣지 않는다 —
+#    넣는 순간 deploy.yml 머리말의 「pull_request 트리거 절대 금지」가 그대로 적용된다.
+#    dev-screen-check.yml(self-hosted)과는 별개 파일이다.
+name: mvp3 화면 캡처
+
+on:
+  workflow_dispatch:
+    inputs:
+      cases:
+        description: '「파일이름=상담 문장」을 | 로 구분'
+        default: '배그롤150=배그와 롤 150만원으로 추천해줘|롤150=롤 150만원으로 추천해줘|사무용100=사무용 100만원으로 추천해줘'
+  pull_request:
+    paths:
+      - .github/workflows/mvp3-capture.yml
+      - tools/ci/mvp3_capture.cjs
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mvp3-capture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: tools/ci
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright 설치 (작업 폴더 밖 임시 위치)
+        shell: bash
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: 화면 캡처
+        shell: bash
+        env:
+          BASE: https://popcornai.co.kr
+          CASES: ${{ inputs.cases || '배그롤150=배그와 롤 150만원으로 추천해줘|롤150=롤 150만원으로 추천해줘|사무용100=사무용 100만원으로 추천해줘' }}
+          OUT: ${{ runner.temp }}/mvp3-captures
+        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node tools/ci/mvp3_capture.cjs
+      - name: 캡처 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mvp3-captures
+          path: ${{ runner.temp }}/mvp3-captures
+          if-no-files-found: warn
+          retention-days: 14
