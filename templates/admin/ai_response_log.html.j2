@@ -197,7 +197,7 @@ button{font-family:inherit}
 
 {% block content %}
 <div class="banner" id="banner" data-keep="1">
-  <span class="mark" id="bannerMark">▲ 원천 없음</span>
+  <span class="mark" id="bannerMark">▲ 기록 없음</span>
   <span class="ti" id="bannerTitle">감사할 대상이 아직 생성되지 않습니다</span>
   <span class="ds" id="bannerDesc">AI 호출·응답 텍스트를 남기는 계측 지점이 저장소 어디에도 없습니다.</span>
 </div>
@@ -415,7 +415,7 @@ button{font-family:inherit}
   function renderBanner() {
     var b = $('banner'), preview = S.mode === 'preview';
     b.classList.toggle('preview', preview);
-    $('bannerMark').textContent = preview ? '● 가상 데이터' : '▲ 원천 없음';
+    $('bannerMark').textContent = preview ? '● 가상 데이터' : '▲ 기록 없음';
     $('bannerTitle').textContent = preview
       ? '실제 기록이 아닙니다 — 연동 후 이 화면이 어떻게 보일지 검토하기 위한 예시입니다'
       : '감사할 대상이 아직 생성되지 않습니다';

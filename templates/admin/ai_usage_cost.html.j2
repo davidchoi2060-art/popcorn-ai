@@ -234,7 +234,7 @@ button{font-family:inherit}
     });
   }
   function fmtInt(v) { return (v === null || v === undefined) ? '—' : Number(v).toLocaleString('en-US'); }
-  function fmtUsd(v) { return (v === null || v === undefined) ? '$—' : ('$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); }
+  function fmtUsd(v) { return (v === null || v === undefined) ? '정보 없음' : ('$' + Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })); }
   function fmtTime(iso) {
     if (!iso) return '—';
     try {
@@ -298,10 +298,10 @@ button{font-family:inherit}
   // ── 배너(원천 없음 — rows==0일 때만) ─────────────────────────────
   function tplBanner(d) {
     if (d.source.api_cost_logs_rows > 0) return '';
-    return '<div class="srcband"><span class="tag">▲ 원천 없음</span>' +
+    return '<div class="srcband"><span class="tag">▲ 기록 없음</span>' +
       '<span class="main">비용이 쌓이는 경로 자체가 아직 없습니다 — 접속 문제가 아닙니다</span>' +
-      '<span class="sub">' + esc(d.source.reason) + ' 실측 <code>api_cost_logs ' + d.source.api_cost_logs_rows +
-      '행 · cost_thresholds ' + d.source.cost_thresholds_rows + '행</code> — ' + esc(d.source.built_at) +
+      '<span class="sub">' + esc(d.source.reason) + ' 현재 AI 비용 기록 ' + d.source.api_cost_logs_rows +
+      '건 · 한도 설정 ' + d.source.cost_thresholds_rows + '건 — ' + esc(d.source.built_at) +
       ' 구축 시점부터 ' + d.source.weeks_since_build + '주째 그대로입니다.</span></div>';
   }
 
@@ -354,7 +354,7 @@ button{font-family:inherit}
     var g = d.gauge;
     var chip = g.available
       ? ('<span class="kpichip ' + (g.pct > 100 ? 'nosource' : 'value') + '">' + g.pct + '%</span>')
-      : '<span class="kpichip nosource">원천 없음</span>';
+      : '<span class="kpichip nosource">정보 없음</span>';
     var track;
     if (g.available) {
       var over = g.pct > 100;
@@ -364,25 +364,25 @@ button{font-family:inherit}
     }
     var foot = g.available
       ? ('<span>' + fmtUsd(g.used_usd) + '</span><span>한도 ' + fmtUsd(g.limit_usd) + ' / 일</span>')
-      : ('<span>' + (g.used_usd !== null ? fmtUsd(g.used_usd) : '$—') + '</span>' +
+      : ('<span>' + (g.used_usd !== null ? fmtUsd(g.used_usd) : '정보 없음') + '</span>' +
          '<span>' + (g.limit_usd !== null ? ('한도 ' + fmtUsd(g.limit_usd) + ' / 일') : '일 한도 미설정') + '</span>');
     return '<div class="gaugebox"><div class="head"><span class="t">일 한도 대비 오늘 사용률</span>' +
-      '<span class="src">cost_thresholds · api_cost_logs</span><span class="chip">' + chip + '</span></div>' +
+      '<span class="src">일 한도 설정 · AI 비용 기록</span><span class="chip">' + chip + '</span></div>' +
       track + '<div class="gfoot">' + foot + '</div></div>';
   }
 
   // ── 분해 ─────────────────────────────────────────────────────────
   function tplBreakdowns(d) {
     var prov = d.breakdowns.provider, task = d.breakdowns.task;
-    return '<div class="breakdowns">' + bpanel('프로바이더별 분해', prov.source, prov.available, prov.reason, prov.rows, false) +
+    return '<div class="breakdowns">' + bpanel('AI 업체별 분해', prov.source, prov.available, prov.reason, prov.rows, false) +
       bpanel('작업 종류별 분해', task.source, false, task.reason, task.rows, true) + '</div>';
   }
   function bpanel(title, source, available, reason, rows, schema) {
     var chip = available ? '' : ('<span class="kpichip ' + (schema ? 'noschema' : 'nosource') + '">' +
-      (schema ? '스키마 없음' : '원천 없음') + '</span>');
+      '정보 없음' + '</span>');
     var body = rows.map(function (r) {
-      var tok = (available && r.tokens !== null && r.tokens !== undefined) ? fmtInt(r.tokens) : '—';
-      var cost = (available && r.cost !== null && r.cost !== undefined) ? fmtUsd(r.cost) : '$—';
+      var tok = (available && r.tokens !== null && r.tokens !== undefined) ? fmtInt(r.tokens) : '정보 없음';
+      var cost = (available && r.cost !== null && r.cost !== undefined) ? fmtUsd(r.cost) : '정보 없음';
       return '<div class="brow"><span class="nm">' +
         (r.key ? '<span class="dot" style="background:' + dotColor(r.key) + '"></span>' : '') +
         '<span class="name">' + esc(r.name) + '</span>' +
@@ -403,7 +403,7 @@ button{font-family:inherit}
   // ── 추이 ─────────────────────────────────────────────────────────
   function tplTrend(d) {
     var t = d.trend;
-    var chip = t.available ? '' : '<span class="kpichip nosource">원천 없음</span>';
+    var chip = t.available ? '' : '<span class="kpichip nosource">정보 없음</span>';
     var max = 0;
     if (t.available) t.points.forEach(function (p) { if (p.cost !== null && p.cost > max) max = p.cost; });
     var bars = (t.points || []).map(function (p) {
@@ -413,10 +413,10 @@ button{font-family:inherit}
     }).join('');
     var axis = t.available && max > 0
       ? ('<span>' + fmtUsd(max) + '</span><span>' + fmtUsd(max / 2) + '</span><span>$0</span>')
-      : '<span>$—</span><span>$—</span><span>$—</span>';
+      : '<span></span><span></span><span></span>';
     var overlay = t.available ? '' : '<div class="overlay">' + esc(t.note) + '</div>';
     return '<div class="trendbox"><div class="head"><span class="t">최근 ' + esc(t.period_label) + ' 추이</span>' +
-      '<span class="src">api_cost_logs.created_at</span>' + (chip ? '<span class="chip">' + chip + '</span>' : '') + '</div>' +
+      '<span class="src">AI 비용 기록 · 날짜별</span>' + (chip ? '<span class="chip">' + chip + '</span>' : '') + '</div>' +
       '<div class="tchart"><div class="taxis">' + axis + '</div><div class="tbars">' + bars + '</div>' + overlay + '</div></div>';
   }
 
@@ -432,7 +432,7 @@ button{font-family:inherit}
         '<span class="tok">' + esc(r.tokens_label) + '</span><span class="cost">' + esc(r.cost_label) + '</span></div>';
     }).join('');
     return '<div class="bottom2">' +
-      '<div class="legpanel"><div class="cap">빈 값 표기 규칙 — "0"과 "원천 없음"은 다르다</div>' + legend + '</div>' +
+      '<div class="legpanel"><div class="cap">빈 값 표기 규칙 — "0"과 "정보 없음"은 다르다</div>' + legend + '</div>' +
       '<div class="ccpanel"><div class="head"><span class="t">Claude Code 세션 비용 (별도 구역)</span>' +
       '<span class="cctag">다른 종류의 비용</span></div>' +
       '<div class="desc">' + esc(cc.note) + '</div>' + ccrows +

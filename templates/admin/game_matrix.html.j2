@@ -152,7 +152,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
 {% endblock %}
 
 {% block header_extra %}
-<span class="a2-badge" title="이 화면은 조회만 합니다 — 매핑 재계산은 배치(tools/game_cell_mapper.py)가 합니다">조회 전용</span>
+<span class="a2-badge" title="이 화면은 조회만 합니다 — 매핑 재계산은 별도 일괄 작업이 합니다">조회 전용</span>
 {% endblock %}
 
 {% block content %}
@@ -165,7 +165,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       <span>게임 <b data-bind="m-games">—</b> / <span data-bind="m-games-total">—</span> 매핑</span>
       <span>AI 작업 <b data-bind="m-ai">—</b> / <span data-bind="m-ai-total">—</span> 매핑</span>
       <span>견적 있는 칸 <b data-bind="m-cells">—</b></span>
-      <span>gpu_ladder <b data-bind="m-ladder">—</b>행</span>
+      <span>그래픽카드 서열표 <b data-bind="m-ladder">—</b>개</span>
       <span class="tail gm-tools">
         <button type="button" class="gm-btn" disabled title="향후 사용예정 — 배치 로그 조회 API가 아직 없습니다">배치 로그</button>
         <button type="button" class="gm-btn" disabled title="향후 사용예정 — 내려받기 API가 아직 없습니다">CSV 내려받기</button>
@@ -274,7 +274,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
         <div class="gm-card gm-panel">
           <h6>미정 — 확정 대기</h6>
           <div class="gm-open">
-            <div>화면 ID <span class="sub">— ADM-GRD-020은 가칭</span></div>
+            <div>화면 이름 <span class="sub">— 지금 이름은 가칭</span></div>
             <div>스킵 사유 테이블 적재 <span class="sub">— 1차 범위 여부</span></div>
             <div>권한 범위 <span class="sub">— 조회 등급 공통 노출 여부</span></div>
           </div>
@@ -402,13 +402,13 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     var mapRows = state.tab === 'games' ? m.game_map_rows : m.workload_map_rows;
     if (m.cell_count === 0) {
       set('blocked-title', '격자 데이터 없음');
-      set('blocked-msg', '현재본(is_current) 견적이 0건입니다 — 상품 매트릭스 관리(ADM-GRD-010)에서 먼저 생성하십시오.');
+      set('blocked-msg', '현재 쓰는 견적이 0건입니다 — 상품 매트릭스 관리에서 먼저 생성하십시오.');
       show('blocked', true); show('cols', false); return true;
     }
     if (mapRows === 0) {
       set('blocked-title', '매핑 미실행');
-      set('blocked-msg', (state.tab === 'games' ? 'game_cell_map' : 'workload_cell_map') +
-        '이 0행입니다 — 매핑 배치(tools/game_cell_mapper.py)가 아직 한 번도 실행되지 않았습니다.');
+      set('blocked-msg', (state.tab === 'games' ? '게임별 매핑' : '작업별 매핑') +
+        '이 0건입니다 — 매핑 일괄 작업이 아직 한 번도 실행되지 않았습니다.');
       show('blocked', true); show('cols', false); return true;
     }
     show('blocked', false); show('cols', true); return false;
@@ -546,7 +546,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     set('fail-note', (it.unjudgeable
       ? '원천 데이터가 없어 이 항목은 어느 칸에서도 판정할 수 없습니다 — 불성립(요구 사양 미달)과 구분해 표기합니다.'
       : '탈락 사유는 저장되지 않습니다 — 매핑 표에는 성립한 칸만 기록됩니다(배치 로그로만 확인 가능). ' +
-        '칸의 GPU가 gpu_ladder에 없어 배치가 그 칸 자체를 판정에서 제외한 경우도 이 목록에 함께 나올 수 있으며, 구분 정보는 저장되지 않습니다.') +
+        '칸의 GPU가 그래픽카드 서열표에 없어 배치가 그 칸 자체를 판정에서 제외한 경우도 이 목록에 함께 나올 수 있으며, 구분 정보는 저장되지 않습니다.') +
       ' 견적가 오름차순 상위 ' + num(sel.unmatched_shown) + '칸만 표시합니다.');
   }
 
@@ -591,7 +591,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     if (it.source_url) src.push('<a href="' + esc(it.source_url) + '" target="_blank" rel="noopener">' +
       (isGame ? '게임 요구사양 출처' : '작업 사양 출처') + '</a>' +
       (it.checked_date ? ' · ' + esc(it.checked_date) + ' 확인' : ''));
-    if (g) src.push('<a href="' + esc(g.source_url) + '" target="_blank" rel="noopener">gpu_ladder 출처</a>' +
+    if (g) src.push('<a href="' + esc(g.source_url) + '" target="_blank" rel="noopener">그래픽카드 서열표 출처</a>' +
       (g.checked_date ? ' · ' + esc(g.checked_date) + ' 확인' : ''));
     if (!src.length) src.push('출처 미기록');
 

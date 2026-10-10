@@ -281,7 +281,7 @@ button{font-family:inherit}
   <div class="ledger-banner" data-keep="1">
     <div class="lb-main">
       <div class="lb-title">완주 이후 상태는 두 원장을 함께 확인해야 합니다</div>
-      <div class="lb-desc">orders는 2026-08-10 이후 갱신이 없는 옛 원장이고, handoffs가 지금 쌓이는 인계 원장입니다. 한쪽만 보면 최근 인계가 이 화면에서 사라집니다.</div>
+      <div class="lb-desc">주문 기록은 2026-08-10 이후 갱신이 없는 옛 기록이고, 인계 기록이 지금 쌓이는 기록입니다. 한쪽만 보면 최근 인계가 이 화면에서 사라집니다.</div>
     </div>
     <div class="lb-side">우리는 팔지 않고 인계합니다</div>
   </div>
@@ -387,8 +387,8 @@ button{font-family:inherit}
     // 않는다) — 이 화면은 원래도 status 원문을 그대로 쓰지 않고 snapshots/order_no/
     // handoff_no 유무로 계약의 "상태 4종"을 직접 파생한다.
     if (!it.snapshots || !it.snapshots.length) return { cls: 'drop', label: '— 이탈' };
-    if (it.handoff_no) return { cls: 'handoff', label: '완주 → 인계(handoffs)' };
-    if (it.order_no) return { cls: 'ordered', label: '완주 → 주문(orders)' };
+    if (it.handoff_no) return { cls: 'handoff', label: '완주 → 인계' };
+    if (it.order_no) return { cls: 'ordered', label: '완주 → 주문' };
     return { cls: 'done', label: '✓ 완주' };
   }
   function handoffTip(it) {
@@ -489,9 +489,9 @@ button{font-family:inherit}
       kpiCard('이탈', '<span class="val real">' + fmtInt(dropTotal) + '</span><span class="unit">건</span>',
         '<span class="kpichip sample">전체 ' + fmtInt(total) + '건 기준</span>',
         '이 페이지 ' + fmtInt(N) + '건 기준 ' + fmtInt(dropN) + '건') +
-      kpiCard('완주 이후(orders·handoffs)',
-        '<div class="dual"><span class="dline"><span class="dk">orders</span><span class="dv real num">' + fmtInt(ordersN) + '건</span></span>' +
-        '<span class="dline"><span class="dk">handoffs</span><span class="dv real num">' + fmtInt(handoffN) + '건</span></span></div>',
+      kpiCard('완주 이후(주문·인계)',
+        '<div class="dual"><span class="dline"><span class="dk">주문</span><span class="dv real num">' + fmtInt(ordersN) + '건</span></span>' +
+        '<span class="dline"><span class="dk">인계</span><span class="dv real num">' + fmtInt(handoffN) + '건</span></span></div>',
         '<span class="kpichip sample">이 페이지 ' + fmtInt(N) + '건 기준</span>', '');
   }
 
@@ -701,13 +701,13 @@ button{font-family:inherit}
       ordersLine = '연결된 주문 없음 — 견적 자체가 없으므로 주문할 것도 없습니다.';
       handoffsLine = '인계 없음 — 견적 자체가 없으므로 인계할 것도 없습니다.';
     } else {
-      ordersLine = item.order_no ? (esc(item.order_no) + ' · ' + esc(item.order_status || '상태 없음')) : '연결된 주문 없음(orders 기준).';
+      ordersLine = item.order_no ? (esc(item.order_no) + ' · ' + esc(item.order_status || '상태 없음')) : '연결된 주문 없음.';
       handoffsLine = item.handoff_no
         ? (esc(item.handoff_no) + ' · ' + esc(item.handoff_status || '상태 없음') +
            ' · 우리 합계 ' + esc(fmtWon(item.handoff_total_quoted)) + ' · 몰 합계 ' + esc(fmtWon(item.handoff_total_mall)) +
            ' · ' + (item.handoff_price_checked ? '가격 확인 완료' : '가격 미확인') +
            ' · ' + esc(fmtTime(item.handoff_at)))
-        : '인계 없음 — 아직 이 세션은 인계되지 않았습니다(handoffs 기준).';
+        : '인계 없음 — 아직 이 상담은 인계되지 않았습니다.';
     }
     html += '<div><div class="dw-cap">④ 완주 이후 상태 — 두 원장 모두 확인</div>' +
       '<div class="ledgerline"><span class="ll-k">orders</span><span class="ll-v">' + ordersLine + '</span></div>' +

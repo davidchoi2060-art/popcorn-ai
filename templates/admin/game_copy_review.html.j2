@@ -311,7 +311,7 @@
     var L = S.list, f = L.filters, by = {};
     f.states.forEach(function (s) { by[s.value] = s.n; });
     $('gcKpis').innerHTML =
-        kpi('전체 문구', L.grand_total + '건', 'game_customer_copy 행 수')
+        kpi('전체 문구', L.grand_total + '건', '저장된 고객 문구 수')
       + kpi('고객 노출 중', L.live_count + '건', '팝콘톡이 ' + L.customer_gate_label)
       + f.states.map(function (s) {
           return kpi('검수 ' + s.value, s.n + '건', '전체 기준');

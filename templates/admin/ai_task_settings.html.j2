@@ -299,7 +299,7 @@ input{font-family:var(--rv-mono)}
         <div class="ats-taskbox-hd">
           <span class="t">작업 종류 <span id="taskCount" class="num">—</span></span>
           <span style="flex:1"></span>
-          <span class="tag">닫힌 목록 · A-02·A-03</span>
+          <span class="tag">정해진 목록</span>
         </div>
         <div id="taskRows"></div>
         <div class="ats-empty-mini" id="noTasksMsg" hidden>
@@ -313,11 +313,11 @@ input{font-family:var(--rv-mono)}
         </div>
       </div>
 
-      <div class="ats-conflictbox">
-        <div class="cap">문서 간 불일치 — 결정 필요</div>
+      <details class="ats-conflictbox a2-more">
+        <summary class="cap">자세히 — AI 업체 구성 결정 경위</summary>
         <div id="conflictsList"></div>
-        <div class="ats-conflict-note">랜딩(<span style="font-family:var(--rv-mono)">main-landing.html</span>)이 이미 "3개 AI가 같은 문장을 읽는다"를 고객에게 약속 중입니다 — 이 화면은 그 약속과 맞는 쪽(집합 + 수렴)으로 그려져 있습니다. decision-log <b>A-35</b>(2026-08-13)가 이 안을 정식 채택했습니다.</div>
-      </div>
+        <div class="ats-conflict-note">첫 화면(랜딩)이 이미 "3개 AI가 같은 문장을 읽는다"를 고객에게 알리고 있어, 이 화면도 그에 맞춰 AI 업체 3곳을 함께 쓰는 구성으로 되어 있습니다. 2026-08-13에 이 구성으로 확정했습니다.</div>
+      </details>
     </aside>
 
     <div class="ats-right" id="rightPanel"></div>
@@ -528,7 +528,7 @@ input{font-family:var(--rv-mono)}
     var d = S.draft;
     if (!t || !d) {
       panel.innerHTML = '<div class="ats-nosel"><div class="ti">왼쪽에서 작업을 고르세요</div>' +
-        '<div class="ds">작업 종류는 닫힌 목록입니다 — 견적을 만드는 일은 엔진 소관(A-02·A-03).</div></div>';
+        '<div class="ds">작업 종류는 정해진 목록입니다 — 견적을 만드는 일은 AI가 아니라 추천 엔진이 맡습니다.</div></div>';
       return;
     }
     var owner = canWrite();

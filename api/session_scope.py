@@ -87,6 +87,7 @@ def scope_note() -> str:
     어휘는 `SCOPE_LABEL`(「시험 운영 기간」) 하나로 고정 — 이미 `api/customer_write_lock.py`
     의 `REASON` 이 고객에게 쓰던 말이다. 새 말을 지어내지 않는다.
     """
-    return (f"{SCOPE_BASELINE_SQL}(UTC) 이전은 「{SCOPE_LABEL}」으로 분리해 이 수치에서"
-            f" 제외했습니다 — 그 이전은 회귀·점검 트래픽과 섞여 있었습니다(data_origin="
-            f"'real' · 기준선 이후만 집계).")
+    # 화면 문구 — 내부 조건(data_origin 등)·UTC 표기를 빼고 한국 시간으로 적는다(2026-10-10).
+    # 기준 시각 2026-08-19 15:57:46 UTC = 2026-08-20 00:57 KST.
+    return (f"2026-08-20 00:57(한국 시간) 이전은 「{SCOPE_LABEL}」으로 분리해 이 수치에서"
+            f" 제외했습니다 — 그 이전에는 시험·점검용 접속이 섞여 있었습니다.")
