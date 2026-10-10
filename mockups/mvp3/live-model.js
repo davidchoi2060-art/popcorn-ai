@@ -22,15 +22,14 @@
   function storageLabel(gb){return gb>=1000&&gb%1000===0?gb/1000+'TB':gb>=1024&&gb%1024===0?gb/1024+'TB':gb+'GB';}
   function cardSpecRows(spec){
     if(!object(spec))return [];
-    const rows=[],has=key=>Object.prototype.hasOwnProperty.call(spec,key);
-    if(has('cpu'))rows.push(['CPU',spec.cpu]);
-    if(has('gpu')||has('vram_gb')){
-      const gpu=has('gpu')?spec.gpu:'',vram=has('vram_gb')?spec.vram_gb+'GB':'';
-      rows.push(['GPU',gpu&&vram&&!gpu.replace(/\s+/g,'').toUpperCase().includes(vram.toUpperCase())?gpu+' · '+vram:gpu||vram+' 그래픽카드']);
-    }
-    if(has('ram_gb'))rows.push(['RAM',spec.ram_gb+'GB']);
-    if(has('ssd_gb'))rows.push(['저장장치',storageLabel(spec.ssd_gb)+' SSD']);
-    return rows;
+    const NONE='정보 없음',val=key=>{const v=spec[key];return v===null||v===undefined||(typeof v==='string'&&!v.trim())?'':v;};
+    const cpu=val('cpu'),gpu=val('gpu')?String(val('gpu')):'',vram=val('vram_gb')!==''?val('vram_gb')+'GB':'',ram=val('ram_gb'),ssd=val('ssd_gb');
+    return [
+      ['CPU',cpu!==''?cpu:NONE],
+      ['GPU',gpu&&vram&&!gpu.replace(/\s+/g,'').toUpperCase().includes(vram.toUpperCase())?gpu+' · '+vram:gpu||(vram?vram+' 그래픽카드':NONE)],
+      ['RAM',ram!==''?ram+'GB':NONE],
+      ['저장장치',ssd!==''?storageLabel(ssd)+' SSD':NONE]
+    ];
   }
   function specText(spec){return typeof spec==='string'?spec:specRows(spec).map(([label,value])=>label+' '+value).join('\n');}
   function safeUrl(value){

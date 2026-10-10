@@ -46,17 +46,17 @@ test('generated-media: exact server route and canonical AI notice survive normal
   }
 });
 test('generated-media: missing/unavailable/temporary states request no image and preserve the product',async()=>{
-  for(const [photo,label] of [[undefined,'이미지 준비 중'],[null,'이미지 준비 중'],[{state:'unavailable',url:URL},'이미지 준비 중'],[{state:'temporarily_unavailable',url:URL},'이미지를 불러오지 못했습니다']]){
+  for(const [photo,label] of [[undefined,'정보 없음'],[null,'정보 없음'],[{state:'unavailable',url:URL},'정보 없음'],[{state:'temporarily_unavailable',url:URL},'이미지를 불러오지 못했습니다']]){
     const h=harness({item:{...product,photo}});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null);assert.equal(h.w.document.querySelector('.live-product-image-status').textContent,label);assert.match(h.w.document.querySelector('.live-product-card').textContent,/900,000원/);assert.deepEqual(business(h.w.MVP3LiveModel.recommendations(h.response)),h.before);assert.equal(h.calls.length,2);}finally{h.close();}
   }
 });
 test('generated-media: external, executable, wrong-SKU, admin, cloud, CASE, query and noncanonical URLs are rejected',async()=>{
   const bad=[null,42,'https://external.invalid'+URL,'javascript:alert(1)','data:image/png;base64,AA','//qa.invalid'+URL,'/api/customer/products/113835/representative-image','/api/admin/pc-configurations/1/media','https://storage.googleapis.com/bucket/representative.png','/api/product-images/129551/detail',URL+'?v=1',URL+'#a','/mvp3/..'+URL,'/api/customer/products/0113836/representative-image','https://user@qa.invalid'+URL,'https://qa.invalid:444'+URL];
-  for(const url of bad){const h=harness({item:{...product,photo:{...available,url}}});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null,String(url));assert.equal(h.w.document.querySelector('.live-product-image-status').textContent,'이미지 준비 중');assert.equal(h.calls.length,2);}finally{h.close();}}
+  for(const url of bad){const h=harness({item:{...product,photo:{...available,url}}});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null,String(url));assert.equal(h.w.document.querySelector('.live-product-image-status').textContent,'정보 없음');assert.equal(h.calls.length,2);}finally{h.close();}}
 });
 test('generated-media: original-photo kind, invalid state, altered/missing notice and unsafe code do not claim an AI image',async()=>{
   for(const item of [{...product,photo:{...available,kind:'registered_product_photo'}},{...product,photo:{...available,state:'unknown'}},{...product,photo:{...available,notice:''}},{...product,photo:{...available,notice:'실제 조립 사진'}},{...product,product_code:Number.MAX_SAFE_INTEGER+1,photo:available}]){
-    const h=harness({item});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null);assert.equal(h.w.document.querySelector('figcaption'),null);assert.match(h.w.document.querySelector('.live-product-card').textContent,/이미지 준비 중/);}finally{h.close();}
+    const h=harness({item});try{await recommend(h);assert.equal(h.w.document.querySelector('[data-product-image]'),null);assert.equal(h.w.document.querySelector('figcaption'),null);assert.match(h.w.document.querySelector('.live-product-card').textContent,/정보 없음/);}finally{h.close();}
   }
 });
 test('generated-media: img error retains AI notice, price, spec, selection and API call count; unrelated icon is unaffected',async()=>{
@@ -114,7 +114,7 @@ test('approved-ui: selected BOM, photo, game context and native GPU disclosure s
     const selected=clone(h.flow.state.selected),calls=clone(h.calls);doc.querySelector('details[data-detail="bom-1"]').open=true;h.flow.emit();
     assert.equal(doc.querySelector('details[data-detail="bom-1"]').open,true);assert.match(doc.querySelector('tr[data-part="bom-1"]').textContent,/Fixture 8GB/);
     assert.ok([...doc.querySelectorAll('.public-bom [data-action=unavailable]')].every(b=>b.disabled));assert.equal(doc.querySelectorAll('.public-bom .final-part-price').length,2);
-    assert.ok([...doc.querySelectorAll('.public-bom .final-part-price')].every(e=>e.textContent==='미확인'));assert.match(doc.querySelector('.public-bom-photo').textContent,/미확인/);
+    assert.ok([...doc.querySelectorAll('.public-bom .final-part-price')].every(e=>e.textContent==='미확인'));assert.match(doc.querySelector('.public-bom-photo').textContent,/정보 없음/);
     doc.querySelector('[data-product-image]').dispatchEvent(new h.w.Event('error'));assert.equal(doc.querySelector('figcaption').textContent,NOTICE);assert.equal(doc.querySelector('[data-product-image-status]').hidden,false);
     assert.deepEqual(clone(h.flow.state.selected),selected);assert.deepEqual(h.calls,calls);assert.match(doc.querySelector('#actions').textContent,/900,000원/);
     h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');assert.ok(doc.querySelector('.public-bom-information .live-explanation'));assert.equal(doc.querySelector('.public-bom-information').open,false);

@@ -64,7 +64,7 @@ function assertSavedBasis(h,{photo,bom}){
   assert.equal(h.flow.state.selected.spec.cpu,'SAVED CPU');
   const img=view.querySelector('[data-product-image]');
   if(photo){assert.equal(img.getAttribute('src'),URL);assert.equal(view.querySelector('figcaption').textContent,NOTICE);}
-  else{assert.equal(img,null);assert.match(text,/이미지 준비 중/);}
+  else{assert.equal(img,null);assert.match(text,/정보 없음/);}
   if(bom){assert.ok(view.querySelector('.public-bom'),'public BOM section');assert.ok(!text.includes(EMPTY_BOM));assert.match(text,/CODE\/MOCK GPU/);}
   else{assert.ok(text.includes(EMPTY_BOM));assert.equal(view.querySelector('.public-bom'),null);assert.doesNotMatch(text,/CODE\/MOCK GPU/);}
 }
@@ -82,7 +82,7 @@ test('saved-basis GET load: saved price/spec with current photo and public BOM p
     assert.ok(h.calls.every(c=>c.method==='GET'));
   });
 });
-test('saved-basis GET load: photo unavailable and public_configuration null/withdrawn fall back to 이미지 준비 중 and no BOM',async()=>{
+test('saved-basis GET load: photo unavailable and public_configuration null/withdrawn fall back to 정보 없음 and no BOM',async()=>{
   for(const [photo,configuration] of withdrawn){
     await withHarness({quoteProduct:{...savedProduct,photo,public_configuration:configuration}},async h=>{
       await loadSaved(h);assertSavedBasis(h,{photo:false,bom:false});assert.ok(h.calls.every(c=>c.method==='GET'));
