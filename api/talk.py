@@ -164,6 +164,7 @@ from . import talk_schema as TS
 # 자유 답변·DB 근거 수집·위키 조회·★필터가 전부 저기 있다. 이 파일의 [A] 프롬프트는
 # 한 글자도 바뀌지 않았다(제약 추출 정확도를 건드리지 않는다).
 from . import talk_answer as TA
+from . import talk_rules as TR   # 문장 원문으로 AI state 를 바로잡는 규칙(2026-10-10)
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -472,6 +473,8 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "- 애매하면 true 다. false 는 격자 좌표를 뽑지 않는 판정이라 확실할 때만 쓴다"
         "(상담을 끊는 판정이 아니다 -- 서버가 [잡담] 단계로 받아준다).",
         "- 이전 상태가 있고 이번 문장이 그것을 고치는 말이면(예산 변경·용도 추가) true 다.",
+        "- 노트북·랩탑 문의도 true 다. 우리는 노트북을 팔지 않고 데스크톱(조립 PC)만 판다 --"
+        " reply 에서 노트북을 찾아 주겠다고 말하지 않는다(안내 문장은 서버가 붙인다).",
         "- 게임 «고르기·공략·재미»만 묻고 컴퓨터를 사거나 맞출 뜻이 없어 보이면 false 다"
         " (예: \"어떤 게임 해볼까?\", \"그 게임 재밌어요?\"). 반송하려는 것이 아니라 아래"
         " [잡담] 규칙으로 받아주기 위한 구분이다 -- 같은 사람이 곧 PC 를 물으면 true 로 돌아온다.",
@@ -500,6 +503,7 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "- tier_key 는 비게임 용도에서 고객 말이 성능 수준을 가리킬 때만(예: \"4K 편집\"·"
         "\"가볍게 문서만\") [성능 티어] 설명을 보고 고른다. 가늠할 말이 없으면 null.",
         "- budget_won 은 원 단위 정수다. \"150만\"·\"150\"(만원 생략)·\"백오십\" -> 1500000."
+        " \"백만원\" -> 1000000 (천만원이 아니다), \"천만원\" -> 10000000."
         " 금액이 문장에 없으면 이전 값 유지, 이전에도 없으면 null.",
         f"- usages 가 비었으면 missing 에 \"{TS.MISSING_USAGES}\" 를 적는다. missing 은"
         f" {' / '.join(_MISSING_KEYS)} 둘 중에서만 고른다 -- 해상도·예산은 missing 이 아니다.",
@@ -787,6 +791,47 @@ def _legacy_constraints(state: "TS.TalkState") -> list:
     return out
 
 
+def _apply_text_rules(text: str, raw, vocab: "TS.Vocab") -> tuple:
+    """AI 가 낸 state(dict) -> (바로잡은 dict, 바로잡은 내역[{field, value, reason}]).
+
+    `validate_state` **앞**에서 고친다 -- 그래야 게임명을 채웠을 때 확정 등급(catalog)이
+    검증층에서 그대로 붙는다. 고친 것은 dropped 와 같은 모양으로 남긴다(삼키지 않는다).
+      · 예산: 문장에 금액이 하나로 적혀 있고 AI 값과 다르면 문장 값을 쓴다(「백만원」 10배 오독).
+      · 게임명: AI 가 이름을 하나도 안 넣었는데 문장에 우리 목록의 게임이 있으면 채운다.
+    """
+    raw = dict(raw) if isinstance(raw, dict) else {}
+    fixes: list = []
+    won = TR.budget_from_text(text)
+    if won:
+        try:
+            ai_won = int(str(raw.get("budget_won")).replace(",", "")) if raw.get("budget_won") is not None else None
+        except (TypeError, ValueError):
+            ai_won = None
+        if ai_won != won:
+            fixes.append({"field": "budget_won", "value": raw.get("budget_won"),
+                          "reason": f"문장의 금액({won}원)으로 바로잡음"})
+            raw["budget_won"] = won
+    game = raw.get("game") if isinstance(raw.get("game"), dict) else None
+    names = game.get("names") if game else None
+    if not (isinstance(names, list) and any(isinstance(n, str) and n.strip() for n in names)):
+        found = TR.games_from_text(text, vocab, TS.match_game)
+        if found:
+            usages = [u for u in (raw.get("usages") or []) if isinstance(u, str)] \
+                if isinstance(raw.get("usages"), list) else []
+            if not any(TS.is_game_usage(u) for u in usages):
+                label = "게임" if "게임" in vocab.usage_labels else next(
+                    (u for u in vocab.usage_labels if TS.is_game_usage(u)), None)
+                if label:
+                    usages.append(label)
+            raw["usages"] = usages
+            g = dict(game or {})
+            g["names"] = found
+            raw["game"] = g
+            fixes.append({"field": "game.names", "value": names,
+                          "reason": "문장에서 게임 이름을 찾아 채움: " + ", ".join(found)})
+    return raw, fixes
+
+
 def _evidence_lines(obj: dict) -> list:
     """모델의 evidence -> 문자열 목록. 형식이 틀리면 빈 목록(판단 근거는 표시용이라 502 사유가
     아니다). 줄 하나의 길이는 REPLY_MAX_LEN 으로 자른다 -- 로그·화면 표시용 문자열이다."""
@@ -921,17 +966,30 @@ def parse_talk(body: ParseBody, request: Request):
         raise HTTPException(502, PARSE_FAILED)
 
     # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
-    state, dropped = TS.validate_state(obj.get("state") or {}, vocab)
+    # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
+    raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab)
+    state, dropped = TS.validate_state(raw_state, vocab)
+    dropped.extend(fixes)
     # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
     # "game.resolution" 처럼 계약 밖 좌표를 적어도 카드가 막히지 않게).
     missing = TS.missing_for(state, vocab)
+    # 게임 이름 없는 게임 질문 -- 예산이 있거나 이미 한 번 물었으면 FHD 기준으로 카드로 넘긴다
+    # (2026-10-10 점검 9·27번. 추천 단계는 #53 에서 같은 기준으로 이미 고쳤다).
+    released = TR.release_unnamed_game(missing, state, prev_state_obj, TS.is_game_usage,
+                                       TS.MISSING_GAME_GRADE)
+    if released:
+        missing = []
     # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
     # 2026-09-16). missing 이 있으면 카드가 안 나가는데 「1080p 가정」 배지가 붙는 것은
     # 앞서 가는 말이다 -- 되묻는 턴에는 가정도 없다.
     assumed: list = []
-    if not missing and state.game is not None and state.game.resolution is None:
+    if not missing and any(TS.is_game_usage(u) for u in state.usages) and (
+            state.game is None or state.game.resolution is None):
         assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
     pc = _pc_verdict(obj)
+    laptop = TR.mentions_laptop(text)
+    if laptop and pc is not True:
+        pc = True        # 노트북 문의는 PC 상담이다 -- 잡담으로 세지 않는다
     # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
     #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
     #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
@@ -942,6 +1000,10 @@ def parse_talk(body: ParseBody, request: Request):
     prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
     turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
     reply = _reply_text(obj, pc, bool(state.usages), stage)
+    if released and stage == TS.STAGE_PC:
+        reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
+    if laptop and stage == TS.STAGE_PC:
+        reply = TR.with_laptop_notice(reply)
     evidence = _evidence_lines(obj)
 
     # ── [B] 결과 조립 ────────────────────────────────────────────────────────
@@ -949,6 +1011,9 @@ def parse_talk(body: ParseBody, request: Request):
     #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
     #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
     answer = ans.answer or ""
+    if released and ans.narrowing == TS.NARROWING_WIDE:
+        # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
+        answer = ""
     if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
         answer = answer.replace(TA.NUDGE_NARROW, "").strip()
     # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).

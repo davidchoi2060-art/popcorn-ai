@@ -28,6 +28,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import usage_floors as UF   # 용도 어휘의 정본 로더 — 다시 짜지 않는다
+from . import talk_rules as TR    # 줄임말 보충 표(2026-10-10)
 
 # ── 스키마 수준 고정값 (DB 에서 읽지 않는 유일한 어휘) ────────────────────────
 # RESOLUTION_VALUES: grid_cells.game_resolution 의 실값 DISTINCT(2026-09-16 실측 —
@@ -334,6 +335,8 @@ def load_vocab(conn) -> Vocab:
         " ORDER BY a.alias"
     )).mappings().all():
         game_aliases[_norm_name(r["alias"])] = r["name"]
+    # 표에 없는 흔한 줄임말(발로·메이플·서든 …)을 코드에서 보충한다 — 표가 이긴다(2026-10-10).
+    game_aliases = TR.merged_game_aliases(game_aliases, all_names, _norm_name)
     return Vocab(tiers=tiers, grades=grades, confirmed_games=confirmed,
                  all_game_names=all_names, usages=usages, genres=genres,
                  genre_aliases=aliases, game_aliases=game_aliases,
