@@ -247,6 +247,44 @@ class PickRuleTest(unittest.TestCase):
             self.assertNotIn(old, src.split('"""', 2)[2])
 
 
+class SameLevelBudgetTest(unittest.TestCase):
+    """2026-10-10: 예산 안 상품이 모두 같은 수준이면 다음 수준에 가장 가까운 것을 추천 구성으로 둔다.
+    「영상 편집 300만원」·「배그 200만원」에 158만원 1장만 나오던 사례."""
+
+    @staticmethod
+    def p(code, price, gap, rank=2):
+        return {'code': code, 'name': f'PC{code}', 'price': price, 'price_src': '현재 판매가',
+                'url': None, 'spec': {}, 'includes': None,
+                'fit': {'게임': {'level': f'L{rank}', 'rank': rank,
+                                 'blocked': [f'램 {16 * (i + 2)}GB 미만' for i in range(gap)]}}}
+
+    def pick(self, items, budget, preferred=frozenset()):
+        return S.pick('게임', 1, budget, '이하', [], {i['code']: i for i in items}, preferred)
+
+    def roles(self, res):
+        return [(i['product_code'], i['role']) for i in res['items']]
+
+    def test_same_level_pair_is_cheapest_then_closest_to_next_level(self):
+        res = self.pick([self.p(1, 1585100, 5), self.p(2, 1900000, 3), self.p(3, 2700000, 1),
+                         self.p(4, 2800000, 1), self.p(5, 3200000, 0)], 3000000)
+        self.assertEqual(self.roles(res), [(1, 'value'), (3, 'recommended')])
+
+    def test_single_when_cheapest_is_also_closest(self):
+        res = self.pick([self.p(1, 1500000, 1), self.p(2, 1800000, 1), self.p(3, 1900000, 2)], 2000000)
+        self.assertEqual(self.roles(res), [(1, 'recommended')])
+
+    def test_value_is_never_closer_to_next_level_than_recommended(self):
+        # 승인 우선으로 3 이 추천이면, 그보다 다음 수준에 가까운 2 는 알뜰 자리에 오지 않는다.
+        res = self.pick([self.p(1, 1500000, 4), self.p(2, 1600000, 1), self.p(3, 1900000, 2)],
+                        2000000, preferred=frozenset({3}))
+        self.assertEqual(self.roles(res), [(1, 'value'), (3, 'recommended')])
+
+    def test_public_preferred_among_same_level(self):
+        res = self.pick([self.p(1, 1585100, 5), self.p(2, 1945700, 1), self.p(3, 1780600, 2)],
+                        2000000, preferred=frozenset({1, 3}))
+        self.assertEqual(self.roles(res), [(1, 'value'), (3, 'recommended')])
+
+
 class PublicPreferenceTest(unittest.TestCase):
     """2026-10-09 조정 결정: 같은 판정 안에서만 고객 공개 승인(사진 있음) 상품을 먼저 고른다."""
     p = staticmethod(PickRuleTest.p)
