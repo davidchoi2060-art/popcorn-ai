@@ -148,3 +148,40 @@ test('rate-limited retry respects delay; overlong input never requests',async()=
  let calls=0;const h=harness({parse:async()=>{calls++;throw new A.ApiError('wait',429,'rate',30);}});
  assert.equal(await h.flow.submit('x'.repeat(301)),false);await h.flow.submit('request');await h.flow.retry();assert.equal(calls,1);assert.ok(h.flow.state.error.retryAt>Date.now());
 });
+// 2026-10-11 상담 주고받기: 세 장 · 카드 뒤 선택 · 추가 조건 왕복(api/reco_explore).
+const explored={...reco,talk_notes:['「램 64GB 이상」 조건은 지금 못 맞춥니다. 판매 중인 PC 중에 이 조건을 맞추는 것이 없어요.','더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요.',7],
+ choices:[{id:'cheaper',label:'더 싼 PC 볼래요',enabled:true},{id:'better',label:'더 높은 사양 볼래요',enabled:false},{id:'change',label:'조건 바꿀게요',enabled:true},{id:'evil',label:'x',enabled:true}],
+ anchor_code:101,wants:{min_ram_gb:64}};
+test('recommend forwards only text, wants, direction and anchor',async()=>{
+ const bodies=[],c=client(async(url,init)=>{bodies.push(JSON.parse(init.body));return response(reco);});
+ await c.recommend(talk,{},{text:'램 64GB',wants:{min_ram_gb:64},nav:'better',anchor_code:101,secret:'x'});
+ await c.recommend(talk,{},{nav:'sideways',anchor_code:-1,wants:[1],text:'  '});await c.recommend(talk);
+ assert.deepEqual(bodies,[{state:talk,text:'램 64GB',wants:{min_ram_gb:64},nav:'better',anchor_code:101},{state:talk},{state:talk}]);
+});
+test('model keeps premium/chosen roles and only well-formed follow-up fields',()=>{
+ assert.equal(M.product({...product,tag:'더 높은 사양',role:'premium'}).role,'premium');
+ assert.equal(M.product({...product,tag:'더 높은 사양'}).role,'premium');assert.equal(M.product({...product,tag:'고른 구성'}).role,'chosen');
+ const r=M.recommendations(explored);
+ assert.equal(r.talkNotes.length,2);assert.deepEqual(r.choices.map(c=>[c.id,c.enabled]),[['cheaper',true],['better',false],['change',true]]);
+ assert.equal(r.anchorCode,101);assert.deepEqual(r.wants,{min_ram_gb:64});
+ const none=M.recommendations(reco);assert.deepEqual([none.talkNotes,none.choices,none.anchorCode,none.wants],[[],[],null,null]);
+});
+test('flow: server notes become chat lines; wants and anchor round-trip; quick choice skips the AI parse',async()=>{
+ const calls=[];let parses=0;
+ const h=harness({parse:async()=>{parses++;return parsed;},recommend:async(state,options,extra)=>{calls.push(extra);return explored;}});
+ await h.flow.submit('램 64기가로 올려주세요');
+ assert.deepEqual(calls[0],{wants:null,anchor_code:null,text:'램 64기가로 올려주세요'});
+ assert.deepEqual(h.flow.state.messages.slice(-2).map(m=>m.text),explored.talk_notes.slice(0,2));
+ assert.deepEqual(h.flow.state.wants,{min_ram_gb:64});assert.equal(h.flow.state.anchorCode,101);assert.equal(h.flow.state.pendingText,'');
+ await h.flow.explore('cheaper','더 싼 PC 볼래요');
+ assert.equal(parses,1);assert.deepEqual(calls[1],{wants:{min_ram_gb:64},anchor_code:101,nav:'cheaper'});
+ assert.equal(h.flow.state.messages.filter(m=>m.who==='user').at(-1).text,'더 싼 PC 볼래요');
+ await h.flow.explore('sideways');assert.equal(calls.length,2);
+ h.flow.reset();assert.deepEqual([h.flow.state.wants,h.flow.state.choices,h.flow.state.anchorCode],[null,[],null]);
+});
+test('flow: a condition said while the server still asks rides along to the next recommendation',async()=>{
+ const calls=[];let n=0;
+ const h=harness({parse:async()=>(n++===0?{...parsed,missing:['usages']}:parsed),recommend:async(s,o,extra)=>{calls.push(extra.text);return reco;}});
+ await h.flow.submit('흰색 케이스로요');assert.equal(calls.length,0);await h.flow.submit('게임용 200');
+ assert.deepEqual(calls,['흰색 케이스로요 / 게임용 200']);
+});

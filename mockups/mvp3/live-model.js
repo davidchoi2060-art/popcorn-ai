@@ -88,9 +88,10 @@
   }
   // Card role (sold_reco: value · recommended · reference). Responses and saved
   // snapshots from before the role field carry only the badge text.
-  const legacyRoles={'추천 구성':'recommended','예산 안 최고 수준':'recommended','알뜰 구성':'value','가장 저렴한 선택':'value','예산을 넘는 최저가':'reference'};
+  // premium = 추천 구성 다음 「더 높은 사양」, chosen = 목록 밖에서 고객이 고른 카드를 보관한 것(2026-10-11).
+  const legacyRoles={'추천 구성':'recommended','예산 안 최고 수준':'recommended','알뜰 구성':'value','가장 저렴한 선택':'value','예산을 넘는 최저가':'reference','더 높은 사양':'premium','고른 구성':'chosen'};
   function productRole(value){
-    if(['value','recommended','reference'].includes(value.role))return value.role;
+    if(['value','recommended','reference','premium','chosen'].includes(value.role))return value.role;
     return value.role===undefined||value.role===null?legacyRoles[text(value.tag)]||'':'';
   }
   function product(value){
@@ -118,7 +119,19 @@
         products:(Array.isArray(set.items)?set.items:[]).map(product).filter(Boolean).map(p=>({...p,index:index++}))};
     }).filter(Boolean);
     return {groups,unsupported,needs:Array.isArray(value.needs)?value.needs.filter(x=>typeof x==='string'):[],
-      assumed:Array.isArray(value.assumed)?value.assumed.filter(x=>typeof x==='string'):[],aiEstimated:Array.isArray(value.ai_estimated)?value.ai_estimated:[]};
+      assumed:Array.isArray(value.assumed)?value.assumed.filter(x=>typeof x==='string'):[],aiEstimated:Array.isArray(value.ai_estimated)?value.ai_estimated:[],
+      ...exploration(value)};
+  }
+  // Conversation follow-ups (api/reco_explore): sentences to say after the cards, quick
+  // choices, the card they are measured from, and the extra conditions to send back next time.
+  const CHOICE_IDS=['cheaper','better','change'];
+  function exploration(value){
+    const notes=Array.isArray(value.talk_notes)?value.talk_notes.filter(x=>typeof x==='string'&&x.trim()).slice(0,8):[];
+    const choices=Array.isArray(value.choices)?value.choices.filter(c=>object(c)&&CHOICE_IDS.includes(c.id)&&text(c.label).trim())
+      .map(c=>({id:c.id,label:c.label,enabled:c.enabled===true})):[];
+    const anchorCode=Number.isSafeInteger(value.anchor_code)&&value.anchor_code>0?value.anchor_code:null;
+    const wants=object(value.wants)&&JSON.stringify(value.wants).length<=2048?copy(value.wants):null;
+    return {talkNotes:notes,choices,anchorCode,wants};
   }
   function quote(value){
     if(!object(value)||!uuid(value.id)||!object(value.state)||typeof value.saved_at!=='string'||!/^\d{4}-\d\d-\d\dT/.test(value.saved_at)||!Number.isFinite(Date.parse(value.saved_at)))return null;

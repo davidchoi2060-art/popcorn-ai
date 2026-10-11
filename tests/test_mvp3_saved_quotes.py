@@ -71,7 +71,8 @@ class SavedQuotesTest(unittest.TestCase):
                         patch.object(m, 'load_vocab', return_value=None),
                         patch.object(m, 'validate_state', return_value=(SimpleNamespace(model_dump=lambda: {'usages': ['게임']}), [])),
                         patch.object(m.customer_pc_offer, 'public_item', side_effect=lambda code: dict(LIVE)),
-                        patch.object(m.grid_public, 'recommend', return_value=RECO)]
+                        patch.object(m.grid_public, 'recommend', return_value=RECO),
+                        patch.object(m.grid_public, 'eligible_sold_item', return_value=None)]
         self.mocks = [p.start() for p in self.patches]
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
 
@@ -247,8 +248,27 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertEqual(self.store.executed, [])
 
     def test_private_grid_quote_is_not_sold_product(self):
-        self.mocks[-1].return_value = {'card_sets': [{'kind': 'game', 'cards': [{'product_code': 17}]}]}
+        self.mocks[-2].return_value = {'card_sets': [{'kind': 'game', 'cards': [{'product_code': 17}]}]}
         with self.assertRaises(HTTPException): m.save_quote(body(), request(), Response())
+        self.assertEqual(self.store.rows, [])
+
+    def test_explored_card_outside_default_list_saves_when_eligible(self):
+        # 「더 싸게」로 본 카드는 조건만으로 다시 조회한 목록에 없다 — 같은 판매 원천의 용도 판정을 통과하면 보관한다.
+        eligible = dict(PRODUCT, product_code=31, price=990000, tag='고른 구성', role='chosen')
+        self.mocks[-1].return_value = eligible
+        saved = m.save_quote(body(product_code=31, expected_price=990000), request(), Response())
+        self.assertEqual(saved['quote']['product']['product_code'], 31)
+        self.assertEqual(saved['quote']['product']['role'], 'chosen')
+        self.mocks[-1].assert_called_once_with({'usages': ['게임']}, 31)
+
+    def test_recommended_product_does_not_ask_eligibility(self):
+        m.save_quote(body(), request(), Response())
+        self.mocks[-1].assert_not_called()
+
+    def test_ineligible_explored_card_cannot_insert(self):
+        with self.assertRaises(HTTPException) as ex:
+            m.save_quote(body(product_code=31, expected_price=990000), request(), Response())
+        self.assertEqual(ex.exception.status_code, 409)
         self.assertEqual(self.store.rows, [])
 
 

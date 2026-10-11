@@ -1,5 +1,25 @@
 {
   "ok": true,
+  "talk_notes": [],
+  "choices": [
+    {
+      "id": "cheaper",
+      "label": "더 싼 PC 볼래요",
+      "enabled": false
+    },
+    {
+      "id": "better",
+      "label": "더 높은 사양 볼래요",
+      "enabled": false
+    },
+    {
+      "id": "change",
+      "label": "조건 바꿀게요",
+      "enabled": true
+    }
+  ],
+  "anchor_code": 1,
+  "wants": {},
   "card_sets": [
     {
       "usage": "영상편집",

@@ -86,7 +86,9 @@ class UnsupportedConditions(unittest.TestCase):
                       ai_reply='흰색 케이스로 맞춰드리겠습니다.')
         self.assertNotIn('맞춰드리겠습니다', r['reply'])
         self.assertIn('흰색 케이스', r['reply'])
-        self.assertIn('반영하지 못해요', r['reply'])
+        # 2026-10-11 상담 주고받기: 흰색 케이스는 추천이 실제로 거른다 — 못 맞추면 카드와 함께 말한다.
+        self.assertIn('조건으로 판매 중인 PC를 골라 볼게요', r['reply'])
+        self.assertNotIn('반영하지 못해요', r['reply'])
 
     def test_pref_from_previous_turn_not_repeated(self):
         prev = {'usages': ['사무·인강'], 'budget_won': 800000, 'prefs': ['저소음']}
@@ -95,10 +97,20 @@ class UnsupportedConditions(unittest.TestCase):
         self.assertEqual(r['reply'], '90만원으로 찾아볼게요.')
 
     def test_ram_storage_gpu_listed(self):
-        conds = TR.unsupported_conditions('영상 편집용인데 램 64GB에 2TB, RTX 4070 이상', TS.TalkState())
-        self.assertIn('메모리 64GB', conds)
-        self.assertIn('저장공간 2TB', conds)
-        self.assertTrue(any(c.startswith('그래픽카드 RTX 4070') for c in conds))
+        applied, conds = TR.requested_conditions('영상 편집용인데 램 64GB에 2TB, RTX 4070 이상', TS.TalkState())
+        self.assertIn('메모리 64GB', applied)
+        self.assertIn('저장공간 2TB', applied)
+        self.assertTrue(any(c.startswith('그래픽카드 RTX 4070') for c in applied))
+        self.assertEqual(conds, [])
+        self.assertEqual(TR.unsupported_conditions('영상 편집용인데 램 64GB에 2TB, RTX 4070 이상', TS.TalkState()), [])
+
+    def test_cpu_and_brand_only_gpu_stay_unsupported(self):
+        applied, conds = TR.requested_conditions('i7으로 지포스 들어간 거 램 32GB', TS.TalkState())
+        self.assertEqual(applied, ['메모리 32GB'])
+        self.assertEqual(conds, ['그래픽카드 지포스', 'CPU i7'])
+        notes = TR.honest_notices('i7으로 램 32GB', TS.TalkState())
+        self.assertIn('메모리 32GB 조건으로 판매 중인 PC를 골라 볼게요', notes[0])
+        self.assertIn('CPU i7 조건은 아직 추천에 반영하지 못해요', notes[1])
 
 
 class AdminTags(unittest.TestCase):
@@ -114,9 +126,10 @@ class AdminTags(unittest.TestCase):
             st.enter_context(patch.object(talk.TA, 'run_parallel', lambda a, b: (_ai({}), ans)))
             st.enter_context(patch.object(talk.TA, 'is_game_related', lambda *a: False))
             st.enter_context(patch.object(talk, '_record_hit', lambda *a, **k: seen.update(k)))
-            talk.parse_talk(talk.ParseBody(text='세금계산서 되나요? 램 64GB로'), request=None)
+            talk.parse_talk(talk.ParseBody(text='세금계산서 되나요? 램 64GB로 i7으로'), request=None)
         self.assertIn('주제:payment', seen['matched'])
-        self.assertIn('미반영:메모리 64GB', seen['matched'])
+        self.assertIn('미반영:CPU i7', seen['matched'])
+        self.assertNotIn('미반영:메모리 64GB', seen['matched'])      # 램은 추천이 거른다(2026-10-11)
 
     def test_admin_screen_labels_tags(self):
         from api import admin_mvp3_consults as MC

@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-"""고객 추천 = 판매 중인 몰 조립PC 최대 2개 (2026-09-25 재설계 4단계 · 사장님 「최대 2개 · 승인」).
+"""고객 추천 = 판매 중인 몰 조립PC 최대 3개 (2026-09-25 재설계 4단계 · 사장님 「최대 2개 · 승인」,
+2026-10-11 중헌 님 「스펙트럼을 — 더 고급 사양을」으로 「더 높은 사양」 한 장 추가).
 
 ■ 무엇을 하나
   고객의 용도·예산(TalkState)을 받아, 0115 평가(product_usage_fit)에서 그 용도를 충족하는
@@ -24,6 +25,12 @@
               그대로이고, 승인 후보가 없으면 지금과 같다. 「예산을 넘는 최저가」 참고 카드는
               「얼마부터 되는지」를 말하므로 승인 여부와 무관하게 최저가를 둔다.
               승인 집합은 힌트일 뿐이다 — 실제 공개 판정은 customer_pc_offer 가 매번 한다.
+  더 높은 사양  (2026-10-11) 위 카드 뒤에 한 장 — 추천 구성보다 성능 비교값이 PREMIUM_STEP 배 이상
+              높거나 수준이 위인 것. 예산 안에 있으면 그중 가장 높은 것, 없으면 예산의 PREMIUM_OVER_X 배
+              안에서 가장 싼 것(over_budget). 예산이 없으면 가장 싼 높은 사양. 없으면 붙이지 않는다.
+  주고받기     (2026-10-11 · api/reco_explore) 고객이 말한 램·저장공간·그래픽카드·흰색 케이스·저소음·
+              모니터 포함을 후보에서 실제로 거르고, 못 거르면 «못 맞춘다»고 밝힌다. 「더 싸게」는 지금
+              추천 구성보다 싼 것들로, 「더 좋게」는 지금 추천 구성보다 높은 것들로 같은 규칙을 다시 돈다.
   게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K).
   캐주얼(rank 1)은 고객이 말한 게임 «전부»가 캐주얼 수준의 대상 게임(product_fit_levels.work
   에 적힌 게임)일 때만 쓴다 — 하나라도 밖이면 가장 까다로운 쪽을 따라 해상도 수준으로 간다.
@@ -41,6 +48,7 @@ from sqlalchemy import text
 from .admin_product_fit import load
 from .db import engine
 from .product_name import card_name, match_storage_shorthand   # 카드 이름에서 광고 문구를 뗀다(원천은 그대로)
+from . import reco_explore as X
 from .talk_schema import match_game
 
 log = logging.getLogger("sold_reco")
@@ -60,10 +68,18 @@ USAGE_RULES = [
     ("사무", "사무용"), ("인강", "사무용"), ("인터넷", "사무용"),
 ]
 GAME_RES_RANK = {"1080p": 2, "1440p": 3, "4K": 4}
-MAX_ITEMS = 2
+MAX_ITEMS = 3     # 알뜰 · 추천 · 더 높은 사양
 # 승인 시안 R01 의 배지 문구와 역할. 화면은 role 로 강조를 정한다(문구로 추측하지 않는다).
 TAG_VALUE, TAG_RECOMMENDED, TAG_REFERENCE = "알뜰 구성", "추천 구성", "예산을 넘는 최저가"
-ROLE_OF = {TAG_VALUE: "value", TAG_RECOMMENDED: "recommended", TAG_REFERENCE: "reference"}
+# 2026-10-11 중헌 님 「더 고급 사양을 보여준다던지 — 스펙트럼을」: 추천 구성 다음에 한 장 더.
+# 고객이 고른 카드를 보관할 때 지금 목록 밖이면(더 싸게·더 좋게로 본 카드) 「고른 구성」으로 남긴다.
+TAG_PREMIUM, TAG_CHOSEN = "더 높은 사양", "고른 구성"
+ROLE_OF = {TAG_VALUE: "value", TAG_RECOMMENDED: "recommended", TAG_REFERENCE: "reference",
+           TAG_PREMIUM: "premium", TAG_CHOSEN: "chosen"}
+# 「더 높은 사양」 카드: 추천 구성보다 성능 비교값이 이만큼 높거나 수준이 위여야 한다(같은 PC 를 다시 내밀지 않게).
+PREMIUM_STEP = 1.10
+# 예산이 있으면 그 안에서 가장 높은 사양을, 없으면 예산의 이 배까지에서 가장 싼 높은 사양을 보여 준다.
+PREMIUM_OVER_X = 1.3
 MAX_UPGRADE_HINTS = 2
 
 # 「다음 수준」 안내 — 고객 문구는 Codex 확정본 그대로(PR #2 댓글 6057234341, 2026-10-08).
@@ -212,6 +228,151 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
     return {"items": [rec]}
 
 
+def premium_item(res, usage, min_rank, budget_won, bound, levels, products) -> dict | None:
+    """추천 구성 다음 한 장 — 「더 높은 사양」. 추천 구성이 없거나(예산 안 상품 없음) 더 높은 것이 없으면 None.
+
+    예산(이하) 안에 추천 구성보다 분명히 높은 사양이 있으면 그중 가장 높은 것, 없으면 예산의
+    PREMIUM_OVER_X 배 안에서 가장 싼 높은 사양(over_budget 으로 표시). 예산이 없으면 가장 싼 높은 사양.
+    """
+    rec = next((i for i in res.get("items") or [] if i["role"] == "recommended"), None)
+    if rec is None or rec["product_code"] not in products:
+        return None
+    base = products[rec["product_code"]]
+    shown = {i["product_code"] for i in res["items"]}
+    rank = lambda p: p["fit"].get(usage, {}).get("rank", 0)  # noqa: E731
+    bp = X.perf(base, usage)
+    better = [p for p in products.values()
+              if p["code"] not in shown and p["price"] is not None and rank(p) >= min_rank
+              and p["price"] > base["price"]
+              and (rank(p) > rank(base) or X.perf(p, usage) >= bp * PREMIUM_STEP)]
+    if not better:
+        return None
+    if budget_won is not None and bound != "이상":
+        within = [p for p in better if p["price"] <= budget_won]
+        if within:
+            chosen = max(within, key=lambda p: (X.perf(p, usage), -p["price"]))
+        else:
+            above = [p for p in better if p["price"] <= budget_won * PREMIUM_OVER_X]
+            if not above:
+                return None
+            chosen = min(above, key=lambda p: p["price"])
+    else:
+        chosen = min(better, key=lambda p: p["price"])
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    return _item(chosen, usage, levels_by, TAG_PREMIUM, budget_won, bound)
+
+
+def _uhd_rank(levels, usage, r):
+    """비게임 용도에서 「4K」라고 하면 그 용도의 4K 작업 수준(product_fit_levels.work)을 최소로."""
+    hits = [l["level_rank"] for l in levels if l["usage"] == usage and "4K" in (l.get("work") or "")]
+    return max(r, min(hits)) if hits else r
+
+
+def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
+    """한 용도의 카드 — 고객 추가 조건(wants)과 「더 싸게/더 좋게」(nav)를 반영한다."""
+    min_ok = lambda p: p["price"] is not None and p["fit"].get(fu, {}).get("rank", 0) >= r  # noqa: E731
+    kept, applied, unmet = X.apply_filters(list(products.values()), filters, min_ok)
+    prods = {p["code"]: p for p in kept}
+    budget, bound = state.budget_won, state.budget_bound
+    anchor = products.get(ex.get("anchor_code")) if ex.get("anchor_code") is not None else None
+    nav, nav_note = ex.get("nav"), None
+    res = None
+    if nav == X.CHEAPER and anchor is not None and anchor["price"] is not None:
+        below = {c: p for c, p in prods.items() if p["price"] is not None and p["price"] < anchor["price"]}
+        if any(min_ok(p) for p in below.values()):
+            res = pick(fu, r, anchor["price"] - 1, "이하", levels, below, preferred)
+            for it in res["items"]:      # 고객 예산 기준으로 다시 판정한다(방향 이동 기준가가 아니라)
+                it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
+            nav_note = X.NOTE_CHEAPER
+        else:
+            nav_note = X.NOTE_CHEAPER_NONE
+    elif nav == X.CHEAPER:
+        res, nav_note = pick(fu, r, None, None, levels, prods, preferred), X.NOTE_CHEAPEST
+        for it in res["items"]:
+            it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
+    elif nav == X.BETTER and anchor is not None and anchor["price"] is not None:
+        ap, ar = X.perf(anchor, fu), anchor["fit"].get(fu, {}).get("rank", 0)
+        up = {c: p for c, p in prods.items() if c != anchor["code"] and p["price"] is not None
+              and p["price"] > anchor["price"]
+              and (p["fit"].get(fu, {}).get("rank", 0) > ar or X.perf(p, fu) >= ap * 1.05)}
+        if any(min_ok(p) for p in up.values()):
+            res = pick(fu, r, None, None, levels, up, preferred)
+            for it in res["items"]:
+                it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
+            nav_note = X.NOTE_BETTER
+        else:
+            nav_note = X.NOTE_BETTER_NONE
+    if res is None:
+        res = pick(fu, r, budget, bound, levels, prods, preferred)
+    if nav != X.CHEAPER:
+        extra = premium_item(res, fu, r, budget if nav != X.BETTER else None,
+                             bound if nav != X.BETTER else None, levels, prods)
+        if extra is not None:
+            if nav == X.BETTER:
+                extra["over_budget"] = bool(budget is not None and bound != "이상" and extra["price"] > budget)
+            res["items"].append(extra)
+    # 다음 선택지 — 지금 화면의 추천 구성(없으면 마지막 카드)을 기준으로 더 싼 것·더 높은 것이 있나.
+    items = res["items"]
+    base_item = next((i for i in items if i["role"] == "recommended"), items[-1] if items else None)
+    base = products.get(base_item["product_code"]) if base_item else None
+    has_cheaper = has_better = False
+    if base is not None:
+        bp = X.perf(base, fu)
+        has_cheaper = any(min_ok(p) and p["price"] < base["price"] for p in prods.values())
+        has_better = any(min_ok(p) and p["price"] > base["price"] and X.perf(p, fu) >= bp * 1.05
+                         for p in prods.values())
+    res["explore"] = {"applied": applied, "unmet": unmet, "nav_note": nav_note,
+                      "anchor_code": base["code"] if base else None,
+                      "has_cheaper": has_cheaper, "has_better": has_better}
+    return res
+
+
+def _resolve_more(ex, products, notes):
+    """「램 더 크게」·「저장공간 더 크게」 -> 지금 보신 추천 구성 용량의 두 배 이상(숫자 조건으로 바꾼다)."""
+    more = ex.pop("more", None) or []
+    if not more:
+        return
+    anchor = products.get(ex.get("anchor_code")) if ex.get("anchor_code") is not None else None
+    sp = anchor.get("spec") if anchor and isinstance(anchor.get("spec"), dict) else None
+    if sp is None:
+        ex.setdefault("talk_notes", []).append(X.NOTE_MORE_NO_ANCHOR)
+        return
+    for kind, key, want in (("ram", "ram_gb", "min_ram_gb"), ("ssd", "ssd_gb", "min_ssd_gb")):
+        if kind in more and type(sp.get(key)) in (int, float) and sp[key] > 0:
+            ex["wants"][want] = int(sp[key] * 2) if kind == "ram" else max(int(sp[key] * 2), 1000)
+            notes.append(f"sold: '{kind} more' -> {ex['wants'][want]} from anchor {anchor['code']}")
+
+
+def eligible_item(state, game_usages, other_usages, code, notes, vocab=None) -> dict | None:
+    """보관 확인용 — 이 상품이 판매 중이고 이 상담 용도의 최소 수준을 채우는가(예산·고르기 규칙은 보지 않는다).
+
+    「더 싸게」·「더 좋게」로 본 카드는 다음 조회의 기본 목록에 없을 수 있다. 그래도 같은 판매 원천과
+    같은 수준 판정을 통과한 상품만 보관한다 — 관리자 행이나 임의 코드는 여기서도 막힌다.
+    """
+    levels, products = load()
+    p = products.get(code)
+    if p is None or p["price"] is None:
+        return None
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    for label, fu, r in _targets(state, game_usages, other_usages, levels, vocab, notes):
+        if p["fit"].get(fu, {}).get("rank", 0) >= r:
+            return _item(p, fu, levels_by, TAG_CHOSEN, state.budget_won, state.budget_bound)
+    return None
+
+
+def _targets(state, game_usages, other_usages, levels, vocab, notes):
+    targets = []
+    for u in other_usages:
+        fu = fit_usage(u)
+        if fu is None:
+            notes.append(f"sold: usage '{u}' has no fit mapping - skipped")
+            continue
+        targets.append((u, fu, 1))
+    if game_usages:
+        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
+    return targets
+
+
 def _casual_games(levels, vocab, notes) -> set[str]:
     """캐주얼 수준(게임 rank 1)이 대상으로 적은 게임 -> games.name 집합.
 
@@ -252,26 +413,28 @@ def game_min_rank(g, levels, vocab, notes) -> int:
     return r
 
 
-def card_sets(state, game_usages, other_usages, notes, vocab=None) -> list[dict]:
-    """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 2개."""
+def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None) -> list[dict]:
+    """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 3개.
+
+    explore(선택) = {wants, nav, anchor_code, uhd, more} — api/reco_explore 가 읽은 고객 추가 조건.
+    이 함수가 wants 를 고치고(「램 더 크게」 -> 숫자) talk_notes 를 덧붙인다. 각 set 의 `explore` 에
+    반영한 조건·못 맞춘 조건·다음 선택지 판정이 실린다(화면 문장은 grid_public 이 모은다).
+    """
     levels, products = load()
     preferred = public_codes()
+    ex = explore if explore is not None else {"wants": {}}
+    ex.setdefault("wants", {})
+    _resolve_more(ex, products, notes)
+    filters = X.build_filters(ex["wants"], products)
     out = []
-    targets = []
-    for u in other_usages:
-        fu = fit_usage(u)
-        if fu is None:
-            notes.append(f"sold: usage '{u}' has no fit mapping - skipped")
-            continue
-        targets.append((u, fu, 1))
-    if game_usages:
-        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
     seen = set()
-    for label, fu, r in targets:
+    for label, fu, r in _targets(state, game_usages, other_usages, levels, vocab, notes):
+        if ex["wants"].get("uhd") and fu != "게임":
+            r = _uhd_rank(levels, fu, r)
         if (fu, r) in seen:
             continue
         seen.add((fu, r))
-        res = pick(fu, r, state.budget_won, state.budget_bound, levels, products, preferred)
+        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters)
         lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
         out.append({
             "usage": label, "usage_grid": fu, "kind": "sold",
@@ -279,6 +442,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None) -> list[dict]
             "min_level_work": lv["work"] if lv else None,
             "items": res["items"],
             "empty_reason": res.get("empty_reason"), "empty_note": res.get("empty_note"),
+            "explore": res["explore"],
             # 옛 화면 경로가 깨지지 않게 — 조합 카드는 없다
             "cards": [], "empty_cells": [], "omitted_variants": [],
             "center_band": None, "center_band_key": None, "bands_considered": [],

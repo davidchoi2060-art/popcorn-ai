@@ -22,7 +22,8 @@
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
-      saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null};
+      saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
+      wants:null,choices:[],anchorCode:null,pendingText:''};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -36,17 +37,23 @@
     }
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
-        selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null});
+        selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
+        wants:null,choices:[],anchorCode:null,pendingText:''});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
     }
-    async function recommendFor(op){
+    async function recommendFor(op,extra={}){
       state.phase='recommend';emit();
-      const response=await api.recommend(state.talk,{signal:op.signal});
+      const response=await api.recommend(state.talk,{signal:op.signal},{wants:state.wants,anchor_code:state.anchorCode,...extra});
       if(!current(op))return;
+      if(extra.text!==undefined)state.pendingText='';
       const parsed=M.recommendations(response);
       state.recommendation=parsed;state.groups=parsed.groups;state.assumed=parsed.assumed;state.missing=parsed.needs;
+      state.wants=parsed.wants;state.choices=parsed.choices;state.anchorCode=parsed.anchorCode;
+      // What the server could and could not do with the request, then the follow-up question.
+      for(const note of parsed.talkNotes){message(note);state.history.push({role:'assistant',text:note.slice(0,300)});}
+      state.history=state.history.slice(-6);
       state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
@@ -68,8 +75,11 @@
         }
         state.history=state.history.slice(-6);state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
+        // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
+        // ride along until a recommendation actually reads them.
+        state.pendingText=(state.pendingText?state.pendingText+' / '+text:text).slice(-300);
         if(state.missing.length||response.pc_related===false||response.silent){state.screen='welcome';}
-        else {await recommendFor(op);}
+        else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
         if(current(op))fail(error,state.phase==='recommend'?{kind:'recommend'}:{kind:'talk',text});
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
@@ -79,6 +89,16 @@
       if(!state.talk||state.phase)return;
       const op=begin('recommend');
       try{await recommendFor(op);}catch(error){if(current(op))fail(error,{kind:'recommend'});}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    // Quick choice after the cards: cheaper / better than the card being looked at.
+    // Same recommend call with a direction; no AI parse, the conditions stay as they are.
+    async function explore(direction,label){
+      if(state.phase||!state.talk||!state.recommendation||!['cheaper','better'].includes(direction))return;
+      const op=begin('recommend');
+      if(label){message(label,'user');state.history.push({role:'user',text:label});}
+      try{await recommendFor(op,{nav:direction});}
+      catch(error){if(current(op))fail(error,{kind:'recommend'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
     function select(index){
@@ -186,7 +206,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff};
+    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff};
   }
   if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);
