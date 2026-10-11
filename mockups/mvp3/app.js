@@ -444,7 +444,10 @@ function render(){
   const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
   document.body.dataset.screen=state.screen;document.body.classList.add('live-mode');document.body.classList.toggle('original-flow',['welcome','results','detail','final'].includes(state.screen));
   view.dataset.screen=state.screen;
-  if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());}
+  if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());
+    // 예외 입력·상담 실패 뒤에는 사람 상담 길을 연다(서버 handoff_offer). 신청 칸은 구매 상담 신청과 같다.
+    if(state.handoffOffer||state.inquiry.open||state.inquiry.done)view.insertAdjacentHTML('beforeend',
+      (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('사람 상담 남기기','inquiry-open','outline',state.phase?'disabled':'')+'</p>':'')+inquiryPanel());}
   else if(state.screen==='results')renderResults();
   else if(state.screen==='detail'&&state.selected)renderDetail();
   else if(state.screen==='final'&&state.selected)renderFinal();
@@ -479,7 +482,7 @@ function enterRoute(hash,initial=false){
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
 async function submit(text,{fromInput=false}={}){if(!String(text||'').trim()){notice('원하는 조건을 입력해주세요.');$('#request').focus();return;}
-  if(text.trim().length>300){notice('상담 요청은 300자 이내로 입력해주세요.');return;}
+  if(text.trim().length>1000){notice('한 번에 1,000자까지 읽을 수 있어요. 나눠서 보내 주세요.');return;}
   if(state.phase)return;
   const sent=text.trim();await flow.submit(text);
   // submit() also returns true after errors. Only validated conversation history
