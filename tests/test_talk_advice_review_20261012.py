@@ -22,7 +22,7 @@ class MarketPriceWithStorePrice(unittest.TestCase):
 
     def test_plain_market_sentence_stays(self):
         s = "시중에서는 보통 150만원 안팎에서 많이 고르세요."
-        self.assertEqual(kept(s, sentence="게임용 PC 얼마 정도 해요?"), s)
+        self.assertEqual(kept(s, sentence="게임용 PC 얼마 정도 해요?"), s + " " + PA.NOTE_MARKET)
 
 
 class RyzenFullModel(unittest.TestCase):
