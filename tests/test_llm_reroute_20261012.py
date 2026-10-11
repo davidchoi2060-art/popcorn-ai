@@ -1,4 +1,4 @@
-"""서버 env 한 줄로 막힌 공급자 대신 다른 공급자를 부른다 -- 2026-10-12 사장님 「다른 API 를 일단 사용하자」.
+"""기본값(또는 서버 env)으로 막힌 공급자 대신 다른 공급자를 부른다 -- 2026-10-12 사장님 「다른 API 를 일단 사용하자」.
 
 Anthropic 잔액 부족(400)은 _is_fallback_eligible 이 넘기지 않아 상담 [A] 가 전부 502 였다.
 """
@@ -26,8 +26,12 @@ class Reroute(unittest.TestCase):
             self.assertEqual(llm.call("hi", task_key="task.s1_parse", **kw), "ok")
         return seen
 
-    def test_no_env_keeps_claude(self):
-        self.assertEqual(self.run_call(None), [("claude", "claude-haiku-4-5-20251001")])
+    def test_no_env_uses_default_reroute(self):
+        self.assertEqual(self.run_call(None), [("codex", "gpt-5.6-luna")])
+
+    def test_off_keeps_claude(self):
+        self.assertEqual(self.run_call("off"), [("claude", "claude-haiku-4-5-20251001")])
+        self.assertEqual(self.run_call(""), [("claude", "claude-haiku-4-5-20251001")])
 
     def test_reroute_to_named_model(self):
         self.assertEqual(self.run_call("claude=codex:gpt-5.6-luna"), [("codex", "gpt-5.6-luna")])

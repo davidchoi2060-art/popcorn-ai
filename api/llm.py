@@ -936,15 +936,23 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 # 한 공급자 계정이 통째로 막혔을 때(잔액 부족처럼 다른 공급자로 넘겨도 되는데 _is_fallback_eligible 이
 # 넘기지 않는 400) 서버 env 한 줄로 그 공급자 대신 다른 공급자를 부른다. 값이 없으면 아무것도 바뀌지 않는다.
 #   POPCORN_LLM_REROUTE=claude=codex:gpt-5.6-luna      (여럿이면 쉼표로)
+#   POPCORN_LLM_REROUTE=off                              (우회 끔)
+# env 가 없으면 REROUTE_DEFAULT 를 쓴다. 지금은 Anthropic 잔액 부족 동안 배포만으로 우회가 켜지도록
+# Claude -> OpenAI luna 다(서버 env 를 고칠 사람이 없는 시간이라). 잔액이 돌아오면 이 기본값을 ""로 되돌린다.
 # 대상 모델을 생략하거나 레지스트리에 없는 모델이면 대상 공급자의 default_model 을 쓴다.
-# 우회된 공급자는 폴백 순서에서도 뺀다(막힌 계정을 다시 부르지 않는다). 되돌릴 때는 줄을 지우고 재시작한다.
+# 우회된 공급자는 폴백 순서에서도 뺀다(막힌 계정을 다시 부르지 않는다).
 REROUTE_ENV = "POPCORN_LLM_REROUTE"
+REROUTE_DEFAULT = "claude=codex:gpt-5.6-luna"
 
 
 def _reroutes() -> dict[str, tuple[str, str | None]]:
     """env -> {막힌 공급자: (대신 부를 공급자, 모델|None)}. 형식이 틀린 항목은 버리고 로그만 남긴다."""
     out: dict[str, tuple[str, str | None]] = {}
-    for item in os.environ.get(REROUTE_ENV, "").split(","):
+    raw = os.environ.get(REROUTE_ENV)
+    raw = REROUTE_DEFAULT if raw is None else raw
+    if raw.strip().lower() == "off":
+        return out
+    for item in raw.split(","):
         item = item.strip()
         if not item:
             continue
