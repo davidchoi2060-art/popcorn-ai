@@ -183,6 +183,13 @@
       <a href="{{ back_link.href }}" id="a2BackLink" data-action="back-to-parent"><span aria-hidden="true">←</span> {{ back_link.label }}</a>
     </nav>
     {% endif %}
+    {% if entry_links %}
+    {#  묶음 첫 화면에서 카드 없이 들어가는 화면 링크(2026-10-11, 원천 BACK_LINKS.entries).
+        들어간 화면에는 위 돌아가기 줄이 짝으로 나온다. #}
+    <nav class="a2-back a2-entries" aria-label="같은 메뉴의 다른 화면">
+      {% for e in entry_links %}<a href="{{ e.href }}">{{ e.label }} <span aria-hidden="true">→</span></a>{% endfor %}
+    </nav>
+    {% endif %}
     {% if page_intro %}
     {#  화면 머리말 — 2026-10-11 「관리자 나머지 화면 개편」. 문구·바로가기 원천은
         `api/admin_page_intro.py`(이 파일에 문구를 적지 않는다). 본문은 건드리지 않고

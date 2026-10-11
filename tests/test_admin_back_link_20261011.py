@@ -83,6 +83,32 @@ class BackLinkTests(unittest.TestCase):
         self.assertNotIn('<a class="a2-crumb"', shell('/admin2/talk-patterns', False))
         self.assertNotIn('<a class="a2-crumb"', shell('/admin2/products', True))
 
+    def test_members_hub_links_to_reviews_and_reviews_link_back(self):
+        self.assertEqual(API.entries_for('/admin2/members'), [{'label': '후기 관리', 'href': '/admin2/member-reviews'}])
+        self.assertEqual(API.entries_for('/admin2/member-reviews'), [])
+        self.assertEqual(API.back_for('/admin2/member-reviews')['href'], '/admin2/members')
+        self.assertIsNone(API.group_crumb('/admin2/members'))  # 「회원 관리 › 회원 관리」 겹침 방지
+        self.assertEqual(API.group_crumb('/admin2/member-reviews'), {'href': '/admin2/members', 'label': '회원 관리'})
+        active = [i['href'] for i in admin_nav.new_admin_nav('/admin2/member-reviews') if i['active']]
+        self.assertEqual(active, ['/admin2/members'])
+
+    def test_every_back_link_source_is_in_its_hub_menu_group(self):
+        for hub, meta in API.BACK_LINKS.items():
+            labels = {i['href']: i['label'] for i in admin_nav.new_admin_nav('')}
+            self.assertEqual(labels[hub], meta['group'])
+            for path in meta['from']:
+                with self.subTest(path=path):
+                    self.assertEqual([i['href'] for i in admin_nav.new_admin_nav(path) if i['active']], [hub])
+
+    def test_member_reviews_page_uses_existing_api_and_no_false_send_claim(self):
+        src = (ROOT / 'templates/admin/member_reviews.html.j2').read_text(encoding='utf-8')
+        for url in ("'/api/admin/member-reviews'", "'/api/admin/member-reviews/' + id + '/moderate'",
+                    "'/api/admin/member-reviews/undo/' + logId"):
+            self.assertIn(url, src)
+        script = src[src.index('<script>'):]
+        self.assertNotIn('발송', script)
+        self.assertNotIn('innerHTML = r.', script)
+
 
 if __name__ == '__main__':
     unittest.main()

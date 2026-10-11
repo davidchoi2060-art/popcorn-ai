@@ -408,3 +408,4 @@ details.a2-more[open]>summary{margin-bottom:8px}
 .a2-hd a.a2-crumb{color:var(--rv-link);text-decoration:none}
 .a2-hd a.a2-crumb:hover{text-decoration:underline}
 .a2-hd a.a2-crumb:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
+.a2-entries{display:flex;flex-wrap:wrap;gap:8px}

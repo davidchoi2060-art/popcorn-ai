@@ -385,6 +385,16 @@ BACK_LINKS: dict[str, dict] = {
         "from": ("/admin2/game-copy-review", "/admin2/game-grades", "/admin2/talk-patterns",
                  "/admin2/shop-notices", "/admin2/talk-review", "/admin2/product-fit"),
     },
+    # 구 관리자에서 옮긴 「후기 관리」(2026-10-11 사장님 결정). 회원 관리 화면에는 카드가
+    # 없으므로 그 화면에 들어가는 링크(`entries`)를 셸이 그린다. 묶음 첫 화면의 경로는
+    # 「회원 관리 › 회원 관리」가 되어 겹치므로 그리지 않는다(`crumb_on_hub`).
+    "/admin2/members": {
+        "label": "회원 관리로 돌아가기",
+        "group": "회원 관리",
+        "from": ("/admin2/member-reviews",),
+        "entries": (("후기 관리", "/admin2/member-reviews"),),
+        "crumb_on_hub": False,
+    },
 }
 
 
@@ -406,6 +416,16 @@ def group_crumb(path: str) -> dict | None:
     """
     key = _norm(path)
     for href, meta in BACK_LINKS.items():
-        if key == _norm(href) or key in meta["from"]:
+        on_hub = key == _norm(href) and meta.get("crumb_on_hub", True)
+        if on_hub or key in meta["from"]:
             return {"href": href, "label": meta["group"]}
     return None
+
+
+def entries_for(path: str) -> list[dict]:
+    """묶음 첫 화면에서 카드 없이 들어갈 화면들 — [{href, label}]. 없으면 빈 목록."""
+    key = _norm(path)
+    for href, meta in BACK_LINKS.items():
+        if key == _norm(href):
+            return [{"label": label, "href": h} for label, h in meta.get("entries", ())]
+    return []

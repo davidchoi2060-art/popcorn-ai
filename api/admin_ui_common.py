@@ -18,7 +18,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from .admin_nav import counts as nav_counts, nav_for, new_admin_nav
-from .admin_page_intro import back_for, group_crumb, intro_for
+from .admin_page_intro import back_for, entries_for, group_crumb, intro_for
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
@@ -55,6 +55,7 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     ctx.setdefault("page_intro", None if ctx['new_admin'] else intro_for(request.url.path))
     # 카드로 들어온 화면의 「돌아가기」 줄 — 두 모드 공통(2026-10-11 사장님 신고).
     ctx.setdefault("back_link", back_for(request.url.path))
+    ctx.setdefault("entry_links", entries_for(request.url.path))
     # 신 관리자 헤더 경로는 신 메뉴 묶음 이름으로 맞춘다 — 「사용·성능 자료 › 현재 화면」.
     crumb_href = ""
     group = group_crumb(request.url.path) if ctx['new_admin'] else None
