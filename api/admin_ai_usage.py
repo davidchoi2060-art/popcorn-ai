@@ -15,10 +15,10 @@
       "원천 없음"이다 — 0이 아니라 잴 근거 자체가 없다는 뜻.
     · 테이블에 행이 생긴 뒤(`source_exists=True`) 특정 기간·필터에 걸리는 행이 없으면
       그건 진짜 "0"이다(원천은 있고 값이 0).
-    · "작업 종류별 분해"는 `api_cost_logs`에 그 컬럼 자체가 없다(실측:
-      `db/migrations/versions/0001_initial_schema.py`) — 행이 아무리 쌓여도 계산할 수
-      없는 **구조적** 결측이라 "스키마 없음"으로 항상 고정 표기한다(원천 없음과 다른
-      말이어야 한다는 요구사항 그대로).
+    · "작업 종류별 분해"는 0141(2026-10-11)부터 `api_cost_logs.task_key` 로 잰다.
+      그 전 기록은 작업 종류가 없어 「작업 종류 미기록」 한 줄로 묶는다(옛 행은 고치지
+      않는다). 0141 이 안 깔린 DB 면 예전처럼 "스키마 없음"으로 둔다 — 컬럼 유무를
+      매 요청 실측한다.
   아래 SQL은 이 세 상태를 실시간으로 다시 재는 것이지 하드코딩이 아니다 —
   `cost_thresholds`(AI 연동 설정에서 owner가 저장하면 즉시 채워진다)와 `api_cost_logs`
   둘 다 이 파일이 쓰지 않고 읽기만 한다.
@@ -63,6 +63,12 @@ REASON = (f"AI 실제 연결을 미뤄 둔 상태({DECISION_AT} 결정)라 사�
 SCHEMA_REASON = ("이 분해는 데이터가 쌓여도 계산되지 않습니다 — AI 비용 기록에 작업 종류"
                   " 항목이 아직 없습니다.")
 
+# 0141 이 채우는 작업 종류 중 TASKS(설정 화면의 4종) 밖에 있는 것 — 팝콘톡 답변 경로.
+EXTRA_TASKS = [{"key": "task.talk_answer", "label": "팝콘톡 답변"}]
+UNTAGGED_LABEL = "작업 종류 미기록"
+TASK_REASON = ("작업 종류는 2026-10-11 이후 기록부터 남습니다."
+               " 그 전 기록은 「" + UNTAGGED_LABEL + "」으로 묶습니다.")
+
 NOSOURCE_STYLE_NOTE = {
     "per_consult": "상담 수·비용 기록 모두 없음",
     "per_batch": "아래 「Claude Code 세션 비용」 칸 참고",
@@ -94,6 +100,14 @@ def _day_range_bounds(d0: date, d1: date):
     return lo, hi
 
 
+def _has_task_cols(conn) -> bool:
+    """0141 의 두 컬럼(task_key · hit_id)이 실제로 있는가 — 매 요청 실측한다."""
+    n = conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'api_cost_logs'"
+        " AND column_name IN ('task_key', 'hit_id') AND table_schema = current_schema()")).scalar_one()
+    return n == 2
+
+
 def _agg(conn, lo, hi, provider=None, model=None) -> dict:
     where = ["created_at >= :lo", "created_at < :hi"]
     params = {"lo": lo, "hi": hi}
@@ -108,6 +122,36 @@ def _agg(conn, lo, hi, provider=None, model=None) -> dict:
         " COALESCE(SUM(tokens_in),0) + COALESCE(SUM(tokens_out),0) AS tokens"
         " FROM api_cost_logs WHERE " + " AND ".join(where)), params).mappings().first()
     return {"n": row["n"], "cost": float(row["cost"]), "tokens": int(row["tokens"])}
+
+
+def _task_breakdown(has_task: bool, source_exists: bool, task_rows) -> dict:
+    """작업 종류별 분해. 0141 전 DB 면 「스키마 없음」, 기록이 없으면 「원천 없음」."""
+    if not has_task:
+        return {"available": False, "schema_missing": True, "source": "항목 없음",
+                "reason": SCHEMA_REASON,
+                # 원안(dc-ai-usage-cost.html TASKS)은 작업 키 자체를 행 아래 보조
+                # 라벨로 함께 보여준다 — 프로바이더 분해의 "company" 보조 라벨과 같은 자리.
+                "rows": [{"key": t["key"], "name": t["label"], "sub": "",
+                          "tokens": None, "cost": None} for t in TASKS]}
+    by_key = {r["task_key"]: r for r in task_rows}
+    known = TASKS + EXTRA_TASKS
+    rows = []
+    for t in known:
+        r = by_key.get(t["key"])
+        rows.append({"key": t["key"], "name": t["label"], "sub": t["key"],
+                     "tokens": int(r["tokens"]) if r else (0 if source_exists else None),
+                     "cost": round(float(r["cost"]), 4) if r else (0.0 if source_exists else None)})
+    for k in sorted(k for k in by_key if k and k not in {t["key"] for t in known}):
+        r = by_key[k]
+        rows.append({"key": k, "name": k, "sub": "목록에 없는 작업 종류",
+                     "tokens": int(r["tokens"]), "cost": round(float(r["cost"]), 4)})
+    if None in by_key:
+        r = by_key[None]
+        rows.append({"key": "", "name": UNTAGGED_LABEL, "sub": "2026-10-11 이전 기록",
+                     "tokens": int(r["tokens"]), "cost": round(float(r["cost"]), 4)})
+    return {"available": source_exists, "schema_missing": False,
+            "source": "AI 비용 기록 · 작업 종류별",
+            "reason": TASK_REASON if source_exists else REASON, "rows": rows}
 
 
 @router.get("/summary")
@@ -165,6 +209,20 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
         if model:
             trend_where.append("model = :model")
             trend_params["model"] = model
+        # ── 작업 종류별 분해 · 문의당 평균(0141) — 기간·프로바이더·모델 필터를 그대로 건다 ──
+        has_task = _has_task_cols(conn)
+        task_rows, consult = [], None
+        if has_task:
+            task_rows = conn.execute(text(
+                "SELECT task_key, COUNT(*) AS n, COALESCE(SUM(cost_usd),0) AS cost,"
+                " COALESCE(SUM(tokens_in),0) + COALESCE(SUM(tokens_out),0) AS tokens"
+                " FROM api_cost_logs WHERE " + " AND ".join(trend_where) +
+                " GROUP BY task_key"), trend_params).mappings().all()
+            consult = conn.execute(text(
+                "SELECT COUNT(DISTINCT hit_id) AS hits, COALESCE(SUM(cost_usd),0) AS cost"
+                " FROM api_cost_logs WHERE hit_id IS NOT NULL AND " + " AND ".join(trend_where)),
+                trend_params).mappings().first()
+
         trend_rows = conn.execute(text(
             "SELECT (created_at + interval '9 hour')::date AS d, COALESCE(SUM(cost_usd),0) AS cost"
             " FROM api_cost_logs WHERE " + " AND ".join(trend_where) +
@@ -176,19 +234,40 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
     def money_kpi(key, label, agg):
         if source_exists:
             return {"key": key, "label": label, "kind": "value", "unit": "USD",
-                    "value": round(agg["cost"], 2), "note": f"AI 비용 기록 {total_rows}건"}
+                    "value": round(agg["cost"], 4), "note": f"AI 비용 기록 {total_rows}건"}
         return {"key": key, "label": label, "kind": "nosource", "unit": "USD",
                 "value": "정보 없음", "note": f"AI 비용 기록 {total_rows}건"}
+
+    # 문의 1건당 평균 — 문의 번호가 이어진 기록만 센다(0141 이후 팝콘톡). 없으면 정보 없음.
+    if consult and consult["hits"]:
+        per_consult = {"key": "per_consult", "label": "상담 1건당 평균", "kind": "value", "unit": "USD",
+                       "value": round(float(consult["cost"]) / consult["hits"], 4),
+                       "note": f"팝콘톡 문의 {consult['hits']}건 기준 · {period_label}"}
+    else:
+        per_consult = {"key": "per_consult", "label": "상담 1건당 평균", "kind": "nosource", "unit": "USD",
+                       "value": "정보 없음",
+                       "note": ("문의 번호가 이어진 기록 없음 · " + period_label) if has_task
+                       else NOSOURCE_STYLE_NOTE["per_consult"]}
+    tagged = [r for r in task_rows if r["task_key"]]
+    if has_task and source_exists:
+        n_all = sum(r["n"] for r in task_rows)
+        by_task = {"key": "by_task", "label": "작업 종류 기록분", "kind": "value", "unit": "USD",
+                   "value": round(sum(float(r["cost"]) for r in tagged), 4),
+                   "note": f"작업 종류가 있는 기록 {sum(r['n'] for r in tagged)}건 / {n_all}건 · {period_label}"}
+    elif has_task:
+        by_task = {"key": "by_task", "label": "작업 종류별 분해", "kind": "nosource", "unit": "",
+                   "value": "정보 없음", "note": f"AI 비용 기록 {total_rows}건"}
+    else:
+        by_task = {"key": "by_task", "label": "작업 종류별 분해", "kind": "noschema", "unit": "",
+                   "value": "정보 없음", "note": "AI 비용 기록에 작업 종류 항목 없음"}
 
     kpis = [
         money_kpi("today_cost", "오늘 사용액", today_agg),
         money_kpi("month_cost", "이번 달 누계", month_agg),
-        {"key": "per_consult", "label": "상담 1건당 평균", "kind": "nosource", "unit": "USD",
-         "value": "정보 없음", "note": NOSOURCE_STYLE_NOTE["per_consult"]},
+        per_consult,
         {"key": "per_batch", "label": "배치당 평균", "kind": "nosource", "unit": "USD",
          "value": "정보 없음", "note": NOSOURCE_STYLE_NOTE["per_batch"]},
-        {"key": "by_task", "label": "작업 종류별 분해", "kind": "noschema", "unit": "",
-         "value": "정보 없음", "note": "AI 비용 기록에 작업 종류 항목 없음"},
+        by_task,
     ]
 
     # ── 게이지 ──
@@ -214,23 +293,18 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
         prov_breakdown_rows.append({
             "key": p["key"], "name": p["vendor"], "sub": p["company"],
             "tokens": int(r["tokens"]) if (r and source_exists) else None,
-            "cost": round(float(r["cost"]), 2) if (r and source_exists) else None,
+            "cost": round(float(r["cost"]), 4) if (r and source_exists) else None,
         })
     leftover = set(prov_map) - set(PROVIDER_MAP)
     for extra in sorted(leftover):
         r = prov_map[extra]
         prov_breakdown_rows.append({"key": extra, "name": extra, "sub": "카탈로그에 없는 프로바이더",
-                                     "tokens": int(r["tokens"]), "cost": round(float(r["cost"]), 2)})
+                                     "tokens": int(r["tokens"]), "cost": round(float(r["cost"]), 4)})
 
     breakdowns = {
         "provider": {"available": source_exists, "source": "AI 비용 기록 · 업체별",
                       "reason": None if source_exists else REASON, "rows": prov_breakdown_rows},
-        "task": {"available": False, "schema_missing": True, "source": "항목 없음",
-                  "reason": SCHEMA_REASON,
-                  # 원안(dc-ai-usage-cost.html TASKS)은 작업 키 자체를 행 아래 보조
-                  # 라벨로 함께 보여준다 — 프로바이더 분해의 "company" 보조 라벨과 같은 자리.
-                  "rows": [{"key": t["key"], "name": t["label"], "sub": "",
-                            "tokens": None, "cost": None} for t in TASKS]},
+        "task": _task_breakdown(has_task, source_exists, task_rows),
     }
 
     # ── 추이 ──
@@ -286,8 +360,9 @@ def summary(period: str = "today", provider: str | None = None, model: str | Non
             {"chip": "0", "desc": "원천은 있는데 값이 0 — 실제로 아무도 쓰지 않았다는 뜻입니다."
                                     " 지금은 이 상태가 아닙니다." if not source_exists else
                                     "원천은 있는데 값이 0 — 실제로 아무도 쓰지 않았다는 뜻입니다."},
-            {"chip": "정보 없음", "desc": "기록이 쌓이는 경로가 없거나(AI 연동 보류), 계산에 필요한"
-                                          " 항목이 없어(작업 종류별 분해) 값을 낼 수 없습니다."
+            {"chip": "정보 없음", "desc": ("기록이 쌓이는 경로가 없거나(AI 연동 보류), 계산에 필요한"
+                                           " 항목이 없어(작업 종류별 분해) 값을 낼 수 없습니다." if not has_task else
+                                           "기록이 없거나 계산에 필요한 연결(문의 번호 등)이 없어 값을 낼 수 없습니다.")
                                           + (" 오늘 이 화면 전 구간이 이 상태입니다." if not source_exists else "")},
         ],
     }

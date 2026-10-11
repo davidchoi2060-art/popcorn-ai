@@ -194,6 +194,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
 from sqlalchemy import inspect as sa_inspect, text
+from sqlalchemy.exc import ProgrammingError
 
 from .db import engine
 from .timeutil import KST, iso, kst_day_range
@@ -844,6 +845,27 @@ def _resolve_task_default(task_key: str) -> tuple[str | None, str | None, str]:
                               f" or TASK_DEFAULTS")
 
 
+def _insert_cost_log(row: dict) -> int:
+    """비용 한 행을 남기고 log_id 를 돌려준다. 작업 종류(`task_key`)도 함께 남긴다(0141).
+
+    0141 이 아직 안 깔린 DB 에서는 `task_key` 컬럼이 없다 -- 그때는 옛 형태로 다시 남긴다.
+    비용 기록을 잃는 것이 작업 종류를 잃는 것보다 나쁘다.
+    """
+    try:
+        with engine.begin() as conn:
+            return conn.execute(text(
+                "INSERT INTO api_cost_logs (provider, model, tokens_in, tokens_out, cost_usd, task_key)"
+                " VALUES (:p, :m, :ti, :to, :c, :tk) RETURNING log_id"), row).scalar_one()
+    except ProgrammingError as e:
+        if "task_key" not in str(e.orig if hasattr(e, "orig") else e):
+            raise
+        log.warning("[llm] api_cost_logs.task_key missing (migration 0141 not applied) - logging without it")
+    with engine.begin() as conn:
+        return conn.execute(text(
+            "INSERT INTO api_cost_logs (provider, model, tokens_in, tokens_out, cost_usd)"
+            " VALUES (:p, :m, :ti, :to, :c) RETURNING log_id"), row).scalar_one()
+
+
 def _call_one(prompt: str, provider: str, task_key: str | None, model: str | None,
               system: str | None, customer_facing: bool, max_output_tokens: int,
               timeout_sec: int, caller_key: int | None = None) -> LLMResult:
@@ -887,13 +909,10 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 
     log_id = None
     cost_logged = False
+    row = {"p": spec.key, "m": used_model, "ti": tokens_in, "to": tokens_out,
+           "c": cost_usd, "tk": (task_key or None) and task_key[:48]}
     try:
-        with engine.begin() as conn:
-            log_id = conn.execute(text(
-                "INSERT INTO api_cost_logs (provider, model, tokens_in, tokens_out, cost_usd)"
-                " VALUES (:p, :m, :ti, :to, :c) RETURNING log_id"),
-                {"p": spec.key, "m": used_model, "ti": tokens_in, "to": tokens_out,
-                 "c": cost_usd}).scalar_one()
+        log_id = _insert_cost_log(row)
         cost_logged = True
     except Exception:
         # 이미 호출은 성공해 비용이 발생했다 -- 기록 실패를 이유로 응답을 버리지

@@ -1116,6 +1116,8 @@ def parse_talk(body: ParseBody, request: Request):
                              answer_kind="constraint_parse", llm_called=True)
         _record_reply(conn, hit_id, text_raw=text, ai_reply=ai_reply, shown_reply=reply,
                       answer=answer, answer_error=bool(ans.error))
+    # 이 문의에서 부른 AI 비용 기록에 문의 번호를 잇는다(0141 · F18). 실패해도 상담은 그대로 나간다.
+    _link_cost_logs(hit_id, [getattr(result, "log_id", None), getattr(ans, "log_id", None)])
 
     if ans.error:
         log.warning("[talk] answer path B failed: %s", ans.error)
@@ -1469,6 +1471,26 @@ def mask_pii(s: str) -> str:
     for pat, rep in _MASKS:
         out = pat.sub(rep, out)
     return out
+
+
+def _link_cost_logs(hit_id, log_ids) -> int:
+    """문의 원장 `hit_id` 를 그 문의에서 부른 `api_cost_logs` 행에 적는다(0141 · F18).
+
+    새로 남은 행만 잇는다(`hit_id IS NULL`). 이미 있던 기록은 건드리지 않는다.
+    0141 전 DB 이거나 기록이 실패해도 상담을 끊지 않는다 -- 로그만 남긴다.
+    """
+    ids = [int(i) for i in log_ids if i]
+    if not hit_id or not ids:
+        return 0
+    try:
+        with engine.begin() as conn:
+            return conn.execute(text(
+                "UPDATE api_cost_logs SET hit_id = :h"
+                " WHERE log_id = ANY(:ids) AND hit_id IS NULL"),
+                {"h": int(hit_id), "ids": ids}).rowcount or 0
+    except Exception as e:                                   # noqa: BLE001
+        log.warning("[talk] cost log link failed: %s", type(e).__name__)
+        return 0
 
 
 def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
