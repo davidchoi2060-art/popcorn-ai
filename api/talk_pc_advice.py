@@ -31,8 +31,9 @@ from . import talk_filter as TF
 
 log = logging.getLogger(__name__)
 
-ADVICE_MAX_LEN = 420
-ADVICE_MAX_TOKENS = 500
+ADVICE_MAX_LEN = 480
+# 한국어는 글자당 토큰이 많다 -- 500 이면 설명이 「CPU는 높은 프」에서 끊겼다(2026-10-11 일반 AI 비교 R05·R23).
+ADVICE_MAX_TOKENS = 900
 ADVICE_TIMEOUT_SEC = 10
 TASK_KEY = "task.talk_answer"
 
@@ -156,7 +157,9 @@ def basis_lines(conn, labels: list[str]) -> list[str]:
 
 
 _TOPIC_TASK = {
-    TOPIC_BUILD: "이 용도에 무엇이 중요하고 무엇은 필요 없거나 아껴도 되는지, 그 이유를 서너 문장으로 쓴다."
+    TOPIC_BUILD: "이 용도에 맞는 구성을 구체적으로 서너 문장 쓴다 -- CPU와 그래픽카드는 등급(보급형·중급형·상급형,"
+                 " 예시는 「RTX 5060급」처럼 급으로), 램과 SSD 는 용량, 그리고 시중 예상 가격대를 「시중에서는 보통"
+                 " ○○만원대」처럼 일반 시세로 말한다. 무엇은 아껴도 되는지와 그 이유도 말한다."
                  " 고객이 싸게(최저가·가성비)를 말했으면 어디를 아끼고 어디는 지킬지, 좋은 것을 말했으면 어디에 더"
                  " 쓰면 체감이 큰지 말한다. 작업이 커지면(예: 도커·가상 머신 여러 개) 무엇이 더 필요해지는지도 한 문장 말해도 된다."
                  " 용도를 말하지 않았으면 용도에 따라 무엇이 달라지는지 짧게 설명한다.",
@@ -188,7 +191,7 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD])
         + (_BUILD_WITH_GENERAL if topic == TOPIC_BUILD and _GENERAL.search(sentence or "") else ""),
         *(["[고객이 말한 게임] " + ", ".join(games) + " -- 게임 소개·역사·장르·인기 설명은 쓰지 않는다."
-            " 이 게임들이 가벼운지 무거운지, 그래서 그래픽카드·CPU·램 중 무엇이 체감을 좌우하는지만 말한다."]
+            " 이 게임들이 가벼운지 무거운지, 그래서 그래픽카드·CPU·램 중 무엇이 체감을 좌우하는지와 그에 맞는 등급을 말한다."]
           if games else []),
         "[말투] 쉬운 한국어 존댓말(~요). 강조 기호(**)·목록 기호 없이 문장으로 쓴다. 감사 인사로 시작하지 않는다."
         " %d자 이내." % ADVICE_MAX_LEN,
@@ -198,8 +201,10 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         *(basis or ["(기준표를 읽지 못했다 - 일반적인 설명만 한다)"]),
         "",
         "[쓰지 않는 것]",
-        "- 가격·금액·예산 숫자(카드가 보여 준다).",
-        "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다."
+        ("- 시중 시세를 넘는 가격 이야기 -- 가격은 「시중에서는 보통 ○○만원대」 한 문장으로만 쓰고, 우리 가게 가격·할인처럼"
+         " 말하지 않는다(우리 가격은 아래 카드가 보여 준다)." if topic == TOPIC_BUILD
+         else "- 가격·금액·예산 숫자(카드가 보여 준다)."),
+        "- 특정 부품 모델명을 단정하는 말(「RTX 4060을 사세요」). 등급 예시는 「RTX 5060급」처럼 급·정도·이상을 붙여서만 쓴다."
         + (" 고객이 직접 말한 모델명(%s)은 그대로 써서 비교해도 된다." % ", ".join(_models(sentence))
            if _models(sentence) else ""),
         ("- 재고·할인·특정 기간을 우리 가게 약속처럼 단정하는 말." if topic == TOPIC_GENERAL
@@ -222,6 +227,10 @@ _PRICE_WORDS = re.compile(r"\d+\s*만|\d+\s*원|원대|가격대")
 _STOCK_ONLY = ("재고", "품절", "입고")
 
 
+_TIER_AFTER = re.compile(r"\s*(급|정도|이상|수준|대\b|계열)")
+_ENDED = re.compile(r"[.!?。…]\s*$|[요다죠네](\s*[)」』\]])?\s*$")
+
+
 def _norm(m: str) -> str:
     return re.sub(r"\s+", "", m).lower()
 
@@ -239,15 +248,22 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
     """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
-    general = topic == TOPIC_GENERAL
+    general, build = topic == TOPIC_GENERAL, topic in (None, TOPIC_BUILD)
     stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
     asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
-    for s in TF.split_sentences((raw or "").replace("**", "")):
+    sents = TF.split_sentences((raw or "").replace("**", ""))
+    if sents and not _ENDED.search(sents[-1]):
+        # 토큰이 다해 끊긴 끝 문장(「CPU는 높은 프」)은 내지 않는다.
+        dropped.append({"before": sents.pop(), "reason": "cut"})
+    for s in sents:
         # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
         # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
-        foreign_model = any(_norm(m.group(0)) not in asked for m in TF._RE_PART.finditer(s))
-        if TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s):
+        # 「RTX 5060급」「i5 정도」처럼 등급 예시로 든 모델명은 남긴다(2026-10-12 -- 설명이 등급을 구체적으로 말하게).
+        foreign_model = any(_norm(m.group(0)) not in asked and not _TIER_AFTER.match(s, m.end())
+                            for m in TF._RE_PART.finditer(s))
+        market_price = build and "시중" in s and not any(p.search(s) for _label, p in PROMISE_PATTERNS)
+        if (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s)) and not market_price:
             dropped.append({"before": s, "reason": "price"})
         elif foreign_model:
             dropped.append({"before": s, "reason": "part model"})
@@ -259,11 +275,14 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
             dropped.append({"before": s, "reason": "question"})
         else:
             kept.append(s.lstrip("-•* ").strip())
-    body = " ".join(k for k in kept if k)
-    if len(body) > ADVICE_MAX_LEN:
-        cut = body[:ADVICE_MAX_LEN]
-        body = cut[:cut.rfind(".") + 1] if "." in cut else cut
-    return body, dropped
+    # 길이는 문장 단위로 줄인다 -- 글자 수로 자르면 문장 중간에서 끊긴다(2026-10-11 R23 「기본형을 선택」).
+    body = ""
+    for k in (k for k in kept if k):
+        if body and len(body) + 1 + len(k) > ADVICE_MAX_LEN:
+            dropped.append({"before": k, "reason": "length"})
+            continue
+        body = (body + " " + k).strip()
+    return body[:ADVICE_MAX_LEN], dropped
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
