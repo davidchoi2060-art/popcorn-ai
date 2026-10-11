@@ -59,7 +59,7 @@ function renderLog(){
   const msgs=state.messages,talked=msgs.some(m=>m.who==='user');
   const props=state.proposals||[],last=props[props.length-1];
   const after=new Map();for(const p of props){const k=Math.max(0,p.at-1);after.set(k,[...(after.get(k)||[]),p]);}
-  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">무엇을 도와드릴까요?</h1><p>궁금한 것부터 편하게 물어보세요. PC를 찾거나 부품을 바꿀 때도 이어서 도와드릴게요.</p>'+
+  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">어떤 PC를 찾고 계세요?</h1><p>쓰실 용도와 예산을 편하게 말씀해 주세요. 조건에 맞는 판매 중인 PC를 찾아 드리고, 부품을 바꿀 때도 이어서 도와드릴게요.</p>'+
     '<div class="tk-examples" aria-label="시작 예시">'+['게임용 PC를 찾고 있어요.','지금 쓰는 PC를 업그레이드하고 싶어요.','그래픽카드와 메모리는 어떤 역할을 해요?']
       .map(t=>button(esc(t),'example','outline','data-text="'+esc(t)+'"')).join('')+'</div></section>';
   msgs.forEach((m,i)=>{
