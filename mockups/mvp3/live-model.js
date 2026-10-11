@@ -155,6 +155,14 @@
     out.source={kind:'game_customer_copy',fields:Array.isArray(value.source.fields)?value.source.fields.filter(x=>typeof x==='string'):[],url:safeUrl(value.source.url)};
     return out;
   }
+  // 새로 나온 PC(api/sold_reco.custom_items · 부품 상품화 5단계): 몰 상품번호가 없는 운영자 신규 조립PC.
+  // 몰 카드(products)와 섞지 않는다 — 보관 견적·쇼핑몰 연결 대신 「새로 나온 PC」 화면으로 보낸다.
+  function customItem(v){
+    if(!object(v)||typeof v.configuration_id!=='string'||!/^A[0-9A-F]{16}$/.test(v.configuration_id)||!text(v.title).trim()||!Number.isSafeInteger(v.price)||v.price<=0)return null;
+    const parts=Array.isArray(v.parts)?v.parts.filter(p=>object(p)&&text(p.slot_label)&&text(p.name)).map(p=>({slot_label:p.slot_label,name:p.name,quantity:Number.isSafeInteger(p.quantity)&&p.quantity>0?p.quantity:1})):[];
+    return {configuration_id:v.configuration_id,title:v.title,price:v.price,price_note:text(v.price_note),fit:v.fit==='fit'?'fit':'unknown',
+      level_text:text(v.level_text)||'정보 없음',parts,url:'new-pcs.html#'+v.configuration_id};
+  }
   function recommendations(value){
     if(!object(value)||value.ok!==true||!Array.isArray(value.card_sets))throw new Error('추천 응답 형식을 확인할 수 없어요.');
     let index=0,unsupported=false;
@@ -163,7 +171,8 @@
       if(set.kind!=='sold'){unsupported=true;return null;}
       return {usage:text(set.usage),usage_grid:text(set.usage_grid),empty_reason:text(set.empty_reason),empty_note:text(set.empty_note),
         min_level:text(set.min_level),min_level_work:text(set.min_level_work),game_context:set.usage_grid==='게임'?gameContext(set.game_context):null,
-        products:(Array.isArray(set.items)?set.items:[]).map(product).filter(Boolean).map(p=>({...p,index:index++}))};
+        products:(Array.isArray(set.items)?set.items:[]).map(product).filter(Boolean).map(p=>({...p,index:index++})),
+        custom:(Array.isArray(set.custom_items)?set.custom_items:[]).map(customItem).filter(Boolean)};
     }).filter(Boolean);
     return {groups,unsupported,needs:Array.isArray(value.needs)?value.needs.filter(x=>typeof x==='string'):[],
       assumed:Array.isArray(value.assumed)?value.assumed.filter(x=>typeof x==='string'):[],aiEstimated:Array.isArray(value.ai_estimated)?value.ai_estimated:[],
@@ -245,6 +254,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,partOptions,buildOptions,buildQuote,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,customItem,partOptions,buildOptions,buildQuote,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

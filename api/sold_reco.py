@@ -516,6 +516,55 @@ def game_min_rank(g, levels, vocab, notes) -> int:
     return r
 
 
+# ── 새로 나온 PC(운영자가 부품을 골라 만든 조립PC · 부품 상품화 5단계) ─────────────────────
+# 공개 판정·가격은 api/custom_pc 한 곳, 용도 평가는 api/custom_pc_fit(몰 상품과 같은 기준표)이다.
+# 몰 카드(items)와 섞지 않고 set 의 custom_items 로 따로 싣는다 — 몰 상품번호가 없어 보관 견적·쇼핑몰
+# 연결 경로를 탈 수 없고, 구매는 「새로 나온 PC」 화면의 구매 상담 신청으로 받는다.
+MAX_CUSTOM_ITEMS = 2
+CUSTOM_PC_URL = "new-pcs.html#"
+
+
+def load_custom_pcs(notes) -> list[dict]:
+    """고객에게 지금 공개 중인 신규 조립PC + 부품 사양 판독. 읽지 못하면 빈 목록(추천은 그대로)."""
+    try:
+        from . import custom_pc
+        from .custom_pc_fit import spec_from_parts
+        with engine.connect() as conn:
+            pcs = custom_pc.customer_list(conn)
+    except Exception:  # noqa: BLE001 - 추가 카드라 추천을 막지 않는다
+        log.exception("[sold_reco] custom pcs unavailable - skipped")
+        return []
+    return [dict(pc, fit_spec=spec_from_parts(pc["parts"])) for pc in pcs]
+
+
+def custom_items(pcs, fu, r, levels, budget_won, bound) -> list[dict]:
+    """그 용도·최소 수준에 맞는(또는 정보 없음인) 공개 신규 PC — 예산 안만, 최대 MAX_CUSTOM_ITEMS 개."""
+    from .custom_pc_fit import NO_INFO, judge, reached
+    lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
+    rank_of = {l["level"]: l["level_rank"] for l in levels if l["usage"] == fu}
+    out = []
+    for pc in pcs:
+        if pc["price"] is None or (budget_won is not None and bound != "이상" and pc["price"] > budget_won):
+            continue
+        state = judge(pc["fit_spec"], fu, lv["level"]) if lv else "unknown"
+        if state == "short":
+            continue
+        top = reached(pc["fit_spec"], fu) if state == "fit" else None
+        out.append({
+            "configuration_id": pc["configuration_id"], "title": pc["title"], "price": pc["price"],
+            "price_note": pc["price_note"], "fit": state,
+            "level": top, "level_text": f"{fu} {top}" if top else NO_INFO,
+            "parts": [{"slot_label": p["slot_label"], "name": p["name"], "quantity": p["quantity"]}
+                      for p in pc["parts"] if p["slot"] in ("CPU", "GPU", "RAM", "SSD")],
+            "url": CUSTOM_PC_URL + pc["configuration_id"],
+            "_rank": rank_of.get(top, 0),
+        })
+    out.sort(key=lambda x: (x["fit"] != "fit", -x["_rank"], x["price"]))
+    for x in out:
+        x.pop("_rank")
+    return out[:MAX_CUSTOM_ITEMS]
+
+
 def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None) -> list[dict]:
     """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 3개.
 
@@ -531,6 +580,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
     filters = X.build_filters(ex["wants"], products)
     out = []
     seen = set()
+    customs = load_custom_pcs(notes)
     for label, fu, r in _targets(state, game_usages, other_usages, levels, vocab, notes):
         if ex["wants"].get("uhd") and fu != "게임":
             r = _uhd_rank(levels, fu, r)
@@ -551,4 +601,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
             "center_band": None, "center_band_key": None, "bands_considered": [],
             "center_tier": None, "center_tier_key": None, "tiers_considered": [],
         })
+        extra = custom_items(customs, fu, r, levels, state.budget_won, state.budget_bound) if customs else []
+        if extra:
+            out[-1]["custom_items"] = extra
     return out

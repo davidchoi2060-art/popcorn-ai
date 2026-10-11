@@ -19,3 +19,4 @@ html,body{height:auto}
 .new-pc-form .consent input{margin-top:5px}
 .new-pc-done{color:var(--green);font-weight:600}.new-pc-error{color:var(--amber)}
 @media(max-width:760px){.new-pcs{padding:20px 16px 36px}.new-pc{padding:16px}.new-pc-price{text-align:left}.new-pc-parts th{width:84px}.new-pc-head h2{font-size:21px}}
+.new-pc.is-target{border-color:var(--green);box-shadow:0 0 0 2px var(--tint)}
