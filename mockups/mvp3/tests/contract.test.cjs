@@ -18,7 +18,7 @@ function harness(extra={},sessionStorage=storage()){
 async function selected(h){await h.flow.submit('예산 150만원으로 추천');h.flow.select(0);h.flow.navigate('final');return h;}
 test('live HTML only loads live modules and same-origin connections',()=>{
  const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
- assert.match(html,/connect-src 'self'/);assert.match(html,/maxlength="300"/);assert.doesNotMatch(html,/src="(?:fixtures|model)\.js"|connect-src 'none'|auth\.js/);
+ assert.match(html,/connect-src 'self'/);assert.match(html,/maxlength="20000"/);assert.doesNotMatch(html,/src="(?:fixtures|model)\.js"|connect-src 'none'|auth\.js/);
  assert.doesNotMatch(fs.readFileSync(path.join(__dirname,'../app.js'),'utf8'),/MVP3Fixtures|MVP3Model|1490000|\.gpus|swap\/apply/);
 });
 test('object specs retain only public CPU GPU RAM SSD VRAM and exclude nested internal fields',()=>{
@@ -146,7 +146,7 @@ test('list failure stays error rather than empty successful result',async()=>{
 });
 test('rate-limited retry respects delay; overlong input never requests',async()=>{
  let calls=0;const h=harness({parse:async()=>{calls++;throw new A.ApiError('wait',429,'rate',30);}});
- assert.equal(await h.flow.submit('x'.repeat(301)),false);await h.flow.submit('request');await h.flow.retry();assert.equal(calls,1);assert.ok(h.flow.state.error.retryAt>Date.now());
+ assert.equal(await h.flow.submit('x'.repeat(20001)),false);await h.flow.submit('request');await h.flow.retry();assert.equal(calls,1);assert.ok(h.flow.state.error.retryAt>Date.now());
 });
 // 2026-10-11 상담 주고받기: 세 장 · 카드 뒤 선택 · 추가 조건 왕복(api/reco_explore).
 const explored={...reco,talk_notes:['「램 64GB 이상」 조건은 지금 못 맞춥니다. 판매 중인 PC 중에 이 조건을 맞추는 것이 없어요.','더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요.',7],

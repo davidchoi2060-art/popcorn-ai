@@ -67,6 +67,8 @@
   <p class="mc-note" id="mcNote"></p>
   <div class="mc-bar">
     <label><input type="checkbox" id="mcTest"> 시험 문의 포함</label>
+    <label><input type="checkbox" id="mcExc"> 예외 입력만</label>
+    <span class="mc-muted" id="mcExcNote"></span>
     <span class="mc-muted" id="mcTestNote"></span>
   </div>
   <div class="mc-table">
@@ -110,17 +112,19 @@
     return r.json();
   }
   function q(){return 'include_test='+($('mcTest').checked?'true':'false');}
+  function qList(){return q()+'&only_exceptions='+($('mcExc').checked?'true':'false');}
 
   async function load(){
     $('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">불러오는 중입니다.</td></tr>';
     let d;
-    try{d=await getJSON('/api/admin/mvp3-consults?offset='+offset+'&'+q());}
+    try{d=await getJSON('/api/admin/mvp3-consults?offset='+offset+'&'+qList());}
     catch(e){$('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">'+esc(e.message)+'</td></tr>';return;}
     const s=d.summary||{};
     $('kHitsToday').textContent=num(s.hits_today);$('kSavedToday').textContent=num(s.saved_today);
     $('kHits').textContent=num(s.hits);$('kSaved').textContent=num(s.saved);$('kVisitors').textContent=num(d.total_visitors);
     $('mcRawNotice').innerHTML=RawText.notice(d.raw_notice);
     $('mcNote').textContent=d.note||'';
+    $('mcExcNote').textContent='예외 입력 문의 '+num(s.exceptions)+'건';
     $('mcTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 문의 '+num(d.test_excluded)+'건을 뺐습니다.':'');
     limit=d.limit||50;lastLen=(d.items||[]).length;
     if(!lastLen){$('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">아직 고객 문의가 없습니다.</td></tr>';}
@@ -160,7 +164,7 @@
         (e.conditions.length?'<div>조건: '+chips(e.conditions)+'</div>':'')+
         (e.product.reasons.length?'<ul>'+e.product.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')+'</div>'
         :
-        '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+'</div>'+
+        '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+(e.exception?' · 예외 입력':'')+'</div>'+
         RawText.html(e.question)+
         '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div>'+
         (e.reply?'<div class="mc-reply">AI 답: '+esc(e.reply.shown_reply||(e.reply.reply_purged?'보관 기간 지남':'없음'))+
@@ -176,6 +180,7 @@
   $('mcPrev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);load();});
   $('mcNext').addEventListener('click',()=>{offset+=limit;load();});
   $('mcTest').addEventListener('change',()=>{offset=0;load();if(selected)open(selected);});
+  $('mcExc').addEventListener('change',()=>{offset=0;load();});
   load();
   // 다른 화면(구매 상담 신청 등)에서 #u123 으로 오면 그 방문자 서랍을 바로 연다.
   if(/^#[uh]\d{1,12}$/.test(location.hash))open(location.hash.slice(1));

@@ -38,6 +38,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
 from . import talk_rules as TR
+from . import talk_exceptions as TX
 from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST
 from .admin_raw_text import NOTICE as RAW_NOTICE, expired, raw_view
 from .db import engine
@@ -66,8 +67,16 @@ HIT_IS_TEST = "(data_origin <> 'real' OR COALESCE(raw_text, '') ILIKE 'QA-%')"
 DETAIL_LIMITS = {"hits": 500, "saved": 200, "inquiries": 100}
 
 
-def _hit_origin(include_test: bool) -> str:
-    return "TRUE" if include_test else f"NOT {HIT_IS_TEST}"
+# 예외 입력 문의(api/talk_exceptions -- 이상한 말·욕·외국어·사람 상담 요청 등). 상담 기록에
+# `예외:<종류>` 꼬리표로 남는다. 「예외 입력만」을 고르면 이 조건으로 문의만 추린다.
+HIT_IS_EXCEPTION = ("(jsonb_typeof(matched_terms) = 'array' AND EXISTS (SELECT 1 FROM"
+                    " jsonb_array_elements_text(matched_terms) AS x(term)"
+                    " WHERE x.term LIKE '%s%%'))" % TX.EXCEPTION_TAG)
+
+
+def _hit_origin(include_test: bool, only_exceptions: bool = False) -> str:
+    base = "TRUE" if include_test else f"NOT {HIT_IS_TEST}"
+    return f"({base} AND {HIT_IS_EXCEPTION})" if only_exceptions else base
 
 
 def _saved_origin(include_test: bool) -> str:
@@ -106,6 +115,9 @@ def _term(t: str) -> str:
         return "문의 주제: " + (TR.topic_label(key) or key)
     if t.startswith(TR.UNAPPLIED_TAG):
         return "반영 못 함: " + t[len(TR.UNAPPLIED_TAG):]
+    if t.startswith(TX.EXCEPTION_TAG):
+        key = t[len(TX.EXCEPTION_TAG):]
+        return "예외 입력: " + (TX.kind_label(key) or key)
     return TERM_KO.get(t, t)
 
 
@@ -134,14 +146,17 @@ _EVENTS = """
 
 
 @router.get("/mvp3-consults")
-def list_visitors(offset: int = 0, include_test: bool = False):
-    """방문자별 문의·보관 요약 — 마지막 활동이 최근인 순서."""
+def list_visitors(offset: int = 0, include_test: bool = False, only_exceptions: bool = False):
+    """방문자별 문의·보관 요약 — 마지막 활동이 최근인 순서.
+
+    `only_exceptions` 이면 예외 입력 문의(`예외:` 꼬리표)가 있는 방문자·문의만 센다(보관 견적은 뺀다).
+    """
     offset = max(0, offset)
-    hit_origin = _hit_origin(include_test)
+    hit_origin = _hit_origin(include_test, only_exceptions)
     today_kst = datetime.now(KST).date()
     lo, hi = kst_day_range(today_kst.isoformat(), today_kst.isoformat())
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
-        saved_origin = _saved_origin(include_test)
+        saved_origin = "FALSE" if only_exceptions else _saved_origin(include_test)
         ev = _EVENTS.format(hit_origin=hit_origin, saved_origin=saved_origin)
         rows = conn.execute(text(f"""
             SELECT vkey, MIN(at) AS first_at, MAX(at) AS last_at,
@@ -162,6 +177,9 @@ def list_visitors(offset: int = 0, include_test: bool = False):
                                       AND saved_at AT TIME ZONE 'UTC' < :hi) AS saved_today
               FROM mvp3_saved_recommendations s WHERE {saved_origin}"""),
             {"lo": lo, "hi": hi}).mappings().one()
+        exceptions = conn.execute(text(
+            f"SELECT COUNT(*) FROM talk_intent_hits WHERE {_hit_origin(include_test)}"
+            f" AND {HIT_IS_EXCEPTION}")).scalar_one()
         excluded = 0 if include_test else conn.execute(text(
             f"SELECT COUNT(*) FROM talk_intent_hits WHERE {HIT_IS_TEST}")).scalar_one()
         # 줄마다 마지막 보관 견적 한 건(있으면) — 상품명·가격을 목록에서 바로 보이게 한다.
@@ -210,8 +228,8 @@ def list_visitors(offset: int = 0, include_test: bool = False):
         "items": items, "limit": LIMIT, "offset": offset, "total_visitors": int(total_visitors),
         "summary": {"hits": int(s["hits"]), "hits_today": int(s["hits_today"]),
                     "ai_calls": int(s["ai"]), "saved": int(sv["saved"]),
-                    "saved_today": int(sv["saved_today"])},
-        "include_test": include_test, "test_excluded": int(excluded),
+                    "saved_today": int(sv["saved_today"]), "exceptions": int(exceptions)},
+        "include_test": include_test, "only_exceptions": only_exceptions, "test_excluded": int(excluded),
         "raw_notice": RAW_NOTICE,
         "note": ("문의 원문은 저장할 때 전화번호·이메일이 가려진 채로 남고 90일 뒤 지워집니다. "
                  "문의 기록은 같은 상담 API를 쓰는 다른 고객 화면의 문의도 함께 셉니다."),
@@ -220,7 +238,7 @@ def list_visitors(offset: int = 0, include_test: bool = False):
 
 @router.get("/mvp3-consults/{visitor}")
 def visitor_detail(visitor: str, include_test: bool = False):
-    """방문자 한 명의 문의와 보관 견적을 시간 순서로."""
+    """방문자 한 명의 문의와 보관 견적을 시간 순서로. 예외 입력 문의는 `exception: true`."""
     uid, hit_id = _visitor_where(visitor)
     hit_origin = _hit_origin(include_test)
     with engine.connect() as conn:
@@ -267,6 +285,8 @@ def visitor_detail(visitor: str, include_test: bool = False):
     timeline = [{
         "kind": "hit", "at": iso(h["created_at"]),
         "terms": _terms(h["matched_terms"]), "unread": int(h["unmatched_n"] or 0),
+        "exception": any(isinstance(t, str) and t.startswith(TX.EXCEPTION_TAG)
+                         for t in (h["matched_terms"] or [])),
         "ai_called": bool(h["llm_called"]), "intent_key": h["intent_key"],
         "test": bool(h["is_test"]),
         "question": raw_view(h["raw_text"], h["raw_purge_at"]),

@@ -444,8 +444,12 @@ function render(){
   const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
   document.body.dataset.screen=state.screen;document.body.classList.add('live-mode');document.body.classList.toggle('original-flow',['welcome','results','detail','final'].includes(state.screen));
   view.dataset.screen=state.screen;
-  if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());}
-  else if(state.screen==='results')renderResults();
+  // 예외 입력·상담 실패 뒤에는 사람 상담 길을 연다(서버 handoff_offer). 신청 칸은 구매 상담 신청과 같다.
+  const handoffBlock=()=>(state.handoffOffer||state.inquiry.open||state.inquiry.done)?
+    (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('사람 상담 남기기','inquiry-open','outline',state.phase?'disabled':'')+'</p>':'')+inquiryPanel():'';
+  if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());view.insertAdjacentHTML('beforeend',handoffBlock());}
+  // 견적을 보던 중에 받은 예외 입력도 같은 길을 연다(보던 견적은 그대로 둔다).
+  else if(state.screen==='results'){renderResults();if(state.handoffOffer)view.insertAdjacentHTML('beforeend',handoffBlock());}
   else if(state.screen==='detail'&&state.selected)renderDetail();
   else if(state.screen==='final'&&state.selected)renderFinal();
   else if(state.screen==='saved')renderSaved();
@@ -479,7 +483,7 @@ function enterRoute(hash,initial=false){
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
 async function submit(text,{fromInput=false}={}){if(!String(text||'').trim()){notice('원하는 조건을 입력해주세요.');$('#request').focus();return;}
-  if(text.trim().length>300){notice('상담 요청은 300자 이내로 입력해주세요.');return;}
+  if(text.trim().length>20000){notice('한 번에 20,000자까지 보낼 수 있어요. 나눠서 보내 주세요.');return;}
   if(state.phase)return;
   const sent=text.trim();await flow.submit(text);
   // submit() also returns true after errors. Only validated conversation history

@@ -2,6 +2,8 @@
 (function(root){'use strict';
   const M=typeof module!=='undefined'?require('./live-model.js'):root.MVP3LiveModel;
   const JOURNAL_KEY='popcorn-mvp3-pending-save-v1';
+  // 상담 한 번에 읽는 글자 수 -- 서버 api/talk.py MAX_TEXT_LEN 과 같다. 넘는 글은 서버가 앞부분만 읽고 알린다.
+  const MAX_TEXT=20000;
   function validPending(record){
     const p=record?.payload;
     return M.object(record)&&record.version===1&&/^[a-f0-9]{64}$/.test(record.binding)&&M.object(p)
@@ -44,7 +46,7 @@
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -59,7 +61,7 @@
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
-        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null});
+        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
@@ -80,29 +82,35 @@
     }
     async function submit(raw,{repeat=false}={}){
       const text=String(raw||'').trim();
-      if(!text||text.length>300||state.phase)return false;
+      if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),op=begin('talk');
       state.lastText=text;if(!repeat)message(text,'user');emit();
       try{
         const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
+        // 잡담·범위 밖 질문이 조건을 바꾸지 않았으면 보던 견적을 지우지 않는다(코덱스 1816 「앞서 말한 조건과 보던 견적을 잃지 않기」).
+        const keep=!!state.recommendation&&(response.pc_related===false||!!response.fallback)&&JSON.stringify(response.state)===JSON.stringify(state.talk);
         state.talk=M.copy(response.state);state.chatFlow=M.object(response.chat_flow)?M.copy(response.chat_flow):null;
-        state.history.push({role:'user',text});
+        state.history.push({role:'user',text:text.slice(0,1000)});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
           if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
           if(reply.trim()){message(reply);state.history.push({role:'assistant',text:reply.slice(0,300)});}
         }
-        state.history=state.history.slice(-6);state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
+        // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
+        if(response.handoff_offer===true)state.handoffOffer=true;
+        state.history=state.history.slice(-6);
+        if(keep)return true;
+        state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.
         state.pendingText=(state.pendingText?state.pendingText+' / '+text:text).slice(-300);
-        if(state.missing.length||response.pc_related===false||response.silent){state.screen='welcome';}
+        if(state.missing.length||response.pc_related===false||response.silent||response.fallback){state.screen='welcome';}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
-        if(current(op))fail(error,state.phase==='recommend'?{kind:'recommend'}:{kind:'talk',text});
+        if(current(op)){fail(error,state.phase==='recommend'?{kind:'recommend'}:{kind:'talk',text});state.handoffOffer=true;}
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
       return true;
     }
@@ -216,8 +224,10 @@
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
     async function openInquiry(){
-      if(state.phase||!state.selected)return;
+      if(state.phase)return;
       state.inquiry.open=true;state.inquiry.error='';
+      // 상품을 고르기 전(상담 중) 사람 상담: 주제 「기타」와 마지막 문장을 미리 채운다 -- 고객이 고칠 수 있다.
+      if(!state.selected&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
       if(state.inquiry.meta){emit();return;}
       const op=begin('inquiry-form');
       try{
@@ -236,7 +246,7 @@
       if(typeof values?.consent==='boolean')d.consent=values.consent;
     }
     async function inquire(values){
-      if(state.phase||!state.selected||!state.inquiry.open||state.inquiry.done)return;
+      if(state.phase||!state.inquiry.open||state.inquiry.done)return;
       inquiryDraft(values);
       const d=state.inquiry.draft,problem=inquiryProblem(d,state.inquiry.meta);
       if(problem){state.inquiry.error=problem;emit();return;}
@@ -244,7 +254,7 @@
       const phone=d.phone.replace(/\s+/g,''),email=d.email.trim(),name=d.name.trim(),text=d.message.trim();
       if(phone)payload.phone=phone;if(email)payload.email=email;if(name)payload.name=name;if(text)payload.message=text;
       if(state.savedQuote&&M.uuid(state.savedQuote.id))payload.quote_id=state.savedQuote.id;
-      if(Number.isInteger(state.selected.product_code)&&state.selected.product_code>0)payload.product_code=state.selected.product_code;
+      if(Number.isInteger(state.selected?.product_code)&&state.selected.product_code>0)payload.product_code=state.selected.product_code;
       const op=begin('inquiry');state.inquiry.error='';
       try{
         const r=await api.inquiry(payload,{signal:op.signal});
