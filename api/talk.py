@@ -443,6 +443,13 @@ class ParseBody(BaseModel):
     # 않는다 -- `clamp_turns` 가 범위 밖·형식 오류를 접는다. 화면이 0 으로 조작해 잡담을
     # 무한히 할 수 있다는 것은 알고 둔 것이고, 그건 `rate_limit_policies`(visitor.ai)가 막는다.
     chat_flow: dict | None = None
+    # 대화 화면 시작 단추(코덱스 1816 보강6 의견 v1 -- 입구는 하나, 안에 시작 단추 셋). 어느 단추 초안으로
+    # 시작했는지만 서버 로그에 센다 -- 문장은 찍지 않는다. `ENTRY_KEYS` 밖의 값은 「-」로 찍는다.
+    entry: str | None = None
+
+
+# 시작 단추 키. 화면 정본은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야 센다(테스트가 대조한다).
+ENTRY_KEYS = frozenset({"new_pc", "upgrade", "parts"})
 
 
 def _trim_history(history) -> list:
@@ -1109,9 +1116,10 @@ def parse_talk(body: ParseBody, request: Request):
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
     # games/usages/tiers 는 프롬프트에 실린 격자 어휘 수 -- 표가 늘면 프롬프트도 길어지므로
     # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
-    log.info("[talk] parse request: chars=%d usages=%d games=%d tiers=%d hist=%d prev=%s",
+    log.info("[talk] parse request: chars=%d usages=%d games=%d tiers=%d hist=%d prev=%s entry=%s",
              len(text), len(vocab.usages), len(vocab.confirmed_games), len(vocab.tiers),
-             len(history), "yes" if prev_ok else "no")
+             len(history), "yes" if prev_ok else "no",
+             body.entry if body.entry in ENTRY_KEYS else "-")
 
     # ── [A] 좌표 추출 ∥ [B] 답변 — **병렬이다**(2026-09-21 · talk_design_v2 §4-1) ──
     # 순차면 12초로 LLM_TIMEOUT_SEC(15)에 육박한다. 병렬이면 최악 7초.

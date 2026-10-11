@@ -46,16 +46,39 @@ function scripted({failSecond=false}={}){
   };
 }
 
-test('first screen offers examples that fill the input without sending',async()=>{
+test('first screen offers three starters that fill the input without sending',async()=>{
   const h=harness(scripted());
   try{
     await until(()=>h.doc.querySelector('.tk-welcome'));
-    assert.match(h.text('.tk-welcome h1'),/어떤 PC를 찾고 계세요/);
-    assert.equal(h.doc.querySelectorAll('[data-action=example]').length,3);
+    assert.match(h.text('.tk-welcome h1'),/어떤 PC가 필요하세요/);
+    const labels=[...h.doc.querySelectorAll('[data-action=starter]')].map(b=>b.textContent);
+    assert.deepEqual(labels,['새 PC 찾기','쓰던 PC 업그레이드','부품·구성 물어보기']);
     assert.match(h.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);
-    h.click('[data-action=example]');
-    assert.equal(h.doc.querySelector('#tk-input').value,'게임용 PC를 찾고 있어요.');
+    h.click('[data-action=starter][data-entry=upgrade]');
+    assert.equal(h.doc.querySelector('#tk-input').value,'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.');
+    h.click('[data-action=starter][data-entry=new_pc]');
+    assert.equal(h.doc.querySelector('#tk-input').value,'새 PC를 찾고 있어요.','another starter replaces an untouched draft');
     await tick();assert.equal(h.calls.length,0);assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('a starter keeps what the customer already typed and its key rides the first send only',async()=>{
+  const h=harness(scripted());
+  try{
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    const box=h.doc.querySelector('#tk-input');box.value='영상 편집용으로';
+    h.click('[data-action=starter][data-entry=new_pc]');
+    assert.equal(box.value,'영상 편집용으로 새 PC를 찾고 있어요.');
+    h.doc.querySelector('#tk-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    const first=h.calls.find(c=>c.url==='/api/talk/parse');
+    assert.equal(first.body.entry,'new_pc');assert.equal(first.body.text,'영상 편집용으로 새 PC를 찾고 있어요.');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.ok(h.doc.querySelector('#tk-starters').hidden,'starters go away once the conversation starts');
+    assert.ok(!h.doc.querySelector('.tk-chat').classList.contains('is-fresh'));
+    await h.say('150만원 게임용');
+    await until(()=>h.calls.filter(c=>c.url==='/api/talk/parse').length===2);
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[1].body.entry,undefined);
+    assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
 test('cards sit under the answer and choosing one fills the quote panel',async()=>{

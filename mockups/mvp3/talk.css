@@ -4,7 +4,7 @@
 .tk-chat{display:flex;flex-direction:column;min-height:0;padding:20px clamp(16px,4vw,48px) 12px}
 .tk-log{flex:1;overflow:auto;padding:8px 0 16px;display:flex;flex-direction:column;gap:12px}
 .tk-welcome{max-width:680px;padding:24px 0 8px}.tk-welcome p{color:var(--muted)}
-.tk-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tk-examples button{font-size:14px;padding:8px 12px}
+.tk-chat.is-fresh .tk-log{flex:0 0 auto}.tk-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tk-examples[hidden]{display:none}.tk-examples button{font-size:14px;padding:8px 12px}
 .tk-msg{max-width:min(680px,88%)}.tk-msg p{white-space:pre-wrap;margin:0}
 .tk-msg.is-user{align-self:flex-end;background:var(--green);color:white;border-radius:16px 16px 4px 16px;padding:10px 14px}
 .tk-msg.is-ai{align-self:flex-start;background:var(--tint);border-radius:16px 16px 16px 4px;padding:10px 14px}
