@@ -438,6 +438,10 @@ NAV = [
         #   행만 싣는다 — 코드 수정 없이 켜진다). 근거·검증은 위 11차 노트 참조.
         ("게임 견적 근거 검수", "/admin2/game-copy-review",
          "신설(ADM-TLK-020) · 사장님 확정 2026-09-21 — 86종을 보신 뒤 내보낸다"),
+        # 2026-10-11 신설(ADM-TLK-021) — 게임마다 사양 등급(E·A·B·C·S·L·미배정)을 고친다.
+        #   견적은 game_grade_assignments 를 읽으므로 저장 즉시 다음 상담부터 반영된다. 대표만 저장.
+        ("게임 사양 등급", "/admin2/game-grades",
+         "신설(ADM-TLK-021 · 가칭) 2026-10-11 — 등급 변경 · 이유 · 되돌리기"),
         ("AI 작업 설정", "/admin2/ai-task-settings", "신설 — 작업↔모델 · 폴백"),
         ("AI 연동 설정", "/admin2/ai-integration", "신설 — 키는 서버 env"),
         ("AI 사용량 · 비용", "/admin2/ai-usage-cost", None),
@@ -584,7 +588,7 @@ def new_admin_nav(current_path=''):
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members',)),
-        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/talk-review', '/admin2/product-fit')),
+        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/game-grades', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/talk-review', '/admin2/product-fit')),
         ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/mvp3-consults', '/admin2/handoff-log', '/admin2/swap-click-logs')),
     ]
     return [dict(label=label, href=href, icon=icon, active=current_path.rstrip('/') in paths)

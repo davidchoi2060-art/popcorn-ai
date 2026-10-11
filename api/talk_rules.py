@@ -166,15 +166,74 @@ def budget_from_text(text: str) -> int | None:
     return found[0] if len(vals) == 1 else None
 
 
+# ①-2 (2026-10-11 품질관리 R8) 「100만원대」 — 그 자릿수 구간 전체로 읽는다.
+#   지금까지는 「100만」만 읽혀 상한 100만원이 됐다. 「N만원대」는 N 에서 시작하는 그 자릿수
+#   구간이다(100만원대 = 100~199만원 · 150만원대 = 150~159만원 · 50만원대 = 50~59만원).
+#   그래서 «구간의 끝까지(이하)»로 읽고, 그렇게 읽었다고 답에 밝힌다(`budget_band_note`).
+_BAND = re.compile(r"(?<![0-9,.])([0-9]{1,4})\s*만\s*원?\s*대(?:(?![가-힣])|(?=[로에의요쯤정면이는도가를]))")
+
+
+def budget_band_from_text(text: str) -> tuple[int, int] | None:
+    """「100만원대」 -> (구간 시작 원, 구간 끝 원) = (1_000_000, 1_990_000). 하나일 때만."""
+    if not text:
+        return None
+    found = {m.group(1) for m in _BAND.finditer(str(text))}
+    if len(found) != 1:
+        return None
+    n = int(found.pop())
+    if n <= 0:
+        return None
+    zeros = len(str(n)) - len(str(n).rstrip("0"))
+    width = 10 ** min(zeros, len(str(n)) - 1)
+    return n * 10_000, (n + width - 1) * 10_000
+
+
+def budget_band_note(text: str) -> str | None:
+    band = budget_band_from_text(text)
+    if not band:
+        return None
+    lo, hi = band
+    return "「%d만원대」는 %d만원부터 %d만원까지로 보고 찾았어요." % (lo // 10_000, lo // 10_000, hi // 10_000)
+
+
+# ①-3 (2026-10-11 품질관리 R8) 「롤 120」「오버워치 할 컴 120」 — 단위 없는 맨 숫자 예산.
+#   문장 끝에(또는 「정도·쯤·선·까지·이하·이내·으로·요」 앞에) 혼자 있는 30~999 를 만원으로
+#   읽는다. 그래픽카드 번호(4060)·주사율(144hz)·크기(27인치)·대수(5대)는 단위나 글자가
+#   붙거나 범위 밖이라 걸리지 않는다. 금액이 따로 적혀 있으면 이 규칙은 쓰지 않는다.
+_BARE_NUM = re.compile(r"(?<![0-9A-Za-z.,\-])([0-9]{2,3})(?=(?:\s*(?:정도|쯤|선|까지|이하|이내|으로|로|이요|요))*\s*[.!?~]*\s*$)")
+
+
+def bare_budget_from_text(text: str) -> int | None:
+    """단위 없는 맨 숫자 예산(만원). 하나뿐이고 30~999 일 때만. 금액 표기가 있으면 None."""
+    if not text or budget_from_text(text) is not None:
+        return None
+    s = str(text).strip()
+    nums = [int(m.group(1)) for m in _BARE_NUM.finditer(s)]
+    if len(nums) != 1 or not 30 <= nums[0] <= 999:
+        return None
+    return nums[0] * 10_000
+
+
 # ── ② 게임 이름 ───────────────────────────────────────────────────────────
 # 「배그는 안 하고」처럼 빼는 말이 있으면 문장에서 게임을 줍지 않는다 — AI 가 문맥을 본다.
 _NEGATION = re.compile(r"안\s*해|안\s*하|않|말고|빼고|제외|싫|별로")
+
+
+# 게임이 아닌 작업 프로그램 — 영상·사진·3D·설계·문서. 게임 이름 찾기 전에 문장에서 지운다.
+SOFTWARE_RE = re.compile(
+    r"(?:어도비\s*)?(?:프리미어(?:\s*프로)?|애프터\s*이펙트|포토샵|라이트룸|일러스트레이터|일러스트"
+    r"|인디자인|다빈치(?:\s*리졸브)?|리졸브|파이널\s*컷(?:\s*프로)?|베가스(?:\s*프로)?|캡컷|블렌더"
+    r"|시네마\s*4d|3ds\s*맥스|스케치업|오토\s*캐드|캐드|솔리드\s*웍스|레빗|라이노|줌|엑셀|파워\s*포인트)",
+    re.IGNORECASE)
 
 
 def games_from_text(text: str, vocab, match_game) -> list[str]:
     """문장에서 우리 목록에 있는 게임(games.name)을 찾는다. 부정 표현이 있으면 빈 목록."""
     if not text or _NEGATION.search(text):
         return []
+    # 작업 프로그램 이름은 게임 이름 찾기에서 뺀다 — 「프리미어 프로」의 「프로」가
+    # 「프로젝트 좀보이드」에 부분 일치해 없는 게임을 지어냈다(2026-10-11 고객3 3번).
+    text = SOFTWARE_RE.sub(" ", text)
     out: list[str] = []
     for name in getattr(vocab, "all_game_names", []) or []:
         if name and name in text and name not in out:
