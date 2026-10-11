@@ -88,6 +88,8 @@ NOTE_ORDER_STATUS = ("주문·결제·환불 처리 상태는 제가 여기서 �
 NOTE_LINK = "링크 안의 내용은 제가 열어 볼 수 없어요. 비교할 구성과 금액을 글로 적어 주시면 함께 볼게요."
 NOTE_REPEAT = ("같은 말씀을 여러 번 하셨네요. 제 답이 부족했다면 원하시는 조건을 하나만 더 알려 주시거나,"
                " 아래 「사람 상담 남기기」를 눌러 주세요.")
+# 다른 쇼핑몰 비교에 AI 가 「저희도 맞춰드릴 수 있습니다」처럼 약속하면 그 문장을 걷고 이 한 줄을 앞에 둔다.
+NOTE_COMPETITOR = "다른 곳 가격은 제가 확인할 수 없어요."
 NOTE_SMALLTALK_LONG = "PC가 필요하시면 언제든 용도와 예산을 말씀해 주세요."
 REPLY_AI_UNREADABLE = ("방금 말씀을 제가 잘 정리하지 못했어요. 한 번만 다르게 말씀해 주시거나,"
                        " 사람 상담을 원하시면 아래 「사람 상담 남기기」를 눌러 주세요.")
@@ -317,6 +319,8 @@ def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
         out = REPLY_ABUSE
     elif "gibberish" in ks and pc is not True:
         out = REPLY_GIBBERISH
+    if "competitor" in ks:
+        out = _drop_promises(out)
     if "foreign" in ks and NOTE_FOREIGN not in out:
         out = (out.rstrip() + " " + NOTE_FOREIGN).strip()
     if "contradiction" in ks and state is not None and top_spec_re is not None:
@@ -340,6 +344,20 @@ def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
     if "too_long" in ks and read_len:
         out = _add(out, NOTE_TOO_LONG % format(read_len, ","))
     return out, handoff
+
+
+_SENT = re.compile(r"(?<=[.!?。])\s+")
+
+
+def _drop_promises(out: str) -> str:
+    """가게가 해 주겠다는 약속 문장(talk_rules.PROMISE_PATTERNS)을 걷는다 -- 걷었으면 확인 불가 한 줄을 앞에 둔다.
+    남의 가격을 모르는 채 「맞춰 드릴게요」라고 하면 근거 없는 약속이다(2026-10-12 개발 서버)."""
+    from .talk_rules import PROMISE_PATTERNS     # talk_rules 는 이 모듈을 읽지 않는다 -- 순환 없음
+    sents = [x for x in _SENT.split(out or "") if x.strip()]
+    kept = [x for x in sents if not any(p.search(x) for _label, p in PROMISE_PATTERNS)]
+    if len(kept) == len(sents):
+        return out
+    return " ".join([NOTE_COMPETITOR] + [x for x in kept if NOTE_COMPETITOR not in x]).strip()
 
 
 def _add(out: str, note: str) -> str:
