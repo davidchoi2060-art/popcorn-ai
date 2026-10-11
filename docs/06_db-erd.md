@@ -1890,3 +1890,11 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 | created_at · updated_at | TIMESTAMPTZ | |
 
 행은 저장할 때 생기고, 행이 없으면 화면은 «대기»로 본다. 저장은 운영자 이상만 한다. 행을 지우지 않는다. 시드 행은 없다. downgrade 는 행이 하나라도 있으면 거부한다.
+
+### 34. 신규 조립PC 고객 공개 기록 `custom_pc_release_events` (2026-10-11, 0142)
+
+관리자 「신규 조립PC 생성」으로 만든 구성(오퍼 `ADMIN-…`, 쇼핑몰 상품번호 없음)을 고객 화면 「새로 나온 PC」에 낼 때 운영자의 「고객 공개」·「공개 중지」를 한 줄씩 쌓는다. 지우거나 고치지 않는다 — 공개 중지는 `action='withdraw'` 한 줄과 `ref_event_id`(내리는 공개 줄)로 남긴다. 공개 줄은 그때의 `revision`·`bom_fingerprint`·`price_at_release`(부품 판매가 합 + 조립비, 기록용)를 담는다.
+
+고객 화면은 마지막 줄이 `release` 이고 그 판·부품 지문이 지금 구성과 같고 구성 상태가 `approved` 일 때만 공개 중으로 본다. 그 위에 요청마다 부품 판매중·판매가·호환(`api/build_check`)을 다시 보고, 하나라도 어긋나면 고객 화면에서 뺀다. 가격은 늘 지금 `products.sale_price` 합 + 조립비다(`api/custom_pc.py`).
+
+`purchase_inquiries.configuration_id`(TEXT, NULL 허용, FK `pc_configurations`)는 「새로 나온 PC」에서 남긴 구매 상담 신청을 그 구성에 잇는다. 이미 있는 행은 바꾸지 않는다. downgrade 는 공개 기록이나 연결된 신청이 하나라도 있으면 거부한다.

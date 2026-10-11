@@ -1,0 +1,21 @@
+/* 「새로 나온 PC」(부품 상품화 4단계). 색은 styles.css :root 를 그대로 쓴다. */
+html,body{height:auto}
+.new-pcs{max-width:960px;margin:0 auto;padding:28px 34px 48px}
+.new-pcs h1{font-size:30px;margin:0 0 6px;letter-spacing:-.5px}
+.new-pcs .muted{color:var(--muted)}
+.new-pc{border:1px solid var(--line);border-radius:14px;padding:22px;margin:18px 0;background:#fff}
+.new-pc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.new-pc-head h2{font-size:24px;margin:0;overflow-wrap:anywhere}
+.new-pc-price{text-align:right}.new-pc-price strong{display:block;font-size:28px;color:var(--green)}.new-pc-price small{color:var(--muted);font-size:14px}
+.new-pc-parts{width:100%;border-collapse:collapse;margin:16px 0}
+.new-pc-parts th,.new-pc-parts td{border:0;text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.new-pc-parts th{width:110px;color:var(--muted);font-weight:500}
+.new-pc ul{padding-left:20px;margin:8px 0}.new-pc h3{font-size:18px;margin:16px 0 4px}
+.new-pc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.new-pc-form{display:grid;gap:10px;margin-top:16px;padding:16px;border-radius:12px;background:var(--tint)}
+.new-pc-form label{display:grid;gap:4px;font-size:15px}
+.new-pc-form input,.new-pc-form textarea{border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:#fff}
+.new-pc-form .consent{display:flex;gap:8px;align-items:flex-start}
+.new-pc-form .consent input{margin-top:5px}
+.new-pc-done{color:var(--green);font-weight:600}.new-pc-error{color:var(--amber)}
+@media(max-width:760px){.new-pcs{padding:20px 16px 36px}.new-pc{padding:16px}.new-pc-price{text-align:left}.new-pc-parts th{width:84px}.new-pc-head h2{font-size:21px}}

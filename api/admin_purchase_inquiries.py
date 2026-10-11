@@ -59,6 +59,7 @@ def _row(r, full: bool) -> dict:
         "visitor": ("u%d" % r["user_id"]) if r["user_id"] is not None else None,
         "quote_id": str(r["quote_id"]) if r["quote_id"] else None,
         "product_code": r["product_code"], "product_name": r["product_name"],
+        "configuration_id": r.get("configuration_id"),
         "assignee": r["assignee_name"], "assignee_id": r["assignee_id"],
         "updated_at": iso(r["updated_at"]), "purge_at": iso(r["purge_at"]),
         "test": bool(r["is_test"]),
@@ -67,10 +68,11 @@ def _row(r, full: bool) -> dict:
 
 _SELECT = f"""
     SELECT i.*, {IS_TEST} AS is_test,
-           s.product_snapshot->>'name' AS product_name,
+           COALESCE(s.product_snapshot->>'name', '새로 나온 PC · ' || (pc.content->>'title')) AS product_name,
            o.name AS assignee_name
       FROM purchase_inquiries i
       LEFT JOIN mvp3_saved_recommendations s ON s.quote_id = i.quote_id
+      LEFT JOIN pc_configurations pc ON pc.configuration_id = i.configuration_id
       LEFT JOIN admin_operators o ON o.operator_id = i.assignee_id
 """
 
