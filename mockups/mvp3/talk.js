@@ -12,6 +12,38 @@ const log=$('#tk-log'),panel=$('#tk-now-body'),input=$('#tk-input'),status=$('#t
 const flow=LF.createFlow(A,{onChange:render,keepCurrent:true}),state=flow.state;
 // 새로고침 전에 보던 구성을 다시 연 경우. 그 전에 보관했는지는 이 탭이 모르므로 「아직 저장하지 않았어요」라고 단정하지 않는다.
 let resumed=false;
+// 첫 화면 시작 단추(코덱스 1816 보강6 의견 v1 §2 — 입구는 하나, 안에 시작 단추 셋). 문구는 여기 한곳에서 바꾼다.
+// 누르면 입력창에 초안만 넣고 보내지 않는다(고객이 고쳐 보낸다). 이미 적던 말은 지우지 않고 뒤에 붙인다.
+// key 는 그 초안으로 시작한 첫 메시지에 실려 서버 로그로만 센다 -- api/talk.py ENTRY_KEYS 와 같아야 한다.
+const STARTERS=[
+  {key:'new_pc',label:'새 PC 찾기',draft:'새 PC를 찾고 있어요.'},
+  {key:'upgrade',label:'쓰던 PC 업그레이드',draft:'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.'},
+  {key:'parts',label:'부품·구성 물어보기',draft:'PC 부품이나 구성에서 궁금한 점이 있어요.'}];
+let entry=null;
+// 처음 화면의 세 갈래에서 들어오면(talk.html?start=키) 그 갈래 초안을 입력창에 넣어 둔다(보내지 않는다).
+// 하던 대화가 있으면 그 대화에 이어서 보낼 수 있게 둔다 -- 갈래를 바꿔도 같은 상담이다(보강6 의견 §1).
+// 주소에서 지워 새로고침 때 다시 넣지 않게 한다.
+// 처음 화면 채팅창에 쓴 글이 있으면 꺼내 바로 보낸다(고객이 이미 「보내기」를 눌렀다). 갈래는 서버가 글
+// 내용으로 고른다. 오래된 글(10분 넘음)은 버린다 -- 다른 날 연 탭에서 갑자기 보내지 않게.
+const FIRST_KEY='popcorn-mvp3-first-message-v1';
+function takeFirstMessage(){
+  let raw=null;try{raw=sessionStorage.getItem(FIRST_KEY);sessionStorage.removeItem(FIRST_KEY);}catch{return '';}
+  try{const m=JSON.parse(raw||'null');return m&&typeof m.text==='string'&&Date.now()-m.at<600000?m.text.trim().slice(0,MAX_TEXT):'';}catch{return '';}
+}
+async function startFromGateway(){
+  const first=takeFirstMessage();
+  if(first){
+    if(state.phase){input.value=first;count();status.textContent='보던 견적을 불러오는 중이에요. 다 불러온 뒤 「보내기」를 눌러 주세요.';status.hidden=false;return;}
+    const sent=await flow.submit(first);if(!sent&&!input.value){input.value=first;count();}
+    return;
+  }
+  let key=null;try{key=new URLSearchParams(location.search).get('start');}catch{}
+  if(!key)return;
+  try{history.replaceState(history.state,'',location.pathname+location.hash);}catch{}
+  const t=STARTERS.find(x=>x.key===key);
+  if(!t||input.value.trim())return;
+  input.value=t.draft;entry=t.key;count();input.focus();
+}
 
 function budgetGap(product,talk){
   const won=talk?.budget_won;
@@ -59,9 +91,11 @@ function renderLog(){
   const msgs=state.messages,talked=msgs.some(m=>m.who==='user');
   const props=state.proposals||[],last=props[props.length-1];
   const after=new Map();for(const p of props){const k=Math.max(0,p.at-1);after.set(k,[...(after.get(k)||[]),p]);}
-  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">어떤 PC를 찾고 계세요?</h1><p>쓰실 용도와 예산을 편하게 말씀해 주세요. 조건에 맞는 판매 중인 PC를 찾아 드리고, 부품을 바꿀 때도 이어서 도와드릴게요.</p>'+
-    '<div class="tk-examples" aria-label="시작 예시">'+['게임용 PC를 찾고 있어요.','지금 쓰는 PC를 업그레이드하고 싶어요.','그래픽카드와 메모리는 어떤 역할을 해요?']
-      .map(t=>button(esc(t),'example','outline','data-text="'+esc(t)+'"')).join('')+'</div></section>';
+  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">어떤 PC가 필요하세요?</h1><p>PC로 할 일이나 바꾸고 싶은 점을 편하게 말씀해 주세요. 필요한 조건은 대화하면서 함께 정리할게요.</p></section>';
+  // 첫 화면에서는 입력창을 제목 바로 아래로 올리고 시작 단추를 그 아래에 둔다(보강6 의견 §2 배치). 대화가 시작되면 걷는다.
+  $('.tk-chat').classList.toggle('is-fresh',!talked);
+  const starters=$('#tk-starters');starters.hidden=talked;
+  starters.innerHTML=talked?'':STARTERS.map(t=>button(esc(t.label),'starter','outline','data-entry="'+esc(t.key)+'"')).join('');
   msgs.forEach((m,i)=>{
     if(!(m.who==='ai'&&m.text===LF.GREETING))html+='<div class="tk-msg is-'+(m.who==='user'?'user':'ai')+'"><p>'+esc(m.text)+'</p></div>';
     for(const p of after.get(i)||[])html+=proposalBlock(p,p===last&&state.recommendation!==null);
@@ -140,6 +174,8 @@ function renderPanel(){
 
 function render(){
   renderLog();renderPanel();
+  // 지금 상담 갈래(서버가 글 내용이나 고른 단추로 정한 것)를 상단에 보여 준다.
+  const g=STARTERS.find(x=>x.key===state.chatFlow?.entry);$('.demo-label').textContent=g?'PC 상담 · '+g.label:'PC 상담';
   const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
@@ -156,7 +192,8 @@ async function send(){
   if(text.trim().length>MAX_TEXT){status.textContent='한 번에 20,000자까지 보낼 수 있어요. 나눠서 보내 주세요.';status.hidden=false;return;}
   if(state.phase)return;
   input.value='';count();
-  const sent=await flow.submit(text);
+  const from=entry;entry=null;
+  const sent=await flow.submit(text,{entry:from});
   if(!sent&&!input.value)input.value=text;
 }
 function count(){const n=input.value.length;$('#tk-count').textContent=n>1000?n.toLocaleString('ko-KR')+' / 20,000자':'';}
@@ -164,7 +201,11 @@ function count(){const n=input.value.length;$('#tk-count').textContent=n>1000?n.
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;
   switch(b.dataset.action){
-    case 'example':input.value=b.dataset.text;count();input.focus();break;
+    case 'starter':{
+      const t=STARTERS.find(x=>x.key===b.dataset.entry);if(!t)break;
+      const now=input.value.trim();
+      input.value=!now||STARTERS.some(x=>x.draft===now)?t.draft:now+' '+t.draft;
+      entry=t.key;count();input.focus();break;}
     case 'choose':{const i=Number(b.dataset.index);flow.select(i);if(state.selected){resumed=false;flow.message('「'+state.selected.name+'」 구성을 지금 견적으로 골랐어요. 저장은 따로 할 수 있어요.');flow.emit();}break;}
     case 'detail':{
       // 이미 고른 구성이면 그대로 연다(바꾼 부품·저장 상태를 지우지 않는다). 다른 구성이면 지금 견적이 바뀐다고 먼저 묻는다.
@@ -180,11 +221,11 @@ document.addEventListener('click',e=>{
     case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
-    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;flow.reset();input.value='';count();}break;
+    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;flow.reset();input.value='';count();}break;
     case 'toggle-now':{const open=$('#tk-now').classList.toggle('is-open');b.setAttribute('aria-expanded',String(open));break;}
   }
 });
-document.addEventListener('input',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());if(e.target===input)count();});
+document.addEventListener('input',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());if(e.target===input){count();if(!input.value.trim())entry=null;}});
 document.addEventListener('change',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 $('#tk-form').addEventListener('submit',e=>{e.preventDefault();void send();});
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void send();}});
@@ -195,4 +236,5 @@ if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
 const draftHandoff=LF.createDraftHandoff();
 window.addEventListener('pagehide',()=>{draftHandoff.put(input.value);});
 {const carried=draftHandoff.take();if(carried&&!input.value.trim()){input.value=carried;count();}}
+void startFromGateway();
 })();

@@ -138,6 +138,9 @@ class ChatFlow(BaseModel):
     # 판단하지 않고 화면이 왕복하는 이 흐름 상태에 둔다.
     pc_offered: bool = False
     pc_declined: bool = False
+    # 상담 갈래(api/talk_entry) -- 정한 갈래와 「한 번 되물었나」. 갈래는 첫 응대만 바꾼다.
+    entry: str | None = None
+    entry_asked: bool = False
 
 
 def flow_flags(raw) -> tuple[bool, bool]:

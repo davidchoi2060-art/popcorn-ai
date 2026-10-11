@@ -149,6 +149,7 @@ from sqlalchemy import bindparam, text   # /monitor-bands 가 집계 쿼리를 �
 
 from . import access_gate   # 방문자별 호출 횟수 제한의 단일 원천
 from . import visitor      # 방문자 키 — 자동 승격의 「서로 다른 사람」 판정에 쓴다
+from . import talk_entry as TE   # 상담 갈래(새 PC / 업그레이드 / 부품) 판정
 # 회귀 표식 판정의 단일 원천. 언더스코어 함수를 다른 모듈이 가져다 쓰는 것은 이 저장소의
 # 기존 관례다 — `api/expert.py` 가 같은 함수를 그렇게 쓴다(그 파일 상단 주석 참조).
 from .recommend import _resolve_data_origin
@@ -465,6 +466,14 @@ class ParseBody(BaseModel):
     # 않는다 -- `clamp_turns` 가 범위 밖·형식 오류를 접는다. 화면이 0 으로 조작해 잡담을
     # 무한히 할 수 있다는 것은 알고 둔 것이고, 그건 `rate_limit_policies`(visitor.ai)가 막는다.
     chat_flow: dict | None = None
+    # 대화 화면 시작 단추(코덱스 1816 보강6 의견 v1 -- 입구는 하나, 안에 시작 단추 셋). 어느 단추 초안으로
+    # 시작했는지만 서버 로그에 센다 -- 문장은 찍지 않는다. `ENTRY_KEYS` 밖의 값은 「-」로 찍는다.
+    entry: str | None = None
+
+
+# 시작 단추 키. 정본은 api/talk_entry.KEYS, 화면은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야
+# 센다(테스트가 대조한다).
+ENTRY_KEYS = frozenset(TE.KEYS)
 
 
 def _trim_history(history) -> list:
@@ -524,7 +533,7 @@ def _prev_state_json(prev: dict | None) -> str:
 
 
 def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
-                  history: list | None = None) -> str:
+                  history: list | None = None, entry: str | None = None) -> str:
     """매 요청마다 접는다 -- 격자 어휘(티어·등급·확정 게임·용도)가 DB 에서 바뀌면 다음
     요청부터 반영된다. 골격은 설계서 §9(docs/design/talk-grid-guide-redesign-2026-09-16.md).
 
@@ -608,6 +617,7 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "",
         EXCEPTION_BLOCK,
         "",
+        *([TE.prompt_block(entry), ""] if TE.prompt_block(entry) else []),
         "[규칙]",
         "- state 는 **누적**이다. 이전까지 파악한 상태를 그대로 가져오고, 이번 문장이 바꾼 것만"
         " 고친다. 이번 문장에 없다고 이전 값을 지우지 않는다.",
@@ -1034,11 +1044,13 @@ def _quick_response(body: ParseBody, reply: str, exceptions: list) -> dict:
     state = prev or TS.TalkState()
     turns = TS.clamp_turns((body.chat_flow or {}).get("smalltalk_turns"))
     offered, declined = TS.flow_flags(body.chat_flow)
+    entry, asked = TE.from_flow(body.chat_flow)
     return {
         "ok": True, "state": state.model_dump(), "missing": [], "dropped": [], "evidence": [],
         "reply": reply, "assumed": [], "pc_related": None, "constraints": _legacy_constraints(state),
         "note": None, "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=offered,
-                                                pc_declined=declined).model_dump(),
+                                                pc_declined=declined, entry=entry,
+                                                entry_asked=asked).model_dump(),
         "stage": TS.stage_for(turns), "answer": "", "sources": [], "narrowing": TS.NARROWING_WIDE,
         "answer_game_names": [], "answer_notice": None, "answer_filter": None,
         "answer_elapsed_sec": 0, "answer_error": None, "silent": False,
@@ -1127,13 +1139,23 @@ def parse_talk(body: ParseBody, request: Request):
         # 화면이 보낸 이전 state 가 스키마로 안 접힌다 -- 첫 문장처럼 다룬다. 삼키지 않고
         # 로그에 남긴다(문장·값은 찍지 않는다 -- 키 수만).
         log.warning("[talk] prev state rejected (keys=%d) - treated as none", len(body.state))
-    prompt = _build_prompt(text, vocab, body.state if prev_ok else None, history)
+    # 상담 갈래 -- 단추 > 지난 턴 > 이번 문장 규칙 순(talk_entry 머리말). AI 판정 뒤에 한 번 더 본다.
+    flow_entry, entry_asked = TE.from_flow(body.chat_flow)
+    if body.entry in ENTRY_KEYS:
+        entry, entry_src = body.entry, "button"
+    elif flow_entry:
+        entry, entry_src = flow_entry, "kept"
+    else:
+        entry = TE.classify(text)
+        entry_src = "rule" if entry else "-"
+    prompt = _build_prompt(text, vocab, body.state if prev_ok else None, history, entry)
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
     # games/usages/tiers 는 프롬프트에 실린 격자 어휘 수 -- 표가 늘면 프롬프트도 길어지므로
     # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
-    log.info("[talk] parse request: chars=%d usages=%d games=%d tiers=%d hist=%d prev=%s",
+    log.info("[talk] parse request: chars=%d usages=%d games=%d tiers=%d hist=%d prev=%s entry=%s",
              len(text), len(vocab.usages), len(vocab.confirmed_games), len(vocab.tiers),
-             len(history), "yes" if prev_ok else "no")
+             len(history), "yes" if prev_ok else "no",
+             body.entry if body.entry in ENTRY_KEYS else "-")
 
     # ── [A] 좌표 추출 ∥ [B] 답변 — **병렬이다**(2026-09-21 · talk_design_v2 §4-1) ──
     # 순차면 12초로 LLM_TIMEOUT_SEC(15)에 육박한다. 병렬이면 최악 7초.
@@ -1291,6 +1313,18 @@ def parse_talk(body: ParseBody, request: Request):
     if pc is None and not state.usages:
         # 판정을 못 얻었고 읽은 조건도 없다 -- 「모르는 경우」다. 사람 상담 길을 함께 연다.
         handoff_offer = True
+    # 상담 갈래 ④⑤(talk_entry 머리말): 규칙으로 못 정했어도 AI 가 용도·예산을 읽었으면 새 PC 찾기다.
+    # 그래도 모르는 PC 이야기면 상담에 한 번만 갈래를 되묻는다(사장님 2026-10-11 「위 채팅 내용을 보고
+    # 적당한 화면으로」). 문장은 찍지 않고 갈래 키와 출처만 로그에 남긴다.
+    if not entry and pc is True and (state.usages or state.budget_won):
+        entry, entry_src = "new_pc", "state"
+    # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
+    if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
+            and not exceptions and not notices and not laptop and not handoff_offer
+            and TE.ASK not in reply):
+        reply = (reply.rstrip() + " " + TE.ASK).strip()
+        entry_asked, entry_src = True, "ask"
+    log.info("[talk] entry: key=%s src=%s", entry or "-", entry_src)
     evidence = _evidence_lines(obj)
 
     # ── [B] 결과 조립 ────────────────────────────────────────────────────────
@@ -1383,7 +1417,8 @@ def parse_talk(body: ParseBody, request: Request):
         # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
         # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
         "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
-                                 pc_declined=pc_declined).model_dump(),
+                                 pc_declined=pc_declined, entry=entry,
+                                 entry_asked=entry_asked).model_dump(),
         "stage": stage,
         # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
         # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,
