@@ -20,6 +20,17 @@ const STARTERS=[
   {key:'upgrade',label:'쓰던 PC 업그레이드',draft:'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.'},
   {key:'parts',label:'부품·구성 물어보기',draft:'PC 부품이나 구성에서 궁금한 점이 있어요.'}];
 let entry=null;
+// 처음 화면의 세 갈래에서 들어오면(talk.html?start=키) 그 갈래 초안을 입력창에 넣어 둔다(보내지 않는다).
+// 하던 대화가 있으면 그 대화에 이어서 보낼 수 있게 둔다 -- 갈래를 바꿔도 같은 상담이다(보강6 의견 §1).
+// 주소에서 지워 새로고침 때 다시 넣지 않게 한다.
+function startFromGateway(){
+  let key=null;try{key=new URLSearchParams(location.search).get('start');}catch{}
+  if(!key)return;
+  try{history.replaceState(history.state,'',location.pathname+location.hash);}catch{}
+  const t=STARTERS.find(x=>x.key===key);
+  if(!t||input.value.trim())return;
+  input.value=t.draft;entry=t.key;count();input.focus();
+}
 
 function budgetGap(product,talk){
   const won=talk?.budget_won;
@@ -206,4 +217,5 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 
 flow.reset({restore:true});
 if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
+startFromGateway();
 })();

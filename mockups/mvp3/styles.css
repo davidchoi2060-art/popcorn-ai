@@ -471,3 +471,6 @@ body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:6
 /* 새로 나온 PC 카드(부품 상품화 5단계 · app.js customCards). */
 .custom-pc-group{margin-top:22px}.custom-pc-group h4{font-size:18px;margin:0 0 4px}.custom-pc-card .custom-pc-fit{font-size:14px;color:var(--green);font-weight:600;margin:4px 0}
 .custom-pc-link{display:block;text-align:center;border-radius:9px;padding:11px 17px;text-decoration:none;font-weight:600;margin-top:auto;width:100%;box-sizing:border-box}
+
+.gateway-choices.is-three{grid-template-columns:repeat(3,1fr)}.gateway-more{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 24px}@media(max-width:900px){.gateway-choices.is-three{grid-template-columns:1fr}}
+@media(max-width:700px){body[data-surface="gateway"] .topbar nav>*{white-space:nowrap}body[data-surface="gateway"] .topbar nav a[href="talk.html"]{display:none}}

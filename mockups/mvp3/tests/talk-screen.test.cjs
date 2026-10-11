@@ -13,9 +13,9 @@ const tick=()=>new Promise(r=>setImmediate(r));
 async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k),key:i=>[...map.keys()][i]??null,get length(){return map.size;}};}
 
-function harness(script,ss=storage()){
+function harness(script,ss=storage(),url='https://qa.invalid/mvp3/talk.html'){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
-  const dom=new JSDOM(read('talk.html'),{url:'https://qa.invalid/mvp3/talk.html',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
+  const dom=new JSDOM(read('talk.html'),{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   Object.defineProperty(w,'crypto',{value:webcrypto});Object.defineProperty(w,'sessionStorage',{value:ss});
   w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
@@ -80,6 +80,23 @@ test('a starter keeps what the customer already typed and its key rides the firs
     assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[1].body.entry,undefined);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
+});
+test('arriving from a landing path fills that draft once and clears the address',async()=>{
+  const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=upgrade');
+  try{
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    assert.equal(h.doc.querySelector('#tk-input').value,'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.');
+    assert.equal(h.w.location.search,'');
+    h.doc.querySelector('#tk-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    assert.equal(h.calls.find(c=>c.url==='/api/talk/parse').body.entry,'upgrade');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('an unknown landing path key is ignored',async()=>{
+  const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=game');
+  try{await until(()=>h.doc.querySelector('.tk-welcome'));assert.equal(h.doc.querySelector('#tk-input').value,'');assert.deepEqual(h.errors,[]);}finally{h.close();}
 });
 test('cards sit under the answer and choosing one fills the quote panel',async()=>{
   const h=harness(scripted());

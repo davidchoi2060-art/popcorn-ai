@@ -1,5 +1,12 @@
 (function(){'use strict';
 const DIRECT_ACTION='gateway-talk';
+// 처음 화면의 세 갈래(사장님 2026-10-11 「첫화면에서 세갈래 길이 생긴다는 느낌이 없어」, 코덱스 1816 보강6 의견 §3 문구).
+// 어느 갈래든 같은 대화 화면으로 들어가고, 고른 갈래의 첫 문장 초안만 입력창에 넣어 둔다(보내지 않는다).
+// 키는 talk.js STARTERS 와 같다. 예전 두 갈래(용도부터 / 바로 상담)로 되돌리려면 GATEWAY_PATHS 를 null 로 둔다.
+const GATEWAY_PATHS=[
+  ['computer-tower','새 PC 고르기','어떤 일에 쓸지부터 함께 정리해요.','새 PC 상담 시작','new_pc'],
+  ['wrench','쓰던 PC 업그레이드','불편한 점과 바꾸고 싶은 부품을 말씀해 주세요.','업그레이드 상담 시작','upgrade'],
+  ['cpu','부품·구성 알아보기','부품의 차이와 내게 필요한 구성을 물어보세요.','부품 상담 시작','parts']];
 const M=window.MVP3LiveModel,A=window.MVP3Api;
 const {customerPhoto}=window.MVP3LivePhoto;
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
@@ -46,7 +53,11 @@ function focusSurface(){
 }
 function renderGateway(){
   const icon=name=>uiIcon(name),arrow=icon('arrow-right');
-  if(ui.surface==='gateway')gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
+  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어떤 PC</span>가 필요하세요?</h1><p>하려는 일을 고르거나,<br class="mobile-break"> 편하게 바로 이야기해 주세요.</p></div><div class="gateway-choices is-three">'+
+    GATEWAY_PATHS.map(([image,title,text,go,key])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><span class="entry-action">'+go+' '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
+    '</div><p class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</p><div class="gateway-more">'+button('아직 정하지 못했나요? 편하게 상담하기 '+arrow,DIRECT_ACTION,'continue-draft')+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
+    (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></section>';
+  else if(ui.surface==='gateway')gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
     [['game-controller','용도부터 시작하기','게임, 작업, 일상 중 필요한 용도부터 골라요.','예산은 아직 몰라도 괜찮아요.','gateway-use'],['chat-circle','바로 상담하기','원하는 사양이나 조건을 자유롭게 이야기해 주세요.','생각해 둔 조건부터 말해 주세요.',DIRECT_ACTION]].map(([image,title,text,small,action])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><small>'+small+'</small><span class="entry-action">'+title+' '+arrow+'</span>',action,'entry-card')).join('')+'</div><p class="change-note">선택한 방식은 언제든 바꿀 수 있어요.</p>'+(draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</section>';
   else gateway.innerHTML=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+
     [['game','game-controller','즐겨 하는 게임에 쓸 PC예요.'],['edit','video-camera','영상 편집과 작업에 쓸 PC예요.'],['office','monitor','문서 작업과 일상 업무에 써요.'],['unknown','question','어떤 용도가 좋을지 함께 정해요.']].map(([value,image,text])=>button(icon(image)+'<strong>'+usageLabels[value]+'</strong><span>'+text+'</span>','gateway-usage','','data-usage="'+value+'" aria-pressed="'+(draft.usage_choice===value)+'"')).join('')+'</div></fieldset><div class="budget-controls"><label for="gateway-budget">예산은 어느 정도인가요?</label><select id="gateway-budget"><option value="">예산 미정도 괜찮아요</option>'+[100,150,200,250].map(n=>'<option value="'+n+'" '+(draft.budget_won===n*10000?'selected':'')+'>'+n+'만원 이하</option>').join('')+'</select></div><p class="condition-summary" aria-live="polite">'+draftSummary()+'</p>'+button('이 조건으로 상담 시작 '+arrow,'gateway-begin','gateway-button')+'</div><figure class="purpose-image"><img src="assets/gateway-pc-example.png" alt="PC 본체 예시 이미지"><figcaption>예시 이미지 · 실제 추천 상품과 다를 수 있어요.</figcaption></figure></section>';
@@ -473,6 +484,7 @@ document.addEventListener('click',e=>{
     case 'gateway-use':draft.start_mode='use_first';showSurface('usage');break;
     case 'gateway-direct':draft.start_mode='direct';showSurface('consultation');break;
     case 'gateway-talk':location.href='talk.html';break;
+    case 'gateway-start':location.href='talk.html?start='+encodeURIComponent(b.dataset.start);break;
     case 'gateway-continue':showSurface('consultation');break;
     case 'gateway-usage':captureDraft();draft.usage_choice=draft.usage_choice===b.dataset.usage?null:b.dataset.usage;if(!draft.draft_edited)refreshDraft();render();gateway.querySelector('[data-usage="'+b.dataset.usage+'"]')?.focus({preventScroll:true});break;
     case 'gateway-begin':draft.start_mode='use_first';if(!draft.draft_edited)refreshDraft();showSurface('consultation');break;

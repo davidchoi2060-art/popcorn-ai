@@ -25,6 +25,11 @@ class StarterKeys(unittest.TestCase):
         for k in talk.ENTRY_KEYS:
             self.assertTrue(k.isascii())
 
+    def test_landing_paths_use_the_same_keys(self):
+        app = (ROOT / "mockups/mvp3/app.js").read_text(encoding="utf-8")
+        block = app[app.index("const GATEWAY_PATHS=["):app.index("]];", app.index("const GATEWAY_PATHS=[")) + 3]
+        self.assertEqual(set(re.findall(r"'([a-z_]+)'\]", block)), set(talk.ENTRY_KEYS))
+
     def test_starters_do_not_lead_with_games(self):
         # 사장님 2026-10-11 「게임.. 뭐 이런건 빼고」 -- 시작 단추가 게임 탐색을 권하지 않는다.
         js = (ROOT / "mockups/mvp3/talk.js").read_text(encoding="utf-8")
