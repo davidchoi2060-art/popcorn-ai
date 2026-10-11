@@ -22,6 +22,7 @@ import re
 from sqlalchemy import text
 
 from .db import engine
+from .talk_rules import weighs_options
 
 log = logging.getLogger("reco_explore")
 
@@ -87,21 +88,23 @@ def extract(raw: str | None) -> dict:
                 out["cheapest"] = True
         elif _BETTER.search(s):
             out["nav"] = BETTER
-    m = _RAM.search(s)
+    # 「16기가면 충분해요 아니면 32기가?」는 견주는 질문이라 사양 숫자로 거르지 않는다(talk_rules.weighs_options).
+    weigh = weighs_options(s)
+    m = None if weigh else _RAM.search(s)
     if m and 4 <= int(m.group(2)) <= 256:
         out["min_ram_gb"] = int(m.group(2))
     elif _RAM_MORE.search(s):
         out.setdefault("more", []).append("ram")
-    m = _SSD.search(s) or None
+    m = None if weigh else _SSD.search(s)
     gb = _ssd_gb(m.group(2), m.group(3)) if m else None
-    if gb is None:
+    if gb is None and not weigh:
         t = _TB.search(s)
         gb = _ssd_gb(t.group(1), t.group(2)) if t else None
     if gb is not None:
         out["min_ssd_gb"] = gb
     elif _SSD_MORE.search(s):
         out.setdefault("more", []).append("ssd")
-    if _GPU_CONTEXT.search(s):
+    if _GPU_CONTEXT.search(s) and not weigh:
         for g in _GPU.finditer(s):
             n = int(g.group(2))
             if n % 10 or not 1000 <= n <= 9999:

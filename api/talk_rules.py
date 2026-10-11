@@ -416,6 +416,20 @@ def drop_current_pc(text: str) -> str:
         return text or ""
     end = _CLAUSE_END.search(text, m.end())
     return text[:m.start()] + (text[end.end():] if end else "")
+
+
+# 「램 16기가면 충분해요 아니면 32기가 사야 돼요?」는 둘을 견주는 질문이다 -- 조건으로 읽으면 「메모리 16GB
+# 조건으로 골라 볼게요」가 된다(2026-10-12 개발 서버, 모델 luna). 견주는 문장에서는 부품 숫자를 조건으로
+# 쓰지 않고 설명(AI 답)에 맡긴다. 「16기가면 충분할까요?」처럼 충분한지 묻는 것도 같다.
+_WEIGH = re.compile(r"아니면|(?<![a-z])vs(?![a-z])|또는|둘\s*중|(어느|뭐)\s*(게|것이|쪽이|가)\s*(더\s*)?(나아|낫|좋|맞)|"
+                    r"중에\s*(뭐|어느)|면\s*(충분|될까|되나|돼요\?|되요\?)|충분\s*(할까|한가|하나|해요\?|해\?|할지)", re.I)
+
+
+def weighs_options(text: str) -> bool:
+    """부품 사양을 견주거나 충분한지 묻는 문장인가(조건이 아니라 질문이다)."""
+    return bool(_WEIGH.search(text or ""))
+
+
 PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
 # 2026-10-11 품질관리 M6: 「4K 편집」「최고사양」은 추천이 거르지 않는데 AI 가 「맞춰 드릴게요」라
 # 답했다. 4K 는 게임 칸(state.game.resolution)에서만 추천에 쓰인다 — 비게임 tier_key 힌트는
@@ -455,6 +469,8 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     안내가 되풀이되면 AI 답이 영영 안 보인다).
     """
     t = drop_current_pc(text or "")
+    if weighs_options(t):
+        t = _RAM.sub(" ", _STORAGE.sub(" ", _GPU.sub(" ", _CPU.sub(" ", t))))
     out = []
     m = _GPU.search(t)
     if m:

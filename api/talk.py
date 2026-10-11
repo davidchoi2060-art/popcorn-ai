@@ -1297,7 +1297,9 @@ def parse_talk(body: ParseBody, request: Request):
     # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
     # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
     # 본체 구성 설명(build)일 때만 -- 「게임용 PC 램 역할이 뭐예요?」 같은 부품 설명 뒤에 추천을 열지 않는다(2026-10-12 검수 9595 P2-2).
-    if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
+    # 게임 이름이 있어도 등급이 아직 없는 이름(「스팀 인디(통칭)」)이면 같다 -- 설명이 이미 나갔는데 「주로 어떤 게임을
+    # 하실 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 카드 쪽(sold_reco)은 등급을 쓰지 않고 해상도로 거른다.
+    if (not released and missing == [TS.MISSING_GAME_GRADE]
             and getattr(ans, "kind", "game") == "pc_advice" and getattr(ans, "topic", None) == PA.TOPIC_BUILD
             and (ans.answer or "").strip()):
         released = True
@@ -1409,7 +1411,10 @@ def parse_talk(body: ParseBody, request: Request):
     # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
     asked_before = TS.flow_asked(body.chat_flow)
     # 램·SSD 같은 구성 조건 안내(cond_notes)는 설명과 함께 둔다 -- 판매 주제 안내만 설명을 대신한다.
-    plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
+    # 한 문장 안 되풀이(「싸게 싸게 싸게 싸게」)는 응대 문장을 바꾸지 않는 예외라 평범한 PC 문장으로 본다 -- 막으면 용도만
+    # 되묻고 카드가 없었다(2026-10-12 개발 서버, 모델 luna). 같은 문장을 거듭 보낸 반복(turns)은 기존대로 사람 상담 길이다.
+    soft_exc = {"repeat"} if TX.repeated(text, history) == "words" else set()
+    plain_pc = (not (set(exceptions) - soft_exc) and pc is True and stage == TS.STAGE_PC
                 and not topic_notes and not laptop)
     # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
     # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
@@ -1422,7 +1427,8 @@ def parse_talk(body: ParseBody, request: Request):
                        and bool(state.budget_won or getattr(state, "prefs", None) or cond_notes))
     if plain_pc and explained and missing == [TS.MISSING_USAGES]:
         reply = " ".join(cond_notes)
-    elif plain_pc and (asked_before or build_explained) and missing == [TS.MISSING_USAGES]:
+    # 가격 방향(「싸게」·「좋은 걸로」)을 말했으면 그것도 조건이다 -- 용도를 되묻지 않고 일반 용도로 카드를 낸다.
+    elif plain_pc and (asked_before or build_explained or pref) and missing == [TS.MISSING_USAGES]:
         # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
         # 구성 설명을 먼저 한 턴도 같다(2026-10-12 일반 AI 비교 R10·R11: 「조용한 PC」·「화이트 100만원대」에 설명 뒤
         # 용도만 되묻고 카드가 없었다 -- 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
@@ -1431,7 +1437,9 @@ def parse_talk(body: ParseBody, request: Request):
             state = state.model_copy(update={"usages": [label]})
             missing = TS.missing_for(state, vocab)
             fit = TD._fit_usage(label)
-            reply = (TD.no_usage_reply(TD.basis_work(fit) if fit else None) + " " + " ".join(cond_notes)).strip()
+            price_line = TD.PREF_LINE.get(pref, "") if pref and state.budget_won is None else ""
+            reply = " ".join(x for x in (TD.no_usage_reply(TD.basis_work(fit) if fit else None), price_line,
+                                         " ".join(cond_notes)) if x).strip()
             log.info("[talk] answer-first: no usage after ask - assumed general use")
     elif plain_pc and not missing and (
             # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
