@@ -46,6 +46,7 @@
 .mc-ev .mc-at{font-size:12px;color:var(--rv-muted);margin-bottom:4px}
 .mc-ev h3{font-size:14px;margin:2px 0 4px}
 .mc-ev ul{margin:4px 0 0 18px;padding:0;color:var(--rv-ink-soft)}
+.mc-reply{margin-top:6px;padding-top:6px;border-top:1px dashed var(--rv-dim4);color:var(--rv-ink-soft)}
 @media (max-width:768px){
   .mc-wrap{padding:12px 16px 24px}
   .mc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -150,7 +151,10 @@
         (e.product.reasons.length?'<ul>'+e.product.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')+'</div>'
         :
         '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+'</div>'+
-        '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div></div>'
+        '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div>'+
+        (e.reply?'<div class="mc-reply">AI 답: '+esc(e.reply.shown_reply||'없음')+
+          (e.reply.flags.length?' '+chips(e.reply.flags.map(f=>'⚠ '+f)):'')+
+          ' <a href="/admin2/talk-review">점검</a> <span class="mc-muted">('+esc(e.reply.status)+')</span></div>':'')+'</div>'
       ).join('');
   }
 

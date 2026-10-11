@@ -14,4 +14,4 @@ router = APIRouter(prefix="/admin2", tags=["admin-ui"])
 def shop_notices(request: Request) -> HTMLResponse:
     return render(request, "admin/shop_notices.html.j2",
                   screen_id="ADM-TLK-011", domain="shop-notices",
-                  crumb_group="상품사양관리", crumb_now="판매 안내 자료")
+                  crumb_group="AI 관리", crumb_now="판매 안내 자료")

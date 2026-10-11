@@ -1008,6 +1008,7 @@ def parse_talk(body: ParseBody, request: Request):
     prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
     turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
     reply = _reply_text(obj, pc, bool(state.usages), stage)
+    ai_reply = reply      # 서버가 바꾸기 전 모델의 말 — 관리자 AI 답 점검이 본다
     if released and stage == TS.STAGE_PC:
         reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
     # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
@@ -1076,9 +1077,11 @@ def parse_talk(body: ParseBody, request: Request):
     filled += [TR.TOPIC_TAG + k for k in TR.purchase_topics(text)]
     filled += [TR.UNAPPLIED_TAG + c for c in TR.unsupported_conditions(text, state, prev_state_obj)]
     with engine.begin() as conn:
-        _record_hit(conn, request=request, text_raw=text, matched=filled,
-                    unmatched_n=len(dropped), intent_key=body.intent_key,
-                    answer_kind="constraint_parse", llm_called=True)
+        hit_id = _record_hit(conn, request=request, text_raw=text, matched=filled,
+                             unmatched_n=len(dropped), intent_key=body.intent_key,
+                             answer_kind="constraint_parse", llm_called=True)
+        _record_reply(conn, hit_id, text_raw=text, ai_reply=ai_reply, shown_reply=reply,
+                      answer=answer, answer_error=bool(ans.error))
 
     if ans.error:
         log.warning("[talk] answer path B failed: %s", ans.error)
@@ -1456,7 +1459,7 @@ def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
             raw = mask_pii(text_raw) if text_raw else None
         except Exception:                                # noqa: BLE001
             raw = None                                   # 마스킹이 실패하면 원문을 버린다
-        conn.execute(text("""
+        return conn.execute(text("""
             INSERT INTO talk_intent_hits
                 (session_id, intent_key, matched_terms, unmatched_n,
                  raw_text, raw_masked_yn, raw_purge_at,
@@ -1464,6 +1467,7 @@ def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
             VALUES (:sid, :ik, CAST(:mt AS JSONB), :un,
                     :raw, :masked, :purge,
                     :vk, :ak, :llm, :origin)
+            RETURNING hit_id
         """), {
             "sid": session_id, "ik": intent_key,
             "mt": json.dumps(matched or [], ensure_ascii=False),
@@ -1474,10 +1478,38 @@ def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
             "purge": None if raw is None else _purge_at(),
             "vk": None if uid is None else str(uid),
             "ak": answer_kind, "llm": bool(llm_called), "origin": origin,
-        })
+        }).scalar()
     except Exception as e:                               # noqa: BLE001
         log.warning("[talk] hit record failed (chars=%d): %s",
                     len(text_raw or ""), type(e).__name__)
+        return None
+
+
+def _record_reply(conn, hit_id, *, text_raw, ai_reply, shown_reply, answer, answer_error):
+    """문의 한 건에 고객이 본 답을 남긴다(관리자 AI 답 점검 · 0138). 실패해도 상담을 끊지 않는다.
+
+    세이브포인트 안에서 쓴다 — 여기서 실패해도 바로 위 문의 기록(같은 트랜잭션)은 남는다.
+    고객 문장 원문은 싣지 않는다. 같은 질문 묶음 키(`question_key`)만 마스킹된 문장에서 만든다.
+    """
+    if hit_id is None:
+        return
+    try:
+        try:
+            qkey = TR.question_key(mask_pii(text_raw))
+        except Exception:                                # noqa: BLE001
+            qkey = None
+        with conn.begin_nested():
+            conn.execute(text("""
+                INSERT INTO talk_reply_reviews
+                    (hit_id, ai_reply, shown_reply, answer, answer_error, flags,
+                     question_key, purge_at)
+                VALUES (:h, :ar, :sr, :an, :ae, CAST(:fl AS JSONB), :qk, :purge)
+            """), {"h": hit_id, "ar": ai_reply or None, "sr": shown_reply or None,
+                   "an": answer or None, "ae": bool(answer_error),
+                   "fl": json.dumps(TR.promise_flags(ai_reply, answer), ensure_ascii=False),
+                   "qk": qkey, "purge": _purge_at()})
+    except Exception as e:                               # noqa: BLE001
+        log.warning("[talk] reply record failed: %s", type(e).__name__)
 
 
 def _purge_at():

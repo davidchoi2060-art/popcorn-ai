@@ -354,3 +354,36 @@ def honest_reply(notes: list[str], has_usage: bool, missing: list[str]) -> str:
         out += (" 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요." if not has_usage
                 else " 예산이나 게임 같은 조건을 조금 더 알려 주시면 카드로 보여 드릴게요.")
     return out.strip()
+
+
+# ── ⑥ 약속하는 말 표시 (2026-10-11 관리자 AI 답 점검 · R2) ─────────────────────────
+# 관리자 「AI 답 점검」 화면이 문의마다 붙이는 자동 표시. 판정은 «AI 가 낸 말»(서버가 바꾸기
+# 전 reply 와 답변 [B])만 본다 — 고객 문장은 보지 않는다. 표시는 점검 대상을 고르는 단서이지
+# 결함 판정이 아니다(「포함」은 「본체만 포함」일 수도 있다). 최종 판정은 사람이 한다.
+PROMISE_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
+    # 「찾아 드릴게요」(되묻기)는 약속이 아니므로 동사를 좁힌다
+    ("해 드린다는 약속", re.compile(r"(해|깔아|맞춰|보내|넣어|챙겨)\s*드(리겠|릴|립니다|려요)")),
+    ("확인했다는 말", re.compile(r"확인(했|하였)습니다|확인\s*됐|접수(했|됐|되었)")),
+    ("가능하다는 단정", re.compile(r"(포함|설치|배송|할인|발행|결제)[^.?!]{0,8}가능(합니다|해요)")),
+    ("담당자·다른 단계로 미룸", re.compile(r"담당\s*(팀|자|부서)|다른\s*(부서|시스템)|(구매|주문|결제|상품\s*확정)\s*(단계|후)에?서?\s*(안내|확인)")),
+)
+
+
+def promise_flags(*texts: str) -> list[str]:
+    """AI 가 낸 말에서 약속하는 말의 종류 — PROMISE_PATTERNS 순서, 중복 없이."""
+    joined = " ".join(t for t in texts if t)
+    return [label for label, pat in PROMISE_PATTERNS if pat.search(joined)]
+
+
+_QA_LABEL = re.compile(r"^\s*QA-\S*\s*", re.I)
+_NON_WORD = re.compile(r"[\s\W_]+")
+
+
+def question_key(masked_text: str) -> str | None:
+    """같은 질문을 묶는 키 — 품질관리 이름표·공백·문장부호를 걷고 소문자로 맞춘 sha256.
+
+    원문 대신 이 키만 저장한다. 마스킹된 문장에서 만든다(개인정보 조각은 이미 치환됨).
+    """
+    import hashlib
+    t = _NON_WORD.sub("", _QA_LABEL.sub("", masked_text or "")).lower()
+    return hashlib.sha256(t.encode("utf-8")).hexdigest() if t else None

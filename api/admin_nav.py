@@ -426,6 +426,9 @@ NAV = [
         #   여기 적힌 안내로 답한다(api/talk_rules.honest_notices). 비우면 기본 안내.
         ("판매 안내 자료", "/admin2/shop-notices",
          "신설(ADM-TLK-011 · 가칭) 2026-10-11 — 고객 AI 가 답할 가게 안내"),
+        # 2026-10-11 신설(ADM-TLK-012) — 문의마다 고객에게 나간 AI 답을 보고 약속하는 말을 점검한다.
+        ("AI 답 점검", "/admin2/talk-review",
+         "신설(ADM-TLK-012 · 가칭) 2026-10-11 — 약속하는 말 표시 · 상태 · 메모"),
         # 2026-09-21 신설(ADM-TLK-020) — game_customer_copy 86행 사람 검수.
         # ★ 승인 한 번이 곧 고객 노출이다(api/talk_answer.py 가 reviewed_by IS NOT NULL
         #   행만 싣는다 — 코드 수정 없이 켜진다). 근거·검증은 위 11차 노트 참조.
@@ -577,7 +580,7 @@ def new_admin_nav(current_path=''):
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders',)),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members',)),
-        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/product-fit')),
+        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/talk-review', '/admin2/product-fit')),
         ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/mvp3-consults', '/admin2/handoff-log', '/admin2/swap-click-logs')),
     ]
     return [dict(label=label, href=href, icon=icon, active=current_path.rstrip('/') in paths)

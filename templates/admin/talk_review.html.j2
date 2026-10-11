@@ -1,0 +1,210 @@
+{#
+  AI 답 점검 (ADM-TLK-012 · 가칭) — 2026-10-11 신설
+
+  고객 AI 가 문의마다 낸 답을 보고, 약속하는 말이 붙은 답을 골라 「문제 있음 · 확인」과
+  메모를 남긴다. 같은 질문에 나간 답을 나란히 본다.
+  데이터 = `GET /api/admin/talk-review` · 같은 질문 `GET /api/admin/talk-review/same/{key}`
+  · 저장 `PUT /api/admin/talk-review/{hit_id}` (`api/admin_talk_review.py` — 정직 표기는 그 파일 docstring).
+
+  ■ 머리말은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
+  ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. 외부 자원 0.
+  ■ 서버가 준 문자열은 textContent 로만 넣는다(innerHTML 금지).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}AI 답 점검{% endblock %}
+
+{% block head_extra %}
+<style>
+.tr-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px}
+.tr-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.tr-kpi{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:12px 14px}
+.tr-kpi b{display:block;font-family:var(--rv-mono);font-size:22px;color:var(--rv-ink)}
+.tr-kpi span{font-size:12.5px;color:var(--rv-muted)}
+.tr-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.tr-side{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tr-box{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:10px 14px;font-size:13px}
+.tr-box h2{font-size:13.5px;margin:0 0 6px;color:var(--rv-ink-soft)}
+.tr-chip{display:inline-block;border:1px solid var(--rv-dim3);border-radius:10px;padding:0 7px;margin:0 3px 3px 0;font-size:12px;color:var(--rv-ink-soft);background:var(--rv-canvas)}
+.tr-chip.flag{border-color:var(--rv-amber-line);background:var(--rv-amber-bg);color:var(--rv-ink)}
+.tr-chip.bad{border-color:var(--rv-red);color:var(--rv-red)}
+.tr-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--rv-ink-soft)}
+.tr-bar label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.tr-bar select{font:inherit;border:1px solid var(--rv-dim3);border-radius:6px;padding:3px 6px;background:var(--rv-card);color:var(--rv-ink)}
+.tr-table{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;overflow-x:auto}
+.tr-table table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:820px}
+.tr-table th{background:var(--rv-panel);text-align:left;font-weight:600;color:var(--rv-ink-soft);padding:9px 12px;border-bottom:1px solid var(--rv-dim4);white-space:nowrap}
+.tr-table td{padding:9px 12px;border-bottom:1px solid var(--rv-panel2);vertical-align:top;color:var(--rv-ink)}
+.tr-table tbody tr{cursor:pointer}
+.tr-table tbody tr:hover,.tr-table tbody tr[aria-selected="true"]{background:var(--rv-panel2)}
+.tr-muted{color:var(--rv-faint)}
+.tr-at{font-family:var(--rv-mono);white-space:nowrap}
+.tr-pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:13px}
+.tr-pager button,.tr-drawer button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+.tr-pager button:disabled{opacity:.45;cursor:default}
+.tr-empty{padding:28px;text-align:center;color:var(--rv-muted)}
+.tr-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.tr-drawer[hidden]{display:none}
+.tr-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
+.tr-drawer header h2{font-size:16px;margin:0}
+.tr-body{overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.tr-lbl{font-size:12px;color:var(--rv-muted)}
+.tr-say{background:var(--rv-panel);border-radius:6px;padding:8px 10px;margin:0;white-space:pre-wrap}
+.tr-body textarea{width:100%;box-sizing:border-box;min-height:64px;font:inherit;border:1px solid var(--rv-dim3);border-radius:6px;padding:8px 10px;background:var(--rv-card);color:var(--rv-ink)}
+.tr-status{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tr-status label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.tr-same{border:1px solid var(--rv-dim4);border-radius:8px;padding:8px 10px}
+.tr-msg{color:var(--rv-muted)}
+.tr-msg.err{color:var(--rv-red)}
+@media (max-width:768px){
+  .tr-wrap{padding:12px 16px 24px}
+  .tr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tr-side{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="tr-wrap" data-keep="1">
+  <section class="tr-kpis" aria-label="요약">
+    <div class="tr-kpi"><b id="kCheck">—</b><span>점검할 답 (표시 있음 · 미확인)</span></div>
+    <div class="tr-kpi"><b id="kProblem">—</b><span>문제 있음</span></div>
+    <div class="tr-kpi"><b id="kReplaced">—</b><span>안내 문장으로 바꾼 답</span></div>
+    <div class="tr-kpi"><b id="kErr">—</b><span>AI 답변 실패</span></div>
+    <div class="tr-kpi"><b id="kLogged">—</b><span>기록된 답</span></div>
+  </section>
+  <p class="tr-note" id="trNote">고객 문장 원문은 보여 주지 않습니다. 「약속하는 말」 표시는 점검할 답을 고르는 단서이고, 판정은 상태로 남깁니다.</p>
+  <div class="tr-side">
+    <section class="tr-box"><h2>반영하지 못한 조건</h2><div id="trUnapplied" class="tr-muted">—</div></section>
+    <section class="tr-box"><h2>문의 주제</h2><div id="trTopics" class="tr-muted">—</div></section>
+  </div>
+  <div class="tr-bar">
+    <label><input type="checkbox" id="trFlagged" checked> 약속하는 말이 있는 답만</label>
+    <label>상태 <select id="trStatus"><option value="">전체</option><option>미확인</option><option>문제 있음</option><option>확인</option></select></label>
+    <label><input type="checkbox" id="trTest"> 시험 문의 포함</label>
+  </div>
+  <div class="tr-table">
+    <table>
+      <thead><tr>
+        <th scope="col">시각</th><th scope="col">약속하는 말</th><th scope="col">AI가 낸 말</th>
+        <th scope="col">고객이 본 말</th><th scope="col">같은 질문</th><th scope="col">상태</th>
+      </tr></thead>
+      <tbody id="trRows"><tr><td colspan="6" class="tr-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+  <div class="tr-pager">
+    <span id="trPage" class="tr-muted"></span>
+    <button type="button" id="trPrev">이전</button><button type="button" id="trNext">다음</button>
+  </div>
+</div>
+<aside class="tr-drawer" id="trDrawer" hidden data-keep="1" aria-label="답 상세">
+  <header><h2 id="trDTitle">답 상세</h2><button type="button" id="trClose">닫기</button></header>
+  <div class="tr-body" id="trDBody"></div>
+</aside>
+<script>
+(function(){
+  var API = '/api/admin/talk-review';
+  var st = {offset:0, total:0, limit:50, items:[], picked:null};
+  var $ = function(id){ return document.getElementById(id); };
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function chips(box, list, cls){ list.forEach(function(t){ box.appendChild(el('span','tr-chip'+(cls?' '+cls:''),t)); }); }
+  function qs(){
+    var p = ['offset='+st.offset];
+    if ($('trFlagged').checked) p.push('flagged=true');
+    if ($('trStatus').value) p.push('status='+encodeURIComponent($('trStatus').value));
+    if ($('trTest').checked) p.push('include_test=true');
+    return '?'+p.join('&');
+  }
+  function counts(box, list){
+    box.textContent=''; box.className='';
+    if (!list.length){ box.className='tr-muted'; box.textContent='아직 없습니다.'; return; }
+    list.forEach(function(x){ box.appendChild(el('span','tr-chip',x.label+' '+x.n+'건')); });
+  }
+  function load(){
+    fetch(API+qs()).then(function(r){ if(!r.ok) throw new Error('목록을 불러오지 못했습니다'); return r.json(); })
+    .then(function(d){
+      st.items=d.items; st.total=d.total; st.limit=d.limit;
+      var s=d.summary;
+      $('kCheck').textContent=s.to_check; $('kProblem').textContent=s.problem;
+      $('kReplaced').textContent=s.replaced; $('kErr').textContent=s.answer_errors; $('kLogged').textContent=s.logged;
+      $('trNote').textContent='고객 문장 원문은 보여 주지 않습니다. 「약속하는 말」 표시는 점검할 답을 고르는 단서이고, 판정은 상태로 남깁니다.'
+        + (d.before_logging ? ' 답 기록을 시작하기 전 문의 '+d.before_logging+'건은 답이 남아 있지 않습니다.' : '');
+      counts($('trUnapplied'), d.unapplied); counts($('trTopics'), d.topics);
+      var body=$('trRows'); body.textContent='';
+      if (!d.items.length){ var tr=el('tr'); var td=el('td','tr-empty','조건에 맞는 답이 없습니다.'); td.colSpan=6; tr.appendChild(td); body.appendChild(tr); }
+      d.items.forEach(function(it){
+        var tr=el('tr'); tr.setAttribute('data-h', it.hit_id);
+        if (st.picked===it.hit_id) tr.setAttribute('aria-selected','true');
+        tr.appendChild(el('td','tr-at',when(it.at)));
+        var f=el('td'); if(it.flags.length) chips(f,it.flags,'flag'); else f.appendChild(el('span','tr-muted','없음'));
+        if (it.answer_error) f.appendChild(el('span','tr-chip bad','답변 실패'));
+        tr.appendChild(f);
+        tr.appendChild(el('td',null,it.ai_reply||'—'));
+        tr.appendChild(el('td',it.replaced?null:'tr-muted',it.replaced?(it.shown_reply||'—'):'같음'));
+        tr.appendChild(el('td',null,it.same_question_n>1?it.same_question_n+'번':'—'));
+        tr.appendChild(el('td',null,it.status));
+        tr.addEventListener('click',function(){ open(it); });
+        body.appendChild(tr);
+      });
+      var from=d.total?d.offset+1:0, to=d.offset+d.items.length;
+      $('trPage').textContent='전체 '+d.total+'건 중 '+from+'–'+to;
+      $('trPrev').disabled=d.offset<=0; $('trNext').disabled=to>=d.total;
+    }).catch(function(e){
+      var body=$('trRows'); body.textContent=''; var tr=el('tr'); var td=el('td','tr-empty',e.message); td.colSpan=6; tr.appendChild(td); body.appendChild(tr);
+    });
+  }
+  function open(it){
+    st.picked=it.hit_id;
+    Array.prototype.forEach.call(document.querySelectorAll('#trRows tr'),function(r){ r.toggleAttribute('aria-selected', r.getAttribute('data-h')==String(it.hit_id)); });
+    $('trDTitle').textContent=when(it.at)+' 문의의 답';
+    var b=$('trDBody'); b.textContent='';
+    if (it.flags.length||it.topics.length||it.unapplied.length){
+      var c=el('div'); chips(c,it.flags,'flag'); chips(c,it.topics); chips(c,it.unapplied.map(function(u){return '반영 못 함: '+u;})); b.appendChild(c);
+    }
+    b.appendChild(el('span','tr-lbl','AI가 낸 말 (서버가 바꾸기 전)')); b.appendChild(el('p','tr-say',it.ai_reply||'—'));
+    b.appendChild(el('span','tr-lbl','고객이 본 말')); b.appendChild(el('p','tr-say',it.shown_reply||'—'));
+    b.appendChild(el('span','tr-lbl','자유 답변')); b.appendChild(el('p','tr-say',it.answer||(it.answer_error?'답변 실패':'없음')));
+    if (it.visitor){ var a=el('a',null,'이 방문자의 문의 · 보관 견적 보기'); a.href='/admin2/mvp3-consults'; b.appendChild(a); }
+    b.appendChild(el('span','tr-lbl','점검'));
+    var row=el('div','tr-status');
+    ['미확인','문제 있음','확인'].forEach(function(s){
+      var l=el('label'); var r=el('input'); r.type='radio'; r.name='trSt'; r.value=s; r.checked=it.status===s;
+      l.appendChild(r); l.appendChild(document.createTextNode(' '+s)); row.appendChild(l);
+    });
+    b.appendChild(row);
+    var ta=el('textarea'); ta.maxLength=500; ta.placeholder='무엇이 문제인지, 어떻게 고칠지 적습니다.'; ta.value=it.memo||''; b.appendChild(ta);
+    var save=el('button',null,'저장'); var msg=el('span','tr-msg', it.reviewed_at?'마지막 저장 '+when(it.reviewed_at):'');
+    var line=el('div','tr-status'); line.appendChild(save); line.appendChild(msg); b.appendChild(line);
+    save.addEventListener('click',function(){
+      var picked=b.querySelector('input[name=trSt]:checked');
+      save.disabled=true; msg.className='tr-msg'; msg.textContent='저장하는 중입니다.';
+      fetch(API+'/'+it.hit_id,{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({status:picked?picked.value:'미확인', memo:ta.value})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.detail)||'저장하지 못했습니다'); msg.textContent=x.d.note; save.disabled=false; load(); })
+      .catch(function(e){ msg.className='tr-msg err'; msg.textContent=e.message; save.disabled=false; });
+    });
+    if (it.question_key && it.same_question_n>1){
+      b.appendChild(el('span','tr-lbl','같은 질문에 나간 답'));
+      var box=el('div','tr-same',null); box.textContent='불러오는 중입니다.'; b.appendChild(box);
+      fetch(API+'/same/'+it.question_key+($('trTest').checked?'?include_test=true':''))
+      .then(function(r){ if(!r.ok) throw new Error('같은 질문의 답을 불러오지 못했습니다'); return r.json(); })
+      .then(function(d){
+        box.textContent='';
+        box.appendChild(el('div','tr-lbl',d.items.length+'번 중 AI가 낸 말 '+d.distinct_replies+'가지'));
+        d.items.forEach(function(x){
+          var p=el('p','tr-say',when(x.at)+'  '+(x.ai_reply||'—')); if(x.flags.length) p.appendChild(el('span','tr-chip flag',' '+x.flags.join(' · '))); box.appendChild(p);
+        });
+      }).catch(function(e){ box.textContent=e.message; });
+    }
+    $('trDrawer').hidden=false;
+  }
+  $('trClose').addEventListener('click',function(){ $('trDrawer').hidden=true; st.picked=null; });
+  ['trFlagged','trStatus','trTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  $('trPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
+  $('trNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
+  load();
+})();
+</script>
+{% endblock %}
