@@ -95,7 +95,7 @@ function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;cl
 function budget(product,talk=state.selectionState||state.talk){
   const won=talk?.budget_won;
   if(!Number.isInteger(product.price)||!Number.isInteger(won))return '예산 조건 미확인';
-  if(talk.budget_bound==='이상')return '입력하신 예산 하한 '+money(won);
+  if(talk.budget_bound==='이상')return '입력하신 최소 예산 '+money(won);
   const delta=won-product.price;
   return delta>0?'예산보다 '+money(delta)+' 낮아요':delta<0?'예산보다 '+money(-delta)+' 높아요':'예산과 같아요';
 }
@@ -338,7 +338,7 @@ function productDetails(finalOnly=false){
 function finalConditions(){
   const row=(name,label,text)=>'<div>'+uiIcon(name)+'<dt>'+label+'</dt><dd>'+esc(text)+'</dd></div>';
   return '<section class="final-conditions"><h3>구매 전 확인할 내용</h3><div class="final-conditions-grid"><dl>'+
-    row('gear','호환성','실제 조립 검수 결과 미확인')+row('tag','가격',state.savedQuote?'보관 시점 참고 금액 · 확정가 아님':state.selected.price_src||'가격 기준 미확인')+
+    row('gear','호환성','실제 조립 검수 결과는 확인되지 않았어요.')+row('tag','가격',state.savedQuote?'보관 시점 참고 금액 · 확정가 아님':state.selected.price_src||'가격 기준 미확인')+
     row('package','재고','재고 확보 전 · 구매 전 확인')+'</dl><dl>'+row('squares-four','운영체제','포함 여부 재확인 필요')+
     row('monitor','키보드 · 마우스 · 모니터','포함 여부 미확인')+row('shield','보증','기간 · 범위 재확인 필요')+'</dl></div></section>';
 }
@@ -356,7 +356,7 @@ function priceCheckPanel(){
 // Mall handoff result (api/mvp3_handoff.py). Price differences are told, never hidden.
 function handoffPanel(h){
   const changed=h.status==='가격변동'&&Number.isInteger(h.price_mall),soldout=h.status==='품절',unknown=h.status==='확인못함';
-  const line=changed?'쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라 보관 견적을 쇼핑몰 가격으로 고쳤어요. 쇼핑몰에서는 바뀐 가격으로 결제됩니다.':
+  const line=changed?'쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라 보관 견적을 쇼핑몰 가격으로 고쳤어요. 결제 금액은 쇼핑몰에서 최종 확인해 주세요.':
     soldout?'쇼핑몰에서 지금 품절로 표시돼요. 구매 전에 쇼핑몰에서 재고를 확인해주세요.':
     unknown?'현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다.':
     '쇼핑몰 가격도 '+money(h.price_quoted)+'으로 같아요.';
@@ -412,7 +412,7 @@ function renderFinal(){
   actions.hidden=true;
 }
 function renderSaved(){
-  view.innerHTML=heading('내 견적',false)+'<p class="muted">이 브라우저의 보관 키로 접근하는 서버 기록입니다. 다른 기기와 회원 계정 동기화는 지원하지 않아요.</p>'+errorPanel()+
+  view.innerHTML=heading('내 견적',false)+'<p class="muted">이 브라우저의 보관 키로 접근하는 서버 기록입니다. 다른 기기나 회원 계정에서는 이 보관 기록을 이어 볼 수 없어요.</p>'+errorPanel()+
     (state.phase==='list'?'<div class="empty small-empty"><p>보관 기록을 불러오는 중이에요.</p></div>':state.error?'':state.quotes.length?
       '<div class="quote-cards">'+state.quotes.map(q=>'<section class="quote-card live-product-card">'+productImage(q.product)+'<span class="pill">보관 시점 기록</span><h3>'+esc(q.product.name)+'</h3><strong class="price">'+money(q.product.price)+'</strong><p>'+esc(new Date(q.saved_at).toLocaleString('ko-KR'))+'</p>'+button('보관 견적 보기','load','primary','data-id="'+esc(q.id)+'"')+'</section>').join('')+'</div>':
       '<div class="empty small-empty"><h3>보관된 견적이 없어요</h3><p>상담 후 상품을 선택하면 서버에 보관할 수 있어요.</p>'+button('상담으로 돌아가기','back','outline')+'</div>')+
