@@ -50,7 +50,7 @@ function surface(h){return h.w.document.body.dataset.surface;}
 function send(h){h.w.document.querySelector('#chat-form').requestSubmit();}
 async function traverse(h,method){await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(Error('history traversal timeout')),1500);h.w.addEventListener('popstate',()=>{clearTimeout(timer);resolve();},{once:true});h.w.history[method]();});}
 test('generic entry shows approved two choices; direct is empty; no API until explicit send',()=>{
-  const h=harness({hash:''});assert.equal(surface(h),'gateway');assert.match(h.w.document.querySelector('#gateway-root').textContent,/어디서부터/);assert.equal(h.calls.length,0);const n=h.w.history.length;h.click('gateway');assert.equal(h.w.history.length,n);const direct=h.w.document.querySelector('[data-action="gateway-talk"]');assert.ok(direct);assert.match(direct.textContent,/바로 상담하기/);assert.equal(h.w.document.querySelector('[data-action="gateway-direct"]'),null);h.click('new');assert.equal(surface(h),'consultation');assert.equal(h.input.value,'');assert.equal(h.calls.length,0);
+  const h=harness({hash:''});assert.equal(surface(h),'gateway');assert.match(h.w.document.querySelector('#gateway-root').textContent,/어떤 PC가 필요하세요/);assert.deepEqual([...h.w.document.querySelectorAll('[data-action="gateway-start"]')].map(b=>[b.dataset.start,b.querySelector('h2').textContent]),[['new_pc','새 PC 고르기'],['upgrade','쓰던 PC 업그레이드'],['parts','부품·구성 알아보기']]);assert.ok(h.w.document.querySelector('[data-action="gateway-use"]'));assert.equal(h.calls.length,0);const n=h.w.history.length;h.click('gateway');assert.equal(h.w.history.length,n);const direct=h.w.document.querySelector('[data-action="gateway-talk"]');assert.ok(direct);assert.match(direct.textContent,/편하게 상담하기/);assert.equal(h.w.document.querySelector('[data-action="gateway-direct"]'),null);h.click('new');assert.equal(surface(h),'consultation');assert.equal(h.input.value,'');assert.equal(h.calls.length,0);
 });
 test('unknown usage and unset budget generate editable draft without requests; won budget is parsed only on explicit send',async()=>{
   const h=harness({hash:''});h.click('gateway-use');choose(h,'unknown');budget(h,'');h.click('gateway-begin');assert.equal(h.input.value,'어떤 PC가 좋을지 함께 정하고 싶어요.');assert.equal(h.calls.length,0);h.click('gateway-use');choose(h,'edit');budget(h,'150');h.click('gateway-begin');assert.match(h.input.value,/영상 편집.*150만원 이하/);assert.equal(h.calls.length,0);send(h);await until(()=>h.flow.state.phase===null);assert.deepEqual(Object.keys(h.calls[0].body).sort(),['chat_flow','history','state','text']);assert.equal(h.calls[0].body.state,null);assert.deepEqual(h.calls[1].body,{state:talk,text:h.calls[0].body.text});
@@ -126,4 +126,18 @@ test('quick replies follow what the consultation asks: usage question gets usage
   const b=harness({respond:url=>url==='/api/talk/parse'?grade:empty});await b.flow.submit('게임 100만원');await until(()=>b.flow.state.phase===null);
   assert.deepEqual(chips(b),['배그를 해요','롤을 해요','배그와 롤 둘 다 해요']);
   const c=harness();assert.ok(chips(c).includes('QHD로 해줘요'));
+});
+// 사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」: 처음 화면 채팅창의 글은 주소가 아니라
+// 탭 보관함으로 대화 화면에 넘긴다(갈래는 서버가 글 내용으로 고른다).
+test('the landing chat box hands its text to the talk screen through tab storage, not the address',()=>{
+  const h=harness({hash:''});const d=h.w.document;
+  const form=d.querySelector('#gateway-chat');assert.ok(form);
+  form.dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+  assert.equal(d.querySelector('#gateway-chat-status').hidden,false);assert.equal(h.w.sessionStorage.getItem('popcorn-mvp3-first-message-v1'),null);
+  const box=d.querySelector('#gateway-text');box.value='  지금 쓰는 PC가 느려요  ';box.dispatchEvent(new h.w.Event('input',{bubbles:true}));
+  form.dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+  const saved=JSON.parse(h.w.sessionStorage.getItem('popcorn-mvp3-first-message-v1'));
+  assert.equal(saved.text,'지금 쓰는 PC가 느려요');assert.ok(Number.isFinite(saved.at));
+  assert.equal(h.calls.length,0,'the landing screen itself sends nothing');
+  h.errors.splice(0,h.errors.length,...h.errors.filter(m=>!/navigation/i.test(m)));
 });
