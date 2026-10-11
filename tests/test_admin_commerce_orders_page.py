@@ -19,7 +19,8 @@ PAGE = ROOT / 'api/admin_ui_commerce_orders.py'
 NAV = ROOT / 'api/admin_nav.py'
 # 2026-10-11: 「고객 문의 · 보관 견적」(/admin2/mvp3-consults)·「판매 안내 자료」(/admin2/shop-notices)
 # ·「AI 답 점검」(/admin2/talk-review) 메뉴 추가로 기대 지문 갱신
-NAV_BASELINE_AST_SHA = '6af493364f48b99c6c9deaedf5e82da52d60ab2d3defdc4036b748c3326bb947'
+# 2026-10-11: 「쇼핑몰 가격 반영」(/admin2/mall-price) 메뉴 추가로 기대 지문 갱신
+NAV_BASELINE_AST_SHA = 'c73e4c32e2bbc02b9aa2bee8f10e318de2395d6e0a4d4bea9265c16d10a19b7e'
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'

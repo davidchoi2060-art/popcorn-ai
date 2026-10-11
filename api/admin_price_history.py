@@ -80,6 +80,15 @@ REASON_KO = {
     "manual_match": ("몰 값 맞춤", None),  # 판매가 관리(/admin2/sale-price) — NAV 미연결, 위 주석 참조
     "sourcing": ("매입 확정", "sourcing.html"),
     "csv": ("일괄 등록", "csv-jobs.html"),
+    # 2026-10-11 쇼핑몰 가격 반영(api/mall_price.py) — 두 겹 안전장치의 시점별 사유
+    "mall_price_file": ("쇼핑몰 가격 반영(파일)", None),
+    "mall_price_auto": ("쇼핑몰 가격 반영(자동 갱신)", None),
+    "mall_price_manual": ("쇼핑몰 가격 반영(바로 실행)", None),
+    "mall_price_cart": ("쇼핑몰 가격 확인(장바구니)", None),
+    "mall_price_checkout": ("쇼핑몰 가격 확인(결제 이동)", None),
+    "mall_price_file_undo": ("쇼핑몰 가격 반영 되돌림(파일)", None),
+    "mall_price_auto_undo": ("쇼핑몰 가격 반영 되돌림(자동 갱신)", None),
+    "mall_price_manual_undo": ("쇼핑몰 가격 반영 되돌림(바로 실행)", None),
 }
 # margin_policy(_undo)인데 ref_id가 NULL(대량 재산정)일 때만 쓰는 예외 라벨.
 # REASON_KO와 같은 dict에 욱여넣지 않는다 — REASON_KO의 키는 "이 reason 코드가 무엇을
