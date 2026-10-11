@@ -13,9 +13,9 @@ const tick=()=>new Promise(r=>setImmediate(r));
 async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k),key:i=>[...map.keys()][i]??null,get length(){return map.size;}};}
 
-function harness(script,ss=storage()){
+function harness(script,ss=storage(),url='https://qa.invalid/mvp3/talk.html'){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
-  const dom=new JSDOM(read('talk.html'),{url:'https://qa.invalid/mvp3/talk.html',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
+  const dom=new JSDOM(read('talk.html'),{url,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   Object.defineProperty(w,'crypto',{value:webcrypto});Object.defineProperty(w,'sessionStorage',{value:ss});
   w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
@@ -46,17 +46,108 @@ function scripted({failSecond=false}={}){
   };
 }
 
-test('first screen offers examples that fill the input without sending',async()=>{
+test('first screen offers three starters that fill the input without sending',async()=>{
   const h=harness(scripted());
   try{
     await until(()=>h.doc.querySelector('.tk-welcome'));
-    assert.match(h.text('.tk-welcome h1'),/어떤 PC를 찾고 계세요/);
-    assert.equal(h.doc.querySelectorAll('[data-action=example]').length,3);
+    assert.match(h.text('.tk-welcome h1'),/어떤 PC가 필요하세요/);
+    const labels=[...h.doc.querySelectorAll('[data-action=starter]')].map(b=>b.textContent);
+    assert.deepEqual(labels,['새 PC 찾기','쓰던 PC 업그레이드','부품·구성 물어보기']);
     assert.match(h.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);
-    h.click('[data-action=example]');
-    assert.equal(h.doc.querySelector('#tk-input').value,'게임용 PC를 찾고 있어요.');
+    h.click('[data-action=starter][data-entry=upgrade]');
+    assert.equal(h.doc.querySelector('#tk-input').value,'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.');
+    h.click('[data-action=starter][data-entry=new_pc]');
+    assert.equal(h.doc.querySelector('#tk-input').value,'새 PC를 찾고 있어요.','another starter replaces an untouched draft');
     await tick();assert.equal(h.calls.length,0);assert.deepEqual(h.errors,[]);
   }finally{h.close();}
+});
+test('a starter keeps what the customer already typed and its key rides the first send only',async()=>{
+  const h=harness(scripted());
+  try{
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    const box=h.doc.querySelector('#tk-input');box.value='영상 편집용으로';
+    h.click('[data-action=starter][data-entry=new_pc]');
+    assert.equal(box.value,'영상 편집용으로 새 PC를 찾고 있어요.');
+    h.doc.querySelector('#tk-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    const first=h.calls.find(c=>c.url==='/api/talk/parse');
+    assert.equal(first.body.entry,'new_pc');assert.equal(first.body.text,'영상 편집용으로 새 PC를 찾고 있어요.');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.ok(h.doc.querySelector('#tk-starters').hidden,'starters go away once the conversation starts');
+    assert.ok(!h.doc.querySelector('.tk-chat').classList.contains('is-fresh'));
+    await h.say('150만원 게임용');
+    await until(()=>h.calls.filter(c=>c.url==='/api/talk/parse').length===2);
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[1].body.entry,undefined);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('arriving from a landing path fills that draft once and clears the address',async()=>{
+  const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=upgrade');
+  try{
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    assert.equal(h.doc.querySelector('#tk-input').value,'지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.');
+    assert.equal(h.w.location.search,'');
+    h.doc.querySelector('#tk-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    assert.equal(h.calls.find(c=>c.url==='/api/talk/parse').body.entry,'upgrade');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('a sentence typed on the landing chat box is sent once on arrival without a button key',async()=>{
+  const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'지금 쓰는 PC가 느려요',at:Date.now()}));
+  const h=harness(scripted(),ss);
+  try{
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    const first=h.calls.find(c=>c.url==='/api/talk/parse');
+    assert.equal(first.body.text,'지금 쓰는 PC가 느려요');assert.equal(first.body.entry,undefined);
+    assert.equal(ss.getItem('popcorn-mvp3-first-message-v1'),null,'taken once');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('an old landing sentence is dropped instead of being sent later',async()=>{
+  const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'예전 글',at:Date.now()-3600000}));
+  const h=harness(scripted(),ss);
+  try{await until(()=>h.doc.querySelector('.tk-welcome'));await tick();assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse').length,0);assert.equal(ss.getItem('popcorn-mvp3-first-message-v1'),null);}finally{h.close();}
+});
+test('the top label shows the consultation path the server chose',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:[],budget_won:null},missing:[],reply:'어떤 작업에서 느린가요?',answer:'',pc_related:true,chat_flow:{smalltalk_turns:0,pc_offered:false,pc_declined:false,entry:'upgrade',entry_asked:false}}}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    await h.say('지금 쓰는 PC가 느려요');
+    await until(()=>/업그레이드/.test(h.text('.demo-label')));
+    assert.equal(h.text('.demo-label'),'PC 상담 · 쓰던 PC 업그레이드');
+  }finally{h.close();}
+});
+test('a new consultation drops the earlier starter key and path label',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:[],budget_won:null},missing:[],reply:'어떤 작업에서 느린가요?',answer:'',pc_related:true,chat_flow:body.entry?{smalltalk_turns:0,pc_offered:false,pc_declined:false,entry:body.entry,entry_asked:false}:null}}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    h.w.confirm=()=>true;
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    // 단추만 고르고 보내지 않은 채 새 상담 -> 다음 첫 문장에 옛 갈래가 실리지 않는다.
+    h.click('[data-action=starter][data-entry=upgrade]');
+    h.click('[data-action=new]');
+    await h.say('지금 쓰는 PC가 느려요');
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[0].body.entry,undefined);
+    // 단추로 시작해 갈래가 잡힌 뒤 새 상담 -> 상단 표시가 돌아오고 다음 문장에도 갈래가 없다.
+    h.click('[data-action=new]');
+    h.click('[data-action=starter][data-entry=upgrade]');
+    await h.say(h.doc.querySelector('#tk-input').value);
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[1].body.entry,'upgrade');
+    assert.equal(h.text('.demo-label'),'PC 상담 · 쓰던 PC 업그레이드');
+    h.click('[data-action=new]');
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    await h.say('새 PC를 알아보고 있어요');
+    const third=h.calls.filter(c=>c.url==='/api/talk/parse')[2];
+    assert.equal(third.body.entry,undefined);assert.equal(third.body.chat_flow,null);
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('an unknown landing path key is ignored',async()=>{
+  const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=game');
+  try{await until(()=>h.doc.querySelector('.tk-welcome'));assert.equal(h.doc.querySelector('#tk-input').value,'');assert.deepEqual(h.errors,[]);}finally{h.close();}
 });
 test('cards sit under the answer and choosing one fills the quote panel',async()=>{
   const h=harness(scripted());
