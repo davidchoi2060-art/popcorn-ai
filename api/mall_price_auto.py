@@ -58,6 +58,9 @@ DELAY = 1.5                            # 공개 페이지 요청 간격(초)
 MAX_READS = int(os.environ.get("MALL_PRICE_MAX_READS") or 3000)
 FAIL_RATIO = 0.5                       # 공개 페이지 읽기가 이 비율을 넘게 실패하면 실행 실패
 STALE_RUNNING = "2 hours"              # 이보다 오래 «실행 중»인 행은 죽은 실행으로 본다
+COLLECT_LIMIT = 90 * 60                # 공개 페이지 읽기 상한(초). STALE_RUNNING 보다 짧아야 한다 —
+                                       # 살아 있는 실행이 「죽은 실행」으로 보여 다른 실행이 겹치지 않게
+                                       # (2026-10-11 코덱스 검수 #106·#109 지적 반영)
 
 
 class CollectError(RuntimeError):
@@ -167,12 +170,18 @@ def targets(conn, *, include_parts=False) -> list[tuple[int, str]]:
     return [(r[0], r[1]) for r in conn.execute(text(sql), {"pt": MP.PC_PART_TYPE, "n": MAX_READS})]
 
 
-def collect_public(codes, *, sleep=time.sleep, read=None) -> tuple[dict, dict]:
+def collect_public(codes, *, sleep=time.sleep, read=None, clock=time.monotonic) -> tuple[dict, dict]:
     read = read or R.read_price
     prices, failed, errs = {}, 0, {}
+    deadline = clock() + COLLECT_LIMIT
     for i, (code, part_type) in enumerate(codes):
         if i:
             sleep(DELAY)
+        if clock() > deadline:
+            info = {"source": "pages", "asked": len(codes), "read": len(prices), "failed": failed,
+                    "stopped_at": i}
+            raise CollectError("공개 상품 페이지 읽기가 %d분을 넘어 멈췄습니다 (%d/%d건 읽음)"
+                               % (COLLECT_LIMIT // 60, i, len(codes)), info)
         got = read(code, part_type)
         if got.get("ok") and got.get("price"):
             prices[code] = int(got["price"])
@@ -200,8 +209,17 @@ class AlreadyRunning(RuntimeError):
     pass
 
 
-def begin(moment: str, *, operator_id=None) -> int:
-    """실행 행을 만든다(겹치면 AlreadyRunning). 수집은 `execute()` 가 한다."""
+class SlotDone(RuntimeError):
+    """그 시각의 정기 실행이 이미 시작됐다(다른 프로세스가 먼저 했다)."""
+
+
+def begin(moment: str, *, operator_id=None, slot=None) -> int:
+    """실행 행을 만든다(겹치면 AlreadyRunning). 수집은 `execute()` 가 한다.
+
+    `slot`(정기 실행의 시각)을 주면 잠금 «안에서» 그 시각 이후 시작한 auto 실행이 있는지 다시 본다.
+    잠금 밖에서 읽은 판정만 믿으면, 먼저 시작한 실행이 끝난 뒤 다른 프로세스가 같은 시각을 또 돈다
+    (2026-10-11 코덱스 검수 #106·#109 지적 반영).
+    """
     if moment not in ("auto", "manual"):
         raise ValueError(moment)
     with engine.begin() as conn:
@@ -209,6 +227,10 @@ def begin(moment: str, *, operator_id=None) -> int:
         other = running(conn)
         if other:
             raise AlreadyRunning(other)
+        if slot is not None:
+            last = _last_auto_started(conn)
+            if last is not None and last >= slot:
+                raise SlotDone(slot)
         src = "export" if settings()["login"] and settings()["export_url"] else "pages"
         return MP.start_run(conn, moment, source=src, operator_id=operator_id)
 
@@ -253,12 +275,14 @@ def execute(run_id: int, moment: str, *, operator_id=None, collect_public_fn=Non
         return {"ok": False, "run_id": run_id, "fail_reason": reason}
 
 
-def run(moment: str = "auto", *, operator_id=None) -> dict:
-    """한 번 돌린다(앱 안 스케줄러 · 명령줄)."""
+def run(moment: str = "auto", *, operator_id=None, slot=None) -> dict:
+    """한 번 돌린다(앱 안 스케줄러는 auto · 명령줄은 manual)."""
     try:
-        run_id = begin(moment, operator_id=operator_id)
+        run_id = begin(moment, operator_id=operator_id, slot=slot)
     except AlreadyRunning as e:
         return {"ok": False, "run_id": e.args[0], "fail_reason": "이미 실행 중입니다"}
+    except SlotDone:
+        return {"ok": False, "run_id": None, "fail_reason": "이 시각의 정기 실행은 이미 했습니다"}
     return execute(run_id, moment, operator_id=operator_id)
 
 
@@ -303,20 +327,24 @@ def due_slot(now, last_auto_started):
     return slot
 
 
-def _last_auto_started():
-    with engine.connect() as conn:
-        return conn.execute(text(
-            # started_at 은 TIMESTAMP(무시간대, 세션 시간대의 now()) — 같은 세션 시간대로 붙여 비교한다
-            "SELECT max(started_at) AT TIME ZONE current_setting('TimeZone')"
-            " FROM mall_price_runs WHERE moment='auto'")).scalar()
+def _last_auto_started(conn=None):
+    # 정기 실행(auto)만 센다. 명령줄 · 관리자 「지금 실행」은 manual 이라 정기 시각을 채우지 않는다.
+    sql = text(
+        # started_at 은 TIMESTAMP(무시간대, 세션 시간대의 now()) — 같은 세션 시간대로 붙여 비교한다
+        "SELECT max(started_at) AT TIME ZONE current_setting('TimeZone')"
+        " FROM mall_price_runs WHERE moment='auto'")
+    if conn is not None:
+        return conn.execute(sql).scalar()
+    with engine.connect() as c:
+        return c.execute(sql).scalar()
 
 
 def _tick():
     import datetime as dt
     now = dt.datetime.now(dt.timezone.utc)
-    last = _last_auto_started()
-    if due_slot(now, last) is not None:
-        res = run("auto")
+    slot = due_slot(now, _last_auto_started())
+    if slot is not None:
+        res = run("auto", slot=slot)
         log.info("[mall-price-auto] scheduled run ok=%s", res.get("ok"))
 
 

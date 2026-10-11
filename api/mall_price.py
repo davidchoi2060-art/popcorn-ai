@@ -376,7 +376,17 @@ def undo_run(conn, run_id: int, *, operator_id: int) -> dict:
     cur = dict(conn.execute(text(
         "SELECT product_code, sale_price FROM products WHERE product_code = ANY(:c)"),
         {"c": codes}).all())
-    back = [pc for pc in codes if cur.get(pc) == after[pc]]
+    # 값이 같다는 것만으로는 부족하다 — 다른 경로가 바꿨다가 같은 값으로 돌아온 경우도 같다.
+    # 이 실행이 남긴 이력 뒤에 그 상품의 판매가 이력이 또 있으면 남의 변경으로 보고 건너뛴다
+    # (2026-10-11 코덱스 검수 #99 지적 반영 · 게임 등급 되돌리기와 같은 유형).
+    later = {r[0] for r in conn.execute(text(
+        "SELECT DISTINCT h.product_code FROM product_price_history h"
+        " JOIN (SELECT product_code, MAX(history_id) AS hid FROM product_price_history"
+        "        WHERE field='sale' AND ref_id=:l AND product_code = ANY(:c) GROUP BY product_code) mine"
+        "   ON mine.product_code = h.product_code"
+        " WHERE h.field='sale' AND h.history_id > mine.hid"),
+        {"l": run["apply_log_id"], "c": codes})}
+    back = [pc for pc in codes if cur.get(pc) == after[pc] and pc not in later]
     skipped = [pc for pc in codes if pc not in back]
     undo_log = log_action(conn, "mall_price_undo", "run:%s" % run_id, {
         "run_id": run_id, "ref_log_id": run["apply_log_id"],

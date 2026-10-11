@@ -182,6 +182,25 @@ class ApplyUndoTests(unittest.TestCase):
         with self.assertRaises(MP.UndoRefused):
             MP.undo_run(c, run, operator_id=7)
 
+    def test_undo_skips_a_round_trip_by_another_path(self):
+        # 코덱스 검수 #99: 다른 경로가 바꿨다가 같은 값으로 돌아오면 값만 봐서는 모른다
+        c = self.conn()
+        self.seed(c, [(1, "PC_COMPLETE", 1000, []), (2, "PC_COMPLETE", 2000, [])])
+        plan = MP.build_plan(c, {1: 1100, 2: 2200})
+        run = MP.start_run(c, "file", source="file", operator_id=7, file_name="a.csv")
+        res = MP.apply_changes(c, plan["changes"], moment="file", operator_id=7, run_id=run)
+        MP.finish_run(c, run, ok=True, apply_log_id=res["log_id"], counts={"changed": 2})
+        # 장바구니 재확인이 1 을 1150 으로 바꿨다가, 다음 재확인이 다시 1100 으로 돌렸다
+        later = MP.apply_changes(c, [{"product_code": 1, "old": 1100, "new": 1150, "diff": 50}],
+                                 moment="cart", operator_id=None)
+        self.assertEqual(later["changed"], 1)
+        MP.apply_changes(c, [{"product_code": 1, "old": 1150, "new": 1100, "diff": -50}],
+                         moment="cart", operator_id=None)
+        out = MP.undo_run(c, run, operator_id=7)
+        self.assertEqual((out["restored"], out["skipped"], out["skipped_codes"]), (1, 1, [1]))
+        prices = dict(c.execute(self.text("SELECT product_code, sale_price FROM products")).all())
+        self.assertEqual(prices, {1: 1100, 2: 2000})
+
     def test_stale_and_hold_big(self):
         c = self.conn()
         self.seed(c, [(1, "PC_COMPLETE", 1000, []), (2, "PC_COMPLETE", 1000, [])])

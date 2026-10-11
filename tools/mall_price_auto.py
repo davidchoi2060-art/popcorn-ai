@@ -5,6 +5,8 @@
     python tools/mall_price_auto.py --check    # 설정 이름과 «있는지»만 본다(값은 안 보인다, 요청 없음)
 
 하는 일은 전부 `api/mall_price_auto.run()` 이 한다. 관리자 화면 「지금 실행」과 같은 함수다.
+실행 기록(mall_price_runs.moment)에는 «manual» 로 남는다 — 정기 실행(auto)과 구분하고,
+손으로 돌린 것이 그 시각의 정기 실행을 대신 채우지 않게 한다(2026-10-11 코덱스 검수 반영).
 출력은 ASCII 만 쓴다(서버 stdout 이 cp949 — 슬라이스 40). 실패하면 종료 코드 1.
 실패 사유 원문(한국어)은 관리자 화면 · mall_price_runs 에 남는다.
 """
@@ -32,7 +34,7 @@ def main(argv=None) -> int:
             cfg["login"], cfg["export_url"], "export" if cfg["login"] and cfg["export_url"] else "pages"))
         print("names: " + " ".join(cfg["names"]))
         return 0
-    res = AUTO.run("auto")
+    res = AUTO.run("manual")
     print(json.dumps(res, ensure_ascii=True))
     return 0 if res.get("ok") else 1
 

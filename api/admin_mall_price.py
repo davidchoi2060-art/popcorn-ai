@@ -112,7 +112,17 @@ async def preview(file: UploadFile = File(...), include_parts: bool = Form(False
 def apply(staging_id: str = Form(...), token: str = Form(...), include_parts: bool = Form(False)):
     me = _owner()
     p = _stage_path(staging_id)
-    if not os.path.exists(p):
+    # 보존 1시간은 다음 미리보기의 _sweep() 만 지키고 있었다 — 새 미리보기가 없으면 지난 파일이 남는다.
+    # 반영할 때도 같은 기한을 본다(2026-10-11 코덱스 검수 #99 지적 반영).
+    try:
+        expired = time.time() - os.path.getmtime(p) > STAGE_TTL
+    except OSError:
+        expired = True
+    if expired:
+        try:
+            os.remove(p)
+        except OSError:
+            pass
         raise HTTPException(410, "미리보기가 만료됐습니다. 파일을 다시 올려 주세요.")
     with io.open(p, encoding="utf-8") as f:
         staged = json.load(f)
