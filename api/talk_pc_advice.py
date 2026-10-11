@@ -81,11 +81,18 @@ def pc_intent(sentence: str) -> bool:
     return bool(_PC_WORD.search(s) or _PART.search(s) or _PC_INTENT.search(s))
 
 
+# 부품을 이해하려는 질문(「PC 메모리 구성과 SSD 차이가 뭐예요?」) -- 「구성」이 요청 낱말에 걸려도 사려는 말이
+# 없으면 새 PC 추천이 아니라 부품 설명이다(코덱스 PR157 검수 v1 P2-1).
+_EXPLAIN = re.compile(r"차이|역할|왜|무슨\s*(뜻|의미|역할)|뭐예요|뭔가요|뭐야|뭐에요|뭐죠|뭐지|설명")
+_BUY = re.compile(r"추천|사려|살려|살까|사고\s*싶|구매|구입|견적|맞춰|맞추|짜\s*줘|짜\s*주|\d+\s*만\s*원?|예산", re.I)
+
+
 def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | general | None. game=True 면 게임 이름을 용도로 친다."""
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
-    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game))
+    explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
+    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game)) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):

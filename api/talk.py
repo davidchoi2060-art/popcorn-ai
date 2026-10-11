@@ -1373,6 +1373,9 @@ def parse_talk(body: ParseBody, request: Request):
     # 적당한 화면으로」). 문장은 찍지 않고 갈래 키와 출처만 로그에 남긴다.
     if not entry and pc is True and (state.usages or state.budget_won):
         entry, entry_src = "new_pc", "state"
+    # 부품·쓰던 PC 설명을 먼저 했으면 그 설명이 갈래다 -- 설명 뒤에 갈래를 다시 되묻지 않는다(코덱스 PR157 검수 v1 P2-2).
+    if not entry and explained:
+        entry, entry_src = ("parts" if getattr(ans, "topic", None) == "part" else "upgrade"), "answer"
     # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
     if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
             and not exceptions and not notices and not laptop and not handoff_offer
