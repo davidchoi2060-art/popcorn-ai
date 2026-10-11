@@ -24,7 +24,7 @@ from sqlalchemy import text
 
 from . import talk_rules as TR
 from .admin_mvp3_consults import HIT_IS_TEST, _terms
-from .admin_raw_text import NOTICE as RAW_NOTICE, raw_view
+from .admin_raw_text import NOTICE as RAW_NOTICE, expired, raw_view
 from .admin_talk_patterns import NOTHING_READ
 from .auth import current_operator
 from .db import engine
@@ -46,6 +46,8 @@ def _writer():
 
 def _row(r, same_n=None) -> dict:
     tags = [t for t in (r["matched_terms"] or []) if isinstance(t, str)]
+    # AI 답은 고객 말을 되짚을 수 있어 원문과 같은 보관 기한을 둔다(0138) — 지나면 내보내지 않는다.
+    gone = expired(r["reply_purge_at"])
     return {
         "hit_id": r["hit_id"], "at": iso(r["created_at"]),
         "question": raw_view(r["raw_text"], r["raw_purge_at"]),
@@ -53,9 +55,10 @@ def _row(r, same_n=None) -> dict:
         "topics": _terms([t for t in tags if t.startswith(TR.TOPIC_TAG)]),
         "unapplied": [t[len(TR.UNAPPLIED_TAG):] for t in tags if t.startswith(TR.UNAPPLIED_TAG)],
         "flags": list(r["flags"] or []),
-        "ai_reply": r["ai_reply"], "shown_reply": r["shown_reply"],
+        "ai_reply": None if gone else r["ai_reply"], "shown_reply": None if gone else r["shown_reply"],
         "replaced": bool(r["ai_reply"]) and r["ai_reply"] != r["shown_reply"],
-        "answer": r["answer"], "answer_error": bool(r["answer_error"]),
+        "answer": None if gone else r["answer"], "answer_error": bool(r["answer_error"]),
+        "reply_purged": gone,
         "question_key": r["question_key"], "same_question_n": same_n,
         "status": r["status"], "memo": r["memo"],
         "reviewed_at": iso(r["reviewed_at"]),
@@ -67,6 +70,7 @@ _SELECT = f"""
     SELECT h.hit_id, h.created_at, h.visitor_key, h.matched_terms, {HIT_IS_TEST} AS is_test,
            h.raw_text, h.raw_purge_at,
            r.ai_reply, r.shown_reply, r.answer, r.answer_error, r.flags, r.question_key,
+           r.purge_at AS reply_purge_at,
            r.status, r.memo, r.reviewed_at
       FROM talk_reply_reviews r JOIN talk_intent_hits h ON h.hit_id = r.hit_id
 """
@@ -149,7 +153,7 @@ def same_question(question_key: str, include_test: bool = False):
     items = [_row(r) for r in rows]
     return {"ok": True, "items": items,
             # 답이 매번 달라지는지는 «AI 가 낸 말»로 센다 — 고객이 본 말은 서버 안내로 같아질 수 있다
-            "distinct_replies": len({i["ai_reply"] for i in items})}
+            "distinct_replies": len({i["ai_reply"] for i in items if i["ai_reply"] is not None})}
 
 
 class ReviewBody(BaseModel):

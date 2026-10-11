@@ -39,7 +39,7 @@ from sqlalchemy import text
 
 from . import talk_rules as TR
 from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST
-from .admin_raw_text import NOTICE as RAW_NOTICE, raw_view
+from .admin_raw_text import NOTICE as RAW_NOTICE, expired, raw_view
 from .db import engine
 from .timeutil import iso, KST, kst_day_range
 
@@ -60,6 +60,10 @@ ROLE_KO = {"value": "알뜰", "recommended": "추천", "reference": "참고"}
 # 이름표가 있는지는 SQL 안에서 본다(2026-10-11 관리자 확인 M1).
 # 원문은 보관 기간이 지나면 지워지므로, 그 뒤에는 data_origin 만 남는다.
 HIT_IS_TEST = "(data_origin <> 'real' OR COALESCE(raw_text, '') ILIKE 'QA-%')"
+
+
+# 방문자 상세 한 번에 싣는 최대 건수(최근 것부터). 넘으면 `truncated` 로 알린다.
+DETAIL_LIMITS = {"hits": 500, "saved": 200, "inquiries": 100}
 
 
 def _hit_origin(include_test: bool) -> str:
@@ -224,31 +228,41 @@ def visitor_detail(visitor: str, include_test: bool = False):
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
                        intent_key, {HIT_IS_TEST} AS is_test, h.raw_text, h.raw_purge_at,
-                       r.shown_reply, r.flags, r.status AS review_status
+                       r.shown_reply, r.flags, r.status AS review_status, r.purge_at AS reply_purge_at
                   FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
                  WHERE visitor_key = :k AND {hit_origin}
-                 ORDER BY h.created_at, h.hit_id LIMIT 500"""), {"k": str(uid)}).mappings().all()
+                 ORDER BY h.created_at DESC, h.hit_id DESC LIMIT :n"""),
+                {"k": str(uid), "n": DETAIL_LIMITS["hits"] + 1}).mappings().all()
             quotes = conn.execute(text(f"""
                 SELECT quote_id, product_snapshot, talk_state, saved_at
                   FROM mvp3_saved_recommendations s WHERE user_id = :u AND {_saved_origin(include_test)}
-                 ORDER BY saved_at, quote_id LIMIT 200"""), {"u": uid}).mappings().all()
+                 ORDER BY saved_at DESC, quote_id DESC LIMIT :n"""),
+                {"u": uid, "n": DETAIL_LIMITS["saved"] + 1}).mappings().all()
             # 구매 상담 신청(0139) — 연락처는 싣지 않는다. 처리는 「구매 상담 신청」 화면에서 한다.
             inquiries = conn.execute(text(f"""
                 SELECT i.inquiry_no, i.created_at, i.topic, i.status
                   FROM purchase_inquiries i
                  WHERE i.user_id = :u AND ({'TRUE' if include_test else 'NOT ' + INQUIRY_IS_TEST})
-                 ORDER BY i.created_at, i.inquiry_id LIMIT 100"""), {"u": uid}).mappings().all()
+                 ORDER BY i.created_at DESC, i.inquiry_id DESC LIMIT :n"""),
+                {"u": uid, "n": DETAIL_LIMITS["inquiries"] + 1}).mappings().all()
         else:
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
                        intent_key, {HIT_IS_TEST} AS is_test, h.raw_text, h.raw_purge_at,
-                       r.shown_reply, r.flags, r.status AS review_status
+                       r.shown_reply, r.flags, r.status AS review_status, r.purge_at AS reply_purge_at
                   FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
-                 WHERE h.hit_id = :h"""), {"h": hit_id}).mappings().all()
+                 WHERE h.hit_id = :h AND {hit_origin}"""), {"h": hit_id}).mappings().all()
             quotes = []
             inquiries = []
     if not hits and not quotes and not inquiries:
         raise HTTPException(404, "이 방문자의 기록이 없습니다")
+    # 상한을 넘는 방문자는 «최근» 것만 싣고 잘린 사실을 함께 알린다 — 예전에는 오래된 것부터 읽어
+    # 최신 내역이 말없이 빠졌다(2026-10-11 코덱스 검수 #81 지적 반영).
+    truncated = {"hits": len(hits) > DETAIL_LIMITS["hits"], "saved": len(quotes) > DETAIL_LIMITS["saved"],
+                 "inquiries": len(inquiries) > DETAIL_LIMITS["inquiries"]}
+    hits = hits[:DETAIL_LIMITS["hits"]]
+    quotes = quotes[:DETAIL_LIMITS["saved"]]
+    inquiries = inquiries[:DETAIL_LIMITS["inquiries"]]
 
     timeline = [{
         "kind": "hit", "at": iso(h["created_at"]),
@@ -258,7 +272,8 @@ def visitor_detail(visitor: str, include_test: bool = False):
         "question": raw_view(h["raw_text"], h["raw_purge_at"]),
         # 고객이 본 AI 답(0138 이후 문의만 있다) — 점검은 「AI 답 점검」 화면에서 한다
         "reply": None if h["review_status"] is None else {
-            "shown_reply": h["shown_reply"], "flags": list(h["flags"] or []),
+            "shown_reply": None if expired(h["reply_purge_at"]) else h["shown_reply"],
+            "reply_purged": expired(h["reply_purge_at"]), "flags": list(h["flags"] or []),
             "status": h["review_status"]},
     } for h in hits]
     for q in quotes:
@@ -279,4 +294,5 @@ def visitor_detail(visitor: str, include_test: bool = False):
     return {"visitor": visitor, "visitor_known": uid is not None,
             "visitor_label": ("방문자 " + str(uid)) if uid is not None else "방문자 미확인",
             "hits": len(hits), "saved": len(quotes), "inquiries": len(inquiries),
+            "truncated": truncated, "limits": DETAIL_LIMITS,
             "raw_notice": RAW_NOTICE, "timeline": timeline}

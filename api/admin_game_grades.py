@@ -278,7 +278,13 @@ def undo(log_id: int):
         if cur is None:
             raise HTTPException(404, "없는 게임입니다")
         after, before = d.get("after") or {}, d.get("before") or {}
-        if cur["grade"] != after.get("grade"):
+        # 값이 같다는 것만으로는 부족하다 — A→B→C→B 처럼 돌아온 경우도 같다. 이 게임의 «최신» 기록만
+        # 되돌린다(게임 행을 잠근 뒤 보므로 동시 변경과도 겹치지 않는다 · 2026-10-11 코덱스 검수 #88 지적 반영).
+        newer = conn.execute(text(
+            "SELECT 1 FROM admin_operator_activity_logs WHERE target_kind = :k AND target_id = :t"
+            " AND action IN ('game_grade_set', 'game_grade_undo') AND log_id > :i LIMIT 1"),
+            {"k": TARGET_KIND, "t": str(game_id), "i": log_id}).first()
+        if newer or cur["grade"] != after.get("grade"):
             raise HTTPException(409, "그 뒤에 등급이 다시 바뀌어 이 기록은 되돌릴 수 없습니다")
         _write(conn, game_id, before.get("grade"), bool(before.get("is_confirmed")), before.get("note"))
         undo_id = _log(conn, op, "game_grade_undo", game_id,

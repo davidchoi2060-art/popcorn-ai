@@ -127,5 +127,57 @@ class GameGradeAdmin(unittest.TestCase):
         self.assertEqual([g['label'] for g in groups if g['active']], ['사용·성능 자료'])
 
 
+def _local_url():
+    from tests.test_mall_price import _local_url as f
+    return f()
+
+
+@unittest.skipUnless(_local_url(), '루프백 Postgres 가 없어 DB 검사를 건너뜁니다')
+class GameGradeUndoLatestOnly(unittest.TestCase):
+    """코덱스 검수 #88: A->B, B->C, C->B 뒤 첫 기록(A->B)을 되돌리면 안 된다(값만 같을 뿐 최신 기록이 아니다)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import uuid
+        from sqlalchemy import create_engine, text
+        cls.text = staticmethod(text)
+        cls.schema = 'game_grade_t_' + uuid.uuid4().hex[:12]
+        with create_engine(_local_url()).begin() as c:
+            c.execute(text('CREATE SCHEMA "%s"' % cls.schema))
+        cls.engine = create_engine(_local_url(), connect_args={'options': '-csearch_path=%s' % cls.schema})
+        with cls.engine.begin() as c:
+            for stmt in (
+                'CREATE TABLE games (game_id INT PRIMARY KEY, name TEXT)',
+                'CREATE TABLE game_grade_assignments (game_id INT PRIMARY KEY, grade TEXT,'
+                ' is_confirmed BOOLEAN, note TEXT, assigned_at TIMESTAMP)',
+                'CREATE TABLE admin_operator_activity_logs (log_id BIGSERIAL PRIMARY KEY, operator_id INT,'
+                ' action TEXT, target_kind TEXT, target_id TEXT, detail JSONB)',
+                "INSERT INTO games VALUES (1, '게임1')",
+                "INSERT INTO game_grade_assignments VALUES (1, 'A', TRUE, NULL, now())"):
+                c.execute(text(stmt))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.engine.dispose()
+        from sqlalchemy import create_engine
+        with create_engine(_local_url()).begin() as c:
+            c.execute(cls.text('DROP SCHEMA "%s" CASCADE' % cls.schema))
+
+    def test_old_record_is_refused_and_latest_is_undone(self):
+        grades = [{'grade': g} for g in 'ABC']
+        with patch.object(GG, 'engine', self.engine), \
+                patch.object(GG, 'current_operator', lambda: {'role': 'owner', 'operator_id': 1}), \
+                patch.object(GG, '_grades', lambda conn: grades):
+            first = GG.set_grade(1, GG.GradeBody(grade='B', reason='r1'))['log_id']
+            GG.set_grade(1, GG.GradeBody(grade='C', reason='r2'))
+            last = GG.set_grade(1, GG.GradeBody(grade='B', reason='r3'))['log_id']
+            with self.assertRaises(HTTPException) as c:
+                GG.undo(first)
+            self.assertEqual(c.exception.status_code, 409)
+            GG.undo(last)
+        with self.engine.connect() as c:
+            self.assertEqual(c.execute(self.text('SELECT grade FROM game_grade_assignments')).scalar(), 'C')
+
+
 if __name__ == '__main__':
     unittest.main()

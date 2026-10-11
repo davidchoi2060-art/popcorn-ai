@@ -151,6 +151,10 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
     name = product.get('name') or ('상품 %d' % code)
 
     with engine.begin() as conn:
+        # 견적 하나에 잠금을 먼저 잡고 기존 기록을 본다. 채번 잠금(_no)만으로는 같은 견적의 동시 요청
+        # 둘이 모두 「기록 없음」을 읽은 뒤 차례로 INSERT 해 인계가 두 건이 됐다
+        # (2026-10-11 코덱스 검수 #82 지적 반영).
+        conn.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {'k': 'mvp3_handoff:' + qid})
         found = _existing(conn, qid)       # 그 사이 같은 요청이 먼저 끝났으면 그것을 돌려준다
         if found:
             return _result(found[0], found[1], qid, build)

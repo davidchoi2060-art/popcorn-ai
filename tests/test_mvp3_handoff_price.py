@@ -35,6 +35,8 @@ class DB:
     def __init__(self):
         self.snapshot = {'product_code': 98149, 'name': 'PC', 'price': 1585100}
         self.handoffs, self.items, self.updates = [], [], []
+        self.locks, self.on_lock = [], None
+        self.existing = None
 
     @contextmanager
     def begin(self): yield self
@@ -45,8 +47,15 @@ class DB:
             return R([{'product_snapshot': dict(self.snapshot)}])
         if 'FROM ops_settings' in sql:
             return R([('pay', 'mall')])
+        if 'pg_advisory_xact_lock' in sql:
+            self.locks.append(p['k'])
+            if self.on_lock:
+                self.on_lock()
+            return R()
         if 'FROM handoffs WHERE' in sql:
-            return R([])
+            return R([self.existing[0]] if self.existing else [])
+        if 'FROM handoff_items WHERE' in sql:
+            return R([self.existing[1]] if self.existing else [])
         if 'INSERT INTO handoffs' in sql:
             self.handoffs.append(p)
             return R(scalar=1)
@@ -120,6 +129,19 @@ class HandoffPriceTest(unittest.TestCase):
         # 전에는 부품용 product_detail.html 로 보내 완제품은 쇼핑몰 첫 화면이 열렸다.
         out = self.run_with(check('same', 1585100))
         self.assertEqual(out['mall_url'], 'https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149')
+
+    def test_same_quote_waits_on_its_own_lock_then_returns_the_first_handoff(self):
+        # 코덱스 검수 #82: 동시 요청 B 가 잠금을 기다리는 동안 A 가 기록을 끝냈다 -> B 는 새로 넣지 않는다
+        first = ({'handoff_id': 7, 'handoff_no': 'HO-1000'},
+                 {'product_code': 98149, 'name_snap': 'PC', 'price_quoted': 1585100,
+                  'price_mall': 1585100, 'mall_status': '확인됨'})
+        def a_finished():
+            self.db.existing = first
+        self.db.on_lock = a_finished
+        out = self.run_with(check('same', 1585100))
+        self.assertEqual(self.db.locks, ['mvp3_handoff:' + str(QID)])
+        self.assertEqual(out['handoff_no'], 'HO-1000')
+        self.assertEqual((self.db.handoffs, self.db.items), ([], []))
 
 
 if __name__ == '__main__': unittest.main()
