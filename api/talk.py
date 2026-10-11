@@ -1244,6 +1244,12 @@ def parse_talk(body: ParseBody, request: Request):
     if (not released and pref and missing == [TS.MISSING_GAME_GRADE]
             and TR.unnamed_game(state)):
         released = True
+    # 게임 이름 없이 PC 를 물었는데 설명([B])을 먼저 했으면 「어떤 게임?」을 되묻지 않고 FHD 기준 카드를 아래에 낸다
+    # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
+    # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
+    if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
+            and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip()):
+        released = True
     if released:
         missing = []
     # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
