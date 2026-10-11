@@ -304,9 +304,9 @@
       try{
         const q=M.buildQuote(await api.buildQuote(M.copy(state.selectionState),base,changes,{signal:op.signal}),base);
         if(!current(op))return;
-        state.selected={...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes}:null};
+        state.selected={...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null};
         state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;state.inquiry=emptyInquiry();state.build=emptyBuild();
-        message(say(q));
+        message(say(q)+(q.changes.length&&q.warnings.length?' '+q.warnings.join(' '):''));
       }catch(error){if(current(op))state.build.error=error?.message||'부품을 바꾸지 못했어요.';}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }

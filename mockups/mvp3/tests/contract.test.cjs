@@ -202,3 +202,15 @@ test('card shows the approved intro under a small "이 PC 특징" label and drop
   assert.match(app,/description\?\.intro\|\|M\.cardFallbackIntro\(product,comparison\)/);
   assert.doesNotMatch(app,/const featured=[^\n]*product\.reasons\[0\]/);
 });
+test('part build keeps server compat warnings (no cooler line) and drops non-text entries',()=>{
+ const change={ordinal:1,slot:'CPU',label:'CPU',quantity:1,before:{product_code:1,name:'A',price:100},after:{product_code:2,name:'B',price:150},delta:50};
+ const warn='쿨러 호환은 확인되지 않았습니다(이 PC 구성표에 따로 적힌 CPU 쿨러가 없습니다).';
+ const q=M.buildQuote({ok:true,base_code:12,base_price:1000,total:1050,changes:[change],warnings:[warn,3,'',null]},12);
+ assert.deepEqual(q.warnings,[warn]);
+ assert.deepEqual(M.buildQuote({ok:true,base_code:12,base_price:1000,total:1050,changes:[change]},12).warnings,[]);
+ assert.deepEqual(M.product({...product,build:{base_price:1000,changes:[change],warnings:[warn]}}).build.warnings,[warn]);
+ const o=M.buildOptions({ok:true,base_code:12,ordinal:1,total:1000,options:[],warnings:[warn]},12,1);
+ assert.deepEqual(o.warnings,[warn]);
+ const app=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+ assert.match(app,/p\.build\.warnings/);assert.match(app,/d\.warnings/);
+});

@@ -259,5 +259,45 @@ class MissingLineRules(unittest.TestCase):
         self.assertEqual(why[0], 'unknown')
 
 
+
+class MissingCoolerWarns(unittest.TestCase):
+    """쿨러 줄이 없거나 가상 줄(「기본 쿨러」)뿐인 PC: CPU 교체는 받되 쿨러 호환 미확인을 알린다."""
+    COOLER_RULE = dict(rule_key='cooler_socket', label='쿨러-CPU 소켓', slot='COOLER', field='socket_list',
+                       ref_slot='CPU', ref_field='socket', op='contains', part_types=[], null_ref_mode=None,
+                       ref_offset=None, detail_fmt=None)
+
+    def rules(self):
+        return RULES + [self.COOLER_RULE]
+
+    def test_cpu_swap_allowed_with_warning_when_cooler_line_missing(self):
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            res = b.quote(Conn(), 1000000, [dict(l) for l in BOM], [change(1, 102)], self.rules())
+        self.assertEqual(res['total'], 1050000)
+        self.assertEqual(res['warnings'], [b.WARNING_TEXT['COOLER']])
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            opts = b.options_for(Conn([102, 103]), [dict(l) for l in BOM], 1, self.rules())
+        self.assertEqual([o['product_code'] for o in opts['options']], [102])
+        self.assertEqual(opts['warnings'], [b.WARNING_TEXT['COOLER']])
+
+    def test_pseudo_cooler_line_counts_as_missing(self):
+        bom = [dict(l) for l in BOM] + [dict(ordinal=6, slot='COOLER', quantity=1, pseudo=True, product_code=None,
+                                             name='기본 쿨러', sale_price=None, status=None)]
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            res = b.quote(Conn(), 1000000, bom, [change(1, 102)], self.rules())
+        self.assertEqual(res['warnings'], [b.WARNING_TEXT['COOLER']])
+
+    def test_board_missing_is_still_refused(self):
+        bom = [dict(l) for l in BOM if l['slot'] != 'MB']
+        with patch.object(b, 'load_specs', return_value=SPECS), self.assertRaises(HTTPException) as e:
+            b.quote(Conn(), 1000000, bom, [change(1, 102)], self.rules())
+        self.assertIn('CPU-보드 소켓', e.exception.detail)
+        self.assertNotIn('쿨러', e.exception.detail)
+
+    def test_no_warning_when_cooler_rule_absent(self):
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            res = b.quote(Conn(), 1000000, [dict(l) for l in BOM], [change(1, 102)], RULES)
+        self.assertEqual(res['warnings'], [])
+
+
 if __name__ == '__main__':
     unittest.main()
