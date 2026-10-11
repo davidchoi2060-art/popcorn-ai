@@ -239,18 +239,27 @@ REPLY_NOT_PC = REPLY_ROLE_GUIDE
 REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. 궁금한 것이 있으면 무엇이든 물어보세요."
 # 게임 목록을 답한 턴의 마무리 -- 고른 게임으로 추천에 잇는다(2026-10-11).
 # 코덱스 1816 보강2 시안 문구(2026-10-11): 고를지 묻지 않고, 이어질 수 있다고만 알린다.
-# 잡담 답 끝의 PC 권유 문장(「혹시 컴퓨터 맞추실 생각 있으세요?」·「PC가 필요하시면 …」).
-_PC_PUSH = re.compile(r"(?:컴퓨터|PC|피시|견적|사양|업그레이드)")
-_SENTENCE = re.compile(r"[^.!?。？！]+[.!?。？！]?")
+# 잡담 답 속 AI 의 PC 권유 문장(「혹시 컴퓨터 맞추실 생각 있으세요?」·「PC가 필요하시면 …」).
+# 권유 = PC 낱말 «과» 권하는 말이 한 문장에 함께 있을 때다. PC 낱말만 있는 설명(「PC방에서
+# 친구들과 하기 좋아요」)은 걷지 않는다(코덱스 #141 검수: 낱말만 보면 정상 설명이 지워진다).
+_PC_WORD = re.compile(r"(?:컴퓨터|pc|피시|본체|견적|사양|업그레이드)", re.I)
+_PC_ASK = re.compile(r"(?:[?？]|생각\s*(?:있|이\s*있)|있으신가요|있으세요|어떠세요|어떨까요|드릴까요|볼까요"
+                     r"|알아보|살펴보|맞추|장만|구매|구입|필요하시면|필요하면|말씀해\s*주|추천해\s*드|도와\s*드)")
+_SENTENCE = re.compile(r"[^.!?。？！\n]+[.!?。？！]*\s*")
+
+
+def is_pc_push(sentence: str) -> bool:
+    return bool(_PC_WORD.search(sentence) and _PC_ASK.search(sentence))
 
 
 def drop_pc_push(reply: str) -> str:
-    """잡담 답의 «끝» 문장들 중 PC 권유를 걷는다. 다 걷히면 원문을 둔다(빈 말풍선 금지)."""
+    """잡담 답에서 AI 가 스스로 붙인 PC 권유 문장을 위치와 관계없이 걷는다.
+
+    권유는 서버가 상담에 한 번만 한다(아래 pc_offered). 전부 권유라 남는 것이 없으면 빈
+    문자열을 돌려주고, 부르는 쪽이 빈 말풍선 대신 기본 문장을 쓴다.
+    """
     parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
-    while len(parts) > 1 and _PC_PUSH.search(parts[-1]):
-        parts.pop()
-    out = "".join(parts).strip()
-    return out or (reply or "")
+    return "".join(p for p in parts if not is_pc_push(p)).strip()
 
 
 SMALLTALK_INVITE_AT = TS.SMALLTALK_ALLOW_MAX   # 잡담 3회차에 한 번만 PC 상담을 권한다
@@ -978,10 +987,12 @@ def _quick_response(body: ParseBody, reply: str, exceptions: list) -> dict:
             prev = None
     state = prev or TS.TalkState()
     turns = TS.clamp_turns((body.chat_flow or {}).get("smalltalk_turns"))
+    offered, declined = TS.flow_flags(body.chat_flow)
     return {
         "ok": True, "state": state.model_dump(), "missing": [], "dropped": [], "evidence": [],
         "reply": reply, "assumed": [], "pc_related": None, "constraints": _legacy_constraints(state),
-        "note": None, "chat_flow": TS.ChatFlow(smalltalk_turns=turns).model_dump(),
+        "note": None, "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=offered,
+                                                pc_declined=declined).model_dump(),
         "stage": TS.stage_for(turns), "answer": "", "sources": [], "narrowing": TS.NARROWING_WIDE,
         "answer_game_names": [], "answer_notice": None, "answer_filter": None,
         "answer_elapsed_sec": 0, "answer_error": None, "silent": False,
@@ -1171,6 +1182,13 @@ def parse_talk(body: ParseBody, request: Request):
     game_related = TA.is_game_related(text, vocab)
     prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
     turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
+    # PC 제안은 상담에 한 번, 거절하면 하지 않는다. 고객이 먼저 PC 를 물으면 거절을 푼다.
+    pc_offered, pc_declined = TS.flow_flags(body.chat_flow)
+    if TS.declines_pc(text):
+        pc_declined = True
+    elif pc is True:
+        pc_declined = False
+    may_offer = not pc_offered and not pc_declined
     reply = _reply_text(obj, pc, bool(state.usages), stage)
     ai_reply = reply      # 서버가 바꾸기 전 모델의 말 — 관리자 AI 답 점검이 본다
     if released and stage == TS.STAGE_PC:
@@ -1193,15 +1211,20 @@ def parse_talk(body: ParseBody, request: Request):
     if ((ans.answer or "").strip() and len(ans.game_names) >= 2
             and ans.narrowing == TS.NARROWING_WIDE and not released
             and pc is not True and stage in (TS.STAGE_PC, TS.STAGE_OPEN)):
-        # 같은 상담에서 이미 한 번 권했으면 되풀이하지 않는다(답만 보인다).
+        # 같은 상담에서 이미 한 번 권했거나 고객이 거절했으면 되풀이하지 않는다(답만 보인다).
+        # 흐름 상태가 없던 옛 화면을 위해 최근 이력의 같은 문장도 함께 본다.
         said = any(r == "assistant" and REPLY_GAME_PICK in t for r, t in history)
-        reply = "" if said else REPLY_GAME_PICK
+        reply = REPLY_GAME_PICK if may_offer and not said else ""
+        pc_offered = pc_offered or bool(reply)
     elif pc is False:
         # 지시해도 AI 가 잡담 끝에 「혹시 컴퓨터 맞추면서 …?」를 붙였다(2026-10-11 개발 서버, #140 배포 뒤).
-        # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 세 번째에 «한 번만» 서버 줄을 붙인다.
+        # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 잡담이 세 번 이어진 뒤 상담에
+        # «한 번만» 서버 줄을 붙인다. 거절했으면 붙이지 않는다.
         reply = drop_pc_push(reply)
-        if turns == SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
+        if may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
             reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
+            pc_offered = True
+        reply = reply or REPLY_SMALLTALK_EMPTY
     # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
     # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
     # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.
@@ -1309,7 +1332,8 @@ def parse_talk(body: ParseBody, request: Request):
         # 보낸다(state 왕복과 같은 방식). **TalkState 안이 아니라 형제 필드**다 --
         # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
         # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
-        "chat_flow": TS.ChatFlow(smalltalk_turns=turns).model_dump(),
+        "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
+                                 pc_declined=pc_declined).model_dump(),
         "stage": stage,
         # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
         # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,

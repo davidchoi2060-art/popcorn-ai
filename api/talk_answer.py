@@ -89,6 +89,13 @@ _RANK_REPEAT = re.compile(r"(인기\S*\s*순(으로|위)?(는|로는)?|순위로
 
 
 _DATA_EXCUSE = re.compile(r"[ \t]*[^.\n]*(?:제공된|주어진|받은|저희)\s*자료[^.\n]*(?:없|부족)[^.\n]*\.?")
+# 고객이 알아야 할 한계(최신 순위·기준일·확인하지 못한 수치)는 같은 모양이어도 지우지 않는다
+# (코덱스 #140 검수: 내부 자료 사정과 고객용 불확실성을 구분하지 않으면 중요한 한계까지 숨긴다).
+_CUSTOMER_LIMIT = re.compile(r"(?:최신|기준|시점|날짜|순위|확인(?:하지|할\s*수|이\s*어렵|되지)|달라질|바뀔)")
+
+
+def _drop_data_excuse(text: str) -> str:
+    return _DATA_EXCUSE.sub(lambda m: m.group(0) if _CUSTOMER_LIMIT.search(m.group(0)) else "", text)
 
 
 def tidy_game_list(body: str, facts: list) -> str:
@@ -117,7 +124,7 @@ def tidy_game_list(body: str, facts: list) -> str:
                 ln = ln[:m.start()].rstrip()
         kept.append(ln)
     # 「제공된 자료에는 … 없어」 같은 자료 사정 설명은 고객에게 하지 않는다(2026-10-11 개발 서버 실측)
-    return _DATA_EXCUSE.sub("", "\n".join(kept)).strip()
+    return _drop_data_excuse("\n".join(kept)).strip()
 
 
 # ── 1. DB 조회 계층 ────────────────────────────────────────────────────────

@@ -55,7 +55,7 @@ class NeverBlocked(unittest.TestCase):
         r = talk.parse_talk(talk.ParseBody(text='', state=prev,
                                            chat_flow={'smalltalk_turns': 2}), request=None)
         self.assertEqual(r['state']['budget_won'], 800000)
-        self.assertEqual(r['chat_flow'], {'smalltalk_turns': 2})
+        self.assertEqual(r['chat_flow'], {'smalltalk_turns': 2, 'pc_offered': False, 'pc_declined': False})
 
     def test_very_long_text_is_read_not_rejected(self):
         long = '배그 하고 예산은 150만원이에요. ' + '설명이 깁니다. ' * 300
@@ -82,26 +82,28 @@ class NeverBlocked(unittest.TestCase):
         for turns in (4, 5, 9):
             with self.subTest(turns=turns):
                 r = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai({'pc': False, 'state': {}, 'reply': '맛있는 걸 드세요!'}),
-                               chat_flow={'smalltalk_turns': turns})
+                               chat_flow={'smalltalk_turns': turns, 'pc_offered': True})
                 self.assertFalse(r['silent'])
                 self.assertTrue(r['reply'].strip())
-                # 사장님 2026-10-11 「너무 강제하면 짜증스럽다」: 4회차부터는 권유 줄을 붙이지 않는다.
+                # 사장님 2026-10-11 「너무 강제하면 짜증스럽다」: 이미 한 번 권했으면 다시 붙이지 않는다.
                 self.assertEqual(r['reply'], '맛있는 걸 드세요!')
                 self.assertNotIn('여기까지만', r['reply'])
                 if r['stage'] == TS.STAGE_SILENT:
                     self.assertIn('smalltalk_long', r['exceptions'])
 
     def test_smalltalk_invites_to_pc_only_once(self):
-        """잡담 1·2회차는 답만, 3회차에 한 번만 PC 상담 한 줄."""
-        seen = []
-        for prev in (0, 1, 2, 3, 4):
+        """잡담 1·2회차는 답만, 3회차에 한 번만 PC 상담 한 줄. 화면처럼 받은 흐름 상태를 되돌려 보낸다."""
+        seen, flow = [], {'smalltalk_turns': 0}
+        for _ in range(5):
             r = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai({'pc': False, 'state': {}, 'reply': '김치찌개 어떠세요?'}),
-                           chat_flow={'smalltalk_turns': prev})
+                           chat_flow=flow)
             seen.append(TX.NOTE_SMALLTALK_LONG in r['reply'])
+            flow = r['chat_flow']
         self.assertEqual(seen, [False, False, True, False, False])
 
     def test_smalltalk_empty_model_reply_does_not_cut_off(self):
-        r = _parse_raw('그냥 심심해서 들어왔어요', raw_ai=_ai({'pc': False, 'state': {}, 'reply': ''}), chat_flow={'smalltalk_turns': 3})
+        r = _parse_raw('그냥 심심해서 들어왔어요', raw_ai=_ai({'pc': False, 'state': {}, 'reply': ''}),
+                       chat_flow={'smalltalk_turns': 3, 'pc_offered': True})
         self.assertEqual(r['reply'], talk.REPLY_SMALLTALK_EMPTY)
 
 
@@ -249,7 +251,8 @@ class PopularGamesAnswer(unittest.TestCase):
         self.assertEqual(TA.tidy_game_list('발로란트는 팀 단위 총싸움 게임이에요.', self.facts()),
                          '발로란트는 팀 단위 총싸움 게임이에요.')
 
-    def test_game_list_turn_ends_with_pick_line(self, history=None):
+    def test_game_list_turn_ends_with_pick_line(self, history=None, chat_flow=None,
+                                               text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?'):
         result = SimpleNamespace(text=_ai({'pc': False, 'state': {}, 'missing': ['usages'],
                                            'reply': '혹시 특정 장르나 게임 스타일이 있으신가요?'}),
                                  provider='t', model='t', tokens_in=1, elapsed_sec=0.1)
@@ -263,10 +266,10 @@ class PopularGamesAnswer(unittest.TestCase):
             st.enter_context(patch.object(talk.TA, 'run_parallel', lambda a, b: (result, ans)))
             st.enter_context(patch.object(talk.TA, 'is_game_related', lambda *a: True))
             st.enter_context(patch.object(talk, '_record_hit', lambda *a, **k: None))
-            r = talk.parse_talk(talk.ParseBody(text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?',
-                                               history=history or []), request=None)
+            r = talk.parse_talk(talk.ParseBody(text=text, history=history or [], chat_flow=chat_flow),
+                                request=None)
         self.assertEqual(r['answer'], '- 리그 오브 레전드: 팀 대전')
-        if history:
+        if history or chat_flow:
             return r
         self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
 
@@ -429,8 +432,6 @@ class PromptCarriesExceptionGuide(unittest.TestCase):
         self.assertIn('일반 AI', talk.EXCEPTION_BLOCK)
 
 
-if __name__ == '__main__':
-    unittest.main()
 
 
 class NoPcPush(unittest.TestCase):
@@ -450,3 +451,85 @@ class NoPcPush(unittest.TestCase):
         self.assertEqual(r1['reply'], '김치찌개 어떠세요?')
         r3 = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai(ai), chat_flow={'smalltalk_turns': 2})
         self.assertEqual(r3['reply'], '김치찌개 어떠세요? ' + TX.NOTE_SMALLTALK_LONG)
+
+
+class PcOfferOnceAndDecline(unittest.TestCase):
+    """코덱스 #140·#141 검수(2026-10-11): PC 제안은 상담 전체에서 한 번, 거절하면 다시 권하지 않는다.
+
+    이력 창(최근 6개)이 아니라 화면이 왕복하는 chat_flow 로 판단한다 -- 아래는 화면처럼 응답의
+    chat_flow 를 다음 요청에 그대로 넘긴다.
+    """
+
+    def _talk(self, text, flow, reply='그것도 좋네요.', pc=False):
+        return _parse_raw(text, raw_ai=_ai({'pc': pc, 'state': {}, 'reply': reply}), chat_flow=flow)
+
+    def test_counter_reset_by_pc_question_does_not_bring_a_second_offer(self):
+        flow, offers = {'smalltalk_turns': 0}, 0
+        for text in ['심심해', '비 오네', '주말 뭐 하지']:
+            r = self._talk(text, flow); flow = r['chat_flow']; offers += TX.NOTE_SMALLTALK_LONG in r['reply']
+        self.assertEqual(offers, 1)
+        self.assertTrue(flow['pc_offered'])
+        r = self._talk('게임용 PC 150만원', flow, reply='찾아볼게요.', pc=True); flow = r['chat_flow']
+        self.assertEqual(flow['smalltalk_turns'], 0)
+        for text in ['고양이 이름', '오늘 날씨', '점심 메뉴', '저녁 메뉴']:
+            r = self._talk(text, flow); flow = r['chat_flow']
+            self.assertNotIn(TX.NOTE_SMALLTALK_LONG, r['reply'])
+
+    def test_decline_stops_the_offer(self):
+        r = self._talk('PC는 나중에 볼게요', {'smalltalk_turns': 0}); flow = r['chat_flow']
+        self.assertTrue(flow['pc_declined'])
+        for text in ['심심해', '비 오네', '주말 뭐 하지', '고양이 이름']:
+            r = self._talk(text, flow); flow = r['chat_flow']
+            self.assertNotIn(TX.NOTE_SMALLTALK_LONG, r['reply'])
+        self.assertFalse(flow['pc_offered'])
+
+    def test_decline_also_stops_the_game_pick_line(self):
+        r = PopularGamesAnswer().test_game_list_turn_ends_with_pick_line(
+            chat_flow={'smalltalk_turns': 0, 'pc_declined': True})
+        self.assertEqual(r['reply'], '')
+        self.assertNotIn('특정 장르', r['reply'])
+
+    def test_game_pick_counts_as_the_one_offer_beyond_the_history_window(self):
+        r = PopularGamesAnswer().test_game_list_turn_ends_with_pick_line(chat_flow={'smalltalk_turns': 0})
+        self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
+        flow = r['chat_flow']; self.assertTrue(flow['pc_offered'])
+        again = PopularGamesAnswer().test_game_list_turn_ends_with_pick_line(chat_flow=flow, history=[])
+        self.assertEqual(again['reply'], '')
+        for text in ['심심해', '비 오네', '주말 뭐 하지']:
+            r = self._talk(text, flow); flow = r['chat_flow']
+            self.assertNotIn(TX.NOTE_SMALLTALK_LONG, r['reply'])
+
+    def test_asking_about_pc_lifts_the_decline(self):
+        r = self._talk('PC는 나중에요', {'smalltalk_turns': 0}); flow = r['chat_flow']
+        r = self._talk('아니다 게임용 PC 보여줘', flow, reply='찾아볼게요.', pc=True)
+        self.assertFalse(r['chat_flow']['pc_declined'])
+
+    def test_screen_values_are_not_trusted_unless_true(self):
+        r = self._talk('심심해', {'smalltalk_turns': 2, 'pc_offered': 'yes', 'pc_declined': 1})
+        self.assertIn(TX.NOTE_SMALLTALK_LONG, r['reply'])
+
+    def test_ai_push_only_reply_falls_back_without_a_push(self):
+        r = self._talk('심심해', {'smalltalk_turns': 0}, reply='혹시 PC 맞추실 생각 있으세요?')
+        self.assertEqual(r['reply'], talk.REPLY_SMALLTALK_EMPTY)
+
+
+class PcPushByIntent(unittest.TestCase):
+    """권유 = PC 낱말 + 권하는 말. PC 낱말만 있는 설명은 남긴다(코덱스 #141 검수)."""
+
+    def test_plain_pc_mention_kept_even_at_the_end(self):
+        s = '비 오는 날엔 실내가 좋아요. PC방에서 친구들과 게임하는 것도 재밌어요.'
+        self.assertEqual(talk.drop_pc_push(s), s)
+
+    def test_single_push_sentence_removed(self):
+        self.assertEqual(talk.drop_pc_push('PC 맞출 생각 있으세요?'), '')
+
+    def test_push_in_the_middle_removed(self):
+        self.assertEqual(talk.drop_pc_push('국수 좋아요. 컴퓨터 필요하시면 말씀해 주세요. 맛있게 드세요!'),
+                         '국수 좋아요. 맛있게 드세요!')
+
+    def test_lowercase_and_newline(self):
+        self.assertEqual(talk.drop_pc_push('산책도 좋아요\n혹시 pc 견적도 알아볼까요'), '산책도 좋아요')
+
+
+if __name__ == '__main__':
+    unittest.main()
