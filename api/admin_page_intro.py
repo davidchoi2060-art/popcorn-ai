@@ -395,6 +395,14 @@ BACK_LINKS: dict[str, dict] = {
         "entries": (("후기 관리", "/admin2/member-reviews"),),
         "crumb_on_hub": False,
     },
+    # 결제·정산 기록장(2026-10-11 사장님 「기록장」 확정). 주문 운영 화면에 들어가는 링크를 둔다.
+    "/admin2/commerce-orders": {
+        "label": "주문 운영으로 돌아가기",
+        "group": "주문 운영",
+        "from": ("/admin2/payment-records",),
+        "entries": (("결제·정산 기록", "/admin2/payment-records"),),
+        "crumb_on_hub": False,
+    },
 }
 
 

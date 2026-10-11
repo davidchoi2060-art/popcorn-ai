@@ -1,0 +1,520 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+{#  결제·정산 기록장(ADM-PAY-020) — 2026-10-11 사장님 「기록장」 · 「표시만」 확정. 문구는 코덱스 1813 후보.
+    · 관리자가 은행·PG·쇼핑몰에서 확인한 거래를 적는다. 시스템은 기관과 대조하지 않는다.
+    · 「입금 완료」·「정산 완료」·「월 마감 완료」를 쓰지 않는다 — 저장은 기록일 뿐 거래 확정이 아니다.
+    · 숫자는 서버 응답만 쓴다. 못 불러오면 「—」와 이유를 적는다(0 은 「없다」는 주장).
+    · 옛 계산은 참고 영역에만 둔다. 기록 입력값을 자동으로 채우지 않는다. #}
+
+{% block title %}결제·정산 기록장{% endblock %}
+
+{% block head_extra %}
+<style>
+.pr-wrap [hidden],.pr-dialog [hidden]{display:none!important}
+.pr-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px;max-width:1080px}
+.pr-head h1{margin:0;font:700 22px/1.35 var(--rv-font);color:var(--rv-ink)}
+.pr-head p{margin:4px 0 0;font:400 13px/1.6 var(--rv-font);color:var(--rv-muted)}
+.pr-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pr-bar label{font:500 12.5px/1.2 var(--rv-font);color:var(--rv-muted);display:flex;align-items:center;gap:6px}
+.pr-input{border:1px solid rgba(0,0,0,.18);border-radius:6px;padding:6px 8px;font:400 13px/1.3 var(--rv-font);
+    color:var(--rv-ink);background:var(--rv-card);min-width:0}
+.pr-chip{border:1px solid rgba(0,0,0,.14);background:var(--rv-card);border-radius:16px;padding:5px 12px;
+    font:500 12.5px/1.2 var(--rv-font);color:var(--rv-ink);cursor:pointer}
+.pr-chip[aria-pressed=true]{background:var(--rv-ink);border-color:var(--rv-ink);color:var(--rv-card)}
+.pr-btn{border:1px solid rgba(0,0,0,.16);background:var(--rv-card);border-radius:6px;padding:6px 12px;
+    font:600 12px/1.2 var(--rv-font);color:var(--rv-ink);cursor:pointer}
+.pr-btn.primary{background:var(--rv-ink);border-color:var(--rv-ink);color:var(--rv-card)}
+.pr-btn.danger{color:var(--rv-red);border-color:var(--rv-red)}
+.pr-btn:disabled{opacity:.45;cursor:default}
+.pr-chip:focus-visible,.pr-btn:focus-visible,.pr-input:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
+.pr-push{margin-left:auto}
+.pr-sec{font:700 14px/1.4 var(--rv-font);color:var(--rv-ink);margin:4px 0 0}
+.pr-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pr-kpi{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 14px}
+.pr-kpi span{display:block;font:400 12px/1.4 var(--rv-font);color:var(--rv-muted)}
+.pr-kpi b{font:700 19px/1.3 var(--font-num,var(--rv-font));color:var(--rv-ink)}
+.pr-kpi small{font:400 12px/1 var(--rv-font);color:var(--rv-faint);margin-left:3px}
+.pr-kpi.warn b{color:var(--rv-red)}
+.pr-note{margin:0;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.pr-review{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 14px;
+    display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;font:400 13px/1.55 var(--rv-font);color:var(--rv-ink)}
+.pr-review .alert{color:var(--rv-red);font-weight:600}
+.pr-list{display:flex;flex-direction:column;gap:8px}
+.pr-item{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.pr-item.off{opacity:.7}
+.pr-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font:400 12.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.pr-amt{font:700 16px/1.3 var(--font-num,var(--rv-font));color:var(--rv-ink)}
+.pr-tag{border:1px solid rgba(0,0,0,.14);border-radius:10px;padding:1px 8px;font-size:11.5px;color:var(--rv-ink);background:var(--rv-canvas)}
+.pr-tag.warn{border-color:var(--rv-red);color:var(--rv-red)}
+.pr-tag.off{color:var(--rv-faint)}
+.pr-dl{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 12px;margin:0;font:400 12.5px/1.5 var(--rv-font)}
+.pr-dl dt{color:var(--rv-muted)}
+.pr-dl dd{margin:0;color:var(--rv-ink);overflow-wrap:anywhere}
+.pr-allocs{margin:0;padding:0;list-style:none;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-ink)}
+.pr-allocs li{display:flex;gap:8px}
+.pr-allocs .num{font-family:var(--font-num,var(--rv-font));margin-left:auto}
+.pr-diff{margin:0;padding:6px 10px;border-radius:6px;background:var(--rv-amber-bg);font:400 12.5px/1.5 var(--rv-font);color:var(--rv-ink)}
+.pr-acts{display:flex;flex-wrap:wrap;gap:8px}
+.pr-empty{background:var(--rv-card);border:1px dashed rgba(0,0,0,.16);border-radius:8px;padding:22px;text-align:center;
+    font:400 13px/1.6 var(--rv-font);color:var(--rv-muted)}
+.pr-empty.err{border-style:solid;border-color:var(--rv-red);color:var(--rv-red)}
+.pr-ref{background:var(--rv-canvas);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+.pr-ref h2{margin:0;font:700 13.5px/1.4 var(--rv-font);color:var(--rv-ink)}
+.pr-ref .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.pr-ref .box{background:var(--rv-card);border:1px solid rgba(0,0,0,.08);border-radius:6px;padding:8px 12px;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-ink)}
+.pr-ref .box b{display:block;font:600 12.5px/1.5 var(--rv-font)}
+.pr-dialog{border:0;border-radius:10px;padding:0;width:min(640px,calc(100vw - 24px));max-height:calc(100vh - 32px);background:var(--rv-card);color:var(--rv-ink)}
+.pr-dialog::backdrop{background:rgba(0,0,0,.35)}
+.pr-form{display:flex;flex-direction:column;gap:10px;padding:18px 20px}
+.pr-form h2{margin:0;font:700 16px/1.4 var(--rv-font)}
+.pr-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.pr-field{display:flex;flex-direction:column;gap:4px;font:500 12.5px/1.3 var(--rv-font);color:var(--rv-muted)}
+.pr-field.full{grid-column:1/-1}
+.pr-hint{margin:0;font:400 12px/1.5 var(--rv-font);color:var(--rv-muted)}
+.pr-hint.warn{color:var(--rv-red)}
+.pr-arow{display:grid;grid-template-columns:minmax(0,1fr) 140px auto;gap:6px;align-items:center}
+.pr-found{font:400 12px/1.5 var(--rv-font);color:var(--rv-muted);grid-column:1/-1}
+.pr-foot{display:flex;justify-content:flex-end;gap:8px;padding-top:4px}
+.pr-ver{border-top:1px solid rgba(0,0,0,.08);padding-top:8px;display:flex;flex-direction:column;gap:4px;font:400 12.5px/1.55 var(--rv-font)}
+@media (max-width:768px){
+  .pr-wrap{padding:12px 12px 24px}
+  .pr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pr-dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pr-ref .grid,.pr-grid{grid-template-columns:minmax(0,1fr)}
+  .pr-push{margin-left:0}
+  .pr-arow{grid-template-columns:minmax(0,1fr) 110px auto}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pr-wrap" data-screen-id="ADM-PAY-020" data-domain="payment-records">
+  <header class="pr-head">
+    <h1>결제·정산 기록장</h1>
+    <p>관리자가 은행·PG에서 확인한 내용을 적는 기록장입니다. 실제 거래 상태는 해당 기관의 기록으로 확인해 주세요. 기록해도 주문·결제·환불 상태는 바뀌지 않습니다.</p>
+  </header>
+
+  <div class="pr-bar" data-keep="1">
+    <label>기관 거래일 월 <input type="month" class="pr-input" id="prMonth"></label>
+    <div role="group" aria-label="기록 종류로 거르기" class="pr-bar">
+      <button type="button" class="pr-chip" data-kind="" aria-pressed="true">전체</button>
+      <button type="button" class="pr-chip" data-kind="deposit" aria-pressed="false">입금 확인</button>
+      <button type="button" class="pr-chip" data-kind="settlement" aria-pressed="false">정산 내역</button>
+      <button type="button" class="pr-chip" data-kind="refund" aria-pressed="false">환불 출금</button>
+    </div>
+    <button type="button" class="pr-btn pr-push" id="prReload">새로고침</button>
+    <button type="button" class="pr-btn primary" id="prAdd" data-write="1">거래 기록 추가</button>
+  </div>
+
+  <h2 class="pr-sec">기관 거래일 기준 월별 합계(KST) · 관리자 기록 기준 합계</h2>
+  <section class="pr-kpis" aria-label="월별 합계">
+    <div class="pr-kpi"><span>입금 확인</span><b id="kDeposit">—</b><small>원</small><span id="kDepositN"></span></div>
+    <div class="pr-kpi"><span>정산 내역</span><b id="kSettle">—</b><small>원</small><span id="kSettleN"></span></div>
+    <div class="pr-kpi"><span>환불 출금</span><b id="kRefund">—</b><small>원</small><span id="kRefundN"></span></div>
+    <div class="pr-kpi" id="kDiffBox"><span>미해결 차이</span><b id="kDiff">—</b><small>건</small><span id="kNoRef"></span></div>
+  </section>
+  <p class="pr-note">은행·PG 대사는 확인하지 않았습니다. 철회한 기록은 합계에서 빠집니다.</p>
+
+  <div class="pr-review" id="prReview" aria-live="polite">불러오는 중입니다.</div>
+
+  <div class="pr-list" id="prList" aria-live="polite"><div class="pr-empty">불러오는 중입니다.</div></div>
+  <p class="pr-note" id="prPage"></p>
+
+  <section class="pr-ref" aria-label="옛 계산 참고">
+    <h2>옛 계산 기준 참고 금액 · 실제 은행·PG 금액 아님</h2>
+    <div class="grid" id="prRef"><div class="box">불러오는 중입니다.</div></div>
+    <p class="pr-note">옛 계산은 결제일을 UTC 날짜로 묶고 카드 수수료율을 곱한 값입니다. 새 주문은 옛 계산에 들어가지 않습니다. 이 숫자로 기록을 자동으로 채우지 않습니다.</p>
+  </section>
+</div>
+
+<dialog class="pr-dialog" id="prDialog" aria-labelledby="prDlgTitle">
+  <form class="pr-form" id="prForm" method="dialog" novalidate>
+    <h2 id="prDlgTitle">거래 기록 추가</h2>
+    <p class="pr-hint" id="prDlgLead">은행·PG·쇼핑몰에서 확인한 거래 1건을 적습니다.</p>
+    <div class="pr-grid" id="prFields">
+      <label class="pr-field">기록 종류
+        <select class="pr-input" name="kind">
+          <option value="deposit">입금 확인</option>
+          <option value="settlement">정산 내역</option>
+          <option value="refund">환불 출금</option>
+        </select></label>
+      <label class="pr-field">확인한 곳
+        <select class="pr-input" name="source">
+          <option value="bank">은행</option>
+          <option value="pg">PG</option>
+          <option value="mall">쇼핑몰</option>
+        </select></label>
+      <label class="pr-field">기관명 <input class="pr-input" name="institution" maxlength="60" autocomplete="off"></label>
+      <label class="pr-field">거래 참고번호 <input class="pr-input" name="external_ref" maxlength="120" autocomplete="off"></label>
+      <label class="pr-field">금액(원) <input class="pr-input" name="amount" type="number" min="1" step="1" inputmode="numeric"></label>
+      <span></span>
+      <label class="pr-field">기관 거래일 <input class="pr-input" name="occurred_on" type="date"></label>
+      <label class="pr-field">관리자 확인일 <input class="pr-input" name="confirmed_on" type="date"></label>
+      <label class="pr-field full">메모 <input class="pr-input" name="memo" maxlength="300" autocomplete="off"></label>
+      <p class="pr-hint warn full" id="prRefWarn" hidden>참고번호가 없어 중복 여부를 확인하기 어렵습니다.</p>
+      <div class="pr-field full">연결 주문 · 주문별 배분 금액
+        <div id="prAllocs" style="display:flex;flex-direction:column;gap:6px"></div>
+        <div><button type="button" class="pr-btn" id="prAddAlloc">주문 연결 추가</button></div>
+        <p class="pr-hint" id="prAllocSum"></p>
+      </div>
+    </div>
+    <label class="pr-field" id="prReasonWrap" hidden>사유 <input class="pr-input" name="reason" maxlength="300" autocomplete="off"></label>
+    <p class="pr-hint warn" id="prFormErr" role="alert" hidden></p>
+    <div class="pr-foot">
+      <button type="button" class="pr-btn" id="prCancel">취소</button>
+      <button type="submit" class="pr-btn primary" id="prSubmit">저장</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="pr-dialog" id="prHist" aria-labelledby="prHistTitle">
+  <div class="pr-form">
+    <h2 id="prHistTitle">기록 이력</h2>
+    <div id="prHistBody">불러오는 중입니다.</div>
+    <div class="pr-foot"><button type="button" class="pr-btn" id="prHistClose">닫기</button></div>
+  </div>
+</dialog>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  var DASH = '—';
+  var API = '/api/admin/payment-records';
+  var data = null, loadErr = '', kind = '', mode = null, target = null, busy = false;
+  var $ = function (id) { return document.getElementById(id); };
+  var monthIn = $('prMonth'), list = $('prList'), dlg = $('prDialog'), form = $('prForm');
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function won(n) { return n == null ? DASH : Number(n).toLocaleString('ko-KR'); }
+  function shell() { return window.Admin2Shell || null; }
+  function toast(msg, k) { var s = shell(); if (s && s.toast) s.toast(msg, k); }
+  function canWrite() {
+    if (data && data.can_write === false) return false;
+    var s = shell();
+    return !!(s && s.canWrite && s.canWrite('operator'));
+  }
+  function errText(res, j) {
+    var d = j && j.detail;
+    if (typeof d === 'string') return d;
+    if (Array.isArray(d)) return d.map(function (x) { return (x.loc || []).slice(-1)[0] + ': ' + x.msg; }).join(' · ');
+    if (d && (d.detail || d.error)) return d.detail || d.error;
+    return '오류 ' + res.status;
+  }
+  function day(iso) { return iso ? String(iso).slice(0, 10) : DASH; }
+  function when(iso) {
+    if (!iso) return DASH;
+    var d = new Date(iso);
+    if (isNaN(d)) return DASH;
+    return d.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+  function kstToday() {
+    return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+
+  function setKpi(id, v, nid, n) {
+    $(id).textContent = v;
+    if (nid) $(nid).textContent = n == null ? '' : n + '건';
+  }
+  function renderSummary() {
+    if (!data) {
+      ['kDeposit', 'kSettle', 'kRefund', 'kDiff'].forEach(function (id) { $(id).textContent = DASH; });
+      ['kDepositN', 'kSettleN', 'kRefundN', 'kNoRef'].forEach(function (id) { $(id).textContent = ''; });
+      return;
+    }
+    var k = data.summary.by_kind;
+    setKpi('kDeposit', won(k.deposit.amount), 'kDepositN', k.deposit.n);
+    setKpi('kSettle', won(k.settlement.amount), 'kSettleN', k.settlement.n);
+    setKpi('kRefund', won(k.refund.amount), 'kRefundN', k.refund.n);
+    $('kDiff').textContent = won(data.summary.unresolved_n);
+    $('kDiffBox').classList.toggle('warn', data.summary.unresolved_n > 0);
+    $('kNoRef').textContent = data.summary.no_ref_n ? '참고번호 없음 ' + data.summary.no_ref_n + '건' : '';
+  }
+
+  function renderReview() {
+    var box = $('prReview');
+    if (!data) { box.textContent = loadErr ? DASH : '불러오는 중입니다.'; return; }
+    var btn = '<button type="button" class="pr-btn pr-push" id="prReviewBtn" data-write="1"'
+      + (canWrite() ? '' : ' disabled title="운영자 이상 권한이 필요합니다"') + '>월별 기록 점검 완료 표시</button>';
+    var r = data.review;
+    if (!r) { box.innerHTML = '<span>이 달은 아직 월별 기록 점검을 하지 않았습니다.</span>' + btn; return; }
+    var changed = r.added_after + r.changed_after;
+    box.innerHTML = '<span class="pr-tag">월별 기록 점검 완료</span>'
+      + '<span>' + esc(when(r.reviewed_at)) + ' · ' + esc(r.reviewed_by) + (r.note ? ' · ' + esc(r.note) : '') + '</span>'
+      + '<span>점검 뒤 추가 기록 ' + won(r.added_after) + '건 · 정정·철회 ' + won(r.changed_after) + '건</span>'
+      + (changed ? '<span class="alert">점검 이후 기록이 바뀌었습니다. 다시 확인해 주세요.</span>' : '')
+      + btn;
+  }
+
+  function item(r) {
+    var dis = canWrite() ? '' : ' disabled title="운영자 이상 권한이 필요합니다"';
+    var allocs = r.allocations.length
+      ? '<ul class="pr-allocs">' + r.allocations.map(function (a) {
+          return '<li><span>주문 ' + esc(a.order_no) + (a.new_order ? ' <span class="pr-tag">새 주문</span>' : '') + '</span><span class="num">' + won(a.amount) + '원</span></li>';
+        }).join('') + '</ul>'
+      : '<p class="pr-note">연결 주문이 없습니다.</p>';
+    var diff = (!r.withdrawn && r.diff !== 0)
+      ? '<p class="pr-diff">미해결 차이: 거래 금액과 주문별 배분 합계가 다릅니다. (거래 ' + won(r.amount) + '원 · 배분 ' + won(r.alloc_total) + '원 · 차이 ' + won(r.diff) + '원)</p>'
+      : '';
+    var acts = r.withdrawn ? '' :
+      '<button type="button" class="pr-btn" data-act="correct" data-id="' + r.id + '" data-write="1"' + dis + '>정정 기록 남기기</button>'
+      + '<button type="button" class="pr-btn danger" data-act="withdraw" data-id="' + r.id + '" data-write="1"' + dis + '>기록 철회</button>';
+    return '<article class="pr-item' + (r.withdrawn ? ' off' : '') + '">'
+      + '<div class="pr-meta">'
+      + '<span class="pr-tag">' + esc(r.kind_ko) + '</span>'
+      + '<span class="pr-amt">' + (r.kind === 'refund' ? '−' : '') + won(r.amount) + '원</span>'
+      + '<span>' + esc(r.source_ko) + ' · ' + esc(r.institution) + '</span>'
+      + (r.withdrawn ? '<span class="pr-tag off">철회됨</span>' : '')
+      + (r.action === 'correct' ? '<span class="pr-tag">정정됨</span>' : '')
+      + (r.external_ref ? '' : '<span class="pr-tag warn">참고번호 없음</span>')
+      + '</div>'
+      + '<dl class="pr-dl">'
+      + '<div><dt>거래 참고번호</dt><dd>' + esc(r.external_ref || DASH) + '</dd></div>'
+      + '<div><dt>기관 거래일</dt><dd>' + esc(day(r.occurred_on)) + '</dd></div>'
+      + '<div><dt>관리자 확인일</dt><dd>' + esc(day(r.confirmed_on)) + '</dd></div>'
+      + '<div><dt>기록한 운영자</dt><dd>' + esc(r.recorded_by) + ' · ' + esc(when(r.recorded_at)) + '</dd></div>'
+      + '</dl>'
+      + (r.memo ? '<p class="pr-note">메모 · ' + esc(r.memo) + '</p>' : '')
+      + (r.reason ? '<p class="pr-note">' + (r.withdrawn ? '철회' : '정정') + ' 사유 · ' + esc(r.reason) + '</p>' : '')
+      + allocs + diff
+      + '<div class="pr-acts">' + acts
+      + '<button type="button" class="pr-btn" data-act="history" data-id="' + r.id + '">이력 보기</button></div>'
+      + '</article>';
+  }
+
+  function renderList() {
+    document.querySelectorAll('.pr-chip').forEach(function (c) {
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-kind') === kind));
+    });
+    $('prPage').textContent = '';
+    if (!data) {
+      list.innerHTML = '<div class="pr-empty' + (loadErr ? ' err' : '') + '">' + esc(loadErr || '불러오는 중입니다.') + '</div>';
+      return;
+    }
+    if (!data.records.length) {
+      list.innerHTML = '<div class="pr-empty">' + (kind ? '이 종류의 기록이 없습니다.' : '이 달의 거래 기록이 없습니다.') + '</div>';
+      return;
+    }
+    list.innerHTML = data.records.map(item).join('');
+    if (data.total > data.records.length) {
+      $('prPage').textContent = '전체 ' + won(data.total) + '건 중 ' + won(data.offset + 1) + '–' + won(data.offset + data.records.length) + '건을 보여 줍니다.';
+    }
+  }
+
+  function renderRef() {
+    var box = $('prRef');
+    var ref = data && data.reference;
+    if (!ref) { box.innerHTML = '<div class="box">' + (loadErr ? DASH : '불러오는 중입니다.') + '</div>'; return; }
+    if (ref.error) { box.innerHTML = '<div class="box">' + esc(ref.error) + '</div>'; return; }
+    var s = ref.saved, p = ref.pending;
+    box.innerHTML = '<div class="box"><b>저장된 계산 금액</b>'
+      + s.days + '일 · 결제 합계 ' + won(s.gross) + '원 · 수수료 ' + won(s.fee) + '원 · 순액 ' + won(s.net) + '원'
+      + (s.late_n ? '<br>저장 뒤 들어온 결제 ' + won(s.late_n) + '건은 들어 있지 않습니다.' : '')
+      + '<br>당시 수수료율은 기록되어 있지 않습니다.</div>'
+      + '<div class="box"><b>미마감 참고 계산</b>'
+      + p.days + '일 · 결제 합계 ' + won(p.gross) + '원 · 수수료 ' + won(p.fee) + '원 · 순액 ' + won(p.net) + '원'
+      + '<br>현재 수수료율 ' + (p.fee_rate * 100).toFixed(2) + '%로 계산했습니다.</div>';
+  }
+
+  function render() {
+    renderSummary(); renderReview(); renderList(); renderRef();
+    $('prAdd').disabled = !canWrite();
+    $('prAdd').title = canWrite() ? '' : '조회 권한입니다. 기록 작성·정정은 운영자 이상이 할 수 있습니다.';
+  }
+
+  function load() {
+    var q = '?month=' + encodeURIComponent(monthIn.value || '') + (kind ? '&kind=' + kind : '');
+    return fetch(API + q, { credentials: 'same-origin' })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.status === 401 ? '로그인이 필요합니다.' : '기록을 불러오지 못했습니다 — 오류 ' + res.status);
+        return res.json();
+      })
+      .then(function (d) { data = d; loadErr = ''; if (!monthIn.value) monthIn.value = d.month; render(); });
+  }
+  function reload() {
+    return load().catch(function (e) {
+      if (data) { toast('기록을 다시 불러오지 못했습니다. 새로고침해 주세요.', 'warn'); return; }
+      loadErr = (e && e.message) || '기록을 불러오지 못했습니다.';
+      render();
+    });
+  }
+
+  function post(url, body) {
+    return fetch(url, { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { res: res, j: j }; }); });
+  }
+
+  /* ---- 기록 입력 ---- */
+  function allocRow(no, amt) {
+    var row = document.createElement('div');
+    row.className = 'pr-arow';
+    row.innerHTML = '<input class="pr-input" data-a="no" placeholder="주문번호" autocomplete="off" value="' + esc(no || '') + '">'
+      + '<input class="pr-input" data-a="amt" type="number" min="1" step="1" inputmode="numeric" placeholder="배분 금액" value="' + esc(amt || '') + '">'
+      + '<button type="button" class="pr-btn" data-a="del">빼기</button>'
+      + '<span class="pr-found"></span>';
+    $('prAllocs').appendChild(row);
+    return row;
+  }
+  function allocs() {
+    return Array.prototype.map.call($('prAllocs').querySelectorAll('.pr-arow'), function (row) {
+      return { order_no: row.querySelector('[data-a=no]').value.trim(), amount: Number(row.querySelector('[data-a=amt]').value) };
+    }).filter(function (a) { return a.order_no || a.amount; });
+  }
+  function updateHints() {
+    var f = form.elements;
+    $('prRefWarn').hidden = mode === 'withdraw' || !!f.external_ref.value.trim();
+    var amt = Number(f.amount.value) || 0;
+    var sum = allocs().reduce(function (s, a) { return s + (a.amount || 0); }, 0);
+    $('prAllocSum').textContent = allocs().length
+      ? '배분 합계 ' + won(sum) + '원' + (sum !== amt ? ' · 거래 금액과 ' + won(amt - sum) + '원 차이가 있습니다. 그대로 저장하면 미해결 차이로 표시됩니다.' : ' · 거래 금액과 같습니다.')
+      : '연결 주문이 없으면 미해결 차이로 표시됩니다.';
+  }
+  var lookupTimer = null;
+  function lookup(row) {
+    var span = row.querySelector('.pr-found');
+    var q = row.querySelector('[data-a=no]').value.trim();
+    clearTimeout(lookupTimer);
+    if (q.length < 2) { span.textContent = ''; return; }
+    lookupTimer = setTimeout(function () {
+      fetch(API + '/orders?q=' + encodeURIComponent(q), { credentials: 'same-origin' })
+        .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+        .then(function (d) {
+          var hit = (d.items || []).filter(function (o) { return o.order_no === q; })[0];
+          if (hit) {
+            span.textContent = '주문 금액 ' + won(hit.total) + '원 · ' + hit.record_state + (hit.recorded_in ? ' (기록된 입금 ' + won(hit.recorded_in) + '원)' : '') + (hit.new_order ? ' · 새 주문' : '');
+          } else if ((d.items || []).length) {
+            span.textContent = '비슷한 주문번호: ' + d.items.slice(0, 3).map(function (o) { return o.order_no; }).join(', ');
+          } else {
+            span.textContent = '이 번호로 시작하는 주문이 없습니다.';
+          }
+        })
+        .catch(function () { span.textContent = '주문을 찾지 못했습니다(조회 실패).'; });
+    }, 250);
+  }
+
+  function openForm(m, rec) {
+    mode = m; target = rec || null;
+    form.reset();
+    $('prAllocs').innerHTML = '';
+    $('prFormErr').hidden = true;
+    var withdraw = m === 'withdraw';
+    $('prFields').hidden = withdraw;
+    $('prReasonWrap').hidden = m === 'create';
+    $('prDlgTitle').textContent = m === 'create' ? '거래 기록 추가' : (withdraw ? '기록 철회' : '정정 기록 남기기');
+    $('prDlgLead').textContent = m === 'create' ? '은행·PG·쇼핑몰에서 확인한 거래 1건을 적습니다.'
+      : withdraw ? '이 처리는 기록의 효력만 거두며 실제 거래를 취소하지 않습니다. 원래 기록은 이력에 남습니다.'
+      : '원래 기록은 지우지 않고 이력에 남깁니다. 고친 내용과 사유를 적어 주세요.';
+    $('prSubmit').textContent = withdraw ? '기록 철회' : '저장';
+    $('prSubmit').classList.toggle('danger', withdraw);
+    var f = form.elements;
+    if (rec) {
+      ['kind', 'source', 'institution', 'external_ref', 'amount', 'memo'].forEach(function (k) { f[k].value = rec[k] == null ? '' : rec[k]; });
+      f.occurred_on.value = day(rec.occurred_on); f.confirmed_on.value = day(rec.confirmed_on);
+      rec.allocations.forEach(function (a) { allocRow(a.order_no, a.amount); });
+    } else {
+      f.confirmed_on.value = kstToday();
+    }
+    updateHints();
+    dlg.showModal();
+  }
+
+  form.addEventListener('input', function (ev) {
+    var row = ev.target.closest('.pr-arow');
+    if (row && ev.target.getAttribute('data-a') === 'no') lookup(row);
+    updateHints();
+  });
+  $('prAllocs').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-a=del]');
+    if (b) { b.closest('.pr-arow').remove(); updateHints(); }
+  });
+  $('prAddAlloc').addEventListener('click', function () { allocRow().querySelector('input').focus(); updateHints(); });
+  $('prCancel').addEventListener('click', function () { dlg.close(); });
+
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (busy) return;
+    var f = form.elements, url, body;
+    if (mode === 'withdraw') {
+      url = API + '/' + target.id + '/withdraw'; body = { reason: f.reason.value.trim() };
+    } else {
+      body = { kind: f.kind.value, source: f.source.value, institution: f.institution.value.trim(),
+        external_ref: f.external_ref.value.trim() || null, amount: Number(f.amount.value) || 0,
+        occurred_on: f.occurred_on.value || null, confirmed_on: f.confirmed_on.value || null,
+        memo: f.memo.value.trim() || null, allocations: allocs() };
+      if (mode === 'correct') body.reason = f.reason.value.trim();
+      url = mode === 'correct' ? API + '/' + target.id + '/correct' : API;
+    }
+    busy = true; $('prSubmit').disabled = true;
+    post(url, body).then(function (x) {
+      busy = false; $('prSubmit').disabled = false;
+      if (!x.res.ok) { $('prFormErr').textContent = '저장하지 못했습니다: ' + errText(x.res, x.j); $('prFormErr').hidden = false; return; }
+      dlg.close();
+      toast(x.j.verdict || '확인 내용을 기록했습니다.', 'ok');
+      (x.j.warnings || []).forEach(function (w) { toast(w, 'warn'); });
+      reload();
+    }).catch(function () {
+      busy = false; $('prSubmit').disabled = false;
+      $('prFormErr').textContent = '저장하지 못했습니다: 네트워크 오류'; $('prFormErr').hidden = false;
+    });
+  });
+
+  /* ---- 이력 ---- */
+  function openHistory(id) {
+    $('prHistBody').textContent = '불러오는 중입니다.';
+    $('prHist').showModal();
+    fetch(API + '/' + id, { credentials: 'same-origin' })
+      .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
+      .then(function (d) {
+        var label = { create: '처음 기록', correct: '정정 기록', withdraw: '철회 기록' };
+        $('prHistBody').innerHTML = d.versions.map(function (v) {
+          return '<div class="pr-ver"><b>' + label[v.action] + '</b>'
+            + '<span>' + esc(when(v.recorded_at)) + ' · ' + esc(v.recorded_by) + '</span>'
+            + '<span>' + esc(v.kind_ko) + ' · ' + won(v.amount) + '원 · ' + esc(v.source_ko) + ' ' + esc(v.institution)
+            + ' · 참고번호 ' + esc(v.external_ref || DASH) + ' · 기관 거래일 ' + esc(day(v.occurred_on)) + '</span>'
+            + (v.allocations.length ? '<span>연결 주문 ' + v.allocations.map(function (a) { return esc(a.order_no) + ' ' + won(a.amount) + '원'; }).join(', ') + '</span>' : '')
+            + (v.reason ? '<span>사유 · ' + esc(v.reason) + '</span>' : '')
+            + '</div>';
+        }).join('');
+      })
+      .catch(function () { $('prHistBody').textContent = '이력을 불러오지 못했습니다.'; });
+  }
+  $('prHistClose').addEventListener('click', function () { $('prHist').close(); });
+
+  list.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-act]');
+    if (!b || b.disabled || !data) return;
+    var id = Number(b.getAttribute('data-id'));
+    var rec = data.records.filter(function (r) { return r.id === id; })[0];
+    var act = b.getAttribute('data-act');
+    if (act === 'history') openHistory(id);
+    else if (rec) openForm(act, rec);
+  });
+  $('prAdd').addEventListener('click', function () { if (canWrite()) openForm('create'); });
+
+  $('prReview').addEventListener('click', function (ev) {
+    var b = ev.target.closest('#prReviewBtn');
+    if (!b || b.disabled || !data) return;
+    b.disabled = true;
+    post(API + '/months/' + data.month + '/review', {}).then(function (x) {
+      if (!x.res.ok) { b.disabled = false; toast('표시하지 못했습니다: ' + errText(x.res, x.j), 'err'); return; }
+      toast(x.j.verdict || '월별 기록 점검 완료로 표시했습니다.', 'ok');
+      reload();
+    }).catch(function () { b.disabled = false; toast('표시하지 못했습니다: 네트워크 오류', 'err'); });
+  });
+
+  document.querySelectorAll('.pr-chip').forEach(function (c) {
+    c.addEventListener('click', function () { kind = c.getAttribute('data-kind'); reload(); });
+  });
+  monthIn.addEventListener('change', reload);
+  $('prReload').addEventListener('click', reload);
+
+  var s = shell();
+  if (s && s.meReady) s.meReady.then(render, render);
+  reload();
+})();
+</script>
+{% endblock %}
