@@ -1,0 +1,5 @@
+{
+  "status": 200,
+  "len": 2000,
+  "head": "<!doctype html>\n<html lang=\"ko\">\n<head>\n  <meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n  <meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'\">\n  <title>팝콘AI · MVP3 PC 상담</title>\n  <link rel=\"stylesheet\" href=\"../shared/fonts/fonts.css\"><link rel=\"stylesheet\" href=\"styles.css\">\n  <script defer src=\"live-model.js\"></script><script defer src=\"api-client.js\"></script><script defer src=\"live-"
+}

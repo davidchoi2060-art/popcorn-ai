@@ -1,0 +1,63 @@
+{
+  "id": 101,
+  "kind": "재현·윈도우",
+  "visitor_key_prefix": "xbCXatMI",
+  "turns": [
+    {
+      "text": "QA-고객2 윈도우 깔려서 오나요?",
+      "sent_at": "2026-10-11T00:04:21.812Z",
+      "visitor_key_prefix": "xbCXatMI",
+      "parse": {
+        "status": 200,
+        "sec": 2.945,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "'윈도우 깔려서' = OS 포함 구성을 원함",
+            "용도·예산·게임·플랫폼이 아직 명확하지 않음"
+          ],
+          "reply": "네, 윈도우가 깔린 상태로 맞춰드릴 수 있습니다. 주로 어떤 용도로 쓰실 계획이세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.706,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null,
+      "cards": []
+    }
+  ],
+  "at": "2026-10-11T00:04:21.812Z"
+}

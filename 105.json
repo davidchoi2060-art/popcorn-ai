@@ -1,0 +1,62 @@
+{
+  "id": 105,
+  "kind": "재현·세금계산서",
+  "visitor_key_prefix": "xbCXatMI",
+  "turns": [
+    {
+      "text": "QA-고객2 세금계산서 발행 되나요?",
+      "sent_at": "2026-10-11T00:05:42.790Z",
+      "visitor_key_prefix": "xbCXatMI",
+      "parse": {
+        "status": 200,
+        "sec": 3.732,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "세금계산서 발행은 PC 견적·부품·가격과 무관한 거래 행정 사항"
+          ],
+          "reply": "세금계산서 발행 관련해서는 담당 부서에 문의하셔야 할 것 같아요. PC 구성이나 견적에 대해 궁금하신 점이 있으시면 말씀해 주세요.",
+          "assumed": [],
+          "pc_related": false,
+          "constraints": [],
+          "note": "PC 상담 문장이 아니라고 판정했습니다(잡담 1/3회).",
+          "chat_flow": {
+            "smalltalk_turns": 1
+          },
+          "stage": "open",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.691,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null,
+      "cards": []
+    }
+  ],
+  "at": "2026-10-11T00:05:42.790Z"
+}

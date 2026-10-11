@@ -1,0 +1,62 @@
+{
+  "id": 104,
+  "kind": "재현·법인카드",
+  "visitor_key_prefix": "xbCXatMI",
+  "turns": [
+    {
+      "text": "QA-고객2 법인카드로 결제 되나요?",
+      "sent_at": "2026-10-11T00:05:26.054Z",
+      "visitor_key_prefix": "xbCXatMI",
+      "parse": {
+        "status": 200,
+        "sec": 3.207,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "결제 수단·결제 방식은 PC 견적과 무관한 주제"
+          ],
+          "reply": "법인카드 결제 가능 여부는 결제 담당팀에 확인해 드릴게요. 먼저 어떤 PC가 필요하신지 알려주시겠어요?",
+          "assumed": [],
+          "pc_related": false,
+          "constraints": [],
+          "note": "PC 상담 문장이 아니라고 판정했습니다(잡담 1/3회).",
+          "chat_flow": {
+            "smalltalk_turns": 1
+          },
+          "stage": "open",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.318,
+          "stored": false
+        },
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null,
+      "cards": []
+    }
+  ],
+  "at": "2026-10-11T00:05:26.055Z"
+}

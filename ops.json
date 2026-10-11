@@ -1,0 +1,13 @@
+{
+  "status": 200,
+  "sec": 0.175,
+  "json": {
+    "member": "own",
+    "refund": "mall",
+    "ship": "mall",
+    "pay": "mall",
+    "settle": "mall"
+  },
+  "error": null,
+  "setCookie": null
+}
