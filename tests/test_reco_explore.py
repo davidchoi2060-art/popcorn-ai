@@ -268,7 +268,8 @@ class RecommendEndpointTest(unittest.TestCase):
         # 2026-10-11 개발 서버 「발로 100만원」: 예산 초과 한 장인데 「맞춰 볼게요」·「더 싼 PC나」라고 했다.
         d = self.call(TalkState(**GAME, budget_won=900000, budget_bound='이하'))
         self.assertEqual([c['id'] for c in d['choices'] if c['enabled']], ['better', 'change'])
-        self.assertEqual(d['talk_notes'], ['90만원 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요.',
+        # 얼마나 넘는지까지 말한다 -- 카드 줄(「예산보다 ○원 높아요」)과 같은 표현(2026-10-12).
+        self.assertEqual(d['talk_notes'], ['90만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 400,000원 높아요.',
                                            X.ASK_BETTER_ONLY])
 
     def test_ask_matches_the_enabled_buttons(self):
@@ -277,6 +278,8 @@ class RecommendEndpointTest(unittest.TestCase):
         self.assertEqual(X.ask_next(False, True), X.ASK_BETTER_ONLY)
         self.assertIsNone(X.ask_next(False, False))
         self.assertEqual(X.over_budget_sentence(1234500), '1,234,500원 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요.')
+        self.assertEqual(X.over_budget_sentence(1500000, 1624400),
+                         '150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.')
 
     def test_multi_pc_is_honest(self):
         d = self.call(TalkState(**GAME), text='직원용 PC 5대 사려고요')

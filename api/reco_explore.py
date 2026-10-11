@@ -284,10 +284,16 @@ ASK_CHEAPER_ONLY = "더 싼 PC도 보여 드릴까요? 아래에서 골라 주�
 ASK_BETTER_ONLY = "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
 
 
-def over_budget_sentence(budget_won: int) -> str:
-    """예산 안에 맞는 판매 PC가 없어 예산을 넘는 가장 싼 PC만 보일 때 — 카드 상태와 같은 말."""
+def over_budget_sentence(budget_won: int, nearest_won: int | None = None) -> str:
+    """예산 안에 맞는 판매 PC가 없어 예산을 넘는 가장 싼 PC만 보일 때 — 카드 상태와 같은 말.
+
+    가장 가까운 PC 값을 알면 얼마나 넘는지까지 말한다(2026-10-12 일반 AI 비교 두 번째 86개 「카드가 질문과 어긋남」:
+    예산을 넘는 카드가 붙는데 얼마나 넘는지는 카드 안 작은 줄에만 있었다). 금액 표현은 카드 줄과 같다(「예산보다 ○원 높아요」).
+    """
     man = budget_won // 10000
     amount = f"{man:,}만원" if budget_won % 10000 == 0 else f"{budget_won:,}원"
+    if nearest_won and nearest_won > budget_won:
+        return f"{amount} 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 {nearest_won - budget_won:,}원 높아요."
     return f"{amount} 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요."
 
 
