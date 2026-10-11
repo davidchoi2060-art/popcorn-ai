@@ -115,10 +115,52 @@ def ask_ours(text: str, state=None, chat_flow=None, history=None) -> dict:
                 "rate_limited_day": code == 429}
     answer, reply = (data.get("answer") or "").strip(), (data.get("reply") or "").strip()
     bubble = "" if data.get("silent") else "\n\n".join(x for x in (answer, reply) if x)
-    return {"ok": True, "text": bubble, "silent": bool(data.get("silent")),
+    # 화면(live-flow.js submit)은 조건이 다 차면 곧바로 추천을 불러 말풍선 «아래»에 상품 카드를 붙인다.
+    # 손님이 보는 것은 말풍선 + 카드다 -- 카드까지 우리 답에 넣는다(2026-10-11 사장님 기준).
+    cards = ""
+    st = data.get("state")
+    if (isinstance(st, dict) and not data.get("silent") and data.get("pc_related") is not False
+            and not data.get("fallback") and not data.get("missing")):
+        cards = recommend_cards(st, text)
+    return {"ok": True, "text": "\n\n".join(x for x in (bubble, cards) if x), "silent": bool(data.get("silent")),
+            "cards": bool(cards) and "[아래 상품 카드]" in cards,
             "handoff_offer": data.get("handoff_offer") is True, "pc_related": data.get("pc_related"),
             "answer_error": data.get("answer_error"), "elapsed_sec": data.get("elapsed_sec"),
             "_state": data.get("state"), "_chat_flow": data.get("chat_flow")}
+
+
+def _spec_line(spec) -> str:
+    if isinstance(spec, dict):
+        vals = [str(v) for v in spec.values() if isinstance(v, (str, int, float)) and str(v).strip()]
+    elif isinstance(spec, list):
+        vals = [str(v.get("value") or v.get("v") or "") if isinstance(v, dict) else str(v) for v in spec]
+    else:
+        vals = []
+    return " / ".join(v for v in vals if v)[:120]
+
+
+def recommend_cards(state: dict, text: str) -> str:
+    """POST /api/grid/recommend -- 화면과 같은 본문. 카드(이름·가격·사양)와 카드 뒤 안내 문장을 글로 옮긴다."""
+    code, data, _ = _post("/api/grid/recommend", {"state": state, "text": text[:300]})
+    if code != 200 or not isinstance(data, dict):
+        return "[상품 카드를 불러오지 못함: HTTP %s]" % code
+    lines = []
+    for cs in data.get("card_sets") or []:
+        if not isinstance(cs, dict) or cs.get("kind") != "sold":
+            continue
+        items = [i for i in cs.get("items") or [] if isinstance(i, dict) and i.get("name")]
+        if not items and (cs.get("empty_note") or cs.get("empty_reason")):
+            lines.append("(카드 없음: %s)" % (cs.get("empty_note") or cs.get("empty_reason")))
+        for i in items[:6]:
+            price = i.get("price")
+            spec = _spec_line(i.get("spec"))
+            lines.append("- %s · %s%s" % (i["name"], ("%s원" % format(price, ",")) if isinstance(price, int) else "가격 미정",
+                                           (" · " + spec) if spec else ""))
+    notes = [n for n in data.get("talk_notes") or [] if isinstance(n, str) and n.strip()]
+    if not lines and not notes:
+        return ""
+    head = "[아래 상품 카드]" if any(l.startswith("- ") for l in lines) else "[상품 카드 자리]"
+    return "\n".join([head] + lines + notes)
 
 
 def ours_for(q: dict) -> dict:
@@ -189,6 +231,12 @@ JUDGE_SYSTEM = """너는 PC 판매점 상담 품질 심사관이다. 같은 손�
 3. 실제로 답했는가 -- 질문에 직접 답했는가, 되묻기·회피로 끝나지 않았는가
 4. 헛소리·지어냄 없음 -- 모르는 것을 아는 척하지 않았는가
 5. 자연스러움 -- 사람과 대화하듯 자연스러운 한국어(또는 손님 언어)인가
+판매점 상담 답에는 말풍선 아래에 붙는 「상품 카드」 목록이 함께 적혀 있을 수 있다. 손님은 말풍선과 카드를 함께 본다.
+판매점 사장의 기준(그대로 적용한다):
+- 좋은 판매점 답 = 일반 AI 수준의 설명(구성·가격대·이유)이 위에 있고, 그 설명에 맞는 실제 상품 카드가 아래에 함께 나온다.
+- 되묻기만 하고 답을 미루면 판매점이 못한 것이다. 손님은 계속 되물으면 짜증을 낸다.
+- 카드가 설명 기준과 크게 어긋나면(예: "가장 저렴하게"에 비싼 카드) 감점이다. 크게 어긋나지 않으면 카드는 가점이다.
+- 구매 확정 뒤에도 상담사가 전화로 다시 컨설팅하므로, 답을 늦추는 확인 절차나 검증 단계를 요구하지 마라. 손님 눈에 보이는 결과만 비교한다.
 이 질문에서 좋은 답의 기준도 함께 주어진다. 판매점이 알 수 없는 주문·결제 사실을 일반 AI가 모른다고 하는 것은 감점이 아니다.
 판매점 답이 PC 상담으로 자연스럽게 이어 가는 것은 감점이 아니지만, 손님이 물은 것을 먼저 답하지 않으면 감점이다.
 한쪽 답이 비어 있으면 손님에게는 아무 말도 안 한 것이다.
