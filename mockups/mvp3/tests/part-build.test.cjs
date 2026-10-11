@@ -25,7 +25,7 @@ const options={ok:true,base_code:12,ordinal:1,slot:'RAM',label:'메모리',quant
   note:'호환 규칙을 모두 통과한 판매 중 부품만 보여 드려요.',
   options:[{product_code:503,name:'램 8GB',price:30000,price_diff:-60000,total:1240000},{product_code:502,name:'램 32GB',price:110000,price_diff:100000,total:1400000}]};
 
-function harness({quoteFail=false}={}){
+function harness({quoteFail=false,total=1400000}={}){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
@@ -39,7 +39,7 @@ function harness({quoteFail=false}={}){
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:
       url==='/api/grid/recommend'?reco:
       url==='/api/mvp3/build/options'?options:
-      url==='/api/mvp3/build/quote'?{ok:true,base_code:12,base_price:1300000,total:changes.length?1400000:1300000,changes:changes.length?[change]:[],compat:{ok:true}}:
+      url==='/api/mvp3/build/quote'?{ok:true,base_code:12,base_price:1300000,total:changes.length?total:1300000,changes:changes.length?[change]:[],compat:{ok:true}}:
       url==='/api/mvp3/saved-quotes'&&init.method==='POST'?{ok:true,quote:{id:qid,product:{...pc,price:1400000,build:{base_price:1300000,changes:[change]}},state:talkState,saved_at:'2026-10-11T00:00:00Z'}}:
       url.endsWith('/handoff')?{ok:true,handoff_no:'HO-4001',quote_id:qid,product_code:12,name:'PC 12',price_quoted:1300000,price_mall:1300000,mall_status:'확인됨',
         mall_url:'https://popcornpc.co.kr/shop/product_detail.html?pd_no=12',changes:[change]}:
@@ -126,4 +126,22 @@ test('a refused combination keeps the old price and says why; reset goes back to
     assert.equal(g.flow.state.selected.build,null);
     assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('상품참고금액1,300,000원'));
   }finally{g.close();}
+});
+
+test('the summary keeps the budget line after a change and judges it on the new total',async()=>{
+  const h=harness({total:1580300});try{await toDetail(h);const d=h.d;
+    const line=()=>d.querySelector('.final-summary-price p:last-child');
+    assert.equal(text(line()),'예산보다 200,000원 낮아요');assert.ok(line().classList.contains('green'));
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-build-option]'));
+    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    await until(()=>h.flow.state.selected.price===1580300);
+    const box=text(d.querySelector('.final-summary-price'));
+    assert.ok(box.includes('부품 1개를 바꾼 금액이에요 · 기본 구성 대비 +280,300원'),box);
+    assert.equal(text(line()),'예산보다 80,300원 높아요');assert.ok(line().classList.contains('warn-text'));
+    d.querySelector('[data-action=build-reset]').click();
+    await until(()=>h.flow.state.selected.price===1300000);
+    assert.equal(text(line()),'예산보다 200,000원 낮아요');assert.ok(line().classList.contains('green'));
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
 });
