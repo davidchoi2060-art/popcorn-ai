@@ -77,12 +77,16 @@
   // 바꾼 결과는 선택한 상품의 build(기준 판매가 · 바꾼 줄)와 price(서버가 다시 계산한 합계)에 둔다.
   function emptyBuild(){return {ordinal:null,data:null,error:''};}
   function changesOf(p){return (p?.build?.changes||[]).map(c=>({ordinal:c.ordinal,product_code:c.after.product_code}));}
+  const GREETING='안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.';
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
+    // keepCurrent: 2차 대화 화면(talk.html). 고객이 고른 구성(지금 견적)은 새 조건·새 추천이 와도 지우지 않고,
+    // 고객이 다른 구성을 고를 때만 바뀐다(코덱스 1816 보강3 §5). 1차 화면은 지금처럼 새 조건에서 비운다.
+    const keepCurrent=options.keepCurrent===true;let proposalSeq=0;
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null,proposals:[]};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
     // 화면을 그릴 때마다 대화 상태를 이 탭에 남긴다. 보관이 막혀 있어도 상담은 그대로 간다.
     function remember(){try{conversation.write(conversationSnapshot(state));}catch{}}
@@ -97,12 +101,12 @@
       state.retry=retry;
     }
     function reset({restore=false}={}){
-      cancel();Object.assign(state,{restoredCurrent:null,screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
+      cancel();Object.assign(state,{restoredCurrent:null,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
         wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
-      message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');
+      message(GREETING);
       // restore: 처음 열 때만 이 탭에 남은 대화를 되살린다. 「새 상담」은 지운다.
       let saved=null;
       if(restore){try{saved=conversation.read();}catch{saved=null;}}
@@ -122,10 +126,14 @@
       const parsed=M.recommendations(response);
       state.recommendation=parsed;state.groups=parsed.groups;state.assumed=parsed.assumed;state.missing=parsed.needs;
       state.wants=parsed.wants;state.choices=parsed.choices;state.anchorCode=parsed.anchorCode;
+      // 이 추천이 어느 말 뒤에 나왔는지 남긴다. 대화 화면은 그 말풍선 아래에 카드를 붙이고, 지난 제안은
+      // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
+      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
       // What the server could and could not do with the request, then the follow-up question.
       for(const note of parsed.talkNotes){message(note);state.history.push({role:'assistant',text:note.slice(0,300)});}
       state.history=state.history.slice(-6);
-      state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.screen='results';
+      if(!keepCurrent){state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
+      state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
     async function submit(raw,{repeat=false}={}){
@@ -159,7 +167,8 @@
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
           savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
-        state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
+        if(!keepCurrent){state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
+        state.groups=[];state.recommendation=null;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.
         state.pendingText=(state.pendingText?state.pendingText+' / '+text:text).slice(-300);
@@ -460,5 +469,5 @@
     }
     return {state,reset,submit,refresh,resume,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow};
+  if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow,GREETING};
 })(typeof window==='undefined'?globalThis:window);

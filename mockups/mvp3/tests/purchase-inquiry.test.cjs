@@ -29,7 +29,7 @@ function harness(postReply){
   w.eval(read('live-flow.js'));
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,doc:w.document,get flow(){return flow;},calls,errors,close:()=>dom.window.close()};
 }
 function fill(h,values){

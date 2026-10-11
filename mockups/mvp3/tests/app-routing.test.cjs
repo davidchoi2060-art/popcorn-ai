@@ -33,7 +33,7 @@ function harness({hash='#welcome',respond=standard,journal=null}={}){
   w.eval(read('live-flow.js'));let flow;
   const factory=w.MVP3LiveFlow.createFlow;
   w.MVP3LiveFlow.createFlow=(api,options)=>flow=factory(api,{...options,uuid:()=>ID});
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   const h={dom,w,flow,calls,errors,input:w.document.querySelector('#request'),
     click(action){const button=w.document.querySelector('[data-action="'+action+'"]');assert.ok(button,'actual rendered action '+action);button.click();},
     postCount(){return calls.filter(c=>c.method==='POST').length;},

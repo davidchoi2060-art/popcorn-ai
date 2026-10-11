@@ -25,7 +25,7 @@ function harness(){
     calls.push({url,body:init.body?JSON.parse(init.body):null});
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:url==='/api/grid/recommend'?(recommends++?cheaper:first):{ok:true,quotes:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
-  }});w.eval(read('live-flow.js'));w.eval(read('app.js'));
+  }});w.eval(read('live-flow.js'));w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,errors,calls,close:()=>dom.window.close()};
 }
 async function ask(h,text){const d=h.w.document,input=d.querySelector('#request');input.value=text;input.dispatchEvent(new h.w.Event('input',{bubbles:true}));d.querySelector('#chat-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>d.querySelector('.live-product-card'));}

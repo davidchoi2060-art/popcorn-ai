@@ -18,7 +18,8 @@ REMOVED = (
 )
 CUSTOMER_FILES = ('api/talk.py', 'api/talk_answer.py', 'mockups/mvp3/app.js',
                   'mockups/mvp3/live-flow.js', 'mockups/mvp3/live-model.js',
-                  'mockups/mvp3/index.html', 'mockups/mvp2/app.js', 'mockups/mvp2/index.html')
+                  'mockups/mvp3/index.html', 'mockups/mvp3/talk.js', 'mockups/mvp3/talk.html',
+                  'mockups/mvp3/live-photo.js', 'mockups/mvp2/app.js', 'mockups/mvp2/index.html')
 
 
 class CopyRemovedTests(unittest.TestCase):

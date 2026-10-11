@@ -30,7 +30,7 @@ function harness(parseReply,recommendReply=()=>({status:200,data:{ok:true,card_s
   w.eval(read('live-flow.js'));
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,doc:w.document,get flow(){return flow;},calls,errors,close:()=>dom.window.close()};
 }
 const parsed=extra=>({data:{ok:true,state:talk,missing:[],assumed:[],reply:'사람 상담을 원하시면 아래 「사람 상담 남기기」에 연락처를 남겨 주세요.',...extra}});

@@ -38,7 +38,7 @@ function harness(){
   w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async url=>{
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:url==='/api/grid/recommend'?reco:{ok:true,quotes:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};}});
-  w.eval(read('live-flow.js'));w.eval(read('app.js'));
+  w.eval(read('live-flow.js'));w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,d:w.document,errors,close:()=>dom.window.close()};
 }
 const text=e=>e.textContent.replace(/\s+/g,' ').trim();

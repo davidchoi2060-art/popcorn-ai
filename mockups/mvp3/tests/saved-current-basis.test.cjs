@@ -45,7 +45,7 @@ function harness({hash='saved',quoteProduct=savedProduct,recommendItem=currentPr
   }});w.eval(read('live-flow.js'));
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,doc:w.document,get flow(){return flow;},calls,errors,quote,click:s=>w.document.querySelector(s).click(),close:()=>dom.window.close()};
 }
 // 렌더 뒤 남은 타이머가 닫힌 문서를 만지지 않게 한 박자 기다린 뒤 닫는다. 그 대기 중에 생긴 오류까지
