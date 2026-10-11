@@ -30,6 +30,27 @@
   // 가리는 것은 이 두 모양뿐이다 -- 전화번호·이메일·주소·이름은 가리지 않고, 보관은 이 탭 안 6시간이다.
   // 자르기 전에 가린다: 먼저 자르면 끝에 걸친 번호가 조각으로 남아 모양을 잃고 가려지지 않는다.
   function maskPersonal(t){return String(t).replace(/(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g,'[가림]').replace(/(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)/g,'[가림]');}
+  // 보내지 않은 입력 문장의 화면 간 인계(코덱스 #148 검수 P2 -- 2026-10-11). 처음 화면 <-> 대화 화면은 문서를
+  // 새로 열어 입력 칸이 비었다. 떠날 때 이 탭(sessionStorage)에만 잠깐 두고, 다음 화면이 한 번 읽고 바로 지운다.
+  // 주소(URL)에는 절대 싣지 않고 자동으로 보내지도 않는다 -- 입력 칸에 다시 채워 고객이 고쳐 보낼 수 있게만 한다.
+  const DRAFT_KEY='popcorn-mvp3-draft-handoff-v1',DRAFT_TTL_MS=10*60*1000;
+  function createDraftHandoff(options={}){
+    let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
+    function target(){if(!resolved){storage=root.sessionStorage;resolved=true;}if(!storage)throw new Error('session storage');return storage;}
+    return {
+      // 빈 문장이면 남아 있던 인계를 지운다(보낸 뒤 비운 칸이 옛 문장을 되살리지 않게).
+      put(text,now=Date.now()){
+        try{const t=maskPersonal(String(text||'')).slice(0,MAX_TEXT);
+          if(!t.trim()){target().removeItem(DRAFT_KEY);return false;}
+          target().setItem(DRAFT_KEY,JSON.stringify({version:1,saved_at:now,text:t}));return true;}catch{return false;}
+      },
+      take(now=Date.now()){
+        try{const s=target(),raw=s.getItem(DRAFT_KEY);if(!raw)return '';s.removeItem(DRAFT_KEY);const r=JSON.parse(raw);
+          return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=DRAFT_TTL_MS
+            &&typeof r.text==='string'&&r.text.trim()&&r.text.length<=MAX_TEXT?r.text:'';}catch{return '';}
+      }
+    };
+  }
   function conversationSnapshot(state,now=Date.now()){
     const text=t=>maskPersonal(String(t||'')).slice(0,CONVERSATION_MAX_TEXT);
     const sel=state.selected;
@@ -517,5 +538,5 @@
     }
     return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow,GREETING};
+  if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation,DRAFT_KEY,DRAFT_TTL_MS,createDraftHandoff};else root.MVP3LiveFlow={createFlow,GREETING,createDraftHandoff};
 })(typeof window==='undefined'?globalThis:window);

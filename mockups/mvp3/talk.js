@@ -191,4 +191,8 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 
 flow.reset({restore:true});
 if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
+// 처음 화면과 오갈 때 보내지 않은 입력 문장을 넘긴다(코덱스 #148 검수 P2). 받은 문장은 입력 칸에 채우기만 한다.
+const draftHandoff=LF.createDraftHandoff();
+window.addEventListener('pagehide',()=>{draftHandoff.put(input.value);});
+{const carried=draftHandoff.take();if(carried&&!input.value.trim()){input.value=carried;count();}}
 })();

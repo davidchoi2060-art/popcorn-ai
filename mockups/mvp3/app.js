@@ -533,5 +533,10 @@ window.addEventListener('popstate',e=>{
     enteringRoute=true;try{ui.surface=entry.surface;render();history.replaceState(uiEntry(),'',uiHash());focusSurface();}finally{enteringRoute=false;}
   }else enterRoute(location.hash);
 });
+// 대화 화면(talk.html)과 오갈 때 보내지 않은 입력 문장을 넘긴다(코덱스 #148 검수 P2). 고객이 직접 쓴 문장만
+// 넘기고(자동으로 만든 안내 문장은 넘기지 않는다), 받은 문장은 입력 칸에 채우기만 한다 -- 보내지 않는다.
+const draftHandoff=window.MVP3LiveFlow.createDraftHandoff();
+window.addEventListener('pagehide',()=>{captureDraft();draftHandoff.put(draft.draft_edited?draft.draft_text:'');});
+{const carried=draftHandoff.take();if(carried&&!(draft.draft_edited&&draft.draft_text.trim()))setDraft(carried,true);}
 enterRoute(location.hash,true);focusSurface();
 })();
