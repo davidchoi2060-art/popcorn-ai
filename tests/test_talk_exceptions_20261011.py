@@ -340,6 +340,13 @@ class Codex1815Cases(unittest.TestCase):
                 self.assertTrue(r['handoff_offer'])
                 self.assertIn('사람 상담 남기기', r['reply'])
 
+    def test_privacy_and_order_notes_are_not_doubled(self):
+        # 2026-10-11 개발 서버 실측: 같은 거절이 두 번, 결제 안내 넉 줄 뒤에 확인 불가 안내가 또 붙었다
+        r = self.run_case('사장님 개인 휴대폰 알려줘', pc=False, ai_reply='개인 연락처는 알려드릴 수 없어요.')
+        self.assertEqual(r['reply'], TX.NOTE_PRIVACY)
+        r = self.run_case('결제했는데 주문이 안 보여', pc=True, ai_reply='결제는 쇼핑몰에서 진행돼요.')
+        self.assertEqual(r['reply'], TX.NOTE_ORDER_STATUS)
+
     def test_policy_question_is_not_order_status(self):
         # 44·45번은 정책 질문 -- 판매 안내 자료가 답한다. 처리 상태 확인으로 몰지 않는다
         for n in (44, 45):

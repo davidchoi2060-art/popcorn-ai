@@ -103,7 +103,7 @@ def talk_cases(texts):
             print()
             continue
         print(f'- HTTP {code}, {sec:.1f}s')
-        for key in ('pc_related', 'stage', 'missing', 'exceptions', 'handoff_offer', 'truncated'):
+        for key in ('pc_related', 'stage', 'missing', 'exceptions', 'handoff_offer', 'truncated', 'answer_error'):
             print(f'- {key}: {parsed.get(key)!r}')
         for key in ('answer', 'reply'):
             print(f'- {key}: {str(parsed.get(key) or "")[:600]!r}')

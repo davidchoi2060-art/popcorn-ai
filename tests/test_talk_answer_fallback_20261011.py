@@ -44,13 +44,15 @@ class FallbackIntro(unittest.TestCase):
     def test_uses_reviewed_copy_then_genre_vendor(self):
         ev = TA.Evidence(facts=[LOL, VALO])
         self.assertEqual(TA.fallback_intro(ev),
-                         '리그 오브 레전드: 장르 AOS · 제작 라이엇 게임즈 / '
+                         '리그 오브 레전드는 라이엇 게임즈가 만든 AOS 장르 게임이에요.\n'
                          '발로란트: 가벼운 사양으로도 높은 프레임이 나옵니다.')
 
     def test_no_facts_no_text_and_at_most_three_games(self):
         self.assertEqual(TA.fallback_intro(TA.Evidence(facts=[TA.GameFacts(name='무명')])), '')
         many = [TA.GameFacts(name='g%d' % i, genre='RPG') for i in range(5)]
         self.assertEqual(TA.fallback_intro(TA.Evidence(facts=many)).count('장르'), 3)
+        self.assertEqual(TA.fallback_intro(TA.Evidence(facts=[TA.GameFacts(name='배틀그라운드', vendor='크래프톤')])),
+                         '배틀그라운드는 크래프톤이 만든 게임이에요.')
 
 
 class AnswerPath(unittest.TestCase):
@@ -58,7 +60,7 @@ class AnswerPath(unittest.TestCase):
         r = run_path([LOL], _timeout)
         self.assertTrue(r.error)
         self.assertTrue(r.fallback)
-        self.assertEqual(r.answer, '리그 오브 레전드: 장르 AOS · 제작 라이엇 게임즈')
+        self.assertEqual(r.answer, '리그 오브 레전드는 라이엇 게임즈가 만든 AOS 장르 게임이에요.')
 
     def test_no_usable_fact_keeps_empty(self):
         r = run_path([TA.GameFacts(name='무명')], _timeout)

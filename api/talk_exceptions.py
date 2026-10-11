@@ -326,10 +326,13 @@ def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
             out = (out.rstrip() + " " + note).strip()
     if "personal_info" in ks:
         out = _add(out, NOTE_PERSONAL + (NOTE_PERSONAL_MASKED if masked else ""))
+    # 2026-10-11 개발 서버: AI 의 「알려 드릴 수 없어요」 뒤에 같은 말이 한 번 더 붙었고, 주문 확인
+    # 문의에는 결제 안내 넉 줄 뒤에 확인 불가 안내가 또 붙었다. PC 이야기가 아니면 안내 한 줄로 바꾼다.
     if "privacy_request" in ks:
-        out = _add(out, NOTE_PRIVACY)
+        out = NOTE_PRIVACY if pc is not True else _add(out, NOTE_PRIVACY)
     if "order_status" in ks and "human" not in ks:
-        out = _add(out, NOTE_ORDER_STATUS)
+        no_pc = not list(getattr(state, "usages", None) or [])
+        out = NOTE_ORDER_STATUS if no_pc else _add(out, NOTE_ORDER_STATUS)
     if "link" in ks:
         out = _add(out, NOTE_LINK)
     if "repeat" in ks and repeated(text, history) == "turns":
