@@ -37,7 +37,7 @@ test('generated-media: exact server route and canonical AI notice survive normal
   assert.ok(fs.readFileSync(path.resolve(base,'../../api/pc_media.py'),'utf8').includes("NOTICE='"+NOTICE+"'"));
   for(const url of [URL,'https://qa.invalid'+URL]){
     const h=harness({item:{...product,photo:{...available,url,job_id:'private',bucket:'private'}}});try{
-      await recommend(h);const img=h.w.document.querySelector('[data-product-image]');assert.equal(img.getAttribute('src'),url);assert.equal(img.alt,'CODE/MOCK <PC> · AI 조립 예시');
+      await recommend(h);const img=h.w.document.querySelector('[data-product-image]');assert.equal(img.getAttribute('src'),url+'?size=card');assert.equal(img.alt,'CODE/MOCK <PC> · AI 조립 예시');
       assert.equal(h.w.document.querySelector('figcaption').textContent,NOTICE);assert.equal(h.w.document.querySelector('figcaption').hidden,false);
       const normalized=h.w.MVP3LiveModel.recommendations(h.response);assert.deepEqual(business(normalized),h.before);assert.deepEqual(Object.keys(normalized.groups[0].products[0].photo).sort(),['kind','notice','state','url']);
       h.click('[data-action=detail]');assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),url);assert.equal(h.calls.length,2);assert.deepEqual(h.errors,[]);

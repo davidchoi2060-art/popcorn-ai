@@ -179,6 +179,46 @@ class CustomerPcOfferTest(unittest.TestCase):
         r = self.image(**{"If-None-Match": '"' + ASSET["sha256"] + '"'})
         self.assertEqual((r.status_code, r.content), (304, b""))
 
+    def test_card_size_is_small_webp_and_original_untouched(self):
+        # 개편 18번: 카드는 ?size=card 로 줄인 WebP, 원본 PNG 경로는 그대로.
+        import io as _io
+        from PIL import Image as _Image
+        buf = _io.BytesIO()
+        _Image.effect_noise((1600, 1200), 80).convert("RGB").save(buf, "PNG")
+        big = buf.getvalue()
+        self.job["asset"]["sha256"] = hashlib.sha256(big).hexdigest()
+        self.conn.job = self.job
+        self.body = big
+        m._card_cache.clear()
+        r = self.client.get("/api/customer/products/99413/representative-image?size=card")
+        self.assertEqual((r.status_code, r.headers["content-type"]), (200, "image/webp"))
+        self.assertEqual(r.headers["etag"], '"' + self.job["asset"]["sha256"] + '-card"')
+        self.assertLess(len(r.content), len(big) / 3)
+        with _Image.open(_io.BytesIO(r.content)) as im:
+            self.assertEqual(max(im.size), m.CARD_MAX_SIDE)
+        self.body = b"not fetched again"                      # 같은 원본 해시는 다시 받지 않는다
+        self.assertEqual(self.client.get("/api/customer/products/99413/representative-image?size=card")
+                         .content, r.content)
+        self.body = big
+        orig = self.image()
+        self.assertEqual((orig.content, orig.headers["content-type"]), (big, "image/png"))
+        r304 = self.client.get("/api/customer/products/99413/representative-image?size=card",
+                               headers={"If-None-Match": r.headers["etag"]})
+        self.assertEqual(r304.status_code, 304)
+
+    def test_card_size_follows_same_public_gate(self):
+        self.result = {"status": 404, "error": "not_public"}
+        self.assertEqual(self.client.get(
+            "/api/customer/products/99413/representative-image?size=card").status_code, 404)
+        self.result = {"status": 200, "data": deepcopy(OFFER)}
+        self.assertEqual(self.client.get(
+            "/api/customer/products/99413/representative-image?size=huge").status_code, 422)
+
+    def test_card_size_broken_original_is_503(self):
+        m._card_cache.clear()
+        r = self.client.get("/api/customer/products/99413/representative-image?size=card")
+        self.assertEqual(r.status_code, 503)
+
     def test_image_closed_when_offer_not_public(self):
         self.result = {"status": 404, "error": "not_public"}
         self.assertEqual(self.image().status_code, 404)

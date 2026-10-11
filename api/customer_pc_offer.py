@@ -16,11 +16,14 @@
                         이고 visual_basis 가 지금 구성과 같고 고지문이 정본일 때만
                         `available`, 아니면 `unavailable`. URL 은 SKU 로만 고정한다 —
                         `/api/customer/products/{code}/representative-image`.
+                        카드는 같은 URL 에 `?size=card` 를 붙여 작은 사진(WebP)을 받는다 —
+                        원본 PNG 는 그대로 두고, 판정·URL 계약도 그대로다(2026-10-11 개편 18번).
 
 ■ 공개 아님은 전부 같은 404 — 미승인·철회·근거 변경·판매중 아님·증빙 확인 불가를 구분해
   알려 주지 않는다. 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
 """
 import hashlib
+import io
 import json
 import logging
 import os
@@ -31,7 +34,8 @@ from collections import OrderedDict
 from copy import deepcopy
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy import text
 
 from .db import engine
@@ -221,17 +225,63 @@ def read_offer(product_code: int, response: Response):
     return {"ok": True, **item}
 
 
+# 카드용 작은 사진 (2026-10-11 개편 18번). 대표 사진이 장당 1.4~2.2MB PNG 라 휴대폰에서 카드
+# 두 장에 3MB 를 넘게 받았다. 카드 칸은 휴대폰 폭이라 긴 변 960px WebP 로 충분하다.
+# 원본(sha256)이 같으면 결과도 같으므로 프로세스 안에 작은 예산으로 담아 둔다.
+CARD_MAX_SIDE = 960
+CARD_QUALITY = 80
+CARD_CACHE_BYTES = 16 * 1024 * 1024
+_card_cache = OrderedDict()
+_card_cache_size = 0
+_card_cache_lock = threading.Lock()
+
+
+def card_image(raw: bytes, sha: str) -> bytes:
+    """원본 PNG 바이트 -> 카드용 WebP(긴 변 CARD_MAX_SIDE). 같은 원본 해시는 한 번만 줄인다."""
+    global _card_cache_size
+    with _card_cache_lock:
+        data = _card_cache.get(sha)
+        if data is not None:
+            _card_cache.move_to_end(sha)
+            return data
+    try:
+        with Image.open(io.BytesIO(raw)) as im:
+            im = im.convert("RGB")
+            im.thumbnail((CARD_MAX_SIDE, CARD_MAX_SIDE), Image.LANCZOS)
+            out = io.BytesIO()
+            im.save(out, "WEBP", quality=CARD_QUALITY, method=4)
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise HTTPException(503, "image_unavailable") from exc
+    data = out.getvalue()
+    with _card_cache_lock:
+        if sha not in _card_cache:
+            _card_cache[sha] = data
+            _card_cache_size += len(data)
+        while _card_cache_size > CARD_CACHE_BYTES and _card_cache:
+            _, old = _card_cache.popitem(last=False)
+            _card_cache_size -= len(old)
+    return data
+
+
 @router.get(IMAGE_PATH)
-def read_representative_image(product_code: int, request: Request):
+def read_representative_image(product_code: int, request: Request,
+                              size: str | None = Query(None, pattern="^card$")):
     """URL 에 job 이 없다 — 매 요청 공개 판정을 다시 하고 지금 선택된 현재본만 준다.
-    사진이 바뀌어도 URL 이 같으므로 no-cache + ETag(sha256) 로 재검증하게 한다."""
+    사진이 바뀌어도 URL 이 같으므로 no-cache + ETag(sha256) 로 재검증하게 한다.
+    `size=card` 는 같은 판정을 거친 뒤 줄인 사진을 준다(ETag 는 원본 해시 + `-card`)."""
     _check_code(product_code)
     item, job = _read(product_code)
     if item is None or job is None:
         raise _not_public()
-    etag = '"' + str(job["asset"].get("sha256")) + '"'
+    sha = str(job["asset"].get("sha256"))
+    etag = '"' + sha + ('-card"' if size else '"')
     headers = {"Cache-Control": "no-cache", "ETag": etag, "X-Content-Type-Options": "nosniff"}
     if request.headers.get("if-none-match") == etag:
         return Response(status_code=304, headers=headers)
+    if size:
+        with _card_cache_lock:
+            cached = _card_cache.get(sha)
+        data = cached if cached is not None else card_image(_representative_png(job["asset"], job["job_id"]), sha)
+        return Response(data, media_type="image/webp", headers=headers)
     raw = _representative_png(job["asset"], job["job_id"])
     return Response(raw, media_type="image/png", headers=headers)
