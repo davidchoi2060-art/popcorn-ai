@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
 from .auth import current_operator
+from .build_check import evaluate, load_rules, load_specs
+from .pc_review_specs import specs_for_review
 from .db import engine
 from .part_explanations import is_current
 from .pc_configuration_copy import digest, explanation_digest, read_configuration
@@ -65,7 +67,7 @@ def candidates(identity: str, ordinal: int = Query(ge=0), q: str = Query('', max
         total = c.execute(text('SELECT count(*) FROM ('+PART_SQL+where+') candidates'), args).scalar_one()
         rows = c.execute(text(PART_SQL+where+' ORDER BY p.sale_price,e.source_product_code LIMIT :limit OFFSET :offset'), args).mappings()
         return dict(total=total, offset=offset, limit=limit, items=[part_view(r) for r in rows],
-                    scope='설명이 등록된 판매중 부품 · 호환성은 별도 검토')
+                    scope='설명이 등록된 판매중 부품 · 고르면 변경 확인에서 호환 검사')
 
 
 def bom_hash(parts):
@@ -165,7 +167,17 @@ def prepare(c, identity, body, lock=False):
     duplicate = c.execute(text('SELECT configuration_id FROM pc_configurations WHERE bom_fingerprint=:bom AND configuration_id<>:id'),
                           dict(bom=result['bom_fingerprint'],id=identity)).scalar()
     result['duplicate_id'] = duplicate
+    result['compat'] = bom_compat(c, result['parts'], rows)
     return dict(prior), parts, offers, result
+
+
+def bom_compat(c, parts, rows):
+    """바뀐 구성표를 호환 규칙으로 바로 판정한다 — 검토 단계까지 기다리지 않는다(부품 상품화 2단계)."""
+    real = [p for p in parts if not p['pseudo']]
+    product_codes = [rows[p['explanation_code']].get('product_code') for p in real if p['explanation_code'] in rows]
+    specs = specs_for_review(rows, load_specs(c, product_codes))
+    lines = [dict(key=p['ordinal'], slot=p['slot'], spec_key=p['explanation_code'], label=str(p['source_code'])) for p in real]
+    return evaluate(lines, specs, load_rules(c))
 
 
 @router.post('/api/admin/pc-configurations/{identity}/parts-preview')
@@ -198,6 +210,9 @@ def save_parts(c, identity, body, actor):
     prior, old_parts, offers, result = prepare(c, identity, body, lock=True)
     if not body.preview_token or body.preview_token != result['preview_token']:
         raise HTTPException(409, '가격·부품 정보가 변경되었습니다. 변경 내용 확인을 다시 진행해 주세요.')
+    failures = (result.get('compat') or {}).get('failures') or []
+    if failures:
+        raise HTTPException(409, '호환 검사에 걸려 저장하지 않았습니다: ' + ' · '.join(f['label'] for f in failures))
     if result['duplicate_id']:
         raise HTTPException(409, f"같은 구성의 제품군이 있습니다: {result['duplicate_id']}. 중복 등록하지 않았습니다.")
     target = identity if body.mode == 'update' else 'A'+uuid4().hex[:16].upper()
