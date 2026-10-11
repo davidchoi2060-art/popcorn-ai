@@ -1396,7 +1396,7 @@ def parse_talk(body: ParseBody, request: Request):
     # 예외 응대·노트북 턴은 그 문장이 먼저라 설명을 비운다. 주문·환불 상태 질문에도 일반 기준 설명은 남긴다.
     general = advice and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
     bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset())
-    if advice and (bad_exceptions or laptop
+    if advice and (bad_exceptions or (laptop and getattr(ans, "topic", None) != PA.TOPIC_LAPTOP)
                    or (not general and not (pc is True and stage == TS.STAGE_PC))):
         answer = ""
     if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
