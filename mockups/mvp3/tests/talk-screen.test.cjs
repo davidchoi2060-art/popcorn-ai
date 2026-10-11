@@ -94,6 +94,32 @@ test('arriving from a landing path fills that draft once and clears the address'
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+test('a sentence typed on the landing chat box is sent once on arrival without a button key',async()=>{
+  const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'지금 쓰는 PC가 느려요',at:Date.now()}));
+  const h=harness(scripted(),ss);
+  try{
+    await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+    const first=h.calls.find(c=>c.url==='/api/talk/parse');
+    assert.equal(first.body.text,'지금 쓰는 PC가 느려요');assert.equal(first.body.entry,undefined);
+    assert.equal(ss.getItem('popcorn-mvp3-first-message-v1'),null,'taken once');
+    await until(()=>!h.doc.querySelector('#tk-send').disabled&&h.doc.querySelectorAll('.tk-msg.is-ai').length>0);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('an old landing sentence is dropped instead of being sent later',async()=>{
+  const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'예전 글',at:Date.now()-3600000}));
+  const h=harness(scripted(),ss);
+  try{await until(()=>h.doc.querySelector('.tk-welcome'));await tick();assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse').length,0);assert.equal(ss.getItem('popcorn-mvp3-first-message-v1'),null);}finally{h.close();}
+});
+test('the top label shows the consultation path the server chose',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:[],budget_won:null},missing:[],reply:'어떤 작업에서 느린가요?',answer:'',pc_related:true,chat_flow:{smalltalk_turns:0,pc_offered:false,pc_declined:false,entry:'upgrade',entry_asked:false}}}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    await h.say('지금 쓰는 PC가 느려요');
+    await until(()=>/업그레이드/.test(h.text('.demo-label')));
+    assert.equal(h.text('.demo-label'),'PC 상담 · 쓰던 PC 업그레이드');
+  }finally{h.close();}
+});
 test('an unknown landing path key is ignored',async()=>{
   const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=game');
   try{await until(()=>h.doc.querySelector('.tk-welcome'));assert.equal(h.doc.querySelector('#tk-input').value,'');assert.deepEqual(h.errors,[]);}finally{h.close();}

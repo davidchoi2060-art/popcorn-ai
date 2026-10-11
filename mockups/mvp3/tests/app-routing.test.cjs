@@ -127,3 +127,17 @@ test('quick replies follow what the consultation asks: usage question gets usage
   assert.deepEqual(chips(b),['배그를 해요','롤을 해요','배그와 롤 둘 다 해요']);
   const c=harness();assert.ok(chips(c).includes('QHD로 해줘요'));
 });
+// 사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」: 처음 화면 채팅창의 글은 주소가 아니라
+// 탭 보관함으로 대화 화면에 넘긴다(갈래는 서버가 글 내용으로 고른다).
+test('the landing chat box hands its text to the talk screen through tab storage, not the address',()=>{
+  const h=harness({hash:''});const d=h.w.document;
+  const form=d.querySelector('#gateway-chat');assert.ok(form);
+  form.dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+  assert.equal(d.querySelector('#gateway-chat-status').hidden,false);assert.equal(h.w.sessionStorage.getItem('popcorn-mvp3-first-message-v1'),null);
+  const box=d.querySelector('#gateway-text');box.value='  지금 쓰는 PC가 느려요  ';box.dispatchEvent(new h.w.Event('input',{bubbles:true}));
+  form.dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
+  const saved=JSON.parse(h.w.sessionStorage.getItem('popcorn-mvp3-first-message-v1'));
+  assert.equal(saved.text,'지금 쓰는 PC가 느려요');assert.ok(Number.isFinite(saved.at));
+  assert.equal(h.calls.length,0,'the landing screen itself sends nothing');
+  h.errors.splice(0,h.errors.length,...h.errors.filter(m=>!/navigation/i.test(m)));
+});

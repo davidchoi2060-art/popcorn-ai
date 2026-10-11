@@ -7,6 +7,10 @@ const GATEWAY_PATHS=[
   ['computer-tower','새 PC 고르기','어떤 일에 쓸지부터 함께 정리해요.','새 PC 상담 시작','new_pc'],
   ['wrench','쓰던 PC 업그레이드','불편한 점과 바꾸고 싶은 부품을 말씀해 주세요.','업그레이드 상담 시작','upgrade'],
   ['cpu','부품·구성 알아보기','부품의 차이와 내게 필요한 구성을 물어보세요.','부품 상담 시작','parts']];
+// 처음 화면 채팅창에 쓴 글(사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」). 글은 주소에
+// 싣지 않고(접속 기록에 남는다) 이 탭 보관함에 잠깐 두고 대화 화면으로 간다. 대화 화면이 꺼내 바로 보내고,
+// 서버가 글 내용으로 세 갈래 중 하나를 고른다(api/talk_entry). 키는 talk.js FIRST_KEY 와 같다.
+const FIRST_KEY='popcorn-mvp3-first-message-v1';let gatewayText='';
 const M=window.MVP3LiveModel,A=window.MVP3Api;
 const {customerPhoto}=window.MVP3LivePhoto;
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
@@ -53,7 +57,9 @@ function focusSurface(){
 }
 function renderGateway(){
   const icon=name=>uiIcon(name),arrow=icon('arrow-right');
-  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어떤 PC</span>가 필요하세요?</h1><p>하려는 일을 고르거나,<br class="mobile-break"> 편하게 바로 이야기해 주세요.</p></div><div class="gateway-choices is-three">'+
+  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어떤 PC</span>가 필요하세요?</h1><p>하려는 일을 적거나,<br class="mobile-break"> 아래에서 골라 주세요.</p></div>'+
+    '<form id="gateway-chat" class="gateway-chat"><label class="sr-only" for="gateway-text">PC로 할 일이나 궁금한 점</label><textarea id="gateway-text" rows="2" maxlength="2000" placeholder="PC로 할 일이나 궁금한 점을 적어주세요.">'+esc(gatewayText)+'</textarea><button type="submit" class="gateway-button">보내기</button></form><p id="gateway-chat-status" class="gateway-chat-status" role="status" aria-live="polite" hidden></p>'+
+    '<div class="gateway-choices is-three">'+
     GATEWAY_PATHS.map(([image,title,text,go,key])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><span class="entry-action">'+go+' '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
     '</div><p class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</p><div class="gateway-more">'+button('아직 정하지 못했나요? 편하게 상담하기 '+arrow,DIRECT_ACTION,'continue-draft')+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
     (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></section>';
@@ -525,6 +531,15 @@ document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captur
 view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 view.addEventListener('change',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 $('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
+document.addEventListener('input',e=>{if(e.target.id==='gateway-text')gatewayText=e.target.value;});
+document.addEventListener('submit',e=>{
+  if(e.target.id!=='gateway-chat')return;e.preventDefault();
+  const text=$('#gateway-text').value.trim(),note=$('#gateway-chat-status');
+  if(!text){note.textContent='PC로 할 일이나 궁금한 점을 적어주세요.';note.hidden=false;$('#gateway-text').focus();return;}
+  try{sessionStorage.setItem(FIRST_KEY,JSON.stringify({text,at:Date.now()}));}
+  catch{note.textContent='이 브라우저에서 글을 넘기지 못했어요. 아래 「편하게 상담하기」로 들어가 다시 적어 주세요.';note.hidden=false;return;}
+  location.href='talk.html';
+});
 $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;captureDraft();void submit(draft.draft_text,{fromInput:true});});
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();if(!$('#chat-body').hidden)scrollToLatest();});

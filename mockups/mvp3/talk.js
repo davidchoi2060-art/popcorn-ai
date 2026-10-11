@@ -23,7 +23,20 @@ let entry=null;
 // 처음 화면의 세 갈래에서 들어오면(talk.html?start=키) 그 갈래 초안을 입력창에 넣어 둔다(보내지 않는다).
 // 하던 대화가 있으면 그 대화에 이어서 보낼 수 있게 둔다 -- 갈래를 바꿔도 같은 상담이다(보강6 의견 §1).
 // 주소에서 지워 새로고침 때 다시 넣지 않게 한다.
-function startFromGateway(){
+// 처음 화면 채팅창에 쓴 글이 있으면 꺼내 바로 보낸다(고객이 이미 「보내기」를 눌렀다). 갈래는 서버가 글
+// 내용으로 고른다. 오래된 글(10분 넘음)은 버린다 -- 다른 날 연 탭에서 갑자기 보내지 않게.
+const FIRST_KEY='popcorn-mvp3-first-message-v1';
+function takeFirstMessage(){
+  let raw=null;try{raw=sessionStorage.getItem(FIRST_KEY);sessionStorage.removeItem(FIRST_KEY);}catch{return '';}
+  try{const m=JSON.parse(raw||'null');return m&&typeof m.text==='string'&&Date.now()-m.at<600000?m.text.trim().slice(0,MAX_TEXT):'';}catch{return '';}
+}
+async function startFromGateway(){
+  const first=takeFirstMessage();
+  if(first){
+    if(state.phase){input.value=first;count();status.textContent='보던 견적을 불러오는 중이에요. 다 불러온 뒤 「보내기」를 눌러 주세요.';status.hidden=false;return;}
+    const sent=await flow.submit(first);if(!sent&&!input.value){input.value=first;count();}
+    return;
+  }
   let key=null;try{key=new URLSearchParams(location.search).get('start');}catch{}
   if(!key)return;
   try{history.replaceState(history.state,'',location.pathname+location.hash);}catch{}
@@ -161,6 +174,8 @@ function renderPanel(){
 
 function render(){
   renderLog();renderPanel();
+  // 지금 상담 갈래(서버가 글 내용이나 고른 단추로 정한 것)를 상단에 보여 준다.
+  const g=STARTERS.find(x=>x.key===state.chatFlow?.entry);$('.demo-label').textContent=g?'PC 상담 · '+g.label:'PC 상담';
   const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
@@ -217,5 +232,5 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 
 flow.reset({restore:true});
 if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
-startFromGateway();
+void startFromGateway();
 })();
