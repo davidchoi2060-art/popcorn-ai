@@ -7,7 +7,7 @@ const BASE='https://popcornai.co.kr', OUT=process.env.OUT||'out';
 const cases=JSON.parse(fs.readFileSync(path.join(__dirname,'cases.json'),'utf8'));
 fs.mkdirSync(OUT,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-let cookie='', lastParse=0, parseCount=0, parseByVisitor=0;
+let cookie='', vid='', lastParse=0, parseCount=0, parseByVisitor=0;
 async function call(method,p,body,extra={},binary=false){
   const h={'Accept':binary?'*/*':'application/json','Origin':BASE,'User-Agent':'Mozilla/5.0 popcorn-qa-office-check',...extra};
   if(body)h['Content-Type']='application/json';
@@ -26,6 +26,7 @@ async function getVisitor(){
   cookie='';
   const r=await call('GET','/api/mvp3/saved-quotes?limit=1',null,{'X-Access-Key':key});
   const m=(r.setCookie||'').match(/pc_vid=([^;]+)/);
+  vid=m?m[1].slice(0,8):'';
   return m?'pc_vid='+m[1]:'';
 }
 async function parse(body){
@@ -52,6 +53,7 @@ async function checkCard(item){
 (async()=>{
   const summary=[];
   const page=await call('GET','/mvp3/');
+  const ops=await call('GET','/api/ops');fs.writeFileSync(path.join(OUT,'ops.json'),JSON.stringify(ops,null,2));
   fs.writeFileSync(path.join(OUT,'page.json'),JSON.stringify({status:page.status,len:(page.raw||'').length,head:(page.raw||'').slice(0,600)},null,2));
   for(const c of cases){
     const needed=c.turns.length;
@@ -59,7 +61,7 @@ async function checkCard(item){
     let talk=null,chatFlow=null,history=[];const turns=[];
     for(const text of c.turns){
       const p=await parse({text,state:talk,chat_flow:chatFlow,history:history.slice(-6)});
-      const turn={text,parse:p,recommend:null,cards:[]};
+      const turn={text,sent_at:new Date(lastParse).toISOString(),visitor_key_prefix:vid,parse:p,recommend:null,cards:[]};
       const j=p.json;
       if(p.status===200&&j&&j.ok===true&&j.state){
         talk=j.state;chatFlow=j.chat_flow||null;history.push({role:'user',text});
@@ -74,7 +76,7 @@ async function checkCard(item){
       }
       turns.push(turn);
     }
-    const rec={id:c.id,kind:c.kind,turns,at:new Date().toISOString()};
+    const rec={id:c.id,kind:c.kind,visitor_key_prefix:vid,turns,at:new Date().toISOString()};
     fs.writeFileSync(path.join(OUT,String(c.id).padStart(2,'0')+'.json'),JSON.stringify(rec,null,2));
     const last=turns[turns.length-1];
     summary.push({id:c.id,parse:turns.map(t=>t.parse.status+'/'+t.parse.sec.toFixed(1)+'s'),rec:last.recommend?last.recommend.status+'/'+last.recommend.sec.toFixed(1)+'s':'-',cards:last.cards.map(x=>x.code+':'+x.offer.status+'/photo '+(x.photo?x.photo.status:'-'))});
