@@ -236,9 +236,23 @@ REPLY_ROLE_GUIDE = ("PC 견적을 도와드리는 자리라 다른 이야기는 
 # (외부 참조 grep 2026-09-17: 없음. 되돌림 근거로만 남긴다).
 REPLY_NOT_PC = REPLY_ROLE_GUIDE
 # 잡담에 모델이 문장을 안 냈을 때의 최소 문장 -- 「여기까지만」 같은 끊는 말을 쓰지 않는다.
-REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. PC가 필요하시면 언제든 용도와 예산을 말씀해 주세요."
+REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. 궁금한 것이 있으면 무엇이든 물어보세요."
 # 게임 목록을 답한 턴의 마무리 -- 고른 게임으로 추천에 잇는다(2026-10-11).
 # 코덱스 1816 보강2 시안 문구(2026-10-11): 고를지 묻지 않고, 이어질 수 있다고만 알린다.
+# 잡담 답 끝의 PC 권유 문장(「혹시 컴퓨터 맞추실 생각 있으세요?」·「PC가 필요하시면 …」).
+_PC_PUSH = re.compile(r"(?:컴퓨터|PC|피시|견적|사양|업그레이드)")
+_SENTENCE = re.compile(r"[^.!?。？！]+[.!?。？！]?")
+
+
+def drop_pc_push(reply: str) -> str:
+    """잡담 답의 «끝» 문장들 중 PC 권유를 걷는다. 다 걷히면 원문을 둔다(빈 말풍선 금지)."""
+    parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
+    while len(parts) > 1 and _PC_PUSH.search(parts[-1]):
+        parts.pop()
+    out = "".join(parts).strip()
+    return out or (reply or "")
+
+
 SMALLTALK_INVITE_AT = TS.SMALLTALK_ALLOW_MAX   # 잡담 3회차에 한 번만 PC 상담을 권한다
 REPLY_GAME_PICK = "마음에 드는 게임이 있으면, 그 게임을 즐길 PC 구성도 함께 살펴볼 수 있어요."
 REPLY_MAX_LEN = 200
@@ -1182,9 +1196,12 @@ def parse_talk(body: ParseBody, request: Request):
         # 같은 상담에서 이미 한 번 권했으면 되풀이하지 않는다(답만 보인다).
         said = any(r == "assistant" and REPLY_GAME_PICK in t for r, t in history)
         reply = "" if said else REPLY_GAME_PICK
-    elif pc is False and turns == SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
-        # 잡담이 이어지면 세 번째에 «한 번만» 가볍게 권한다. 그 뒤로는 고객이 PC 이야기를 꺼낼 때 잇는다.
-        reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
+    elif pc is False:
+        # 지시해도 AI 가 잡담 끝에 「혹시 컴퓨터 맞추면서 …?」를 붙였다(2026-10-11 개발 서버, #140 배포 뒤).
+        # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 세 번째에 «한 번만» 서버 줄을 붙인다.
+        reply = drop_pc_push(reply)
+        if turns == SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
+            reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
     # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
     # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
     # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.
