@@ -32,11 +32,11 @@ def test_model_follows_repo_setting(monkeypatch):
     assert C.repo_model().startswith("claude-")
 
 
-def _combine(tmp_path, verdicts, gate=True):
+def _combine(tmp_path, verdicts, gate=True, reason="r"):
     d = tmp_path / "s1"
     d.mkdir()
     rows = [{"id": "R%02d" % i, "group": "g", "question": "q", "criterion": "c", "ours": "a",
-             "generic": "b", "verdict": v, "reason": "r"} for i, v in enumerate(verdicts, 1)]
+             "generic": "b", "verdict": v, "reason": reason} for i, v in enumerate(verdicts, 1)]
     (d / "rows.json").write_text(json.dumps({"base": "x", "model": "m", "rows": rows}), encoding="utf-8")
     args = type("A", (), {"dirs": [str(d)], "report": str(tmp_path / "r.md"), "summary": None,
                           "gate": gate, "require_judge": False, "print_rows": True})
@@ -49,3 +49,8 @@ def test_gate_red_on_any_worse(tmp_path):
 
 def test_gate_green_without_worse_and_unmeasured_not_counted_as_loss(tmp_path):
     assert _combine(tmp_path, [C.SAME, C.BETTER, C.UNMEASURED]) == 0
+
+
+def test_gate_red_when_consult_api_is_down(tmp_path):
+    down = C.OURS_FAILED + "HTTP 502"
+    assert _combine(tmp_path, [C.UNMEASURED] * 3, reason=down) == 1
