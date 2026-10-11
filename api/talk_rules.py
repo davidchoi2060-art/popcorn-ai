@@ -230,6 +230,36 @@ SOFTWARE_RE = re.compile(
     re.IGNORECASE)
 
 
+def usages_from_programs(text: str, usages) -> list[str]:
+    """문장에 적힌 작업 프로그램 이름이 가리키는 용도 라벨(용도 표 순서, 중복 없음).
+
+    용도 표(`usage_floors.match_terms`, vocab.usages)의 낱말 중 **프로그램 이름**(SOFTWARE_RE 에
+    통째로 맞는 것)만 본다. 「편집」「영상」 같은 넓은 낱말은 여기서 쓰지 않는다 — AI 가 문맥으로
+    고른 값을 넓은 낱말로 뒤집지 않기 위해서다.
+    2026-10-11 고객3 F8: 「라이트룸이랑 포토샵으로 사진 보정할 컴퓨터 150만원」이 1차는
+    디자인·조판, 2차는 영상편집으로 읽혀 카드가 달라졌다.
+    """
+    low = (text or "").casefold()
+    out: list[str] = []
+    for label, terms in usages or []:
+        for t in terms or []:
+            if (isinstance(t, str) and t and SOFTWARE_RE.fullmatch(t)
+                    and t.casefold() in low and label not in out):
+                out.append(label)
+    return out
+
+
+def usage_supported_by_text(text: str, label: str, usages) -> bool:
+    """그 용도 라벨의 낱말(아무것이나)이나 라벨 자체가 문장에 있는가."""
+    low = (text or "").casefold()
+    if label and label.casefold() in low:
+        return True
+    for lab, terms in usages or []:
+        if lab == label and any(isinstance(t, str) and t and t.casefold() in low for t in terms or []):
+            return True
+    return False
+
+
 def games_from_text(text: str, vocab, match_game) -> list[str]:
     """문장에서 우리 목록에 있는 게임(games.name)을 찾는다. 부정 표현이 있으면 빈 목록."""
     if not text or _NEGATION.search(text):
