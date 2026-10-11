@@ -160,6 +160,11 @@ def settled(check, rules_by_key):
 # 구성표에 이 슬롯 줄이 없거나 가상 줄(「기본 쿨러」 등)뿐이면, 그 슬롯이 걸린 규칙의 미판정은 거절하지 않고
 # 경고만 한다(2026-10-11 쿨러 줄이 가상 줄인 초안 PC). 보드 같은 다른 슬롯이 없으면 여전히 거절한다.
 WARN_MISSING_SLOTS = {'COOLER'}
+BUILD_NOTE = '호환 규칙을 모두 통과한 판매 중 부품만 보여 드려요. 금액은 PC 판매가에 부품 가격 차이를 더한 값이에요.'
+# 쿨러 미확인 경고가 있을 때는 「모두 통과」라고 말하지 않는다 — 안내와 경고가 한 문장이 되게 한다
+# (2026-10-11 코덱스 검수 #129 문구 지적).
+BUILD_NOTE_WARNED = ('쿨러를 뺀 호환 규칙을 통과한 판매 중 부품을 보여 드려요. 이 PC 구성표에는 CPU 쿨러가 따로 적혀 있지 않아 '
+                     '쿨러 호환은 따로 확인해 주세요. 금액은 PC 판매가에 부품 가격 차이를 더한 값이에요.')
 WARNING_TEXT = {'COOLER': '쿨러 호환은 확인되지 않았습니다(이 PC 구성표에 따로 적힌 CPU 쿨러가 없습니다).'}
 
 
@@ -313,7 +318,7 @@ def build_options(body: OptionsBody, response: Response):
     for o in res['options']:
         o['total'] = q['total'] + o['price_diff']
     return {'ok': True, 'base_code': body.product_code, 'total': q['total'], **res,
-            'note': '호환 규칙을 모두 통과한 판매 중 부품만 보여 드려요. 금액은 PC 판매가에 부품 가격 차이를 더한 값이에요.'}
+            'note': BUILD_NOTE_WARNED if res['warnings'] else BUILD_NOTE}
 
 
 @router.post('/build/quote')

@@ -213,4 +213,6 @@ test('part build keeps server compat warnings (no cooler line) and drops non-tex
  assert.deepEqual(o.warnings,[warn]);
  const app=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
  assert.match(app,/p\.build\.warnings/);assert.match(app,/d\.warnings/);
+ // 후보 안내와 쿨러 경고를 따로 나란히 두지 않는다 — 경고가 있으면 서버 안내 한 줄만 warn-text 로
+ assert.doesNotMatch(app,/\(d\.warnings\|\|\[\]\)\.map/);assert.match(app,/warned\?'warn-text':'muted'/);
 });
