@@ -147,8 +147,8 @@
         var f=el('td'); if(it.flags.length) chips(f,it.flags,'flag'); else f.appendChild(el('span','tr-muted','없음'));
         if (it.answer_error) f.appendChild(el('span','tr-chip bad','답변 실패'));
         tr.appendChild(f);
-        tr.appendChild(el('td',null,it.ai_reply||'—'));
-        tr.appendChild(el('td',it.replaced?null:'tr-muted',it.replaced?(it.shown_reply||'—'):'같음'));
+        tr.appendChild(el('td',null,it.ai_reply||(it.reply_purged?'보관 기간 지남':'—')));
+        tr.appendChild(el('td',it.replaced?null:'tr-muted',it.replaced?(it.shown_reply||(it.reply_purged?'보관 기간 지남':'—')):'같음'));
         tr.appendChild(el('td',null,it.same_question_n>1?it.same_question_n+'번':'—'));
         tr.appendChild(el('td',null,it.status));
         tr.addEventListener('click',function(){ open(it); });
@@ -170,9 +170,9 @@
       var c=el('div'); chips(c,it.flags,'flag'); chips(c,it.topics); chips(c,it.unapplied.map(function(u){return '반영 못 함: '+u;})); b.appendChild(c);
     }
     b.appendChild(el('span','tr-lbl','고객 질문')); var qd=el('div','tr-say'); qd.innerHTML=RawText.html(it.question); b.appendChild(qd);
-    b.appendChild(el('span','tr-lbl','AI가 낸 말 (서버가 바꾸기 전)')); b.appendChild(el('p','tr-say',it.ai_reply||'—'));
-    b.appendChild(el('span','tr-lbl','고객이 본 말')); b.appendChild(el('p','tr-say',it.shown_reply||'—'));
-    b.appendChild(el('span','tr-lbl','자유 답변')); b.appendChild(el('p','tr-say',it.answer||(it.answer_error?'답변 실패':'없음')));
+    b.appendChild(el('span','tr-lbl','AI가 낸 말 (서버가 바꾸기 전)')); b.appendChild(el('p','tr-say',it.ai_reply||(it.reply_purged?'보관 기간 지남':'—')));
+    b.appendChild(el('span','tr-lbl','고객이 본 말')); b.appendChild(el('p','tr-say',it.shown_reply||(it.reply_purged?'보관 기간 지남':'—')));
+    b.appendChild(el('span','tr-lbl','자유 답변')); b.appendChild(el('p','tr-say',it.answer||(it.reply_purged?'보관 기간 지남':it.answer_error?'답변 실패':'없음')));
     if (it.visitor){ var a=el('a',null,'이 방문자의 문의 · 보관 견적 보기'); a.href='/admin2/mvp3-consults'; b.appendChild(a); }
     b.appendChild(el('span','tr-lbl','점검'));
     var row=el('div','tr-status');
@@ -202,7 +202,7 @@
         box.textContent='';
         box.appendChild(el('div','tr-lbl',d.items.length+'번 중 AI가 낸 말 '+d.distinct_replies+'가지'));
         d.items.forEach(function(x){
-          var p=el('p','tr-say',when(x.at)+'  '+(x.ai_reply||'—')); if(x.flags.length) p.appendChild(el('span','tr-chip flag',' '+x.flags.join(' · '))); box.appendChild(p);
+          var p=el('p','tr-say',when(x.at)+'  '+(x.ai_reply||(x.reply_purged?'보관 기간 지남':'—'))); if(x.flags.length) p.appendChild(el('span','tr-chip flag',' '+x.flags.join(' · '))); box.appendChild(p);
         });
       }).catch(function(e){ box.textContent=e.message; });
     }

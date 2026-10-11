@@ -145,7 +145,10 @@
     try{d=await getJSON('/api/admin/mvp3-consults/'+encodeURIComponent(v)+'?'+q());}
     catch(e){$('mcDrawerBody').innerHTML='<p>'+esc(e.message)+'</p>';return;}
     $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved)+(d.inquiries?' · 구매 상담 '+num(d.inquiries):'');
+    const cut=d.truncated||{},lim=d.limits||{};
+    const cutNote=[cut.hits?'문의 최근 '+num(lim.hits)+'건':'',cut.saved?'보관 최근 '+num(lim.saved)+'건':'',cut.inquiries?'구매 상담 최근 '+num(lim.inquiries)+'건':''].filter(Boolean);
     $('mcDrawerBody').innerHTML=RawText.notice(d.raw_notice)+
+      (cutNote.length?'<p class="mc-muted">기록이 많아 '+esc(cutNote.join(' · '))+'만 표시합니다. 그 이전 기록은 표시하지 않습니다.</p>':'')+
       (d.timeline||[]).map(e=>e.kind==='inquiry'?
         '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청</div>'+
         '<div>'+esc(e.inquiry_no)+' · '+esc(e.topic)+' · '+esc(e.status)+
@@ -160,7 +163,7 @@
         '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+'</div>'+
         RawText.html(e.question)+
         '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div>'+
-        (e.reply?'<div class="mc-reply">AI 답: '+esc(e.reply.shown_reply||'없음')+
+        (e.reply?'<div class="mc-reply">AI 답: '+esc(e.reply.shown_reply||(e.reply.reply_purged?'보관 기간 지남':'없음'))+
           (e.reply.flags.length?' '+chips(e.reply.flags.map(f=>'⚠ '+f)):'')+
           ' <a href="/admin2/talk-review">점검</a> <span class="mc-muted">('+esc(e.reply.status)+')</span></div>':'')+'</div>'
       ).join('');

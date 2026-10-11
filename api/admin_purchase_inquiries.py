@@ -9,6 +9,8 @@
 
 ■ 개인정보
   연락처는 운영자 이상에게만 그대로 보인다. 조회 권한은 가운데를 가린다.
+  조회 권한에는 문의 내용 · 메모 안의 연락처도 가린다(`api/talk.mask_pii`).
+  보관 기한이 지난 신청은 연락처 · 문의 내용을 내보내지 않는다(`contact_purged`).
   행을 지우지 않는다 — 상태로 처리한다. 보관 기한(`purge_at`)은 응답에 함께 싣는다.
   시험 신청(회귀 표식 · 「QA-」로 시작하는 이름이나 내용)은 기본으로 뺀다.
 """
@@ -17,7 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .auth import current_operator
-from .admin_raw_text import NOTICE as RAW_NOTICE
+from .admin_raw_text import NOTICE as RAW_NOTICE, expired
 from .db import engine
 from .timeutil import iso
 
@@ -48,14 +50,27 @@ def _mask_email(e):
     return local[:2] + "***@" + dom
 
 
+def _mask_text(s):
+    """자유 입력(문의 내용 · 메모)에 고객이 적은 연락처를 가린다 — 조회 권한용.
+    연락처 칸만 가리고 본문을 그대로 주면 같은 번호가 본문으로 드러났다(2026-10-11 코덱스 검수 #85)."""
+    if not s:
+        return s
+    from .talk import mask_pii
+    return mask_pii(s)
+
+
 def _row(r, full: bool) -> dict:
+    # 보관 기한(신청 후 180일)이 지난 연락처 · 문의 내용은 내보내지 않는다 — 고객 동의 문구의 약속이다.
+    gone = expired(r["purge_at"])
     return {
         "inquiry_id": r["inquiry_id"], "inquiry_no": r["inquiry_no"], "at": iso(r["created_at"]),
         "topic": r["topic"], "status": r["status"],
-        "name": r["contact_name"],
-        "phone": r["contact_phone"] if full else _mask_phone(r["contact_phone"]),
-        "email": r["contact_email"] if full else _mask_email(r["contact_email"]),
-        "message": r["message"], "memo": r["memo"],
+        "name": None if gone else r["contact_name"],
+        "phone": None if gone else (r["contact_phone"] if full else _mask_phone(r["contact_phone"])),
+        "email": None if gone else (r["contact_email"] if full else _mask_email(r["contact_email"])),
+        "message": None if gone else (r["message"] if full else _mask_text(r["message"])),
+        "memo": r["memo"] if full else _mask_text(r["memo"]),
+        "contact_purged": gone,
         "visitor": ("u%d" % r["user_id"]) if r["user_id"] is not None else None,
         "quote_id": str(r["quote_id"]) if r["quote_id"] else None,
         "product_code": r["product_code"], "product_name": r["product_name"],

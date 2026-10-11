@@ -16,6 +16,22 @@ NOTICE = "고객 원문 · 개선 목적으로만 열람"
 STATE_LABEL = {"kept": None, "purged": "원문 보관 기간 지남", "none": "원문 기록 없음"}
 
 
+def expired(purge_at, now: datetime | None = None) -> bool:
+    """보관 기한이 지났나. `purge_at` 은 naive UTC 또는 시간대 있는 값(TIMESTAMPTZ) 둘 다 받는다.
+
+    AI 답(`talk_reply_reviews.purge_at`) · 구매 상담 연락처(`purchase_inquiries.purge_at`)도
+    질문 원문과 같이 기한이 지나면 내보내지 않는다(2026-10-11 코덱스 검수 #84 · #85 지적 반영).
+    """
+    if purge_at is None:
+        return False
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+    if purge_at.tzinfo is None:
+        purge_at = purge_at.replace(tzinfo=timezone.utc)
+    return purge_at <= now
+
+
 def raw_view(raw_text, purge_at, now: datetime | None = None) -> dict:
     """원문 한 건을 화면용으로 — {text, state, label}. `purge_at` 은 naive UTC."""
     now = now or datetime.now(timezone.utc).replace(tzinfo=None)
