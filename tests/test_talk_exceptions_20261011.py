@@ -449,7 +449,7 @@ class NoPcPush(unittest.TestCase):
     def test_parse_drops_ai_push_but_server_invites_once(self):
         ai = {'pc': False, 'state': {}, 'reply': '김치찌개 어떠세요? 혹시 PC 맞출 생각 있으세요?'}
         r1 = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai(ai), chat_flow={'smalltalk_turns': 0})
-        self.assertEqual(r1['reply'], '김치찌개 어떠세요?')
+        self.assertEqual(r1['reply'], '김치찌개 어떠세요? ' + talk.REPLY_SMALLTALK_FOLLOW)   # 한 줄로 끝내지 않는다
         r3 = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai(ai), chat_flow={'smalltalk_turns': 2})
         self.assertEqual(r3['reply'], '김치찌개 어떠세요? ' + TX.NOTE_SMALLTALK_LONG)
 

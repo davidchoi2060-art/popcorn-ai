@@ -330,6 +330,25 @@ def drop_pc_push(reply: str) -> str:
     return "".join(kept).strip()
 
 
+# 잡담 답에서 권유 문장을 걷고 나서 짧은 한 문장만 남으면 대화가 끊긴다(2026-10-12 일반 AI 비교 E06 「그런 말씀 마세요.」
+# · E07 「뭔가 마음에 안 드셨나 봐요.」). PC 권유가 아닌 이어 말하기 한 문장을 붙인다.
+REPLY_SMALLTALK_FOLLOW = "궁금하거나 불편한 점이 있으면 편하게 더 말씀해 주세요. 이어서 같이 이야기해 볼게요."
+ONE_LINER_MAX = 40
+
+
+def _count_sentences(text: str) -> int:
+    return len([p for p in _SENTENCE.findall(text or "") if p.strip()])
+
+
+def extend_one_liner(reply: str) -> str:
+    """한 문장·짧은(ONE_LINER_MAX 자 미만) 잡담 답에 이어 말하기 한 문장을 붙인다. 빈 답은 그대로 둔다."""
+    r = (reply or "").strip()
+    parts = [p for p in _SENTENCE.findall(r) if p.strip()]
+    if not r or len(parts) > 1 or len(r) >= ONE_LINER_MAX:
+        return r
+    return r + " " + REPLY_SMALLTALK_FOLLOW
+
+
 SMALLTALK_INVITE_AT = TS.SMALLTALK_ALLOW_MAX   # 잡담 3회차에 한 번만 PC 상담을 권한다
 REPLY_GAME_PICK = "마음에 드는 게임이 있으면, 그 게임을 즐길 PC 구성도 함께 살펴볼 수 있어요."
 REPLY_MAX_LEN = 200
@@ -376,8 +395,11 @@ SMALLTALK_BLOCK = "\n".join([
 # 여기는 AI 의 말투만 정한다. 금지(부품·가격·약속)는 위 [절대 금지]·[잡담] 그대로다.
 EXCEPTION_BLOCK = "\n".join([
     "[예외 입력 -- 이상하거나 엉뚱한 말도 거절하지 않는다]",
-    "- 어떤 말이 와도 문전박대하지 않는다. 일반 AI 처럼 그 말에 먼저 답하고, 끝에 한 문장으로 가볍게 PC 상담으로 잇는다.",
-    "- 욕설·장난: 감정적으로 맞대응하지 않는다. 차분하게 받아 주고 원하는 PC 를 묻는다."
+    "- 어떤 말이 와도 문전박대하지 않는다. 일반 AI 처럼 그 말에 먼저 두세 문장으로 답한다."
+    " PC 상담으로 잇는 말은 고객이 PC·게임·사양·예산을 말했을 때만 한다(잡담 권유는 서버가 한 번만 붙인다).",
+    "- 욕설·장난·불만(「너 바보야?」「이런 가격 미쳤냐」「왜요 왜요」): 감정적으로 맞대응하지 않는다."
+    " 기분을 받아 주는 한 문장, 무엇이 불편했는지·무엇을 원했는지 짐작해 짚는 한 문장, 편하게 다시 말해 달라는"
+    " 한 문장으로 두세 문장을 쓴다. 한 마디로 끝내지 않는다(2026-10-12 일반 AI 비교 E06·E07·E53)."
     " 욕설 속에도 예산·용도가 있으면 그대로 state 에 넣는다.",
     "- 알아볼 수 없는 글(기호·자판 두드리기): 무엇을 말하려 했는지 짐작하지 않는다."
     " 용도와 예산을 예시와 함께 다시 묻는다.",
@@ -1350,12 +1372,18 @@ def parse_talk(body: ParseBody, request: Request):
         # 지시해도 AI 가 잡담 끝에 「혹시 컴퓨터 맞추면서 …?」를 붙였다(2026-10-11 개발 서버, #140 배포 뒤).
         # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 잡담이 세 번 이어진 뒤 상담에
         # «한 번만» 서버 줄을 붙인다. 거절했으면 붙이지 않는다.
+        before = reply
         reply = drop_pc_push(reply)
         # 고객이 이번에도, 최근에도 게임을 말하지 않았으면 AI 가 먼저 건 게임 권유도 걷는다.
         said_game = game_related or any(r == "user" and TA.is_game_related(t, vocab) for r, t in history)
         if not said_game:
             reply = drop_game_nudge(reply)
-        if may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
+        invite = may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply
+        if not invite and _count_sentences(reply) < _count_sentences(before):
+            # 문장을 통째로 걷었을 때만 -- AI 가 처음부터 한 줄로 답한 것(「지금 날씨 정보는 확인할 수 없어요.」)이나
+            # 문장 안의 낱말만 걷은 것(「게임을 하거나 영상 봐도」)은 그대로 둔다.
+            reply = extend_one_liner(reply)
+        if invite:
             reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
             pc_offered = True
         reply = reply or REPLY_SMALLTALK_EMPTY

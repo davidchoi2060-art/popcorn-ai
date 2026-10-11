@@ -34,7 +34,8 @@ def _turn(text, reply, *, pc=False, game=False, history=None, state=None):
 class NoGameNudgeInSmallTalk(unittest.TestCase):
     def test_question_about_games_is_removed_when_customer_did_not_mention_games(self):
         r = _turn('비 오네', '비가 오니까 집에서 쉬기 좋네요. 혹시 할 게임 있으세요?')
-        self.assertEqual(r['reply'], '비가 오니까 집에서 쉬기 좋네요.')
+        # 문장을 통째로 걷어 짧은 한 줄만 남으면 이어 말하기 한 문장을 붙인다(2026-10-12 일반 AI 비교 E06·E07).
+        self.assertEqual(r['reply'], '비가 오니까 집에서 쉬기 좋네요. ' + talk.REPLY_SMALLTALK_FOLLOW)
 
     def test_game_only_suggestion_falls_back_to_a_plain_line(self):
         r = _turn('심심해', '그럴 때 게임하면 좋지요.')
@@ -64,7 +65,7 @@ class NoGameNudgeInSmallTalk(unittest.TestCase):
 
     def test_any_other_game_sentence_is_dropped(self):
         r = _turn('주말 뭐 하지', '푹 쉬세요. 영화나 게임도 좋죠.')
-        self.assertEqual(r['reply'], '푹 쉬세요.')
+        self.assertEqual(r['reply'], '푹 쉬세요. ' + talk.REPLY_SMALLTALK_FOLLOW)
 
     def test_compound_words_with_game_stay_intact(self):
         # 코덱스 #150 검수 P2: 합성어 끝의 「게임이나」를 지우면 「보드독서」처럼 문장이 깨졌다.
