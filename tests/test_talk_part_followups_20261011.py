@@ -25,6 +25,19 @@ class PartBeforeBuild(unittest.TestCase):
             self.assertEqual(PA.topic_of(t, vocab()), PA.TOPIC_BUILD, t)
 
 
+class GameBudgetQuestions(unittest.TestCase):
+    """게임 이름 + 「예산 얼마나」·「돌아가는 컴퓨터」는 게임 소개가 아니라 PC 설명이다(일반 AI 비교 R09·E13)."""
+
+    def test_budget_size_and_runs_questions_are_build(self):
+        for t in ("배틀그라운드 QHD 144Hz로 하고 싶은데 예산 얼마나 잡아야 돼요?", "배그 돌아가는 컴퓨터"):
+            self.assertTrue(PA.pc_intent(t), t)
+            self.assertEqual(PA.topic_of(t, vocab(), game=True), PA.TOPIC_BUILD, t)
+
+    def test_game_chat_is_still_game_chat(self):
+        for t in ("롤 재밌어?", "배그 몇 시간 했어?"):
+            self.assertIsNone(PA.topic_of(t, vocab(), game=True), t)
+
+
 class NoBranchQuestionAfterExplanation(unittest.TestCase):
     def test_part_explanation_is_not_followed_by_the_branch_question(self):
         t = "PC에서 SSD가 왜 필요해요?"
