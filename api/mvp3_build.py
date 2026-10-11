@@ -11,8 +11,14 @@
 ■ 가격   기준 PC 판매가 + Σ(새 부품 판매가 − 원래 부품 판매가) × 수량.
          부품 판매가 원천은 `products.sale_price` 하나다(가격 자동 업데이트가 채우는 그 칸).
          관리자 구성표 부품 수정(`pc_configuration_parts_edit.compute_preview`)과 같은 규칙이다.
+■ 데스크톱 메모리  RAM 줄은 노트북용(SO-DIMM)·서버용(REG) 메모리로 바꾸지 않는다. 호환 규칙(`mem`)은
+         DDR 세대만 비교해 노트북 DDR5 도 통과시켰다(2026-10-11 코덱스 검수 재현: 영상 PC 에 Crucial 노트북
+         DDR5 16GB). 판정은 `catalog_map` 의 분류 토큰(적재와 같은 기준)에 더해 상품명이 노트북·SO-DIMM 을
+         스스로 밝힌 것도 뺀다 — 후보에서 하나 덜 보이는 쪽이 꽂히지 않는 램을 파는 쪽보다 싸다.
+■ 후보와 직접 계산은 같은 수용 기준(`refusal`)을 쓴다 — 목록을 거치지 않은 요청도 같은 이유로 거절한다.
 ■ 읽기만 한다. 보관(`mvp3_saved_quotes`)과 쇼핑몰 연결(`mvp3_handoff`)은 같은 계산을 다시 부른다.
 """
+import re
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Response
@@ -20,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
 from . import customer_pc_offer, grid_public
+from .catalog_map import is_server_ram, is_sodimm
 from .build_check import DISPLAY_KEY, evaluate, load_rules, load_specs
 from .db import engine
 from .product_name import display_name
@@ -38,12 +45,12 @@ BOM_SQL = """SELECT pp.ordinal, pp.slot, pp.quantity, pp.pseudo, e.product_code,
                LEFT JOIN products p ON p.product_code = e.product_code
               WHERE o.offer_id = :offer
               ORDER BY pp.ordinal"""
-CANDIDATE_SQL = """SELECT p.product_code, p.product_name, p.sale_price, p.part_type
+CANDIDATE_SQL = """SELECT p.product_code, p.product_name, p.sale_price, p.part_type, p.spec_source_text
                      FROM products p JOIN product_specs s ON s.product_code = p.product_code
                     WHERE p.status = '판매중' AND p.sale_price > 0 AND p.data_origin = 'real'
                       AND NOT p.review_required_yn
                       AND p.part_type = ANY(:types)"""
-PARTS_SQL = """SELECT product_code, product_name, sale_price, status, part_type
+PARTS_SQL = """SELECT product_code, product_name, sale_price, status, part_type, spec_source_text
                  FROM products WHERE product_code = ANY(:codes)"""
 
 
@@ -88,6 +95,17 @@ def swappable(line):
             and type(line['sale_price']) is int and line['sale_price'] > 0)
 
 
+NOT_DESKTOP_NAME = re.compile(r'노트북|SO[\s\-]?DIMM|랩탑|laptop|notebook', re.I)
+
+
+def not_desktop_ram(row):
+    """데스크톱 보드 메모리 슬롯에 꽂히지 않는 RAM 인가(노트북용 · 서버용)."""
+    if (row.get('part_type') or '') != 'RAM':
+        return False
+    raw = row.get('spec_source_text') or ''
+    return is_sodimm(raw) or is_server_ram(raw) or bool(NOT_DESKTOP_NAME.search(row.get('product_name') or ''))
+
+
 def apply_changes(bom, changes, parts):
     """구성표에 바꾼 줄을 얹는다. parts = {product_code: products 행}. 잘못된 변경은 422/409."""
     lines = {l['ordinal']: dict(l) for l in bom}
@@ -104,6 +122,8 @@ def apply_changes(bom, changes, parts):
             raise HTTPException(409, '고른 부품이 지금 판매 중이 아니에요. 다시 골라 주세요.')
         if slot_of(new['part_type'] or '') != old['slot']:
             raise HTTPException(422, '같은 종류의 부품으로만 바꿀 수 있어요.')
+        if not_desktop_ram(new):
+            raise HTTPException(409, '노트북용·서버용 메모리는 이 PC에 꽂을 수 없어요. 다른 메모리를 골라 주세요.')
         if ch.product_code == old['product_code']:
             continue
         out.append(dict(ordinal=ch.ordinal, slot=old['slot'], label=SLOT_LABELS.get(old['slot'], old['slot']),
@@ -133,6 +153,31 @@ def settled(check, rules_by_key):
             and check.get('missing_fields') == [rule['ref_field']])
 
 
+def rule_slots(rules):
+    return {x for r in rules for x in (r['slot'], r['ref_slot'])}
+
+
+def refusal(checks, ordinals, slots, rules, display):
+    """바꾼 줄(ordinals, 그 줄의 슬롯 slots)에 대한 판정 묶음을 받아들일 수 없는 이유. 받아들이면 None.
+
+    후보 목록(options_for)과 직접 계산(quote)이 같은 기준을 쓴다.
+      fail      바꾼 줄이 걸린 규칙에 걸렸다
+      unknown   바꾼 줄이 걸린 규칙을 판정하지 못했다(엔진도 넘기는 skip 규칙의 상대 값 없음만 예외)
+      빈 판정    그 슬롯에 걸린 규칙이 있는데 바꾼 줄을 본 판정이 하나도 없다 — 통과로 세지 않는다
+    """
+    by_key = {r['rule_key']: r for r in rules}
+    mine = [c for c in checks if (display and c['key'] == DISPLAY_KEY) or touches(c, ordinals)]
+    failed = [c for c in mine if c['state'] == 'fail']
+    if failed:
+        return 'fail', failed
+    unsettled = [c for c in mine if not settled(c, by_key)]
+    if unsettled:
+        return 'unknown', unsettled
+    if not rules or (not mine and slots & rule_slots(rules)):
+        return 'unknown', []
+    return None
+
+
 def changed_lines(conn, bom, changes):
     codes = sorted({c.product_code for c in changes})
     parts = {r['product_code']: dict(r) for r in conn.execute(text(PARTS_SQL), dict(codes=codes)).mappings()} if codes else {}
@@ -140,17 +185,20 @@ def changed_lines(conn, bom, changes):
 
 
 def quote(conn, base_price, bom, changes, rules=None):
-    """바꾼 구성의 금액과 호환 판정. 바꾼 줄이 만든 호환 실패가 있으면 409."""
+    """바꾼 구성의 금액과 호환 판정. 바꾼 줄이 만든 호환 실패 · 판정 못 한 호환이 있으면 409."""
     lines, applied = changed_lines(conn, bom, changes)
     rules = load_rules(conn) if rules is None else rules
     lines_c = compat_lines(lines)
     compat = evaluate(lines_c, load_specs(conn, [l['spec_key'] for l in lines_c]), rules)
-    # 바꾸지 않은 줄끼리의 판정은 공개된 구성 그대로다 — 바꾼 줄이 만든 실패만 막는다.
-    changed = [x['ordinal'] for x in applied]
-    swapped_display = any(x['slot'] in ('CPU', 'GPU') for x in applied)
-    new_fail = [f for f in compat['failures'] if touches(f, changed) or (swapped_display and f['key'] == DISPLAY_KEY)]
-    if new_fail:
-        raise HTTPException(409, '이 조합은 호환되지 않아요: ' + ' · '.join(f['label'] for f in new_fail))
+    # 바꾸지 않은 줄끼리의 판정은 공개된 구성 그대로다 — 바꾼 줄이 만든 문제만 막는다.
+    # 후보 목록과 같은 기준(refusal)이다: 실패뿐 아니라 판정하지 못한 것도 받지 않는다.
+    for x in applied:
+        why = refusal(compat['checks'], [x['ordinal']], {x['slot']}, rules, x['slot'] in ('CPU', 'GPU'))
+        if why and why[0] == 'fail':
+            raise HTTPException(409, '이 조합은 호환되지 않아요: ' + ' · '.join(f['label'] for f in why[1]))
+        if why:
+            names = ' · '.join(dict.fromkeys(c['label'] for c in why[1])) or '호환 규칙'
+            raise HTTPException(409, f"{x['label']} 부품의 호환을 확인하지 못해 바꿀 수 없어요: {names}")
     total = base_price + sum(x['delta'] for x in applied)
     return dict(base_price=base_price, total=total, changes=applied,
                 compat=dict(ok=compat['ok'], rule_count=compat['rule_count'],
@@ -166,15 +214,17 @@ def options_for(conn, lines, ordinal, rules):
             if r['product_code'] != line['product_code']]
     base_lines = compat_lines(lines)
     specs = load_specs(conn, [l['spec_key'] for l in base_lines] + [r['product_code'] for r in rows])
-    by_key = {r['rule_key']: r for r in rules}
     ok, untested = [], 0
     for r in rows:
-        trial = [dict(l, spec_key=r['product_code'], label=str(r['product_code'])) if l['key'] == ordinal else l for l in base_lines]
-        out = evaluate(trial, specs, rules, display=line['slot'] in ('CPU', 'GPU'))
-        mine = [c for c in out['checks'] if c['key'] == DISPLAY_KEY or touches(c, [ordinal])]
-        if any(c['state'] == 'fail' for c in mine):
+        if not_desktop_ram(r):
             continue
-        if not all(settled(c, by_key) for c in mine):
+        trial = [dict(l, spec_key=r['product_code'], label=str(r['product_code'])) if l['key'] == ordinal else l for l in base_lines]
+        display = line['slot'] in ('CPU', 'GPU')
+        out = evaluate(trial, specs, rules, display=display)
+        why = refusal(out['checks'], [ordinal], {line['slot']}, rules, display)
+        if why and why[0] == 'fail':
+            continue
+        if why:
             untested += 1
             continue
         ok.append(dict(product_code=r['product_code'], name=display_name(r['product_name']), price=r['sale_price'],

@@ -148,5 +148,76 @@ class Handoff(unittest.TestCase):
         self.assertIsNone(h._build({'build': {'base_price': 1, 'changes': []}}))
 
 
+# 2026-10-11 코덱스 검수: 영상 PC 에서 노트북 DDR5 로 바꾸기가 받아들여졌다(mem 규칙은 DDR 세대만 본다).
+MEM_RULE = dict(rule_key='mem', label='메모리-보드 규격', slot='RAM', field='mem_type', ref_slot='MB', ref_field='mem_type',
+                op='eq', part_types=[], null_ref_mode='block', ref_offset=None, detail_fmt=None)
+RAM_BOM = BOM[:2] + [dict(ordinal=6, slot='RAM', quantity=2, pseudo=False, product_code=601, name='램 16GB', sale_price=60000, status='판매중')] + BOM[2:]
+RAM_SPECS = {**SPECS, 201: dict(part_type='MB', socket='AM5', mem_type='DDR5'), 601: dict(part_type='RAM', mem_type='DDR5'),
+             602: dict(part_type='RAM', mem_type='DDR5'), 603: dict(part_type='RAM', mem_type='DDR5'),
+             604: dict(part_type='RAM', mem_type='DDR5'), 605: dict(part_type='RAM', mem_type='DDR4'),
+             606: dict(part_type='RAM', mem_type=None)}
+RAM_PARTS = {
+    602: dict(product_code=602, product_name='삼성 DDR5 32GB', sale_price=110000, status='판매중', part_type='RAM',
+              spec_source_text='삼성전자 / 데스크탑용 / DDR5 / 32GB'),
+    603: dict(product_code=603, product_name='Crucial 노트북 DDR5-5600 16GB', sale_price=55000, status='판매중', part_type='RAM',
+              spec_source_text='마이크론 / DDR5 / 16GB'),
+    604: dict(product_code=604, product_name='Crucial DDR5 16GB', sale_price=56000, status='판매중', part_type='RAM',
+              spec_source_text='마이크론 / 노트북 / DDR5 / 16GB'),
+    605: dict(product_code=605, product_name='DDR4 16GB', sale_price=40000, status='판매중', part_type='RAM', spec_source_text=''),
+    606: dict(product_code=606, product_name='사양 없는 램', sale_price=50000, status='판매중', part_type='RAM', spec_source_text=''),
+}
+
+
+class RamConn(Conn):
+    def execute(self, sql, p=None):
+        sql = str(sql)
+        if 'FROM products WHERE product_code = ANY' in sql:
+            return Rows([RAM_PARTS[c] for c in p['codes'] if c in RAM_PARTS])
+        if 'JOIN product_specs' in sql:
+            return Rows([RAM_PARTS[c] for c in self.candidates])
+        raise AssertionError(sql)
+
+
+class DesktopRam(unittest.TestCase):
+    rules = RULES + [MEM_RULE]
+
+    def quote(self, code, bom=RAM_BOM):
+        with patch.object(b, 'load_specs', return_value=RAM_SPECS):
+            return b.quote(RamConn(), 1500000, bom, [change(6, code)], self.rules)
+
+    def test_options_hide_laptop_and_unknown_memory(self):
+        with patch.object(b, 'load_specs', return_value=RAM_SPECS):
+            res = b.options_for(RamConn([602, 603, 604, 605, 606]), [dict(l) for l in RAM_BOM], 6, self.rules)
+        self.assertEqual([o['product_code'] for o in res['options']], [602])
+        self.assertEqual(res['options'][0]['price_diff'], 100000)   # 수량 2 x 50,000
+        self.assertEqual(res['untested'], 1)                        # 606 사양 없음
+
+    def test_direct_quote_refuses_what_the_list_hides(self):
+        for code in (603, 604, 605, 606):
+            with self.assertRaises(HTTPException) as e:
+                self.quote(code)
+            self.assertEqual(e.exception.status_code, 409, code)
+        self.assertEqual(self.quote(602)['total'], 1600000)
+
+    def test_rule_with_no_board_is_not_a_pass(self):
+        # 보드 줄이 없으면 mem 규칙은 줄 번호 없는 unknown 하나다 — 바꾼 램을 본 판정이 없으므로 받지 않는다.
+        with self.assertRaises(HTTPException) as e:
+            self.quote(602, bom=[l for l in RAM_BOM if l['slot'] != 'MB'])
+        self.assertIn('확인하지 못해', e.exception.detail)
+
+    def test_no_active_rules_is_not_a_pass(self):
+        with patch.object(b, 'load_specs', return_value=RAM_SPECS), self.assertRaises(HTTPException):
+            b.quote(RamConn(), 1500000, RAM_BOM, [change(6, 602)], [])
+
+    def test_unknown_cpu_socket_is_refused_on_direct_quote(self):
+        PARTS[104] = dict(product_code=104, product_name='CPU 사양 없음', sale_price=280000, status='판매중', part_type='CPU')
+        try:
+            with patch.object(b, 'load_specs', return_value=SPECS), self.assertRaises(HTTPException) as e:
+                b.quote(Conn(), 1200000, BOM, [change(1, 104)], RULES)
+        finally:
+            del PARTS[104]
+        self.assertIn('CPU-보드 소켓', e.exception.detail)
+
+
 if __name__ == '__main__':
     unittest.main()
