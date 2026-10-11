@@ -283,6 +283,13 @@ def _uhd_rank(levels, usage, r):
     return max(r, min(hits)) if hits else r
 
 
+def _heavy_rank(levels, usage, r, heavy):
+    """고객이 말한 한 단계 위 작업(reco_explore.HEAVY_WORK) -> 그 단계의 순위를 최소로. 기준표에 없으면 그대로."""
+    level = (heavy or {}).get(usage)
+    hits = [l["level_rank"] for l in levels if l["usage"] == usage and l["level"] == level]
+    return max(r, hits[0]) if hits else r
+
+
 def _cheapest(usage, min_rank, levels, products, preferred, min_ok) -> dict:
     """조건 안의 실제 최저가 한 장. 「가장 싸게」에 한 단계 위(수백만 원) 구성을 «추천»으로 함께 내밀지
     않는다(2026-10-11 사장님 비교 -- 「개발자용 가장 저렴하게」에 248만원 카드). 더 높은 사양은 아래 빠른
@@ -616,6 +623,8 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
     for label, fu, r in _targets(state, game_usages, other_usages, levels, vocab, notes):
         if ex["wants"].get("uhd") and fu != "게임":
             r = _uhd_rank(levels, fu, r)
+        if fu != "게임":
+            r = _heavy_rank(levels, fu, r, ex["wants"].get("heavy"))
         if (fu, r) in seen:
             continue
         seen.add((fu, r))

@@ -1438,7 +1438,8 @@ def parse_talk(body: ParseBody, request: Request):
             (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
             or (asked_before and "?" in reply)
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage)
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage,
+                                heavy=TD.X.heavy_levels(text))
         if first:
             reply = (first + " " + " ".join(cond_notes)).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
