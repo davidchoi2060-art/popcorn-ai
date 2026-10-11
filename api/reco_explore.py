@@ -38,6 +38,7 @@ _CHEAPER = re.compile(r"(더|좀|조금|많이)\s*(싼|싸|저렴)|싸게|저렴
 _CHEAPEST = re.compile(r"(가장|제일|젤|최대한|최저)\s*(싼|싸|저렴)|최저\s*가|최소\s*(비용|가격|금액|예산)")
 _BETTER = re.compile(r"(더|좀|조금|훨씬)\s*(좋은|좋게|높은|나은|센|빠른|고급|비싼)|업그레이드|고사양|상위|"
                      r"한\s*단계\s*위|최고\s*사양|최고사양|최고로|풀옵|제일\s*좋은|가장\s*좋은|높은\s*사양|좋은\s*(걸|거|것)\s*으?로")
+_SPEC_NUMBER = re.compile(r"(rtx|gtx|rx)?\s*\d+(?:\.\d+)?\s*(gb|기가|g|tb|테라|t|hz|헤르츠|인치|fps|프레임|ti|super|xt)(?![a-z])|(rtx|gtx|rx)\s*\d{3,4}", re.I)
 _RAM = re.compile(r"(램|ram|메모리)\s*(?:은|는|을|를|도)?\s*(\d{1,3})\s*(?:gb|기가|g)?", re.I)
 _RAM_MORE = re.compile(r"(램|ram|메모리)\s*(?:을|를|은|는|도)?\s*(?:좀|조금|많이)?\s*(더|늘|업|크게|넉넉)", re.I)
 _SSD = re.compile(r"(ssd|저장\s*공간|저장\s*장치|용량|하드)\s*(?:은|는|을|를|도)?\s*(\d+(?:\.\d+)?)\s*(tb|테라|t|gb|기가|g)", re.I)
@@ -74,7 +75,9 @@ def extract(raw: str | None) -> dict:
         return out
     has_budget_number = bool(_NUMBER_BUDGET.search(s))
     # 「더 싸게 150으로」처럼 숫자가 있으면 예산 변경이다 — 해석(talk)이 예산을 바꾸므로 방향은 걸지 않는다.
-    if not has_budget_number and not re.search(r"\d{2,}", s):
+    # 사양 숫자(램 64GB · SSD 1TB · RTX 5060 · 144Hz)는 예산 변경이 아니다 -- 지우고 본다(코덱스 #161 검수 경계:
+    # 「램 64GB로 최대한 싸게」가 최저가를 못 읽었다).
+    if not has_budget_number and not re.search(r"\d{2,}", _SPEC_NUMBER.sub(" ", s)):
         if _CHEAPER.search(s):
             out["nav"] = CHEAPER
             if _CHEAPEST.search(s):

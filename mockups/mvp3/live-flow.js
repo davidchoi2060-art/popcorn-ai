@@ -268,6 +268,10 @@
           if(!current(op))return;
           const o=M.partOptions(r,want.swap_from.slot,want.swap_from.product_code).options.find(x=>x.product_code===want.product_code);
           if(o){p=M.copy(o);delete p.swap;p.swap_from=M.copy(want.swap_from);}
+        }else if(p&&validSwapFrom(want.swap_from)){
+          // 이번엔 일반 추천에서 찾았어도 어디서 옮겼는지는 남긴다 -- 다음 왕복에서 추천에서 빠지면 그 부품 선택지로
+          // 다시 찾는다(코덱스 PR158 검수 v1 신규 후보).
+          p={...p,swap_from:M.copy(want.swap_from)};
         }
         if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);

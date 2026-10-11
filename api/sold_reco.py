@@ -309,7 +309,12 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
         # 「가장 싸게」(또는 기준 카드 없는 「싸게」) -- 앞 추천 카드와 상관없이 조건 안의 실제 최저가 한 장.
         # 공개 승인 구성은 같은 가격일 때만 앞에 둔다(코덱스 #155 검수 P2-1·P2-2: 승인 우선이 최저가를
         # 밀어내 「가장 싼 쪽」 안내와 카드가 어긋났다). 후보 범위(판매·적합 수준·조건)는 바꾸지 않는다.
-        res, nav_note = _cheapest(fu, r, levels, prods, preferred, min_ok), X.NOTE_CHEAPEST
+        # 「150만원 이상」처럼 하한을 말했으면 그 안에서 가장 싼 것 -- 하한을 넘는 후보가 없을 때만 하한을 푼다
+        # (코덱스 #161 검수 경계: 최저가 요청이 예산 하한을 말없이 지웠다). pick 의 「이상」 처리와 같다.
+        floor = {c: p for c, p in prods.items() if p["price"] is not None and p["price"] >= budget} \
+            if budget is not None and bound == "이상" else {}
+        pool = floor if any(min_ok(p) for p in floor.values()) else prods
+        res, nav_note = _cheapest(fu, r, levels, pool, preferred, min_ok), X.NOTE_CHEAPEST
         for it in res["items"]:
             it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
     elif nav == X.CHEAPER and anchor is not None and anchor["price"] is not None:
