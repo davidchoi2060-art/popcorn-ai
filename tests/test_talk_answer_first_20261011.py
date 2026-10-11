@@ -28,11 +28,11 @@ def vocab():
     return v
 
 
-def parse(text, ai_state, ai_reply, *, prev=None, chat_flow=None):
+def parse(text, ai_state, ai_reply, *, prev=None, chat_flow=None, ans=None):
     obj = {"pc": True, "state": ai_state, "missing": [], "evidence": [], "reply": ai_reply}
     result = SimpleNamespace(text=json.dumps(obj, ensure_ascii=False), provider="t", model="t",
                              tokens_in=1, elapsed_sec=0.1)
-    ans = TA.AnswerResult(answer="", narrowing=TS.NARROWING_WIDE)
+    ans = ans or TA.AnswerResult(answer="", narrowing=TS.NARROWING_WIDE)
     body = talk.ParseBody(text=text, state=prev, chat_flow=chat_flow)
     with contextlib.ExitStack() as st:
         st.enter_context(patch.object(talk.engine, "connect", lambda: _Conn()))
@@ -83,6 +83,31 @@ class OwnerConversation(unittest.TestCase):
         self.assertEqual(cs["items"][0]["price"],
                          min(p["price"] for p in PRODUCTS.values() if p["fit"]["영상편집"]["rank"] >= 1))
         self.assertTrue(cs["explore"]["has_better"])         # 더 높은 사양은 빠른 선택으로 연다
+
+
+ADVICE = ("개발용 PC는 그래픽카드보다 CPU와 메모리, SSD가 체감을 좌우해요. 웹 개발이라면 내장 그래픽으로도"
+          " 충분해서 그래픽카드는 아껴도 돼요. 도커나 가상 머신을 여러 개 띄우면 램 32GB가 편해요.")
+
+
+class ExplanationAboveCards(unittest.TestCase):
+    """사장님 원칙: LLM 이 일반 AI 처럼 먼저 설명하고, 가정 한 줄로 마무리, 카드는 그 아래."""
+
+    def test_turn1_has_explanation_then_assumption_and_cards(self):
+        ans = TA.AnswerResult(answer=ADVICE, narrowing=TS.NARROWING_WIDE, kind="pc_advice")
+        r = parse("개발자용 PC를 가장 저렴하게 추천해줘",
+                  {"usages": ["개발"], "budget_won": None},
+                  "개발자용 PC를 찾고 계시는군요.", ans=ans)
+        self.assertEqual(r["answer"], ADVICE)               # 화면 말풍선 위쪽
+        self.assertEqual(r["missing"], [])                  # 같은 턴에 저렴한 카드를 부른다
+        self.assertIn("가장 싼 쪽", r["reply"])            # 가정 한 줄이 설명 끝에
+        self.assertTrue(r["reply"].endswith(DEV_AFTER))
+        self.assertNotIn("?", r["answer"] + r["reply"])
+
+    def test_explanation_is_dropped_on_laptop_turns(self):
+        ans = TA.AnswerResult(answer=ADVICE, narrowing=TS.NARROWING_WIDE, kind="pc_advice")
+        r = parse("개발용 노트북 추천해줘", {"usages": ["개발"]},
+                  "개발용 PC를 찾고 계시는군요.", ans=ans)
+        self.assertEqual(r["answer"], "")              # 노트북 안내가 먼저다
 
 
 class PriceWords(unittest.TestCase):

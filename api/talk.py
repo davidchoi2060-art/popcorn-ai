@@ -1301,7 +1301,9 @@ def parse_talk(body: ParseBody, request: Request):
             reply = TD.no_usage_reply(TD.basis_work(fit) if fit else None)
             log.info("[talk] answer-first: no usage after ask - assumed general use")
     elif plain_pc and not missing and (
-            (asked_before and "?" in reply)
+            # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
+            (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
+            or (asked_before and "?" in reply)
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
         reply = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage) or reply
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
@@ -1320,7 +1322,11 @@ def parse_talk(body: ParseBody, request: Request):
     #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
     #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
     answer = ans.answer or ""
-    if released and ans.narrowing == TS.NARROWING_WIDE:
+    advice = getattr(ans, "kind", "game") == "pc_advice"
+    if advice and not plain_pc:
+        # PC 구성 설명은 평범한 PC 상담 턴에만 위에 둔다 -- 예외·안내·노트북 턴은 그 문장이 먼저다.
+        answer = ""
+    if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
         # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
         answer = ""
     if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
