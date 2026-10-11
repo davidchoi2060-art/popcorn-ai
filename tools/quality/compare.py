@@ -44,6 +44,7 @@ CALL_GAP_SEC = 13            # 분당 5회 한도 아래로
 UA = "popcorn-answer-quality/1"
 
 WORSE, SAME, BETTER, UNMEASURED = "우리가 못함", "비슷함", "우리가 나음", "측정 못함"
+OURS_FAILED = "우리 답을 받지 못함: "
 
 
 # ── 질문 ──────────────────────────────────────────────────────────────────────
@@ -291,7 +292,7 @@ def cmd_run(args) -> int:
         row["ours"] = o.get("text", "")
         row["ours_meta"] = {k: v for k, v in o.items() if k != "text"}
         if not o["ok"]:
-            row.update(verdict=UNMEASURED, reason="우리 답을 받지 못함: " + o["error"])
+            row.update(verdict=UNMEASURED, reason=OURS_FAILED + o["error"])
         elif not has_key:
             row.update(generic="", verdict=UNMEASURED, reason="ANTHROPIC_API_KEY 없음 -- 일반 AI·심판 생략")
         else:
@@ -300,7 +301,7 @@ def cmd_run(args) -> int:
                 row.update(judge(q, row["ours"], row["generic"], rng))
             except Exception as e:                               # noqa: BLE001
                 row.setdefault("generic", "")
-                row.update(verdict=UNMEASURED, reason="일반 AI·심판 호출 실패: %s %s" % (type(e).__name__, str(e)[:80]))
+                row.update(verdict=UNMEASURED, reason="일반 AI·심판 호출 실패: %s %s" % (type(e).__name__, str(e)[:300]))
         print("%s  %s  %s" % (row["id"], row["verdict"], row.get("reason", "")), flush=True)
         rows.append(row)
     (out / "rows.json").write_text(json.dumps({"base": BASE, "model": model, "rows": rows},
@@ -370,6 +371,13 @@ def cmd_combine(args) -> int:
         return 1
     if args.gate and not rows:
         print("::error::결과가 하나도 없다")
+        return 1
+    # 상담 API 자체가 죽으면 모든 질문이 「측정 못함」이 되어 못함 0 으로 통과해 버린다
+    # (2026-10-11 02:21 전부 502 였는데 배포 뒤 비교가 초록불이었다). 절반 넘게 우리 답을
+    # 못 받았으면 품질 판정 전에 서비스 장애로 보고 빨간불을 켠다.
+    down = sum(1 for r in rows if str(r.get("reason", "")).startswith(OURS_FAILED))
+    if args.gate and rows and down * 2 > len(rows):
+        print("::error::상담 AI 가 답을 못 했다 %d/%d (서버·AI 사용 한도 확인)" % (down, len(rows)))
         return 1
     if args.require_judge and count[UNMEASURED] == len(rows):
         print("::error::판정한 질문이 하나도 없다(API 키·서버 확인)")
