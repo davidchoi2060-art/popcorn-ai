@@ -248,6 +248,27 @@ _PC_ASK = re.compile(r"(?:[?？]|생각\s*(?:있|이\s*있)|있으신가요|있�
 _SENTENCE = re.compile(r"[^.!?。？！\n]+[.!?。？！]*\s*")
 
 
+# 잡담 답 속 AI 가 먼저 꺼낸 게임 권유(「혹시 할 게임 있으세요?」·「그럴 때 게임하면 좋지요」).
+# 고객이 게임을 말하지 않은 턴에만 걷는다. 기준은 「그 말의 답이 PC 추천 조건이 되는가」 --
+# 잡담에서 게임으로 말을 거는 것은 조건 질문이 아니다. PC 상담 턴의 「어떤 게임을 하세요?」는
+# 이 경로(pc 가 false)를 타지 않으므로 그대로다. 「게임이나 영화」처럼 여러 갈래 중 하나로
+# 지나가는 말은 남긴다 -- 문장째 지우면 실제 답까지 사라진다.
+_GAME_NUDGE = re.compile(r"게임\S*\s*(?:하면|해\s*보|을\s*해|추천|이\s*인기|은\s*어떠|어떠)|인기\s*(?:있는\s*|많은\s*)?게임")
+_GAME_WORD = re.compile(r"게임|겜")
+
+
+def is_game_nudge(sentence: str) -> bool:
+    if not _GAME_WORD.search(sentence):
+        return False
+    return bool(_GAME_NUDGE.search(sentence) or sentence.rstrip().endswith(("?", "？")))
+
+
+def drop_game_nudge(reply: str) -> str:
+    """고객이 게임을 꺼내지 않은 잡담 답에서 AI 가 먼저 건 게임 권유 문장을 걷는다."""
+    parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
+    return "".join(p for p in parts if not is_game_nudge(p)).strip()
+
+
 def is_pc_push(sentence: str) -> bool:
     return bool(_PC_WORD.search(sentence) and _PC_ASK.search(sentence))
 
@@ -294,6 +315,9 @@ SMALLTALK_BLOCK = "\n".join([
     " **PC 이야기를 붙이지 않는다** -- 「컴퓨터 맞출 생각 있으세요?」 같은 권유도 하지 않는다."
     " 필요할 때 서버가 한 번만 붙인다. 고객이 PC·게임·사양·예산 이야기를 꺼내면 그때 자연스럽게 잇는다"
     " (사장님 2026-10-11 「너무 강제하면 고객은 짜증스럽다」).",
+    "**게임 이야기도 먼저 꺼내지 않는다** -- 고객이 게임을 말하지 않았으면 「혹시 할 게임 있으세요?」·"
+    "「그럴 땐 게임하면 좋지요」·「요즘 이런 게임이 인기예요」처럼 게임 쪽으로 말을 걸지 않는다."
+    " 고객이 게임을 물으면 그때는 충분히 답한다(사장님 2026-10-11 「게임 이런 건 빼고 편하게 대화로 상담」).",
 ])
 
 # ── 프롬프트 [예외 입력] 문단 (2026-10-11 사장님 지시 「무조건 차단하면 안 된다」) ──────────
@@ -1221,6 +1245,10 @@ def parse_talk(body: ParseBody, request: Request):
         # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 잡담이 세 번 이어진 뒤 상담에
         # «한 번만» 서버 줄을 붙인다. 거절했으면 붙이지 않는다.
         reply = drop_pc_push(reply)
+        # 고객이 이번에도, 최근에도 게임을 말하지 않았으면 AI 가 먼저 건 게임 권유도 걷는다.
+        said_game = game_related or any(r == "user" and TA.is_game_related(t, vocab) for r, t in history)
+        if not said_game:
+            reply = drop_game_nudge(reply)
         if may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
             reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
             pc_offered = True
