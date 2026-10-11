@@ -795,13 +795,16 @@ def _legacy_constraints(state: "TS.TalkState") -> list:
     return out
 
 
-def _apply_text_rules(text: str, raw, vocab: "TS.Vocab") -> tuple:
+def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None = None) -> tuple:
     """AI 가 낸 state(dict) -> (바로잡은 dict, 바로잡은 내역[{field, value, reason}]).
 
     `validate_state` **앞**에서 고친다 -- 그래야 게임명을 채웠을 때 확정 등급(catalog)이
     검증층에서 그대로 붙는다. 고친 것은 dropped 와 같은 모양으로 남긴다(삼키지 않는다).
       · 예산: 문장에 금액이 하나로 적혀 있고 AI 값과 다르면 문장 값을 쓴다(「백만원」 10배 오독).
       · 게임명: AI 가 이름을 하나도 안 넣었는데 문장에 우리 목록의 게임이 있으면 채운다.
+      · 2026-10-11(R8): 「100만원대」는 그 자릿수 구간 끝까지(이하)로, 「롤 120」의 맨 숫자는
+        만원으로 읽는다. 작업 프로그램(프리미어·포토샵…)만 말했는데 AI 가 문장에 없는 게임을
+        넣었으면 그 게임과 게임 용도를 뺀다.
     """
     raw = dict(raw) if isinstance(raw, dict) else {}
     fixes: list = []
@@ -815,6 +818,29 @@ def _apply_text_rules(text: str, raw, vocab: "TS.Vocab") -> tuple:
             fixes.append({"field": "budget_won", "value": raw.get("budget_won"),
                           "reason": f"문장의 금액({won}원)으로 바로잡음"})
             raw["budget_won"] = won
+    band = TR.budget_band_from_text(text)
+    if band:
+        lo, hi = band
+        if raw.get("budget_won") != hi or raw.get("budget_bound") != "이하":
+            fixes.append({"field": "budget_won", "value": raw.get("budget_won"),
+                          "reason": f"「{lo // 10_000}만원대」를 {hi // 10_000}만원까지로 읽음"})
+        raw["budget_won"], raw["budget_bound"] = hi, "이하"
+    elif not won:
+        bare = TR.bare_budget_from_text(text)
+        ai_raw = raw.get("budget_won")
+        if bare and ai_raw != bare and (ai_raw is None or ai_raw == prev_budget):
+            fixes.append({"field": "budget_won", "value": ai_raw,
+                          "reason": f"문장 끝의 숫자를 예산({bare}원)으로 읽음"})
+            raw["budget_won"] = bare
+    game = raw.get("game") if isinstance(raw.get("game"), dict) else None
+    names = game.get("names") if game else None
+    if (TR.SOFTWARE_RE.search(text or "") and isinstance(names, list) and names
+            and not TR.games_from_text(text, vocab, TS.match_game)):
+        fixes.append({"field": "game.names", "value": names,
+                      "reason": "작업 프로그램 이름만 있고 문장에 게임이 없어 게임을 뺌"})
+        raw["game"] = None
+        if isinstance(raw.get("usages"), list):
+            raw["usages"] = [u for u in raw["usages"] if not (isinstance(u, str) and TS.is_game_usage(u))]
     game = raw.get("game") if isinstance(raw.get("game"), dict) else None
     names = game.get("names") if game else None
     if not (isinstance(names, list) and any(isinstance(n, str) and n.strip() for n in names)):
@@ -973,7 +999,8 @@ def parse_talk(body: ParseBody, request: Request):
 
     # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
     # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
-    raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab)
+    raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab,
+                                         prev_budget=prev_state_obj.budget_won if prev_state_obj else None)
     state, dropped = TS.validate_state(raw_state, vocab)
     dropped.extend(fixes)
     # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
@@ -1018,6 +1045,9 @@ def parse_talk(body: ParseBody, request: Request):
         reply = TR.honest_reply(notices, bool(state.usages), missing)
     if laptop and stage == TS.STAGE_PC:
         reply = TR.with_laptop_notice(reply)
+    band_note = TR.budget_band_note(text)
+    if band_note and stage == TS.STAGE_PC and band_note not in reply:
+        reply = (reply.rstrip() + " " + band_note).strip()
     evidence = _evidence_lines(obj)
 
     # ── [B] 결과 조립 ────────────────────────────────────────────────────────
