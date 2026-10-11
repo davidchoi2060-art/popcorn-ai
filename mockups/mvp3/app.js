@@ -19,6 +19,11 @@ const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+na
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const money=value=>Number.isInteger(value)?value.toLocaleString('ko-KR')+'원':'금액 미확인';
 const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state;
+// 대화 화면(talk.html)에서 넘어왔는지(talk.js FROM_TALK_KEY · 한 번 읽고 지운다). 넘어왔으면 「대화로 돌아가기」를
+// 보이고, 「부품 바꾸기」로 넘어왔으면 상세가 열린 뒤 부품 바꾸기 칸으로 옮긴다. 대화·견적은 같은 탭 보관으로 온다.
+const FROM_TALK_KEY='popcorn-mvp3-from-talk-v1';
+const arrival=(()=>{try{const raw=sessionStorage.getItem(FROM_TALK_KEY);sessionStorage.removeItem(FROM_TALK_KEY);const v=raw?JSON.parse(raw):null;return v&&typeof v==='object'?{focus:v.focus==='parts'}:null;}catch{return null;}})();
+if(arrival)$('#back-to-talk').hidden=false;
 let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='',enteringRoute=true;
 const draft={version:1,start_mode:null,usage_choice:null,budget_won:null,budget_bound:null,draft_text:'',draft_edited:false};
 const ui={surface:!location.hash||location.hash==='#start'?'gateway':location.hash==='#purpose'?'usage':'consultation',epoch:window.crypto.randomUUID?window.crypto.randomUUID():Array.from(window.crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16)).join('-')};
@@ -454,7 +459,11 @@ function render(){
   }
   lastScreen=state.screen;
   clearTimeout(retryTimer);if(state.error?.retryAt>Date.now())retryTimer=setTimeout(()=>render(),1000);
+  settleArrival();
 }
+function focusParts(){const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});(s?.querySelector('button')||view.querySelector('[data-action=build-options]'))?.focus({preventScroll:true});}
+// 넘어온 직후 견적을 다시 불러오는 일이 끝나면 한 번만 부품 바꾸기 칸으로 옮긴다(못 불러왔으면 옮기지 않고 끝낸다).
+function settleArrival(){if(!arrival?.focus||enteringRoute||state.phase)return;arrival.focus=false;if(state.screen==='detail'&&state.selected)focusParts();}
 function openSaved(){ui.surface='consultation';if(state.screen==='saved'&&state.phase==='list'){render();return;}void flow.list();}
 function enterRoute(hash,initial=false){
   enteringRoute=true;
@@ -463,12 +472,14 @@ function enterRoute(hash,initial=false){
     if(initial&&(!hash||hash==='#start'||hash==='#purpose')){
       ui.surface=hash==='#purpose'?'usage':'gateway';history.replaceState(uiEntry(),'',uiHash());render();return;
     }
-    ui.surface='consultation';let screen=hash.slice(1);
+    ui.surface='consultation';let screen=hash.slice(1);const asked=screen;
     if(!screenNames.includes(screen)||(['detail','final'].includes(screen)&&!state.selected)||(screen==='results'&&!state.recommendation))screen='welcome';
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
     if(screen==='saved')openSaved();else flow.navigate(screen);
     // 새로고침 전에 보던 견적이 있으면 같은 조건으로 다시 물어 그 상품을 다시 연다(값은 지금 기준).
     if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk)void flow.resume();
+    // 고른 견적 없이 조건만 넘어왔으면(대화 화면의 「기존 상담 화면」) 그 조건으로 추천을 다시 받아 추천 목록을 연다.
+    else if(initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk)void flow.refresh();
   }finally{enteringRoute=false;}
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
@@ -515,7 +526,7 @@ document.addEventListener('click',e=>{
     case 'build-close':flow.closeBuild();break;
     case 'build-pick':void flow.pickBuild(Number(b.dataset.code));break;
     case 'build-reset':void flow.resetBuild();break;
-    case 'part-focus':{const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});(s?.querySelector('button')||view.querySelector('[data-action=build-options]'))?.focus({preventScroll:true});break;}
+    case 'part-focus':focusParts();break;
     case 'inquiry-close':flow.inquiryDraft(inquiryValues());flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
     case 'recover':void flow.recover();break;
@@ -560,5 +571,5 @@ window.addEventListener('popstate',e=>{
     enteringRoute=true;try{ui.surface=entry.surface;render();history.replaceState(uiEntry(),'',uiHash());focusSurface();}finally{enteringRoute=false;}
   }else enterRoute(location.hash);
 });
-enterRoute(location.hash,true);focusSurface();
+enterRoute(location.hash,true);focusSurface();settleArrival();
 })();
