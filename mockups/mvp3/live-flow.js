@@ -27,15 +27,19 @@
   const CONVERSATION_KEY='popcorn-mvp3-conversation-v1',CONVERSATION_TTL_MS=6*3600*1000,CONVERSATION_MAX_BYTES=65536;
   const CONVERSATION_MAX_MESSAGES=60,CONVERSATION_MAX_TEXT=2000;
   // 카드번호·주민번호 모양의 숫자는 보관하기 전에 가린다(서버 api/talk_exceptions.mask_personal 과 같은 모양).
+  // 가리는 것은 이 두 모양뿐이다 -- 전화번호·이메일·주소·이름은 가리지 않고, 보관은 이 탭 안 6시간이다.
+  // 자르기 전에 가린다: 먼저 자르면 끝에 걸친 번호가 조각으로 남아 모양을 잃고 가려지지 않는다.
   function maskPersonal(t){return String(t).replace(/(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g,'[가림]').replace(/(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)/g,'[가림]');}
   function conversationSnapshot(state,now=Date.now()){
-    const text=t=>maskPersonal(String(t||'').slice(0,CONVERSATION_MAX_TEXT));
+    const text=t=>maskPersonal(String(t||'')).slice(0,CONVERSATION_MAX_TEXT);
     const sel=state.selected;
     return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,
       chat_flow:M.object(state.chatFlow)?M.copy(state.chatFlow):null,
       history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
       messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
-      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel)}:null};
+      // 되살린 견적을 아직 다시 불러오기 전이면(selected 없음) 그 상품 번호를 지우지 않고 그대로 둔다.
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel)}
+        :state.restoredCurrent?M.copy(state.restoredCurrent):null};
   }
   function validConversation(r,now=Date.now()){
     return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=CONVERSATION_TTL_MS
@@ -127,7 +131,7 @@
     async function submit(raw,{repeat=false}={}){
       const text=String(raw||'').trim();
       if(!text||text.length>MAX_TEXT||state.phase)return false;
-      const previous=state.history.slice(-6),op=begin('talk');
+      const previous=state.history.slice(-6),previousTalk=state.talk,op=begin('talk');
       state.lastText=text;if(!repeat)message(text,'user');emit();
       // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
       let prior=null;
@@ -150,6 +154,8 @@
         if(response.handoff_offer===true)state.handoffOffer=true;
         state.history=state.history.slice(-6);
         if(keep)return true;
+        // 조건이 바뀌었으면 새로고침 전 견적은 더 이상 지금 조건의 견적이 아니다.
+        if(JSON.stringify(response.state)!==JSON.stringify(previousTalk))state.restoredCurrent=null;
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
           savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
@@ -174,6 +180,36 @@
       try{await recommendFor(op);}catch(error){if(current(op))fail(error,{kind:'recommend'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 같은 조건으로 서버에 다시 묻고,
+    // 같은 상품 번호가 지금 추천에 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
+    // 없거나 실패하면 지어내지 않고 그 사실을 말한다. 실패하면 상품 번호는 남겨 다시 시도할 수 있게 한다.
+    async function resume(){
+      const want=state.restoredCurrent;
+      if(state.phase||!want||!state.talk)return;
+      const op=begin('recommend');
+      try{
+        await recommendFor(op);
+        if(!current(op))return;
+        const p=state.groups.flatMap(g=>g.products).find(x=>x.product_code===want.product_code);
+        if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 같은 조건의 추천에 없어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
+        state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.selectedContext=null;state.screen='detail';
+        let note='새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.';
+        if(want.changes.length){
+          try{
+            const q=M.buildQuote(await api.buildQuote(M.copy(state.selectionState),p.product_code,M.copy(want.changes),{signal:op.signal}),p.product_code);
+            if(!current(op))return;
+            state.selected={...state.selected,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null};
+            if(q.changes.length<want.changes.length)note+=' 바꿨던 부품 중 일부는 지금 다시 적용할 수 없어 기본 구성으로 두었어요.';
+            else note+=' 바꿨던 부품도 다시 적용했어요.';
+          }catch(error){
+            if(!current(op))return;
+            note+=' 바꿨던 부품은 다시 적용하지 못해 기본 구성으로 보여 드려요. 부품 구성에서 다시 바꿀 수 있어요.';
+          }
+        }
+        state.restoredCurrent=null;message(note);
+      }catch(error){if(current(op))fail(error,{kind:'resume'});}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
     // Quick choice after the cards: cheaper / better than the card being looked at.
     // Same recommend call with a direction; no AI parse, the conditions stay as they are.
     async function explore(direction,label){
@@ -187,7 +223,7 @@
     function select(index){
       if(state.phase)return;
       const p=state.groups.flatMap(g=>g.products).find(p=>p.index===index);if(!p)return;
-      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
+      cancel();state.restoredCurrent=null;state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
     }
     function navigate(screen){
       if(['detail','final'].includes(screen)&&!state.selected)return;
@@ -279,7 +315,10 @@
     }
     async function openInquiry({human=false}={}){
       if(state.phase)return;
-      state.inquiry.open=true;state.inquiry.error='';if(human)state.inquiry.human=true;
+      // 어느 단추로 열었는지가 신청의 성격을 정한다(일반 상담 / 구매 상담). 닫았다 다른 단추로 열면 그 성격을 따른다.
+      // 성격이 바뀌면 앞서 미리 채운 주제·내용은 비운다. 연락처는 고객이 적은 것이라 둔다.
+      if(!state.inquiry.done){if(state.inquiry.human!==human){state.inquiry.draft.topic='';state.inquiry.draft.message='';}state.inquiry.human=human;}
+      state.inquiry.open=true;state.inquiry.error='';
       // 상품을 고르기 전(상담 중) 사람 상담: 주제 「기타」와 마지막 문장을 미리 채운다 -- 고객이 고칠 수 있다.
       if((!state.selected||human)&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
       if(state.inquiry.meta){emit();return;}
@@ -413,12 +452,13 @@
       const task=state.retry;
       if(task.kind==='talk')await submit(task.text,{repeat:true});
       else if(task.kind==='recommend')await refresh();
+      else if(task.kind==='resume')await resume();
       else if(task.kind==='save')await save();
       else if(task.kind==='recover')await recover();
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
+    return {state,reset,submit,refresh,resume,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
   if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);
