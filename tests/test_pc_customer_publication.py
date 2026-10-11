@@ -70,6 +70,9 @@ def sources():
     description = selected('pc_configuration_edit','api/pc_configuration_edit.py',('description_complete',))
     recommend = selected('recommend','api/recommend.py',('_cmp','rule_ref_value','rule_verdict','_rule_applies'),
                          namespace=dict(re=re))
+    build = selected('build_check','api/build_check.py',('rule_checks',),namespace=dict(
+                         rule_verdict=recommend.rule_verdict,rule_ref_value=recommend.rule_ref_value,
+                         _rule_applies=recommend._rule_applies))
     review = selected('pc_configuration_review','api/pc_configuration_review.py',
                       ('basis_hash','assess','load_review'), assignments=('MANUAL',), namespace=dict(
                           text=text,HTTPException=HTTPException,digest=copy.digest,
@@ -77,7 +80,8 @@ def sources():
                           cooling_plan=cooling.cooling_plan,POLICY_VERSION=policy.POLICY_VERSION,
                           issue_stages=policy.issue_stages,route_checks=policy.route_checks,
                           specs_for_review=specs.specs_for_review,rule_verdict=recommend.rule_verdict,
-                          rule_ref_value=recommend.rule_ref_value,_rule_applies=recommend._rule_applies))
+                          rule_ref_value=recommend.rule_ref_value,_rule_applies=recommend._rule_applies,
+                          rule_checks=build.rule_checks))
     # Extract only the actual bucket constant, never initialize GCS or its module.
     selected('product_images','api/product_images.py',(),assignments=('MEDIA_BUCKET',))
     core = full('pc_customer_publication','api/pc_customer_publication.py')

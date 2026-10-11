@@ -14,7 +14,7 @@ from .db import engine
 from .timeutil import now_iso
 from .pc_configuration_copy import digest, part_needs_review
 from .pc_review_specs import specs_for_review
-from .recommend import rule_verdict, rule_ref_value, _rule_applies
+from .build_check import rule_checks
 from .pc_review_policy import POLICY_VERSION, issue_stages, route_checks
 from .pc_cooling_plan import cooling_plan
 
@@ -100,36 +100,12 @@ def assess(config, parts, offers, rows, specs, rules):
     if not rules:
         blockers.append('활성 호환 규칙 없음')
     # Evaluate all registered active rules against the fixed BOM, not DFS traversal order.
-    for rule in rules:
-        left, right = slots.get(rule['slot'], []), slots.get(rule['ref_slot'], [])
-        if not left or not right:
-            checks.append(dict(key=rule['rule_key'],label=rule['label'],state='unknown',
-                               detail='대상 부품 또는 비교 부품 없음 · 내장/기본 포함 여부 근거 확인'))
-            continue
-        for p in left:
-            s = specs.get(p['explanation_code'], {})
-            if s.get('part_type') and not _rule_applies(rule,s):
-                continue
-            for q in right:
-                key = f"{rule['rule_key']}:{p['ordinal']}:{q['ordinal']}"
-                ref = specs.get(q['explanation_code'], {})
-                v, r = s.get(rule['field']), ref.get(rule['ref_field'])
-                state = 'unknown'
-                detail = f"{p['source_code']} {rule['field']}={v}; {q['source_code']} {rule['ref_field']}={r}"
-                if v is not None and r is not None and s.get('part_type') and rule['op'] in ('eq','gte','lte','contains'):
-                    try:
-                        state = 'pass' if rule_verdict(rule,v,r) else 'fail'
-                        detail = (rule.get('detail_fmt') or '{v} / {r}').replace('{v}',str(v)).replace('{r}',str(rule_ref_value(rule,r)))
-                        if state == 'fail' and rule['op'] == 'contains':
-                            detail = f"등록 지원 목록 {v} / 대상 {r} · 목록에 없음"
-                        if rule['rule_key']=='power':
-                            detail = f"파워 정격 {v}W / GPU {r}W + 규칙 여유 {rule.get('ref_offset') or 0}W"
-                    except (TypeError, ValueError):
-                        detail += ' · 사양 형식 확인 필요'
-                checks.append(dict(key=key,label=rule['label'],state=state,detail=detail,
-                                   missing_fields=[field for field,value in ((rule['field'],v),(rule['ref_field'],r)) if value is None]))
-                if state == 'fail':
-                    blockers.append(rule['label']+' · 현재 DB 사양 불일치')
+    # The rule-pair evaluation is shared with the builder, BOM edits and customer swaps (api/build_check.py).
+    lines = [dict(key=p['ordinal'], slot=p['slot'], spec_key=p['explanation_code'], label=p['source_code']) for p in real]
+    checks = rule_checks(lines, specs, rules)
+    for x in checks:
+        if x['state'] == 'fail':
+            blockers.append(x['label']+' · 현재 DB 사양 불일치')
     route_checks(checks,parts,specs,config,rows)
     cooling = cooling_plan(parts,rows)
     if cooling['installed']=='bundled':
