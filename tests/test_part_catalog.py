@@ -65,6 +65,15 @@ class Judge(unittest.TestCase):
         v = pc.judge(row(slot='COOLER', part_type='COOLER_CPU_AIO'), {'part_type': 'COOLER_CPU_AIO', 'socket_list': []}, RULES)
         self.assertEqual(v['missing_fields'], ['socket_list'])
 
+    def test_no_active_rules_is_not_ready(self):
+        # 활성 호환 규칙이 0개면 사양을 따질 기준이 없다 — 「판매 가능」이 아니라 「호환 규칙 없음」(코덱스 검수 #95)
+        v = pc.judge(row(), {'part_type': 'CPU', 'socket': 'AM5'}, [])
+        self.assertEqual((v['state'], v['reasons']), ('no_rules', ['no_rules']))
+        self.assertEqual(pc.STATE_LABELS['no_rules'], '호환 규칙 없음')
+        # 다른 막힘이 있으면 그것이 먼저다
+        v = pc.judge(row(sale_status='품절'), {'part_type': 'CPU'}, [])
+        self.assertEqual(v['reasons'], ['not_on_sale', 'no_rules'])
+
     def test_no_specs_row(self):
         v = pc.judge(row(slot='MB', part_type='MB'), None, RULES)
         self.assertEqual((v['state'], v['missing_fields']), ('missing_specs', ['socket']))

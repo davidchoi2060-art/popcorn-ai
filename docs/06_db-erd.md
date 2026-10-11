@@ -1913,3 +1913,7 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 | started_at · finished_at | TIMESTAMPTZ | |
 
 기본은 미리보기다. 실제로 비우는 것은 `RETENTION_PURGE_APPLY=on` 일 때만이다. `purchase_inquiries.contact_purged_at`(TIMESTAMPTZ)은 연락처를 비운 시각이고, 연락처 CHECK(전화 또는 이메일 필수)는 이 칸이 찬 행만 예외로 둔다. downgrade 는 비운 연락처나 실행 기록이 하나라도 있으면 거부한다.
+
+### 36. 상담 해석 바로잡기 — 시험 기록 (2026-10-11, 0154)
+
+`talk_text_fixes` 에 `tested_sig`(VARCHAR(120)) · `tested_at`(TIMESTAMPTZ) · `tested_by`(BIGINT)를 더한다. 저장된 규칙을 시험(`POST /api/admin/talk-text-fixes/try` 에 `fix_id`)해 그 규칙이 문장에 실제로 맞았을 때만 값의 지문(표현 · 종류 · 예산 · 경계 · 해상도, 메모 제외)을 남긴다. 새 규칙은 «미사용»으로만 만들고, «사용»으로 올리려면 지금 값의 지문이 `tested_sig` 와 같아야 한다(코덱스 검수 #111). 이미 «사용»인 규칙은 값을 바꾸지 않으면 그대로 저장할 수 있다. 기존 행은 바꾸지 않는다.

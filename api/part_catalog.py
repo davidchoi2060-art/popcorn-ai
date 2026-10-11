@@ -7,6 +7,8 @@
   not_on_sale      상품은 있으나 판매중이 아니다(품절·단종·삭제대기)
   no_price         판매가가 없다
   missing_specs    호환 규칙이 읽는 사양 칸이 비어 있다 — 이대로면 호환 검사가 「판정 못 함」이 된다
+  no_rules         활성 호환 규칙이 하나도 없다 — 사양을 따질 기준이 없으니 「판매 가능」이라 하지 않는다
+                   (코덱스 검수 #95). 다른 막힘이 있으면 그것이 먼저다
 
 필요한 사양은 **지금 활성 호환 규칙(`compat_rules`)에서 뽑는다** — 규칙이 늘면 기준도 따라 는다.
 재고 0 은 막힘이 아니다(공급처에서 받아 파는 부품이 있다). 화면에 수만 함께 보인다.
@@ -26,13 +28,14 @@ from .taxonomy import SLOT_LABELS, slot_of
 
 router = APIRouter()
 
-STATES = ('ready', 'no_product', 'not_on_sale', 'no_price', 'missing_specs')
+STATES = ('ready', 'no_product', 'not_on_sale', 'no_price', 'missing_specs', 'no_rules')
 STATE_LABELS = {
     'ready': '판매 가능',
     'no_product': '판매 상품 없음',
     'not_on_sale': '판매중 아님',
     'no_price': '판매가 없음',
     'missing_specs': '호환 사양 부족',
+    'no_rules': '호환 규칙 없음',
 }
 FIELD_LABELS = {
     'socket': '소켓', 'socket_list': '지원 소켓 목록', 'mem_type': '메모리 규격', 'form_factor': '폼팩터',
@@ -83,6 +86,8 @@ def judge(row, spec, rules):
     missing = [f for f in required_fields(rules, slot, part_type) if empty(f)]
     if missing:
         reasons.append('missing_specs')
+    if not rules:
+        reasons.append('no_rules')
     later = [f for f in required_fields(rules, slot, part_type, conditional=True) if empty(f)]
     return dict(state=reasons[0] if reasons else 'ready', reasons=reasons, missing_fields=missing,
                 conditional_missing=later)
@@ -121,7 +126,7 @@ def summarize(items):
 
 
 @router.get('/api/admin/part-catalog')
-def catalog(state: Literal['', 'ready', 'no_product', 'not_on_sale', 'no_price', 'missing_specs'] = '',
+def catalog(state: Literal['', 'ready', 'no_product', 'not_on_sale', 'no_price', 'missing_specs', 'no_rules'] = '',
             slot: str = Query('', max_length=20), used: bool = True,
             offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)):
     with engine.connect() as c:

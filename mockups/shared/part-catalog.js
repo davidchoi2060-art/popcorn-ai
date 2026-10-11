@@ -4,7 +4,7 @@
 const box=document.getElementById('pc-cat');if(!box)return;
 const $=s=>box.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number.isFinite(x)&&x>0?x.toLocaleString('ko-KR')+'원':'-';
-const ORDER=['no_product','not_on_sale','no_price','missing_specs','ready'];
+const ORDER=['no_product','not_on_sale','no_price','missing_specs','no_rules','ready'];
 let state='',used=true,offset=0,limit=20,seq=0;
 async function load(){
   const my=++seq,q=new URLSearchParams({state,used:String(used),offset:String(offset),limit:String(limit)});
