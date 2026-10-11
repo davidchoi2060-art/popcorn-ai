@@ -394,3 +394,13 @@ details.a2-more[open]>summary{margin-bottom:8px}
   .a2-intro-links{grid-auto-columns:minmax(150px,72%)}
   .a2-intro-steps p{padding-left:0;border-left:0;flex-basis:100%}
 }
+
+/* ── 돌아가기 줄 (2026-10-11 사장님 신고) ────────────────────────────────────────
+   카드를 눌러 들어온 화면 맨 위에 원래 화면으로 돌아가는 링크 한 줄. 셸이
+   `api/admin_page_intro.BACK_LINKS` 값으로 그린다. 배치 개편 전 최소 조치다. */
+.a2-back{flex:none;padding:10px 20px 0;background:var(--rv-canvas)}
+.a2-back a{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid rgba(0,0,0,.14);
+    border-radius:6px;background:var(--rv-card);font:600 12.5px/1.2 var(--rv-font);color:var(--rv-link);text-decoration:none}
+.a2-back a:hover{border-color:rgba(0,0,0,.28)}
+.a2-back a:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
+@media (max-width:768px){.a2-back{padding:8px 12px 0}}

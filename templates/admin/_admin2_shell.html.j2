@@ -174,6 +174,15 @@
       </span>
     </header>
 
+    {% if back_link %}
+    {#  돌아가기 줄 — 카드를 눌러 들어온 화면에서 원래 화면으로 돌아가는 길(2026-10-11).
+        원천은 `api/admin_page_intro.BACK_LINKS`. 평범한 링크라 브라우저 뒤로 가기와
+        충돌하지 않는다. 직전 화면이 바로 그 화면이면 admin2-shell.js 가 뒤로 가기로
+        돌려 스크롤·필터를 지킨다. #}
+    <nav class="a2-back" aria-label="돌아가기">
+      <a href="{{ back_link.href }}" id="a2BackLink" data-action="back-to-parent"><span aria-hidden="true">←</span> {{ back_link.label }}</a>
+    </nav>
+    {% endif %}
     {% if page_intro %}
     {#  화면 머리말 — 2026-10-11 「관리자 나머지 화면 개편」. 문구·바로가기 원천은
         `api/admin_page_intro.py`(이 파일에 문구를 적지 않는다). 본문은 건드리지 않고
