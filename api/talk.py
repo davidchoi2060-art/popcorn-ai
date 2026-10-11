@@ -1291,7 +1291,13 @@ def parse_talk(body: ParseBody, request: Request):
     asked_before = TS.flow_asked(body.chat_flow)
     plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
                 and not notices and not laptop)
-    if plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
+    # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
+    # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
+    explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+                 and getattr(ans, "topic", None) in ("part", "upgrade"))
+    if plain_pc and explained and missing == [TS.MISSING_USAGES]:
+        reply = ""
+    elif plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
         # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
         label = TD.default_usage_label(vocab)
         if label:
@@ -1413,7 +1419,7 @@ def parse_talk(body: ParseBody, request: Request):
         "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
                                  pc_declined=pc_declined,
                                  asked=bool(missing) and pc is True and stage == TS.STAGE_PC
-                                 ).model_dump(),
+                                 and bool(reply.strip())).model_dump(),
         "stage": stage,
         # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
         # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,

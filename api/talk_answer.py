@@ -520,6 +520,8 @@ class AnswerResult:
     fallback: bool = False
     # "game"(게임 질문 답) | "pc_advice"(PC 구성 질문에 먼저 하는 설명 -- api/talk_pc_advice)
     kind: str = "game"
+    # pc_advice 일 때 build(구성 추천) | part(부품 질문) | upgrade(쓰던 PC 고민)
+    topic: str | None = None
 
 
 FALLBACK_MAX_GAMES = 3
@@ -607,7 +609,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                 labels = None
         if labels is not None:
             return PA.advise(conn_factory, sentence, labels, res, history=history,
-                             timeout_sec=timeout_sec)
+                             timeout_sec=timeout_sec, topic=PA.topic_of(sentence, vocab))
         if not is_game_related(sentence, vocab):
             res.elapsed_sec = round(time.time() - t0, 3)
             return res

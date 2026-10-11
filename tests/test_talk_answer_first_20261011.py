@@ -186,3 +186,20 @@ class LeavesGoodAnswersAlone(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PartQuestionDoesNotStartBuying(unittest.TestCase):
+    def test_part_question_gets_explanation_without_usage_question(self):
+        ans = TA.AnswerResult(answer="SSD는 저장 공간이고 메모리는 작업 공간이에요.", narrowing=TS.NARROWING_WIDE,
+                              kind="pc_advice", topic="part")
+        r = parse("SSD랑 메모리 차이가 뭐예요", {}, "어떤 용도로 쓰실 PC인가요?", ans=ans)
+        self.assertEqual(r["answer"], "SSD는 저장 공간이고 메모리는 작업 공간이에요.")
+        self.assertEqual(r["reply"], "")                    # 새 PC 용도를 묻지 않는다
+        self.assertFalse(r["chat_flow"]["asked"])
+
+    def test_plain_pc_request_without_usage_still_asks_once(self):
+        ans = TA.AnswerResult(answer="PC는 쓰는 일에 따라 중요한 부품이 달라요.", narrowing=TS.NARROWING_WIDE,
+                              kind="pc_advice", topic="build")
+        r = parse("PC 추천해줘", {}, "주로 어떤 일에 쓰실 PC인가요?", ans=ans)
+        self.assertEqual(r["reply"], "주로 어떤 일에 쓰실 PC인가요?")   # 설명 뒤 핵심 질문 하나
+        self.assertTrue(r["chat_flow"]["asked"])
