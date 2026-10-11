@@ -2,7 +2,7 @@
 // 읽기만 한다: talk/parse, grid/recommend, 대표 사진·부품 사진 GET, pc-offers GET, saved-quotes GET.
 // 견적 보관(POST saved-quotes)은 DB 쓰기라 부르지 않는다. 비밀값 없음.
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
-const BASE='https://popcornai.co.kr', OUT=process.env.OUT||'out';
+const BASE='https://popcornai.co.kr', OUT=process.env.OUT||'out', TAG=process.env.TAG||'';
 const cases=JSON.parse(fs.readFileSync(path.join(__dirname,'cases.json'),'utf8'));
 fs.mkdirSync(OUT,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -53,13 +53,13 @@ async function checkMedia(rec){
   return res;
 }
 (async()=>{
-  const summary=[];let v=null;
+  const summary=[];let v=null;const ops=await call('GET','/api/ops');fs.writeFileSync(path.join(OUT,'ops.json'),JSON.stringify(ops,null,2));
   for(const c of cases){
     if(c.id===1||c.id===9||c.id===17){cookie='';v=await getVisitor();cookie=v.cookie;}
     let talk=null,chatFlow=null,history=[];const turns=[];
     for(const text of c.turns){
-      const p=await parse({text,state:talk,chat_flow:chatFlow,history:history.slice(-6)});
-      const turn={text,parse:p,recommend:null,media:null};
+      const sent=new Date();const p=await parse({text:TAG+text,state:talk,chat_flow:chatFlow,history:history.slice(-6)});
+      const turn={text:TAG+text,sent_at_utc:sent.toISOString(),sent_at_kst:new Date(sent.getTime()+9*3600e3).toISOString().replace('Z','+09:00'),pc_vid:cookie.replace('pc_vid=',''),parse:p,recommend:null,media:null};
       const j=p.json;
       if(p.status===200&&j&&j.ok===true&&j.state){
         talk=j.state;chatFlow=j.chat_flow||null;history.push({role:'user',text});

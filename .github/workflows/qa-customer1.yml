@@ -20,6 +20,7 @@ jobs:
       - name: 문의 실행
         env:
           OUT: ${{ runner.temp }}/qa1
+          TAG: 'QA-고객1 '
         run: node run.cjs
       - name: 결과를 전용 브랜치에 올리기
         if: always()
