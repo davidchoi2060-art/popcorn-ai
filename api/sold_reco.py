@@ -363,6 +363,101 @@ def eligible_item(state, game_usages, other_usages, code, notes, vocab=None) -> 
     return None
 
 
+# ── 부품 바꾸기 (2026-10-11 중헌 님 「제품을 선택하고 부품 변경하는 부분 — 아직 안 된다」) ──
+# 고객이 고르는 것은 몰의 완제품 한 대(pd_no)다. 부품 하나를 바꾼 구성은 몰에 상품이 없어 살 수
+# 없고, 우리가 값을 매기면 새 가격 계산을 만드는 것이다. 그래서 «부품 바꾸기» = 바꾸려는 부품만
+# 다르고 핵심 부품은 같은 **다른 판매 PC** 로 옮기는 것이다. 호환은 몰이 조립·판매하는 구성이라
+# 보장되고, 가격은 그 상품의 현재 판매가(load() 와 같은 원천) 그대로다. 보관·쇼핑몰 연결도 그
+# 상품번호로 지금 경로를 그대로 탄다.
+SWAP_SLOTS = {   # 바꾸는 부품 -> (사양 키, 고객 이름, 그대로 두는 핵심 부품)
+    "cpu": ("cpu", "CPU", ("gpu",)),
+    "gpu": ("gpu", "그래픽카드", ("cpu",)),
+    "ram": ("ram_gb", "메모리", ("cpu", "gpu")),
+    "ssd": ("ssd_gb", "저장장치", ("cpu", "gpu")),
+}
+# 핵심 부품이 아닌 공개 사양 — 이것이 함께 달라지면 숨기지 않고 «함께 바뀌는 것»으로 말한다.
+SWAP_ALSO = (("ram_gb", "메모리"), ("ssd_gb", "저장장치"))
+MAX_SWAP_OPTIONS = 8
+
+
+def _swap_val(p, key):
+    sp = p.get("spec") if isinstance(p.get("spec"), dict) else {}
+    v = sp.get(key)
+    if isinstance(v, str):
+        v = v.strip()
+        return v or None
+    return v if type(v) in (int, float) and v > 0 else None
+
+
+def _swap_same(key, a, b) -> bool:
+    if a is None or b is None:
+        return False
+    if isinstance(a, str) or isinstance(b, str):
+        return str(a).upper().replace(" ", "") == str(b).upper().replace(" ", "")
+    if key == "ssd_gb":   # 960GB 와 1,000GB 는 같은 1TB 다(표기 차이 — reco_explore 의 90% 와 같은 기준)
+        return abs(a - b) <= max(a, b) * 0.1
+    return a == b
+
+
+def _swap_label(key, v) -> str:
+    if key == "ram_gb":
+        return f"{int(v)}GB"
+    if key == "ssd_gb":
+        return X._gb_label(int(v))
+    return str(v)
+
+
+def part_options(state, game_usages, other_usages, code, slot, notes, vocab=None) -> dict | None:
+    """선택한 판매 PC(code)에서 한 부품(slot)만 다른 판매 PC 목록. 이 PC 가 판매 중이 아니거나
+    이 상담 용도를 채우지 못하면 None(화면은 다시 조회하라고 말한다).
+
+    후보 = 판매 중 · 이 상담 용도의 최소 수준 충족(eligible_item 과 같은 판정) · 핵심 부품 같음 ·
+    바꾸려는 부품 값이 다름. 같은 값이 여러 대면 함께 바뀌는 것이 적은 것 -> 고객 공개 승인 ->
+    지금 가격과 가까운 것 한 대만. 목록 순서는 용량은 작은 것부터, CPU·그래픽카드는 싼 것부터.
+    """
+    key, label, keep = SWAP_SLOTS[slot]
+    levels, products = load()
+    base = products.get(code)
+    if base is None or base["price"] is None:
+        return None
+    targets = _targets(state, game_usages, other_usages, levels, vocab, notes)
+    usage_of = lambda p: next((fu for _, fu, r in targets if p["fit"].get(fu, {}).get("rank", 0) >= r), None)  # noqa: E731
+    if usage_of(base) is None:
+        return None
+    current = _swap_val(base, key)
+    preferred = public_codes()
+    best = {}
+    for p in products.values():
+        if p["code"] == code or p["price"] is None or usage_of(p) is None:
+            continue
+        v = _swap_val(p, key)
+        if v is None or _swap_same(key, v, current):
+            continue
+        if not all(_swap_same(k, _swap_val(p, k), _swap_val(base, k)) for k in keep):
+            continue
+        also = [(k, lab) for k, lab in SWAP_ALSO if k != key
+                and not _swap_same(k, _swap_val(p, k), _swap_val(base, k))]
+        group = next((g for g in best if _swap_same(key, g, v)), v)
+        rank = (len(also), p["code"] not in preferred, abs(p["price"] - base["price"]), p["code"])
+        if group not in best or rank < best[group][0]:
+            best[group] = (rank, p, also)
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    options = []
+    for v, (_, p, also) in best.items():
+        it = _item(p, usage_of(p), levels_by, TAG_CHOSEN, state.budget_won, state.budget_bound)
+        it["swap"] = {
+            "slot": slot, "value": _swap_label(key, v), "price_diff": p["price"] - base["price"],
+            "also": [{"label": lab, "from": _swap_label(k, _swap_val(base, k)) if _swap_val(base, k) is not None else "정보 없음",
+                      "to": _swap_label(k, _swap_val(p, k)) if _swap_val(p, k) is not None else "정보 없음"}
+                     for k, lab in also],
+        }
+        options.append((v, it))
+    options.sort(key=lambda o: (o[0], o[1]["price"]) if key in ("ram_gb", "ssd_gb") else (o[1]["price"], str(o[0])))
+    return {"slot": slot, "label": label, "current": _swap_label(key, current) if current is not None else None,
+            "base_code": code, "base_price": base["price"],
+            "options": [it for _, it in options[:MAX_SWAP_OPTIONS]]}
+
+
 def _targets(state, game_usages, other_usages, levels, vocab, notes):
     targets = []
     for u in other_usages:

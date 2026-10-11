@@ -150,6 +150,20 @@
     if(!object(value)||!uuid(value.id)||!object(value.state)||typeof value.saved_at!=='string'||!/^\d{4}-\d\d-\d\dT/.test(value.saved_at)||!Number.isFinite(Date.parse(value.saved_at)))return null;
     const p=product(value.product);return p&&p.price!==null?{id:value.id,product:p,state:copy(value.state),saved_at:value.saved_at}:null;
   }
+  // 부품 바꾸기 응답(api/mvp3_part_options): 그 부품만 다른 판매 PC 들. 상품은 추천 카드와 같은 판정을 거치고,
+  // 차액·함께 바뀌는 것은 서버가 준 값만 쓴다(화면이 금액을 더하거나 빼지 않는다).
+  const SWAP_SLOTS=['cpu','gpu','ram','ssd'];
+  function partOptions(value,slot,baseCode){
+    if(!object(value)||value.ok!==true||!SWAP_SLOTS.includes(slot)||value.slot!==slot||value.base_code!==baseCode||!Array.isArray(value.options))
+      throw new Error('부품 선택지를 확인할 수 없어요.');
+    const options=value.options.map(raw=>{
+      const p=product(raw),s=raw?.swap;
+      if(!p||p.price===null||p.product_code===baseCode||!object(s)||s.slot!==slot||!text(s.value).trim()||!Number.isSafeInteger(s.price_diff)||!Array.isArray(s.also))return null;
+      const also=s.also.filter(x=>object(x)&&['label','from','to'].every(k=>typeof x[k]==='string')).map(x=>({label:x.label,from:x.from,to:x.to}));
+      return {...p,swap:{value:s.value,price_diff:s.price_diff,also}};
+    }).filter(Boolean);
+    return {slot,label:text(value.label)||slot,current:text(value.current),options};
+  }
   function sources(value){
     return Array.isArray(value)?value.filter(object).filter(x=>['own','web'].includes(x.kind)&&text(x.label))
       .map(x=>({kind:x.kind,label:x.label,url:safeUrl(x.url)})):[];
@@ -188,6 +202,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,partOptions,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

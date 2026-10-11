@@ -760,9 +760,8 @@ def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str],
     return choices, e.get("anchor_code")
 
 
-def eligible_sold_item(state_raw: dict, code: int) -> dict | None:
-    """보관 확인용(api/mvp3_saved_quotes): 지금 목록에 없어도 이 상담 용도를 채우는 판매 상품인가."""
-    notes: list[str] = []
+def _sold_usages(state_raw: dict):
+    """화면이 돌려보낸 상담 조건 -> (state, 판매 게임 용도, 그 밖 용도, vocab). 추천과 같은 나눔."""
     with engine.connect() as conn:
         vocab = load_vocab(conn)
         state, _ = validate_state(state_raw, vocab)
@@ -771,10 +770,29 @@ def eligible_sold_item(state_raw: dict, code: int) -> dict | None:
     game_grade = state.game.grade if (game_usages and state.game) else None
     sold_games = game_usages if (game_grade is not None or not named) else []
     others = [u for u in state.usages if not is_game_usage(u)]
+    return state, sold_games, others, vocab
+
+
+def eligible_sold_item(state_raw: dict, code: int) -> dict | None:
+    """보관 확인용(api/mvp3_saved_quotes): 지금 목록에 없어도 이 상담 용도를 채우는 판매 상품인가."""
+    notes: list[str] = []
+    state, sold_games, others, vocab = _sold_usages(state_raw)
     item = SOLD.eligible_item(state, sold_games, others, code, notes, vocab)
     if notes:
         log.info("[grid_public] eligible notes: %r", notes)
     return item
+
+
+def sold_part_options(state_raw: dict, code: int, slot: str) -> dict | None:
+    """부품 바꾸기(api/mvp3_part_options): 고른 판매 PC 에서 그 부품만 다른 판매 PC 들. 공개 구성도 붙인다."""
+    notes: list[str] = []
+    state, sold_games, others, vocab = _sold_usages(state_raw)
+    res = SOLD.part_options(state, sold_games, others, code, slot, notes, vocab)
+    if notes:
+        log.info("[grid_public] part option notes: %r", notes)
+    if res is not None:
+        _PC_OFFER.attach(res["options"])
+    return res
 
 
 @router.post("/recommend")
