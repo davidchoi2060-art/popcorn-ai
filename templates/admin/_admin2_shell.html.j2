@@ -126,7 +126,7 @@
 
   <div class="a2-main" id="main">
     <header class="a2-hd">
-      <span class="a2-crumb">{{ crumb_group }}</span><span class="a2-sep">/</span><span class="a2-now">{{ crumb_now }}</span>
+      {% if crumb_href %}<a class="a2-crumb" href="{{ crumb_href }}">{{ crumb_group }}</a><span class="a2-sep" aria-hidden="true">›</span>{% else %}<span class="a2-crumb">{{ crumb_group }}</span><span class="a2-sep">/</span>{% endif %}<span class="a2-now">{{ crumb_now }}</span>
       {% block header_extra %}{% endblock %}
       <span class="a2-grow"></span>
       {#  「허브」 — 내부 접근 허브(INT-GATE-010 · `/mvp1/index.html`)로 가는 단추.

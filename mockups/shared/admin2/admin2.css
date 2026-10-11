@@ -404,3 +404,7 @@ details.a2-more[open]>summary{margin-bottom:8px}
 .a2-back a:hover{border-color:rgba(0,0,0,.28)}
 .a2-back a:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
 @media (max-width:768px){.a2-back{padding:8px 12px 0}}
+/* 헤더 경로의 묶음 칸이 링크일 때(신 관리자 「사용·성능 자료 › 현재 화면」) */
+.a2-hd a.a2-crumb{color:var(--rv-link);text-decoration:none}
+.a2-hd a.a2-crumb:hover{text-decoration:underline}
+.a2-hd a.a2-crumb:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}

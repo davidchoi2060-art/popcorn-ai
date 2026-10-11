@@ -376,10 +376,12 @@ def intro_for(path: str) -> dict | None:
 # 설계를 기다리고, 여기서는 «돌아가는 링크 한 줄»만 셸이 그린다.
 #   key   카드가 모여 있는 화면(돌아갈 곳)
 #   label 돌아가기 링크 문구 — 이름은 신 관리자 좌측 메뉴 이름과 같게 둔다
+#   group 신 관리자 헤더 경로에 쓸 묶음 이름 — 신 관리자 좌측 메뉴 이름과 같다
 #   from  그 화면의 카드·같은 메뉴 묶음으로 들어오는 화면들
 BACK_LINKS: dict[str, dict] = {
     "/admin2/usage-floors": {
         "label": "사용·성능 자료로 돌아가기",
+        "group": "사용·성능 자료",
         "from": ("/admin2/game-copy-review", "/admin2/game-grades", "/admin2/talk-patterns",
                  "/admin2/shop-notices", "/admin2/talk-review", "/admin2/product-fit"),
     },
@@ -392,4 +394,18 @@ def back_for(path: str) -> dict | None:
     for href, meta in BACK_LINKS.items():
         if key in meta["from"]:
             return {"href": href, "label": meta["label"]}
+    return None
+
+
+def group_crumb(path: str) -> dict | None:
+    """신 관리자 헤더 경로의 묶음 칸 — 「사용·성능 자료 › 현재 화면」(코덱스 설계 2026-10-11).
+
+    묶음 안 화면들의 헤더 경로가 구 메뉴 이름(상품사양관리·AI 관리·상품관리)으로 흩어져
+    있던 것을 신 관리자 좌측 메뉴 이름 하나로 맞춘다. {href, label}. 묶음 밖이면 None.
+    구 관리자 모드는 구 메뉴 묶음을 그대로 쓴다(그쪽 왼쪽 메뉴와 맞아야 하므로).
+    """
+    key = _norm(path)
+    for href, meta in BACK_LINKS.items():
+        if key == _norm(href) or key in meta["from"]:
+            return {"href": href, "label": meta["group"]}
     return None
