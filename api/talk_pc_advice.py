@@ -41,12 +41,20 @@ _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\
                       r"어떤\s*(pc|피시|컴퓨터|컴|본체|사양)\S{0,2}\s*(좋|괜찮|필요|돼|되)|"
                       r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양|"
                       # 「예산 얼마나 잡아야」·「배그 돌아가는 컴퓨터」(2026-10-11 일반 AI 비교 R09·E13)
-                      r"얼마\S{0,2}\s*(잡|들|필요|있어야|정도|면\s*돼|면\s*되)|돌아가는|돌릴|돌리려", re.I)
+                      r"얼마\S{0,2}\s*(잡|들|필요|있어야|정도|면\s*돼|면\s*되)|돌아가는|돌릴|돌리려|"
+                      # 「사무용 컴퓨터 50만원으로 맞출 수 있어요?」·「회계 사무실 PC 5대 필요해요」·「4K 편집이랑 3D 렌더링
+                      # 같이 하려면?」·「공부용이랑 마인크래프트용 컴퓨터요」(2026-10-11 개발 서버 -- 설명 없이 되묻기만 했다)
+                      r"맞출|용\s*(pc|피시|컴퓨터|본체|데스크)", re.I)
+# 「~하려면」「~필요해요」는 용도·게임·PC 를 말했을 때만 새 PC 질문이다. 부품을 말했으면(「PC 램 몇 기가 필요해요?」)
+# 부품 설명으로 둔다 -- 새 PC 용도를 되묻지 않게.
+_NEED = re.compile(r"하려면|쓰려면|필요해|필요한가|필요할까|뭐가\s*필요")
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
 # 모니터는 뺀다 -- 「모니터 추천」은 크기 구간을 바로 보여 주는 별도 흐름이 있다(talk.MONITOR_BANDS).
-_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스", re.I)
+# 그래픽카드·CPU 모델명도 부품이다 -- 「RTX 5060이랑 RTX 5060 Ti 차이가 뭐예요?」가 「판단할 수 없어요」로 끝났다(2026-10-11).
+_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스|"
+                   r"(?<![a-z])(rtx|gtx|rx)\s*\d{3,4}|지포스|라데온|라이젠|ryzen", re.I)
 _ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|좋은|괜찮|비교|알려|궁금|역할|\?")
 _UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
 TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE, TOPIC_GENERAL = "build", "part", "upgrade", "general"
@@ -94,7 +102,9 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
     explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
-    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game)) and not explain_part
+    uses = bool(usage_hits(s, vocab)) or game
+    build = bool((_REQUEST.search(s) and (uses or pc))
+                 or (_NEED.search(s) and (uses or (pc and not part)))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):

@@ -1260,6 +1260,11 @@ def parse_talk(body: ParseBody, request: Request):
     custom_hits = TR.custom_topic_hits(text, custom_notices)
     if (TR.purchase_topics(text) or custom_hits) and pc is not True:
         pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
+    if pc is not True and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
+        # 규칙(talk_pc_advice.topic_of)이 PC·부품 질문으로 보고 설명을 지었으면 PC 상담이다. AI 판정이
+        # 「주제 밖」이라고 그 설명을 지우지 않는다(2026-10-11 개발 서버: 「발로란트 240프레임 그래픽카드 뭐 사야 돼?」·
+        # 「RTX 5070 들어간 PC 얼마 정도 해요?」에 설명 없이 「다른 시스템에서 확인하세요」만 나갔다).
+        pc = True
     # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
     #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
     #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
