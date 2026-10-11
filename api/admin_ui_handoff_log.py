@@ -111,12 +111,15 @@ TIER_LABELS = {
     "highend": {"label": "고성능형", "cls": "hi"},
     "recommend": {"label": "추천형", "cls": "re"},
     "value": {"label": "가성비형", "cls": "va"},
+    # 2026-10-11 — 지금 고객 화면(mvp3) 보관 견적에서 넘긴 완제품 한 대(api/mvp3_handoff.py).
+    "mvp3": {"label": "고객 화면 완제품", "cls": "re"},
 }
 
 ITEM_KIND_LABELS = {
     "core_part": "부품",
     "assembly_service": "조립비",
     "peripheral": "주변기기",
+    "built_pc": "조립PC",          # mvp3 완제품 인계(api/mvp3_handoff.py)
 }
 
 # handoff_items.mall_status — 컬럼 자체는 varchar이고(실측: information_schema, enum 아님),

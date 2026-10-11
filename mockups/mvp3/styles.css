@@ -435,3 +435,5 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 .chat-body .chat-intro{padding-bottom:10px;border-bottom:1px solid transparent;transition:border-color .15s}
 .chat-body.log-scrolled .chat-intro{border-bottom-color:var(--line)}
 .chat-body .messages.is-scrolled{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}
+/* Mall handoff link (2026-10-11): an anchor styled like the primary button. */
+.live-handoff a.primary{display:inline-block;padding:11px 17px;border-radius:9px;text-decoration:none}

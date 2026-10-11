@@ -22,7 +22,7 @@
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
-      saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:''};
+      saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -36,7 +36,7 @@
     }
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
-        selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[]});
+        selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
@@ -140,6 +140,23 @@
       }catch(error){if(current(op))saveFailure(error);}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    // Saved quote -> mall handoff (api/mvp3_handoff.py). The server re-reads the saved
+    // record and rechecks the mall price; the screen only shows what it returns.
+    async function handoff(){
+      const q=state.savedQuote;
+      if(state.phase||!q||!M.uuid(q.id))return;
+      if(state.handoff?.quote_id===q.id)return;
+      const op=begin('handoff');
+      try{
+        const r=await api.handoff(q.id,{signal:op.signal});
+        if(!current(op))return;
+        const url=M.safeUrl(r?.mall_url);
+        if(r?.ok!==true||!url||r.quote_id!==q.id||!Number.isInteger(r.price_quoted))throw new Error('쇼핑몰 연결 응답을 확인할 수 없어요.');
+        state.handoff={quote_id:q.id,handoff_no:M.text(r.handoff_no),mall_url:url,status:M.text(r.mall_status),
+          price_quoted:r.price_quoted,price_mall:Number.isInteger(r.price_mall)?r.price_mall:null};
+      }catch(error){if(current(op))fail(error,{kind:'handoff'});}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
     async function list(){
       const op=begin('list');state.screen='saved';emit();
       try{
@@ -167,8 +184,9 @@
       else if(task.kind==='save')await save();
       else if(task.kind==='recover')await recover();
       else if(task.kind==='list')await list();
+      else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,select,navigate,save,recover,list,load,retry,cancel,message,emit};
+    return {state,reset,submit,refresh,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff};
   }
   if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);
