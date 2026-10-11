@@ -337,6 +337,16 @@ REPLY_SMALLTALK_FOLLOW = "궁금하거나 불편한 점이 있으면 편하게 �
 ONE_LINER_MAX = 40
 
 
+# 한 턴에 질문은 하나까지 -- AI 답이 이미 무엇을 묻고 있으면(「어떤 용도로 쓰실지 말씀해 주세요.」) 갈래 질문을
+# 붙이지 않는다. 「이런 가격 미쳤냐」·「ㅋㅋㅋㅋ 컴퓨터가 날아다녀?」에 질문 두 개가 잇달아 나갔다(2026-10-12 개발
+# 서버, 모델 luna · 사장님 원칙 「되묻기 최소」). 갈래 질문은 답에 질문이 하나도 없을 때만 붙는다.
+_ASKING = re.compile(r"\?|알려\s*주세요|말씀해\s*주세요|알려\s*주시면|말씀해\s*주시면")
+
+
+def _asks_already(reply: str) -> bool:
+    return bool(_ASKING.search(reply or ""))
+
+
 def _count_sentences(text: str) -> int:
     return len([p for p in _SENTENCE.findall(text or "") if p.strip()])
 
@@ -1470,7 +1480,7 @@ def parse_talk(body: ParseBody, request: Request):
     # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
     if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
             and not exceptions and not notices and not laptop and not handoff_offer
-            and TE.ASK not in reply):
+            and TE.ASK not in reply and not _asks_already(reply)):
         reply = (reply.rstrip() + " " + TE.ASK).strip()
         entry_asked, entry_src = True, "ask"
     log.info("[talk] entry: key=%s src=%s", entry or "-", entry_src)
