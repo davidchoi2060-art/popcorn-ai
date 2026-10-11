@@ -437,3 +437,6 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 .chat-body .messages.is-scrolled{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 22px);mask-image:linear-gradient(to bottom,transparent 0,#000 22px)}
 /* Mall handoff link (2026-10-11): an anchor styled like the primary button. */
 .live-handoff a.primary{display:inline-block;padding:11px 17px;border-radius:9px;text-decoration:none}
+/* 2026-10-11 상담 주고받기: 세 장(알뜰 · 추천 · 더 높은 사양)과 카드 뒤 빠른 선택 */
+@media(min-width:1400px){.live-mode .quote-cards.has-three{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.explore-choices{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0 0}

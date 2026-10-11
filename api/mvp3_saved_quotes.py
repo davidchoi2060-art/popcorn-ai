@@ -71,6 +71,11 @@ def public_product(item):
     return out
 
 
+def in_recommendation(recommendation, code):
+    return any(p.get('product_code') == code for group in recommendation.get('card_sets', [])
+               if group.get('kind') == 'sold' for p in group.get('items', []))
+
+
 def selected_product(recommendation, code, expected_price):
     items = [p for group in recommendation.get('card_sets', [])
              if group.get('kind') == 'sold' for p in group.get('items', [])]
@@ -137,6 +142,12 @@ def save_quote(body: SaveBody, request: Request, response: Response):
     if previous:
         return {'ok': True, 'quote': with_live_offer([quote])[0]}
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
+    if not in_recommendation(public, body.product_code):
+        # 「더 싸게」·「더 좋게」·추가 조건으로 본 카드는 조건만으로 다시 조회한 목록에 없을 수 있다.
+        # 같은 판매 원천에서 이 상담 용도의 최소 수준을 채우는 상품일 때만 받는다(api/sold_reco.eligible_item).
+        item = grid_public.eligible_sold_item(state.model_dump(), body.product_code)
+        if item is not None:
+            public = {'card_sets': [{'kind': 'sold', 'items': [item]}]}
     product = selected_product(public, body.product_code, body.expected_price)
     params = {'id': str(uuid4()), 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
               'product': json.dumps(product, ensure_ascii=False),

@@ -15,6 +15,7 @@ from api import sold_reco as S
 from api.talk_schema import GameState, TalkState, Vocab
 
 TOP_KEYS = {'ok', 'card_sets', 'cards', 'assumed', 'ai_estimated', 'needs', 'dropped',
+            'talk_notes', 'choices', 'anchor_code', 'wants',
             'platform', 'budget_won', 'budget_bound', 'game_grade', 'game_resolution', 'game_name'}
 SET_KEYS = {'usage', 'usage_grid', 'kind', 'items', 'empty_reason', 'empty_note',
             'min_level', 'min_level_work'}
@@ -241,7 +242,8 @@ class PickRuleTest(unittest.TestCase):
         self.assertEqual(self.roles(res), [(2, '알뜰 구성', 'value'), (3, '추천 구성', 'recommended')])
 
     def test_every_tag_has_a_role_and_old_tags_are_gone(self):
-        self.assertEqual(set(S.ROLE_OF.values()), {'value', 'recommended', 'reference'})
+        self.assertEqual(set(S.ROLE_OF.values()),
+                         {'value', 'recommended', 'reference', 'premium', 'chosen'})
         src = pathlib.Path(S.__file__).read_text(encoding='utf-8')
         for old in ('예산 안 최고 수준', '같은 수준 다른 구성', '가장 저렴한 선택', '한 단계 위"'):
             self.assertNotIn(old, src.split('"""', 2)[2])

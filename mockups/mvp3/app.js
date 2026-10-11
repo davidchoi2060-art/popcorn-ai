@@ -108,6 +108,13 @@ function quickPrompts(){
   if(state.screen==='welcome'&&missing.includes('game.grade'))return ['배그를 해요','롤을 해요','배그와 롤 둘 다 해요'];
   return state.screen==='welcome'?['QHD로 해줘요','예산을 좀 더 낮춰줘요','다른 게임도 추가할게요']:['예산을 바꿀게요','용도를 바꿀게요'];
 }
+// After cards: the server's quick choices (cheaper / better than the card being looked at,
+// or change conditions). Disabled ones are left out — the server found nothing that way.
+function exploreButtons(cls){
+  const choices=state.screen==='results'&&state.recommendation?state.choices||[]:[];
+  return choices.filter(c=>c.enabled).map(c=>c.id==='change'?button(esc(c.label),'conditions',cls,state.phase?'disabled':''):
+    button(esc(c.label),'explore',cls,'data-dir="'+c.id+'" data-label="'+esc(c.label)+'" '+(state.phase?'disabled':''))).join('');
+}
 // Show the newest message from its first line; a long answer that does not fit
 // starts at its top instead of being cut mid-sentence at the top of the log.
 function scrollToLatest(){
@@ -130,8 +137,8 @@ function renderMessages(){
   const examples=$('#start-examples');examples.hidden=state.screen!=='welcome';
   if(!examples.hidden)examples.innerHTML=[['game-controller','배그와 롤, 150만원으로 추천해줘'],['video-camera','영상 편집용 PC가 필요해요'],['question','아직 잘 모르겠어요']].map(pair=>
     button(uiIcon(pair[0])+'<span>'+pair[1]+'</span>'+uiIcon('caret-right','example-chevron'),'prompt','start-example','data-text="'+pair[1]+'" '+(state.phase?'disabled':''))).join('');
-  const prompts=quickPrompts();
-  $('#suggestions').innerHTML=prompts.map(text=>button(text,'prompt','chip','data-text="'+text+'" '+(state.phase?'disabled':''))).join('');
+  const prompts=quickPrompts(),explore=exploreButtons('chip');
+  $('#suggestions').innerHTML=explore||prompts.map(text=>button(text,'prompt','chip','data-text="'+text+'" '+(state.phase?'disabled':''))).join('');
   $('#request').disabled=!!state.phase;$('#chat-form .send').disabled=!!state.phase;
   const label={talk:'AI가 조건과 답변을 확인하고 있어요.',recommend:'조건에 맞는 판매 중 PC를 조회하고 있어요.',save:'서버에서 최신 상품과 가격을 확인해 보관하고 있어요.',list:'이 브라우저의 보관 기록을 불러오고 있어요.'};
   $('#operation-status').textContent=label[state.phase]||'';$('#operation-status').hidden=!state.phase;
@@ -168,6 +175,7 @@ function productImage(product){
 }
 // The emphasized card is the server's "recommended" role (normalized in live-model.js).
 function recommendedCard(product){return product.role==='recommended';}
+const cardsClass=group=>'quote-cards'+(group.products.length===3?' has-three':'');
 // Approved part photos on the card itself; parts without one are simply left out (no placeholder).
 function cardPartPhotos(product){
   const photos=M.cardPartPhotos(product);
@@ -193,15 +201,17 @@ function renderResults(){
   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
   const products=groups.flatMap(g=>g.products),withinBudget=Number.isInteger(state.talk?.budget_won)&&state.talk.budget_bound!=='이상'&&products.every(p=>!p.over_budget);
-  const subtitle=groups.length===1&&products.length===2?(withinBudget?'예산 안에서 비교할 수 있는 두 가지 구성입니다.':'비교할 수 있는 두 가지 구성입니다.'):'';
+  const subtitle=groups.length===1&&products.length===2?(withinBudget?'예산 안에서 비교할 수 있는 두 가지 구성입니다.':'비교할 수 있는 두 가지 구성입니다.'):
+    groups.length===1&&products.length===3?'싼 구성부터 더 높은 사양까지 세 가지를 비교해 보세요.':'';
   // A usage heading is needed only to tell several usage groups apart.
   const groupHeading=group=>groups.length>1?'<h3>'+esc(group.usage||group.usage_grid||'추천 상품')+'</h3>':'';
   view.innerHTML=heading('나에게 맞는 PC',false,subtitle,true)+errorPanel()+
     groups.map(group=>{const ctx=group.game_context,url=M.safeUrl(ctx?.source.url);return '<section class="live-result-group">'+groupHeading(group)+
       (group.empty_note?'<p class="muted">'+esc(group.empty_note)+'</p>':'')+
-      (group.products.length?'<div class="quote-cards">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n===1&&group.products.length===2?group.products[0]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
+      (group.products.length?'<div class="'+cardsClass(group)+'">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n>0?group.products[n-1]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
       (ctx?'<div class="live-explanation"><h4>게임 안내 · '+esc(ctx.game_name)+'</h4><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</div>':'')+'</section>';}).join('')+
     (!hasProducts&&!groups.length?'<div class="empty"><h3>'+(state.missing.length?'조건을 조금 더 알려주세요':'현재 조건의 추천 상품이 없어요')+'</h3><p>상담은 계속할 수 있어요. 예산이나 사용 목적을 알려주세요.</p></div>':'')+
+    (hasProducts&&exploreButtons('outline small')?'<div class="explore-choices" role="group" aria-label="다른 구성 보기">'+exploreButtons('outline small')+'</div>':'')+
     (hasProducts?'<p class="results-note">'+uiIcon('info')+'해상도나 포함 품목을 바꾸면 견적이 달라질 수 있어요.</p>':'')+
     (state.recommendation?.aiEstimated.length?'<p class="muted">일부 게임 등급은 AI 추정입니다. 실제 게임 성능 측정값과는 달라요.</p>':'');
   actions.hidden=true;
@@ -365,6 +375,7 @@ document.addEventListener('click',e=>{
     case 'new':chatPreference=null;lastMessages='';Object.assign(draft,{start_mode:null,usage_choice:null,budget_won:null,budget_bound:null});setDraft('');ui.surface='consultation';flow.reset();break;
     case 'saved':captureDraft();openSaved();break;
     case 'prompt':submit(b.dataset.text);break;
+    case 'explore':void flow.explore(b.dataset.dir,b.dataset.label);break;
     case 'detail':flow.select(Number(b.dataset.id));break;
     case 'final':flow.navigate('final');break;
     case 'edit':flow.navigate('detail');break;

@@ -85,7 +85,14 @@
       return request('POST','/api/mvp3/saved-quotes',payload,options);
     }
     return {request,parse:(payload,options)=>request('POST','/api/talk/parse',payload,options),
-      recommend:(state,options)=>request('POST','/api/grid/recommend',{state},options),listSaved,saveQuote,prepareSave,
+      // extra: this turn's text, the wants the server returned last time, a quick-choice
+      // direction and the card it is measured from. Nothing else is forwarded.
+      recommend:(state,options,extra={})=>{const body={state};
+        if(typeof extra.text==='string'&&extra.text.trim())body.text=extra.text.slice(0,300);
+        if(extra.wants&&typeof extra.wants==='object'&&!Array.isArray(extra.wants))body.wants=extra.wants;
+        if(['cheaper','better'].includes(extra.nav))body.nav=extra.nav;
+        if(Number.isSafeInteger(extra.anchor_code)&&extra.anchor_code>0)body.anchor_code=extra.anchor_code;
+        return request('POST','/api/grid/recommend',body,options);},listSaved,saveQuote,prepareSave,
       // 보관 견적을 팝콘PC 쇼핑몰로 넘긴다(api/mvp3_handoff.py). 결제는 쇼핑몰이 한다.
       handoff:async(quoteId,options={})=>{if(!primed){validList(await request('GET','/api/mvp3/saved-quotes?limit=1',null,options));primed=true;}
         return request('POST','/api/mvp3/saved-quotes/'+String(quoteId).toLowerCase()+'/handoff',null,{...options,existingKeyOnly:true});}};

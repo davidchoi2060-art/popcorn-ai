@@ -288,7 +288,9 @@ def topic_label(key: str) -> str | None:
     return next((label for k, label, _p, _d in PURCHASE_TOPICS if k == key), None)
 
 
-# 추천(sold_reco)이 아직 쓰지 않는 조건. 받았다고 말하지 않고, 못 쓴다고 말한다.
+# 고객이 말한 부품·외형 조건. 2026-10-11(상담 주고받기)부터 램·저장공간·그래픽카드 모델·
+# 흰색 케이스·저소음은 추천(api/reco_explore)이 판매 PC 를 실제로 거르고, 못 거르면 카드와 함께
+# 「못 맞춥니다」라고 말한다. CPU 와 모델 없는 그래픽카드(「지포스」)는 여전히 쓰지 않는다.
 _RAM = re.compile(r"(?:램|메모리|ram)\s*(\d{1,3})\s*(?:gb|기가|g)(?![a-z])|(\d{1,3})\s*(?:gb|기가|g)\s*(?:램|메모리|ram)", re.I)
 _STORAGE = re.compile(r"(\d{1,2})\s*(?:tb|테라)|(?:ssd|저장\s*공간|하드)\s*(\d{3,4})\s*(?:gb|기가)", re.I)
 _GPU = re.compile(r"\b(rtx|gtx|rx)\s*-?\s*(\d{3,4})\s*(ti|super|xt)?(?![0-9a-z])|지포스|라데온", re.I)
@@ -302,8 +304,26 @@ def purchase_topics(text: str) -> list[str]:
     return [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
 
 
-def unsupported_conditions(text: str, state, prev_state=None) -> list[str]:
+# 추천이 거르는 조건의 이름표 머리(unsupported_conditions 가 만드는 문자열과 같은 틀).
+_APPLIED_HEADS = ("메모리 ", "저장공간 ", "흰색 케이스", "조용한 PC")
+
+
+def _applied_by_recommend(cond: str) -> bool:
+    if cond.startswith(_APPLIED_HEADS):
+        return True
+    return bool(re.match(r"그래픽카드 (RTX|GTX|RX) \d{4}", cond))
+
+
+def requested_conditions(text: str, state, prev_state=None) -> tuple[list[str], list[str]]:
+    """고객이 말한 조건 -> (추천이 거르는 것, 추천이 쓰지 않는 것)."""
+    conds = unsupported_conditions(text, state, prev_state, _all=True)
+    return ([c for c in conds if _applied_by_recommend(c)],
+            [c for c in conds if not _applied_by_recommend(c)])
+
+
+def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False) -> list[str]:
     """추천이 반영하지 않는 조건 — 고객 문장과 검증된 state 에서만 읽는다.
+    (_all=True 면 추천이 거르는 조건까지 모두 — requested_conditions 가 나눈다.)
 
     state.prefs 는 누적이라, 이전 턴에 이미 있던 선호는 다시 말하지 않는다(매 턴 같은
     안내가 되풀이되면 AI 답이 영영 안 보인다).
@@ -329,7 +349,7 @@ def unsupported_conditions(text: str, state, prev_state=None) -> list[str]:
         label = PREF_LABEL.get(p, p)
         if label not in out:
             out.append(label)
-    return out
+    return out if _all else [c for c in out if not _applied_by_recommend(c)]
 
 
 def honest_notices(text: str, state, written: dict | None = None, prev_state=None) -> list[str]:
@@ -340,7 +360,10 @@ def honest_notices(text: str, state, written: dict | None = None, prev_state=Non
     written = written or {}
     hit = purchase_topics(text)
     notes = [written.get(key) or msg for key, _label, _pat, msg in PURCHASE_TOPICS if key in hit]
-    conds = unsupported_conditions(text, state, prev_state)
+    applied, conds = requested_conditions(text, state, prev_state)
+    if applied:
+        notes.append("말씀하신 " + " · ".join(applied) + " 조건으로 판매 중인 PC를 골라 볼게요."
+                     " 맞추지 못하는 조건은 추천 카드와 함께 알려 드려요.")
     if conds:
         notes.append("말씀하신 " + " · ".join(conds) + " 조건은 아직 추천에 반영하지 못해요."
                      " 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.")

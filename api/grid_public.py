@@ -87,12 +87,13 @@ import re
 
 import os
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from . import game_copy as GC
 from .db import engine
 from . import sold_reco as SOLD
+from . import reco_explore as EXPLORE
 from . import customer_pc_offer as _PC_OFFER
 
 # 고객 추천 원천 스위치(2026-09-25 재설계 4단계). 기본 「sold」= 판매 중인 몰 조립PC.
@@ -230,6 +231,11 @@ class RecommendBody(BaseModel):
     state: dict | None = None            # 정본 — talk_schema.TalkState 모양의 dict
     constraints: list[Constraint] = []   # 하위호환(옛 모양). state 가 있으면 무시
     history_note: str | None = None     # 받기만 한다 — 이 단계에선 판정에 쓰지 않는다
+    # 상담 주고받기(2026-10-11 · api/reco_explore). 셋 다 없으면 예전과 같은 추천이다.
+    text: str | None = Field(default=None, max_length=300)   # 이번 고객 문장(규칙으로만 읽는다)
+    wants: dict | None = None            # 앞 응답의 wants 를 화면이 그대로 돌려보낸다
+    nav: str | None = None               # "cheaper" | "better" — 빠른 선택 단추
+    anchor_code: int | None = None       # 앞 응답의 anchor_code(지금 보고 있던 추천 구성)
 
 
 # ── 예산 문자열 → 원 ───────────────────────────────────────────────────────
@@ -699,6 +705,76 @@ def _game_card_set(conn, usage: str, state: TalkState, platform: str,
 
 
 # ── 본체 ────────────────────────────────────────────────────────────────
+def _explore_input(body: RecommendBody, state: TalkState, talk_notes: list[str]):
+    """고객 문장·앞 조건·빠른 선택 -> (state, explore). state 는 고치지 않는다.
+
+    읽는 것은 규칙뿐이다(api/reco_explore.extract). 화면이 돌려보낸 wants 는 모양만 맞으면 받는다.
+    예산·게임·해상도 같은 «좌표» 해석은 talk(파서) 몫이라 여기서 다시 읽지 않는다.
+    해석이 이미 읽어 둔 선호(state.prefs 의 화이트·저소음)는 조건으로 이어받는다.
+    """
+    ex = EXPLORE.extract(body.text)
+    wants = EXPLORE.merge(EXPLORE.clean_wants(body.wants), ex)
+    for pref, key in (("화이트", "white"), ("저소음", "silent")):
+        if pref in (state.prefs or []):
+            wants[key] = True
+    if ex.get("multi"):
+        talk_notes.append(EXPLORE.NOTE_MULTI)
+    nav = body.nav if body.nav in (EXPLORE.CHEAPER, EXPLORE.BETTER) else ex.get("nav")
+    explore = {"wants": wants, "nav": nav, "anchor_code": body.anchor_code}
+    if ex.get("more"):
+        explore["more"] = ex["more"]
+    return state, explore
+
+
+CHOICE_LABELS = (("cheaper", "더 싼 PC 볼래요"), ("better", "더 높은 사양 볼래요"), ("change", "조건 바꿀게요"))
+
+
+def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str]):
+    """판매 카드 뒤 빠른 선택 + 고객에게 할 말(반영한 조건 · 못 맞춘 조건 · 방향 안내 · 되묻기)."""
+    if explore is None:
+        return [], None
+    talk_notes[:0] = explore.pop("talk_notes", [])
+    first = next((cs for cs in card_sets if cs.get("items")), None)
+    seen = set()
+
+    def say(line):
+        if line and line not in seen:
+            seen.add(line)
+            talk_notes.append(line)
+    for cs in card_sets:
+        e = cs.get("explore") or {}
+        say(e.get("nav_note"))
+        if e.get("applied"):
+            say(EXPLORE.applied_sentence(e["applied"]))
+        for label, why in e.get("unmet") or []:
+            say(EXPLORE.unmet_sentence(label, why))
+    if first is None:
+        return [], None
+    e = first.get("explore") or {}
+    enabled = {"cheaper": bool(e.get("has_cheaper")), "better": bool(e.get("has_better")), "change": True}
+    choices = [{"id": k, "label": label, "enabled": enabled[k]} for k, label in CHOICE_LABELS]
+    if enabled["cheaper"] or enabled["better"]:
+        talk_notes.append(EXPLORE.ASK_NEXT)
+    return choices, e.get("anchor_code")
+
+
+def eligible_sold_item(state_raw: dict, code: int) -> dict | None:
+    """보관 확인용(api/mvp3_saved_quotes): 지금 목록에 없어도 이 상담 용도를 채우는 판매 상품인가."""
+    notes: list[str] = []
+    with engine.connect() as conn:
+        vocab = load_vocab(conn)
+        state, _ = validate_state(state_raw, vocab)
+    game_usages = [u for u in state.usages if is_game_usage(u)]
+    named = bool(state.game and state.game.names)
+    game_grade = state.game.grade if (game_usages and state.game) else None
+    sold_games = game_usages if (game_grade is not None or not named) else []
+    others = [u for u in state.usages if not is_game_usage(u)]
+    item = SOLD.eligible_item(state, sold_games, others, code, notes, vocab)
+    if notes:
+        log.info("[grid_public] eligible notes: %r", notes)
+    return item
+
+
 @router.post("/recommend")
 def recommend(body: RecommendBody):
     """state(TalkState) → 용도별 격자 카드 묶음. 400 을 내지 않는다 — 부족한 것은
@@ -762,6 +838,10 @@ def recommend(body: RecommendBody):
         assumed: list[str] = []
         ai_estimated: list[dict] = []
         game_resolution = game_name = None
+        talk_notes: list[str] = []
+        explore = None
+        if RECO_SOURCE == "sold":
+            state, explore = _explore_input(body, state, talk_notes)
         if RECO_SOURCE == "sold":
             # 2026-09-25 재설계 4단계 — 조합 격자 대신 판매 중인 몰 조립PC 최대 2개(api/sold_reco).
             # 판매 경로의 수준은 등급이 아니라 게임명·해상도가 정한다(sold_reco.game_min_rank).
@@ -772,7 +852,7 @@ def recommend(body: RecommendBody):
             named = bool(state.game and state.game.names)
             sold_games = game_usages if (game_grade is not None or not named) else []
             others = [u for u in state.usages if not is_game_usage(u)]
-            card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab))
+            card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab, explore))
             if sold_games:
                 g = state.game
                 game_resolution = (g.resolution if g else None) or DEFAULT_RESOLUTION
@@ -825,8 +905,16 @@ def recommend(body: RecommendBody):
     if notes:
         log.info("[grid_public] recommend notes: %r", notes)
 
+    choices, anchor_code = _choices(card_sets, explore, talk_notes)
+    for cs in card_sets:
+        cs.pop("explore", None)
+
     return {
         "ok": True,
+        "talk_notes": talk_notes,
+        "choices": choices,
+        "anchor_code": anchor_code,
+        "wants": (explore or {}).get("wants", {}),
         "card_sets": card_sets,
         "cards": card_sets[0]["cards"] if card_sets else [],     # 하위호환
         "assumed": assumed,
