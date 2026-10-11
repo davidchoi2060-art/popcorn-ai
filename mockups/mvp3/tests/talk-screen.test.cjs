@@ -46,24 +46,17 @@ function scripted({failSecond=false}={}){
   };
 }
 
-test('first screen offers three starters; a starter is sent as the first message with its key',async()=>{
+test('first screen offers examples that fill the input without sending',async()=>{
   const h=harness(scripted());
   try{
     await until(()=>h.doc.querySelector('.tk-welcome'));
     assert.match(h.text('.tk-welcome h1'),/무엇을 도와드릴까요/);
-    const starters=[...h.doc.querySelectorAll('[data-action=starter]')];
-    assert.deepEqual(starters.map(b=>b.textContent),['게임용 PC 바로 추천받기','요즘 인기 게임 알아보기','사무·영상용 PC 추천받기']);
-    assert.match(h.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);assert.equal(h.calls.length,0);
-    starters[0].click();
-    await until(()=>h.calls.length&&!h.doc.querySelector('#tk-send').disabled);
-    assert.equal(h.calls[0].url,'/api/talk/parse');assert.equal(h.calls[0].body.text,'게임용 PC 바로 추천받기');assert.equal(h.calls[0].body.entry,'game_pick');
-    assert.match(h.text('#tk-log'),/게임용 PC 바로 추천받기/);assert.equal(h.doc.querySelector('.tk-welcome'),null);
-    assert.deepEqual(h.errors,[]);
+    assert.equal(h.doc.querySelectorAll('[data-action=example]').length,3);
+    assert.match(h.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);
+    h.click('[data-action=example]');
+    assert.equal(h.doc.querySelector('#tk-input').value,'게임용 PC를 찾고 있어요.');
+    await tick();assert.equal(h.calls.length,0);assert.deepEqual(h.errors,[]);
   }finally{h.close();}
-});
-test('typing without a starter sends no entry key',async()=>{
-  const h=harness(scripted());
-  try{await h.say('150만원 게임용');assert.equal('entry' in h.calls[0].body,false);assert.deepEqual(h.errors,[]);}finally{h.close();}
 });
 test('cards sit under the answer and choosing one fills the quote panel',async()=>{
   const h=harness(scripted());

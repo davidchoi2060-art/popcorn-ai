@@ -136,7 +136,7 @@
       state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
-    async function submit(raw,{repeat=false,entry=null}={}){
+    async function submit(raw,{repeat=false}={}){
       const text=String(raw||'').trim();
       if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),previousTalk=state.talk,op=begin('talk');
@@ -144,9 +144,7 @@
       // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
       let prior=null;
       try{
-        // entry: 대화 화면 시작 단추로 보낸 첫 문장이면 그 단추 키(서버가 로그로만 센다).
-        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous};if(entry)payload.entry=entry;
-        const response=await api.parse(payload,{signal:op.signal});
+        const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
         // 잡담·범위 밖 질문이 조건을 바꾸지 않았으면 보던 견적을 지우지 않는다(코덱스 1816 「앞서 말한 조건과 보던 견적을 잃지 않기」).

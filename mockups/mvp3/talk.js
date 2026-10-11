@@ -8,13 +8,6 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const money=v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미확인';
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const MAX_TEXT=20000;
-// 대화 화면 첫 상태의 시작 단추(2026-10-11 「입구는 하나, 그 안에 세 갈래」). 문구는 여기 한곳에서 바꾼다.
-// 누르면 label 이 그대로 첫 메시지로 간다(손님이 본 말 = 보낸 말). key 는 서버가 로그로만 센다 --
-// api/talk.py ENTRY_KEYS 와 같아야 한다. 단추를 안 누르고 그냥 적어도 된다.
-const STARTERS=[
-  {key:'game_pick',label:'게임용 PC 바로 추천받기'},
-  {key:'game_browse',label:'요즘 인기 게임 알아보기'},
-  {key:'work_pick',label:'사무·영상용 PC 추천받기'}];
 const log=$('#tk-log'),panel=$('#tk-now-body'),input=$('#tk-input'),status=$('#tk-status');
 const flow=LF.createFlow(A,{onChange:render,keepCurrent:true}),state=flow.state;
 // 새로고침 전에 보던 구성을 다시 연 경우. 그 전에 보관했는지는 이 탭이 모르므로 「아직 저장하지 않았어요」라고 단정하지 않는다.
@@ -66,9 +59,9 @@ function renderLog(){
   const msgs=state.messages,talked=msgs.some(m=>m.who==='user');
   const props=state.proposals||[],last=props[props.length-1];
   const after=new Map();for(const p of props){const k=Math.max(0,p.at-1);after.set(k,[...(after.get(k)||[]),p]);}
-  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">무엇을 도와드릴까요?</h1><p>아래에서 골라 시작하거나, 궁금한 것을 바로 적어 주세요. PC를 찾거나 부품을 바꿀 때도 이어서 도와드릴게요.</p>'+
-    '<div class="tk-examples" aria-label="이렇게 시작할 수 있어요">'+STARTERS
-      .map(t=>button(esc(t.label),'starter','outline','data-entry="'+esc(t.key)+'"'+(state.phase?' disabled':''))).join('')+'</div></section>';
+  let html=talked?'':'<section class="tk-welcome"><h1 tabindex="-1">무엇을 도와드릴까요?</h1><p>궁금한 것부터 편하게 물어보세요. PC를 찾거나 부품을 바꿀 때도 이어서 도와드릴게요.</p>'+
+    '<div class="tk-examples" aria-label="시작 예시">'+['게임용 PC를 찾고 있어요.','지금 쓰는 PC를 업그레이드하고 싶어요.','그래픽카드와 메모리는 어떤 역할을 해요?']
+      .map(t=>button(esc(t),'example','outline','data-text="'+esc(t)+'"')).join('')+'</div></section>';
   msgs.forEach((m,i)=>{
     if(!(m.who==='ai'&&m.text===LF.GREETING))html+='<div class="tk-msg is-'+(m.who==='user'?'user':'ai')+'"><p>'+esc(m.text)+'</p></div>';
     for(const p of after.get(i)||[])html+=proposalBlock(p,p===last&&state.recommendation!==null);
@@ -163,7 +156,7 @@ function count(){const n=input.value.length;$('#tk-count').textContent=n>1000?n.
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;
   switch(b.dataset.action){
-    case 'starter':{const t=STARTERS.find(x=>x.key===b.dataset.entry);if(t&&!state.phase)void flow.submit(t.label,{entry:t.key});break;}
+    case 'example':input.value=b.dataset.text;count();input.focus();break;
     case 'choose':{const i=Number(b.dataset.index);flow.select(i);if(state.selected){resumed=false;flow.message('「'+state.selected.name+'」 구성을 지금 견적으로 골랐어요. 저장은 따로 할 수 있어요.');flow.emit();}break;}
     case 'detail':flow.select(Number(b.dataset.index));if(state.selected)goDetail();break;
     case 'open-detail':if(state.selected)goDetail();break;
