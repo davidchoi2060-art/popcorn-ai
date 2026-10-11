@@ -1,0 +1,78 @@
+{
+  "id": 7,
+  "kind": "예산만",
+  "turns": [
+    {
+      "text": "QA-고객1 예산 180",
+      "sent_at_utc": "2026-10-11T00:04:55.519Z",
+      "sent_at_kst": "2026-10-11T09:04:55.519+09:00",
+      "pc_vid": "7SLjKVedWaCFZ2G9vi8rAbfkvF3f8jGh",
+      "parse": {
+        "status": 200,
+        "sec": 2.832,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [],
+            "budget_won": 1800000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": null,
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "usages"
+          ],
+          "dropped": [],
+          "evidence": [
+            "예산 180만원으로 파악"
+          ],
+          "reply": "180만원 예산이신데, 어떤 용도로 쓸 PC를 찾으세요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "180만원"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: usages",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.226,
+          "stored": false
+        },
+        "bytes": 0,
+        "ctype": null,
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null,
+      "media": null
+    }
+  ],
+  "visitor": "cookie",
+  "visitor_probe": {
+    "status": 200,
+    "json": {
+      "ok": true,
+      "quotes": [],
+      "has_more": false
+    }
+  },
+  "at": "2026-10-11T00:05:09.805Z"
+}

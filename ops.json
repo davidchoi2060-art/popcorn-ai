@@ -1,0 +1,15 @@
+{
+  "status": 200,
+  "sec": 1.144,
+  "json": {
+    "member": "own",
+    "refund": "mall",
+    "ship": "mall",
+    "pay": "mall",
+    "settle": "mall"
+  },
+  "bytes": 0,
+  "ctype": null,
+  "error": null,
+  "setCookie": null
+}

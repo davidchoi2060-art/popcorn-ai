@@ -1,0 +1,1091 @@
+{
+  "id": 10,
+  "kind": "게임+해상도+예산",
+  "turns": [
+    {
+      "text": "QA-고객1 오버워치2 qhd 144프레임 200",
+      "sent_at_utc": "2026-10-11T00:05:51.904Z",
+      "sent_at_kst": "2026-10-11T09:05:51.904+09:00",
+      "pc_vid": "yT8CJvEDseXiYQ-VRPCdwqxpyB0_sIMY",
+      "parse": {
+        "status": 200,
+        "sec": 7.06,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "게임"
+            ],
+            "budget_won": 2000000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [
+                "오버워치2"
+              ],
+              "grade": "E",
+              "grade_src": "catalog",
+              "resolution": "1440p"
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [],
+          "dropped": [],
+          "evidence": [
+            "'오버워치2'는 확정 목록에서 E등급",
+            "QHD는 1440p로 변환",
+            "144프레임 언급으로 고주사율 게이밍 의도 확인",
+            "200은 200만원(2000000원)으로 파악"
+          ],
+          "reply": "오버워치2를 QHD 144프레임으로 즐기고 싶으시고 예산은 200만원이시군요. 확인했습니다.",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "200만원"
+            },
+            {
+              "l": "용도",
+              "v": "게임"
+            }
+          ],
+          "note": null,
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "오버워치 2는 블리자드가 제작한 1인칭 슈팅 게임입니다. Steam 공개 통계에 따르면 2026-09-18 기준 동시접속자는 51,765명입니다. 다만 제공된 자료에는 요청하신 화면 해상도와 출력 목표를 충족하는 구체적인 PC 조건이 없습니다. 따라서 해당 목표에 맞는 PC 판단은 게임 설명 자료가 부족해 여기서 안내하기 어렵습니다. 서버 안내: 게임 정보 기준으로만 답변드렸습니다. PC 구성은 용도와 예산을 바탕으로 안내합니다.",
+          "sources": [],
+          "narrowing": "narrow",
+          "answer_game_names": [
+            "오버워치2"
+          ],
+          "answer_notice": null,
+          "answer_filter": {
+            "kept": 5,
+            "replaced": [],
+            "dropped": [],
+            "gate_hit": false
+          },
+          "answer_elapsed_sec": 6.035,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 3.685,
+          "stored": false
+        },
+        "bytes": 0,
+        "ctype": null,
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": {
+        "status": 200,
+        "sec": 0.96,
+        "json": {
+          "ok": true,
+          "card_sets": [
+            {
+              "usage": "게임",
+              "usage_grid": "게임",
+              "kind": "sold",
+              "min_level": "QHD",
+              "min_level_work": "최신 대작 QHD 높음 옵션",
+              "items": [
+                {
+                  "product_code": 129832,
+                  "name": "[9600X/16G/1TB/RTX5070]",
+                  "price": 2633700,
+                  "price_src": "현재 판매가",
+                  "mall_url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=129832",
+                  "spec": {
+                    "cpu": "라이젠5 9600X",
+                    "gpu": "RTX 5070",
+                    "ram_gb": 16,
+                    "ssd_gb": 1000,
+                    "vram_gb": 12
+                  },
+                  "level": "QHD",
+                  "tag": "예산을 넘는 최저가",
+                  "role": "reference",
+                  "over_budget": true,
+                  "reasons": [
+                    "게임 QHD — 최신 대작 QHD 높음 옵션",
+                    "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+                    "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."
+                  ],
+                  "photo": {
+                    "state": "available",
+                    "kind": "ai_assembly_example",
+                    "url": "/api/customer/products/129832/representative-image",
+                    "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+                  },
+                  "public_configuration": {
+                    "configuration_id": "P129832",
+                    "revision": 3,
+                    "offer_id": "P129832",
+                    "description": {
+                      "title": "게임 화면의 화질과 움직임을 함께 고민한다면",
+                      "intro": "Ryzen 5 9600X와 RTX 5070 12GB를 중심으로 구성했습니다. 높은 화질이나 프레임을 목표로 PC를 고를 때, 주로 즐기는 게임과 모니터를 기준으로 비교해 보세요. 저장공간은 1TB SSD입니다. 시스템 메모리는 16GB입니다.",
+                      "scene": "QHD 또는 4K 모니터를 고려하면서, 원하는 게임의 화질과 목표 프레임을 기준으로 PC를 고르는 사용.",
+                      "benefits": [
+                        [
+                          "게임 목표부터 정하고 비교해요",
+                          "RTX 5070를 담은 구성입니다. 해상도, 그래픽 옵션과 목표 프레임을 함께 정하면 필요한 그래픽 성능인지 판단하기 쉬워요."
+                        ],
+                        [
+                          "16GB 메모리를 담았어요",
+                          "실행 중인 프로그램이 쓰는 작업 공간입니다. 게임과 방송·편집을 동시에 하거나 큰 파일을 다룬다면, 사용량에 맞춰 32GB 이상 구성과 비교해 주세요."
+                        ],
+                        [
+                          "자주 쓰는 파일을 모아 둘 1TB",
+                          "1TB SSD를 담았습니다. 게임·사진·작업 파일의 설치 및 보관 공간을 고를 때 비교할 부분이며, 실제 사용할 수 있는 공간은 시스템 설치 후 달라집니다."
+                        ]
+                      ],
+                      "checks": [
+                        "QHD·4K는 상담할 사용 조건이며 성능 보증이 아닙니다. 게임·옵션·레이 트레이싱 설정별 결과를 확인한 뒤 안내합니다.",
+                        "가벼운 게임이나 단순 사무가 중심이라면 추가 비용의 이점이 있는지 낮은 가격의 구성과도 비교해 주세요."
+                      ],
+                      "faq": [
+                        {
+                          "question": "어떤 게임에서 몇 프레임이 나오나요?",
+                          "answer": "게임 이름·해상도·옵션·목표 프레임을 알려주세요. 이 구성에 대응하는 성능 근거를 확인한 뒤 안내하며, 부품 이름만으로 프레임을 확정하지 않습니다."
+                        },
+                        {
+                          "question": "이 PC가 저에게 알뜰 구성인가요, 추천 구성인가요?",
+                          "answer": "두 이름은 상품의 고정 등급이 아닙니다. 사용 조건을 충족하는 후보 중 비용을 줄이는 선택을 알뜰 구성으로, 추가 비용의 이점이 분명한 선택을 추천 구성으로 안내합니다."
+                        },
+                        {
+                          "question": "가격에 조립비가 들어 있나요?",
+                          "answer": "기존 완제품 표시 가격 · 제작 서비스 포함 · 조립비 중복 가산 없음"
+                        },
+                        {
+                          "question": "부품을 바꾸면 설명도 달라지나요?",
+                          "answer": "네. 메모리·그래픽카드 등 부품이 달라지면 달라진 구성의 호환성과 작업 조건을 확인한 뒤 설명과 가격을 다시 안내합니다."
+                        }
+                      ]
+                    },
+                    "parts": [
+                      {
+                        "ordinal": 0,
+                        "slot": "CPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "AMD 라이젠5-6세대 9600X (그래니트 릿지) (멀티팩(정품))",
+                        "description": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+                        "specs": [
+                          {
+                            "label": "모델",
+                            "value": "라이젠5 9600X"
+                          },
+                          {
+                            "label": "코어 구성",
+                            "value": "6"
+                          },
+                          {
+                            "label": "스레드",
+                            "value": "12"
+                          },
+                          {
+                            "label": "소켓",
+                            "value": "AM5"
+                          },
+                          {
+                            "label": "기본 클럭",
+                            "value": "3.9(GHz)"
+                          },
+                          {
+                            "label": "최대 클럭",
+                            "value": "5.4(GHz)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/121807/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 1,
+                        "slot": "GPU",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "ZOTAC GAMING 지포스 RTX 5070 SOLID OC D7 12GB [회원가입 계좌이체 현금할인 -2.5%]",
+                        "description": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+                        "specs": [
+                          {
+                            "label": "GPU 모델",
+                            "value": "RTX 50"
+                          },
+                          {
+                            "label": "그래픽 메모리",
+                            "value": "12(GB)"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "GDDR7"
+                          },
+                          {
+                            "label": "카드 길이",
+                            "value": "304.4(mm)"
+                          },
+                          {
+                            "label": "권장 파워",
+                            "value": "정격 650(W) 이상"
+                          },
+                          {
+                            "label": "팬 개수",
+                            "value": "3(EA)"
+                          },
+                          {
+                            "label": "모니터 수",
+                            "value": "최대 4대"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/123795/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 2,
+                        "slot": "RAM",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "ESSENCORE KLEVV DDR5-5600 CL46 AMD 파인인포 (16GB)",
+                        "description": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+                        "specs": [
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR5"
+                          },
+                          {
+                            "label": "상품 용량",
+                            "value": "16(GB)"
+                          },
+                          {
+                            "label": "표기 속도",
+                            "value": "5600(MHz),PC5-44800"
+                          },
+                          {
+                            "label": "패키지 구성",
+                            "value": "1(EA)"
+                          },
+                          {
+                            "label": "전압",
+                            "value": "1.1(V)"
+                          },
+                          {
+                            "label": "타이밍",
+                            "value": "CL46-46-46-90"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/127334/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 3,
+                        "slot": "SSD",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "BIWIN Black Opal NV3500 M.2 NVMe (1TB)",
+                        "description": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+                        "specs": [
+                          {
+                            "label": "용량",
+                            "value": "1(TB)"
+                          },
+                          {
+                            "label": "연결 형태",
+                            "value": "M.2(NVMe)"
+                          },
+                          {
+                            "label": "M.2 크기",
+                            "value": "2280"
+                          },
+                          {
+                            "label": "플래시 종류",
+                            "value": "TLC"
+                          },
+                          {
+                            "label": "최대 읽기",
+                            "value": "3,500(MB/s)"
+                          },
+                          {
+                            "label": "최대 쓰기",
+                            "value": "3,000(MB/s)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/128449/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 4,
+                        "slot": "MB",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "ASRock B650M Pro X3D 대원씨티에스/에즈윈/디앤디컴",
+                        "description": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+                        "specs": [
+                          {
+                            "label": "CPU 소켓",
+                            "value": "AM5"
+                          },
+                          {
+                            "label": "메모리 규격",
+                            "value": "DDR5"
+                          },
+                          {
+                            "label": "보드 크기",
+                            "value": "m-ATX"
+                          },
+                          {
+                            "label": "메모리 슬롯",
+                            "value": "4(EA)"
+                          },
+                          {
+                            "label": "최대 메모리",
+                            "value": "최대 256(GB)"
+                          },
+                          {
+                            "label": "M.2 슬롯",
+                            "value": "3(EA)"
+                          },
+                          {
+                            "label": "유선 네트워크",
+                            "value": "2.5기가비트"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/123917/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 5,
+                        "slot": "COOLER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "쿨러마스터 HYPER 212 SPECTRUM V3 ARGB",
+                        "description": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+                        "specs": [
+                          {
+                            "label": "냉각 방식",
+                            "value": "공랭"
+                          },
+                          {
+                            "label": "높이",
+                            "value": "152(mm)"
+                          },
+                          {
+                            "label": "히트파이프",
+                            "value": "4(EA)"
+                          },
+                          {
+                            "label": "팬 최대 회전수",
+                            "value": "1,750(RPM)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "2(년)"
+                          },
+                          {
+                            "label": "제조사 표기 TDP",
+                            "value": "200 W"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/128119/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 6,
+                        "slot": "POWER",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "쿨러마스터 MWE GOLD 750 V3 ATX3.1 블랙",
+                        "description": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+                        "specs": [
+                          {
+                            "label": "정격 출력",
+                            "value": "750(W)"
+                          },
+                          {
+                            "label": "파워 규격",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "효율 표기",
+                            "value": "GOLD"
+                          },
+                          {
+                            "label": "팬 크기",
+                            "value": "120(mm)"
+                          },
+                          {
+                            "label": "보증 표기",
+                            "value": "무상 5(년)"
+                          },
+                          {
+                            "label": "SATA 전원",
+                            "value": "6"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/123939/detail"
+                        }
+                      },
+                      {
+                        "ordinal": 7,
+                        "slot": "CASE",
+                        "quantity": 1,
+                        "pseudo": false,
+                        "name": "마이크로닉스 WIZMAX CHILL 세븐팬",
+                        "description": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+                        "specs": [
+                          {
+                            "label": "형태",
+                            "value": "미들타워"
+                          },
+                          {
+                            "label": "지원 파워",
+                            "value": "ATX"
+                          },
+                          {
+                            "label": "쿨러 높이",
+                            "value": "165(mm)"
+                          },
+                          {
+                            "label": "GPU 장착 길이",
+                            "value": "400(mm)"
+                          },
+                          {
+                            "label": "수랭 지원",
+                            "value": "최대 3열"
+                          },
+                          {
+                            "label": "팬 구성 표기",
+                            "value": "7(개)"
+                          },
+                          {
+                            "label": "크기",
+                            "value": "너비 : 215(mm) / 높이 : 490(mm) / 깊이 : 450(mm)"
+                          }
+                        ],
+                        "photo": {
+                          "state": "approved",
+                          "url": "/api/product-images/127295/detail"
+                        }
+                      }
+                    ],
+                    "price": {
+                      "state": "unknown",
+                      "amount": null,
+                      "checked_at": null,
+                      "observed_date": null,
+                      "model": null
+                    },
+                    "stock": {
+                      "state": "unknown",
+                      "checked_at": null
+                    },
+                    "compatibility": {
+                      "document_state": "unknown",
+                      "public_summary": null,
+                      "assembly_state": "unknown"
+                    },
+                    "customer_conditions": {
+                      "os": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "운영체제 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "keyboard": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "키보드 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "mouse": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "마우스 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "monitor": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "모니터 포함 여부를 구매 전에 확인해 주세요."
+                      },
+                      "warranty": {
+                        "state": "unknown",
+                        "detail": "",
+                        "months": null,
+                        "needs_reconfirmation": false,
+                        "customer_statement": "보증·AS 조건을 구매 전에 확인해 주세요."
+                      }
+                    },
+                    "product_code": 129832,
+                    "photo": {
+                      "state": "unresolved",
+                      "url": null
+                    }
+                  }
+                }
+              ],
+              "empty_reason": "예산 안 상품 없음",
+              "empty_note": "이 작업은 2,633,700원부터 가능합니다.",
+              "cards": [],
+              "empty_cells": [],
+              "omitted_variants": [],
+              "center_band": null,
+              "center_band_key": null,
+              "bands_considered": [],
+              "center_tier": null,
+              "center_tier_key": null,
+              "tiers_considered": [],
+              "game_context": null
+            }
+          ],
+          "cards": [],
+          "assumed": [],
+          "ai_estimated": [],
+          "needs": [],
+          "dropped": [],
+          "platform": "인텔",
+          "budget_won": 2000000,
+          "budget_bound": null,
+          "game_grade": "E",
+          "game_resolution": "1440p",
+          "game_name": "오버워치2"
+        },
+        "bytes": 0,
+        "ctype": null,
+        "error": null,
+        "setCookie": null
+      },
+      "media": [
+        {
+          "product_code": 129832,
+          "photo_state": "available",
+          "photo_url": "/api/customer/products/129832/representative-image",
+          "photo_get": {
+            "status": 200,
+            "bytes": 1434733,
+            "ctype": "image/png"
+          },
+          "parts_total": 8,
+          "parts_photo": [
+            {
+              "u": "/api/product-images/121807/detail",
+              "status": 200,
+              "bytes": 177937,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/123795/detail",
+              "status": 200,
+              "bytes": 250255,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/127334/detail",
+              "status": 200,
+              "bytes": 73368,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/128449/detail",
+              "status": 200,
+              "bytes": 141838,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/123917/detail",
+              "status": 200,
+              "bytes": 226804,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/128119/detail",
+              "status": 200,
+              "bytes": 331475,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/123939/detail",
+              "status": 200,
+              "bytes": 418338,
+              "ctype": "image/png"
+            },
+            {
+              "u": "/api/product-images/127295/detail",
+              "status": 200,
+              "bytes": 260304,
+              "ctype": "image/png"
+            }
+          ],
+          "offer": {
+            "status": 200,
+            "json": {
+              "ok": true,
+              "product_code": 129832,
+              "photo": {
+                "state": "available",
+                "kind": "ai_assembly_example",
+                "url": "/api/customer/products/129832/representative-image",
+                "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+              },
+              "public_configuration": {
+                "configuration_id": "P129832",
+                "revision": 3,
+                "offer_id": "P129832",
+                "description": {
+                  "title": "게임 화면의 화질과 움직임을 함께 고민한다면",
+                  "intro": "Ryzen 5 9600X와 RTX 5070 12GB를 중심으로 구성했습니다. 높은 화질이나 프레임을 목표로 PC를 고를 때, 주로 즐기는 게임과 모니터를 기준으로 비교해 보세요. 저장공간은 1TB SSD입니다. 시스템 메모리는 16GB입니다.",
+                  "scene": "QHD 또는 4K 모니터를 고려하면서, 원하는 게임의 화질과 목표 프레임을 기준으로 PC를 고르는 사용.",
+                  "benefits": [
+                    [
+                      "게임 목표부터 정하고 비교해요",
+                      "RTX 5070를 담은 구성입니다. 해상도, 그래픽 옵션과 목표 프레임을 함께 정하면 필요한 그래픽 성능인지 판단하기 쉬워요."
+                    ],
+                    [
+                      "16GB 메모리를 담았어요",
+                      "실행 중인 프로그램이 쓰는 작업 공간입니다. 게임과 방송·편집을 동시에 하거나 큰 파일을 다룬다면, 사용량에 맞춰 32GB 이상 구성과 비교해 주세요."
+                    ],
+                    [
+                      "자주 쓰는 파일을 모아 둘 1TB",
+                      "1TB SSD를 담았습니다. 게임·사진·작업 파일의 설치 및 보관 공간을 고를 때 비교할 부분이며, 실제 사용할 수 있는 공간은 시스템 설치 후 달라집니다."
+                    ]
+                  ],
+                  "checks": [
+                    "QHD·4K는 상담할 사용 조건이며 성능 보증이 아닙니다. 게임·옵션·레이 트레이싱 설정별 결과를 확인한 뒤 안내합니다.",
+                    "가벼운 게임이나 단순 사무가 중심이라면 추가 비용의 이점이 있는지 낮은 가격의 구성과도 비교해 주세요."
+                  ],
+                  "faq": [
+                    {
+                      "question": "어떤 게임에서 몇 프레임이 나오나요?",
+                      "answer": "게임 이름·해상도·옵션·목표 프레임을 알려주세요. 이 구성에 대응하는 성능 근거를 확인한 뒤 안내하며, 부품 이름만으로 프레임을 확정하지 않습니다."
+                    },
+                    {
+                      "question": "이 PC가 저에게 알뜰 구성인가요, 추천 구성인가요?",
+                      "answer": "두 이름은 상품의 고정 등급이 아닙니다. 사용 조건을 충족하는 후보 중 비용을 줄이는 선택을 알뜰 구성으로, 추가 비용의 이점이 분명한 선택을 추천 구성으로 안내합니다."
+                    },
+                    {
+                      "question": "가격에 조립비가 들어 있나요?",
+                      "answer": "기존 완제품 표시 가격 · 제작 서비스 포함 · 조립비 중복 가산 없음"
+                    },
+                    {
+                      "question": "부품을 바꾸면 설명도 달라지나요?",
+                      "answer": "네. 메모리·그래픽카드 등 부품이 달라지면 달라진 구성의 호환성과 작업 조건을 확인한 뒤 설명과 가격을 다시 안내합니다."
+                    }
+                  ]
+                },
+                "parts": [
+                  {
+                    "ordinal": 0,
+                    "slot": "CPU",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "AMD 라이젠5-6세대 9600X (그래니트 릿지) (멀티팩(정품))",
+                    "description": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+                    "specs": [
+                      {
+                        "label": "모델",
+                        "value": "라이젠5 9600X"
+                      },
+                      {
+                        "label": "코어 구성",
+                        "value": "6"
+                      },
+                      {
+                        "label": "스레드",
+                        "value": "12"
+                      },
+                      {
+                        "label": "소켓",
+                        "value": "AM5"
+                      },
+                      {
+                        "label": "기본 클럭",
+                        "value": "3.9(GHz)"
+                      },
+                      {
+                        "label": "최대 클럭",
+                        "value": "5.4(GHz)"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/121807/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 1,
+                    "slot": "GPU",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "ZOTAC GAMING 지포스 RTX 5070 SOLID OC D7 12GB [회원가입 계좌이체 현금할인 -2.5%]",
+                    "description": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+                    "specs": [
+                      {
+                        "label": "GPU 모델",
+                        "value": "RTX 50"
+                      },
+                      {
+                        "label": "그래픽 메모리",
+                        "value": "12(GB)"
+                      },
+                      {
+                        "label": "메모리 규격",
+                        "value": "GDDR7"
+                      },
+                      {
+                        "label": "카드 길이",
+                        "value": "304.4(mm)"
+                      },
+                      {
+                        "label": "권장 파워",
+                        "value": "정격 650(W) 이상"
+                      },
+                      {
+                        "label": "팬 개수",
+                        "value": "3(EA)"
+                      },
+                      {
+                        "label": "모니터 수",
+                        "value": "최대 4대"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/123795/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 2,
+                    "slot": "RAM",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "ESSENCORE KLEVV DDR5-5600 CL46 AMD 파인인포 (16GB)",
+                    "description": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+                    "specs": [
+                      {
+                        "label": "메모리 규격",
+                        "value": "DDR5"
+                      },
+                      {
+                        "label": "상품 용량",
+                        "value": "16(GB)"
+                      },
+                      {
+                        "label": "표기 속도",
+                        "value": "5600(MHz),PC5-44800"
+                      },
+                      {
+                        "label": "패키지 구성",
+                        "value": "1(EA)"
+                      },
+                      {
+                        "label": "전압",
+                        "value": "1.1(V)"
+                      },
+                      {
+                        "label": "타이밍",
+                        "value": "CL46-46-46-90"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/127334/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 3,
+                    "slot": "SSD",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "BIWIN Black Opal NV3500 M.2 NVMe (1TB)",
+                    "description": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+                    "specs": [
+                      {
+                        "label": "용량",
+                        "value": "1(TB)"
+                      },
+                      {
+                        "label": "연결 형태",
+                        "value": "M.2(NVMe)"
+                      },
+                      {
+                        "label": "M.2 크기",
+                        "value": "2280"
+                      },
+                      {
+                        "label": "플래시 종류",
+                        "value": "TLC"
+                      },
+                      {
+                        "label": "최대 읽기",
+                        "value": "3,500(MB/s)"
+                      },
+                      {
+                        "label": "최대 쓰기",
+                        "value": "3,000(MB/s)"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/128449/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 4,
+                    "slot": "MB",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "ASRock B650M Pro X3D 대원씨티에스/에즈윈/디앤디컴",
+                    "description": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+                    "specs": [
+                      {
+                        "label": "CPU 소켓",
+                        "value": "AM5"
+                      },
+                      {
+                        "label": "메모리 규격",
+                        "value": "DDR5"
+                      },
+                      {
+                        "label": "보드 크기",
+                        "value": "m-ATX"
+                      },
+                      {
+                        "label": "메모리 슬롯",
+                        "value": "4(EA)"
+                      },
+                      {
+                        "label": "최대 메모리",
+                        "value": "최대 256(GB)"
+                      },
+                      {
+                        "label": "M.2 슬롯",
+                        "value": "3(EA)"
+                      },
+                      {
+                        "label": "유선 네트워크",
+                        "value": "2.5기가비트"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/123917/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 5,
+                    "slot": "COOLER",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "쿨러마스터 HYPER 212 SPECTRUM V3 ARGB",
+                    "description": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+                    "specs": [
+                      {
+                        "label": "냉각 방식",
+                        "value": "공랭"
+                      },
+                      {
+                        "label": "높이",
+                        "value": "152(mm)"
+                      },
+                      {
+                        "label": "히트파이프",
+                        "value": "4(EA)"
+                      },
+                      {
+                        "label": "팬 최대 회전수",
+                        "value": "1,750(RPM)"
+                      },
+                      {
+                        "label": "보증 표기",
+                        "value": "2(년)"
+                      },
+                      {
+                        "label": "제조사 표기 TDP",
+                        "value": "200 W"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/128119/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 6,
+                    "slot": "POWER",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "쿨러마스터 MWE GOLD 750 V3 ATX3.1 블랙",
+                    "description": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+                    "specs": [
+                      {
+                        "label": "정격 출력",
+                        "value": "750(W)"
+                      },
+                      {
+                        "label": "파워 규격",
+                        "value": "ATX"
+                      },
+                      {
+                        "label": "효율 표기",
+                        "value": "GOLD"
+                      },
+                      {
+                        "label": "팬 크기",
+                        "value": "120(mm)"
+                      },
+                      {
+                        "label": "보증 표기",
+                        "value": "무상 5(년)"
+                      },
+                      {
+                        "label": "SATA 전원",
+                        "value": "6"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/123939/detail"
+                    }
+                  },
+                  {
+                    "ordinal": 7,
+                    "slot": "CASE",
+                    "quantity": 1,
+                    "pseudo": false,
+                    "name": "마이크로닉스 WIZMAX CHILL 세븐팬",
+                    "description": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+                    "specs": [
+                      {
+                        "label": "형태",
+                        "value": "미들타워"
+                      },
+                      {
+                        "label": "지원 파워",
+                        "value": "ATX"
+                      },
+                      {
+                        "label": "쿨러 높이",
+                        "value": "165(mm)"
+                      },
+                      {
+                        "label": "GPU 장착 길이",
+                        "value": "400(mm)"
+                      },
+                      {
+                        "label": "수랭 지원",
+                        "value": "최대 3열"
+                      },
+                      {
+                        "label": "팬 구성 표기",
+                        "value": "7(개)"
+                      },
+                      {
+                        "label": "크기",
+                        "value": "너비 : 215(mm) / 높이 : 490(mm) / 깊이 : 450(mm)"
+                      }
+                    ],
+                    "photo": {
+                      "state": "approved",
+                      "url": "/api/product-images/127295/detail"
+                    }
+                  }
+                ],
+                "price": {
+                  "state": "unknown",
+                  "amount": null,
+                  "checked_at": null,
+                  "observed_date": null,
+                  "model": null
+                },
+                "stock": {
+                  "state": "unknown",
+                  "checked_at": null
+                },
+                "compatibility": {
+                  "document_state": "unknown",
+                  "public_summary": null,
+                  "assembly_state": "unknown"
+                },
+                "customer_conditions": {
+                  "os": {
+                    "state": "unknown",
+                    "detail": "",
+                    "months": null,
+                    "needs_reconfirmation": false,
+                    "customer_statement": "운영체제 포함 여부를 구매 전에 확인해 주세요."
+                  },
+                  "keyboard": {
+                    "state": "unknown",
+                    "detail": "",
+                    "months": null,
+                    "needs_reconfirmation": false,
+                    "customer_statement": "키보드 포함 여부를 구매 전에 확인해 주세요."
+                  },
+                  "mouse": {
+                    "state": "unknown",
+                    "detail": "",
+                    "months": null,
+                    "needs_reconfirmation": false,
+                    "customer_statement": "마우스 포함 여부를 구매 전에 확인해 주세요."
+                  },
+                  "monitor": {
+                    "state": "unknown",
+                    "detail": "",
+                    "months": null,
+                    "needs_reconfirmation": false,
+                    "customer_statement": "모니터 포함 여부를 구매 전에 확인해 주세요."
+                  },
+                  "warranty": {
+                    "state": "unknown",
+                    "detail": "",
+                    "months": null,
+                    "needs_reconfirmation": false,
+                    "customer_statement": "보증·AS 조건을 구매 전에 확인해 주세요."
+                  }
+                },
+                "product_code": 129832,
+                "photo": {
+                  "state": "unresolved",
+                  "url": null
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "visitor": "cookie",
+  "visitor_probe": {
+    "status": 200,
+    "json": {
+      "ok": true,
+      "quotes": [],
+      "has_more": false
+    }
+  },
+  "at": "2026-10-11T00:06:13.405Z"
+}

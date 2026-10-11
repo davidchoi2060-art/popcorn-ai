@@ -1,0 +1,86 @@
+{
+  "id": 13,
+  "kind": "애매",
+  "turns": [
+    {
+      "text": "QA-고객1 게이밍 컴 추천",
+      "sent_at_utc": "2026-10-11T00:06:45.894Z",
+      "sent_at_kst": "2026-10-11T09:06:45.894+09:00",
+      "pc_vid": "yT8CJvEDseXiYQ-VRPCdwqxpyB0_sIMY",
+      "parse": {
+        "status": 200,
+        "sec": 3.151,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "게임"
+            ],
+            "budget_won": null,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [],
+          "evidence": [
+            "게이밍 컴 = 게임 용도 확인",
+            "구체적인 게임명 없음"
+          ],
+          "reply": "게이밍 컴퓨터를 찾고 계시는군요. 주로 어떤 게임들을 하실 예정인가요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "용도",
+              "v": "게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.55,
+          "stored": false
+        },
+        "bytes": 0,
+        "ctype": null,
+        "error": null,
+        "setCookie": null
+      },
+      "recommend": null,
+      "media": null
+    }
+  ],
+  "visitor": "cookie",
+  "visitor_probe": {
+    "status": 200,
+    "json": {
+      "ok": true,
+      "quotes": [],
+      "has_more": false
+    }
+  },
+  "at": "2026-10-11T00:07:01.084Z"
+}
