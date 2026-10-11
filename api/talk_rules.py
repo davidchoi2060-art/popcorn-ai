@@ -483,10 +483,22 @@ def honest_notices(text: str, state, written: dict | None = None, prev_state=Non
     `written` = 관리자가 적고 «사용»으로 둔 안내 {주제 키: 문장}. 있으면 기본 안내 대신 쓴다.
     `custom` = 관리자가 직접 더한 주제 중 «사용»인 것 — 낱말이 문장에 있으면 그 안내를 쓴다.
     """
+    return topic_notices(text, written, custom) + condition_notices(text, state, prev_state)
+
+
+def topic_notices(text: str, written: dict | None = None, custom: list | None = None) -> list[str]:
+    """판매 주제(운영체제·배송·결제 등) 안내 -- 이 말이 AI 설명보다 먼저다."""
     written = written or {}
     hit = purchase_topics(text)
     notes = [written.get(key) or msg for key, _label, _pat, msg in PURCHASE_TOPICS if key in hit]
     notes += [c["body"] for c in custom_topic_hits(text, custom) if c.get("body")]
+    return notes
+
+
+def condition_notices(text: str, state, prev_state=None) -> list[str]:
+    """램·SSD 같은 구성 조건을 반영하는지 / 못 하는지 짧은 안내. 설명을 대신하지 않고 곁들인다
+    (코덱스 #155 검수 P2-3: 「개발용 PC, 램 64GB」에서 정상 조건 안내가 설명 답을 통째로 지웠다)."""
+    notes: list[str] = []
     applied, conds = requested_conditions(text, state, prev_state)
     if applied:
         notes.append("말씀하신 " + " · ".join(applied) + " 조건으로 판매 중인 PC를 골라 볼게요."
