@@ -4,7 +4,7 @@
   고객이 게임 이름을 말하면 견적은 그 게임의 사양 등급(game_grade_assignments)으로
   사양 하한을 정한다. 이 화면에서 게임마다 등급을 바꾸고(이유 필수 · 대표만),
   해상도별 사양 단계를 함께 보고, 바꾼 기록에서 되돌린다.
-  데이터 = `GET /api/admin/game-grades` · 기록 `GET /api/admin/game-grades/history`
+  데이터 = `GET /api/admin/game-grades` · 기록 `GET /api/admin/game-grades/history` · 목록 밖 추정 `GET /api/admin/game-grades/estimates`
   · 저장 `PUT /api/admin/game-grades/{game_id}` · 되돌리기 `POST /api/admin/game-grades/undo/{log_id}`
   (`api/admin_game_grades.py`).
 
@@ -104,6 +104,11 @@
     <h2>최근 바꾼 기록</h2>
     <div class="gg-hist" id="ggHist"><span class="gg-muted">불러오는 중입니다.</span></div>
   </section>
+  <section class="gg-box">
+    <h2>목록 밖 게임 추정</h2>
+    <p class="gg-muted" id="ggEstNote">고객이 목록에 없는 게임을 말하면 AI가 등급을 추정해 카드를 냅니다. 아직 게임 목록에 넣지 않은 추정을 이름별로 모았습니다.</p>
+    <div class="gg-hist" id="ggEst"><span class="gg-muted">불러오는 중입니다.</span></div>
+  </section>
 </div>
 <aside class="gg-drawer" id="ggDrawer" hidden data-keep="1" aria-label="등급 바꾸기">
   <header><h2 id="ggDTitle">등급 바꾸기</h2><button type="button" id="ggClose">닫기</button></header>
@@ -156,8 +161,24 @@
       var from=d.total?d.offset+1:0, to=d.offset+d.items.length;
       $('ggPage').textContent='전체 '+d.total+'건 중 '+from+'–'+to;
       $('ggPrev').disabled=d.offset<=0; $('ggNext').disabled=to>=d.total;
-      if (first) hist();
-    }).catch(function(e){ emptyRow(e.message); if (first) hist(); });
+      if (first){ hist(); est(); }
+    }).catch(function(e){ emptyRow(e.message); if (first){ hist(); est(); } });
+  }
+  function est(){
+    fetch(API+'/estimates').then(function(r){ if(!r.ok) throw new Error('추정 기록을 불러오지 못했습니다'); return r.json(); })
+    .then(function(d){
+      var h=$('ggEst'); h.textContent='';
+      $('ggEstNote').textContent='고객이 목록에 없는 게임을 말하면 AI가 등급을 추정해 카드를 냅니다. 아직 게임 목록에 넣지 않은 추정 '+d.open+'건을 이름별로 모았습니다'+(d.resolved?' (목록에 넣은 것 '+d.resolved+'건 제외)':'')+'.';
+      if (!d.items.length){ h.appendChild(el('span','gg-muted','목록 밖 게임 추정이 없습니다.')); return; }
+      d.items.forEach(function(it){
+        var row=el('div');
+        row.appendChild(el('span',null,it.name||'(게임 이름 없음)'));
+        row.appendChild(el('span','gg-chip',it.count+'건'));
+        row.appendChild(el('span','gg-muted','추정 등급 '+Object.keys(it.grades).sort().map(function(g){ return g+' '+it.grades[g]+'건'; }).join(' · ')));
+        row.appendChild(el('span','gg-at','마지막 '+when(it.last_at)));
+        h.appendChild(row);
+      });
+    }).catch(function(e){ var h=$('ggEst'); h.textContent=''; h.appendChild(el('span','gg-msg err',e.message)); });
   }
   function hist(){
     fetch(API+'/history').then(function(r){ if(!r.ok) throw new Error('기록을 불러오지 못했습니다'); return r.json(); })

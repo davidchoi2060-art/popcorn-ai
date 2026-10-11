@@ -24,6 +24,7 @@ from sqlalchemy import text
 
 from . import talk_rules as TR
 from .admin_mvp3_consults import HIT_IS_TEST, _terms
+from .admin_talk_patterns import NOTHING_READ
 from .auth import current_operator
 from .db import engine
 from .timeutil import iso
@@ -70,7 +71,7 @@ _SELECT = f"""
 
 @router.get("/talk-review")
 def list_reviews(offset: int = 0, status: str | None = None, flagged: bool = False,
-                 include_test: bool = False):
+                 include_test: bool = False, unread: bool = False):
     offset = max(0, offset)
     if status is not None and status not in STATUSES:
         raise HTTPException(400, "알 수 없는 상태입니다")
@@ -80,6 +81,9 @@ def list_reviews(offset: int = 0, status: str | None = None, flagged: bool = Fal
         where.append("r.status = :st"); params["st"] = status
     if flagged:
         where.append("jsonb_array_length(r.flags) > 0")
+    if unread:
+        # 조건을 하나도 못 읽은 문의 — 응답 패턴 「AI 가 되물은 질문」과 같은 바탕(F9)
+        where.append(NOTHING_READ)
     w = " AND ".join(where)
     base = "FROM talk_reply_reviews r JOIN talk_intent_hits h ON h.hit_id = r.hit_id"
     test_w = "TRUE" if include_test else f"NOT {HIT_IS_TEST}"
@@ -125,7 +129,7 @@ def list_reviews(offset: int = 0, status: str | None = None, flagged: bool = Fal
         "summary": {k: int(v or 0) for k, v in s.items()},
         "before_logging": int(before), "unapplied": unapplied, "topics": topics,
         "flag_kinds": [label for label, _ in TR.PROMISE_PATTERNS],
-        "include_test": include_test,
+        "include_test": include_test, "unread": unread,
     }
 
 

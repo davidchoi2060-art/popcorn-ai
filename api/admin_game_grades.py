@@ -192,6 +192,34 @@ def history(limit: int = 30):
     return {"items": out}
 
 
+@router.get("/estimates")
+def estimates(limit: int = 50):
+    """목록 밖 게임 추정 기록(talk_game_estimates · 0093) — 2026-10-11 품질관리 F7.
+
+    고객이 목록에 없는 게임을 말하면 AI 가 등급을 추정해 바로 카드를 내고 한 행을 남긴다.
+    그 기록을 볼 화면이 없었다. 아직 편입되지 않은 것만, 같은 이름끼리 묶어 보여 준다.
+    편입(게임 목록에 넣기)은 여기서 하지 않는다 — 읽기만 한다.
+    """
+    _me()
+    limit = max(1, min(int(limit or 50), 200))
+    with engine.connect() as conn:
+        rows = conn.execute(text(
+            "SELECT name, sum(c) AS n, jsonb_object_agg(grade, c) AS grades,"
+            "       min(first_at) AS first_at, max(last_at) AS last_at"
+            "  FROM (SELECT NULLIF(btrim(game_name_raw), '') AS name, grade, count(*) AS c,"
+            "               min(created_at) AS first_at, max(created_at) AS last_at"
+            "          FROM talk_game_estimates WHERE resolved_game_id IS NULL"
+            "         GROUP BY 1, 2) g"
+            " GROUP BY name ORDER BY sum(c) DESC, max(last_at) DESC LIMIT :lim"), {"lim": limit}).mappings().all()
+        totals = conn.execute(text(
+            "SELECT count(*) FILTER (WHERE resolved_game_id IS NULL) AS open,"
+            "       count(*) FILTER (WHERE resolved_game_id IS NOT NULL) AS resolved"
+            "  FROM talk_game_estimates")).mappings().one()
+    return {"items": [{"name": r["name"], "count": int(r["n"]), "grades": r["grades"] or {},
+                       "first_at": iso(r["first_at"]), "last_at": iso(r["last_at"])} for r in rows],
+            "open": totals["open"], "resolved": totals["resolved"], "limit": limit}
+
+
 # ── 쓰기 ────────────────────────────────────────────────────────────────────
 class GradeBody(BaseModel):
     model_config = ConfigDict(extra="forbid")

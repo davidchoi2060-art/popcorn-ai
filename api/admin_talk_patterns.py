@@ -66,8 +66,17 @@ def _owner():
 #
 # 실측 대조: 「모니터도 하나 추천해주세요」(band_cards, 답을 줌)와 「예산 12000만원까지」
 # (matched=['예산'], 조건을 읽음)는 빠지고, 「오늘 서울 날씨 어때요?」만 남는다.
-UNANSWERED = ("h.intent_key IS NULL AND h.matched_terms = '[]'::jsonb"
-              " AND h.answer_kind = 'constraint_parse'")
+#
+# 2026-10-11 품질관리 F9·F10: 지금 고객 화면(mvp3)은 조건을 하나도 못 읽어도 AI 가 되물어 답한다.
+# 그 질문까지 「답을 못 만든 질문」으로 세면 큐가 실제와 다른 말을 한다. 그래서 고객에게 나간
+# 말풍선이 기록된 것(`talk_reply_reviews.shown_reply`)은 큐에서 빼고 「AI 가 되물은 질문」으로
+# 따로 센다(`ASKED_BACK`). 둘 다 같은 바탕(`NOTHING_READ`)에서 나온다.
+NOTHING_READ = ("h.intent_key IS NULL AND h.matched_terms = '[]'::jsonb"
+                " AND h.answer_kind = 'constraint_parse'")
+_REPLIED = ("EXISTS (SELECT 1 FROM talk_reply_reviews rr WHERE rr.hit_id = h.hit_id"
+            " AND NULLIF(btrim(rr.shown_reply), '') IS NOT NULL)")
+UNANSWERED = NOTHING_READ + " AND NOT " + _REPLIED
+ASKED_BACK = NOTHING_READ + " AND " + _REPLIED
 
 
 def _origin_where(include_regression: bool) -> str:
@@ -152,6 +161,9 @@ def queue(include_regression: bool = False, limit: int = 8):
         total = conn.execute(text(
             "SELECT COUNT(*) FROM talk_intent_hits h WHERE " + UNANSWERED
             + _origin_where(include_regression))).scalar()
+        asked_back = conn.execute(text(
+            "SELECT COUNT(*) FROM talk_intent_hits h WHERE " + ASKED_BACK
+            + _origin_where(include_regression))).scalar()
     groups = []
     for r in rows:
         v = int(r["visitors"] or 0)
@@ -164,6 +176,9 @@ def queue(include_regression: bool = False, limit: int = 8):
             "at_threshold": v >= AUTO_PROMOTE_VISITORS,
         })
     return {"ok": True, "groups": groups, "total_hits": int(total or 0),
+            # AI 가 조건을 못 읽고 되물은 질문 — 큐(답을 못 만든 질문)와 겹치지 않는다.
+            # 질문과 답은 「AI 답 점검」(`/admin2/talk-review?unread=1`)에서 읽는다.
+            "asked_back": int(asked_back or 0), "review_link": "/admin2/talk-review?unread=1",
             "threshold": AUTO_PROMOTE_VISITORS,
             "regression_excluded": not include_regression}
 
