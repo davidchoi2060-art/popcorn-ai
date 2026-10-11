@@ -149,3 +149,36 @@ test('round trip keeps the conversation and the part swapped on the old screen',
     assert.deepEqual(real(back.errors),[]);
   }finally{back.close();}
 });
+
+test('a swapped PC found in the plain recommendation still remembers where it was swapped from',async()=>{
+  // 코덱스 PR158 검수 v1 신규 후보: 한 번은 일반 추천에서 찾고, 다음 왕복에서 추천에서 빠져도 부품 선택지로 다시 찾는다.
+  const ss=storage(),t=talkPage(ss),items=reco.card_sets[0].items;
+  try{
+    await say(t,'배그 150만원 이하 게임용');t.d.querySelector('[data-action=choose][data-index="0"]').click();await tick();
+    t.d.querySelector('[data-action=open-detail][data-focus=parts]').click();
+  }finally{t.close();}
+  const h=indexPage(ss,'#detail');
+  try{
+    await until(()=>h.flow.state.screen==='detail'&&!h.flow.state.phase&&h.d.querySelector('#part-change'));
+    h.d.querySelector('#part-change [data-slot=gpu]').click();
+    await until(()=>h.d.querySelector('[data-action=part-swap]'));
+    h.d.querySelector('[data-action=part-swap]').click();
+    await until(()=>h.flow.state.selected.product_code===22);
+  }finally{h.close();}
+  const plain={...swapped};delete plain.swap;
+  items.push(plain);                                   // 이번 왕복에서는 22가 일반 추천에 있다
+  const first=talkPage(ss);
+  try{
+    await until(()=>first.flow.state.selected&&!first.flow.state.phase);
+    assert.equal(first.flow.state.selected.product_code,22);
+    assert.equal(first.calls.filter(c=>c.url==='/api/mvp3/part-options').length,0,'found in the plain recommendation');
+    assert.deepEqual(snapshot(ss).current.swap_from,{product_code:12,slot:'gpu'},'the origin is kept in the snapshot');
+  }finally{first.close();items.pop();}
+  const second=talkPage(ss);                           // 다음 왕복에서는 22가 추천에서 빠졌다
+  try{
+    await until(()=>second.flow.state.selected&&!second.flow.state.phase);
+    assert.equal(second.flow.state.selected.product_code,22,'found again from the part options of 12');
+    assert.equal(second.calls.filter(c=>c.url==='/api/mvp3/part-options').length,1);
+    assert.deepEqual(real(second.errors),[]);
+  }finally{second.close();}
+});
