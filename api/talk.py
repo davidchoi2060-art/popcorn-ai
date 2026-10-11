@@ -515,7 +515,7 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "① missing 이 있으면 **그중 하나만** 자연스럽게 되묻는다(예: 게임 등급이 비었으면"
         ' "주로 어떤 게임 하세요?").',
         "② missing 이 없으면 고객의 요청을 이해했다는 사실만 짧게 확인한다. 예산 안 구성을 찾았다거나 요청 조건이 반영됐다고 미리 약속하지 않는다"
-        ' (예 "오버워치용 PC를 찾고 계시는군요"). 금액은 고객이 말한 값을 200만원처럼 숫자로 적는다.',
+        ' (예 "오버워치용 PC를 찾고 계시는군요"). 금액은 고객이 말한 값을 200만원처럼 숫자로 적는다. 고객이 「대」를 붙이지 않았으면 「200만원대」처럼 「대」를 붙이지 않는다.',
         "③ 이력·이전 상태에 이미 있는 예산·용도·게임을 다시 묻지 않는다.",
         "④ 수치·부품명·가격·후보 수·등급 이름을 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은"
         " 추천·평가 금지. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
@@ -1048,6 +1048,9 @@ def parse_talk(body: ParseBody, request: Request):
     band_note = TR.budget_band_note(text)
     if band_note and stage == TS.STAGE_PC and band_note not in reply:
         reply = (reply.rstrip() + " " + band_note).strip()
+    # 2026-10-11 개발 서버: 모델 문장에 힌디어 낱말(「उपलब्ध한」)이 섞여 깨진 글자로 보였고,
+    # 「150만원」을 「150만원대」로 받아 말했다. 화면에 내기 전에 걷는다(원문은 ai_reply 로 남는다).
+    reply = TR.tidy_customer_text(reply, text)
     evidence = _evidence_lines(obj)
 
     # ── [B] 결과 조립 ────────────────────────────────────────────────────────
@@ -1060,6 +1063,7 @@ def parse_talk(body: ParseBody, request: Request):
         answer = ""
     if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
         answer = answer.replace(TA.NUDGE_NARROW, "").strip()
+    answer = TR.tidy_customer_text(answer, text)
     # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).
     # 값 자체는 [A] 의 state 가 정본이다(격자 좌표 계약을 [B] 가 덮어쓰지 않는다).
     a_names = set(state.game.names) if state.game and state.game.names else set()

@@ -483,3 +483,38 @@ def question_key(masked_text: str) -> str | None:
     import hashlib
     t = _NON_WORD.sub("", _QA_LABEL.sub("", masked_text or "")).lower()
     return hashlib.sha256(t.encode("utf-8")).hexdigest() if t else None
+
+
+# ── ⑦ 고객에게 내기 전 손질 (2026-10-11 개발 서버 「배그와 롤 150만원」 캡처) ─────────────
+# 모델 문장에 한국어가 아닌 문자(힌디어 「उपलब्ध한」)가 섞여 낱자모처럼 깨져 보였다. 글자 수로
+# 자르는 곳(REPLY_MAX_LEN 등)은 파이썬 문자 단위라 한글을 깨지 않는다 -- 원인은 모델 출력이다.
+# 한글·영문·숫자·한자 밖의 문자(그리스 문자는 단위 기호로 남긴다)가 든 낱말을 통째로 걷는다.
+_FOREIGN_CHARS = ("\u0400-\u052F\u0530-\u058F\u0590-\u05FF\u0600-\u06FF\u0750-\u077F"
+                  "\u08A0-\u08FF\u0900-\u109F\u10A0-\u10FF\u1200-\u139F\u1780-\u17FF"
+                  "\u3040-\u30FF")
+_FOREIGN_WORD = re.compile(r"[^\s.,!?]*[" + _FOREIGN_CHARS + r"][^\s.,!?]*")
+# 고객이 「150만원」이라 했는데 「150만원대」로 받는 것 -- 「대」는 고객이 붙였을 때만 쓴다.
+# 「대」 뒤 조사는 받침 있는 「원」에 맞게 바꾼다(「150만원대로」 -> 「150만원으로」).
+_AFTER_WON = {"로": "으로", "가": "이", "는": "은", "를": "을", "라": "이라", "야": "이야",
+              "예요": "이에요", "여서": "이어서"}
+_SAID_MAN = re.compile(r"(?<![0-9])([0-9][0-9,]*)\s*만\s*원?(?!\s*대)")
+
+
+def tidy_customer_text(s: str, customer_text: str = "") -> str:
+    """AI 가 낸 고객용 문장 손질 -- 외국 문자 낱말 걷기 · 고객이 안 붙인 「만원대」의 「대」 떼기."""
+    if not s:
+        return s
+    out = s
+    if _FOREIGN_WORD.search(out):
+        out = _FOREIGN_WORD.sub("", out)
+        out = re.sub(r"[ \t]{2,}", " ", out)
+        out = re.sub(r" +([.,!?])", r"\1", out).strip()
+    said = {int(n.replace(",", "")) for n in _SAID_MAN.findall(customer_text or "") if n.replace(",", "")}
+    bare = bare_budget_from_text(customer_text) if customer_text else None
+    if bare:
+        said.add(bare // 10_000)
+    for n in said:
+        if not re.search(r"(?<![0-9])%d\s*만\s*원?\s*대" % n, customer_text or ""):
+            out = re.sub(r"(?<![0-9,])(?:%s|%d)\s*만\s*원\s*대(로|가|는|를|라|야|예요|여서)?" % (f"{n:,}", n),
+                         lambda m, n=n: "%d만원" % n + _AFTER_WON.get(m.group(1) or "", m.group(1) or ""), out)
+    return out
