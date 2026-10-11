@@ -109,7 +109,7 @@ class PurgeOnPostgres(unittest.TestCase):
                            " VALUES (1, 'a', 's', 'n', '운영 메모', :p), (2, 'a', 's', 'n', NULL, :f)"),
                       {'p': past, 'f': future})
             c.execute(text("INSERT INTO purchase_inquiries (contact_name, contact_phone, contact_email, message,"
-                           " memo, purge_at) VALUES ('홍', '010', NULL, '문의', '메모', :p),"
+                           " memo, purge_at) VALUES ('홍', '010', NULL, '문의', '010-1234-5678 로 연락함', :p),"
                            " ('김', NULL, 'a@b.c', '문의', NULL, :f)"), {'p': past, 'f': future})
         self.patch = patch.object(RP, 'engine', self.engine)
         self.patch.start()
@@ -127,7 +127,7 @@ class PurgeOnPostgres(unittest.TestCase):
 
     def test_dry_run_counts_only_and_records(self):
         res = RP.purge('manual', apply=False, now=self.NOW)
-        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1})
+        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'inquiry_memo': 1})
         self.assertTrue(res['dry_run'])
         self.assertEqual(self.q('SELECT count(*) FROM talk_intent_hits WHERE raw_text IS NOT NULL')[0][0], 2)
         self.assertEqual(self.q('SELECT count(*) FROM purchase_inquiries WHERE contact_purged_at IS NULL')[0][0], 2)
@@ -136,7 +136,7 @@ class PurgeOnPostgres(unittest.TestCase):
 
     def test_apply_clears_only_expired_values(self):
         res = RP.purge('manual', apply=True, now=self.NOW)
-        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1})
+        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'inquiry_memo': 1})
         self.assertEqual(self.q('SELECT hit_id, raw_text FROM talk_intent_hits ORDER BY hit_id'),
                          [(1, None), (2, '새 질문'), (3, None)])
         self.assertEqual(self.q('SELECT hit_id, ai_reply, shown_reply, answer, memo FROM talk_reply_reviews'
@@ -144,13 +144,20 @@ class PurgeOnPostgres(unittest.TestCase):
                          [(1, None, None, None, '운영 메모'), (2, 'a', 's', 'n', None)])
         rows = self.q('SELECT contact_name, contact_phone, contact_email, message, memo, contact_purged_at'
                       ' FROM purchase_inquiries ORDER BY inquiry_id')
-        self.assertEqual(rows[0][:5], (None, None, None, None, '메모'))
+        self.assertEqual(rows[0][:4], (None, None, None, None))
+        self.assertNotIn('1234-5678', rows[0][4])
+        self.assertIn('로 연락함', rows[0][4])
         self.assertEqual(rows[0][5], self.NOW)
         self.assertEqual(rows[1][:5], ('김', None, 'a@b.c', '문의', None))
         self.assertIsNone(rows[1][5])
         # 다시 돌리면 지울 것이 없다
         self.assertEqual(RP.purge('manual', apply=True, now=self.NOW)['counts'],
-                         {'talk_raw': 0, 'talk_reply': 0, 'inquiry_contact': 0})
+                         {'talk_raw': 0, 'talk_reply': 0, 'inquiry_contact': 0, 'inquiry_memo': 0})
+        # 비운 뒤 운영자가 메모에 연락처를 다시 적어도 다음 실행이 가린다
+        with self.engine.begin() as c:
+            c.execute(self.text("UPDATE purchase_inquiries SET memo = 'a@b.co 재연락' WHERE inquiry_id = 1"))
+        self.assertEqual(RP.purge('manual', apply=True, now=self.NOW)['counts']['inquiry_memo'], 1)
+        self.assertNotIn('a@b.co', self.q('SELECT memo FROM purchase_inquiries WHERE inquiry_id = 1')[0][0])
 
     def test_contact_check_still_guards_live_rows(self):
         from sqlalchemy.exc import IntegrityError
@@ -178,6 +185,38 @@ class PurgeOnPostgres(unittest.TestCase):
         err = self.q('SELECT error FROM retention_purge_runs')
         self.assertEqual(len(err), 1)
         self.assertIn('no_such_table', err[0][0])
+
+    def test_failed_scheduled_run_is_retried_same_day(self):
+        slot = dt.datetime(2026, 10, 11, 4, 0, tzinfo=KST)
+        now = slot + dt.timedelta(minutes=5)
+        bad = (('talk_raw', 'no_such_table WHERE x <= :now', 'x = NULL'),)
+        with patch.object(RP, 'TARGETS', bad), self.assertRaises(Exception):
+            RP.purge('auto', apply=True, now=now, slot=slot)
+        with self.engine.connect() as c:
+            self.assertIsNone(RP._last_auto_started(c))          # 실패는 그 시각을 채우지 않는다
+            self.assertEqual(RP.due_slot(now + dt.timedelta(minutes=5), RP._last_auto_started(c)), slot)
+        res = RP.purge('auto', apply=True, now=now + dt.timedelta(minutes=5), slot=slot)
+        self.assertTrue(res['ok'])
+        self.assertEqual(res['counts']['inquiry_contact'], 1)
+        with self.engine.connect() as c:
+            self.assertEqual(RP._last_auto_started(c), now + dt.timedelta(minutes=5))
+
+    def test_tick_stops_after_repeated_failures(self):
+        now = dt.datetime.now(dt.timezone.utc)
+        slot = RP.due_slot(now, None)
+        with self.engine.begin() as c:
+            for _ in range(RP.MAX_FAILURES):
+                c.execute(self.text("INSERT INTO retention_purge_runs (moment, dry_run, error, started_at)"
+                                    " VALUES ('auto', true, 'x', :s)"), {'s': slot})
+        with patch.object(RP, 'purge') as run:
+            RP._tick()
+        run.assert_not_called()
+        with self.engine.begin() as c:
+            c.execute(self.text("DELETE FROM retention_purge_runs"))
+        with patch.object(RP, 'purge', return_value={'ok': True}) as run:
+            RP._tick()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.kwargs['slot'], slot)
 
     def test_downgrade_refuses_after_purge(self):
         RP.purge('manual', apply=True, now=self.NOW)

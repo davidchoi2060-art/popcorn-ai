@@ -126,7 +126,7 @@ def list_sessions(offset: int = 0):
             f" JOIN consult_sessions s ON s.session_id = q.session_id WHERE {scope}")).scalar_one()
         drop_total = total - done_total
 
-    notes = _load_notes([r["session_id"] for r in rows])
+    notes, notes_error = _load_notes([r["session_id"] for r in rows])
     by_session: dict = {}
     for q in snaps:
         by_session.setdefault(q["session_id"], []).append(q)
@@ -180,7 +180,8 @@ def list_sessions(offset: int = 0):
             "note_at": (notes or {}).get(r["session_id"], {}).get("at"),
         })
     return {"items": items, "today": today, "done": done, "drop": drop, "limit": LIMIT,
-            "notes_ready": notes is not None, "note_statuses": list(NOTE_STATUSES),
+            "notes_ready": notes is not None, "notes_error": notes_error,
+            "note_statuses": list(NOTE_STATUSES),
             "offset": offset, "total": total,
             "done_total": done_total, "drop_total": drop_total,
             "scope_note": scope_note(),   # A-81 — 아래 kpiCard(「전체 세션」)의 note 자리로 간다
@@ -193,9 +194,11 @@ def list_sessions(offset: int = 0):
                      " consult_sessions 중 「시험 운영 기간」 제외 %d건 기준입니다." % (LIMIT, total))}
 
 
-def _load_notes(ids: list) -> dict | None:
-    """처리 기록 {session_id: {status, memo, at}}. 표가 없으면(0152 전) None — 목록은 그대로 나간다.
+def _load_notes(ids: list):
+    """처리 기록 ({session_id: {status, memo, at}}, None). 읽지 못하면 (None, 이유) — 목록은 그대로 나간다.
 
+    이유는 둘로 나눈다(2026-10-11 코덱스 검수 #116): 표가 없으면(0152 전) 'missing', 연결 · 권한 등
+    그 밖의 실패는 'error'. 화면은 이 둘을 다르게 안내한다 — DB 장애를 「마이그레이션 전」으로 단정하지 않는다.
     목록 본문과 다른 연결에서 읽는다(REPEATABLE READ 트랜잭션이 이 실패로 끊기지 않게).
     """
     if not ids:
@@ -206,10 +209,12 @@ def _load_notes(ids: list) -> dict | None:
                 "SELECT session_id, status, memo, updated_at FROM consult_session_notes"
                 " WHERE session_id = ANY(:ids)"), {"ids": ids}).mappings().all()
     except Exception as e:                                    # noqa: BLE001
+        missing = (getattr(getattr(e, "orig", None), "pgcode", None) == "42P01"
+                   or 'relation "consult_session_notes" does not exist' in str(e))
         log.warning("[sessions] notes load failed - skipped: %s", type(e).__name__)
-        return None
+        return None, ("missing" if missing else "error")
     return {r["session_id"]: {"status": r["status"], "memo": r["memo"], "at": iso(r["updated_at"])}
-            for r in rows}
+            for r in rows}, None
 
 
 class NoteBody(BaseModel):

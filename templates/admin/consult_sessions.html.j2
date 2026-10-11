@@ -661,7 +661,11 @@ button{font-family:inherit}
   // ── 처리 기록(2026-10-11 개편 16번 · 0152) — 상담 원장은 그대로 두고 상태·메모만 남긴다 ──
   function noteHtml(item) {
     if (!S.data.notes_ready) {
-      return '<div><div class="dw-cap">처리 기록</div><div class="dw-note">처리 기록 표가 아직 없습니다(마이그레이션 0152 전). 조회만 할 수 있습니다.</div></div>';
+      // 표가 없을 때와 조회 실패를 나눠 안내한다(코덱스 검수 #116) — DB 장애를 「마이그레이션 전」으로 단정하지 않는다.
+      var why = S.data.notes_error === 'missing'
+        ? '처리 기록 표가 아직 없습니다(마이그레이션 0152 전). 조회만 할 수 있습니다.'
+        : '처리 기록을 불러오지 못했습니다(DB 조회 실패). 잠시 후 다시 열어 주십시오. 조회만 할 수 있습니다.';
+      return '<div><div class="dw-cap">처리 기록</div><div class="dw-note">' + why + '</div></div>';
     }
     var opts = (S.data.note_statuses || []).map(function (st) {
       return '<option value="' + esc(st) + '"' + (st === item.note_status ? ' selected' : '') + '>' + esc(st) + '</option>';

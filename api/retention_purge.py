@@ -9,7 +9,8 @@
     inquiry_contact   purchase_inquiries.contact_name · phone · email · message
                       (+ contact_purged_at 에 지운 시각)              purge_at
 
-운영자 메모(`memo`)는 고객이 쓴 글이 아니라 지우지 않는다.
+운영자 메모(`memo`)는 고객이 쓴 글이 아니라 지우지 않는다. 다만 구매 상담 메모에 옮겨 적힌
+연락처는 기한이 지나면 가린다(inquiry_memo, `_mask_memos`).
 
 **기본은 미리보기다.** 지울 대상 건수만 `retention_purge_runs` 에 남긴다. 실제로 지우려면
 `RETENTION_PURGE_APPLY=on`. 실행 기록(미리보기 포함)은 한 번에 한 줄이고 지우지 않는다.
@@ -98,6 +99,7 @@ def purge(moment="manual", *, apply=None, now=None, slot=None) -> dict:
                 else:
                     counts[name] = c.execute(text("SELECT count(*) FROM %s WHERE %s" % (table, where)),
                                              params).scalar()
+            counts["inquiry_memo"] = _mask_memos(c, params, apply)
             c.execute(text(
                 "UPDATE retention_purge_runs SET counts = CAST(:c AS JSONB), finished_at = now()"
                 " WHERE run_id = :r"), {"c": json.dumps(counts), "r": run_id})
@@ -118,6 +120,24 @@ def purge(moment="manual", *, apply=None, now=None, slot=None) -> dict:
     return {"ok": True, "run_id": run_id, "dry_run": not apply, "counts": counts}
 
 
+def _mask_memos(conn, params, apply):
+    """기한 지난 구매 상담의 운영자 메모에 옮겨 적힌 연락처를 가린다. 메모의 나머지 글은 남긴다.
+
+    운영자가 고객 번호 · 이메일을 메모에 옮겨 적으면 연락처 칸을 비워도 복사본이 남는다
+    (2026-10-11 코덱스 검수 #124 · #126). 연락처를 비운 뒤에도 메모는 고칠 수 있으므로
+    매번 기한 지난 행 전체를 본다. 가리는 규칙은 상담 원문과 같다(`api/talk.mask_pii`).
+    """
+    from .talk import mask_pii
+    rows = conn.execute(text(
+        "SELECT inquiry_id, memo FROM purchase_inquiries WHERE purge_at <= :now AND memo IS NOT NULL"),
+        params).all()
+    changed = [(i, mask_pii(m)) for i, m in rows if mask_pii(m) != m]
+    if apply:
+        for i, m in changed:
+            conn.execute(text("UPDATE purchase_inquiries SET memo = :m WHERE inquiry_id = :i"), {"m": m, "i": i})
+    return len(changed)
+
+
 def due_slot(now, last_auto_started):
     """지금 돌려야 할 정기 시각(aware) 또는 None. 놓친 시각은 그날 안에 한 번 만회한다."""
     local = now.astimezone(_KST)
@@ -130,15 +150,28 @@ def due_slot(now, last_auto_started):
 
 
 def _last_auto_started(conn):
+    # 실패한 실행(error)은 세지 않는다 — 실패하면 같은 날 다음 확인 때 다시 돈다(코덱스 검수 #126).
     return conn.execute(text(
-        "SELECT max(started_at) FROM retention_purge_runs WHERE moment = 'auto'")).scalar()
+        "SELECT max(started_at) FROM retention_purge_runs WHERE moment = 'auto' AND error IS NULL")).scalar()
+
+
+MAX_FAILURES = 3                       # 같은 정기 시각에 실패하면 몇 번까지 다시 해 보나
+
+
+def _failures_since(conn, slot):
+    return conn.execute(text(
+        "SELECT count(*) FROM retention_purge_runs WHERE moment = 'auto' AND error IS NOT NULL"
+        " AND started_at >= :s"), {"s": slot}).scalar()
 
 
 def _tick():
     now = dt.datetime.now(dt.timezone.utc)
     with engine.connect() as c:
         last = _last_auto_started(c)
-    slot = due_slot(now, last)
+        slot = due_slot(now, last)
+        if slot is not None and _failures_since(c, slot) >= MAX_FAILURES:
+            # 실패가 쌓이면 그날은 멈춘다 — 실패 기록이 남아 있고, 손으로 다시 돌릴 수 있다.
+            return
     if slot is not None:
         res = purge("auto", now=now, slot=slot)
         log.info("[retention-purge] scheduled run ok=%s", res.get("ok"))

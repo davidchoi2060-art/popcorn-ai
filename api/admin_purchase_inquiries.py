@@ -69,7 +69,8 @@ def _row(r, full: bool) -> dict:
         "phone": None if gone else (r["contact_phone"] if full else _mask_phone(r["contact_phone"])),
         "email": None if gone else (r["contact_email"] if full else _mask_email(r["contact_email"])),
         "message": None if gone else (r["message"] if full else _mask_text(r["message"])),
-        "memo": r["memo"] if full else _mask_text(r["memo"]),
+        # 기한이 지나면 메모에 옮겨 적힌 연락처도 가린다(2026-10-11 코덱스 검수 #124 · #126).
+        "memo": r["memo"] if full and not gone else _mask_text(r["memo"]),
         "contact_purged": gone,
         "visitor": ("u%d" % r["user_id"]) if r["user_id"] is not None else None,
         "quote_id": str(r["quote_id"]) if r["quote_id"] else None,

@@ -122,6 +122,11 @@ class RetentionAndMasking(unittest.TestCase):
         row = PI._row(self.inquiry(self.past), full=True)
         self.assertEqual((row["name"], row["phone"], row["email"], row["message"]), (None, None, None, None))
         self.assertTrue(row["contact_purged"])
+        # 메모에 옮겨 적은 연락처도 가린다 — 메모의 나머지 글은 남는다(코덱스 검수 #124 · #126)
+        self.assertNotIn("abc@example.com", row["memo"])
+        self.assertIn("메일 보냄", row["memo"])
+        live = PI._row(self.inquiry(self.future), full=True)
+        self.assertIn("abc@example.com", live["memo"])
 
     def test_expired_ai_reply_is_not_sent(self):
         from api import admin_talk_review as TRV

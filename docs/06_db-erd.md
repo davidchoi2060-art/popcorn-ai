@@ -1901,14 +1901,14 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 
 ### 35. 보관 기한 지난 개인정보 지우기 기록 `retention_purge_runs` (2026-10-11, 0153)
 
-고객 질문 원문(`talk_intent_hits.raw_text`) · AI 답(`talk_reply_reviews.ai_reply`·`shown_reply`·`answer`) · 구매 상담 연락처(`purchase_inquiries.contact_name`·`contact_phone`·`contact_email`·`message`)를 보관 기한이 지나면 비우는 일일 작업(`api/retention_purge.py`, 매일 04:00 KST)의 실행 기록이다. 행은 지우지 않고 값만 비운다. 운영자 메모는 지우지 않는다.
+고객 질문 원문(`talk_intent_hits.raw_text`) · AI 답(`talk_reply_reviews.ai_reply`·`shown_reply`·`answer`) · 구매 상담 연락처(`purchase_inquiries.contact_name`·`contact_phone`·`contact_email`·`message`)를 보관 기한이 지나면 비우는 일일 작업(`api/retention_purge.py`, 매일 04:00 KST)의 실행 기록이다. 행은 지우지 않고 값만 비운다. 운영자 메모는 지우지 않되, 구매 상담 메모에 옮겨 적힌 연락처는 기한이 지나면 가린다(`counts.inquiry_memo`). 실패한 정기 실행은 그 시각을 채우지 않아 같은 날 다시 돈다(같은 시각 실패 3번이면 그날은 멈춘다).
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
 | run_id | BIGSERIAL PK | |
 | moment | VARCHAR(8) | `auto`(정기) · `manual`(`tools/retention_purge.py`) |
 | dry_run | BOOLEAN | 미리보기면 TRUE — `counts` 는 지울 대상 건수 |
-| counts | JSONB | 표별 건수 `{talk_raw, talk_reply, inquiry_contact}` |
+| counts | JSONB | 표별 건수 `{talk_raw, talk_reply, inquiry_contact, inquiry_memo}` |
 | error | TEXT | 실패 사유(실패한 실행도 한 줄 남긴다) |
 | started_at · finished_at | TIMESTAMPTZ | |
 
