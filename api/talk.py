@@ -479,7 +479,7 @@ class ParseBody(BaseModel):
 
 
 # 일반 기준 설명을 지우지 않는 예외 -- 주문·환불 상태를 묻는 턴도 일반적인 환불 기간은 말해 줄 수 있다.
-GENERAL_OK_EXCEPTIONS = frozenset({"order_status"})
+GENERAL_OK_EXCEPTIONS = frozenset({"order_status", "competitor"})
 
 # 시작 단추 키. 정본은 api/talk_entry.KEYS, 화면은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야
 # 센다(테스트가 대조한다).
