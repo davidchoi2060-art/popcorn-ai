@@ -217,13 +217,14 @@ class PopularGamesAnswer(unittest.TestCase):
         return [TA.GameFacts(name='리그 오브 레전드', grade='E'), TA.GameFacts(name='FC온라인', grade=None),
                 TA.GameFacts(name='메이플스토리', grade='L')]
 
-    def test_list_is_one_per_line_with_load_word_and_no_rank_repeat(self):
+    def test_list_is_one_per_line_without_fixed_tail_and_no_rank_repeat(self):
         out = TA.tidy_game_list(DEV_ANSWER, self.facts())
         lines = out.split('\n')
-        self.assertEqual(lines[1], '- 리그 오브 레전드: 전장 운영과 팀 대결을 즐기는 게임 (필요한 사양: 보통)')
-        self.assertEqual(lines[2], '- FC온라인: 축구 경기를 즐기는 스포츠 게임')      # 등급 없음 -> 안 붙인다
-        self.assertEqual(lines[3], '- 메이플스토리: 캐릭터 성장과 모험을 즐기는 다중접속 역할수행 게임 (필요한 사양: 가벼운 편)')
+        self.assertEqual(lines[1], '- 리그 오브 레전드: 전장 운영과 팀 대결을 즐기는 게임')
+        self.assertEqual(lines[2], '- FC온라인: 축구 경기를 즐기는 스포츠 게임')
+        self.assertEqual(lines[3], '- 메이플스토리: 캐릭터 성장과 모험을 즐기는 다중접속 역할수행 게임')
         self.assertNotIn('인기도 순으로는', out)
+        self.assertNotIn('사양', out)     # 서버가 고정 꼬리를 붙이지 않는다
         self.assertEqual(len(lines), 4)
 
     def test_plain_answer_untouched(self):
@@ -253,6 +254,11 @@ class PromptCarriesExceptionGuide(unittest.TestCase):
     def test_prompt_has_exception_block(self):
         p = talk._build_prompt('ㅋㅋ', vocab())
         self.assertIn('[예외 입력', p)
+
+    def test_prompts_ask_for_general_ai_tone(self):
+        # 사장님 2026-10-11 「기존 AI와 대화하듯이」 -- 잡담·범위 밖도 먼저 답하고 가볍게 잇는다
+        self.assertIn('일반 AI', talk.SMALLTALK_BLOCK)
+        self.assertIn('일반 AI', talk.EXCEPTION_BLOCK)
 
 
 if __name__ == '__main__':

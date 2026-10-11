@@ -79,22 +79,15 @@ NO_DATA = "이 게임에 대한 설명은 지금 정확히 안내하기 어렵�
 
 # ── 인기 게임 목록 다듬기 (2026-10-11 「요즘 많이 하는 게임 뭐 있어?」 실측) ──────────
 # 개발 서버 실측: 게임 여섯이 한 문단에 « - » 로 붙어 나왔고, 끝에 같은 게임을 «인기도 순»으로
-# 한 번 더 나열했다. 그래서 ① 목록은 한 줄에 하나로 펴고 ② 되풀이 순위 문장은 걷고
-# ③ 게임마다 우리 DB 부하 등급을 쉬운 말로 서버가 붙인다(AI 는 사양 판단을 말하지 않는다 --
-# 위 [절대 금지]. 서버가 DB 값으로 붙이므로 추천 카드와 어긋나지 않는다).
-# 등급 -> 쉬운 말. 근거는 game_grade_resolution_tiers 1080p 요구 티어(0091):
-#   L(경량 캐주얼, 사장님 확인 「높은 성능을 필요로 하지 않는다」) -> 가벼운 편
-#   E·A(1080p T1) -> 보통 · B·C·S(1080p T2 이상, S 는 CPU T4) -> 무거운 편
-# 표에 없는 등급·등급 없는 게임은 붙이지 않는다(지어내지 않는다).
-LOAD_WORDS = {"L": "가벼운 편", "E": "보통", "A": "보통",
-              "B": "무거운 편", "C": "무거운 편", "S": "무거운 편"}
-LOAD_LABEL = "필요한 사양"
+# 한 번 더 나열했다. 서버는 ① 붙은 목록을 게임마다 줄을 바꾸고 ② 되풀이 순위 문장만 걷는다.
+# 말 자체는 AI 가 일반 대화처럼 쓴다(사장님 2026-10-11 「기존 AI와 대화하듯이」) -- 서버가
+# 등급 말 같은 고정 꼬리를 붙이지 않는다. 사양 판단은 여전히 말하지 않는다(위 [절대 금지]).
 _INLINE_ITEM = re.compile(r"\s+-\s+(?=\S)")
 _RANK_REPEAT = re.compile(r"(인기\S*\s*순(으로|위)?(는|로는)?|순위로는|순서로는)")
 
 
 def tidy_game_list(body: str, facts: list) -> str:
-    """게임 목록 답변을 한 줄에 하나로 펴고, 끝의 되풀이 순위 문장을 걷고, 등급 말을 붙인다."""
+    """붙어 나온 게임 목록을 게임마다 줄을 바꾸고, 끝의 되풀이 순위 문장을 걷는다."""
     if not body or not facts:
         return body
     names = [f.name for f in facts if getattr(f, "name", None)]
@@ -117,11 +110,6 @@ def tidy_game_list(body: str, facts: list) -> str:
             m = _RANK_REPEAT.search(ln)
             if m and sum(1 for n in names if n in ln[m.start():]) >= 3:
                 ln = ln[:m.start()].rstrip()
-            for f in facts:
-                word = LOAD_WORDS.get(getattr(f, "grade", None) or "")
-                if word and f.name and ln.lstrip("- ").startswith(f.name) and LOAD_LABEL not in ln:
-                    ln = ln.rstrip() + " (%s: %s)" % (LOAD_LABEL, word)
-                    break
         kept.append(ln)
     return "\n".join(kept).strip()
 
@@ -463,10 +451,12 @@ def build_answer_prompt(sentence: str, ev: Evidence, narrowing: str,
     lines.append("")
     # 유도는 **서버가 붙인다**. 모델에게 시키지 않는다(그 안에 숫자가 들어간다).
     if narrowing == TS.NARROWING_WIDE:
-        lines.append("[이번 답변] 고객이 아직 둘러보는 중이다. **게임 이야기만 한다.**"
-                     " PC·견적 이야기를 꺼내지 않는다. 고객 질문에 답하고 끝낸다. 후속 질문을 반드시 붙이지 않는다.")
-        lines.append("[목록 형식] 게임을 여럿 소개하면 한 줄에 하나씩 「- 게임명: 쉬운 설명 한 문장」으로 쓰고"
-                     " 줄을 바꾼다. 목록 뒤에 같은 게임을 순위로 다시 늘어놓지 않는다. 마지막에 질문을 붙이지 않는다.")
+        lines.append("[이번 답변] 고객이 아직 둘러보는 중이다. 일반 AI 와 대화하듯 자연스럽고 친근하게 답한다."
+                     " 짧은 도입 한 문장 뒤, 게임마다 어떤 게임이고 어떤 점이 재미있는지 한두 문장씩 소개한다."
+                     " **게임 이야기만 한다** - PC·견적 이야기는 꺼내지 않는다(서버가 끝에 가볍게 한 줄 붙인다)."
+                     " 마지막에 질문을 붙이지 않는다.")
+        lines.append("[목록 형식] 게임을 여럿 소개하면 게임마다 줄을 바꾸고 「- 게임명: 설명」으로 시작한다."
+                     " 목록 뒤에 같은 게임을 순위로 다시 늘어놓지 않는다.")
     elif narrowing == TS.NARROWING_NARROW:
         lines.append("[이번 답변] 장르나 게임이 좁혀졌다. 그 게임들을 근거대로 설명한다."
                      " **PC 이야기는 붙이지 않는다** - 서버가 한 줄 덧붙인다.")
