@@ -448,6 +448,7 @@ class AnswerResult:
     cost_usd: float | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    log_id: int | None = None                 # api_cost_logs.log_id -- 문의 번호를 잇는 데 쓴다(0141)
     error: str | None = None
 
 
@@ -520,6 +521,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                        timeout_sec=int(min(ANSWER_TIMEOUT_SEC, timeout_sec)))
         res.provider, res.model = out.provider, out.model
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
+        res.log_id = out.log_id
         raw = (out.text or "").strip()
 
         # ★ 필터 — LLM 이 자유롭게 쓴 것을 우리 DB 기준으로 거른다.
