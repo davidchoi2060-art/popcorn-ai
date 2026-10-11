@@ -205,7 +205,7 @@ if __name__ == '__main__':
         rc = 1
     probes()
     blob='\n'.join(_LINES)
-    for i in range(0, len(blob), 3500):
-        part=blob[i:i+3500].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
-        _print(f'::notice title=check {i//3500}::{part}')
+    for i in range(0, len(blob), 1200):
+        part=blob[i:i+1200].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+        _print(f'::notice title=check {i//1200:02d}::{part}')
     sys.exit(rc)
