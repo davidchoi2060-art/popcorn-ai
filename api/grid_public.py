@@ -841,14 +841,14 @@ def recommend(body: RecommendBody):
         talk_notes: list[str] = []
         explore = None
         if RECO_SOURCE == "sold":
-            state, explore = _explore_input(body, state, talk_notes)
-        if RECO_SOURCE == "sold":
             # 2026-09-25 재설계 4단계 — 조합 격자 대신 판매 중인 몰 조립PC 최대 2개(api/sold_reco).
             # 판매 경로의 수준은 등급이 아니라 게임명·해상도가 정한다(sold_reco.game_min_rank).
             # 게임명이 «없으면» 해상도 기준(기본 FHD)으로 등급 없이 추천한다(2026-10-09 조정 결정:
             # 「게임용 250만원」이 0장이었다). 게임명이 «있는데» 등급이 없으면 validate_state 가
             # 「전체 게임 적합성 확인 전 추천 보류」로 막은 것이라 그대로 보류한다.
             # needs 의 game.grade 는 어느 쪽이든 그대로.
+            # 2026-10-11 상담 주고받기: 말한 조건 · 더 싸게/더 높게(api/reco_explore). state 는 바꾸지 않는다.
+            state, explore = _explore_input(body, state, talk_notes)
             named = bool(state.game and state.game.names)
             sold_games = game_usages if (game_grade is not None or not named) else []
             others = [u for u in state.usages if not is_game_usage(u)]

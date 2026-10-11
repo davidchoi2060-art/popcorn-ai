@@ -143,9 +143,10 @@ class GameScopeTests(unittest.TestCase):
                'is_game_usage': TS.is_game_usage, 'SOLD': SimpleNamespace(card_sets=cards),
                '_game_context': context, 'assumed': [], 'ai_estimated': [],
                'DEFAULT_RESOLUTION': TS.DEFAULT_RESOLUTION,
-               'ASSUMED_RESOLUTION': 'game.resolution=1080p', 'conn': None, 'vocab': v}
+               'ASSUMED_RESOLUTION': 'game.resolution=1080p', 'conn': None, 'vocab': v,
+               'body': None, 'talk_notes': [], '_explore_input': lambda b, st, tn: (st, None)}
         exec(compile(ast.Module(body=branch.body, type_ignores=[]), 'grid sold branch', 'exec'), env)
-        cards.assert_called_once_with(grid_state, [], [], env['notes'], v)
+        cards.assert_called_once_with(grid_state, [], [], env['notes'], v, None)
         context.assert_not_called()
         self.assertEqual(env['card_sets'], [])
 
