@@ -471,7 +471,7 @@ function openSaved(){ui.surface='consultation';if(state.screen==='saved'&&state.
 function enterRoute(hash,initial=false){
   enteringRoute=true;
   try{
-    if(initial)flow.reset();
+    if(initial)flow.reset({restore:true});
     if(initial&&(!hash||hash==='#start'||hash==='#purpose')){
       ui.surface=hash==='#purpose'?'usage':'gateway';history.replaceState(uiEntry(),'',uiHash());render();return;
     }

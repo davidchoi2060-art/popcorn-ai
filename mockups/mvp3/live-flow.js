@@ -21,6 +21,38 @@
       clear(){target().removeItem(JOURNAL_KEY);}
     };
   }
+  // 대화 상태 보관(2차 대화 중심 화면의 바닥 -- 2026-10-11). 새로고침해도 앞서 말한 조건과 대화,
+  // 지금 보던 견적(상품 번호와 바꾼 부품)을 잃지 않게 이 탭(sessionStorage)에만 둔다. 가격·추천 카드는
+  // 두지 않는다 -- 시간이 지나면 틀리므로 되살린 뒤 서버에 다시 묻는다(restoredCurrent).
+  const CONVERSATION_KEY='popcorn-mvp3-conversation-v1',CONVERSATION_TTL_MS=6*3600*1000,CONVERSATION_MAX_BYTES=65536;
+  const CONVERSATION_MAX_MESSAGES=60,CONVERSATION_MAX_TEXT=2000;
+  // 카드번호·주민번호 모양의 숫자는 보관하기 전에 가린다(서버 api/talk_exceptions.mask_personal 과 같은 모양).
+  function maskPersonal(t){return String(t).replace(/(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g,'[가림]').replace(/(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)/g,'[가림]');}
+  function conversationSnapshot(state,now=Date.now()){
+    const text=t=>maskPersonal(String(t||'').slice(0,CONVERSATION_MAX_TEXT));
+    const sel=state.selected;
+    return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,
+      chat_flow:M.object(state.chatFlow)?M.copy(state.chatFlow):null,
+      history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
+      messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel)}:null};
+  }
+  function validConversation(r,now=Date.now()){
+    return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=CONVERSATION_TTL_MS
+      &&(r.talk===null||M.object(r.talk))&&(r.chat_flow===null||M.object(r.chat_flow))
+      &&Array.isArray(r.history)&&r.history.length<=6&&r.history.every(h=>M.object(h)&&['user','assistant'].includes(h.role)&&typeof h.text==='string')
+      &&Array.isArray(r.messages)&&r.messages.length<=CONVERSATION_MAX_MESSAGES&&r.messages.every(m=>M.object(m)&&['user','ai'].includes(m.who)&&typeof m.text==='string')
+      &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes));
+  }
+  function createConversationStore(options){
+    let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
+    function target(){if(!resolved){storage=root.sessionStorage;resolved=true;}if(!storage)throw new Error('session storage');return storage;}
+    return {
+      read(now=Date.now()){const raw=target().getItem(CONVERSATION_KEY);if(!raw)return null;const r=JSON.parse(raw);return validConversation(r,now)?r:null;},
+      write(record){const raw=JSON.stringify(record);if(raw.length>CONVERSATION_MAX_BYTES)return false;target().setItem(CONVERSATION_KEY,raw);return true;},
+      clear(){target().removeItem(CONVERSATION_KEY);}
+    };
+  }
   // 구매 상담 신청 칸의 상태. 서버가 준 주제·동의 문구만 쓰고, 받은 신청 번호만 보여 준다.
   function emptyInquiry(){return {open:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
   const PHONE_RE=/^0\d{1,2}-?\d{3,4}-?\d{4}$/, EMAIL_RE=/^[^@\s]{1,64}@[^@\s]{1,100}\.[^@\s]{2,}$/;
@@ -46,9 +78,11 @@
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false};
-    let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
-    function emit(){changed(state);}
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null};
+    let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
+    // 화면을 그릴 때마다 대화 상태를 이 탭에 남긴다. 보관이 막혀 있어도 상담은 그대로 간다.
+    function remember(){try{conversation.write(conversationSnapshot(state));}catch{}}
+    function emit(){remember();changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
     function begin(phase){cancel();controller=new AbortController();state.phase=phase;state.error=null;state.retry=null;emit();return {id:generation,signal:controller.signal};}
     function current(op){return op.id===generation&&!op.signal.aborted;}
@@ -58,13 +92,23 @@
         retryAfter:error?.retryAfter||0,retryAt:Date.now()+(error?.retryAfter||0)*1000};
       state.retry=retry;
     }
-    function reset(){
-      cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
+    function reset({restore=false}={}){
+      cancel();Object.assign(state,{restoredCurrent:null,screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
         wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
-      message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
+      message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');
+      // restore: 처음 열 때만 이 탭에 남은 대화를 되살린다. 「새 상담」은 지운다.
+      let saved=null;
+      if(restore){try{saved=conversation.read();}catch{saved=null;}}
+      else{try{conversation.clear();}catch{}}
+      if(saved){
+        state.talk=saved.talk;state.chatFlow=saved.chat_flow;state.history=saved.history;
+        if(saved.messages.length)state.messages=saved.messages;
+        state.restoredCurrent=saved.current;
+      }
+      emit();
     }
     async function recommendFor(op,extra={}){
       state.phase='recommend';emit();
@@ -366,5 +410,5 @@
     }
     return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem};else root.MVP3LiveFlow={createFlow};
+  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);
