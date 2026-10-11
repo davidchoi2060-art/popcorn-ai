@@ -168,7 +168,9 @@ function renderPanel(){
         :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+'<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요.</p>')+'</div>';
     }
   }
-  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>';
+  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>'+
+    // 구매 확정은 끝이 아니다 -- 확정 뒤에도 상담사가 전화로 구성을 다시 살펴본다(2026-10-11 사장님).
+    '<p class="muted tk-phone">구매를 확정한 뒤에도 상담사가 전화로 구성을 함께 살펴봐요.</p>';
   panel.innerHTML=html+inquiryForm();
 }
 
