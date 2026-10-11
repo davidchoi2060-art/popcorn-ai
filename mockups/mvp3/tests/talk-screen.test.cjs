@@ -271,3 +271,17 @@ test('cards over the budget come with the server reason above them',async()=>{
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+test('a budget far below the cheapest PC shows only the server line, no cards',async()=>{
+  const note='이 작업은 4,800,000원부터 가능합니다. 예산을 조금 올리시면 보여 드릴게요.';
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:['영상 편집'],budget_won:100000,budget_bound:'이하'},missing:[],reply:'영상 편집 10만원으로 볼게요.',pc_related:true}}
+    :url==='/api/grid/recommend'?{data:{ok:true,card_sets:[{kind:'sold',usage:'영상 편집',empty_reason:'예산이 너무 낮음',empty_note:note,items:[]}],needs:[],assumed:[]}}
+    :{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    await h.say('영상 편집 10만원');
+    assert.equal(h.text('.tk-cards.is-empty .tk-group-note'),note);
+    assert.equal(h.doc.querySelectorAll('.tk-card-list li').length,0);
+    assert.doesNotMatch(h.text('.tk-cards.is-empty'),/찾지 못했어요/);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
