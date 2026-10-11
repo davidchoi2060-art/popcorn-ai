@@ -297,10 +297,10 @@ function buildPanel(){
   if(state.phase==='build')return '<div class="part-options" role="status">'+head+'<p class="muted">'+(d?'바꾼 구성의 호환과 금액을 다시 확인하는 중이에요.':'이 PC에 맞는 판매 부품을 찾는 중이에요.')+'</p></div>';
   if(q.error)return '<div class="part-options" role="alert">'+head+'<p class="warn-text">'+esc(q.error)+'</p>'+button('다시 찾기','build-options','outline small','data-ordinal="'+q.ordinal+'" data-retry="1"')+'</div>';
   if(!d)return '';
-  const untested=(d.untested?'<p class="muted">사양 정보가 모자라 호환을 확인하지 못한 부품 '+d.untested+'개는 빼고 보여 드려요.</p>':'')+
-    (d.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join('');
+  // 쿨러 미확인 경고는 서버 안내(note)가 한 문장으로 품는다 — 「모두 통과」와 경고를 따로 나란히 두지 않는다.
+  const warned=(d.warnings||[]).length>0,untested=d.untested?'<p class="muted">사양 정보가 모자라 호환을 확인하지 못한 부품 '+d.untested+'개는 빼고 보여 드려요.</p>':'';
   if(!d.options.length)return '<div class="part-options" role="status">'+head+'<p>지금 이 PC에 맞는 다른 판매 부품이 없어요.</p>'+untested+'</div>';
-  return '<div class="part-options">'+head+'<p class="muted">'+esc(d.note||'호환 규칙을 통과한 판매 중 부품만 보여 드려요.')+'</p>'+untested+'<ul class="part-option-list">'+
+  return '<div class="part-options">'+head+'<p class="'+(warned?'warn-text':'muted')+'">'+esc(d.note||(warned?d.warnings.join(' '):'호환 규칙을 통과한 판매 중 부품만 보여 드려요.'))+'</p>'+untested+'<ul class="part-option-list">'+
     d.options.map(o=>'<li class="part-option" data-build-option="'+o.product_code+'"><div class="part-option-copy"><strong>'+esc(o.name)+'</strong><span class="part-option-name">부품 판매가 '+money(o.price)+'</span></div>'+
       '<div class="part-option-price"><strong>'+money(o.total)+'</strong><span class="'+(o.price_diff>0?'warn-text':'green')+'">'+signedMoney(o.price_diff)+'</span>'+
       button('이걸로 바꾸기','build-pick','primary small','data-code="'+o.product_code+'"'+(state.phase?' disabled':''))+'</div></li>').join('')+'</ul></div>';

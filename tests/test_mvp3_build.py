@@ -299,5 +299,13 @@ class MissingCoolerWarns(unittest.TestCase):
         self.assertEqual(res['warnings'], [])
 
 
+
+class BuildNote(unittest.TestCase):
+    def test_note_does_not_claim_all_rules_pass_when_cooler_unchecked(self):
+        self.assertIn('모두 통과', b.BUILD_NOTE)
+        self.assertNotIn('모두 통과', b.BUILD_NOTE_WARNED)
+        self.assertIn('쿨러 호환은 따로 확인', b.BUILD_NOTE_WARNED)
+
+
 if __name__ == '__main__':
     unittest.main()
