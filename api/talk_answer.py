@@ -450,6 +450,31 @@ class AnswerResult:
     tokens_out: int | None = None
     log_id: int | None = None                 # api_cost_logs.log_id -- 문의 번호를 잇는 데 쓴다(0141)
     error: str | None = None
+    # 2026-10-11 개편 15번: 답변 AI 가 실패했을 때 우리 DB 사실로 짧은 소개를 대신 냈는가.
+    # error 는 그대로 둔다(관리자 「AI 답 점검」의 답변 실패 수에 계속 잡힌다).
+    fallback: bool = False
+
+
+FALLBACK_MAX_GAMES = 3
+
+
+def fallback_intro(ev: "Evidence") -> str:
+    """답변 AI 가 실패했을 때의 짧은 기본 소개 — 우리 DB 에 있는 사실만 쓴다(개편 15번).
+
+    고객1 기능 11: 26턴 중 2턴에서 답변 AI 가 9.3초가 걸려 8초 상한에서 끊겼고, 게임 소개 글이
+    통째로 빠졌다. 그때 이미 모아 둔 근거(장르 · 제작사 · 검수된 안내)로 한두 줄을 낸다.
+    웹 자료와 인기도는 쓰지 않는다 — 출처·시점 설명이 함께 가야 하는 값이라 짧은 소개에 맞지 않는다.
+    """
+    out = []
+    for f in ev.facts[:FALLBACK_MAX_GAMES]:
+        if f.copy_spec:
+            out.append("%s: %s" % (f.name, f.copy_spec.strip()))
+            continue
+        bits = [b for b in (("장르 " + f.genre) if f.genre else None,
+                            ("제작 " + f.vendor) if f.vendor else None) if b]
+        if bits:
+            out.append("%s: %s" % (f.name, " · ".join(bits)))
+    return scrub_internal_source_names(" / ".join(out))[:ANSWER_MAX_LEN]
 
 
 def _grade_of(ev: Evidence) -> str | None:
@@ -475,6 +500,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
     """
     t0 = time.time()
     res = AnswerResult()
+    ev = None
     try:
         # ★ [B] 는 **게임 이야기일 때만** 답한다.
         #   여기는 PC 견적 창구다. \"오늘 점심 뭐 먹을까\"에 게임 순위를 읊으면 그것이야말로
@@ -545,6 +571,10 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         # ⚠ 예외 문자열에 DSN 이 새어 나온 사고가 있었다 — **타입 이름만** 남긴다.
         res.error = "answer path error: %s" % type(e).__name__
         log.warning("[talk-answer] path failed: %s", type(e).__name__)
+    if res.error and not res.answer and ev is not None and ev.has_any():
+        # 근거까지 모은 뒤 답변 AI 만 실패한 경우 -- 소개를 비워 두지 않고 사실로 짧게 낸다.
+        res.answer = fallback_intro(ev)
+        res.fallback = bool(res.answer)
     res.elapsed_sec = round(time.time() - t0, 3)
     return res
 
@@ -555,6 +585,7 @@ def run_parallel(fn_a, fn_b, timeout_sec: float = PATH_B_TIMEOUT_SEC):
     순차면 12초로 `LLM_TIMEOUT_SEC = 15` 에 육박한다. 병렬이면 최악 7초.
     [B] 가 늦거나 죽어도 [A] 는 그대로 나간다 — 답변이 없는 것이 상담이 끊기는 것보다 낫다.
     """
+    t0 = time.time()
     with ThreadPoolExecutor(max_workers=2) as pool:
         fa = pool.submit(fn_a)
         fb = pool.submit(fn_b)
@@ -563,5 +594,6 @@ def run_parallel(fn_a, fn_b, timeout_sec: float = PATH_B_TIMEOUT_SEC):
             b = fb.result(timeout=timeout_sec)
         except Exception as e:                # noqa: BLE001
             log.warning("[talk-answer] path B timed out or failed: %s", type(e).__name__)
-            b = AnswerResult(error="path B unavailable: %s" % type(e).__name__)
+            b = AnswerResult(error="path B unavailable: %s" % type(e).__name__,
+                             elapsed_sec=round(time.time() - t0, 3))
     return a, b

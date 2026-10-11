@@ -1138,7 +1138,8 @@ def parse_talk(body: ParseBody, request: Request):
                              unmatched_n=len(dropped), intent_key=body.intent_key,
                              answer_kind="constraint_parse", llm_called=True)
         _record_reply(conn, hit_id, text_raw=text, ai_reply=ai_reply, shown_reply=reply,
-                      answer=answer, answer_error=bool(ans.error))
+                      answer=answer, answer_error=bool(ans.error),
+                      extra_flags=_answer_flags(ans))
     # 이 문의에서 부른 AI 비용 기록에 문의 번호를 잇는다(0141 · F18). 실패해도 상담은 그대로 나간다.
     _link_cost_logs(hit_id, [getattr(result, "log_id", None), getattr(ans, "log_id", None)])
 
@@ -1564,7 +1565,8 @@ def _record_hit(conn, *, request, text_raw, matched, unmatched_n,
         return None
 
 
-def _record_reply(conn, hit_id, *, text_raw, ai_reply, shown_reply, answer, answer_error):
+def _record_reply(conn, hit_id, *, text_raw, ai_reply, shown_reply, answer, answer_error,
+                  extra_flags=()):
     """문의 한 건에 고객이 본 답을 남긴다(관리자 AI 답 점검 · 0138). 실패해도 상담을 끊지 않는다.
 
     세이브포인트 안에서 쓴다 — 여기서 실패해도 바로 위 문의 기록(같은 트랜잭션)은 남는다.
@@ -1585,10 +1587,28 @@ def _record_reply(conn, hit_id, *, text_raw, ai_reply, shown_reply, answer, answ
                 VALUES (:h, :ar, :sr, :an, :ae, CAST(:fl AS JSONB), :qk, :purge)
             """), {"h": hit_id, "ar": ai_reply or None, "sr": shown_reply or None,
                    "an": answer or None, "ae": bool(answer_error),
-                   "fl": json.dumps(TR.promise_flags(ai_reply, answer), ensure_ascii=False),
+                   "fl": json.dumps(TR.promise_flags(ai_reply, answer) + list(extra_flags),
+                                    ensure_ascii=False),
                    "qk": qkey, "purge": _purge_at()})
     except Exception as e:                               # noqa: BLE001
         log.warning("[talk] reply record failed: %s", type(e).__name__)
+
+
+ANSWER_FALLBACK_FLAG = "게임 소개 기본 문구로 대신함"
+
+
+def _answer_flags(ans) -> list[str]:
+    """답변 경로 실패를 관리자 「AI 답 점검」에 남길 꼬리표(개편 15번).
+
+    실패한 턴이 언제 · 몇 초 걸려 끊겼는지 모아 보려면 소요 시간이 함께 있어야 한다.
+    시각은 문의 기록(`talk_intent_hits.created_at`)에 이미 있다.
+    """
+    if not ans.error:
+        return []
+    secs = "%.1f초" % (ans.elapsed_sec or 0)
+    if getattr(ans, "fallback", False):
+        return ["%s(%s)" % (ANSWER_FALLBACK_FLAG, secs)]
+    return ["게임 소개 실패(%s)" % secs]
 
 
 def _purge_at():
