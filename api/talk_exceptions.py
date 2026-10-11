@@ -70,8 +70,8 @@ REPLY_HUMAN = ("사람과 상담을 원하시면 아래 「사람 상담 남기�
 REPLY_ABUSE = ("불편한 일이 있으셨다면 죄송해요. 원하시는 PC 조건을 말씀해 주시면 바로 찾아볼게요.")
 REPLY_GIBBERISH = ("입력하신 내용을 잘 알아보지 못했어요."
                    " 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요.")
-NOTE_FOREIGN = ("We can only consult in Korean for now. Please tell us what you will use"
-                " the PC for and your budget (e.g. gaming, 1,500,000 KRW).")
+NOTE_FOREIGN = ("지금은 한국어로만 상담하고 있어요. 쓰실 용도와 예산을 한국어로 알려 주시면"
+                " 맞는 PC를 찾아 드릴게요.")
 NOTE_CONTRADICTION = ("말씀하신 예산으로는 원하시는 사양을 맞추기 어려울 수 있어요."
                       " 예산 안에서 가장 가까운 구성을 보여 드릴게요. 사양이 더 중요하면 예산을 알려 주세요.")
 NOTE_LOW_BUDGET = ("말씀하신 예산으로는 새 조립 PC를 찾기 어려울 수 있어요."

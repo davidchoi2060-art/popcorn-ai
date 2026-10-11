@@ -5,6 +5,7 @@
 """
 import contextlib
 import json
+import re
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -116,7 +117,7 @@ class KindsAndReplies(unittest.TestCase):
         r = run_parse('ㅁㄴㅇㄹ', {}, pc=False, ai_reply='무슨 말씀인지요?')
         self.assertEqual(r['reply'], TX.REPLY_GIBBERISH)
 
-    def test_foreign_language_gets_english_line(self):
+    def test_foreign_language_gets_korean_line(self):
         self.assertEqual(TX.foreign_language('I want a gaming computer for about 1500 dollars'), 'en')
         self.assertEqual(TX.foreign_language('ゲーム用のPCが欲しいです'), 'ja')
         self.assertEqual(TX.foreign_language('我想要一台游戏电脑'), 'zh')
@@ -126,6 +127,8 @@ class KindsAndReplies(unittest.TestCase):
         r = run_parse('I want a gaming PC', {'usages': ['게임']}, ai_reply='게임용 PC를 찾고 계시는군요.')
         self.assertIn('foreign', r['exceptions'])
         self.assertIn(TX.NOTE_FOREIGN, r['reply'])
+        # 외국어 응답은 하지 않는다(사장님 2026-10-11) -- 안내도 한국어로만.
+        self.assertIsNone(re.search(r'[A-Za-z]{3,}', TX.NOTE_FOREIGN))
 
     def test_contradiction_budget_vs_top_spec(self):
         st = {'usages': ['게임'], 'budget_won': 100000}
