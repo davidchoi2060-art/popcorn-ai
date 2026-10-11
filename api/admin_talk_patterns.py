@@ -14,10 +14,11 @@
   ⑥ 어휘 충돌은 **경고하되 막지 않는다** -> `conflicts` 로 알리고 저장은 진행한다
   ⑦ 내리기는 상태 전이지 삭제가 아니다 -> DELETE 엔드포인트를 두지 않는다
 
-■ ⚠ 원문(`raw_text`)은 이 파일의 어떤 응답에도 실리지 않는다 (A-95 §0-1 ㉰)
-  `/raw-stats` 는 **건수·시각만** 낸다. 원문 내용을 내려보내는 경로는 여기 없다 —
-  「대량으로 읽히면 마스킹이 있어도 사실상 대화 열람」이라는 판단 때문이다.
-  단건 열람 허용 여부는 **미정**(정의서 §9 ㉢)이라 그 경로 자체를 아직 만들지 않는다.
+■ 원문(`raw_text`) — 2026-10-11 중헌 님 결정으로 관리자 열람을 연다(정의서 §9 ㉢)
+  예전엔 「대량으로 읽히면 사실상 대화 열람」이라 어떤 응답에도 싣지 않았다. 결정 원문:
+  「관리자가 고객 질문·AI 답 원문을 읽어도 됩니다. 그래야 향후 개선이 됩니다.」
+  큐의 묶음마다 최근 원문 몇 건(`SAMPLES`)을 싣는다. 표시 규칙은 `api/admin_raw_text`
+  한 곳이다(보관 기한이 지난 원문은 내보내지 않는다).
 
 ■ ⚠ 큐 집계의 한계를 화면에 그대로 말한다 (지어내지 않는다)
   「안 걸린 질문」은 정의상 **아무 의도에도 안 걸린 문장**이라 `matched_terms` 가 비어
@@ -35,6 +36,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from .admin_raw_text import NOTICE as RAW_NOTICE, raw_view
 from .auth import current_operator
 from .db import engine
 # ⚠ 시각은 «반드시» 이 함수를 지난다 — DB 컬럼이 naive(UTC)라 datetime 을 그대로
@@ -46,6 +48,7 @@ from .talk import AUTO_PROMOTE_VISITORS, RAW_KEEP_DAYS
 router = APIRouter(prefix="/api/admin", tags=["admin-talk-patterns"])
 
 STATUSES = ("대기", "사용", "자동", "미사용")
+SAMPLES = 3   # 「안 걸린 질문」 묶음마다 싣는 최근 원문 수
 KINDS = ("text", "band_cards", "constraint_parse", "handoff")
 
 
@@ -164,6 +167,24 @@ def queue(include_regression: bool = False, limit: int = 8):
         asked_back = conn.execute(text(
             "SELECT COUNT(*) FROM talk_intent_hits h WHERE " + ASKED_BACK
             + _origin_where(include_regression))).scalar()
+        # 묶음마다 최근 원문 — 위와 같은 묶음 키(grp)로 가른다
+        samples: dict = {}
+        if rows:
+            for x in conn.execute(text("""
+                SELECT grp, raw_text, raw_purge_at, created_at FROM (
+                  SELECT COALESCE(NULLIF(h.matched_terms::text, '[]'), '(어휘 미상)') AS grp,
+                         h.raw_text, h.raw_purge_at, h.created_at,
+                         ROW_NUMBER() OVER (PARTITION BY COALESCE(NULLIF(h.matched_terms::text, '[]'), '(어휘 미상)')
+                                            ORDER BY h.created_at DESC, h.hit_id DESC) AS rn
+                    FROM talk_intent_hits h
+                   WHERE """ + UNANSWERED + _origin_where(include_regression) + """
+                     AND h.raw_text IS NOT NULL) t
+                 WHERE rn <= :n AND grp = ANY(:g)
+                 ORDER BY created_at DESC"""),
+                    {"n": SAMPLES, "g": [r["grp"] for r in rows]}).mappings():
+                v = raw_view(x["raw_text"], x["raw_purge_at"])
+                if v["state"] == "kept":
+                    samples.setdefault(x["grp"], []).append({**v, "at": iso(x["created_at"])})
     groups = []
     for r in rows:
         v = int(r["visitors"] or 0)
@@ -174,21 +195,20 @@ def queue(include_regression: bool = False, limit: int = 8):
             "hits": int(r["hits"] or 0), "visitors": v,
             "last_at": iso(r["last_at"]),
             "at_threshold": v >= AUTO_PROMOTE_VISITORS,
+            "samples": samples.get(r["grp"], []),
         })
     return {"ok": True, "groups": groups, "total_hits": int(total or 0),
             # AI 가 조건을 못 읽고 되물은 질문 — 큐(답을 못 만든 질문)와 겹치지 않는다.
             # 질문과 답은 「AI 답 점검」(`/admin2/talk-review?unread=1`)에서 읽는다.
             "asked_back": int(asked_back or 0), "review_link": "/admin2/talk-review?unread=1",
-            "threshold": AUTO_PROMOTE_VISITORS,
+            "threshold": AUTO_PROMOTE_VISITORS, "raw_notice": RAW_NOTICE,
             "regression_excluded": not include_regression}
 
 
 @router.get("/talk-patterns/raw-stats")
 def raw_stats():
-    """원문 보관 현황 — **owner 전용 · 건수와 시각만**(A-95 §0-1 ㉰).
-
-    ⚠ 원문 내용은 내려보내지 않는다. 단건 열람 허용 여부는 미정이라(정의서 §9 ㉢)
-    그 경로 자체를 아직 만들지 않았다.
+    """원문 보관 현황 — **owner 전용 · 건수와 시각**(A-95 §0-1 ㉰). 원문 내용은 큐 묶음의
+    `samples` 와 「AI 답 점검」 · 「고객 문의 · 보관 견적」이 낸다(정의서 §9 ㉢, 2026-10-11).
     """
     _owner()
     with engine.connect() as conn:

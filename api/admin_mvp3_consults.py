@@ -15,10 +15,9 @@
   보관했나」를 한 줄로 묶는다.
 
 ■ 정직 표기
-  ① 문의 원문(`raw_text`)은 싣지 않는다. 원문 단건 열람은 아직 정해지지 않았다
-     (`docs/design/req/req-talk-patterns.md` §9 ㉢ — 사장님 몫). 대신 「읽어 낸 조건
-     이름」과 AI 호출 여부만 낸다. 보관 견적의 조건(`talk_state`)은 원문이 아니라
-     서버가 정리한 조건이라 그대로 보인다.
+  ① 문의 원문(`raw_text`)을 싣는다(2026-10-11 중헌 님 결정 — `req-talk-patterns.md` §9 ㉢).
+     표시 규칙은 `api/admin_raw_text.raw_view` 한 곳이다(보관 기한이 지난 원문은 내보내지
+     않는다). 읽어 낸 조건 이름과 AI 호출 여부도 함께 낸다.
   ② `talk_intent_hits` 는 mvp3 만의 표가 아니다 — 같은 `/api/talk/parse` 를 쓰는
      다른 고객 화면의 문의도 들어온다. 표가 어느 화면에서 왔는지 적지 않아 가를 수
      없다. 화면이 그 사실을 말한다.
@@ -40,6 +39,7 @@ from sqlalchemy import text
 
 from . import talk_rules as TR
 from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST
+from .admin_raw_text import NOTICE as RAW_NOTICE, raw_view
 from .db import engine
 from .timeutil import iso, KST, kst_day_range
 
@@ -57,7 +57,7 @@ ROLE_KO = {"value": "알뜰", "recommended": "추천", "reference": "참고"}
 
 
 # 시험 문의 — 회귀 표식(data_origin) 또는 품질관리 이름표(문장 맨 앞 「QA-」).
-# 원문은 화면에 싣지 않는다. 이름표가 있는지만 SQL 안에서 본다(2026-10-11 관리자 확인 M1).
+# 이름표가 있는지는 SQL 안에서 본다(2026-10-11 관리자 확인 M1).
 # 원문은 보관 기간이 지나면 지워지므로, 그 뒤에는 data_origin 만 남는다.
 HIT_IS_TEST = "(data_origin <> 'real' OR COALESCE(raw_text, '') ILIKE 'QA-%')"
 
@@ -173,16 +173,16 @@ def list_visitors(offset: int = 0, include_test: bool = False):
         keys = [r["vkey"][1:] for r in rows if r["vkey"].startswith("u")]
         if keys:
             for h in conn.execute(text(f"""
-                SELECT DISTINCT ON (visitor_key) visitor_key, matched_terms
+                SELECT DISTINCT ON (visitor_key) visitor_key, matched_terms, raw_text, raw_purge_at
                   FROM talk_intent_hits WHERE visitor_key = ANY(:k) AND {hit_origin}
                  ORDER BY visitor_key, created_at DESC, hit_id DESC"""), {"k": keys}).mappings():
-                last_terms[h["visitor_key"]] = h["matched_terms"]
+                last_terms[h["visitor_key"]] = h
         lone = [int(r["vkey"][1:]) for r in rows if r["vkey"].startswith("h")]
         if lone:
             for h in conn.execute(text(
-                    "SELECT hit_id, matched_terms FROM talk_intent_hits WHERE hit_id = ANY(:h)"),
-                    {"h": lone}).mappings():
-                last_terms["h" + str(h["hit_id"])] = h["matched_terms"]
+                    "SELECT hit_id, matched_terms, raw_text, raw_purge_at FROM talk_intent_hits"
+                    " WHERE hit_id = ANY(:h)"), {"h": lone}).mappings():
+                last_terms["h" + str(h["hit_id"])] = h
 
     items = []
     for r in rows:
@@ -190,12 +190,14 @@ def list_visitors(offset: int = 0, include_test: bool = False):
         known = vk.startswith("u")
         q = last_saved.get(int(vk[1:])) if known else None
         p = (q["product_snapshot"] or {}) if q else {}
+        lh = last_terms.get(vk[1:] if known else vk)
         items.append({
             "visitor": vk, "visitor_known": known,
             "visitor_label": ("방문자 " + vk[1:]) if known else "방문자 미확인",
             "first_at": iso(r["first_at"]), "last_at": iso(r["last_at"]),
             "hits": int(r["hits"]), "saved": int(r["saved"]), "ai_calls": int(r["ai"]),
-            "last_terms": _terms(last_terms.get(vk[1:] if known else vk)),
+            "last_terms": _terms(lh["matched_terms"] if lh else None),
+            "last_question": raw_view(lh["raw_text"], lh["raw_purge_at"]) if lh else None,
             "last_product": ({"name": p.get("name"), "price": p.get("price"),
                               "product_code": p.get("product_code"),
                               "saved_at": iso(q["saved_at"])} if q else None),
@@ -206,7 +208,8 @@ def list_visitors(offset: int = 0, include_test: bool = False):
                     "ai_calls": int(s["ai"]), "saved": int(sv["saved"]),
                     "saved_today": int(sv["saved_today"])},
         "include_test": include_test, "test_excluded": int(excluded),
-        "note": ("문의 원문은 보여 주지 않습니다(원문 열람 여부 미정). "
+        "raw_notice": RAW_NOTICE,
+        "note": ("문의 원문은 저장할 때 전화번호·이메일이 가려진 채로 남고 90일 뒤 지워집니다. "
                  "문의 기록은 같은 상담 API를 쓰는 다른 고객 화면의 문의도 함께 셉니다."),
     }
 
@@ -220,7 +223,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
         if uid is not None:
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, {HIT_IS_TEST} AS is_test,
+                       intent_key, {HIT_IS_TEST} AS is_test, h.raw_text, h.raw_purge_at,
                        r.shown_reply, r.flags, r.status AS review_status
                   FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
                  WHERE visitor_key = :k AND {hit_origin}
@@ -238,7 +241,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
         else:
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, {HIT_IS_TEST} AS is_test,
+                       intent_key, {HIT_IS_TEST} AS is_test, h.raw_text, h.raw_purge_at,
                        r.shown_reply, r.flags, r.status AS review_status
                   FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
                  WHERE h.hit_id = :h"""), {"h": hit_id}).mappings().all()
@@ -252,6 +255,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
         "terms": _terms(h["matched_terms"]), "unread": int(h["unmatched_n"] or 0),
         "ai_called": bool(h["llm_called"]), "intent_key": h["intent_key"],
         "test": bool(h["is_test"]),
+        "question": raw_view(h["raw_text"], h["raw_purge_at"]),
         # 고객이 본 AI 답(0138 이후 문의만 있다) — 점검은 「AI 답 점검」 화면에서 한다
         "reply": None if h["review_status"] is None else {
             "shown_reply": h["shown_reply"], "flags": list(h["flags"] or []),
@@ -275,4 +279,4 @@ def visitor_detail(visitor: str, include_test: bool = False):
     return {"visitor": visitor, "visitor_known": uid is not None,
             "visitor_label": ("방문자 " + str(uid)) if uid is not None else "방문자 미확인",
             "hits": len(hits), "saved": len(quotes), "inquiries": len(inquiries),
-            "timeline": timeline}
+            "raw_notice": RAW_NOTICE, "timeline": timeline}
