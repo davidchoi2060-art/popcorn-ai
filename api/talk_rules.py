@@ -322,12 +322,19 @@ def mentions_laptop(text: str) -> bool:
     return bool(text and _LAPTOP.search(text) and not _LAPTOP_PART.search(text))
 
 
+# AI 가 이미 「저희는 조립 PC(데스크톱)만 취급하고 있어요」처럼 같은 말을 했으면 그 문장은 뺀다
+# (2026-10-12 개발 서버 「노트북이 낫지 않아요?」 -- 안내 한 줄 뒤에 같은 말이 한 번 더 나갔다).
+_LAPTOP_SAME = re.compile(r"(노트북|랩탑)\S*\s*(은|는)?\s*(판매|취급)|(조립\s*pc|데스크\s*[탑톱])\S*\s*만\s*(판매|취급|다루)", re.I)
+_SENT_END = re.compile(r"(?<=[.!?。])\s+")
+
+
 def with_laptop_notice(reply: str) -> str:
-    """안내 한 줄을 앞에 붙인다. 이미 붙어 있으면 그대로."""
+    """안내 한 줄을 앞에 붙인다. 이미 붙어 있으면 그대로. AI 가 같은 말을 한 문장은 뺀다."""
     reply = (reply or "").strip()
     if LAPTOP_NOTICE in reply:
         return reply
-    return (LAPTOP_NOTICE + " " + reply).strip()
+    rest = " ".join(x for x in _SENT_END.split(reply) if x.strip() and not _LAPTOP_SAME.search(x))
+    return (LAPTOP_NOTICE + " " + rest).strip()
 
 
 # ── ⑤ 근거 없는 약속 막기 (2026-10-11 품질관리 고객 역할 3곳 공통) ─────────────
