@@ -606,10 +606,15 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         #   아니어도 일반 AI 처럼 먼저 설명한다(api/talk_pc_advice). 게임 이름·장르가 걸리면 기존 게임 답.
         labels, games, topic = None, None, None
         game_names, game_genres = extract_game_names(sentence, vocab), match_genres(sentence, vocab)
+        purchase = PA.topic_of(sentence, vocab) == PA.TOPIC_GENERAL
+        if purchase:
+            # 구매 절차 질문은 게임 이름 비슷한 낱말이 걸려도 절차를 답한다(2026-10-12 「가격 배송 설치 AS 할부 한 번에
+            # 설명해줘」에 게임 소개가 나갔다).
+            game_names, game_genres = [], []
         if not game_names and not game_genres:
             labels = PA.wants_advice(sentence, vocab, prev_state)
             # 「요즘 게임 추천해줘」는 게임 이야기다 -- PC 를 직접 말했을 때만 PC 설명으로 간다.
-            if labels is not None and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence):
+            if labels is not None and not purchase and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence):
                 labels = None
             topic = PA.topic_of(sentence, vocab) if labels is not None else None
         elif PA.pc_intent(sentence):
