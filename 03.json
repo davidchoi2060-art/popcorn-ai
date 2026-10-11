@@ -1,0 +1,91 @@
+{
+  "id": 3,
+  "kind": "프로그램+예산",
+  "turns": [
+    {
+      "text": "프리미어 프로랑 포토샵 쓸 PC 200만원",
+      "sent_at": "2026-10-10T23:58:02.715Z",
+      "parse": {
+        "status": 200,
+        "sec": 3.843,
+        "error": null,
+        "ctype": "application/json",
+        "setCookie": null,
+        "json": {
+          "ok": true,
+          "state": {
+            "usages": [
+              "영상편집",
+              "디자인·조판",
+              "게임"
+            ],
+            "budget_won": 2000000,
+            "budget_bound": null,
+            "platform": null,
+            "tier_key": null,
+            "game": {
+              "names": [
+                "프로젝트 좀보이드"
+              ],
+              "grade": null,
+              "grade_src": null,
+              "resolution": null
+            },
+            "exclude": [],
+            "prefs": []
+          },
+          "missing": [
+            "game.grade"
+          ],
+          "dropped": [
+            {
+              "field": "game.names",
+              "value": null,
+              "reason": "문장에서 게임 이름을 찾아 채움: 프로젝트 좀보이드"
+            }
+          ],
+          "evidence": [
+            "프리미어 프로 → 영상편집",
+            "포토샵 → 디자인·조판",
+            "200만원 → 2000000"
+          ],
+          "reply": "프리미어 프로와 포토샵을 쓸 PC를 200만원대에서 찾고 계시는군요. 편집할 영상의 해상도나 작업 규모가 어느 정도인지 알 수 있을까요?",
+          "assumed": [],
+          "pc_related": true,
+          "constraints": [
+            {
+              "l": "예산",
+              "v": "200만원"
+            },
+            {
+              "l": "용도",
+              "v": "영상편집 · 디자인·조판 · 게임"
+            }
+          ],
+          "note": "카드를 내기엔 좌표가 아직 모자랍니다: game.grade",
+          "chat_flow": {
+            "smalltalk_turns": 0
+          },
+          "stage": "pc",
+          "answer": "",
+          "sources": [],
+          "narrowing": "wide",
+          "answer_game_names": [],
+          "answer_notice": null,
+          "answer_filter": {},
+          "answer_elapsed_sec": 0.001,
+          "answer_error": null,
+          "silent": false,
+          "history_used": 0,
+          "elapsed_sec": 2.964,
+          "stored": false
+        }
+      },
+      "recommend": null,
+      "cards": null
+    }
+  ],
+  "visitor": "pc_vid=9bLYpUpxMJ-TXLIuicHLfbRRCXFM7kI3",
+  "access_key_sha256": "1d041aaf2815b5c2465a2db12b3f663d4d26d1dbb2b0ed9cae43cc09691840fd",
+  "at": "2026-10-10T23:58:06.558Z"
+}
