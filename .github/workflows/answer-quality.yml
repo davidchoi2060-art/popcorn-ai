@@ -38,9 +38,11 @@ on:
 permissions:
   contents: read
 
+# 배포 뒤 실행은 취소하지 않고 줄 세운다. 상담 AI 와 무관한 배포가 몇 분 뒤 이어져도
+# 진행 중이던 비교를 끊지 않게 하려는 것이다(2026-10-11 연속 배포로 세 번 연달아 취소됨).
 concurrency:
   group: answer-quality-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'workflow_run' }}
 
 jobs:
   plan:
@@ -112,7 +114,7 @@ jobs:
 
   report:
     needs: [plan, compare]
-    if: always() && needs.plan.outputs.run == 'true'
+    if: ${{ !cancelled() && needs.plan.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
