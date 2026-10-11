@@ -487,10 +487,18 @@
       }catch(error){if(current(op))fail(error,{kind:'list'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    // 보관 견적을 열어도 같은 상담이다(대화가 남는다). 잡담 횟수는 새로 세되, 이미 PC 상담을 권했거나
+    // 고객이 거절한 사실은 이어 준다 -- 열자마자 다시 권하지 않게(코덱스 #145 검수 3). 「새 상담」만 지운다.
+    function offerFlags(flow){
+      const f=M.object(flow)?flow:{},keep={};
+      if(f.pc_offered===true)keep.pc_offered=true;
+      if(f.pc_declined===true)keep.pc_declined=true;
+      return Object.keys(keep).length?keep:null;
+    }
     function load(id){
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
-      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=offerFlags(state.chatFlow);state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }

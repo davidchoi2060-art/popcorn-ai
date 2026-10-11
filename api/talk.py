@@ -243,8 +243,13 @@ REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. 궁금한 것이 있�
 # 권유 = PC 낱말 «과» 권하는 말이 한 문장에 함께 있을 때다. PC 낱말만 있는 설명(「PC방에서
 # 친구들과 하기 좋아요」)은 걷지 않는다(코덱스 #141 검수: 낱말만 보면 정상 설명이 지워진다).
 _PC_WORD = re.compile(r"(?:컴퓨터|pc|피시|본체|견적|사양|업그레이드)", re.I)
+# 권하는 말은 «고객에게 건네는» 꼴만 센다. 「구매」·「맞추」 낱말만으로는 세지 않는다 -- 「견적은 구매할
+# 부품과 비용을 적은 문서예요」 같은 정상 설명이 지워진다(코덱스 #145 검수 1). 「원하시면 PC 구성도 함께
+# 볼 수 있어요」처럼 물음표 없는 제안은 센다.
 _PC_ASK = re.compile(r"(?:[?？]|생각\s*(?:있|이\s*있)|있으신가요|있으세요|어떠세요|어떨까요|드릴까요|볼까요"
-                     r"|알아보|살펴보|맞추|장만|구매|구입|필요하시면|필요하면|말씀해\s*주|추천해\s*드|도와\s*드)")
+                     r"|알아보시|살펴보시|맞추실|맞추시|장만하실|장만하시|구매하실|구매하시|구입하실|구입하시"
+                     r"|알아봐\s*드|살펴봐\s*드|원하시면|함께\s*(?:보|살펴|알아)"
+                     r"|필요하시면|필요하면|말씀해\s*주|추천해\s*드|도와\s*드)")
 _SENTENCE = re.compile(r"[^.!?。？！\n]+[.!?。？！]*\s*")
 
 
@@ -1208,6 +1213,10 @@ def parse_talk(body: ParseBody, request: Request):
     turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
     # PC 제안은 상담에 한 번, 거절하면 하지 않는다. 고객이 먼저 PC 를 물으면 거절을 푼다.
     pc_offered, pc_declined = TS.flow_flags(body.chat_flow)
+    # 흐름 상태가 없거나 비어 온 경우(옛 화면·보관 견적을 연 직후)에도, 최근 대화에 서버 권유 줄이 이미
+    # 있으면 권한 것으로 친다 -- 같은 상담에서 두 번 권하지 않는다(코덱스 #145 검수 3).
+    if any(r == "assistant" and (REPLY_GAME_PICK in t or TX.NOTE_SMALLTALK_LONG in t) for r, t in history):
+        pc_offered = True
     if TS.declines_pc(text):
         pc_declined = True
     elif pc is True:

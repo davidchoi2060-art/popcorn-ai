@@ -146,3 +146,11 @@ test('the first screen keeps its existing 409 path (fresh recommendation)',async
   const f=make({prepareSave:async()=>BIND,saveQuote:async()=>{throw Object.assign(new Error('x'),{status:409});}},storage());f.reset();
   await f.submit('150만원 게임용');f.select(0);await f.save();assert.equal(f.state.retry.kind,'recommend');
 });
+// 코덱스 #145 검수 보완(2026-10-11): 보관 견적을 열어도 이미 권했거나 거절한 사실은 이어진다.
+test('opening a saved quote keeps the offer and refusal flags but restarts the small-talk count',()=>{
+  const f=keep({},storage());f.reset();
+  const q={id:QID,product,state:talk,saved_at:'2026-10-11T09:00:00+00:00'};
+  f.state.quotes=[q];f.state.chatFlow={smalltalk_turns:2,pc_offered:true,pc_declined:true};f.load(QID);
+  assert.deepEqual(f.state.chatFlow,{pc_offered:true,pc_declined:true});
+  f.state.chatFlow={smalltalk_turns:2};f.load(QID);assert.equal(f.state.chatFlow,null);
+});
