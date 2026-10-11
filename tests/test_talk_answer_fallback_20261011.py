@@ -99,8 +99,6 @@ class AdminFlag(unittest.TestCase):
         self.assertGreaterEqual(b.elapsed_sec, 0)
 
 
-if __name__ == '__main__':
-    unittest.main()
 
 
 class DataExcuseTrim(unittest.TestCase):
@@ -114,6 +112,14 @@ class DataExcuseTrim(unittest.TestCase):
         out = TA.tidy_game_list(body, [NS(name="발로란트"), NS(name="서든어택")])
         self.assertNotIn("자료", out)
         self.assertTrue(out.endswith("넥슨의 슈팅 게임이에요."))
+
+    def test_customer_limit_kept(self):
+        # 최신 순위·기준일처럼 고객이 알아야 할 한계는 같은 모양이어도 남긴다(코덱스 #140 검수).
+        from types import SimpleNamespace as NS
+        body = ("- 발로란트: 팀 슈팅 게임이에요.\n- 롤: 팀 전략 게임이에요. "
+                "제공된 자료에는 이번 주 최신 순위가 없어 지난달 기준으로 소개했어요.")
+        out = TA.tidy_game_list(body, [NS(name="발로란트"), NS(name="롤")])
+        self.assertIn("지난달 기준", out)
 
     def test_normal_text_kept(self):
         from types import SimpleNamespace as NS
@@ -130,3 +136,7 @@ class WidePromptGeneralAI(unittest.TestCase):
         self.assertIn("일반 지식으로 말해도 된다", p)
         self.assertIn("도입에서 한 번만", p)
         self.assertIn("[근거] 에 적힌 것만", p)
+
+
+if __name__ == '__main__':
+    unittest.main()

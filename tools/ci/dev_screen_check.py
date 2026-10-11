@@ -92,9 +92,9 @@ def talk_cases(texts):
     chain = bool(texts) and texts[0].startswith('CHAIN:')
     if chain:
         texts = [texts[0][len('CHAIN:'):].strip()] + list(texts[1:])
-        print('- 이어 보내기: chat_flow·history 를 넘김')
+        print('- 이어 보내기: state·chat_flow·history 를 넘김 (화면 live-flow.js 와 같은 왕복)')
         print()
-    flow, history = None, []
+    flow, state, history, failed = None, None, [], 0
     for i, raw in enumerate(texts, 1):
         text = expand(raw)
         shown = raw if len(raw) <= 60 else raw[:60] + '...'
@@ -102,30 +102,35 @@ def talk_cases(texts):
         try:
             body = {'text': text}
             if chain:
-                body.update({'chat_flow': flow, 'history': history[-6:]})
+                body.update({'state': state, 'chat_flow': flow, 'history': history[-6:]})
             parsed, code, sec = post('/api/talk/parse', body)
         except urllib.error.HTTPError as e:
             body = (e.read() or b'')[:300].decode('utf-8', 'replace')
             print(f'- HTTP {e.code}: {body!r}')
             print()
+            failed += 1
             continue
         except Exception as e:
             print(f'- 실패: {type(e).__name__}: {e}')
             print()
+            failed += 1
             continue
         print(f'- HTTP {code}, {sec:.1f}s')
-        for key in ('pc_related', 'stage', 'missing', 'exceptions', 'handoff_offer', 'truncated', 'answer_error'):
+        for key in ('pc_related', 'stage', 'chat_flow', 'missing', 'exceptions', 'handoff_offer', 'truncated', 'answer_error'):
             print(f'- {key}: {parsed.get(key)!r}')
         for key in ('answer', 'reply'):
             print(f'- {key}: {str(parsed.get(key) or "")[:600]!r}')
         print()
         if chain:
-            flow = parsed.get('chat_flow')
+            flow, state = parsed.get('chat_flow'), parsed.get('state')
             history.append({'role': 'user', 'text': text[:1000]})
             for key in ('answer', 'reply'):
                 if parsed.get(key):
                     history.append({'role': 'assistant', 'text': str(parsed[key])[:300]})
-    return 0
+    # 한 문장이라도 실패하면 점검 실패로 끝낸다(코덱스 #141 검수: 종료 코드가 늘 0 이었다).
+    if failed:
+        print(f'- 실패한 문장: {failed}개')
+    return 1 if failed else 0
 
 
 def main():

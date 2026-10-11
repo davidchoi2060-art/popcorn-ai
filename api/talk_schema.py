@@ -21,6 +21,7 @@
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -132,6 +133,33 @@ class ChatFlow(BaseModel):
     PC 질문이 오면 0 으로 리셋한다 — 고객이 돌아왔으니 다시 3회 여유를 준다(④⑤).
     """
     smalltalk_turns: int = 0
+    # PC 제안은 상담 전체에서 한 번만, 고객이 거절하면 다시 권하지 않는다(코덱스 #140·#141 검수
+    # 2026-10-11 · 사장님 「강제하면 고객은 짜증」). 이력 창(최근 6개)은 넘어가므로 문장을 찾아
+    # 판단하지 않고 화면이 왕복하는 이 흐름 상태에 둔다.
+    pc_offered: bool = False
+    pc_declined: bool = False
+
+
+def flow_flags(raw) -> tuple[bool, bool]:
+    """화면이 보낸 chat_flow -> (이미 제안했나, 고객이 거절했나). 정확히 True 일 때만 참."""
+    raw = raw if isinstance(raw, dict) else {}
+    return raw.get("pc_offered") is True, raw.get("pc_declined") is True
+
+
+# 「PC는 나중에」·「게임만 알아볼게」·「살 생각 없어요」·「추천하지 마세요」 같은 명시적 거절.
+# 모호한 말(「괜찮네」)은 거절로 보지 않는다 -- 잘못 읽으면 원하는 고객에게 PC 를 못 권한다.
+_DECLINE_PC = re.compile(
+    r"(?:pc|피시|컴퓨터|본체|견적)\s*(?:은|는|얘기는|이야기는)?\s*"
+    r"(?:나중|됐어|됐습니다|괜찮아요|괜찮습니다|필요\s*없|생각\s*없|관심\s*없|안\s*(?:살|사|필요|해도))"
+    r"|게임\s*(?:정보|얘기|이야기)?\s*만\s*(?:알아|볼|물어|이야기|얘기|궁금|할)"
+    r"|(?:살|구매할|구입할|맞출)\s*(?:생각|계획)\s*(?:은|는|이)?\s*없"
+    r"|(?:권하지|권유하지|추천하지|권하지는)\s*마"
+    r"|(?:pc|컴퓨터|견적)?\s*추천\s*(?:은|는)?\s*(?:그만|필요\s*없|안\s*해)",
+    re.I)
+
+
+def declines_pc(text: str) -> bool:
+    return bool(_DECLINE_PC.search(text or ""))
 
 
 def stage_for(turns: int) -> str:
