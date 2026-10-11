@@ -1,0 +1,76 @@
+# 검사가 통과한 PR 을 GitHub 가 스스로 병합하고 배포를 시작한다.
+#
+# 기본은 «꺼짐»이다. 아래 둘이 모두 맞을 때만 병합한다.
+#   1) 저장소 변수 AUTO_MERGE 가 on  (설정 -> Secrets and variables -> Actions -> Variables)
+#   2) PR 에 라벨 「자동병합」이 붙어 있다  (라벨은 쓰기 권한자만 붙일 수 있다)
+# 끄기: 변수를 지우거나 off 로 바꾼다. 개별 PR 은 라벨을 뗀다.
+#
+# 이 워크플로는 ubuntu-latest(GitHub 호스팅)에서만 돌고, PR 코드를 내려받아 실행하지 않는다.
+# API 로 PR 정보만 읽는다. self-hosted 러너나 비밀값을 넣지 않는다.
+#
+# 병합하지 않는 경우: 포크에서 온 PR · 초안이 아닌데 mergeable_state 가 clean 이 아님 ·
+# 검사 중 head 가 바뀜 · 보호 파일(api/admin_engine_rules.py, api/admin_reprice.py) 변경 ·
+# 마이그레이션이 있는데 down_revision 이 main 의 현재 head 와 다름.
+# GITHUB_TOKEN 으로 한 병합은 push 트리거를 일으키지 않으므로, 병합 뒤 배포를 직접 시작한다.
+name: 자동 병합
+
+on:
+  workflow_run:
+    workflows: ['단위 테스트']
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      vars.AUTO_MERGE == 'on' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 병합 대상 찾기와 병합
+        env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+          prs=$(gh api "repos/$R/commits/$SHA/pulls" --jq '.[]|select(.state=="open")|.number')
+          [ -n "$prs" ] || { echo "열린 PR 없음"; exit 0; }
+          for p in $prs; do
+            info=$(gh api "repos/$R/pulls/$p" --jq '[.head.sha,.head.repo.full_name,.draft,(.labels|map(.name)|index("자동병합")!=null),.node_id]|@tsv')
+            IFS=$'\t' read -r head repo draft labeled node <<<"$info"
+            [ "$labeled" = true ] || { echo "#$p 라벨 없음"; continue; }
+            [ "$repo" = "$R" ] || { echo "#$p 포크 PR 제외"; continue; }
+            [ "$head" = "$SHA" ] || { echo "#$p head 바뀜"; continue; }
+            if gh api "repos/$R/pulls/$p/files" --paginate --jq '.[].filename' | grep -Eq '^api/(admin_engine_rules|admin_reprice)\.py$'; then
+              echo "#$p 보호 파일 변경 — 병합 안 함"; continue
+            fi
+            mig=$(gh api "repos/$R/pulls/$p/files" --paginate --jq '.[]|select(.filename|test("^db/migrations/versions/"))|.filename' || true)
+            if [ -n "$mig" ]; then
+              main_head=$(gh api "repos/$R/contents/db/migrations/versions?ref=main" --jq '.[].name' | tr '\n' ' ')
+              echo "#$p 마이그레이션 PR — 사람이 down_revision 을 확인해야 하므로 병합 안 함"; continue
+            fi
+            if [ "$draft" = true ]; then
+              gh api graphql -f query='mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){clientMutationId}}' -f id="$node" >/dev/null
+              sleep 5
+            fi
+            state=""
+            for i in 1 2 3 4 5 6; do
+              state=$(gh api "repos/$R/pulls/$p" --jq .mergeable_state)
+              [ "$state" = clean ] && break
+              sleep 5
+            done
+            [ "$state" = clean ] || { echo "#$p 상태 $state — 병합 안 함"; continue; }
+            gh api -X PUT "repos/$R/pulls/$p/merge" -f merge_method=squash -f sha="$SHA" --jq .sha
+            echo "#$p 병합 완료"
+            gh workflow run deploy.yml --ref main -f regression=false
+          done
