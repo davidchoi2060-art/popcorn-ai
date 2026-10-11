@@ -24,7 +24,10 @@
      없다. 화면이 그 사실을 말한다.
   ③ 방문자 쿠키가 없던 문의는 `visitor_key` 가 비어 있다. 한 줄에 한 건씩
      「방문자 미확인」으로 둔다 — 다른 사람과 묶지 않는다.
-  ④ 회귀 트래픽(`data_origin='test'`)은 기본으로 빼고, 뺐다는 사실과 건수를 함께 낸다.
+  ④ 시험 문의(회귀 트래픽 `data_origin='test'`, 품질관리 이름표 「QA-」로 시작하는 문장)는
+     기본으로 빼고, 뺐다는 사실과 건수를 함께 낸다. 시험 문의가 있는 방문자의 보관 견적도 뺀다.
+  ⑤ 문의마다 「문의 주제」(결제·배송·A/S 등)와 「반영 못 함」(흰색 케이스·램 64GB 등) 꼬리표가
+     있으면 보인다 — 조건을 하나도 못 읽은 문의도 빈 줄이 되지 않게(`api/talk.py` 가 남긴다).
 
 ■ 시각 — `talk_intent_hits.created_at` 은 naive UTC, `saved_at` 은 timestamptz 다.
   둘을 한 줄로 비교하려고 `saved_at AT TIME ZONE 'UTC'`(naive UTC)로 맞춘다.
@@ -35,6 +38,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from . import talk_rules as TR
 from .db import engine
 from .timeutil import iso, KST, kst_day_range
 
@@ -51,12 +55,22 @@ TERM_KO = {
 ROLE_KO = {"value": "알뜰", "recommended": "추천", "reference": "참고"}
 
 
-def _origin(include_test: bool, col: str) -> str:
-    return "TRUE" if include_test else f"{col} = 'real'"
+# 시험 문의 — 회귀 표식(data_origin) 또는 품질관리 이름표(문장 맨 앞 「QA-」).
+# 원문은 화면에 싣지 않는다. 이름표가 있는지만 SQL 안에서 본다(2026-10-11 관리자 확인 M1).
+# 원문은 보관 기간이 지나면 지워지므로, 그 뒤에는 data_origin 만 남는다.
+HIT_IS_TEST = "(data_origin <> 'real' OR COALESCE(raw_text, '') ILIKE 'QA-%')"
 
 
 def _hit_origin(include_test: bool) -> str:
-    return _origin(include_test, "data_origin")
+    return "TRUE" if include_test else f"NOT {HIT_IS_TEST}"
+
+
+def _saved_origin(include_test: bool) -> str:
+    """시험 문의만 한 방문자의 보관 견적도 함께 뺀다(그 방문자에게 시험 문의가 하나라도 있으면)."""
+    if include_test:
+        return "TRUE"
+    return (f"NOT EXISTS (SELECT 1 FROM talk_intent_hits t WHERE t.visitor_key = s.user_id::text"
+            f" AND {HIT_IS_TEST.replace('data_origin', 't.data_origin').replace('raw_text', 't.raw_text')})")
 
 
 def conditions(state) -> list[str]:
@@ -81,8 +95,17 @@ def conditions(state) -> list[str]:
     return out
 
 
+def _term(t: str) -> str:
+    if t.startswith(TR.TOPIC_TAG):
+        key = t[len(TR.TOPIC_TAG):]
+        return "문의 주제: " + (TR.topic_label(key) or key)
+    if t.startswith(TR.UNAPPLIED_TAG):
+        return "반영 못 함: " + t[len(TR.UNAPPLIED_TAG):]
+    return TERM_KO.get(t, t)
+
+
 def _terms(matched) -> list[str]:
-    return [TERM_KO.get(t, t) for t in (matched or []) if isinstance(t, str)]
+    return [_term(t) for t in (matched or []) if isinstance(t, str)]
 
 
 def _visitor_where(visitor: str):
@@ -101,7 +124,7 @@ _EVENTS = """
       FROM talk_intent_hits WHERE {hit_origin}
     UNION ALL
     SELECT 'u' || user_id, saved_at AT TIME ZONE 'UTC', 0, 1, 0
-      FROM mvp3_saved_recommendations
+      FROM mvp3_saved_recommendations s WHERE {saved_origin}
 """
 
 
@@ -113,7 +136,8 @@ def list_visitors(offset: int = 0, include_test: bool = False):
     today_kst = datetime.now(KST).date()
     lo, hi = kst_day_range(today_kst.isoformat(), today_kst.isoformat())
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
-        ev = _EVENTS.format(hit_origin=hit_origin)
+        saved_origin = _saved_origin(include_test)
+        ev = _EVENTS.format(hit_origin=hit_origin, saved_origin=saved_origin)
         rows = conn.execute(text(f"""
             SELECT vkey, MIN(at) AS first_at, MAX(at) AS last_at,
                    SUM(hit) AS hits, SUM(saved) AS saved, SUM(ai) AS ai
@@ -127,20 +151,21 @@ def list_visitors(offset: int = 0, include_test: bool = False):
                    COUNT(*) FILTER (WHERE created_at >= :lo AND created_at < :hi) AS hits_today,
                    COUNT(*) FILTER (WHERE llm_called) AS ai
               FROM talk_intent_hits WHERE {hit_origin}"""), {"lo": lo, "hi": hi}).mappings().one()
-        sv = conn.execute(text("""
+        sv = conn.execute(text(f"""
             SELECT COUNT(*) AS saved,
                    COUNT(*) FILTER (WHERE saved_at AT TIME ZONE 'UTC' >= :lo
                                       AND saved_at AT TIME ZONE 'UTC' < :hi) AS saved_today
-              FROM mvp3_saved_recommendations"""), {"lo": lo, "hi": hi}).mappings().one()
+              FROM mvp3_saved_recommendations s WHERE {saved_origin}"""),
+            {"lo": lo, "hi": hi}).mappings().one()
         excluded = 0 if include_test else conn.execute(text(
-            "SELECT COUNT(*) FROM talk_intent_hits WHERE data_origin <> 'real'")).scalar_one()
+            f"SELECT COUNT(*) FROM talk_intent_hits WHERE {HIT_IS_TEST}")).scalar_one()
         # 줄마다 마지막 보관 견적 한 건(있으면) — 상품명·가격을 목록에서 바로 보이게 한다.
         uids = [int(r["vkey"][1:]) for r in rows if r["vkey"].startswith("u")]
         last_saved = {}
         if uids:
-            for q in conn.execute(text("""
+            for q in conn.execute(text(f"""
                 SELECT DISTINCT ON (user_id) user_id, product_snapshot, saved_at
-                  FROM mvp3_saved_recommendations WHERE user_id = ANY(:u)
+                  FROM mvp3_saved_recommendations s WHERE user_id = ANY(:u) AND {saved_origin}
                  ORDER BY user_id, saved_at DESC, quote_id DESC"""), {"u": uids}).mappings():
                 last_saved[q["user_id"]] = q
         last_terms = {}
@@ -194,17 +219,17 @@ def visitor_detail(visitor: str, include_test: bool = False):
         if uid is not None:
             hits = conn.execute(text(f"""
                 SELECT hit_id, created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, data_origin
+                       intent_key, {HIT_IS_TEST} AS is_test
                   FROM talk_intent_hits WHERE visitor_key = :k AND {hit_origin}
                  ORDER BY created_at, hit_id LIMIT 500"""), {"k": str(uid)}).mappings().all()
-            quotes = conn.execute(text("""
+            quotes = conn.execute(text(f"""
                 SELECT quote_id, product_snapshot, talk_state, saved_at
-                  FROM mvp3_saved_recommendations WHERE user_id = :u
+                  FROM mvp3_saved_recommendations s WHERE user_id = :u AND {_saved_origin(include_test)}
                  ORDER BY saved_at, quote_id LIMIT 200"""), {"u": uid}).mappings().all()
         else:
-            hits = conn.execute(text("""
+            hits = conn.execute(text(f"""
                 SELECT hit_id, created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, data_origin
+                       intent_key, {HIT_IS_TEST} AS is_test
                   FROM talk_intent_hits WHERE hit_id = :h"""), {"h": hit_id}).mappings().all()
             quotes = []
     if not hits and not quotes:
@@ -214,7 +239,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
         "kind": "hit", "at": iso(h["created_at"]),
         "terms": _terms(h["matched_terms"]), "unread": int(h["unmatched_n"] or 0),
         "ai_called": bool(h["llm_called"]), "intent_key": h["intent_key"],
-        "test": h["data_origin"] != "real",
+        "test": bool(h["is_test"]),
     } for h in hits]
     for q in quotes:
         p = q["product_snapshot"] or {}

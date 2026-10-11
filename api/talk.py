@@ -165,6 +165,7 @@ from . import talk_schema as TS
 # 한 글자도 바뀌지 않았다(제약 추출 정확도를 건드리지 않는다).
 from . import talk_answer as TA
 from . import talk_rules as TR   # 문장 원문으로 AI state 를 바로잡는 규칙(2026-10-10)
+from . import shop_notices    # 관리자 「판매 안내 자료」 — 결제·배송·A/S 안내의 정본(2026-10-11)
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -519,6 +520,9 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "④ 수치·부품명·가격·후보 수·등급 이름을 **지어내지 않는다** -- \"RTX 4070이 좋아요\" 같은"
         " 추천·평가 금지. 고객이 말한 숫자·이름을 그대로 되짚는 것은 된다.",
         "⑤ 쉬운 한국어 존댓말(~요·~세요)로 쓴다. 불필요한 감사 인사·강조 기호를 붙이지 않는다. 두 문장을 넘기지 않는다.",
+        "⑥ 우리가 할 일을 약속하지 않는다 -- 운영체제 설치·배송·설치·A/S·할인·여러 대 주문·"
+        "모니터 포함·결제·담당자 연락을 「해 드릴게요」「확인했습니다」라고 말하지 않는다."
+        " 램 용량·저장공간·그래픽카드 모델·케이스 색·소음 같은 조건을 「맞춰 드릴게요」라고 하지 않는다.",
         "pc 가 false 이면 위 [잡담] 규칙을 따른다 -- 비우지 말고 자연스럽게 응대한다.",
         "",
         "[이전까지 파악한 상태]",
@@ -904,6 +908,8 @@ def parse_talk(body: ParseBody, request: Request):
     with engine.connect() as conn:
         access_gate.check_rate(conn, request, what="talk.parse")
         vocab = TS.load_vocab(conn)
+        # 관리자 「판매 안내 자료」 — 실패하면 빈 사전(기본 안내가 나간다, shop_notices 머리말)
+        written_notices = shop_notices.load_written(conn)
 
     history = _trim_history(body.history)
     prev_ok = bool(body.state) and _prev_state_json(body.state) != _NO_PREV_STATE
@@ -990,6 +996,8 @@ def parse_talk(body: ParseBody, request: Request):
     laptop = TR.mentions_laptop(text)
     if laptop and pc is not True:
         pc = True        # 노트북 문의는 PC 상담이다 -- 잡담으로 세지 않는다
+    if TR.purchase_topics(text) and pc is not True:
+        pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
     # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
     #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
     #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
@@ -1002,6 +1010,11 @@ def parse_talk(body: ParseBody, request: Request):
     reply = _reply_text(obj, pc, bool(state.usages), stage)
     if released and stage == TS.STAGE_PC:
         reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
+    # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
+    # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
+    notices = TR.honest_notices(text, state, written_notices, prev_state_obj)
+    if notices and stage == TS.STAGE_PC:
+        reply = TR.honest_reply(notices, bool(state.usages), missing)
     if laptop and stage == TS.STAGE_PC:
         reply = TR.with_laptop_notice(reply)
     evidence = _evidence_lines(obj)
@@ -1058,6 +1071,10 @@ def parse_talk(body: ParseBody, request: Request):
     # 질문을 원장에 남긴다(A-95). 실패해도 상담을 끊지 않는다 -- `_record_hit` 주석.
     # matched_terms 에는 채워진 좌표 이름을 남긴다(옛 경로의 라벨 목록과 같은 자리).
     filled = [k for k, v in state.model_dump().items() if v not in (None, [], {})]
+    # 2026-10-11: 조건을 못 읽은 결제·배송·A/S 문의가 관리자 화면에서 빈 줄로 보였다 -- 원문
+    # 대신 주제와 반영 못 한 조건을 꼬리표로 남긴다(관리자 「고객 문의 · 보관 견적」이 읽는다).
+    filled += [TR.TOPIC_TAG + k for k in TR.purchase_topics(text)]
+    filled += [TR.UNAPPLIED_TAG + c for c in TR.unsupported_conditions(text, state, prev_state_obj)]
     with engine.begin() as conn:
         _record_hit(conn, request=request, text_raw=text, matched=filled,
                     unmatched_n=len(dropped), intent_key=body.intent_key,

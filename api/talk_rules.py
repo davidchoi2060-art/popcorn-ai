@@ -236,3 +236,121 @@ def with_laptop_notice(reply: str) -> str:
     if LAPTOP_NOTICE in reply:
         return reply
     return (LAPTOP_NOTICE + " " + reply).strip()
+
+
+# ── ⑤ 근거 없는 약속 막기 (2026-10-11 품질관리 고객 역할 3곳 공통) ─────────────
+# AI 의 reply 가 「네, 윈도우를 깔아서 배송해드립니다」「모니터 포함 가능」「5대 주문
+# 확인했습니다」「결제 담당팀에 확인해 드릴게요」「램 64GB로 맞춰드리겠습니다」처럼
+# **우리가 하지 않는 일, 추천이 반영하지 않는 조건**을 약속했다(품질관리-20261011
+# 고객1·2·3 결과.md). 카드 자료는 운영체제·주변기기·보증을 「구매 전 확인」으로 정직하게
+# 말하는데 말풍선만 어긋났다.
+#
+# 그래서 이 주제가 문장에 있으면 **서버가 안내 문장으로 말풍선을 바꾼다**(노트북 안내와
+# 같은 방식). 판정은 고객 문장 원문(정규식)과 검증된 state 만 본다 — AI 출력은 보지 않는다.
+#
+# 안내 문장의 정본은 관리자 「판매 안내 자료」(표 `shop_notices`, `api/shop_notices.py`)다.
+# 관리자가 그 주제를 적고 «사용»으로 두면 그 문장이 나가고, 아니면 아래 기본 안내가 나간다.
+# 기본 안내는 «사실»만 말한다: 이 화면은 주문·결제를 받지 않는다 · 추천은 한 대 · 본체 가격
+# 기준이다 · 상품마다 다른 것은 상품 페이지에서 확인한다. 연락처·일정을 지어내지 않는다.
+
+# (주제 키, 관리자 화면 이름, 고객 문장 판정, 기본 안내)
+PURCHASE_TOPICS: tuple[tuple[str, str, re.Pattern, str], ...] = (
+    ("os", "운영체제(윈도우) 설치", re.compile(r"윈도우?|운영\s*체제|\bos\b|윈\s*1[01]", re.I),
+     "윈도우(운영체제) 설치 여부는 상품마다 달라 지금 자료로는 확인되지 않았어요."
+     " 구매 전에 팝콘PC 쇼핑몰 상품 페이지에서 확인해 주세요."),
+    ("peripheral", "모니터·주변기기 포함", re.compile(
+        r"(모니터|키보드|마우스|웹캠|캠|스피커|헤드셋)\S{0,3}\s*(도|랑|이랑|까지)?\s*"
+        r"(같이|함께|포함|딸려|따로|사야|구성품|오나요|와요|주나요|오는|사면)"),
+     "추천 가격은 본체 기준이에요. 모니터·키보드·마우스 같은 주변기기는 포함되지 않거나"
+     " 상품마다 달라요. 모니터 값을 뺀 본체 예산을 알려 주시면 그 금액으로 다시 찾아 드릴게요."),
+    ("quantity", "여러 대 구매", re.compile(
+        r"(?<!모니터)(?<!모니터 )(?<![0-9])([2-9]|[1-9][0-9]{1,2}|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*대"
+        r"(?!\s*(연결|까지 연결|를 연결|모니터))"),
+     "추천과 가격은 한 대 기준이에요. 여러 대 구매와 수량 할인은 팝콘PC 쇼핑몰에서 주문할 때 확인해 주세요."),
+    ("payment", "주문·결제·영수증·세금계산서", re.compile(r"결제|법인\s*카드|영수증|세금\s*계산서|계산서|할부|주문|구매\s*(하|할|방법)|사려면|입금"),
+     "이 상담 화면에서는 주문과 결제를 받지 않아요. 마음에 드는 PC를 보관하면 팝콘PC 쇼핑몰"
+     " 상품 페이지로 이어서 주문할 수 있어요. 결제·영수증·세금계산서는 쇼핑몰에서 진행돼요."),
+    ("discount", "할인", re.compile(r"할인|에누리|네고|깎아"),
+     "할인과 가격 조정은 이 상담에서 정할 수 없어요. 쇼핑몰 가격을 기준으로 확인해 주세요."),
+    ("warranty", "A/S·보증", re.compile(r"a\s*/?\s*s|에이에스|보증|무상\s*수리|수리\s*(기간|받|해)", re.I),
+     "보증 기간과 A/S 조건은 상품마다 달라 지금 자료로는 확인되지 않았어요."
+     " 구매 전에 팝콘PC 쇼핑몰 상품 페이지에서 확인해 주세요."),
+    ("delivery", "배송·설치", re.compile(r"배송|택배|출고|언제\s*(와|받|도착)|방문\s*설치|설치\s*기사|설치(도|까지)?\s*해\s*주"),
+     "배송과 설치 안내는 팝콘PC 쇼핑몰에서 해요. 구매 전에 쇼핑몰 상품 페이지에서 확인해 주세요."),
+)
+
+# talk_intent_hits.matched_terms 에 남기는 꼬리표 머리 — 관리자 화면이 이 머리로 알아본다.
+TOPIC_TAG = "주제:"
+UNAPPLIED_TAG = "미반영:"
+
+
+def topic_label(key: str) -> str | None:
+    return next((label for k, label, _p, _d in PURCHASE_TOPICS if k == key), None)
+
+
+# 추천(sold_reco)이 아직 쓰지 않는 조건. 받았다고 말하지 않고, 못 쓴다고 말한다.
+_RAM = re.compile(r"(?:램|메모리|ram)\s*(\d{1,3})\s*(?:gb|기가|g)(?![a-z])|(\d{1,3})\s*(?:gb|기가|g)\s*(?:램|메모리|ram)", re.I)
+_STORAGE = re.compile(r"(\d{1,2})\s*(?:tb|테라)|(?:ssd|저장\s*공간|하드)\s*(\d{3,4})\s*(?:gb|기가)", re.I)
+_GPU = re.compile(r"\b(rtx|gtx|rx)\s*-?\s*(\d{3,4})\s*(ti|super|xt)?(?![0-9a-z])|지포스|라데온", re.I)
+_CPU = re.compile(r"\b(i[3579])\s*-?\s*\d{0,5}|\b라이젠\s*\d|\bryzen\s*\d", re.I)
+PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
+
+
+def purchase_topics(text: str) -> list[str]:
+    """문장에 들어 있는 구매·사후 주제 키 — 순서는 PURCHASE_TOPICS 순서."""
+    t = text or ""
+    return [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+
+
+def unsupported_conditions(text: str, state, prev_state=None) -> list[str]:
+    """추천이 반영하지 않는 조건 — 고객 문장과 검증된 state 에서만 읽는다.
+
+    state.prefs 는 누적이라, 이전 턴에 이미 있던 선호는 다시 말하지 않는다(매 턴 같은
+    안내가 되풀이되면 AI 답이 영영 안 보인다).
+    """
+    t = text or ""
+    out = []
+    m = _GPU.search(t)
+    if m:
+        out.append("그래픽카드 " + (" ".join(x for x in m.groups() if x).upper() if m.group(1) else m.group(0)))
+    m = _CPU.search(t)
+    if m:
+        out.append("CPU " + m.group(0).strip())
+    m = _RAM.search(t)
+    if m:
+        out.append("메모리 %sGB" % (m.group(1) or m.group(2)))
+    m = _STORAGE.search(t)
+    if m:
+        out.append("저장공간 " + ("%sTB" % m.group(1) if m.group(1) else "%sGB" % m.group(2)))
+    before = set(getattr(prev_state, "prefs", None) or [])
+    for p in (getattr(state, "prefs", None) or []):
+        if p in before:
+            continue
+        label = PREF_LABEL.get(p, p)
+        if label not in out:
+            out.append(label)
+    return out
+
+
+def honest_notices(text: str, state, written: dict | None = None, prev_state=None) -> list[str]:
+    """말풍선을 바꿀 안내 문장들. 비어 있으면 AI reply 를 그대로 쓴다.
+
+    `written` = 관리자가 적고 «사용»으로 둔 안내 {주제 키: 문장}. 있으면 기본 안내 대신 쓴다.
+    """
+    written = written or {}
+    hit = purchase_topics(text)
+    notes = [written.get(key) or msg for key, _label, _pat, msg in PURCHASE_TOPICS if key in hit]
+    conds = unsupported_conditions(text, state, prev_state)
+    if conds:
+        notes.append("말씀하신 " + " · ".join(conds) + " 조건은 아직 추천에 반영하지 못해요."
+                     " 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.")
+    return notes
+
+
+def honest_reply(notes: list[str], has_usage: bool, missing: list[str]) -> str:
+    """고정 안내 + (카드를 못 내는 턴이면) 다음에 알려 줄 것 한 줄."""
+    out = " ".join(notes)
+    if missing:
+        out += (" 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요." if not has_usage
+                else " 예산이나 게임 같은 조건을 조금 더 알려 주시면 카드로 보여 드릴게요.")
+    return out.strip()
