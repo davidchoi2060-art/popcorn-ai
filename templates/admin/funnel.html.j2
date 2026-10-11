@@ -212,6 +212,8 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
 .fn-decisions li{font:400 11.5px/1.6 var(--rv-font);color:var(--rv-muted);
   border-left:2px solid var(--rv-dim3);padding-left:10px}
 .fn-decisions b{color:var(--rv-ink-soft);font-weight:600}
+#fnMvp3Price{margin-top:12px}
+#fnMvp3Price:empty{display:none}
 #fnOrphanNote{color:var(--rv-amber)}
 #fnOrphanNote[hidden]{display:none}
 
@@ -278,6 +280,17 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       </div>
       <div class="fn-funnel" id="fnFunnel"></div>
       <div class="fn-denom-note" id="fnDenomNote"></div>
+    </section>
+
+    <!-- ③-2 팝콘톡 추천 -> 쇼핑몰 바로 구매(mvp3) — 세션이 없어 위 깔때기와 따로 센다 -->
+    <section class="fn-panel" aria-label="팝콘톡 추천 쇼핑몰 인계">
+      <div class="fn-panelhd">
+        <h2>팝콘톡 추천 → 보관 견적 → 쇼핑몰 인계</h2>
+        <span class="fn-panelsub">상담 세션 없이 바로 쇼핑몰로 넘어가는 경로입니다 — 위 깔때기와 더하지 않습니다</span>
+      </div>
+      <div class="fn-funnel" id="fnMvp3"></div>
+      <div class="fn-pricechips" id="fnMvp3Price"></div>
+      <div class="fn-denom-note" id="fnMvp3Note"></div>
     </section>
 
     <!-- ④ 3단 카드 -->
@@ -474,6 +487,29 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     $('fnDenomNote').textContent = note;
   }
 
+  // ── ③-2 mvp3 경로 — 비율은 서버가 계산해 보낸다 ─────────────────
+  function renderMvp3(d) {
+    var m = d.mvp3;
+    if (!m) { $('fnMvp3').innerHTML = ''; $('fnMvp3Price').innerHTML = ''; $('fnMvp3Note').textContent = ''; return; }
+    $('fnMvp3').innerHTML = ''
+      + '<div class="fn-stage"><div class="fn-stage-lbl">보관 견적</div><div class="fn-stage-val num">' + fmt(m.saved) + '</div><div class="fn-stage-sub">이 기간에 만든 견적</div></div>'
+      + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(m.pct_of_saved) + '</span><span class="fn-conn-arrow">→</span></div>'
+      + '<div class="fn-stage end"><div class="fn-stage-lbl">쇼핑몰 인계</div><div class="fn-stage-val num">' + fmt(m.saved_handed_off) + '</div><div class="fn-stage-sub">그 견적 중 넘어간 것</div></div>';
+    var L = m.lines;
+    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['확인못함', 'unk']];
+    $('fnMvp3Price').innerHTML = L.total ? order.map(function (pair) {
+      var row = L[pair[0]] || { n: 0, pct: null };
+      return '<div class="fn-pricechip ' + pair[1] + '"><span class="lbl">' + esc(pair[0]) + '</span>'
+        + '<span class="n num">' + fmt(row.n) + '<span class="denom">/' + fmt(L.total) + '</span></span>'
+        + '<span class="p num">' + pctText(row.pct) + '</span></div>';
+    }).join('') : '';
+    var note = '보관 견적 대비 인계 ' + pctText(m.pct_of_saved) + '는 ' + fmt(m.saved_handed_off) + '/' + fmt(m.saved) + '입니다. '
+      + '이 기간에 쇼핑몰로 넘어간 인계는 ' + fmt(m.handoff_count) + '건, 우리 견적가 합계 ' + won(m.amount_sum) + '입니다.';
+    if (L.total) note += ' 위 칸은 그 인계의 쇼핑몰 가격 재확인 결과입니다.';
+    if (m.low_sample) note += ' 표본이 작아 비율의 신뢰도가 낮습니다.';
+    $('fnMvp3Note').textContent = note;
+  }
+
   // ── ④㉮ 티어 분포 ────────────────────────────────────────────────
   function renderTiers(d) {
     var t = d.tiers;
@@ -563,6 +599,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
 
     renderWarning(d);
     renderFunnel(d);
+    renderMvp3(d);
     renderTiers(d);
     renderPriceCheck(d);
     renderSignals(d);
@@ -578,7 +615,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
     var orphanN = (d.integrity && d.integrity.orphan_handoffs) || 0;
     orphanBox.hidden = orphanN === 0;
     if (orphanN > 0) {
-      orphanBox.innerHTML = '<b>세션 연결이 없는 인계 ' + fmt(orphanN) + '건이 있습니다</b> — 이 화면의 기간별 집계에는 포함되지 않습니다(세션이 없으면 어느 기간에도 속할 수 없습니다).';
+      orphanBox.innerHTML = '<b>세션 연결이 없는 인계 ' + fmt(orphanN) + '건이 있습니다</b> — 이 화면의 기간별 집계에는 포함되지 않습니다(세션이 없으면 어느 기간에도 속할 수 없습니다). 팝콘톡 추천 경로의 인계는 위 칸에서 따로 셉니다.';
     }
   }
 

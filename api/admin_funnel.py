@@ -240,6 +240,52 @@ def _scoped_handoffs(conn, lo, hi) -> list:
     return list(rows)
 
 
+def _mvp3_block(conn, lo, hi) -> dict:
+    """mvp3(팝콘톡 추천 -> 쇼핑몰 바로 구매) 경로 — 2026-10-11 품질관리 F16·M3.
+
+    mvp3 는 상담 세션을 만들지 않는다(`handoffs.session_id` NULL, `api/mvp3_handoff.py`
+    머리말). 그래서 위 세션 코호트에 들어갈 수 없고, 예전엔 「세션 연결이 없는 인계」로만
+    보였다. 같은 코호트 원칙(판단한 것 ①)을 mvp3 에 맞게 옮긴다 — **보관 견적이 만들어진
+    시각**으로 기간을 정하고, 그 견적 중 쇼핑몰로 넘어간 것을 센다. 인계 행 자신의 시각으로
+    센 건수(`handoff_count`)와 라인별 가격 재확인도 함께 낸다. 조회만 한다.
+    """
+    params = {}
+    if lo is not None:
+        params["_dt_lo"] = lo
+    if hi is not None:
+        params["_dt_hi"] = hi
+    saved = conn.execute(text(
+        "SELECT COUNT(*) FROM mvp3_saved_recommendations r WHERE TRUE"
+        + range_sql("r.saved_at", lo, hi)), params).scalar_one()
+    handed = conn.execute(text(
+        "SELECT COUNT(*) FROM mvp3_saved_recommendations r WHERE EXISTS ("
+        " SELECT 1 FROM handoffs h WHERE h.quote_type = 'mvp3'"
+        " AND h.note LIKE '%' || r.quote_id::text || '%')"
+        + range_sql("r.saved_at", lo, hi)), params).scalar_one()
+    rows = conn.execute(text(
+        "SELECT h.handoff_id, h.total_quoted FROM handoffs h WHERE h.quote_type = 'mvp3'"
+        + range_sql("h.created_at", lo, hi)), params).mappings().all()
+    ids = [r["handoff_id"] for r in rows]
+    line_counts = {k: 0 for k in MALL_STATUS_ORDER}
+    line_total = 0
+    if ids:
+        for st, n in conn.execute(text(
+                "SELECT mall_status, COUNT(*) FROM handoff_items"
+                " WHERE handoff_id = ANY(:ids) GROUP BY mall_status"), {"ids": ids}):
+            if st in line_counts:
+                line_counts[st] = n
+            line_total += n
+    return {
+        "saved": saved, "saved_handed_off": handed,
+        "pct_of_saved": _pct(handed, saved, 1),
+        "handoff_count": len(ids),
+        "amount_sum": sum(r["total_quoted"] or 0 for r in rows),
+        "lines": {**{k: {"n": v, "pct": _pct(v, line_total, 1)} for k, v in line_counts.items()},
+                  "total": line_total},
+        "low_sample": handed < LOW_SAMPLE_THRESHOLD,
+    }
+
+
 @router.get("/funnel-performance")
 def funnel_performance(preset: str = "feature", date_from: str | None = None,
                         date_to: str | None = None):
@@ -392,8 +438,11 @@ def funnel_performance(preset: str = "feature", date_from: str | None = None,
         }
 
         # ── 데이터 정합성 — 세션 없는 인계(있으면 이 화면의 기간 집계에서 조용히 빠진다) ──
+        # mvp3 인계는 원래 세션이 없다 — 아래 `mvp3` 블록이 따로 센다. 여기선 그 밖의 것만.
         orphan_handoffs = conn.execute(text(
-            "SELECT COUNT(*) FROM handoffs WHERE session_id IS NULL")).scalar_one()
+            "SELECT COUNT(*) FROM handoffs WHERE session_id IS NULL"
+            " AND quote_type IS DISTINCT FROM 'mvp3'")).scalar_one()
+        mvp3 = _mvp3_block(conn, lo, hi)
 
     return {
         "generated_at": iso(datetime.now(_tz.utc)),
@@ -414,6 +463,7 @@ def funnel_performance(preset: str = "feature", date_from: str | None = None,
         "amount": amount,
         "price_check": price_check,
         "signals": signals,
+        "mvp3": mvp3,
         "integrity": {"orphan_handoffs": orphan_handoffs},
         "nav": _nav_links(),
     }
