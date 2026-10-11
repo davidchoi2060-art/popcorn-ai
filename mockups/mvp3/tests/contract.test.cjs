@@ -78,9 +78,11 @@ test('bad JSON, network, timeout and caller abort remain distinct',async()=>{
  await assert.rejects(stalled.parse({}, {timeoutMs:10}),e=>e.code==='timeout');
  const controller=new AbortController(),request=stalled.parse({}, {signal:controller.signal});controller.abort();await assert.rejects(request,e=>e.code==='aborted');
 });
-test('answer/reply and history stay separate and sequential; sources and notice are not shown',async()=>{
+// 답을 먼저, PC 이야기는 같은 말풍선 끝에(코덱스 1816 보강2 · 사장님 「기존 AI와 대화하듯이」). 기록(history)은 따로 남는다.
+test('answer then reply share one bubble in order; history stays separate; sources and notice are not shown',async()=>{
  let last;const h=harness({parse:async payload=>{last=payload;return parsed;}});await h.flow.submit('첫 요청');assert.equal(last.history.length,0);
- assert.deepEqual(h.flow.state.messages.slice(-3).map(m=>m.text),['첫 요청',parsed.answer,parsed.reply]);assert.equal(h.flow.state.messages.at(-2).sources,undefined);assert.equal(h.flow.state.messages.at(-2).notice,undefined);assert.equal(h.flow.state.screen,'results');
+ assert.deepEqual(h.flow.state.messages.slice(-2).map(m=>m.text),['첫 요청',parsed.answer+'\n\n'+parsed.reply]);assert.equal(h.flow.state.messages.at(-1).sources,undefined);assert.equal(h.flow.state.messages.at(-1).notice,undefined);
+ assert.deepEqual(h.flow.state.history.slice(-2).map(x=>x.text),[parsed.answer,parsed.reply]);assert.equal(h.flow.state.screen,'results');
  await h.flow.submit('두번째');assert.equal(last.history.length,3);assert.deepEqual(last.chat_flow,{step:2});assert.equal(h.flow.state.history.length,6);
 });
 test('missing/silent/non-PC answer does not fabricate recommendations',async()=>{

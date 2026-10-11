@@ -388,16 +388,18 @@ function handoffPanel(h){
 // 연락처를 남길 뿐 주문·결제·가격 확정은 하지 않는다고 칸 안에서 먼저 말한다.
 function inquiryPanel(){
   const q=state.inquiry;if(!q.open&&!q.done)return '';
-  if(q.done)return '<section class="live-explanation live-inquiry" role="status" data-inquiry-done><h3>구매 상담 신청</h3><p>'+esc(q.done.note)+'</p>'+
+  // 「사람 상담 남기기」 단추로 열었으면 구매 상담 문구 대신 일반 상담 문구를 쓴다(코덱스 PR136 검수 「신청 문구의 범위」).
+  const human=!!q.human,title=human?'사람 상담 남기기':'구매 상담 신청';
+  if(q.done)return '<section class="live-explanation live-inquiry" role="status" data-inquiry-done><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p>'+
     '<p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 아직 진행되지 않았어요.</p></section>';
   const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft;
   const err=q.error?'<p class="live-inquiry-error" role="alert">'+esc(q.error)+'</p>':'';
-  if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>구매 상담 신청</h3>'+
+  if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
     (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline'))+'</section>';
   const field=(name,label,input)=>'<label class="live-inquiry-field"><span>'+label+'</span>'+input+'</label>';
   const dis=busy?' disabled':'';
-  return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>구매 상담 신청</h3>'+
-    '<p class="muted">여러 대 구매 · 할인 · 세금계산서처럼 상담에서 정할 수 없는 내용은 팝콘PC 담당자가 연락드려 안내해요. 이 신청으로 주문이나 결제가 진행되지는 않아요.</p>'+
+  return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
+    '<p class="muted">'+(human?'상담에서 바로 답하기 어려운 내용은 팝콘PC 담당자가 연락드려 안내해요.':'여러 대 구매 · 할인 · 세금계산서처럼 상담에서 정할 수 없는 내용은 팝콘PC 담당자가 연락드려 안내해요.')+' 이 신청으로 주문이나 결제가 진행되지는 않아요.</p>'+
     field('topic','문의 주제','<select data-inquiry="topic"'+dis+'><option value="">주제를 골라 주세요</option>'+q.meta.topics.map(t=>'<option'+(d.topic===t?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select>')+
     field('name','이름 (선택)','<input data-inquiry="name" maxlength="30" autocomplete="name" value="'+esc(d.name)+'"'+dis+'>')+
     field('phone','전화번호','<input data-inquiry="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'>')+
@@ -446,11 +448,12 @@ function render(){
   view.dataset.screen=state.screen;
   // 예외 입력·상담 실패 뒤에는 사람 상담 길을 연다(서버 handoff_offer). 신청 칸은 구매 상담 신청과 같다.
   const handoffBlock=()=>(state.handoffOffer||state.inquiry.open||state.inquiry.done)?
-    (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('사람 상담 남기기','inquiry-open','outline',state.phase?'disabled':'')+'</p>':'')+inquiryPanel():'';
+    (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('사람 상담 남기기','inquiry-open','outline',(state.phase?'disabled ':'')+'data-human="1"')+'</p>':'')+inquiryPanel():'';
   if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());view.insertAdjacentHTML('beforeend',handoffBlock());}
   // 견적을 보던 중에 받은 예외 입력도 같은 길을 연다(보던 견적은 그대로 둔다).
   else if(state.screen==='results'){renderResults();if(state.handoffOffer)view.insertAdjacentHTML('beforeend',handoffBlock());}
-  else if(state.screen==='detail'&&state.selected)renderDetail();
+  // 상세를 보던 중에도 같은 길을 연다(코덱스 PR136 검수 「상세 화면의 상담 버튼」).
+  else if(state.screen==='detail'&&state.selected){renderDetail();if(state.handoffOffer)view.insertAdjacentHTML('beforeend',handoffBlock());}
   else if(state.screen==='final'&&state.selected)renderFinal();
   else if(state.screen==='saved')renderSaved();
   const recovery=recoveryBanner();if(recovery)view.insertAdjacentHTML('afterbegin',recovery);
@@ -512,7 +515,7 @@ document.addEventListener('click',e=>{
     case 'back':back();break;
     case 'save':void flow.save();break;
     case 'handoff':void flow.handoff();break;
-    case 'inquiry-open':void flow.openInquiry();break;
+    case 'inquiry-open':void flow.openInquiry({human:b.dataset.human==='1'});break;
     case 'part-options':void flow.openParts(b.dataset.slot);break;
     case 'part-close':flow.closeParts();break;
     case 'part-swap':flow.swapPart(Number(b.dataset.code));break;

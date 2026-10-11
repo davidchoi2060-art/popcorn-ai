@@ -2,7 +2,7 @@
 (function(root){'use strict';
   const M=typeof module!=='undefined'?require('./live-model.js'):root.MVP3LiveModel;
   const JOURNAL_KEY='popcorn-mvp3-pending-save-v1';
-  // 상담 한 번에 읽는 글자 수 -- 서버 api/talk.py MAX_TEXT_LEN 과 같다. 넘는 글은 서버가 앞부분만 읽고 알린다.
+  // 상담 한 번에 보낼 수 있는 글자 수. 서버는 긴 글을 막지 않고 앞 800자와 끝 200자를 읽은 뒤 그 사실을 알린다(api/talk.py _read_long).
   const MAX_TEXT=20000;
   function validPending(record){
     const p=record?.payload;
@@ -54,7 +54,7 @@
     };
   }
   // 구매 상담 신청 칸의 상태. 서버가 준 주제·동의 문구만 쓰고, 받은 신청 번호만 보여 준다.
-  function emptyInquiry(){return {open:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
+  function emptyInquiry(){return {open:false,human:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
   const PHONE_RE=/^0\d{1,2}-?\d{3,4}-?\d{4}$/, EMAIL_RE=/^[^@\s]{1,64}@[^@\s]{1,100}\.[^@\s]{2,}$/;
   function inquiryProblem(d,meta){
     if(!meta||!meta.topics.includes(d.topic))return '문의 주제를 골라 주세요.';
@@ -129,6 +129,8 @@
       if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),op=begin('talk');
       state.lastText=text;if(!repeat)message(text,'user');emit();
+      // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
+      let prior=null;
       try{
         const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
         if(!current(op))return false;
@@ -139,14 +141,18 @@
         state.history.push({role:'user',text:text.slice(0,1000)});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
-          if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
-          if(reply.trim()){message(reply);state.history.push({role:'assistant',text:reply.slice(0,300)});}
+          // 답을 먼저 충분히 하고, PC 이야기는 같은 말풍선 끝에 짧게 붙인다(코덱스 1816 보강2).
+          message([answer.trim(),reply.trim()].filter(Boolean).join('\n\n'),'ai');
+          if(answer.trim())state.history.push({role:'assistant',text:answer.slice(0,300)});
+          if(reply.trim())state.history.push({role:'assistant',text:reply.slice(0,300)});
         }
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
         state.history=state.history.slice(-6);
         if(keep)return true;
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
+        if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
+          savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
         state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.
@@ -154,7 +160,11 @@
         if(state.missing.length||response.pc_related===false||response.silent||response.fallback){state.screen='welcome';}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
-        if(current(op)){fail(error,state.phase==='recommend'?{kind:'recommend'}:{kind:'talk',text});state.handoffOffer=true;}
+        if(current(op)){
+          const inRecommend=state.phase==='recommend';
+          fail(error,inRecommend?{kind:'recommend'}:{kind:'talk',text});state.handoffOffer=true;
+          if(inRecommend&&prior)Object.assign(state,prior);
+        }
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
       return true;
     }
@@ -267,11 +277,11 @@
       }catch(error){if(current(op))fail(error,{kind:'handoff'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
-    async function openInquiry(){
+    async function openInquiry({human=false}={}){
       if(state.phase)return;
-      state.inquiry.open=true;state.inquiry.error='';
+      state.inquiry.open=true;state.inquiry.error='';if(human)state.inquiry.human=true;
       // 상품을 고르기 전(상담 중) 사람 상담: 주제 「기타」와 마지막 문장을 미리 채운다 -- 고객이 고칠 수 있다.
-      if(!state.selected&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
+      if((!state.selected||human)&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
       if(state.inquiry.meta){emit();return;}
       const op=begin('inquiry-form');
       try{

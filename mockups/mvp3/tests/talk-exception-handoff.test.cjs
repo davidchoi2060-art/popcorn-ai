@@ -12,7 +12,7 @@ const talk={usages:['게임'],budget_won:1500000};
 const tick=()=>new Promise(r=>setImmediate(r));
 async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 
-function harness(parseReply){
+function harness(parseReply,recommendReply=()=>({status:200,data:{ok:true,card_sets:[],needs:[],assumed:[]}})){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
@@ -24,7 +24,7 @@ function harness(parseReply){
     if(url==='/api/talk/parse'){const r=parseReply();return reply(r.status||200,r.data);}
     if(url==='/api/mvp3/purchase-inquiries/form')return reply(200,FORM);
     if(url==='/api/mvp3/purchase-inquiries')return reply(200,{ok:true,inquiry_no:'PI-2001',note:'CODE/MOCK 신청을 받았어요.'});
-    if(url==='/api/grid/recommend')return reply(200,{ok:true,card_sets:[],needs:[],assumed:[]});
+    if(url==='/api/grid/recommend'){const r=recommendReply();return reply(r.status||200,r.data);}
     return reply(200,{ok:true,quotes:[],has_more:false});
   }});
   w.eval(read('live-flow.js'));
@@ -110,5 +110,64 @@ test('an off-topic question keeps the quote being viewed; a changed condition re
     await until(()=>h.flow.state.phase===null);
     assert.equal(recs(),2);
     assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+// 코덱스 PR136 검수 남은 숙제: ① 새 조건으로 다시 찾다 실패하면 보던 견적으로 되돌린다
+// ② 상세를 보던 중에도 사람 상담 길이 뜬다 ③ 그 칸은 구매 상담이 아닌 일반 상담 문구다
+const product={product_code:113836,name:'CODE/MOCK PC',price:900000,price_src:'판매가',spec:{cpu:'CPU'},reasons:['이유'],over_budget:false};
+const cards={status:200,data:{ok:true,card_sets:[{kind:'sold',usage:'게임',items:[product]}],needs:[],assumed:[]}};
+
+test('a failed re-recommend restores the quote being viewed',async()=>{
+  const replies=[parsed({reply:'찾아볼게요.'}),parsed({state:{...talk,budget_won:2000000},reply:'다시 찾아볼게요.'})];
+  const recs=[cards,{status:502,data:{detail:'잠시 뒤 다시 시도해 주세요.'}}];
+  let n=0,r=0;const h=harness(()=>replies[Math.min(n++,1)],()=>recs[Math.min(r++,1)]);
+  try{
+    await h.flow.submit('배그 150만원');
+    await until(()=>h.flow.state.phase===null);
+    const before=h.flow.state.recommendation;assert.ok(before);assert.equal(h.flow.state.groups.length>0,true);
+    await h.flow.submit('예산 200만원으로 바꿀게요');
+    await until(()=>h.flow.state.phase===null);
+    assert.ok(h.flow.state.error);
+    assert.equal(h.flow.state.retry.kind,'recommend');
+    assert.equal(h.flow.state.recommendation,before);
+    assert.equal(h.flow.state.screen,'results');
+    assert.ok(h.doc.querySelector('[data-action=inquiry-open]'));
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+test('the detail screen also offers the human inquiry with general wording',async()=>{
+  const replies=[parsed({reply:'찾아볼게요.'}),parsed({pc_related:false,handoff_offer:true,exceptions:['human']})];
+  let n=0;const h=harness(()=>replies[Math.min(n++,1)],()=>cards);
+  try{
+    await h.flow.submit('배그 150만원');
+    await until(()=>h.flow.state.phase===null);
+    h.flow.select(h.flow.state.groups[0].products[0].index);
+    await until(()=>h.flow.state.screen==='detail');
+    assert.equal(h.doc.querySelector('[data-action=inquiry-open]'),null);
+    await h.flow.submit('상담원 연결해 주세요');
+    await until(()=>h.flow.state.phase===null&&h.doc.querySelector('[data-action=inquiry-open]'));
+    assert.equal(h.flow.state.screen,'detail');
+    assert.ok(h.flow.state.selected);
+    h.doc.querySelector('[data-action=inquiry-open]').click();
+    await until(()=>h.doc.querySelector('[data-action=inquiry-send]'));
+    assert.equal(h.doc.querySelector('[data-inquiry-form] h3').textContent,'사람 상담 남기기');
+    assert.equal(h.doc.querySelector('[data-inquiry=message]').value,'상담원 연결해 주세요');
+    await until(()=>h.flow.state.phase===null);for(let i=0;i<50;i++)await tick();
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+test('the human inquiry before choosing a product uses general wording',async()=>{
+  const h=harness(()=>parsed({handoff_offer:true,pc_related:false,exceptions:['human']}));
+  try{
+    await h.flow.submit('상담원 연결해 주세요');
+    await until(()=>h.flow.state.phase===null&&h.doc.querySelector('[data-action=inquiry-open]'));
+    h.doc.querySelector('[data-action=inquiry-open]').click();
+    await until(()=>h.doc.querySelector('[data-action=inquiry-send]'));
+    const form=h.doc.querySelector('[data-inquiry-form]');
+    assert.equal(form.querySelector('h3').textContent,'사람 상담 남기기');
+    assert.doesNotMatch(form.textContent,/세금계산서처럼/);
   }finally{h.close();}
 });
