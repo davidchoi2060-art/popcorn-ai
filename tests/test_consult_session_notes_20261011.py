@@ -32,19 +32,44 @@ class SaveNote(unittest.TestCase):
         self.assertEqual(c.exception.status_code, 403)
 
 
+def _broken(exc):
+    class Broken:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def execute(self, *a, **k):
+            raise exc
+    return Broken()
+
+
 class LoadNotes(unittest.TestCase):
     def test_missing_table_returns_none(self):
-        class Broken:
-            def __enter__(self):
-                return self
+        exc = RuntimeError('relation "consult_session_notes" does not exist')
+        with patch.object(AS.engine, 'connect', lambda: _broken(exc)):
+            self.assertEqual(AS._load_notes([1, 2]), (None, 'missing'))
 
-            def __exit__(self, *a):
-                return False
+    def test_undefined_table_code_is_missing(self):
+        class Orig(Exception):
+            pgcode = '42P01'
+        exc = RuntimeError('x')
+        exc.orig = Orig()
+        with patch.object(AS.engine, 'connect', lambda: _broken(exc)):
+            self.assertEqual(AS._load_notes([1]), (None, 'missing'))
 
-            def execute(self, *a, **k):
-                raise RuntimeError('relation "consult_session_notes" does not exist')
-        with patch.object(AS.engine, 'connect', lambda: Broken()):
-            self.assertIsNone(AS._load_notes([1, 2]))
+    def test_other_failure_is_not_called_missing(self):
+        # 연결 · 권한 실패를 「표가 아직 없다」로 안내하지 않는다(코덱스 검수 #116)
+        for exc in (RuntimeError('could not connect to server'),
+                    RuntimeError('permission denied for table consult_session_notes')):
+            with patch.object(AS.engine, 'connect', lambda: _broken(exc)):
+                self.assertEqual(AS._load_notes([1]), (None, 'error'))
+
+    def test_screen_tells_failure_apart(self):
+        t = (ROOT / 'templates/admin/consult_sessions.html.j2').read_text(encoding='utf-8')
+        self.assertIn("notes_error === 'missing'", t)
+        self.assertIn('DB 조회 실패', t)
 
 
 class Screen(unittest.TestCase):
