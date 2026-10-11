@@ -431,3 +431,22 @@ class PromptCarriesExceptionGuide(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class NoPcPush(unittest.TestCase):
+    """2026-10-11 #140 배포 뒤 개발 서버: 지시해도 AI 가 잡담 끝에 PC 권유를 붙였다 -- 서버가 걷는다."""
+
+    def test_trailing_pc_question_dropped(self):
+        self.assertEqual(talk.drop_pc_push('저녁은 국수나 덮밥도 좋아요. 혹시 컴퓨터 맞추면서 참고할 게 있으신가요?'),
+                         '저녁은 국수나 덮밥도 좋아요.')
+
+    def test_only_sentence_kept(self):
+        s = 'PC방 근처라면 분식도 좋아요.'
+        self.assertEqual(talk.drop_pc_push(s), s)
+
+    def test_parse_drops_ai_push_but_server_invites_once(self):
+        ai = {'pc': False, 'state': {}, 'reply': '김치찌개 어떠세요? 혹시 PC 맞출 생각 있으세요?'}
+        r1 = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai(ai), chat_flow={'smalltalk_turns': 0})
+        self.assertEqual(r1['reply'], '김치찌개 어떠세요?')
+        r3 = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai(ai), chat_flow={'smalltalk_turns': 2})
+        self.assertEqual(r3['reply'], '김치찌개 어떠세요? ' + TX.NOTE_SMALLTALK_LONG)

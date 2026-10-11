@@ -87,12 +87,23 @@ def talk_cases(texts):
     print('### 개발 서버 상담 문장 점검 (/api/talk/parse 만)')
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
     print()
+    # 첫 문장이 「CHAIN:」으로 시작하면 한 상담처럼 이어 보낸다(chat_flow·history 를 넘긴다).
+    # 잡담 몇 번째에 PC 권유가 붙는지 같은 «여러 턴» 규칙을 실제 서버에서 볼 때 쓴다.
+    chain = bool(texts) and texts[0].startswith('CHAIN:')
+    if chain:
+        texts = [texts[0][len('CHAIN:'):].strip()] + list(texts[1:])
+        print('- 이어 보내기: chat_flow·history 를 넘김')
+        print()
+    flow, history = None, []
     for i, raw in enumerate(texts, 1):
         text = expand(raw)
         shown = raw if len(raw) <= 60 else raw[:60] + '...'
         print(f'#### {i}. {shown!r} ({len(text)}자)')
         try:
-            parsed, code, sec = post('/api/talk/parse', {'text': text})
+            body = {'text': text}
+            if chain:
+                body.update({'chat_flow': flow, 'history': history[-6:]})
+            parsed, code, sec = post('/api/talk/parse', body)
         except urllib.error.HTTPError as e:
             body = (e.read() or b'')[:300].decode('utf-8', 'replace')
             print(f'- HTTP {e.code}: {body!r}')
@@ -108,6 +119,12 @@ def talk_cases(texts):
         for key in ('answer', 'reply'):
             print(f'- {key}: {str(parsed.get(key) or "")[:600]!r}')
         print()
+        if chain:
+            flow = parsed.get('chat_flow')
+            history.append({'role': 'user', 'text': text[:1000]})
+            for key in ('answer', 'reply'):
+                if parsed.get(key):
+                    history.append({'role': 'assistant', 'text': str(parsed[key])[:300]})
     return 0
 
 
