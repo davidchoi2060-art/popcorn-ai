@@ -20,6 +20,7 @@
 |---|---|
 | 판매가를 바꾸는 코드 | `api/mall_price.apply_changes()` — 네 길 모두 이것만 부른다 |
 | 가격 변경 이력 | `product_price_history` (reason = `mall_price_<시점>`, 배치 되돌림은 `+_undo`) |
+| 쇼핑몰 현재가 읽기 | `api/mall_price_reader.read_price()` — 자동 갱신(상품별 읽기)과 장바구니·결제 확인이 같이 쓴다 |
 | 확인 기록 | `mall_price_checks` — 시점 종류(`moment`)로 1겹·2겹을 가른다. 추가만 한다 |
 | 배치 실행 요약 | `mall_price_runs` — 언제 · 성공/실패 · 건수 · 실패 사유 · 되돌림 |
 | 되돌릴 근거 | 활동 로그 `action='mall_price_apply'` 의 before/after |

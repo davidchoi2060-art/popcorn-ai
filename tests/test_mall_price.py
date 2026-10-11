@@ -99,7 +99,7 @@ class ApplyUndoTests(unittest.TestCase):
         cls.schema = "mall_price_t_" + uuid.uuid4().hex[:12]
         cls.engine = create_engine(_local_url())
         mig = os.path.join(os.path.dirname(__file__), "..", "db", "migrations", "versions",
-                           "0140_mall_price_checks.py")
+                           "0145_mall_price_checks.py")
         src = io.open(mig, encoding="utf-8").read()
         # 마이그레이션의 CREATE 문을 그대로 쓴다(사본을 두지 않는다)
         cls.ddl = [s for s in _upgrade_sql(src)]
@@ -199,6 +199,40 @@ class ApplyUndoTests(unittest.TestCase):
         t1 = MP.build_plan(c, {1: 1100})["token"]
         c.execute(self.text("UPDATE products SET sale_price=1050 WHERE product_code=1"))
         self.assertNotEqual(t1, MP.build_plan(c, {1: 1100})["token"])
+
+
+class ReaderTests(unittest.TestCase):
+    """공개 페이지 읽기 — 네트워크 없이 응답 원문만 바꿔 끼운다."""
+
+    def _with_body(self, body: bytes):
+        from unittest.mock import patch
+
+        class R(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+        return patch("urllib.request.urlopen", lambda req, timeout=0: R(body))
+
+    def test_pc_page_reads_sale_price(self):
+        from api import mall_price_reader as RD
+        from tools.mall_builtpc_fetch import _FIXTURE
+        with self._with_body(_FIXTURE.encode("cp949")):
+            r = RD.read_price(98149, "PC_COMPLETE", timeout=1)
+        self.assertEqual((r["ok"], r["price"]), (True, 1591800))
+        self.assertIn("system_detail.html?pd_no=98149", r["url"])
+
+    def test_pc_page_without_price_is_failure_not_guess(self):
+        from api import mall_price_reader as RD
+        with self._with_body("<html>없음</html>".encode("cp949")):
+            r = RD.read_price(98149, "PC_COMPLETE", timeout=1)
+        self.assertEqual((r["ok"], r["price"]), (False, None))
+
+    def test_part_page_uses_hidden_price(self):
+        from api import mall_price_reader as RD
+        html = ('<input type="hidden" name="pd_no" value="111">'
+                '<input type="hidden" name="price" value="410000">').encode()
+        with self._with_body(html):
+            r = RD.read_price(111, "GPU", timeout=1)
+        self.assertEqual((r["ok"], r["price"]), (True, 410000))
 
 
 def _upgrade_sql(src: str):
