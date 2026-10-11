@@ -138,6 +138,8 @@ class ChatFlow(BaseModel):
     # 판단하지 않고 화면이 왕복하는 이 흐름 상태에 둔다.
     pc_offered: bool = False
     pc_declined: bool = False
+    # 앞 턴이 카드를 막고 되물었나(용도·게임 등급). 되묻기는 연속 두 번 하지 않는다(api/talk_defaults).
+    asked: bool = False
     # 상담 갈래(api/talk_entry) -- 정한 갈래와 「한 번 되물었나」. 갈래는 첫 응대만 바꾼다.
     entry: str | None = None
     entry_asked: bool = False
@@ -147,6 +149,11 @@ def flow_flags(raw) -> tuple[bool, bool]:
     """화면이 보낸 chat_flow -> (이미 제안했나, 고객이 거절했나). 정확히 True 일 때만 참."""
     raw = raw if isinstance(raw, dict) else {}
     return raw.get("pc_offered") is True, raw.get("pc_declined") is True
+
+
+def flow_asked(raw) -> bool:
+    """앞 턴이 카드를 막고 되물었나. 정확히 True 일 때만 참."""
+    return isinstance(raw, dict) and raw.get("asked") is True
 
 
 # 「PC는 나중에」·「게임만 알아볼게」·「살 생각 없어요」·「추천하지 마세요」 같은 명시적 거절.

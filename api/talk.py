@@ -169,6 +169,7 @@ from . import talk_rules as TR   # 문장 원문으로 AI state 를 바로잡는
 from . import shop_notices    # 관리자 「판매 안내 자료」 — 결제·배송·A/S 안내의 정본(2026-10-11)
 from . import talk_text_fixes as text_fixes    # 관리자 「해석 바로잡기」(0151)
 from . import talk_exceptions as TX   # 예외 입력 대응 -- 막지 않고 받아서 이끈다(2026-10-11)
+from . import talk_defaults as TD    # 답 먼저, 되묻기는 끝에 한 번 -- 기본 가정 사전(2026-10-11)
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -244,8 +245,13 @@ REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. 궁금한 것이 있�
 # 권유 = PC 낱말 «과» 권하는 말이 한 문장에 함께 있을 때다. PC 낱말만 있는 설명(「PC방에서
 # 친구들과 하기 좋아요」)은 걷지 않는다(코덱스 #141 검수: 낱말만 보면 정상 설명이 지워진다).
 _PC_WORD = re.compile(r"(?:컴퓨터|pc|피시|본체|견적|사양|업그레이드)", re.I)
+# 권하는 말은 «고객에게 건네는» 꼴만 센다. 「구매」·「맞추」 낱말만으로는 세지 않는다 -- 「견적은 구매할
+# 부품과 비용을 적은 문서예요」 같은 정상 설명이 지워진다(코덱스 #145 검수 1). 「원하시면 PC 구성도 함께
+# 볼 수 있어요」처럼 물음표 없는 제안은 센다.
 _PC_ASK = re.compile(r"(?:[?？]|생각\s*(?:있|이\s*있)|있으신가요|있으세요|어떠세요|어떨까요|드릴까요|볼까요"
-                     r"|알아보|살펴보|맞추|장만|구매|구입|필요하시면|필요하면|말씀해\s*주|추천해\s*드|도와\s*드)")
+                     r"|알아보시|살펴보시|맞추실|맞추시|장만하실|장만하시|구매하실|구매하시|구입하실|구입하시"
+                     r"|알아봐\s*드|살펴봐\s*드|원하시면|함께\s*(?:보|살펴|알아)"
+                     r"|필요하시면|필요하면|말씀해\s*주|추천해\s*드|도와\s*드)")
 _SENTENCE = re.compile(r"[^.!?。？！\n]+[.!?。？！]*\s*")
 
 
@@ -659,6 +665,8 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "⑥ 우리가 할 일을 약속하지 않는다 -- 운영체제 설치·배송·설치·A/S·할인·여러 대 주문·"
         "모니터 포함·결제·담당자 연락을 「해 드릴게요」「확인했습니다」라고 말하지 않는다."
         " 램 용량·저장공간·그래픽카드 모델·케이스 색·소음 같은 조건을 「맞춰 드릴게요」라고 하지 않는다.",
+        "⑦ missing 이 없으면 예산·해상도·세부 조건을 되묻지 않는다 -- 예산이 없으면 서버가 가정을 밝히고"
+        " 카드를 바로 낸다. 「찾아드리겠습니다」처럼 앞으로 할 일만 말하지 않는다.",
         "pc 가 false 이면 위 [잡담] 규칙을 따른다 -- 비우지 말고 자연스럽게 응대한다.",
         "",
         "[이전까지 파악한 상태]",
@@ -1050,7 +1058,8 @@ def _quick_response(body: ParseBody, reply: str, exceptions: list) -> dict:
         "reply": reply, "assumed": [], "pc_related": None, "constraints": _legacy_constraints(state),
         "note": None, "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=offered,
                                                 pc_declined=declined, entry=entry,
-                                                entry_asked=asked).model_dump(),
+                                                entry_asked=asked,
+                                                asked=TS.flow_asked(body.chat_flow)).model_dump(),
         "stage": TS.stage_for(turns), "answer": "", "sources": [], "narrowing": TS.NARROWING_WIDE,
         "answer_game_names": [], "answer_notice": None, "answer_filter": None,
         "answer_elapsed_sec": 0, "answer_error": None, "silent": False,
@@ -1225,6 +1234,12 @@ def parse_talk(body: ParseBody, request: Request):
     # (2026-10-10 점검 9·27번. 추천 단계는 #53 에서 같은 기준으로 이미 고쳤다).
     released = TR.release_unnamed_game(missing, state, prev_state_obj, TS.is_game_usage,
                                        TS.MISSING_GAME_GRADE)
+    # 「게임용 가장 싸게」처럼 가격 방향을 말했으면 게임 이름 없이도 FHD 기준으로 바로 카드를 낸다
+    # (api/talk_defaults -- 예산 대신 가격 방향이 기본값을 정한다).
+    pref = TD.price_pref(text)
+    if (not released and pref and missing == [TS.MISSING_GAME_GRADE]
+            and TR.unnamed_game(state)):
+        released = True
     if released:
         missing = []
     # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
@@ -1252,6 +1267,10 @@ def parse_talk(body: ParseBody, request: Request):
     turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
     # PC 제안은 상담에 한 번, 거절하면 하지 않는다. 고객이 먼저 PC 를 물으면 거절을 푼다.
     pc_offered, pc_declined = TS.flow_flags(body.chat_flow)
+    # 흐름 상태가 없거나 비어 온 경우(옛 화면·보관 견적을 연 직후)에도, 최근 대화에 서버 권유 줄이 이미
+    # 있으면 권한 것으로 친다 -- 같은 상담에서 두 번 권하지 않는다(코덱스 #145 검수 3).
+    if any(r == "assistant" and (REPLY_GAME_PICK in t or TX.NOTE_SMALLTALK_LONG in t) for r, t in history):
+        pc_offered = True
     if TS.declines_pc(text):
         pc_declined = True
     elif pc is True:
@@ -1306,6 +1325,27 @@ def parse_talk(body: ParseBody, request: Request):
     if unreadable:
         exceptions.append("ai_unreadable")
         reply = TX.REPLY_AI_UNREADABLE
+    # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
+    asked_before = TS.flow_asked(body.chat_flow)
+    plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
+                and not notices and not laptop)
+    if plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
+        # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
+        label = TD.default_usage_label(vocab)
+        if label:
+            state = state.model_copy(update={"usages": [label]})
+            missing = TS.missing_for(state, vocab)
+            fit = TD._fit_usage(label)
+            reply = TD.no_usage_reply(TD.basis_work(fit) if fit else None)
+            log.info("[talk] answer-first: no usage after ask - assumed general use")
+    elif plain_pc and not missing and (
+            # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
+            (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
+            or (asked_before and "?" in reply)
+            or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
+        reply = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage) or reply
+        log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
+                 pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
     reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
                                       top_spec_re=TR._TOP, uhd_re=TR._UHD,
                                       read_len=MAX_TEXT_LEN, masked=masked,
@@ -1332,7 +1372,11 @@ def parse_talk(body: ParseBody, request: Request):
     #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
     #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
     answer = ans.answer or ""
-    if released and ans.narrowing == TS.NARROWING_WIDE:
+    advice = getattr(ans, "kind", "game") == "pc_advice"
+    if advice and not plain_pc:
+        # PC 구성 설명은 평범한 PC 상담 턴에만 위에 둔다 -- 예외·안내·노트북 턴은 그 문장이 먼저다.
+        answer = ""
+    if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
         # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
         answer = ""
     if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
@@ -1418,7 +1462,9 @@ def parse_talk(body: ParseBody, request: Request):
         # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
         "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
                                  pc_declined=pc_declined, entry=entry,
-                                 entry_asked=entry_asked).model_dump(),
+                                 entry_asked=entry_asked,
+                                 asked=bool(missing) and pc is True and stage == TS.STAGE_PC
+                                 and bool(reply.strip())).model_dump(),
         "stage": stage,
         # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
         # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,

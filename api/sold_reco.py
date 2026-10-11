@@ -296,6 +296,9 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
             nav_note = X.NOTE_CHEAPER_NONE
     elif nav == X.CHEAPER:
         res, nav_note = pick(fu, r, None, None, levels, prods, preferred), X.NOTE_CHEAPEST
+        # 「가장 싸게」에 한 단계 위(수백만 원) 구성을 «추천»으로 함께 내밀지 않는다(2026-10-11 사장님
+        # 비교 -- 「개발자용 가장 저렴하게」에 248만원 카드). 더 높은 사양은 아래 빠른 선택이 연다.
+        res["items"] = res["items"][:1]
         for it in res["items"]:
             it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
     elif nav == X.BETTER and anchor is not None and anchor["price"] is not None:

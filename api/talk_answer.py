@@ -52,6 +52,7 @@ from sqlalchemy import bindparam, text
 from . import game_copy as GC
 from . import llm
 from . import talk_filter as TF
+from . import talk_pc_advice as PA
 from . import talk_schema as TS
 from . import wiki_fetch as WF
 
@@ -91,7 +92,10 @@ _RANK_REPEAT = re.compile(r"(인기\S*\s*순(으로|위)?(는|로는)?|순위로
 _DATA_EXCUSE = re.compile(r"[ \t]*[^.\n]*(?:제공된|주어진|받은|저희)\s*자료[^.\n]*(?:없|부족)[^.\n]*\.?")
 # 고객이 알아야 할 한계(최신 순위·기준일·확인하지 못한 수치)는 같은 모양이어도 지우지 않는다
 # (코덱스 #140 검수: 내부 자료 사정과 고객용 불확실성을 구분하지 않으면 중요한 한계까지 숨긴다).
-_CUSTOMER_LIMIT = re.compile(r"(?:최신|기준|시점|날짜|순위|확인(?:하지|할\s*수|이\s*어렵|되지)|달라질|바뀔)")
+# 성능·호환·동작을 단정하거나 보장할 수 없다는 말도 고객용 한계다(코덱스 #145 검수 4) -- 최신·기준 낱말이
+# 없어도 남긴다. 「세부 재미 요소가 없어」처럼 답을 못 한 내부 사정만 걷는다.
+_CUSTOMER_LIMIT = re.compile(r"(?:최신|기준|시점|날짜|순위|확인(?:하지|할\s*수|이\s*어렵|되지)|달라질|바뀔"
+                             r"|단정|보장|장담|성능|호환|동작|사양|정확)")
 
 
 def _drop_data_excuse(text: str) -> str:
@@ -517,6 +521,8 @@ class AnswerResult:
     # 2026-10-11 개편 15번: 답변 AI 가 실패했을 때 우리 DB 사실로 짧은 소개를 대신 냈는가.
     # error 는 그대로 둔다(관리자 「AI 답 점검」의 답변 실패 수에 계속 잡힌다).
     fallback: bool = False
+    # "game"(게임 질문 답) | "pc_advice"(PC 구성 질문에 먼저 하는 설명 -- api/talk_pc_advice)
+    kind: str = "game"
 
 
 FALLBACK_MAX_GAMES = 3
@@ -594,6 +600,17 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         #   이미 받아준다 -- 그 경로를 [B] 가 덮어쓰지 않는다.
         #   판정은 `is_game_related` 하나가 한다(잡담 카운터가 쓰는 것과 **같은 함수**) --
         #   두 벌로 두면 「답은 하는데 카운터는 오르는」 어긋남이 생긴다.
+        # 2026-10-11 사장님 「LLM에 먼저 보내 답하고 아래에 우리 제품」: PC 구성 질문은 게임 이야기가
+        #   아니어도 일반 AI 처럼 먼저 설명한다(api/talk_pc_advice). 게임 이름·장르가 걸리면 기존 게임 답.
+        labels = None
+        if not extract_game_names(sentence, vocab) and not match_genres(sentence, vocab):
+            labels = PA.wants_advice(sentence, vocab, prev_state)
+            # 「요즘 게임 추천해줘」는 게임 이야기다 -- PC 를 직접 말했을 때만 PC 설명으로 간다.
+            if labels is not None and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence):
+                labels = None
+        if labels is not None:
+            return PA.advise(conn_factory, sentence, labels, res, history=history,
+                             timeout_sec=timeout_sec)
         if not is_game_related(sentence, vocab):
             res.elapsed_sec = round(time.time() - t0, 3)
             return res

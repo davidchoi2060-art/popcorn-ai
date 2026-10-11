@@ -159,7 +159,7 @@ function renderPanel(){
       (p.build?.changes?.length?'<p class="muted">바꾼 부품 '+p.build.changes.length+'개를 반영한 금액이에요.</p>':'')+
       '<p class="muted">재고·판매 조건은 저장하거나 구매할 때 다시 확인해요.</p>'+
       '<p class="tk-save-state">'+(saved?'견적을 저장했어요.':state.needsRefresh?'금액이 바뀌어 저장하지 못했어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':state.saveState==='uncertain'?'저장 결과를 확인하지 못했어요. 내 견적에서 확인해 주세요.':resumed?'새로고침 전 저장 여부는 내 견적에서 확인할 수 있어요.':'아직 저장하지 않았어요.')+'</p>'+
-      '<div class="tk-row">'+button('구성 자세히 보기','open-detail','outline',busy?'disabled':'')+button('부품 바꾸기','open-detail','outline',busy?'disabled':'')+
+      '<div class="tk-row">'+button('구성 자세히 보기','open-detail','outline',busy?'disabled':'')+button('부품 바꾸기','open-detail','outline',(busy?'disabled ':'')+'data-focus="parts"')+
       (state.needsRefresh&&!saved?button(state.phase==='reprice'?'금액 확인 중…':'지금 금액 다시 확인','reprice','primary',busy?'disabled':''):
         button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':''))+'</div>';
     if(saved){
@@ -168,7 +168,9 @@ function renderPanel(){
         :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+'<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요.</p>')+'</div>';
     }
   }
-  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>';
+  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>'+
+    // 구매 확정은 끝이 아니다 -- 확정 뒤에도 상담사가 전화로 구성을 다시 살펴본다(2026-10-11 사장님).
+    '<p class="muted tk-phone">구매를 확정한 뒤에도 상담사가 전화로 구성을 함께 살펴봐요.</p>';
   panel.innerHTML=html+inquiryForm();
 }
 
@@ -179,9 +181,17 @@ function render(){
   const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
+  $('#tk-old').href='index.html#'+oldScreen();
 }
 
-function goDetail(){location.href='index.html#detail';}
+// 기존 상담 화면(index.html)으로 넘어간다. 대화·조건·지금 견적은 같은 탭 보관(CONVERSATION_KEY)으로 넘어가고,
+// 주소에는 화면 이름만 싣는다(고객 글·조건은 싣지 않는다). FROM_TALK_KEY 는 「대화로 돌아가기」와
+// 「부품 바꾸기」 칸 바로 열기에만 쓰는 한 번짜리 표시다 -- app.js 가 읽고 지운다.
+const FROM_TALK_KEY='popcorn-mvp3-from-talk-v1';
+function markFromTalk(focus){try{sessionStorage.setItem(FROM_TALK_KEY,JSON.stringify({focus:focus||null}));}catch{}}
+// 고른 구성이 있으면 상세, 조건이나 추천이 있으면 추천 목록, 없으면 상담 첫 화면.
+function oldScreen(){return state.selected||state.restoredCurrent?'detail':state.recommendation||state.talk?'results':'welcome';}
+function goDetail(focus){markFromTalk(focus);location.href='index.html#detail';}
 // 좁은 화면에서 접힌 「지금 견적」을 펼친다(문의 양식이 그 안에 있다 -- 코덱스 PR142·143 검수 4).
 function expandNow(){const now=$('#tk-now');if(now.classList.contains('is-open'))return;now.classList.add('is-open');$('[data-action="toggle-now"]').setAttribute('aria-expanded','true');}
 // 문의 양식이 그려진 뒤 첫 입력 칸(없으면 양식 자체)으로 초점을 옮긴다.
@@ -213,7 +223,7 @@ document.addEventListener('click',e=>{
       if(state.selected?.product_code===x.product_code){goDetail();break;}
       if(state.selected&&!confirm('상세를 열면 지금 견적이 「'+x.name+'」 구성으로 바뀌어요. 계속할까요?'))break;
       flow.select(i);if(state.selected)goDetail();break;}
-    case 'open-detail':if(state.selected)goDetail();break;
+    case 'open-detail':if(state.selected)goDetail(b.dataset.focus);break;
     case 'save':void flow.save();break;
     case 'reprice':void flow.reprice();break;
     case 'handoff':void flow.handoff();break;
@@ -227,6 +237,7 @@ document.addEventListener('click',e=>{
 });
 document.addEventListener('input',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());if(e.target===input){count();if(!input.value.trim())entry=null;}});
 document.addEventListener('change',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
+$('#tk-old').addEventListener('click',()=>markFromTalk(null));
 $('#tk-form').addEventListener('submit',e=>{e.preventDefault();void send();});
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void send();}});
 

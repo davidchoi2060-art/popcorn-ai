@@ -56,7 +56,7 @@ class NeverBlocked(unittest.TestCase):
                                            chat_flow={'smalltalk_turns': 2}), request=None)
         self.assertEqual(r['state']['budget_won'], 800000)
         self.assertEqual(r['chat_flow'], {'smalltalk_turns': 2, 'pc_offered': False, 'pc_declined': False,
-                                        'entry': None, 'entry_asked': False})
+                                        'asked': False, 'entry': None, 'entry_asked': False})
 
     def test_very_long_text_is_read_not_rejected(self):
         long = '배그 하고 예산은 150만원이에요. ' + '설명이 깁니다. ' * 300
