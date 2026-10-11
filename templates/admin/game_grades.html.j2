@@ -170,7 +170,7 @@
         row.appendChild(el('span',null,(it.game||('게임 '+it.game_id))+' : '+(it.before||'미배정')+' → '+(it.after||'미배정')));
         row.appendChild(el('span','gg-muted',(it.is_undo?'되돌림':'이유: '+(it.reason||''))+(it.operator?' · '+it.operator:'')));
         if (it.undone) row.appendChild(el('span','gg-chip','되돌려짐'));
-        else if (!it.is_undo && st.canWrite){
+        else if (it.undoable && st.canWrite){
           var btn=el('button',null,'되돌리기'); btn.type='button';
           btn.addEventListener('click',function(){
             btn.disabled=true;

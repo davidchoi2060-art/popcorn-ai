@@ -209,6 +209,9 @@ def bare_budget_from_text(text: str) -> int | None:
         return None
     s = str(text).strip()
     nums = [int(m.group(1)) for m in _BARE_NUM.finditer(s)]
+    # 「롤 120 배그 150」처럼 맨 숫자가 둘 이상이면 어느 것이 예산인지 알 수 없다 — AI 에 맡긴다.
+    if len(re.findall(r"(?<![0-9A-Za-z.,\-])[0-9]{2,3}(?![0-9A-Za-z가-힣])", s)) > 1:
+        return None
     if len(nums) != 1 or not 30 <= nums[0] <= 999:
         return None
     return nums[0] * 10_000

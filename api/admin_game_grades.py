@@ -176,14 +176,18 @@ def history(limit: int = 30):
             "  LEFT JOIN admin_operators o ON o.operator_id = l.operator_id"
             " WHERE l.target_kind = :k ORDER BY l.created_at DESC, l.log_id DESC LIMIT :lim"),
             {"k": TARGET_KIND, "lim": limit}).mappings().all()
-    out = []
+    out, seen = [], set()
     for r in rows:
         d = r["detail"] or {}
+        # 되돌릴 수 있는 것은 그 게임의 «가장 최근» 기록뿐이다(그 뒤에 또 바뀌었으면 409 가 난다).
+        latest = r["target_id"] not in seen
+        seen.add(r["target_id"])
         out.append({"log_id": r["log_id"], "game_id": int(r["target_id"]), "game": d.get("game"),
                     "before": (d.get("before") or {}).get("grade"),
                     "after": (d.get("after") or {}).get("grade"),
                     "reason": d.get("reason"), "is_undo": bool(d.get("ref_log_id")),
                     "undone": bool(r["undone"]), "operator": r["operator"],
+                    "undoable": latest and not d.get("ref_log_id") and not r["undone"],
                     "at": iso(r["created_at"])})
     return {"items": out}
 
