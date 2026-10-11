@@ -129,7 +129,8 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     uses = bool(usage_hits(s, vocab)) or game
     build = bool((_REQUEST.search(s) and (uses or pc))
                  or (_NEED.search(s) and (uses or (pc and not part)))
-                 or (pc and not part and _AMOUNT.search(s))) and not explain_part
+                 # 「100만원 PC 환불 언제 들어와?」의 금액은 새 PC 예산이 아니라 주문 금액이다(코덱스 #177~#181 검수 P2-4).
+                 or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
