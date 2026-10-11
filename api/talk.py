@@ -953,6 +953,8 @@ def parse_talk(body: ParseBody, request: Request):
         vocab = TS.load_vocab(conn)
         # 관리자 「판매 안내 자료」 — 실패하면 빈 사전(기본 안내가 나간다, shop_notices 머리말)
         written_notices = shop_notices.load_written(conn)
+        # 관리자가 직접 더한 안내 주제(0150) — 실패하면 빈 목록
+        custom_notices = shop_notices.load_custom(conn)
 
     history = _trim_history(body.history)
     prev_ok = bool(body.state) and _prev_state_json(body.state) != _NO_PREV_STATE
@@ -1041,7 +1043,8 @@ def parse_talk(body: ParseBody, request: Request):
     laptop = TR.mentions_laptop(text)
     if laptop and pc is not True:
         pc = True        # 노트북 문의는 PC 상담이다 -- 잡담으로 세지 않는다
-    if TR.purchase_topics(text) and pc is not True:
+    custom_hits = TR.custom_topic_hits(text, custom_notices)
+    if (TR.purchase_topics(text) or custom_hits) and pc is not True:
         pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
     # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
     #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
@@ -1058,7 +1061,7 @@ def parse_talk(body: ParseBody, request: Request):
         reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
     # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
     # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
-    notices = TR.honest_notices(text, state, written_notices, prev_state_obj)
+    notices = TR.honest_notices(text, state, written_notices, prev_state_obj, custom_notices)
     if notices and stage == TS.STAGE_PC:
         reply = TR.honest_reply(notices, bool(state.usages), missing)
     if laptop and stage == TS.STAGE_PC:
@@ -1127,6 +1130,8 @@ def parse_talk(body: ParseBody, request: Request):
     # 2026-10-11: 조건을 못 읽은 결제·배송·A/S 문의가 관리자 화면에서 빈 줄로 보였다 -- 원문
     # 대신 주제와 반영 못 한 조건을 꼬리표로 남긴다(관리자 「고객 문의 · 보관 견적」이 읽는다).
     filled += [TR.TOPIC_TAG + k for k in TR.purchase_topics(text)]
+    # 관리자 주제는 이름으로 남긴다 — 나중에 주제를 «미사용»으로 내려도 기록은 읽힌다
+    filled += [TR.TOPIC_TAG + c["label"] for c in custom_hits]
     filled += [TR.UNAPPLIED_TAG + c for c in TR.unsupported_conditions(text, state, prev_state_obj)]
     with engine.begin() as conn:
         hit_id = _record_hit(conn, request=request, text_raw=text, matched=filled,

@@ -32,6 +32,8 @@
 .sn-msg{color:var(--rv-muted)}
 .sn-msg.err{color:var(--rv-red)}
 .sn-count{margin-left:auto;color:var(--rv-faint);font-size:12px}
+.sn-sec{font-size:15px;margin:10px 0 0}
+.sn-card input[type=text]{width:100%;box-sizing:border-box;font:inherit;font-size:13.5px;border:1px solid var(--rv-dim3);border-radius:6px;padding:6px 10px;background:var(--rv-card);color:var(--rv-ink)}
 @media (max-width:768px){.sn-wrap{padding:12px 16px 24px}}
 </style>
 {% endblock %}
@@ -40,6 +42,9 @@
 <div class="sn-wrap" data-keep="1">
   <p class="sn-note">고객이 이 주제를 물으면 AI 답 대신 아래 「지금 고객에게 나가는 안내」가 나갑니다. 비워 두면 기본 안내가 나갑니다. 바꾸기는 대표 권한만 할 수 있습니다.</p>
   <div id="snList"><p class="sn-note">불러오는 중입니다.</p></div>
+  <h2 class="sn-sec">직접 더한 주제</h2>
+  <p class="sn-note">위 일곱 주제 밖의 질문에 쓸 안내입니다. 고객 문장에 적은 낱말이 하나라도 있으면(띄어쓰기·대소문자 무시) 이 안내가 나갑니다. 낱말은 쉼표로 나눠 적습니다.</p>
+  <div id="snCustom"></div>
 </div>
 <script>
 (function(){
@@ -96,6 +101,69 @@
     return c;
   }
 
+  var custom = document.getElementById('snCustom');
+  var kwRule = {min: 2, max: 30, count_max: 20};
+
+  function customCard(it){
+    var isNew = !it;
+    it = it || {label: '', keywords: [], body: '', status: '미사용'};
+    var c = el('section', 'sn-card');
+    if (!isNew) c.setAttribute('data-custom', it.topic_id);
+    var h = el('h2', null, isNew ? '새 주제 추가' : it.label);
+    if (!isNew) h.appendChild(el('span', 'sn-badge' + (it.status === '사용' ? ' on' : ''),
+                                 it.status === '사용' ? '사용 중' : '미사용'));
+    c.appendChild(h);
+    c.appendChild(el('span', 'sn-label', '주제 이름'));
+    var name = el('input'); name.type = 'text'; name.maxLength = 40; name.value = it.label;
+    name.placeholder = '예: CPU 고르기';
+    c.appendChild(name);
+    c.appendChild(el('span', 'sn-label', '알아볼 낱말 (쉼표로 나눔, ' + kwRule.min + '~' + kwRule.max + '자, ' + kwRule.count_max + '개까지)'));
+    var kw = el('input'); kw.type = 'text'; kw.value = (it.keywords || []).join(', ');
+    kw.placeholder = '예: 인텔, AMD, 라이젠';
+    c.appendChild(kw);
+    c.appendChild(el('span', 'sn-label', '고객에게 나갈 안내'));
+    var ta = el('textarea'); ta.value = it.body || ''; ta.maxLength = maxLen;
+    c.appendChild(ta);
+    var row = el('div', 'sn-row');
+    var lab = el('label');
+    var chk = el('input'); chk.type = 'checkbox'; chk.checked = it.status === '사용';
+    lab.appendChild(chk); lab.appendChild(document.createTextNode(' 이 안내를 고객에게 사용'));
+    var btn = el('button', null, isNew ? '추가' : '저장');
+    var msg = el('span', 'sn-msg', it.updated_at ? '마지막 저장 ' + new Date(it.updated_at).toLocaleString('ko-KR') : '');
+    var cnt = el('span', 'sn-count');
+    function count(){ cnt.textContent = ta.value.length + ' / ' + maxLen; }
+    ta.addEventListener('input', count); count();
+    btn.addEventListener('click', function(){
+      btn.disabled = true; msg.className = 'sn-msg'; msg.textContent = '저장하는 중입니다.';
+      var kws = kw.value.split(',').map(function(x){ return x.trim(); }).filter(function(x){ return x; });
+      fetch(API + '/custom' + (isNew ? '' : '/' + encodeURIComponent(it.topic_id)), {
+        method: isNew ? 'POST' : 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({label: name.value, keywords: kws, body: ta.value,
+                              status: chk.checked ? '사용' : '미사용'})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(x){
+        if (!x.ok) throw new Error((window.popcornProgress && window.popcornProgress.errText)
+          ? window.popcornProgress.errText(x.d) : ((x.d && x.d.detail) || '저장하지 못했습니다'));
+        load('custom:' + x.d.topic_id, x.d.note);
+      })
+      .catch(function(e){ msg.className = 'sn-msg err'; msg.textContent = e.message; btn.disabled = false; });
+    });
+    row.appendChild(lab); row.appendChild(btn); row.appendChild(msg); row.appendChild(cnt);
+    c.appendChild(row);
+    return c;
+  }
+
+  function renderCustom(d, focusKey, note){
+    if (d.keyword_rule) kwRule = d.keyword_rule;
+    custom.textContent = '';
+    (d.custom || []).forEach(function(it){
+      var c = customCard(it);
+      if ('custom:' + it.topic_id === focusKey && note) c.querySelector('.sn-msg').textContent = note;
+      custom.appendChild(c);
+    });
+    custom.appendChild(customCard(null));
+  }
+
   function load(focusKey, note){
     fetch(API).then(function(r){
       if (!r.ok) throw new Error('안내 자료를 불러오지 못했습니다');
@@ -108,6 +176,7 @@
         if (it.topic_key === focusKey && note) c.querySelector('.sn-msg').textContent = note;
         list.appendChild(c);
       });
+      renderCustom(d, focusKey, note);
     }).catch(function(e){
       list.textContent = '';
       list.appendChild(el('p', 'sn-note', e.message));

@@ -23,3 +23,19 @@ def load_written(conn) -> dict:
         log.warning("[shop_notices] load failed - default notices used: %s", type(e).__name__)
         return {}
     return {r[0]: r[1] for r in rows}
+
+
+def load_custom(conn) -> list:
+    """관리자가 직접 더한 주제 중 «사용»인 것 — [{label, keywords, body}] (0150).
+
+    표가 아직 없거나(마이그레이션 전) 읽기에 실패하면 빈 목록 — 상담은 끊기지 않는다.
+    """
+    try:
+        rows = conn.execute(text(
+            "SELECT label, keywords, body FROM shop_notice_topics"
+            " WHERE status = '사용' ORDER BY topic_id")).mappings().all()
+    except Exception as e:                                    # noqa: BLE001
+        log.warning("[shop_notices] custom topics load failed - skipped: %s", type(e).__name__)
+        return []
+    return [{"label": r["label"], "keywords": [k for k in (r["keywords"] or []) if isinstance(k, str)],
+             "body": r["body"]} for r in rows]
