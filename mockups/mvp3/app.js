@@ -395,7 +395,7 @@ function inquiryPanel(){
   const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft;
   const err=q.error?'<p class="live-inquiry-error" role="alert">'+esc(q.error)+'</p>':'';
   if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
-    (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline'))+'</section>';
+    (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline',human?'data-human="1"':''))+'</section>';
   const field=(name,label,input)=>'<label class="live-inquiry-field"><span>'+label+'</span>'+input+'</label>';
   const dis=busy?' disabled':'';
   return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
@@ -482,6 +482,8 @@ function enterRoute(hash,initial=false){
     if(!screenNames.includes(screen)||(['detail','final'].includes(screen)&&!state.selected)||(screen==='results'&&!state.recommendation))screen='welcome';
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
     if(screen==='saved')openSaved();else flow.navigate(screen);
+    // 새로고침 전에 보던 견적이 있으면 같은 조건으로 다시 물어 그 상품을 다시 연다(값은 지금 기준).
+    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk)void flow.resume();
   }finally{enteringRoute=false;}
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
