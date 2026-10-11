@@ -1856,3 +1856,23 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 `shop_notice_topics` 를 새로 만든다. 0137 `shop_notices` 의 주제 일곱 개는 코드에 고정돼 있어, 「인텔이 좋아요 AMD가 좋아요?」 같은 질문은 어느 주제에도 걸리지 않았다. 관리자가 주제 이름(`label`, 40자, 고유) · 알아볼 낱말(`keywords`, JSONB 문자열 배열 1~20개) · 안내(`body`, 1~400자) · 상태(`사용`/`미사용`)를 적는다. 고객 상담은 «사용» 주제의 낱말이 문장에 있으면(공백·대소문자 무시, 두 글자 이상) 그 안내로 말풍선을 바꾸고, 문의 꼬리표에 `주제:<이름>` 을 남긴다.
 
 행을 지우지 않는다(«미사용»으로 내린다). 시드 행 없음. 기존 표·데이터는 건드리지 않는다. 표가 없는 DB(마이그레이션 전)에서는 상담이 이 표를 건너뛴다. downgrade 는 행이 하나라도 있으면 거부한다.
+
+### 32. 상담 해석 바로잡기 — 관리자가 등록하는 표현 규칙 (2026-10-11, 0151)
+
+`talk_text_fixes` 를 새로 둔다. AI 가 잘못 읽은 표현(예: 「백만원 언더」)을 관리자가 «표현 → 바로잡을 값»으로 등록하면 고객 상담이 AI 값 대신 이 값을 쓴다(`api/talk_text_fixes.apply`, `api/talk._apply_text_rules` 끝에서 적용).
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| fix_id | BIGSERIAL PK | |
+| phrase | VARCHAR(30) | 관리자가 적은 표현(2~30자) |
+| phrase_norm | VARCHAR(30) UNIQUE | 공백 제거 · 소문자. 문장 비교에 쓴다 |
+| kind | VARCHAR(8) | `예산` · `해상도` |
+| budget_won | INTEGER | 예산일 때 10만~5,000만원 |
+| budget_bound | VARCHAR(4) | 예산일 때 `이하` · `이상` · NULL |
+| resolution | VARCHAR(8) | 해상도일 때 `1080p` · `1440p` · `4K` |
+| memo | VARCHAR(200) | |
+| status | VARCHAR(8) | `사용` · `미사용`(기본) |
+| created_by · updated_by | BIGINT | 운영자 |
+| created_at · updated_at | TIMESTAMPTZ | |
+
+CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해상도면 예산 칸은 NULL). 같은 종류에서 여러 규칙이 맞으면 긴 표현이 먼저다. 행을 지우지 않는다 — «미사용»으로 내린다. 시드 행은 없고 기존 표·데이터는 건드리지 않는다. downgrade 는 행이 하나라도 있으면 거부한다.
