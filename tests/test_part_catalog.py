@@ -1,6 +1,7 @@
 """조립 부품 판매 준비 판정 (부품 상품화 1단계)."""
 import importlib.util
 import unittest
+import unittest.mock
 from pathlib import Path
 from unittest.mock import patch
 
@@ -88,6 +89,20 @@ class Summary(unittest.TestCase):
             out = pc.catalog(state='missing_specs', slot='', used=False, offset=0, limit=20)
             self.assertEqual([i['code'] for i in out['items']], [3])
         self.assertEqual(out['rule_count'], 4)
+
+
+class PcsWithoutBom(unittest.TestCase):
+    def test_lists_on_sale_complete_pcs_without_offer(self):
+        self.assertIn("part_type = 'PC_COMPLETE'", pc.NO_BOM_SQL)
+        self.assertIn("'P' || p.product_code::text", pc.NO_BOM_SQL)
+        rows = [dict(product_code=120221, product_name='<b>[8600G/16G] 사무용</b> 회원가입 할인', sale_price=990000, stock_qty=0)]
+        conn = unittest.mock.MagicMock()
+        conn.__enter__.return_value.execute.return_value.mappings.return_value = rows
+        with patch.object(pc, 'engine') as eng:
+            eng.connect.return_value = conn
+            out = pc.pcs_without_bom(offset=0, limit=20)
+        self.assertEqual(out['total'], 1)
+        self.assertNotIn('<b>', out['items'][0]['name'])
 
 
 class Migration(unittest.TestCase):

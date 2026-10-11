@@ -34,4 +34,15 @@ $('#pc-cat-used').addEventListener('change',e=>{used=e.target.checked;offset=0;l
 $('#pc-cat-prev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);load();});
 $('#pc-cat-next').addEventListener('click',()=>{offset+=limit;load();});
 load();
+let nobom=0;
+async function loadNoBom(){
+  try{const r=await fetch('/api/admin/part-catalog/pcs-without-bom?offset='+nobom+'&limit=20',{credentials:'same-origin'});
+    if(!r.ok)throw new Error('오류 '+r.status);const d=await r.json();
+    $('#pc-cat-nobom-count').textContent=d.total+'개';$('#pc-cat-nobom-msg').textContent=d.note;
+    $('#pc-cat-nobom-list').insertAdjacentHTML('beforeend',d.items.map(i=>`<li>${i.product_code} · ${esc(i.name)} · ${money(i.sale_price)}</li>`).join(''));
+    nobom+=d.items.length;$('#pc-cat-nobom-more').hidden=nobom>=d.total;}
+  catch(e){$('#pc-cat-nobom-msg').textContent='조회 실패: '+(e.message||e);}
+}
+$('#pc-cat-nobom-more').addEventListener('click',loadNoBom);
+loadNoBom();
 })();

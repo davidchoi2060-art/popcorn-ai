@@ -21,6 +21,9 @@
 .pc-cat-state[data-kind="ready"]{color:var(--rv-green)}
 .pc-cat-state:not([data-kind="ready"]){color:var(--rv-red)}
 .pc-cat-empty{color:var(--rv-muted);text-align:center}
+.pc-cat-nobom{margin-top:10px;border-top:1px solid var(--rv-dim4);padding-top:8px}
+.pc-cat-nobom summary{cursor:pointer;font-weight:700}
+.pc-cat-nobom ul{margin:6px 0;padding-left:18px;font-size:9.5pt;line-height:1.7}
 .pc-cat-foot{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
 @media(max-width:850px){
   .pc-cat-bar label{margin-left:0;flex:1 1 100%}
@@ -46,6 +49,8 @@
 <p class="pc-cat-msg" id="pc-cat-msg" role="status" aria-live="polite"></p>
 <div class="pc-cat-scroll"><table><thead><tr><th>부품</th><th>판매 준비</th><th class="num">판매가</th><th class="num">재고</th><th class="num">사용 PC</th></tr></thead><tbody id="pc-cat-rows"></tbody></table></div>
 <footer class="pc-cat-foot"><button id="pc-cat-prev">이전</button><span id="pc-cat-page"></span><button id="pc-cat-next">다음</button></footer>
+<details class="pc-cat-nobom" id="pc-cat-nobom"><summary>구성표 없는 판매중 완제품 PC <b id="pc-cat-nobom-count">-</b></summary>
+<p class="pc-cat-msg" id="pc-cat-nobom-msg"></p><ul id="pc-cat-nobom-list"></ul><button id="pc-cat-nobom-more" hidden>더 보기</button></details>
 </details>
 <p class="pm-message" id="pm-message" role="status" aria-live="polite"></p>
 <div class="pm-grid"><section class="pm-list-card"><header><h2>부품 목록</h2><span id="pm-count">불러오는 중</span></header><div class="pm-list-scroll"><table class="pm-table"><thead><tr><th><input type="checkbox" id="pm-select-page" aria-label="현재 페이지 전체 선택"></th><th>부품 · 제품명</th><th>주요 사양</th><th>판매가</th><th>설명 검토</th></tr></thead><tbody id="pm-rows"></tbody></table></div><footer class="pm-pagination"><button id="pm-batch">선택 항목 보완 제안</button><div><button id="pm-prev">이전</button><span id="pm-page"></span><button id="pm-next">다음</button></div><small>표시 수와 검색 조건 유지</small></footer></section><aside class="pm-detail-card" aria-label="부품 상세"><header><h2 id="pm-detail-title" tabindex="-1">부품 상세</h2><button id="pm-back" class="pm-back">목록으로</button></header><div id="pm-detail" class="pm-detail-body"><p class="pm-empty">목록에서 부품 선택</p></div></aside></div>
