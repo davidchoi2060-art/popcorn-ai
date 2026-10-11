@@ -31,6 +31,19 @@
       ['저장장치',ssd!==''?storageLabel(ssd)+' SSD':NONE]
     ];
   }
+  // 2026-10-11: a card without an approved intro used to show the fit category name
+  // ("게임 캐주얼 — 롤·발로란트…"). Say instead, in plain words, what changed from the card before it.
+  function cardFallbackIntro(product,comparison){
+    if(!object(product)||!object(comparison)||!object(product.spec)||!object(comparison.spec))return '';
+    const NONE='정보 없음',mine=new Map(cardSpecRows(product.spec)),theirs=new Map(cardSpecRows(comparison.spec));
+    const norm=v=>String(v||'').replace(/\s+/g,'').toUpperCase();
+    const parts=[['CPU','CPU를'],['GPU','그래픽카드를'],['RAM','메모리를'],['저장장치','저장공간을']]
+      .filter(([key])=>mine.get(key)&&mine.get(key)!==NONE&&theirs.get(key)!==NONE&&norm(mine.get(key))!==norm(theirs.get(key)))
+      .slice(0,3).map(([key,word])=>word+' '+mine.get(key)+'로');
+    if(!parts.length)return '';
+    const from=text(comparison.tag)||'앞의 구성';
+    return from+'에서 '+parts.join(', ')+(product.role==='premium'?' 바꿔 사양을 높인 구성이에요.':' 바꾼 구성이에요.');
+  }
   function specText(spec){return typeof spec==='string'?spec:specRows(spec).map(([label,value])=>label+' '+value).join('\n');}
   function safeUrl(value){
     if(typeof value!=='string')return null;
@@ -175,6 +188,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

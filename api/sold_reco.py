@@ -228,12 +228,15 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
     return {"items": [rec]}
 
 
-def premium_item(res, usage, min_rank, budget_won, bound, levels, products) -> dict | None:
+def premium_item(res, usage, min_rank, budget_won, bound, levels, products,
+                 preferred=frozenset()) -> dict | None:
     """추천 구성 다음 한 장 — 「더 높은 사양」. 추천 구성이 없거나(예산 안 상품 없음) 더 높은 것이 없으면 None.
 
     예산(이하) 안에 추천 구성보다 분명히 높은 사양이 있으면 그중 가장 높은 것, 없으면 예산의
     PREMIUM_OVER_X 배 안에서 가장 싼 높은 사양(over_budget 으로 표시). 예산이 없으면 가장 싼 높은 사양.
+    어느 경우든 공개 승인 구성(사진·소개 글이 있는 것, preferred)을 먼저 고른다 — pick 과 같은 순서 힌트.
     """
+    pub = lambda p: p["code"] in preferred  # noqa: E731
     rec = next((i for i in res.get("items") or [] if i["role"] == "recommended"), None)
     if rec is None or rec["product_code"] not in products:
         return None
@@ -250,14 +253,14 @@ def premium_item(res, usage, min_rank, budget_won, bound, levels, products) -> d
     if budget_won is not None and bound != "이상":
         within = [p for p in better if p["price"] <= budget_won]
         if within:
-            chosen = max(within, key=lambda p: (X.perf(p, usage), -p["price"]))
+            chosen = max(within, key=lambda p: (pub(p), X.perf(p, usage), -p["price"]))
         else:
             above = [p for p in better if p["price"] <= budget_won * PREMIUM_OVER_X]
             if not above:
                 return None
-            chosen = min(above, key=lambda p: p["price"])
+            chosen = min(above, key=lambda p: (not pub(p), p["price"]))
     else:
-        chosen = min(better, key=lambda p: p["price"])
+        chosen = min(better, key=lambda p: (not pub(p), p["price"]))
     levels_by = {(l["usage"], l["level"]): l for l in levels}
     return _item(chosen, usage, levels_by, TAG_PREMIUM, budget_won, bound)
 
@@ -306,7 +309,7 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
         res = pick(fu, r, budget, bound, levels, prods, preferred)
     if nav != X.CHEAPER:
         extra = premium_item(res, fu, r, budget if nav != X.BETTER else None,
-                             bound if nav != X.BETTER else None, levels, prods)
+                             bound if nav != X.BETTER else None, levels, prods, preferred)
         if extra is not None:
             if nav == X.BETTER:
                 extra["over_budget"] = bool(budget is not None and bound != "이상" and extra["price"] > budget)

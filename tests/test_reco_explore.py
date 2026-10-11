@@ -125,6 +125,17 @@ class SpectrumTest(unittest.TestCase):
         prices = [i['price'] for i in cs['items']]
         self.assertEqual(prices, sorted(prices))
 
+    def test_higher_card_prefers_a_public_pc_with_photo(self):
+        # 2026-10-11 개발 서버: 사진·소개 없는 PC가 「더 높은 사양」에 올랐다 — pick 과 같은 공개 승인 우선(#50).
+        prods = {**PRODUCTS, 7: pc(7, 2100000, 2, 160, ram=32, ssd=1000, gpu='RTX 5070 12GB', gap=1)}
+        state = TalkState(**GAME, budget_won=2300000, budget_bound='이하')
+        self.assertEqual(codes(sets(state, products=prods)[0])[-1], (7, 'premium'))
+        with patch.object(S, 'load', lambda: (LEVELS, prods)), \
+             patch.object(S, 'public_codes', lambda: frozenset({3, 4})), \
+             patch.object(X, 'part_tags', lambda: {}):
+            cs = S.card_sets(state, ['게임'], [], [], None, None)[0]
+        self.assertEqual(codes(cs)[-1], (4, 'premium'))
+
     def test_reference_only_gets_no_higher_card(self):
         cs = sets(TalkState(**GAME, budget_won=900000, budget_bound='이하'))[0]
         self.assertEqual(codes(cs), [(2, 'reference')])
@@ -242,6 +253,20 @@ class RecommendEndpointTest(unittest.TestCase):
         d = self.call(TalkState(**GAME, budget_won=2300000, budget_bound='이하'), nav='cheaper', anchor_code=3)
         self.assertEqual(d['talk_notes'][0], X.NOTE_CHEAPER)
         self.assertTrue(all(i['price'] < PRODUCTS[3]['price'] for i in d['card_sets'][0]['items']))
+
+    def test_over_budget_single_card_says_so_and_asks_only_what_can_be_pressed(self):
+        # 2026-10-11 개발 서버 「발로 100만원」: 예산 초과 한 장인데 「맞춰 볼게요」·「더 싼 PC나」라고 했다.
+        d = self.call(TalkState(**GAME, budget_won=900000, budget_bound='이하'))
+        self.assertEqual([c['id'] for c in d['choices'] if c['enabled']], ['better', 'change'])
+        self.assertEqual(d['talk_notes'], ['90만원 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요.',
+                                           X.ASK_BETTER_ONLY])
+
+    def test_ask_matches_the_enabled_buttons(self):
+        self.assertEqual(X.ask_next(True, True), X.ASK_NEXT)
+        self.assertEqual(X.ask_next(True, False), X.ASK_CHEAPER_ONLY)
+        self.assertEqual(X.ask_next(False, True), X.ASK_BETTER_ONLY)
+        self.assertIsNone(X.ask_next(False, False))
+        self.assertEqual(X.over_budget_sentence(1234500), '1,234,500원 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요.')
 
     def test_multi_pc_is_honest(self):
         d = self.call(TalkState(**GAME), text='직원용 PC 5대 사려고요')
