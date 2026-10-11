@@ -157,6 +157,39 @@ def settled(check, rules_by_key):
             and check.get('missing_fields') == [rule['ref_field']])
 
 
+# 구성표에 이 슬롯 줄이 없거나 가상 줄(「기본 쿨러」 등)뿐이면, 그 슬롯이 걸린 규칙의 미판정은 거절하지 않고
+# 경고만 한다(2026-10-11 쿨러 줄이 가상 줄인 초안 PC). 보드 같은 다른 슬롯이 없으면 여전히 거절한다.
+WARN_MISSING_SLOTS = {'COOLER'}
+WARNING_TEXT = {'COOLER': '쿨러 호환은 확인되지 않았습니다(이 PC 구성표에 따로 적힌 CPU 쿨러가 없습니다).'}
+
+
+def warn_only(check, rules_by_key):
+    """줄이 없어 판정 못 한 규칙인데, 빠진 줄이 경고만 하는 슬롯(쿨러)뿐인가."""
+    missing = check.get('missing_slots')
+    return (check['state'] == 'unknown' and check['key'] in rules_by_key and bool(missing)
+            and set(missing) <= WARN_MISSING_SLOTS)
+
+
+def _mine(checks, ordinals, slots, by_key, display):
+    # 줄이 없어 줄 번호 없이 남은 규칙 판정도 바꾼 슬롯에 걸린 규칙이면 내 것이다 — 화면 출력 통과가
+    # 그 미판정을 가리지 않게 한다(2026-10-11 코덱스 검수 #121: CPU+GPU, 보드 없음).
+    return [c for c in checks if (display and c['key'] == DISPLAY_KEY) or touches(c, ordinals)
+            or (':' not in c['key'] and c['key'] in by_key
+                and slots & {by_key[c['key']]['slot'], by_key[c['key']]['ref_slot']})]
+
+
+def warnings(checks, ordinals, slots, rules, display):
+    """받아들이되 고객에게 알릴 것 — 빠진 쿨러 줄 때문에 확인하지 못한 호환."""
+    by_key = {r['rule_key']: r for r in rules}
+    out = []
+    for c in _mine(checks, ordinals, slots, by_key, display):
+        if warn_only(c, by_key):
+            for slot in c['missing_slots']:
+                if WARNING_TEXT[slot] not in out:
+                    out.append(WARNING_TEXT[slot])
+    return out
+
+
 def rule_slots(rules):
     return {x for r in rules for x in (r['slot'], r['ref_slot'])}
 
@@ -168,17 +201,14 @@ def refusal(checks, ordinals, slots, rules, display):
       fail      바꾼 줄이 걸린 규칙에 걸렸다
       unknown   바꾼 줄이 걸린 규칙을 판정하지 못했다(엔진도 넘기는 skip 규칙의 상대 값 없음만 예외)
       빈 판정    그 슬롯에 걸린 규칙이 있는데 바꾼 줄을 본 판정이 하나도 없다 — 통과로 세지 않는다
+    쿨러 줄이 없어(또는 가상 줄뿐이라) 판정 못 한 규칙은 거절하지 않는다 — `warnings` 가 알린다.
     """
     by_key = {r['rule_key']: r for r in rules}
-    # 줄이 없어 줄 번호 없이 남은 규칙 판정도 바꾼 슬롯에 걸린 규칙이면 내 것이다 — 화면 출력 통과가
-    # 그 미판정을 가리지 않게 한다(2026-10-11 코덱스 검수 #121: CPU+GPU, 보드 없음).
-    mine = [c for c in checks if (display and c['key'] == DISPLAY_KEY) or touches(c, ordinals)
-            or (':' not in c['key'] and c['key'] in by_key
-                and slots & {by_key[c['key']]['slot'], by_key[c['key']]['ref_slot']})]
+    mine = _mine(checks, ordinals, slots, by_key, display)
     failed = [c for c in mine if c['state'] == 'fail']
     if failed:
         return 'fail', failed
-    unsettled = [c for c in mine if not settled(c, by_key)]
+    unsettled = [c for c in mine if not settled(c, by_key) and not warn_only(c, by_key)]
     if unsettled:
         return 'unknown', unsettled
     if not rules or (not mine and slots & rule_slots(rules)):
@@ -200,15 +230,18 @@ def quote(conn, base_price, bom, changes, rules=None):
     compat = evaluate(lines_c, load_specs(conn, [l['spec_key'] for l in lines_c]), rules)
     # 바꾸지 않은 줄끼리의 판정은 공개된 구성 그대로다 — 바꾼 줄이 만든 문제만 막는다.
     # 후보 목록과 같은 기준(refusal)이다: 실패뿐 아니라 판정하지 못한 것도 받지 않는다.
+    warned = []
     for x in applied:
-        why = refusal(compat['checks'], [x['ordinal']], {x['slot']}, rules, x['slot'] in ('CPU', 'GPU'))
+        args = (compat['checks'], [x['ordinal']], {x['slot']}, rules, x['slot'] in ('CPU', 'GPU'))
+        why = refusal(*args)
         if why and why[0] == 'fail':
             raise HTTPException(409, '이 조합은 호환되지 않아요: ' + ' · '.join(f['label'] for f in why[1]))
         if why:
             names = ' · '.join(dict.fromkeys(c['label'] for c in why[1])) or '호환 규칙'
             raise HTTPException(409, f"{x['label']} 부품의 호환을 확인하지 못해 바꿀 수 없어요: {names}")
+        warned += [w for w in warnings(*args) if w not in warned]
     total = base_price + sum(x['delta'] for x in applied)
-    return dict(base_price=base_price, total=total, changes=applied,
+    return dict(base_price=base_price, total=total, changes=applied, warnings=warned,
                 compat=dict(ok=compat['ok'], rule_count=compat['rule_count'],
                             failures=[f['label'] for f in compat['failures']], unknown=len(compat['unknown'])))
 
@@ -222,7 +255,7 @@ def options_for(conn, lines, ordinal, rules):
             if r['product_code'] != line['product_code']]
     base_lines = compat_lines(lines)
     specs = load_specs(conn, [l['spec_key'] for l in base_lines] + [r['product_code'] for r in rows])
-    ok, untested = [], 0
+    ok, untested, warned = [], 0, []
     for r in rows:
         if not_desktop_ram(r):
             continue
@@ -235,6 +268,7 @@ def options_for(conn, lines, ordinal, rules):
         if why:
             untested += 1
             continue
+        warned += [w for w in warnings(out['checks'], [ordinal], {line['slot']}, rules, display) if w not in warned]
         ok.append(dict(product_code=r['product_code'], name=display_name(r['product_name']), price=r['sale_price'],
                        price_diff=(r['sale_price'] - line['sale_price']) * line['quantity']))
     seen, uniq = set(), []
@@ -246,7 +280,7 @@ def options_for(conn, lines, ordinal, rules):
     pricier = [o for o in uniq if o['price_diff'] >= 0][:PRICIER]
     return dict(ordinal=ordinal, slot=line['slot'], label=SLOT_LABELS.get(line['slot'], line['slot']),
                 current=_part(line), quantity=line['quantity'], options=cheaper + pricier,
-                checked=len(rows), untested=untested)
+                checked=len(rows), untested=untested, warnings=warned)
 
 
 def _base(body):

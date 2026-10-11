@@ -128,16 +128,18 @@
     });
     return out.every(Boolean)?out:null;
   }
+  // 받아들였지만 확인하지 못한 호환 안내(예: 구성표에 CPU 쿨러 줄이 없음). 서버 문구만 쓴다.
+  function buildWarnings(list){return Array.isArray(list)?list.filter(x=>typeof x==='string'&&x.trim()):[];}
   function build(value){
     if(!object(value)||!Number.isSafeInteger(value.base_price)||value.base_price<0)return null;
     const changes=buildChanges(value.changes);
-    return changes&&changes.length?{base_price:value.base_price,changes}:null;
+    return changes&&changes.length?{base_price:value.base_price,changes,warnings:buildWarnings(value.warnings)}:null;
   }
   function buildQuote(value,baseCode){
     const changes=buildChanges(value?.changes);
     if(!object(value)||value.ok!==true||value.base_code!==baseCode||!Number.isSafeInteger(value.base_price)||!Number.isSafeInteger(value.total)||!changes)
       throw new Error('바꾼 구성의 금액을 확인할 수 없어요.');
-    return {base_price:value.base_price,total:value.total,changes};
+    return {base_price:value.base_price,total:value.total,changes,warnings:buildWarnings(value.warnings)};
   }
   function buildOptions(value,baseCode,ordinal){
     if(!object(value)||value.ok!==true||value.base_code!==baseCode||value.ordinal!==ordinal||!Number.isSafeInteger(value.total)||!Array.isArray(value.options))
@@ -146,7 +148,8 @@
       Number.isSafeInteger(o.price)&&Number.isSafeInteger(o.price_diff)&&Number.isSafeInteger(o.total)
       ?{product_code:o.product_code,name:o.name,price:o.price,price_diff:o.price_diff,total:o.total}:null).filter(Boolean);
     return {ordinal,label:text(value.label),current:buildPart(value.current),total:value.total,options,
-      checked:Number.isSafeInteger(value.checked)?value.checked:0,untested:Number.isSafeInteger(value.untested)?value.untested:0,note:text(value.note)};
+      checked:Number.isSafeInteger(value.checked)?value.checked:0,untested:Number.isSafeInteger(value.untested)?value.untested:0,note:text(value.note),
+      warnings:buildWarnings(value.warnings)};
   }
   function gameContext(value){
     if(!object(value)||!text(value.game_name).trim()||!object(value.source)||value.source.kind!=='game_customer_copy')return null;

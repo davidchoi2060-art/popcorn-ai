@@ -189,7 +189,8 @@ def built_product(state_raw, body):
     if q['total'] != body.expected_price:
         raise HTTPException(409, '상품 가격이 변경되었습니다. 다시 조회한 가격을 확인해 주세요.')
     product['price'] = q['total']
-    product['build'] = {'base_price': q['base_price'], 'changes': q['changes'], 'compat': q['compat']}
+    product['build'] = {'base_price': q['base_price'], 'changes': q['changes'], 'compat': q['compat'],
+                        'warnings': q.get('warnings', [])}
     return product
 
 
