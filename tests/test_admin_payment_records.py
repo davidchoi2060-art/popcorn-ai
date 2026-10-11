@@ -137,3 +137,11 @@ def test_screen_copy_does_not_claim_settlement():
                    "점검 이후 기록이 바뀌었습니다. 다시 확인해 주세요.",
                    'data-screen-id="ADM-PAY-020"'):
         assert needed in body, needed
+
+
+def test_review_counts_corrections_in_original_month_too():
+    """9월 점검 뒤 거래일을 10월로 옮긴 정정이 9월 「점검 뒤 바뀜」에서 빠지지 않는다(코덱스 #144 검수).
+    로컬 Postgres 에서 옛 쿼리는 9월 0건, 새 쿼리는 9월·10월 각 1건으로 확인했다."""
+    sql = _sql_strings(API)
+    assert "LEFT JOIN payment_confirmation_records prev ON prev.record_id = r.supersedes_id" in sql
+    assert re.search(r"r\.action <> 'create' AND prev\.occurred_on >= :lo AND prev\.occurred_on < :hi", sql)

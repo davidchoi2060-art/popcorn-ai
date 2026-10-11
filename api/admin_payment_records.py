@@ -344,11 +344,17 @@ def list_records(month: str | None = None, kind: str | None = None, offset: int 
             " WHERE v.month = :lo ORDER BY v.reviewed_at DESC, v.review_id DESC LIMIT 1"), p).mappings().first()
         after = None
         if review:
+            # 점검 뒤 바뀐 건수. 정정·철회는 «새 판의 달»과 «원래 판의 달» 둘 다에 센다 —
+            # 9월 점검 뒤 거래일을 10월로 옮긴 정정이 9월에서 사라지면 9월 합계가 바뀐 것을
+            # 아무도 모른다(코덱스 #144 검수). 같은 달 안의 정정·철회는 한 번만 센다.
             after = conn.execute(text(
-                "SELECT COUNT(*) FILTER (WHERE r.action = 'create') AS added,"
+                "SELECT COUNT(*) FILTER (WHERE r.action = 'create' AND r.occurred_on >= :lo"
+                "   AND r.occurred_on < :hi) AS added,"
                 " COUNT(*) FILTER (WHERE r.action <> 'create') AS changed"
                 " FROM payment_confirmation_records r"
-                " WHERE r.occurred_on >= :lo AND r.occurred_on < :hi AND r.recorded_at > :at"),
+                " LEFT JOIN payment_confirmation_records prev ON prev.record_id = r.supersedes_id"
+                " WHERE r.recorded_at > :at AND ((r.occurred_on >= :lo AND r.occurred_on < :hi)"
+                "   OR (r.action <> 'create' AND prev.occurred_on >= :lo AND prev.occurred_on < :hi))"),
                 {**p, "at": review["reviewed_at"]}).mappings().one()
 
     by_kind = {k: {"n": 0, "amount": 0} for k in KIND_KO}
