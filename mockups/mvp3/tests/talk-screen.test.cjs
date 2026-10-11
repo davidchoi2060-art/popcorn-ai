@@ -122,3 +122,49 @@ test('a refresh reopens the chosen quote by asking the server again',async()=>{
     assert.deepEqual(b.calls.map(c=>c.url),['/api/grid/recommend']);assert.deepEqual(b.errors,[]);
   }finally{b.close();}
 });
+// 코덱스 PR142·143 검수 보완(2026-10-11).
+test('a price change on save keeps the quote and offers a fresh price check before saving again',async()=>{
+  const base=scripted();let reprices=0,posts=[];
+  const h=harness((url,body)=>{
+    if(url==='/api/mvp3/saved-quotes'&&body){posts.push(body.expected_price);
+      if(body.expected_price===1450000)return {status:409,data:{detail:{error:'price_changed'}}};
+      return {data:{ok:true,quote:{id:'22222222-2222-4222-8222-222222222222',product:pc(101,'CODE/MOCK A',body.expected_price),state:body.state,saved_at:'2026-10-11T09:00:00+00:00'}}};}
+    if(url==='/api/grid/recommend'&&reprices++>=1)return {data:reco([pc(101,'CODE/MOCK A',1470000)])};
+    return base(url,body);
+  });
+  try{
+    await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
+    h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-action=reprice]'));
+    assert.match(h.text('.tk-msg.is-error'),/금액이 바뀌어 저장하지 못했어요/);assert.match(h.text('#tk-now-body'),/CODE\/MOCK A/);
+    assert.equal(h.doc.querySelector('[data-action=save]'),null,'old price cannot be resent');
+    h.click('[data-action=reprice]');await until(()=>h.doc.querySelector('[data-action=save]')&&!h.doc.querySelector('[data-action=save]').disabled);
+    assert.match(h.text('#tk-now-body'),/1,470,000원/);assert.match(h.text('#tk-log'),/1,450,000원에서 1,470,000원으로/);
+    assert.deepEqual(posts,[1450000]);
+    h.click('[data-action=save]');await until(()=>/견적을 저장했어요/.test(h.text('#tk-now-body')));
+    assert.deepEqual(posts,[1450000,1470000]);assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('on a narrow screen an inquiry button opens the folded quote panel and moves focus to the form',async()=>{
+  const h=harness(scripted({failSecond:true}));
+  try{
+    await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
+    await h.say('100만원으로 바꿀게요');
+    assert.equal(h.doc.querySelector('#tk-now').classList.contains('is-open'),false);
+    h.click('.tk-msg.is-error [data-action=inquiry-open]');
+    await until(()=>h.doc.querySelector('[data-inquiry=topic]'));await tick();
+    assert.equal(h.doc.querySelector('#tk-now').classList.contains('is-open'),true);
+    assert.equal(h.doc.querySelector('[data-action=toggle-now]').getAttribute('aria-expanded'),'true');
+    assert.equal(h.doc.activeElement,h.doc.querySelector('[data-inquiry=topic]'));
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('opening details of another card asks before replacing the chosen quote',async()=>{
+  const h=harness(scripted());
+  try{
+    await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
+    let asked='';h.w.confirm=m=>{asked=m;return false;};
+    h.doc.querySelector('[data-action=detail][data-index="1"]').click();await tick();
+    assert.match(asked,/지금 견적이 「CODE\/MOCK B」 구성으로 바뀌어요/);assert.match(h.text('#tk-now-body'),/CODE\/MOCK A/);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});

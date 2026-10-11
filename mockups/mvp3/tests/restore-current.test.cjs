@@ -24,7 +24,7 @@ test('resume asks the server again and reopens the same product at today\'s pric
   f.reset({restore:true});await f.resume();
   assert.equal(f.state.screen,'detail');assert.equal(f.state.selected.product_code,101);assert.equal(f.state.selected.price,1390000);
   assert.equal(f.state.restoredCurrent,null);assert.match(f.state.messages.at(-1).text,/지금 다시 확인한 값/);
-  assert.deepEqual(stored(ss),{product_code:101,changes:[]});
+  assert.deepEqual(stored(ss),{product_code:101,changes:[],selection_state:talk});
 });
 test('resume re-applies changed parts through the server quote',async()=>{
   const ss=storage();seed(ss,{product_code:101,changes:[{ordinal:1,product_code:502}]});let asked=null;
@@ -32,7 +32,7 @@ test('resume re-applies changed parts through the server quote',async()=>{
   f.reset({restore:true});await f.resume();
   assert.deepEqual(asked,{code:101,changes:[{ordinal:1,product_code:502}]});
   assert.equal(f.state.selected.price,1480000);assert.match(f.state.messages.at(-1).text,/바꿨던 부품도 다시 적용/);
-  assert.deepEqual(stored(ss),{product_code:101,changes:[{ordinal:1,product_code:502}]});
+  assert.deepEqual(stored(ss),{product_code:101,changes:[{ordinal:1,product_code:502}],selection_state:talk});
 });
 test('if parts cannot be re-applied it shows the base build and says so',async()=>{
   const ss=storage();seed(ss,{product_code:101,changes:[{ordinal:1,product_code:502}]});
@@ -45,7 +45,7 @@ test('a product no longer recommended is not invented',async()=>{
   const ss=storage();seed(ss,{product_code:999,changes:[]});
   const f=make({},ss);f.reset({restore:true});await f.resume();
   assert.equal(f.state.selected,null);assert.equal(f.state.screen,'results');assert.equal(f.state.restoredCurrent,null);
-  assert.match(f.state.messages.at(-1).text,/상품번호 999.*추천에 없어요/);
+  assert.match(f.state.messages.at(-1).text,/상품번호 999.*찾지 못했어요/);
 });
 test('a failed re-query keeps the product number for retry',async()=>{
   const ss=storage();seed(ss,{product_code:101,changes:[]});let fail=true;
@@ -76,4 +76,73 @@ test('the retry button keeps the general inquiry wording',()=>{
   const app=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
   assert.match(app,/button\('다시 불러오기','inquiry-open','outline',human\?'data-human="1"':''\)/);
   assert.match(app,/state\.restoredCurrent&&state\.talk\)void flow\.resume\(\)/);
+});
+
+// 코덱스 PR142·143 검수 보완(2026-10-11): 대화 화면(keepCurrent)에서 조건을 바꾼 뒤에도 지금 견적을 지킨다.
+const talk100={...talk,budget_won:1000000};
+const other={...product,product_code:301,name:'100만원 PC',price:990000};
+const reco100={...reco,card_sets:[{kind:'sold',usage:'게임',items:[other]}]};
+const BIND='a'.repeat(64),QID='22222222-2222-4222-8222-222222222222';
+function keep(api,ss){return createFlow({parse:async()=>parsed,recommend:async s=>s.budget_won===1000000?reco100:reco,prepareSave:async()=>BIND,
+  saveQuote:async p=>({ok:true,quote:{id:QID,product:{...product,price:p.expected_price},state:p.state,saved_at:'2026-10-11T09:00:00+00:00'}}),...api},{uuid:()=>ID,sessionStorage:ss,keepCurrent:true});}
+test('a quote chosen before a condition change survives a reload (selection basis is stored)',async()=>{
+  const ss=storage();let next=talk;
+  const f=keep({parse:async()=>({...parsed,state:next})},ss);f.reset();
+  await f.submit('150만원 게임용');f.select(0);
+  next=talk100;await f.submit('100만원으로 바꿀게요');
+  assert.equal(f.state.selected.product_code,101);assert.deepEqual(f.state.talk,talk100);
+  assert.deepEqual(stored(ss),{product_code:101,changes:[],selection_state:talk});
+  const asked=[];const g=keep({recommend:async s=>{asked.push(s.budget_won);return s.budget_won===1000000?reco100:reco;}},ss);
+  g.reset({restore:true});assert.deepEqual(g.state.restoredCurrent.selection_state,talk);
+  await g.resume();
+  assert.deepEqual(asked,[1000000,1500000]);
+  assert.equal(g.state.selected.product_code,101);assert.deepEqual(g.state.selectionState,talk);assert.deepEqual(g.state.talk,talk100);
+});
+test('in the conversation screen a new condition does not drop a quote still waiting to reopen',async()=>{
+  const ss=storage();seed(ss,{product_code:101,changes:[],selection_state:talk});
+  const f=keep({parse:async()=>({...parsed,state:talk100})},ss);f.reset({restore:true});
+  await f.submit('100만원으로 바꿀게요');
+  assert.deepEqual(f.state.restoredCurrent,{product_code:101,changes:[],selection_state:talk});
+});
+test('saving a quote chosen under old conditions keeps the latest conversation conditions',async()=>{
+  const ss=storage();let next=talk,sent=null;
+  const f=keep({parse:async()=>({...parsed,state:next}),saveQuote:async p=>{sent=p;return {ok:true,quote:{id:QID,product,state:p.state,saved_at:'2026-10-11T09:00:00+00:00'}};}},ss);f.reset();
+  await f.submit('150만원 게임용');f.select(0);next=talk100;await f.submit('100만원으로 바꿀게요');
+  await f.save();
+  assert.equal(f.state.saveState,'saved');assert.deepEqual(sent.state,talk);
+  assert.deepEqual(f.state.talk,talk100);assert.deepEqual(f.state.selectionState,talk);
+});
+test('a 409 on save re-checks today\'s price for the same product and lets the customer save again',async()=>{
+  const ss=storage();let price=1430000,saves=[];
+  const f=keep({recommend:async()=>({...reco,card_sets:[{kind:'sold',usage:'게임',items:[{...product,price}]}]}),
+    saveQuote:async p=>{saves.push(p.expected_price);if(p.expected_price!==price)throw Object.assign(new Error('금액이 바뀌었어요.'),{status:409});
+      return {ok:true,quote:{id:QID,product:{...product,price},state:p.state,saved_at:'2026-10-11T09:00:00+00:00'}};}},ss);f.reset();
+  await f.submit('150만원 게임용');f.select(0);
+  price=1450000;await f.save();
+  assert.equal(f.state.needsRefresh,true);assert.equal(f.state.retry.kind,'reprice');assert.equal(f.state.selected.product_code,101);
+  await f.save();assert.deepEqual(saves,[1430000],'blocked save does not resend the old price');
+  await f.retry();
+  assert.equal(f.state.needsRefresh,false);assert.equal(f.state.selected.price,1450000);assert.equal(f.state.saveState,'idle');
+  assert.match(f.state.messages.at(-1).text,/1,430,000원에서 1,450,000원으로/);assert.match(f.state.messages.at(-1).text,/다시 눌러/);
+  assert.equal(f.state.savedQuote,null,'re-check alone does not save');
+  await f.save();assert.deepEqual(saves,[1430000,1450000]);assert.equal(f.state.saveState,'saved');
+});
+test('the price re-check re-applies changed parts through the server',async()=>{
+  const ss=storage();let asked=null;
+  const f=keep({buildQuote:async(s,code,changes)=>{asked={code,changes};return {ok:true,base_code:101,base_price:1430000,total:1490000,changes:[change]};}},ss);f.reset();
+  await f.submit('150만원 게임용');f.select(0);
+  f.state.selected={...f.state.selected,price:1480000,build:{base_price:1430000,changes:[change],warnings:[]}};f.state.needsRefresh=true;
+  await f.reprice();
+  assert.deepEqual(asked,{code:101,changes:[{ordinal:1,product_code:502}]});assert.equal(f.state.selected.price,1490000);assert.equal(f.state.needsRefresh,false);
+});
+test('a product gone after a 409 is not invented and stays blocked',async()=>{
+  const ss=storage();
+  const f=keep({},ss);f.reset();await f.submit('150만원 게임용');f.select(0);
+  f.state.needsRefresh=true;f.state.selected={...f.state.selected,product_code:999};
+  await f.reprice();
+  assert.equal(f.state.needsRefresh,true);assert.match(f.state.messages.at(-1).text,/찾지 못했어요/);
+});
+test('the first screen keeps its existing 409 path (fresh recommendation)',async()=>{
+  const f=make({prepareSave:async()=>BIND,saveQuote:async()=>{throw Object.assign(new Error('x'),{status:409});}},storage());f.reset();
+  await f.submit('150만원 게임용');f.select(0);await f.save();assert.equal(f.state.retry.kind,'recommend');
 });

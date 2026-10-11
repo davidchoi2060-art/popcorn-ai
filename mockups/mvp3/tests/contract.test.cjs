@@ -223,11 +223,11 @@ const {CONVERSATION_KEY,validConversation}=require('../live-flow.js');
 test('conversation survives a reload in the same tab without stale cards; new consult clears it',async()=>{
  const h=await selected(harness());
  const raw=h.sessionStorage.getItem(CONVERSATION_KEY);assert.ok(raw);
- const rec=JSON.parse(raw);assert.deepEqual(rec.talk,talk);assert.deepEqual(rec.current,{product_code:101,changes:[]});
+ const rec=JSON.parse(raw);assert.deepEqual(rec.talk,talk);assert.deepEqual(rec.current,{product_code:101,changes:[],selection_state:talk});
  assert.equal(raw.includes('1430000'),false);
  const again=createFlow(h.api,{uuid:()=>ID,sessionStorage:h.sessionStorage});again.reset({restore:true});
  assert.deepEqual(again.state.talk,talk);assert.equal(again.state.recommendation,null);assert.equal(again.state.screen,'welcome');
- assert.deepEqual(again.state.restoredCurrent,{product_code:101,changes:[]});
+ assert.deepEqual(again.state.restoredCurrent,{product_code:101,changes:[],selection_state:talk});
  assert.ok(again.state.messages.some(m=>m.who==='user'&&m.text==='예산 150만원으로 추천'));
  again.reset();const fresh=JSON.parse(h.sessionStorage.getItem(CONVERSATION_KEY));assert.equal(fresh.talk,null);assert.equal(fresh.current,null);assert.equal(fresh.messages.some(m=>m.who==='user'),false);
 });

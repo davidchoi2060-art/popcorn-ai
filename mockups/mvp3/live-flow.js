@@ -38,7 +38,8 @@
       history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
       messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
       // 되살린 견적을 아직 다시 불러오기 전이면(selected 없음) 그 상품 번호를 지우지 않고 그대로 둔다.
-      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel)}
+      // 고를 때 조건(selection_state)도 함께 둔다 -- 그 뒤 조건을 바꿨으면 지금 조건의 추천에는 그 상품이 없을 수 있다.
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel),selection_state:M.object(state.selectionState)?M.copy(state.selectionState):null}
         :state.restoredCurrent?M.copy(state.restoredCurrent):null};
   }
   function validConversation(r,now=Date.now()){
@@ -46,7 +47,8 @@
       &&(r.talk===null||M.object(r.talk))&&(r.chat_flow===null||M.object(r.chat_flow))
       &&Array.isArray(r.history)&&r.history.length<=6&&r.history.every(h=>M.object(h)&&['user','assistant'].includes(h.role)&&typeof h.text==='string')
       &&Array.isArray(r.messages)&&r.messages.length<=CONVERSATION_MAX_MESSAGES&&r.messages.every(m=>M.object(m)&&['user','ai'].includes(m.who)&&typeof m.text==='string')
-      &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes));
+      &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes)
+        &&(r.current.selection_state===undefined||r.current.selection_state===null||M.object(r.current.selection_state)));
   }
   function createConversationStore(options){
     let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
@@ -163,7 +165,8 @@
         state.history=state.history.slice(-6);
         if(keep)return true;
         // 조건이 바뀌었으면 새로고침 전 견적은 더 이상 지금 조건의 견적이 아니다.
-        if(JSON.stringify(response.state)!==JSON.stringify(previousTalk))state.restoredCurrent=null;
+        // 대화 화면(keepCurrent)은 고를 때 조건을 함께 보관하므로 조건이 바뀌어도 그 견적을 버리지 않는다.
+        if(!keepCurrent&&JSON.stringify(response.state)!==JSON.stringify(previousTalk))state.restoredCurrent=null;
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
           savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
@@ -189,34 +192,65 @@
       try{await recommendFor(op);}catch(error){if(current(op))fail(error,{kind:'recommend'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
-    // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 같은 조건으로 서버에 다시 묻고,
-    // 같은 상품 번호가 지금 추천에 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
+    // 고른 상품을 고를 때 조건(basis)으로 서버에 다시 묻는다. 지금 조건이 고를 때와 같으면 방금 받은 추천에서
+    // 찾고(fresh 가 아닐 때), 아니면 고를 때 조건으로 한 번 더 묻는다 -- 조건을 바꾼 뒤에도 지금 견적이
+    // 사라지지 않게(코덱스 PR142·143 검수 1). 없으면 null, 이 요청이 밀려났으면 undefined.
+    async function findProduct(op,code,basis,{fresh=false}={}){
+      const pick=groups=>groups.flatMap(g=>g.products).find(x=>x.product_code===code)||null;
+      let p=!fresh&&JSON.stringify(basis)===JSON.stringify(state.talk)?pick(state.groups):null;
+      if(!p){const r=M.recommendations(await api.recommend(M.copy(basis),{signal:op.signal}));if(!current(op))return undefined;p=pick(r.groups);}
+      return p&&M.copy(p);
+    }
+    // 바꿨던 부품을 서버 계산으로 다시 적용한다. 못 하면 기본 구성으로 두고 그 사실을 note 로 돌려준다.
+    async function reapply(op,p,basis,changes){
+      if(!changes.length)return {product:p,note:''};
+      try{
+        const q=M.buildQuote(await api.buildQuote(M.copy(basis),p.product_code,M.copy(changes),{signal:op.signal}),p.product_code);
+        if(!current(op))return null;
+        return {product:{...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null},
+          note:q.changes.length<changes.length?' 바꿨던 부품 중 일부는 지금 다시 적용할 수 없어 기본 구성으로 두었어요.':' 바꿨던 부품도 다시 적용했어요.'};
+      }catch{
+        if(!current(op))return null;
+        return {product:p,note:' 바꿨던 부품은 다시 적용하지 못해 기본 구성으로 보여 드려요. 부품 구성에서 다시 바꿀 수 있어요.'};
+      }
+    }
+    // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 고를 때 조건으로 서버에 다시 묻고,
+    // 같은 상품 번호가 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
     // 없거나 실패하면 지어내지 않고 그 사실을 말한다. 실패하면 상품 번호는 남겨 다시 시도할 수 있게 한다.
     async function resume(){
       const want=state.restoredCurrent;
       if(state.phase||!want||!state.talk)return;
-      const op=begin('recommend');
+      const basis=M.object(want.selection_state)?want.selection_state:state.talk,op=begin('recommend');
       try{
         await recommendFor(op);
         if(!current(op))return;
-        const p=state.groups.flatMap(g=>g.products).find(x=>x.product_code===want.product_code);
-        if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 같은 조건의 추천에 없어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
-        state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.selectedContext=null;state.screen='detail';
-        let note='새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.';
-        if(want.changes.length){
-          try{
-            const q=M.buildQuote(await api.buildQuote(M.copy(state.selectionState),p.product_code,M.copy(want.changes),{signal:op.signal}),p.product_code);
-            if(!current(op))return;
-            state.selected={...state.selected,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null};
-            if(q.changes.length<want.changes.length)note+=' 바꿨던 부품 중 일부는 지금 다시 적용할 수 없어 기본 구성으로 두었어요.';
-            else note+=' 바꿨던 부품도 다시 적용했어요.';
-          }catch(error){
-            if(!current(op))return;
-            note+=' 바꿨던 부품은 다시 적용하지 못해 기본 구성으로 보여 드려요. 부품 구성에서 다시 바꿀 수 있어요.';
-          }
-        }
-        state.restoredCurrent=null;message(note);
+        const p=await findProduct(op,want.product_code,basis);
+        if(p===undefined||!current(op))return;
+        if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
+        const r=await reapply(op,p,basis,want.changes);
+        if(!r||!current(op))return;
+        state.selected=r.product;state.selectionState=M.copy(basis);state.selectedContext=null;state.screen='detail';
+        state.restoredCurrent=null;message('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
       }catch(error){if(current(op))fail(error,{kind:'resume'});}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    // 저장하는 사이 금액이 바뀌어(409) 막힌 견적을 지금 금액으로 다시 확인한다(코덱스 PR142·143 검수 3).
+    // 잠금만 풀어 예전 금액을 다시 보내지 않는다 -- 서버에 다시 물은 금액으로 바꾼 뒤, 저장은 고객이 다시 누른다.
+    async function reprice(){
+      const p=state.selected,basis=state.selectionState;
+      if(state.phase||!p||!M.object(basis)||!state.needsRefresh)return;
+      const before=p.price,op=begin('reprice');
+      try{
+        const found=await findProduct(op,p.product_code,basis,{fresh:true});
+        if(found===undefined||!current(op))return;
+        if(!found){message('「'+p.name+'」은 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 다른 구성을 골라 주세요.');return;}
+        const r=await reapply(op,found,basis,changesOf(p));
+        if(!r||!current(op))return;
+        const won=n=>Number.isInteger(n)?n.toLocaleString('ko-KR')+'원':'금액 미확인';
+        state.selected={...r.product,index:p.index};state.needsRefresh=false;state.saveState='idle';state.savedQuote=null;state.handoff=null;
+        message('금액을 지금 기준으로 다시 확인했어요. '+(before===r.product.price?'금액은 '+won(before)+'으로 같아요.':won(before)+'에서 '+won(r.product.price)+'으로 바뀌었어요.')+
+          ' 이 금액으로 저장하려면 「견적 저장」을 다시 눌러 주세요.'+r.note);
+      }catch(error){if(current(op))fail(error,{kind:'reprice'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
     // Quick choice after the cards: cheaper / better than the card being looked at.
@@ -262,7 +296,8 @@
       if(error?.status===409){
         state.needsRefresh=true;state.saveState='failed';
         try{journal.clear();state.pendingSave=null;pendingProduct=null;}catch{state.pendingProblem='이 탭의 이전 보관 복구 기록을 정리하지 못했어요. 내 견적을 확인해주세요.';}
-        fail(error,{kind:'recommend'});
+        // 대화 화면은 지금 견적을 그대로 두고 그 상품의 지금 금액만 다시 확인한다(reprice).
+        fail(error,{kind:keepCurrent?'reprice':'recommend'});
       }else{
         state.saveState=state.pendingSave?'uncertain':'failed';
         fail(error,state.pendingSave?{kind:'recover'}:{kind:'save'});
@@ -282,7 +317,9 @@
         throw new Error('서버 보관 응답을 확인할 수 없어요.');
       try{journal.clear();state.pendingSave=null;state.pendingProblem='';pendingProduct=null;}
       catch{state.pendingProblem='보관은 완료됐지만 이 탭의 복구 기록을 정리하지 못했어요. 같은 요청 외에 새 보관을 보내지 않습니다.';}
-      state.savedQuote=saved;state.saveState='saved';state.selected=saved.product;state.selectionState=saved.state;state.talk=M.copy(saved.state);state.screen='final';
+      state.savedQuote=saved;state.saveState='saved';state.selected=saved.product;state.selectionState=saved.state;state.screen='final';
+      // 대화 화면은 앞선 조건의 견적을 저장해도 지금 상담 조건을 덮지 않는다(코덱스 PR142·143 검수 2).
+      if(!keepCurrent)state.talk=M.copy(saved.state);
     }
     async function recover(){
       if(state.phase||!state.pendingSave)return;
@@ -462,12 +499,13 @@
       if(task.kind==='talk')await submit(task.text,{repeat:true});
       else if(task.kind==='recommend')await refresh();
       else if(task.kind==='resume')await resume();
+      else if(task.kind==='reprice')await reprice();
       else if(task.kind==='save')await save();
       else if(task.kind==='recover')await recover();
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,resume,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
+    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
   if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow,GREETING};
 })(typeof window==='undefined'?globalThis:window);
