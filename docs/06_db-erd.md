@@ -1837,3 +1837,10 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 0130·0131의 승인 이력은 판매 상품(`products`) 연결을 전제로 했다. 조립 전용 부품(`product_explanations.product_code` NULL · `content.availability_scope='assembly_only'`, 현재 127201·127203)은 단품 판매 상품이 없어 승인 이력을 남길 수 없었고, 이 부품을 쓰는 조립PC 5종이 발행 승인에서 막혔다. 2026-10-10 사장님 결정: 사양 수치 확인은 발행을 막는 조건이 아니며, 자료가 없는 항목은 「정보 없음」으로 표시한다.
 
 0136은 표를 새로 만들지 않고 두 이력 표의 snapshot CHECK 와 가드 함수 세 개(`part_explanation_approval_guard` · `part_explanation_metadata_guard` · `part_photo_approval_guard`)만 고친다. 조립 전용 행에 한해 snapshot 의 `product_code` 가 JSON null 이어도 되고, 판매 상품 존재·`판매중`·판매 원문 일치 검사를 건너뛴다. 사진 권리 참조값 형식·자산 키·해시·이력 불변·순번·승인자·같은 트랜잭션 기록 검사는 그대로다. downgrade 는 거부한다(조립 전용 승인 이력이 이미 있을 수 있다).
+
+### 29. 조립 부품 판매 보기 `v_assembly_parts` (2026-10-11, 0140, 보기만 · DDL 은 VIEW 하나)
+
+조립PC 부품(`product_explanations` 한 줄)마다 판매 상품 연결(`products`) · 판매 상태 · 판매가 · 재고 ·
+사양 행 유무 · 이 부품을 쓰는 구성표 수를 한 줄로 모은다. 기존 표의 값은 바꾸지 않는다.
+「판매 가능」 판정(호환 규칙이 읽는 사양이 다 있는가)은 규칙을 읽어야 하므로 보기에 넣지 않고
+`api/part_catalog.py` 한 곳에 둔다. 화면: 부품 설명 관리(ADM-PRD-030) 위 「조립 부품 판매 준비」.
