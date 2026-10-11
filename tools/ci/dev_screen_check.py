@@ -84,7 +84,7 @@ def talk_cases(texts):
     TEXT 를 « || » 로 나누면 이 모드다(2026-10-11 코덱스 예외 55개 대표 10개 점검).
     HTTP 오류도 그 줄에 적는다 -- 「차단됐다」는 것 자체가 점검 결과다.
     """
-    print('### 개발 서버 상담 문장 점검 (/api/talk/parse 만)')
+    print('### 개발 서버 상담 문장 점검' + (' (이어 보내기는 추천 카드까지)' if texts and texts[0].startswith('CHAIN:') else ' (/api/talk/parse 만)'))
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
     print()
     # 첫 문장이 「CHAIN:」으로 시작하면 한 상담처럼 이어 보낸다(chat_flow·history 를 넘긴다).
@@ -94,7 +94,7 @@ def talk_cases(texts):
         texts = [texts[0][len('CHAIN:'):].strip()] + list(texts[1:])
         print('- 이어 보내기: state·chat_flow·history 를 넘김 (화면 live-flow.js 와 같은 왕복)')
         print()
-    flow, state, history, failed = None, None, [], 0
+    flow, state, history, failed, pending = None, None, [], 0, ''
     for i, raw in enumerate(texts, 1):
         text = expand(raw)
         shown = raw if len(raw) <= 60 else raw[:60] + '...'
@@ -116,10 +116,28 @@ def talk_cases(texts):
             failed += 1
             continue
         print(f'- HTTP {code}, {sec:.1f}s')
-        for key in ('pc_related', 'stage', 'chat_flow', 'missing', 'exceptions', 'handoff_offer', 'truncated', 'answer_error'):
+        for key in ('pc_related', 'stage', 'chat_flow', 'state', 'missing', 'exceptions', 'handoff_offer', 'truncated', 'answer_error'):
             print(f'- {key}: {parsed.get(key)!r}')
         for key in ('answer', 'reply'):
             print(f'- {key}: {str(parsed.get(key) or "")[:600]!r}')
+        if chain:
+            # 화면(live-flow.js submit)과 같은 조건으로 추천을 부른다 -- 고객이 그 턴에 카드를 보는지까지 본다.
+            pending = (pending + ' / ' + text if pending else text)[-300:]
+            if (parsed.get('missing') or parsed.get('pc_related') is False or parsed.get('silent')
+                    or parsed.get('fallback') or not isinstance(parsed.get('state'), dict)):
+                print('- 추천 카드: 이 턴은 부르지 않음(화면과 같은 조건)')
+            else:
+                try:
+                    rec, s2, t2 = post('/api/grid/recommend', {'state': parsed['state'], 'text': pending})
+                    found = list(cards(rec))
+                    pending = ''
+                    print(f'- 추천 카드: HTTP {s2}, {t2:.1f}s, {len(found)}개'
+                          + (f", needs={rec.get('needs')!r}" if rec.get('needs') else ''))
+                    for c in found[:6]:
+                        print(f"  - {c.get('product_code')} | {str(c.get('name'))[:50]} | {c.get('price')}원 | {c.get('tag') or ''}")
+                except Exception as e:
+                    print(f'- 추천 카드: 실패 {type(e).__name__}: {e}')
+                    failed += 1
         print()
         if chain:
             flow, state = parsed.get('chat_flow'), parsed.get('state')
