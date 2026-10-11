@@ -1309,7 +1309,7 @@ def parse_talk(body: ParseBody, request: Request):
     cond_notes = TR.condition_notices(text, state, prev_state_obj)
     notices = topic_notes + cond_notes
     if notices and stage == TS.STAGE_PC:
-        reply = TR.honest_reply(notices, bool(state.usages), missing)
+        reply = TR.honest_reply(notices, bool(state.usages), missing, has_budget=bool(state.budget_won))
     if laptop and stage == TS.STAGE_PC:
         reply = TR.with_laptop_notice(reply)
     band_note = TR.budget_band_note(text)

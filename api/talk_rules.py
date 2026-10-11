@@ -509,12 +509,17 @@ def condition_notices(text: str, state, prev_state=None) -> list[str]:
     return notes
 
 
-def honest_reply(notes: list[str], has_usage: bool, missing: list[str]) -> str:
-    """고정 안내 + (카드를 못 내는 턴이면) 다음에 알려 줄 것 한 줄."""
+def honest_reply(notes: list[str], has_usage: bool, missing: list[str], has_budget: bool = False) -> str:
+    """고정 안내 + (카드를 못 내는 턴이면) 다음에 알려 줄 것 한 줄. 이미 말한 예산은 다시 묻지 않는다
+    (2026-10-12 개발 서버 「화이트 감성으로 100만원 PC」 -> 「용도와 예산을 알려 주시면」)."""
     out = " ".join(notes)
     if missing:
-        out += (" 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요." if not has_usage
-                else " 예산이나 게임 같은 조건을 조금 더 알려 주시면 카드로 보여 드릴게요.")
+        if not has_usage:
+            out += (" 어떤 용도로 쓰실지 알려 주시면 맞는 PC를 찾아 드릴게요." if has_budget
+                    else " 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요.")
+        else:
+            out += (" 게임 같은 조건을 조금 더 알려 주시면 카드로 보여 드릴게요." if has_budget
+                    else " 예산이나 게임 같은 조건을 조금 더 알려 주시면 카드로 보여 드릴게요.")
     return out.strip()
 
 
