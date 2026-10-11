@@ -72,3 +72,21 @@ class Cleaning(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Topics(unittest.TestCase):
+    """코덱스 담당의견-최소차이-v1 §3: 부품 질문·쓰던 PC 고민도 설명을 먼저 하고, 구매 절차를 강제로 열지 않는다."""
+
+    def test_topics(self):
+        for s, want in (("SSD랑 메모리 차이가 뭐예요", PA.TOPIC_PART),
+                        ("그래픽카드는 왜 필요해요?", PA.TOPIC_PART),
+                        ("지금 쓰는 PC가 느려요", PA.TOPIC_UPGRADE),
+                        ("램 업그레이드 하고 싶어요", PA.TOPIC_UPGRADE),
+                        ("개발자용 PC를 가장 저렴하게 추천해줘", PA.TOPIC_BUILD),
+                        ("모니터 추천해줘", None), ("오늘 날씨 어때", None), ("개발이요", None)):
+            with self.subTest(s=s):
+                self.assertEqual(PA.topic_of(s, vocab()), want)
+
+    def test_prompt_follows_topic(self):
+        self.assertIn("역할과 차이", PA.build_prompt("SSD랑 메모리 차이가 뭐예요", [], topic=PA.TOPIC_PART))
+        self.assertIn("먼저 살펴볼 부품", PA.build_prompt("PC가 느려요", [], topic=PA.TOPIC_UPGRADE))

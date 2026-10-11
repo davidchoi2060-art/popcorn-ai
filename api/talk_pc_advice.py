@@ -40,6 +40,13 @@ _PC_WORD = re.compile(r"pc|피시|컴퓨터|컴\b|본체|데스크\s*[탑톱]|�
 _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\s*싶|구매|구입|구성|뭐가\s*좋|어떤\s*게\s*좋|"
                       r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양")
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
+# 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
+# (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
+# 모니터는 뺀다 -- 「모니터 추천」은 크기 구간을 바로 보여 주는 별도 흐름이 있다(talk.MONITOR_BANDS).
+_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스", re.I)
+_ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|좋은|괜찮|비교|알려|궁금|역할|\?")
+_UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
+TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE = "build", "part", "upgrade"
 _PUBLIC_COND = re.compile(r"램 \d+GB 이상|SSD \d+GB 이상|그래픽 메모리 \d+GB 이상|외장 그래픽 필요|엔비디아 그래픽 필요")
 _QUESTION = re.compile(r"\?\s*$|까요\s*$|나요\s*$|세요\s*\?|신가요")
 
@@ -58,16 +65,25 @@ def usage_hits(sentence: str, vocab) -> list[str]:
     return out
 
 
-def wants_advice(sentence: str, vocab, prev_state=None) -> list[str] | None:
-    """PC 구성 설명을 먼저 해 줄 문장인가 -> 설명에 쓸 용도 라벨 목록(빈 목록 가능). 아니면 None."""
+def topic_of(sentence: str, vocab) -> str | None:
+    """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | None."""
     s = sentence or ""
-    if not _REQUEST.search(s):
-        return None
-    hits = usage_hits(s, vocab)
-    if hits or _PC_WORD.search(s):
-        prev = list(getattr(prev_state, "usages", None) or []) if prev_state is not None else []
-        return hits or prev
+    part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
+    if _UPGRADE.search(s) and (pc or part):
+        return TOPIC_UPGRADE
+    if _REQUEST.search(s) and (usage_hits(s, vocab) or pc):
+        return TOPIC_BUILD
+    if part and _ASKS.search(s):
+        return TOPIC_PART
     return None
+
+
+def wants_advice(sentence: str, vocab, prev_state=None) -> list[str] | None:
+    """PC 설명을 먼저 해 줄 문장인가 -> 설명에 쓸 용도 라벨 목록(빈 목록 가능). 아니면 None."""
+    if topic_of(sentence, vocab) is None:
+        return None
+    prev = list(getattr(prev_state, "usages", None) or []) if prev_state is not None else []
+    return usage_hits(sentence, vocab) or prev
 
 
 def _fit_of(label: str) -> str | None:
@@ -93,15 +109,27 @@ def basis_lines(conn, labels: list[str]) -> list[str]:
     return out
 
 
-def build_prompt(sentence: str, basis: list[str], history: list | None = None) -> str:
+_TOPIC_TASK = {
+    TOPIC_BUILD: "이 용도에 무엇이 중요하고 무엇은 필요 없거나 아껴도 되는지, 그 이유를 서너 문장으로 쓴다."
+                 " 고객이 싸게(최저가·가성비)를 말했으면 어디를 아끼고 어디는 지킬지, 좋은 것을 말했으면 어디에 더"
+                 " 쓰면 체감이 큰지 말한다. 작업이 커지면(예: 도커·가상 머신 여러 개) 무엇이 더 필요해지는지도 한 문장 말해도 된다."
+                 " 용도를 말하지 않았으면 용도에 따라 무엇이 달라지는지 짧게 설명한다.",
+    TOPIC_PART: "고객이 물은 부품의 역할과 차이, 고르는 기준을 서너 문장으로 쉽게 설명한다."
+                " 새 PC를 사라고 권하지 않는다.",
+    TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
+                   " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
+                   " 특정 PC에 바로 장착된다고 단정하지 않는다.",
+}
+
+
+def build_prompt(sentence: str, basis: list[str], history: list | None = None,
+                 topic: str = TOPIC_BUILD) -> str:
     hist = ["%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in (history or [])][-4:]
     lines = [
-        "당신은 PC 판매점의 상담원이다. 고객이 PC 구성을 물었다. 일반 AI 에게 물었을 때처럼 먼저 답한다.",
+        "당신은 PC 판매점의 상담원이다. 고객이 PC 에 대해 물었다. 일반 AI 에게 물었을 때처럼 먼저 답한다.",
         "되묻기로 답을 미루지 않는다 - 고객은 이미 물었다.",
         "",
-        "[쓸 것] 이 용도에 무엇이 중요하고 무엇은 필요 없거나 아껴도 되는지, 그 이유를 서너 문장으로 쓴다."
-        " 고객이 싸게(최저가·가성비)를 말했으면 어디를 아끼고 어디는 지킬지, 좋은 것을 말했으면 어디에 더"
-        " 쓰면 체감이 큰지 말한다. 작업이 커지면(예: 도커·가상 머신 여러 개) 무엇이 더 필요해지는지도 한 문장 말해도 된다.",
+        "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD]),
         "[말투] 쉬운 한국어 존댓말(~요). 강조 기호(**)·목록 기호 없이 문장으로 쓴다. 감사 인사로 시작하지 않는다."
         " %d자 이내." % ADVICE_MAX_LEN,
         "",
@@ -149,10 +177,11 @@ def clean(raw: str) -> tuple[str, list[dict]]:
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
-           timeout_sec: float = ADVICE_TIMEOUT_SEC):
+           timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD):
     """[B] 의 PC 갈래 -- res(AnswerResult)를 채워 돌려준다. 예외를 올리지 않는다."""
     t0 = time.time()
     res.kind = "pc_advice"
+    res.topic = topic
     try:
         try:
             with conn_factory() as conn:
@@ -160,7 +189,7 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         except Exception as e:  # noqa: BLE001 - 기준표를 못 읽어도 일반 설명은 낸다
             log.warning("[talk-advice] fit levels unavailable: %s", type(e).__name__)
             basis = []
-        out = llm.call(build_prompt(sentence, basis, history), task_key=TASK_KEY,
+        out = llm.call(build_prompt(sentence, basis, history, topic), task_key=TASK_KEY,
                        customer_facing=True, max_output_tokens=ADVICE_MAX_TOKENS,
                        timeout_sec=int(min(ADVICE_TIMEOUT_SEC, timeout_sec)))
         res.provider, res.model = out.provider, out.model
