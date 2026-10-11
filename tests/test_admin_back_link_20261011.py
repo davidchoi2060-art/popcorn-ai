@@ -22,7 +22,8 @@ def shell(path, new):
     t = env.from_string('{% extends "admin/_admin2_shell.html.j2" %}{% block content %}<main></main>{% endblock %}')
     return t.render(new_admin=new, workspace_nav=admin_nav.new_admin_nav(path) if new else None,
                     nav=[] if new else admin_nav.nav_for_screens(path), screen_id='X', domain='x',
-                    crumb_group='g', crumb_now='n', page_intro=None, back_link=API.back_for(path),
+                    crumb_group='g', crumb_now='n', crumb_href=(API.group_crumb(path) or {}).get('href', '') if new else '',
+                    page_intro=None, back_link=API.back_for(path),
                     request=SimpleNamespace(url=SimpleNamespace(path=path)))
 
 
@@ -64,6 +65,23 @@ class BackLinkTests(unittest.TestCase):
         self.assertIn('document.referrer', block)
         self.assertIn('ref.origin !== location.origin', block)
         self.assertLess(block.index('return;', block.index('ref.pathname')), block.index('history.back()'))
+
+    def test_group_crumb_covers_hub_and_members_only(self):
+        for path in (HUB, HUB + '/') + API.BACK_LINKS[HUB]['from']:
+            with self.subTest(path=path):
+                self.assertEqual(API.group_crumb(path), {'href': HUB, 'label': '사용·성능 자료'})
+        for path in ('/admin2/products', '/admin2/', '/admin2/talk-review-x'):
+            self.assertIsNone(API.group_crumb(path))
+
+    def test_group_label_matches_new_admin_menu_label(self):
+        labels = {i['href']: i['label'] for i in admin_nav.new_admin_nav('')}
+        self.assertEqual(labels[HUB], API.BACK_LINKS[HUB]['group'])
+
+    def test_new_shell_header_crumb_links_to_group_only_in_new_mode(self):
+        html = shell('/admin2/talk-patterns', True)
+        self.assertIn(f'<a class="a2-crumb" href="{HUB}">', html)
+        self.assertNotIn('<a class="a2-crumb"', shell('/admin2/talk-patterns', False))
+        self.assertNotIn('<a class="a2-crumb"', shell('/admin2/products', True))
 
 
 if __name__ == '__main__':
