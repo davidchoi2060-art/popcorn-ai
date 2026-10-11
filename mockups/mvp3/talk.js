@@ -68,11 +68,14 @@ function renderLog(){
   });
   if(state.handoffOffer&&!state.inquiry.open&&!state.inquiry.done)html+='<div class="tk-msg-actions">'+button('사람에게 문의하기','inquiry-open','outline','data-human="1"')+'</div>';
   if(state.error){
-    const recommend=state.retry?.kind==='recommend'||state.retry?.kind==='resume';
+    const kind=state.retry?.kind,recommend=kind==='recommend'||kind==='resume',reprice=kind==='reprice';
     const wait=Math.max(0,Math.ceil(((state.error.retryAt||0)-Date.now())/1000));
-    html+='<div class="tk-msg is-ai is-error" role="alert"><p>'+(recommend?'새 추천을 불러오지 못했어요.'+(state.selected?' 앞서 고른 견적은 유지할게요.':''):'이번 답변을 불러오지 못했어요. 다시 시도하거나 사람에게 문의할 수 있어요.')+'</p>'+
+    const head=reprice?(state.error.status===409?'저장하는 사이 금액이 바뀌어 저장하지 못했어요. 지금 견적은 그대로 두었어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':'지금 금액을 다시 확인하지 못했어요. 지금 견적은 그대로 두었어요.')
+      :recommend?'새 추천을 불러오지 못했어요.'+(state.selected?' 앞서 고른 견적은 유지할게요.':''):'이번 답변을 불러오지 못했어요. 다시 시도하거나 사람에게 문의할 수 있어요.';
+    const again=reprice&&state.error.status===409?'지금 금액 다시 확인':'다시 시도';
+    html+='<div class="tk-msg is-ai is-error" role="alert"><p>'+head+'</p>'+
       '<p class="muted">'+esc(state.error.message)+'</p><div class="tk-msg-actions">'+
-      (state.retry?button(wait?wait+'초 뒤 다시 시도':'다시 시도','retry','outline',wait||state.phase?'disabled':''):'')+
+      (state.retry?button(wait?wait+'초 뒤 다시 시도':again,'retry','outline',wait||state.phase?'disabled':''):'')+
       button('사람에게 문의하기','inquiry-open','outline','data-human="1"')+'</div></div>';
   }
   log.innerHTML=html;
@@ -82,13 +85,13 @@ function renderLog(){
 function inquiryForm(){
   const q=state.inquiry;if(!q.open&&!q.done)return '';
   const human=!!q.human,title=human?'사람에게 문의하기':'구매 조건 문의';
-  if(q.done)return '<section class="tk-inquiry" role="status"><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p><p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 진행되지 않았어요.</p></section>';
+  if(q.done)return '<section class="tk-inquiry" role="status" tabindex="-1"><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p><p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 진행되지 않았어요.</p></section>';
   const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft,dis=busy?' disabled':'';
   const err=q.error?'<p class="warn-text" role="alert">'+esc(q.error)+'</p>':'';
   const intro=human?'연락처와 궁금한 내용을 남겨주세요. 이 신청으로 주문이나 결제가 진행되지는 않아요.':'여러 대 구매·할인·세금계산서 등 확인할 내용을 남겨주세요. 이 신청으로 주문이나 결제가 진행되지는 않아요.';
-  if(!q.meta)return '<section class="tk-inquiry"><h3>'+title+'</h3>'+(busy?'<p class="muted">문의 신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline',human?'data-human="1"':''))+'</section>';
+  if(!q.meta)return '<section class="tk-inquiry" tabindex="-1"><h3>'+title+'</h3>'+(busy?'<p class="muted">문의 신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline',human?'data-human="1"':''))+'</section>';
   const field=(label,el)=>'<label class="tk-field"><span>'+label+'</span>'+el+'</label>';
-  return '<section class="tk-inquiry"><h3>'+title+'</h3><p class="muted">'+intro+'</p>'+
+  return '<section class="tk-inquiry" tabindex="-1"><h3>'+title+'</h3><p class="muted">'+intro+'</p>'+
     field('문의 주제','<select data-inquiry="topic"'+dis+'><option value="">주제를 골라 주세요</option>'+q.meta.topics.map(t=>'<option'+(d.topic===t?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select>')+
     field('이름 (선택)','<input data-inquiry="name" maxlength="30" autocomplete="name" value="'+esc(d.name)+'"'+dis+'>')+
     field('전화번호','<input data-inquiry="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'>')+
@@ -121,9 +124,10 @@ function renderPanel(){
       specList(p.spec)+
       (p.build?.changes?.length?'<p class="muted">바꾼 부품 '+p.build.changes.length+'개를 반영한 금액이에요.</p>':'')+
       '<p class="muted">재고·판매 조건은 저장하거나 구매할 때 다시 확인해요.</p>'+
-      '<p class="tk-save-state">'+(saved?'견적을 저장했어요.':state.saveState==='uncertain'?'저장 결과를 확인하지 못했어요. 내 견적에서 확인해 주세요.':resumed?'새로고침 전 저장 여부는 내 견적에서 확인할 수 있어요.':'아직 저장하지 않았어요.')+'</p>'+
+      '<p class="tk-save-state">'+(saved?'견적을 저장했어요.':state.needsRefresh?'금액이 바뀌어 저장하지 못했어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':state.saveState==='uncertain'?'저장 결과를 확인하지 못했어요. 내 견적에서 확인해 주세요.':resumed?'새로고침 전 저장 여부는 내 견적에서 확인할 수 있어요.':'아직 저장하지 않았어요.')+'</p>'+
       '<div class="tk-row">'+button('구성 자세히 보기','open-detail','outline',busy?'disabled':'')+button('부품 바꾸기','open-detail','outline',busy?'disabled':'')+
-      button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':'')+'</div>';
+      (state.needsRefresh&&!saved?button(state.phase==='reprice'?'금액 확인 중…':'지금 금액 다시 확인','reprice','primary',busy?'disabled':''):
+        button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':''))+'</div>';
     if(saved){
       const h=state.handoff?.quote_id===state.savedQuote.id?state.handoff:null;
       html+='<div class="tk-buy">'+(h?'<a class="primary tk-link" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰에서 구매 이어가기</a><p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p>'
@@ -136,12 +140,16 @@ function renderPanel(){
 
 function render(){
   renderLog();renderPanel();
-  const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
+  const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
 }
 
 function goDetail(){location.href='index.html#detail';}
+// 좁은 화면에서 접힌 「지금 견적」을 펼친다(문의 양식이 그 안에 있다 -- 코덱스 PR142·143 검수 4).
+function expandNow(){const now=$('#tk-now');if(now.classList.contains('is-open'))return;now.classList.add('is-open');$('[data-action="toggle-now"]').setAttribute('aria-expanded','true');}
+// 문의 양식이 그려진 뒤 첫 입력 칸(없으면 양식 자체)으로 초점을 옮긴다.
+function focusInquiry(){const box=panel.querySelector('.tk-inquiry');if(!box)return;const f=box.querySelector('[data-inquiry]:not([disabled])')||box;f.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'});}
 async function send(){
   const text=input.value;
   if(!text.trim()){status.textContent='궁금한 내용이나 원하는 조건을 적어주세요.';status.hidden=false;input.focus();return;}
@@ -158,12 +166,18 @@ document.addEventListener('click',e=>{
   switch(b.dataset.action){
     case 'example':input.value=b.dataset.text;count();input.focus();break;
     case 'choose':{const i=Number(b.dataset.index);flow.select(i);if(state.selected){resumed=false;flow.message('「'+state.selected.name+'」 구성을 지금 견적으로 골랐어요. 저장은 따로 할 수 있어요.');flow.emit();}break;}
-    case 'detail':flow.select(Number(b.dataset.index));if(state.selected)goDetail();break;
+    case 'detail':{
+      // 이미 고른 구성이면 그대로 연다(바꾼 부품·저장 상태를 지우지 않는다). 다른 구성이면 지금 견적이 바뀐다고 먼저 묻는다.
+      const i=Number(b.dataset.index),x=state.groups.flatMap(g=>g.products).find(p=>p.index===i);if(!x)break;
+      if(state.selected?.product_code===x.product_code){goDetail();break;}
+      if(state.selected&&!confirm('상세를 열면 지금 견적이 「'+x.name+'」 구성으로 바뀌어요. 계속할까요?'))break;
+      flow.select(i);if(state.selected)goDetail();break;}
     case 'open-detail':if(state.selected)goDetail();break;
     case 'save':void flow.save();break;
+    case 'reprice':void flow.reprice();break;
     case 'handoff':void flow.handoff();break;
     case 'retry':void flow.retry();break;
-    case 'inquiry-open':void flow.openInquiry({human:b.dataset.human==='1'});break;
+    case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
     case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;flow.reset();input.value='';count();}break;
