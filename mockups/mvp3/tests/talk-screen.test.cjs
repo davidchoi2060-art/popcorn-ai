@@ -120,6 +120,31 @@ test('the top label shows the consultation path the server chose',async()=>{
     assert.equal(h.text('.demo-label'),'PC 상담 · 쓰던 PC 업그레이드');
   }finally{h.close();}
 });
+test('a new consultation drops the earlier starter key and path label',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:[],budget_won:null},missing:[],reply:'어떤 작업에서 느린가요?',answer:'',pc_related:true,chat_flow:body.entry?{smalltalk_turns:0,pc_offered:false,pc_declined:false,entry:body.entry,entry_asked:false}:null}}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    h.w.confirm=()=>true;
+    await until(()=>h.doc.querySelector('.tk-welcome'));
+    // 단추만 고르고 보내지 않은 채 새 상담 -> 다음 첫 문장에 옛 갈래가 실리지 않는다.
+    h.click('[data-action=starter][data-entry=upgrade]');
+    h.click('[data-action=new]');
+    await h.say('지금 쓰는 PC가 느려요');
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[0].body.entry,undefined);
+    // 단추로 시작해 갈래가 잡힌 뒤 새 상담 -> 상단 표시가 돌아오고 다음 문장에도 갈래가 없다.
+    h.click('[data-action=new]');
+    h.click('[data-action=starter][data-entry=upgrade]');
+    await h.say(h.doc.querySelector('#tk-input').value);
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/parse')[1].body.entry,'upgrade');
+    assert.equal(h.text('.demo-label'),'PC 상담 · 쓰던 PC 업그레이드');
+    h.click('[data-action=new]');
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    await h.say('새 PC를 알아보고 있어요');
+    const third=h.calls.filter(c=>c.url==='/api/talk/parse')[2];
+    assert.equal(third.body.entry,undefined);assert.equal(third.body.chat_flow,null);
+    assert.equal(h.text('.demo-label'),'PC 상담');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
 test('an unknown landing path key is ignored',async()=>{
   const h=harness(scripted(),storage(),'https://qa.invalid/mvp3/talk.html?start=game');
   try{await until(()=>h.doc.querySelector('.tk-welcome'));assert.equal(h.doc.querySelector('#tk-input').value,'');assert.deepEqual(h.errors,[]);}finally{h.close();}

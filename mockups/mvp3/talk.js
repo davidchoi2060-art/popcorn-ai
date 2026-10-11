@@ -221,7 +221,7 @@ document.addEventListener('click',e=>{
     case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
-    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;flow.reset();input.value='';count();}break;
+    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;flow.reset();input.value='';count();}break;
     case 'toggle-now':{const open=$('#tk-now').classList.toggle('is-open');b.setAttribute('aria-expanded',String(open));break;}
   }
 });
