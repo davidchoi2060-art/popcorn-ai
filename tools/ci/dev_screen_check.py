@@ -11,6 +11,12 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import builtins
+_LINES=[]
+_print=builtins.print
+def print(*a, **k):
+    _LINES.append(' '.join(str(x) for x in a))
+    _print(*a, **k)
 
 BASE = os.environ.get('BASE', 'https://popcornai.co.kr').rstrip('/')
 TEXT = os.environ.get('TEXT', '배그와 롤, 150만원으로 추천해줘')
@@ -194,4 +200,8 @@ if __name__ == '__main__':
         print(f'- 실패: {type(e).__name__}: {e}')
         rc = 1
     probes()
+    blob='\n'.join(_LINES)
+    for i in range(0, len(blob), 3500):
+        part=blob[i:i+3500].replace('%','%25').replace('\r','%0D').replace('\n','%0A')
+        _print(f'::notice title=check {i//3500}::{part}')
     sys.exit(rc)
