@@ -35,13 +35,18 @@ $('#pc-cat-prev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);
 $('#pc-cat-next').addEventListener('click',()=>{offset+=limit;load();});
 load();
 let nobom=0;
+// 요청 중 다시 누르면 같은 offset 을 두 번 받아 같은 상품이 겹치고 다음 묶음을 건너뛴다(코덱스 검수 #101).
+let nobomBusy=false;
 async function loadNoBom(){
+  if(nobomBusy)return;
+  nobomBusy=true;$('#pc-cat-nobom-more').disabled=true;
   try{const r=await fetch('/api/admin/part-catalog/pcs-without-bom?offset='+nobom+'&limit=20',{credentials:'same-origin'});
     if(!r.ok)throw new Error('오류 '+r.status);const d=await r.json();
     $('#pc-cat-nobom-count').textContent=d.total+'개';$('#pc-cat-nobom-msg').textContent=d.note;
     $('#pc-cat-nobom-list').insertAdjacentHTML('beforeend',d.items.map(i=>`<li>${i.product_code} · ${esc(i.name)} · ${money(i.sale_price)} · <a href="/admin2/pc-builder?attach=${encodeURIComponent(i.product_code)}">구성표 붙이기</a></li>`).join(''));
     nobom+=d.items.length;$('#pc-cat-nobom-more').hidden=nobom>=d.total;}
   catch(e){$('#pc-cat-nobom-msg').textContent='조회 실패: '+(e.message||e);}
+  finally{nobomBusy=false;$('#pc-cat-nobom-more').disabled=false;}
 }
 $('#pc-cat-nobom-more').addEventListener('click',loadNoBom);
 loadNoBom();

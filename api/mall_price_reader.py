@@ -58,13 +58,10 @@ def _read_pc(code: int, timeout: float) -> dict:
 
 
 def _read_part(code: int, timeout: float) -> dict:
+    # 시간 제한은 요청마다 넘긴다. 예전에는 모듈 전역 mall.TIMEOUT 을 잠깐 바꿨다 되돌려,
+    # 동시에 도는 다른 요청(장바구니 3초 · 견적 6초)의 제한까지 바뀌었다(2026-10-11 코덱스 검수 #99).
     from . import mall
-    old = mall.TIMEOUT
-    mall.TIMEOUT = timeout
-    try:
-        r = mall._one(int(code))
-    finally:
-        mall.TIMEOUT = old
+    r = mall._one(int(code), timeout=timeout)
     return {"product_code": int(code), "ok": bool(r["ok"]), "price": r["price"],
             "err": r["err"], "url": PART_URL % int(code), "soldout": r.get("soldout", False)}
 

@@ -78,5 +78,36 @@ class AttachTarget(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 404)
 
 
+
+class AttachRetry(unittest.TestCase):
+    """코덱스 검수 #114: 첫 요청이 붙이고 응답을 잃으면, 같은 요청 번호의 재시도는 409 가 아니라 그 결과를 받는다."""
+
+    class Bound:
+        def __init__(self, found): self.found, self.sql = found, []
+        def execute(self, sql, params=None):
+            q = str(sql); self.sql.append((q, params))
+            if 'FROM products p' in q:
+                row = dict(product_code=120221, product_name='PC', sale_price=590000, status='판매중',
+                           part_type='PC_COMPLETE', bound=True)
+                return type('R', (), {'mappings': lambda _: type('M', (), {'first': lambda _: row})()})()
+            found = self.found
+            return type('R', (), {'scalar': lambda _: found})()
+
+    def body(self):
+        return A.Attach(product_code=120221, title='t', parts=[{'code': 1, 'quantity': 1}],
+                        request_id='req-0123456789abcdef')
+
+    def test_same_request_returns_the_first_result(self):
+        c = self.Bound('A0000000000000001')
+        out = A.attach_build(c, self.body(), {'operator_id': 1})
+        self.assertEqual(out, dict(configuration_id='A0000000000000001', status='review_required', reused=True))
+        self.assertEqual(c.sql[1][1], dict(offer='P120221', rid='req-0123456789abcdef', code='120221'))
+
+    def test_other_request_still_conflicts(self):
+        with self.assertRaises(HTTPException) as e:
+            A.attach_build(self.Bound(None), self.body(), {'operator_id': 1})
+        self.assertEqual(e.exception.status_code, 409)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -38,11 +38,17 @@ class Attach(Build):
     product_code: StrictInt = Field(gt=0)
 
 
-def target(c, code, lock=False):
+class AlreadyBound(Exception):
+    pass
+
+
+def target(c, code, lock=False, raise_bound=False):
     row = c.execute(text(TARGET_SQL + (' FOR UPDATE OF p' if lock else '')), dict(code=code)).mappings().first()
     if not row or row['part_type'] != 'PC_COMPLETE':
         raise HTTPException(404, '완제품 PC 상품이 아닙니다.')
     if row['bound']:
+        if raise_bound:
+            raise AlreadyBound()
         raise HTTPException(409, '이미 구성표가 붙은 상품입니다.')
     if row['status'] != '판매중' or not row['sale_price'] or row['sale_price'] <= 0:
         raise HTTPException(409, '판매중이고 판매가가 있는 완제품에만 구성표를 붙일 수 있습니다.')
@@ -58,9 +64,27 @@ def attach_target(product_code: int = Query(gt=0)):
                 note='고른 부품으로 이 완제품의 구성표를 만듭니다. 쇼핑몰 판매가는 바뀌지 않고, 고객 공개는 검토 뒤 따로 진행합니다.')
 
 
+def _same_request(c, code, request_id):
+    """이미 붙은 구성표가 «같은 요청»으로 붙은 것이면 그 구성을 돌려준다(응답을 못 받은 재시도)."""
+    return c.execute(text(
+        "SELECT c.configuration_id FROM pc_configuration_offers o"
+        " JOIN pc_configurations c ON c.configuration_id = o.configuration_id"
+        " WHERE o.offer_id = :offer AND c.content->'_admin_creation'->>'request_id' = :rid"
+        " AND c.content->'_admin_creation'->>'attached_product' = :code"),
+        dict(offer=f"P{code}", rid=request_id, code=str(code))).scalar()
+
+
 def attach_build(c, body, actor):
-    product = target(c, body.product_code, lock=True)
     build = Build(**body.model_dump(exclude={'product_code'}))
+    try:
+        product = target(c, body.product_code, lock=True, raise_bound=True)
+    except AlreadyBound:
+        # 첫 요청이 붙이고 응답만 잃었으면 같은 요청 번호로 다시 온다 — 409 대신 그 결과를 돌려준다
+        # (2026-10-11 코덱스 검수 #114 지적 반영). 다른 요청이면 그대로 409.
+        done = _same_request(c, body.product_code, build.request_id)
+        if done:
+            return dict(configuration_id=done, status='review_required', reused=True)
+        raise HTTPException(409, '이미 구성표가 붙은 상품입니다.')
     r, duplicate = prepare(c, build, lock=True)
     offer_id = f"P{product['product_code']}"
     if duplicate:

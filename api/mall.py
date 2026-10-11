@@ -52,7 +52,7 @@ def _field(html: str, name: str):
     return None
 
 
-def _one(code: int) -> dict:
+def _one(code: int, timeout: float | None = None) -> dict:
     """상품 하나의 몰 가격. 못 읽으면 price=None 으로 돌려준다 — **추측하지 않는다.**
 
     ■ 2026-08-20 추가 — `soldout` 필드
@@ -77,7 +77,7 @@ def _one(code: int) -> dict:
            "soldout": False}
     try:
         req = urllib.request.Request(DETAIL % code, headers={"User-Agent": UA})
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        with urllib.request.urlopen(req, timeout=timeout or TIMEOUT) as r:
             raw = r.read()
         html = raw.decode("utf-8", "ignore")
         # **「몰에 없는 상품」과 「0원인 상품」은 다르다.**
