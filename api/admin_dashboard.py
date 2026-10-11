@@ -31,6 +31,7 @@ from .admin_stock import pending_where
 # A-81 확정 이후: scope_note() = 「왜 세션 수가 줄었나」를 화면이 말할 문장(그 함수 참조).
 from .session_scope import session_scope_where, scope_note
 from .db import engine
+from . import admin_mvp3_consults as MC   # mvp3 시험 문의 기준의 정본
 from .taxonomy import CORE_TYPES, PART_LABELS
 
 router = APIRouter(prefix="/api/admin")
@@ -91,13 +92,14 @@ def dashboard():
         # 지금 고객 화면(mvp3)은 consult_sessions 를 쓰지 않는다 — 위 sess_today 에 안 잡힌다.
         # 그 화면이 남기는 두 표를 따로 센다(2026-10-11 품질관리). sessions_today 의 정의는
         # 바꾸지 않는다(회귀 [4834] 가 견적 상담 기록 today 와의 일치를 본다).
-        # 시험 문의(data_origin='test')는 빼고, 보관 시각(timestamptz)은 naive UTC 로 맞춘다.
+        # 시험 문의는 「고객 문의 · 보관 견적」 화면과 같은 기준으로 빼고(MC.HIT_IS_TEST),
+        # 보관 시각(timestamptz)은 naive UTC 로 맞춘다.
         mvp3_hits_today = conn.execute(text(
-            "SELECT COUNT(*) FROM talk_intent_hits WHERE data_origin = 'real'"
+            f"SELECT COUNT(*) FROM talk_intent_hits WHERE {MC._hit_origin(False)}"
             " AND created_at >= :lo AND created_at < :hi"), _t_params).scalar_one()
         mvp3_saved_today = conn.execute(text(
-            "SELECT COUNT(*) FROM mvp3_saved_recommendations"
-            " WHERE saved_at AT TIME ZONE 'UTC' >= :lo AND saved_at AT TIME ZONE 'UTC' < :hi"),
+            f"SELECT COUNT(*) FROM mvp3_saved_recommendations s WHERE {MC._saved_origin(False)}"
+            " AND saved_at AT TIME ZONE 'UTC' >= :lo AND saved_at AT TIME ZONE 'UTC' < :hi"),
             _t_params).scalar_one()
         orders = conn.execute(text(
             "SELECT status, COUNT(*) FROM orders GROUP BY status")).all()

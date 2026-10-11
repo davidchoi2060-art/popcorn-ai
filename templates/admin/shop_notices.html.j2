@@ -1,0 +1,119 @@
+{#
+  판매 안내 자료 (ADM-TLK-011 · 가칭) — 2026-10-11 신설
+
+  고객 상담 AI 가 운영체제·배송·A/S·결제·할인·여러 대·모니터 포함을 물으면 여기 적힌
+  안내로 답한다. 적지 않았거나 «미사용»이면 기본 안내가 나간다.
+  데이터 = `GET /api/admin/shop-notices` · 저장 `PUT /api/admin/shop-notices/{topic}`
+  (`api/admin_shop_notices.py` — 규칙 넷은 그 파일 docstring).
+
+  ■ 머리말은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
+  ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. 외부 자원 0.
+  ■ 서버가 준 문자열은 textContent / value 로만 넣는다(innerHTML 금지).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}판매 안내 자료{% endblock %}
+
+{% block head_extra %}
+<style>
+.sn-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px;max-width:980px}
+.sn-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.sn-card{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.sn-card h2{font-size:15px;margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sn-badge{font-size:12px;font-weight:500;border-radius:10px;padding:1px 8px;border:1px solid var(--rv-dim3);color:var(--rv-ink-soft);background:var(--rv-canvas)}
+.sn-badge.on{border-color:var(--rv-amber-line);background:var(--rv-amber-bg);color:var(--rv-ink)}
+.sn-live{font-size:13.5px;color:var(--rv-ink);background:var(--rv-panel);border-radius:6px;padding:8px 10px;margin:0}
+.sn-label{font-size:12.5px;color:var(--rv-muted)}
+.sn-card textarea{width:100%;box-sizing:border-box;min-height:72px;font:inherit;font-size:13.5px;border:1px solid var(--rv-dim3);border-radius:6px;padding:8px 10px;resize:vertical;background:var(--rv-card);color:var(--rv-ink)}
+.sn-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px}
+.sn-row label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.sn-row button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 14px;font:inherit;cursor:pointer}
+.sn-row button:disabled{opacity:.45;cursor:default}
+.sn-msg{color:var(--rv-muted)}
+.sn-msg.err{color:var(--rv-red)}
+.sn-count{margin-left:auto;color:var(--rv-faint);font-size:12px}
+@media (max-width:768px){.sn-wrap{padding:12px 16px 24px}}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sn-wrap" data-keep="1">
+  <p class="sn-note">고객이 이 주제를 물으면 AI 답 대신 아래 「지금 고객에게 나가는 안내」가 나갑니다. 비워 두면 기본 안내가 나갑니다. 바꾸기는 대표 권한만 할 수 있습니다.</p>
+  <div id="snList"><p class="sn-note">불러오는 중입니다.</p></div>
+</div>
+<script>
+(function(){
+  var API = '/api/admin/shop-notices';
+  var list = document.getElementById('snList');
+  var maxLen = 400;
+
+  function el(tag, cls, txt){
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt != null) e.textContent = txt;
+    return e;
+  }
+
+  function card(it){
+    var c = el('section', 'sn-card');
+    c.setAttribute('data-topic', it.topic_key);
+    var h = el('h2', null, it.label);
+    var badge = el('span', 'sn-badge' + (it.live_source === 'written' ? ' on' : ''),
+                   it.live_source === 'written' ? '적은 안내 사용 중' : '기본 안내 사용 중');
+    h.appendChild(badge);
+    c.appendChild(h);
+    c.appendChild(el('span', 'sn-label', '지금 고객에게 나가는 안내'));
+    c.appendChild(el('p', 'sn-live', it.live_text));
+    c.appendChild(el('span', 'sn-label', '우리 가게 안내 적기'));
+    var ta = el('textarea');
+    ta.value = it.body || '';
+    ta.maxLength = maxLen;
+    ta.placeholder = '예: ' + it.default_text;
+    c.appendChild(ta);
+    var row = el('div', 'sn-row');
+    var lab = el('label');
+    var chk = el('input'); chk.type = 'checkbox'; chk.checked = it.status === '사용';
+    lab.appendChild(chk); lab.appendChild(document.createTextNode(' 이 안내를 고객에게 사용'));
+    var btn = el('button', null, '저장');
+    var msg = el('span', 'sn-msg', it.updated_at ? '마지막 저장 ' + new Date(it.updated_at).toLocaleString('ko-KR') : '');
+    var cnt = el('span', 'sn-count');
+    function count(){ cnt.textContent = ta.value.length + ' / ' + maxLen; }
+    ta.addEventListener('input', count); count();
+    btn.addEventListener('click', function(){
+      btn.disabled = true; msg.className = 'sn-msg'; msg.textContent = '저장하는 중입니다.';
+      fetch(API + '/' + encodeURIComponent(it.topic_key), {method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({body: ta.value, status: chk.checked ? '사용' : '미사용'})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+      .then(function(x){
+        if (!x.ok) throw new Error((x.d && x.d.detail) || '저장하지 못했습니다');
+        load(it.topic_key, x.d.note);
+      })
+      .catch(function(e){ msg.className = 'sn-msg err'; msg.textContent = e.message; btn.disabled = false; });
+    });
+    row.appendChild(lab); row.appendChild(btn); row.appendChild(msg); row.appendChild(cnt);
+    c.appendChild(row);
+    return c;
+  }
+
+  function load(focusKey, note){
+    fetch(API).then(function(r){
+      if (!r.ok) throw new Error('안내 자료를 불러오지 못했습니다');
+      return r.json();
+    }).then(function(d){
+      maxLen = d.max_len || maxLen;
+      list.textContent = '';
+      d.items.forEach(function(it){
+        var c = card(it);
+        if (it.topic_key === focusKey && note) c.querySelector('.sn-msg').textContent = note;
+        list.appendChild(c);
+      });
+    }).catch(function(e){
+      list.textContent = '';
+      list.appendChild(el('p', 'sn-note', e.message));
+    });
+  }
+  load();
+})();
+</script>
+{% endblock %}
