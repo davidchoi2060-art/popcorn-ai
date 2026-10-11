@@ -24,6 +24,13 @@ class PriceBasis(unittest.TestCase):
         self.assertEqual(F.price_basis(datetime(2026, 10, 1, 1, 0), 'manual'),
                          '10월 1일 기준 판매가 · 구매할 때 확정')
 
+    def test_mall_price_sync_counts_as_mall_price(self):
+        # 2026-10-11 자동 갱신 첫 실행 뒤에도 「9월 28일」이 아니라 그날 날짜 · 쇼핑몰 가격으로 말해야 한다
+        for r in ('mall_price_auto', 'mall_price_upload', 'mall_price_cart', 'mall_price_checkout'):
+            self.assertEqual(F.price_basis(datetime(2026, 10, 11, 3, 20), r),
+                             '10월 11일 기준 쇼핑몰 가격 · 구매할 때 확정')
+        self.assertTrue(F.price_basis(datetime(2026, 10, 11, 3, 20), 'mall_price_auto_undo').startswith('10월 11일 기준 판매가'))
+
     def test_no_history_says_unknown(self):
         self.assertIn('기준일 미확인', F.price_basis(None, None))
 

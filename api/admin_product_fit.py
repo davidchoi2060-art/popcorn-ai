@@ -56,12 +56,18 @@ def band_of(price):
 PRICE_CONFIRM = "구매할 때 확정"
 
 
+def from_mall(reason):
+    """쇼핑몰 값을 그대로 옮긴 변경인가 — CSV 적재와 쇼핑몰 가격 반영(api/mall_price: 업로드·자동 갱신·
+    장바구니·결제 확인). 반영을 되돌린 행(`_undo`)은 쇼핑몰 값이 아니다."""
+    return reason == "csv" or (bool(reason) and reason.startswith("mall_price_") and not reason.endswith("_undo"))
+
+
 def price_basis(sale_at, reason):
     """판매가 출처 문구 — 마지막 판매가 변경 날짜와 경로. 이력이 없으면 기준일을 모른다고 적는다."""
     if sale_at is None:
         return "쇼핑몰 판매가(기준일 미확인) · " + PRICE_CONFIRM
     day = sale_at + timedelta(hours=9) if sale_at.tzinfo is None else sale_at.astimezone(KST)
-    where = "쇼핑몰 가격" if reason == "csv" else "판매가"
+    where = "쇼핑몰 가격" if from_mall(reason) else "판매가"
     return f"{day.month}월 {day.day}일 기준 {where} · {PRICE_CONFIRM}"
 
 
