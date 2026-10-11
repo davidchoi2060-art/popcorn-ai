@@ -66,6 +66,25 @@ class NoGameNudgeInSmallTalk(unittest.TestCase):
         r = _turn('주말 뭐 하지', '푹 쉬세요. 영화나 게임도 좋죠.')
         self.assertEqual(r['reply'], '푹 쉬세요.')
 
+    def test_compound_words_with_game_stay_intact(self):
+        # 코덱스 #150 검수 P2: 합성어 끝의 「게임이나」를 지우면 「보드독서」처럼 문장이 깨졌다.
+        cases = {
+            '보드게임이나 독서를 해보세요.': '보드게임이나 독서를 해보세요.',
+            '비디오게임, 영화 감상도 좋아요.': '비디오게임, 영화 감상도 좋아요.',
+            '미니게임이 들어 있는 앱도 있어요.': '미니게임이 들어 있는 앱도 있어요.',
+            '게임기는 거실에 두면 좋아요.': '게임기는 거실에 두면 좋아요.',
+        }
+        for reply, want in cases.items():
+            with self.subTest(reply=reply):
+                self.assertEqual(talk.drop_game_nudge(reply), want)
+                self.assertEqual(_turn('심심해', reply)['reply'], want)
+
+    def test_standalone_option_next_to_compound_is_still_removed(self):
+        self.assertEqual(talk.drop_game_nudge('게임이나 보드게임 말고 산책도 좋아요.'),
+                         '보드게임 말고 산책도 좋아요.')
+        self.assertEqual(talk.drop_game_nudge('쉬거나 겜, 보드게임도 좋죠.'), '쉬거나 보드게임도 좋죠.')
+        self.assertEqual(talk.drop_game_nudge('독서나 게임이나 산책도 좋아요.'), '독서나 산책도 좋아요.')
+
     def test_prompt_says_not_to_open_with_games(self):
         self.assertIn('게임 이야기도 먼저 꺼내지 않는다', talk.SMALLTALK_BLOCK)
 
