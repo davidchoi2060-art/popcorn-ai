@@ -131,7 +131,7 @@ def ask_ours(text: str, state=None, chat_flow=None, history=None) -> dict:
 
 def _spec_line(spec) -> str:
     if isinstance(spec, dict):
-        vals = [str(v) for v in spec.values() if isinstance(v, (str, int, float)) and str(v).strip()]
+        vals = ["%s %s" % (k, v) for k, v in spec.items() if isinstance(v, (str, int, float)) and str(v).strip()]
     elif isinstance(spec, list):
         vals = [str(v.get("value") or v.get("v") or "") if isinstance(v, dict) else str(v) for v in spec]
     else:
@@ -195,7 +195,7 @@ def repo_model() -> str:
 _client = None
 
 
-def _claude(messages: list, system: str | None = None, max_tokens: int = 1200) -> str:
+def _claude(messages: list, system: str | None = None, max_tokens: int = 8000) -> str:
     global _client
     import anthropic
     if _client is None:
@@ -204,7 +204,12 @@ def _claude(messages: list, system: str | None = None, max_tokens: int = 1200) -
     if system:
         kw["system"] = system
     resp = _client.messages.create(**kw)
-    return "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+    out = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
+    if not out:
+        # 2026-10-11 첫 실행: 상한(1200)이 모자라 글 없이 끝난 응답이 86개 중 21개였다(빈 답과 비교하면
+        # 판정이 거짓이 된다). 빈 글은 실패로 올려 「측정 못함」으로 적는다.
+        raise RuntimeError("empty text (stop_reason=%s)" % getattr(resp, "stop_reason", None))
+    return out
 
 
 def ask_generic(q: dict) -> str:
@@ -253,7 +258,7 @@ def judge(q: dict, ours: str, generic: str, rng: random.Random) -> dict:
         q_text = q_text[:1200] + "\n...(중략)...\n" + q_text[-600:]
     prompt = ("손님 질문:\n%s\n\n좋은 답의 기준: %s\n\n[답 A]\n%s\n\n[답 B]\n%s"
               % (q_text if q_text.strip() else "(빈 입력)", q["criterion"], a or "(빈 답)", b or "(빈 답)"))
-    raw = _claude([{"role": "user", "content": prompt}], system=JUDGE_SYSTEM, max_tokens=300)
+    raw = _claude([{"role": "user", "content": prompt}], system=JUDGE_SYSTEM, max_tokens=4000)
     m = re.search(r"\{.*\}", raw, re.S)
     try:
         j = json.loads(m.group(0)) if m else {}
@@ -295,7 +300,7 @@ def cmd_run(args) -> int:
                 row.update(judge(q, row["ours"], row["generic"], rng))
             except Exception as e:                               # noqa: BLE001
                 row.setdefault("generic", "")
-                row.update(verdict=UNMEASURED, reason="일반 AI·심판 호출 실패: %s" % type(e).__name__)
+                row.update(verdict=UNMEASURED, reason="일반 AI·심판 호출 실패: %s %s" % (type(e).__name__, str(e)[:80]))
         print("%s  %s  %s" % (row["id"], row["verdict"], row.get("reason", "")), flush=True)
         rows.append(row)
     (out / "rows.json").write_text(json.dumps({"base": BASE, "model": model, "rows": rows},
