@@ -196,6 +196,11 @@ REASON_TARGETS = {
     "sourcing": {"target_label": "매입 견적(용산)", "target_path": None},
     "csv": {"target_label": "상품 일괄 등록",
             "target_path": "/admin2/catalog-import"},  # api/admin_ui_catalog_import.py 실측(연결 전)
+    # 2026-10-11 — api/admin_ui_mall_price.py 의 @router.get("/mall-price")
+    **{r: {"target_label": "쇼핑몰 가격 반영", "target_path": "/admin2/mall-price"}
+       for r in ("mall_price_file", "mall_price_auto", "mall_price_manual",
+                 "mall_price_cart", "mall_price_checkout", "mall_price_file_undo",
+                 "mall_price_auto_undo", "mall_price_manual_undo")},
 }
 
 
