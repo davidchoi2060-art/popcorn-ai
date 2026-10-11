@@ -273,19 +273,26 @@ def is_game_nudge(sentence: str) -> bool:
 
 # 「게임을 하거나 영상」·「게임이나 영화」·「게임, 영상」처럼 게임을 여러 할 거리 중 하나로 끼운 자리.
 # 그 항목만 빼면 나머지 문장이 그대로 선다(2026-10-11 개발 서버 실측 -- 프롬프트만으로 안 멈췄다).
-_GAME_OPTION = re.compile(r"(?:게임|겜)(?:을\s*하거나|하거나|이나|,)\s*")
+# 낱말 경계: 게임·겜 바로 앞이 한글·영숫자면 합성어(보드게임·미니게임·비디오게임)의 끝이라
+# 그 자리를 지우면 「보드독서」처럼 문장이 깨진다(코덱스 #150 검수 P2). 합성어 안의 게임은
+# 걷지도, 문장째 빼지도 않는다 -- 홀로 선 「게임」·「겜」 낱말만 대상이다. 뒤에 명사가 붙은
+# 합성어(게임기·게임패드)도 같은 이유로 홀로 선 낱말로 세지 않는다.
+_GAME_BOUNDARY = r"(?<![가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9])"
+_GAME_OPTION = re.compile(_GAME_BOUNDARY + r"(?:게임|겜)(?:을\s*하거나|하거나|이나|,)\s*")
+_GAME_STANDALONE = re.compile(_GAME_BOUNDARY + r"(?:게임|겜)(?!기|패드)")
 
 
 def drop_game_nudge(reply: str) -> str:
     """고객이 게임을 꺼내지 않은 잡담 답에서 AI 가 먼저 꺼낸 게임 이야기를 걷는다.
 
     할 거리 목록에 끼운 게임은 그 항목만 빼고, 그래도 게임이 남는 문장은 통째로 뺀다.
+    합성어(보드게임·미니게임·게임기) 속 게임은 홀로 선 낱말이 아니므로 건드리지 않는다.
     """
     parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
     kept = []
     for p in parts:
         p = _GAME_OPTION.sub("", p)
-        if _GAME_WORD.search(p):
+        if _GAME_STANDALONE.search(p):
             continue
         kept.append(p)
     return "".join(kept).strip()
