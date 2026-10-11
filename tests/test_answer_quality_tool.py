@@ -39,7 +39,7 @@ def _combine(tmp_path, verdicts, gate=True):
              "generic": "b", "verdict": v, "reason": "r"} for i, v in enumerate(verdicts, 1)]
     (d / "rows.json").write_text(json.dumps({"base": "x", "model": "m", "rows": rows}), encoding="utf-8")
     args = type("A", (), {"dirs": [str(d)], "report": str(tmp_path / "r.md"), "summary": None,
-                          "gate": gate, "require_judge": False})
+                          "gate": gate, "require_judge": False, "print_rows": True})
     return C.cmd_combine(args)
 
 

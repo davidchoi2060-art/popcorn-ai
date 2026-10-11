@@ -128,7 +128,7 @@ jobs:
       - name: 합치기 · 판정
         run: >-
           python tools/quality/compare.py combine shards/*
-          --report report/answer-quality.md --summary "$GITHUB_STEP_SUMMARY"
+          --report report/answer-quality.md --summary "$GITHUB_STEP_SUMMARY" --print-rows
           ${{ needs.plan.outputs.gate == 'true' && '--gate' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()

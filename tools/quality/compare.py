@@ -354,6 +354,11 @@ def cmd_combine(args) -> int:
             if worse:
                 f.write("\n".join(["", "## 우리가 못한 답", ""] + ["- **%s** %s — %s" % (
                     r["id"], _cell(r["question"], 80), r["reason"]) for r in worse]) + "\n")
+    if args.print_rows:
+        # 산출물(zip)을 못 받는 곳에서도 작업 기록만으로 결과를 되짚을 수 있게 한 줄씩 남긴다.
+        for r in rows:
+            print("ROW " + json.dumps({k: r.get(k) for k in ("id", "question", "ours", "generic", "verdict", "reason")},
+                                      ensure_ascii=False))
     print("못함 %d · 비슷 %d · 나음 %d · 측정 못함 %d" % (count[WORSE], count[SAME], count[BETTER], count[UNMEASURED]))
     if args.gate and count[WORSE]:
         print("::error::일반 AI 보다 못한 답 %d개" % count[WORSE])
@@ -380,6 +385,7 @@ def main() -> int:
     c.add_argument("--report", required=True)
     c.add_argument("--summary", default=None)
     c.add_argument("--gate", action="store_true", help="우리가 못함이 하나라도 있으면 실패")
+    c.add_argument("--print-rows", action="store_true", help="결과를 한 줄 JSON 으로 작업 기록에 남긴다")
     c.add_argument("--require-judge", action="store_true", help="판정이 하나도 없으면 실패")
     a = ap.parse_args()
     return cmd_run(a) if a.cmd == "run" else cmd_combine(a)
