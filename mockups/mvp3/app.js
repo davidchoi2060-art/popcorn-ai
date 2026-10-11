@@ -204,6 +204,17 @@ function productCard(product,action='detail',id=product.index,comparison=null){
     (product.over_budget?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
     button(strong?'추천 견적 자세히 보기'+uiIcon('arrow-right'):'구성 자세히 보기',action,(strong?'primary':'outline')+' card-detail','data-id="'+esc(id)+'"')+'</section>';
 }
+// 새로 나온 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 나온 PC」 화면으로 보낸다.
+// 용도 적합도는 서버 판정(fit · 정보 없음)을 그대로 적는다 — 정보가 없어도 숨기지 않는다(2026-10-10 결정).
+function customCards(group){
+  if(!group.custom?.length)return '';
+  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립PC</h4><div class="quote-cards">'+group.custom.map(c=>
+    '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 나온 PC</span><h3>'+esc(c.title)+'</h3>'+
+    '<strong class="price">'+money(c.price)+'</strong><p class="muted">'+esc(c.price_note)+'</p>'+
+    '<p class="custom-pc-fit">용도 적합도: '+esc(c.fit==='fit'?c.level_text:'정보 없음')+'</p>'+
+    (c.parts.length?'<dl class="live-card-spec">'+c.parts.map(x=>'<div><dt>'+esc(x.slot_label)+'</dt><dd>'+esc(x.name)+(x.quantity>1?' × '+x.quantity:'')+'</dd></div>').join('')+'</dl>':'')+
+    '<a class="outline card-detail custom-pc-link" href="'+esc(c.url)+'">자세히 보기 · 구매 상담</a></section>').join('')+'</div></section>';
+}
 function renderResults(){
   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
@@ -215,7 +226,7 @@ function renderResults(){
   view.innerHTML=heading('나에게 맞는 PC',false,subtitle,true)+errorPanel()+
     groups.map(group=>{const ctx=group.game_context,url=M.safeUrl(ctx?.source.url);return '<section class="live-result-group">'+groupHeading(group)+
       (group.empty_note?'<p class="muted">'+esc(group.empty_note)+'</p>':'')+
-      (group.products.length?'<div class="'+cardsClass(group)+'">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n>0?group.products[n-1]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+
+      (group.products.length?'<div class="'+cardsClass(group)+'">'+group.products.map((p,n)=>productCard(p,'detail',p.index,n>0?group.products[n-1]:null)).join('')+'</div>':'<div class="empty small-empty"><h3>'+esc(group.empty_reason||'추천 상품이 없어요')+'</h3><p>조건을 더 알려주시거나 예산·용도를 바꿔주세요.</p></div>')+customCards(group)+
       (ctx?'<div class="live-explanation"><h4>게임 안내 · '+esc(ctx.game_name)+'</h4><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</div>':'')+'</section>';}).join('')+
     (!hasProducts&&!groups.length?'<div class="empty"><h3>'+(state.missing.length?'조건을 조금 더 알려주세요':'현재 조건의 추천 상품이 없어요')+'</h3><p>상담은 계속할 수 있어요. 예산이나 사용 목적을 알려주세요.</p></div>':'')+
     (hasProducts&&exploreButtons('outline small')?'<div class="explore-choices" role="group" aria-label="다른 구성 보기">'+exploreButtons('outline small')+'</div>':'')+

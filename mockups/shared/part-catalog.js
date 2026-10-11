@@ -39,7 +39,7 @@ async function loadNoBom(){
   try{const r=await fetch('/api/admin/part-catalog/pcs-without-bom?offset='+nobom+'&limit=20',{credentials:'same-origin'});
     if(!r.ok)throw new Error('오류 '+r.status);const d=await r.json();
     $('#pc-cat-nobom-count').textContent=d.total+'개';$('#pc-cat-nobom-msg').textContent=d.note;
-    $('#pc-cat-nobom-list').insertAdjacentHTML('beforeend',d.items.map(i=>`<li>${i.product_code} · ${esc(i.name)} · ${money(i.sale_price)}</li>`).join(''));
+    $('#pc-cat-nobom-list').insertAdjacentHTML('beforeend',d.items.map(i=>`<li>${i.product_code} · ${esc(i.name)} · ${money(i.sale_price)} · <a href="/admin2/pc-builder?attach=${encodeURIComponent(i.product_code)}">구성표 붙이기</a></li>`).join(''));
     nobom+=d.items.length;$('#pc-cat-nobom-more').hidden=nobom>=d.total;}
   catch(e){$('#pc-cat-nobom-msg').textContent='조회 실패: '+(e.message||e);}
 }

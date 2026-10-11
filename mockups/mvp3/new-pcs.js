@@ -41,7 +41,10 @@ function card(x){
 }
 function draw(){list.innerHTML=items.length?items.map(card).join(''):'<p class="muted">지금 공개된 새 PC가 없어요. PC 상담에서 원하는 조건을 말씀해 주시면 맞는 PC를 찾아 드려요.</p>';}
 async function load(){
-  try{const d=await call('GET','/api/mvp3/custom-pcs');items=d.items||[];if(d.note)noteEl.textContent=d.note;draw();}
+  try{const d=await call('GET','/api/mvp3/custom-pcs');items=d.items||[];if(d.note)noteEl.textContent=d.note;draw();
+    // 추천 카드의 「자세히 보기」(new-pcs.html#구성번호)에서 왔으면 그 PC 로 바로 간다.
+    const id=decodeURIComponent(location.hash.slice(1));const target=id&&list.querySelector(`[data-pc="${CSS.escape(id)}"]`);
+    if(target){target.classList.add('is-target');target.scrollIntoView?.({block:'start'});}}
   catch(e){list.innerHTML=`<p class="new-pc-error" role="alert">목록을 불러오지 못했어요. ${esc(e.message)}</p>`;}
 }
 list.addEventListener('click',async e=>{
