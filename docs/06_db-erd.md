@@ -1876,3 +1876,17 @@ basis는 content(검토/편집 메타 제외), parts, offers, 현재 부품 설�
 | created_at · updated_at | TIMESTAMPTZ | |
 
 CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해상도면 예산 칸은 NULL). 같은 종류에서 여러 규칙이 맞으면 긴 표현이 먼저다. 행을 지우지 않는다 — «미사용»으로 내린다. 시드 행은 없고 기존 표·데이터는 건드리지 않는다. downgrade 는 행이 하나라도 있으면 거부한다.
+
+### 33. 견적 상담 기록 — 처리 상태 · 메모 (2026-10-11, 0152)
+
+`consult_session_notes` 를 새로 둔다. 「견적 상담 기록」(ADM-ORD-010) 상세에서 관리자가 상담 한 건의 처리 상태(`대기` · `처리 중` · `완료`)와 메모(1,000자까지)를 남긴다. 상담 원장 `consult_sessions` 는 재현성 소명 근거라 바꾸지 않는다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| session_id | BIGINT PK FK consult_sessions | 상담 한 건에 한 행 |
+| status | VARCHAR(8) | `대기`(기본) · `처리 중` · `완료` |
+| memo | VARCHAR(1000) | |
+| updated_by | BIGINT | 운영자 |
+| created_at · updated_at | TIMESTAMPTZ | |
+
+행은 저장할 때 생기고, 행이 없으면 화면은 «대기»로 본다. 저장은 운영자 이상만 한다. 행을 지우지 않는다. 시드 행은 없다. downgrade 는 행이 하나라도 있으면 거부한다.

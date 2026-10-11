@@ -198,6 +198,16 @@ button{font-family:inherit}
 .dw-body{flex:1;min-height:0;overflow:auto;padding:15px 18px;display:flex;flex-direction:column;gap:16px}
 .dw-cap{font:600 10.5px/1 var(--rv-font);color:var(--rv-faint);letter-spacing:.04em;margin-bottom:8px}
 .dw-note{font:400 10.5px/1.6 var(--rv-font);color:var(--rv-dim);margin:-4px 0 8px}
+.notebox{display:flex;flex-direction:column;gap:7px;padding:10px 12px;border:1px solid var(--outline-variant);border-radius:8px;background:var(--rv-panel)}
+.notebox .dw-cap{margin-bottom:0}
+.noterow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.notelbl{font:600 11px/1 var(--rv-font);display:flex;align-items:center;gap:6px}
+.notebox select,.notebox textarea{border:1px solid var(--outline);border-radius:6px;background:var(--rv-card);font:400 12px/1.5 var(--rv-font);color:var(--rv-ink)}
+.notebox select{height:28px;padding:0 6px}
+.notebox textarea{width:100%;box-sizing:border-box;padding:6px 8px;resize:vertical}
+.notebtn{height:28px;padding:0 14px;border:none;border-radius:6px;background:var(--rv-ink);color:var(--rv-card);font:600 11.5px/1 var(--rv-font);cursor:pointer}
+.notebtn[disabled]{opacity:.5;cursor:default}
+.notetag{font-weight:600;color:var(--rv-amber)}
 .dw-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);padding:11px 18px;background:var(--rv-panel);
         font:400 10.5px/1.5 var(--rv-font);color:var(--rv-faint)}
 
@@ -542,7 +552,9 @@ button{font-family:inherit}
       '<span class="sid num">#' + it.session_id + '</span>' +
       '<span class="at">' + esc(fmtTime(it.at)) + '</span>' +
       '<span class="modecell"><span class="modedot" style="background:' + color + '"></span>' + esc(it.mode_label || it.mode) + '</span>' +
-      '<span class="cons" title="' + esc(it.summary || '') + '">' + esc(it.summary || '제약 없음') + '</span>' +
+      '<span class="cons" title="' + esc(it.summary || '') + '">' +
+        (it.note_status && it.note_status !== '대기' ? '<b class="notetag">[' + esc(it.note_status) + ']</b> ' : '') +
+        esc(it.summary || '제약 없음') + '</span>' +
       '<span class="result num">' + (it.rep ? esc(it.result) : '—') + '</span>' +
       '<span class="stchip ' + sm.cls + '"' + (tip ? ' title="' + esc(tip) + '"' : '') + '>' + esc(sm.label) + '</span>' +
       '</div>';
@@ -646,6 +658,48 @@ button{font-family:inherit}
     }).join('');
   }
 
+  // ── 처리 기록(2026-10-11 개편 16번 · 0152) — 상담 원장은 그대로 두고 상태·메모만 남긴다 ──
+  function noteHtml(item) {
+    if (!S.data.notes_ready) {
+      return '<div><div class="dw-cap">처리 기록</div><div class="dw-note">처리 기록 표가 아직 없습니다(마이그레이션 0152 전). 조회만 할 수 있습니다.</div></div>';
+    }
+    var opts = (S.data.note_statuses || []).map(function (st) {
+      return '<option value="' + esc(st) + '"' + (st === item.note_status ? ' selected' : '') + '>' + esc(st) + '</option>';
+    }).join('');
+    return '<div class="notebox"><div class="dw-cap">처리 기록</div>' +
+      '<div class="noterow"><label class="notelbl">상태 <select id="noteStatus">' + opts + '</select></label>' +
+      '<span class="dw-note" style="margin:0">' + (item.note_at ? '최근 저장 ' + esc(fmtTime(item.note_at)) : '저장된 기록 없음') + '</span></div>' +
+      '<textarea id="noteMemo" maxlength="1000" rows="3" placeholder="연락 여부 · 확인한 내용(1,000자까지)"></textarea>' +
+      '<div class="noterow"><button type="button" id="noteSave" class="notebtn">저장</button><span id="noteMsg" class="dw-note" style="margin:0"></span></div></div>';
+  }
+  function bindNote(item) {
+    var btn = $('noteSave');
+    if (!btn) return;
+    $('noteMemo').value = item.note_memo || '';
+    btn.addEventListener('click', function () {
+      var msg = $('noteMsg');
+      btn.disabled = true;
+      fetch('/api/admin/sessions/' + item.session_id + '/note', {
+        method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: $('noteStatus').value, memo: $('noteMemo').value })
+      }).then(function (r) {
+        return r.json().catch(function () { return null; }).then(function (j) { return { r: r, j: j }; });
+      }).then(function (x) {
+        if (!x.r.ok) {
+          var P = window.popcornProgress;
+          msg.textContent = P && P.errText ? P.errText(x.j, x.r.status, '처리 기록') : ((x.j && x.j.detail) || ('오류 ' + x.r.status));
+          msg.style.color = 'var(--rv-red)';
+          return;
+        }
+        item.note_status = x.j.status; item.note_memo = x.j.memo; item.note_at = new Date().toISOString();
+        msg.textContent = x.j.note; msg.style.color = 'var(--rv-green)';
+        renderTable();
+      }).catch(function () {
+        msg.textContent = '서버에 연결하지 못했습니다'; msg.style.color = 'var(--rv-red)';
+      }).then(function () { btn.disabled = false; });
+    });
+  }
+
   function renderDrawer() {
     var item = (S.drawerOpen && S.sel != null) ? findItem(S.sel) : null;
     $('scrim').hidden = !item;
@@ -665,7 +719,7 @@ button{font-family:inherit}
       : '방문자 키 미발급';
 
     var dropped = !item.snapshots || !item.snapshots.length;
-    var html = '';
+    var html = noteHtml(item);
 
     html += '<div><div class="dw-cap">① 제약 객체 — 원문 그대로</div>' +
       '<div class="dw-note">상담 시작 시점의 제약을 그대로 저장합니다 — 나중에 이 값이 바뀌지 않습니다.</div>' +
@@ -731,6 +785,7 @@ button{font-family:inherit}
       '<div class="distbox">' + distRows() + '</div></div>';
 
     $('dwBody').innerHTML = html;
+    bindNote(item);
 
     var allItems = S.data.items || [];
     var nullCnt = allItems.filter(function (it) { return !it.member; }).length;
