@@ -37,8 +37,9 @@ ADVICE_TIMEOUT_SEC = 10
 TASK_KEY = "task.talk_answer"
 
 _PC_WORD = re.compile(r"pc|피시|컴퓨터|컴\b|본체|데스크\s*[탑톱]|조립", re.I)
-_REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\s*싶|구매|구입|구성|뭐가\s*좋|어떤\s*게\s*좋|"
-                      r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양")
+_REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\s*싶|구매|구입|구성|뭐가\s*좋|어떤\s*게\s*좋|짜\s*줘|짜\s*주|"
+                      r"어떤\s*(pc|피시|컴퓨터|컴|본체|사양)\S{0,2}\s*(좋|괜찮|필요|돼|되)|"
+                      r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양", re.I)
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
@@ -69,11 +70,22 @@ def usage_hits(sentence: str, vocab) -> list[str]:
     return out
 
 
-def topic_of(sentence: str, vocab) -> str | None:
-    """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | None."""
+# 게임 이름이 든 문장이 «PC 이야기»인가 -- PC·부품 낱말, 예산 숫자, 구성·사양·견적 낱말(「롤 같은 게임 추천해줘」는
+# 게임 이야기라 아니다). 2026-10-11 일반 AI 비교 R01·R23: 「120만원 롤·오버워치·로아 구성 짜줘」에 게임 소개와
+# 「PC 구성은 답변하지 않습니다」가 나갔다.
+_PC_INTENT = re.compile(r"\d+\s*만\s*원?|예산|구성|사양|견적|맞추|맞춰|짜\s*줘|짜\s*주|프레임|fps|옵션", re.I)
+
+
+def pc_intent(sentence: str) -> bool:
+    s = sentence or ""
+    return bool(_PC_WORD.search(s) or _PART.search(s) or _PC_INTENT.search(s))
+
+
+def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
+    """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | general | None. game=True 면 게임 이름을 용도로 친다."""
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
-    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc))
+    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game))
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
@@ -137,7 +149,7 @@ _BUILD_WITH_GENERAL = (" 고객이 배송·설치·환불·운영체제 같은 �
 
 
 def build_prompt(sentence: str, basis: list[str], history: list | None = None,
-                 topic: str = TOPIC_BUILD) -> str:
+                 topic: str = TOPIC_BUILD, games: list[str] | None = None) -> str:
     hist = ["%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in (history or [])][-4:]
     lines = [
         "당신은 PC 판매점의 상담원이다. 고객이 PC 에 대해 물었다. 일반 AI 에게 물었을 때처럼 먼저 답한다.",
@@ -145,6 +157,9 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "",
         "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD])
         + (_BUILD_WITH_GENERAL if topic == TOPIC_BUILD and _GENERAL.search(sentence or "") else ""),
+        *(["[고객이 말한 게임] " + ", ".join(games) + " -- 게임 소개·역사·장르·인기 설명은 쓰지 않는다."
+            " 이 게임들이 가벼운지 무거운지, 그래서 그래픽카드·CPU·램 중 무엇이 체감을 좌우하는지만 말한다."]
+          if games else []),
         "[말투] 쉬운 한국어 존댓말(~요). 강조 기호(**)·목록 기호 없이 문장으로 쓴다. 감사 인사로 시작하지 않는다."
         " %d자 이내." % ADVICE_MAX_LEN,
         "",
@@ -203,7 +218,7 @@ def clean(raw: str, topic: str | None = None) -> tuple[str, list[dict]]:
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
-           timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD):
+           timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD, games: list[str] | None = None):
     """[B] 의 PC 갈래 -- res(AnswerResult)를 채워 돌려준다. 예외를 올리지 않는다."""
     t0 = time.time()
     res.kind = "pc_advice"
@@ -215,7 +230,7 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         except Exception as e:  # noqa: BLE001 - 기준표를 못 읽어도 일반 설명은 낸다
             log.warning("[talk-advice] fit levels unavailable: %s", type(e).__name__)
             basis = []
-        out = llm.call(build_prompt(sentence, basis, history, topic), task_key=TASK_KEY,
+        out = llm.call(build_prompt(sentence, basis, history, topic, games), task_key=TASK_KEY,
                        customer_facing=True, max_output_tokens=ADVICE_MAX_TOKENS,
                        timeout_sec=int(min(ADVICE_TIMEOUT_SEC, timeout_sec)))
         res.provider, res.model = out.provider, out.model
