@@ -17,7 +17,8 @@ from fastapi.testclient import TestClient
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / 'api/admin_ui_commerce_orders.py'
 NAV = ROOT / 'api/admin_nav.py'
-NAV_BASELINE_AST_SHA = '8ae6f3af9d0aacaca4f5f735026d4b9ea64bb4d6b1cd6e0d44032f2831a4daa7'
+# 2026-10-11: 「고객 문의 · 보관 견적」(/admin2/mvp3-consults) 메뉴 추가로 기대 지문 갱신
+NAV_BASELINE_AST_SHA = '40e028a1700e28aee57d1ba0a2670c202951d265c7d3c0c80577295f9f58c6df'
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'

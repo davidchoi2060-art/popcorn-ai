@@ -67,6 +67,8 @@
 .dash-flow .metric{display:flex;align-items:baseline;gap:6px}
 .dash-flow .metric b{font:600 19px/1 var(--font-num)}
 .dash-flow .metric span{font:400 10.5px/1 var(--font);color:var(--rv-ink-soft)}
+.dash-flow a.metric{color:inherit;text-decoration:none}
+.dash-flow a.metric:hover span{text-decoration:underline}
 .dash-flow .arrow{color:var(--rv-dim3)}
 .dash-flow .grow{flex:1}
 .dash-flow .pending{display:flex;align-items:center;gap:7px;color:var(--rv-dim);white-space:nowrap}
@@ -188,6 +190,10 @@
       <span class="metric" title="{{ flow.quoted.reason or '' }}">
         <b>{{ flow.quoted.value_fmt }}</b><span>견적 성립 (오늘 기준)</span>
       </span>
+      <span class="arrow">·</span>
+      <a class="metric" href="/admin2/mvp3-consults" title="{{ flow.mvp3.reason or '' }}">
+        <b>{{ flow.mvp3.value_fmt }}</b><span>고객 화면 문의{% if flow.mvp3.status == 'ok' %} (보관 {{ flow.mvp3.saved_fmt }}){% endif %}</span>
+      </a>
       <span class="arrow">→</span>
       <span class="pending">
         <span>몰 인계</span><span class="tag">아직 연결되지 않음</span>
