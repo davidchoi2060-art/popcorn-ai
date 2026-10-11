@@ -2,7 +2,7 @@
 (function(root){'use strict';
   const M=typeof module!=='undefined'?require('./live-model.js'):root.MVP3LiveModel;
   const JOURNAL_KEY='popcorn-mvp3-pending-save-v1';
-  // 상담 한 번에 읽는 글자 수 -- 서버 api/talk.py MAX_TEXT_LEN 과 같다. 넘는 글은 서버가 앞부분만 읽고 알린다.
+  // 상담 한 번에 보낼 수 있는 글자 수. 서버는 긴 글을 막지 않고 앞 800자와 끝 200자를 읽은 뒤 그 사실을 알린다(api/talk.py _read_long).
   const MAX_TEXT=20000;
   function validPending(record){
     const p=record?.payload;
@@ -21,8 +21,40 @@
       clear(){target().removeItem(JOURNAL_KEY);}
     };
   }
+  // 대화 상태 보관(2차 대화 중심 화면의 바닥 -- 2026-10-11). 새로고침해도 앞서 말한 조건과 대화,
+  // 지금 보던 견적(상품 번호와 바꾼 부품)을 잃지 않게 이 탭(sessionStorage)에만 둔다. 가격·추천 카드는
+  // 두지 않는다 -- 시간이 지나면 틀리므로 되살린 뒤 서버에 다시 묻는다(restoredCurrent).
+  const CONVERSATION_KEY='popcorn-mvp3-conversation-v1',CONVERSATION_TTL_MS=6*3600*1000,CONVERSATION_MAX_BYTES=65536;
+  const CONVERSATION_MAX_MESSAGES=60,CONVERSATION_MAX_TEXT=2000;
+  // 카드번호·주민번호 모양의 숫자는 보관하기 전에 가린다(서버 api/talk_exceptions.mask_personal 과 같은 모양).
+  function maskPersonal(t){return String(t).replace(/(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/g,'[가림]').replace(/(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)/g,'[가림]');}
+  function conversationSnapshot(state,now=Date.now()){
+    const text=t=>maskPersonal(String(t||'').slice(0,CONVERSATION_MAX_TEXT));
+    const sel=state.selected;
+    return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,
+      chat_flow:M.object(state.chatFlow)?M.copy(state.chatFlow):null,
+      history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
+      messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel)}:null};
+  }
+  function validConversation(r,now=Date.now()){
+    return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=CONVERSATION_TTL_MS
+      &&(r.talk===null||M.object(r.talk))&&(r.chat_flow===null||M.object(r.chat_flow))
+      &&Array.isArray(r.history)&&r.history.length<=6&&r.history.every(h=>M.object(h)&&['user','assistant'].includes(h.role)&&typeof h.text==='string')
+      &&Array.isArray(r.messages)&&r.messages.length<=CONVERSATION_MAX_MESSAGES&&r.messages.every(m=>M.object(m)&&['user','ai'].includes(m.who)&&typeof m.text==='string')
+      &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes));
+  }
+  function createConversationStore(options){
+    let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
+    function target(){if(!resolved){storage=root.sessionStorage;resolved=true;}if(!storage)throw new Error('session storage');return storage;}
+    return {
+      read(now=Date.now()){const raw=target().getItem(CONVERSATION_KEY);if(!raw)return null;const r=JSON.parse(raw);return validConversation(r,now)?r:null;},
+      write(record){const raw=JSON.stringify(record);if(raw.length>CONVERSATION_MAX_BYTES)return false;target().setItem(CONVERSATION_KEY,raw);return true;},
+      clear(){target().removeItem(CONVERSATION_KEY);}
+    };
+  }
   // 구매 상담 신청 칸의 상태. 서버가 준 주제·동의 문구만 쓰고, 받은 신청 번호만 보여 준다.
-  function emptyInquiry(){return {open:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
+  function emptyInquiry(){return {open:false,human:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
   const PHONE_RE=/^0\d{1,2}-?\d{3,4}-?\d{4}$/, EMAIL_RE=/^[^@\s]{1,64}@[^@\s]{1,100}\.[^@\s]{2,}$/;
   function inquiryProblem(d,meta){
     if(!meta||!meta.topics.includes(d.topic))return '문의 주제를 골라 주세요.';
@@ -46,9 +78,11 @@
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false};
-    let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
-    function emit(){changed(state);}
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null};
+    let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
+    // 화면을 그릴 때마다 대화 상태를 이 탭에 남긴다. 보관이 막혀 있어도 상담은 그대로 간다.
+    function remember(){try{conversation.write(conversationSnapshot(state));}catch{}}
+    function emit(){remember();changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
     function begin(phase){cancel();controller=new AbortController();state.phase=phase;state.error=null;state.retry=null;emit();return {id:generation,signal:controller.signal};}
     function current(op){return op.id===generation&&!op.signal.aborted;}
@@ -58,13 +92,23 @@
         retryAfter:error?.retryAfter||0,retryAt:Date.now()+(error?.retryAfter||0)*1000};
       state.retry=retry;
     }
-    function reset(){
-      cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
+    function reset({restore=false}={}){
+      cancel();Object.assign(state,{restoredCurrent:null,screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
         wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
-      message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
+      message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');
+      // restore: 처음 열 때만 이 탭에 남은 대화를 되살린다. 「새 상담」은 지운다.
+      let saved=null;
+      if(restore){try{saved=conversation.read();}catch{saved=null;}}
+      else{try{conversation.clear();}catch{}}
+      if(saved){
+        state.talk=saved.talk;state.chatFlow=saved.chat_flow;state.history=saved.history;
+        if(saved.messages.length)state.messages=saved.messages;
+        state.restoredCurrent=saved.current;
+      }
+      emit();
     }
     async function recommendFor(op,extra={}){
       state.phase='recommend';emit();
@@ -85,6 +129,8 @@
       if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),op=begin('talk');
       state.lastText=text;if(!repeat)message(text,'user');emit();
+      // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
+      let prior=null;
       try{
         const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
         if(!current(op))return false;
@@ -95,14 +141,18 @@
         state.history.push({role:'user',text:text.slice(0,1000)});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
-          if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
-          if(reply.trim()){message(reply);state.history.push({role:'assistant',text:reply.slice(0,300)});}
+          // 답을 먼저 충분히 하고, PC 이야기는 같은 말풍선 끝에 짧게 붙인다(코덱스 1816 보강2).
+          message([answer.trim(),reply.trim()].filter(Boolean).join('\n\n'),'ai');
+          if(answer.trim())state.history.push({role:'assistant',text:answer.slice(0,300)});
+          if(reply.trim())state.history.push({role:'assistant',text:reply.slice(0,300)});
         }
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
         state.history=state.history.slice(-6);
         if(keep)return true;
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
+        if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
+          savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
         state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.
@@ -110,7 +160,11 @@
         if(state.missing.length||response.pc_related===false||response.silent||response.fallback){state.screen='welcome';}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
-        if(current(op)){fail(error,state.phase==='recommend'?{kind:'recommend'}:{kind:'talk',text});state.handoffOffer=true;}
+        if(current(op)){
+          const inRecommend=state.phase==='recommend';
+          fail(error,inRecommend?{kind:'recommend'}:{kind:'talk',text});state.handoffOffer=true;
+          if(inRecommend&&prior)Object.assign(state,prior);
+        }
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
       return true;
     }
@@ -223,11 +277,11 @@
       }catch(error){if(current(op))fail(error,{kind:'handoff'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
-    async function openInquiry(){
+    async function openInquiry({human=false}={}){
       if(state.phase)return;
-      state.inquiry.open=true;state.inquiry.error='';
+      state.inquiry.open=true;state.inquiry.error='';if(human)state.inquiry.human=true;
       // 상품을 고르기 전(상담 중) 사람 상담: 주제 「기타」와 마지막 문장을 미리 채운다 -- 고객이 고칠 수 있다.
-      if(!state.selected&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
+      if((!state.selected||human)&&!state.inquiry.draft.topic&&!state.inquiry.draft.message){state.inquiry.draft.topic='기타';state.inquiry.draft.message=String(state.lastText||'').slice(0,500);}
       if(state.inquiry.meta){emit();return;}
       const op=begin('inquiry-form');
       try{
@@ -366,5 +420,5 @@
     }
     return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem};else root.MVP3LiveFlow={createFlow};
+  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);

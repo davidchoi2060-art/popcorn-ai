@@ -78,9 +78,11 @@ test('bad JSON, network, timeout and caller abort remain distinct',async()=>{
  await assert.rejects(stalled.parse({}, {timeoutMs:10}),e=>e.code==='timeout');
  const controller=new AbortController(),request=stalled.parse({}, {signal:controller.signal});controller.abort();await assert.rejects(request,e=>e.code==='aborted');
 });
-test('answer/reply and history stay separate and sequential; sources and notice are not shown',async()=>{
+// 답을 먼저, PC 이야기는 같은 말풍선 끝에(코덱스 1816 보강2 · 사장님 「기존 AI와 대화하듯이」). 기록(history)은 따로 남는다.
+test('answer then reply share one bubble in order; history stays separate; sources and notice are not shown',async()=>{
  let last;const h=harness({parse:async payload=>{last=payload;return parsed;}});await h.flow.submit('첫 요청');assert.equal(last.history.length,0);
- assert.deepEqual(h.flow.state.messages.slice(-3).map(m=>m.text),['첫 요청',parsed.answer,parsed.reply]);assert.equal(h.flow.state.messages.at(-2).sources,undefined);assert.equal(h.flow.state.messages.at(-2).notice,undefined);assert.equal(h.flow.state.screen,'results');
+ assert.deepEqual(h.flow.state.messages.slice(-2).map(m=>m.text),['첫 요청',parsed.answer+'\n\n'+parsed.reply]);assert.equal(h.flow.state.messages.at(-1).sources,undefined);assert.equal(h.flow.state.messages.at(-1).notice,undefined);
+ assert.deepEqual(h.flow.state.history.slice(-2).map(x=>x.text),[parsed.answer,parsed.reply]);assert.equal(h.flow.state.screen,'results');
  await h.flow.submit('두번째');assert.equal(last.history.length,3);assert.deepEqual(last.chat_flow,{step:2});assert.equal(h.flow.state.history.length,6);
 });
 test('missing/silent/non-PC answer does not fabricate recommendations',async()=>{
@@ -215,4 +217,27 @@ test('part build keeps server compat warnings (no cooler line) and drops non-tex
  assert.match(app,/p\.build\.warnings/);assert.match(app,/d\.warnings/);
  // 후보 안내와 쿨러 경고를 따로 나란히 두지 않는다 — 경고가 있으면 서버 안내 한 줄만 warn-text 로
  assert.doesNotMatch(app,/\(d\.warnings\|\|\[\]\)\.map/);assert.match(app,/warned\?'warn-text':'muted'/);
+});
+// 2차 대화 중심 화면의 바닥(2026-10-11): 새로고침해도 조건·대화·지금 견적을 잃지 않는다.
+const {CONVERSATION_KEY,validConversation}=require('../live-flow.js');
+test('conversation survives a reload in the same tab without stale cards; new consult clears it',async()=>{
+ const h=await selected(harness());
+ const raw=h.sessionStorage.getItem(CONVERSATION_KEY);assert.ok(raw);
+ const rec=JSON.parse(raw);assert.deepEqual(rec.talk,talk);assert.deepEqual(rec.current,{product_code:101,changes:[]});
+ assert.equal(raw.includes('1430000'),false);
+ const again=createFlow(h.api,{uuid:()=>ID,sessionStorage:h.sessionStorage});again.reset({restore:true});
+ assert.deepEqual(again.state.talk,talk);assert.equal(again.state.recommendation,null);assert.equal(again.state.screen,'welcome');
+ assert.deepEqual(again.state.restoredCurrent,{product_code:101,changes:[]});
+ assert.ok(again.state.messages.some(m=>m.who==='user'&&m.text==='예산 150만원으로 추천'));
+ again.reset();const fresh=JSON.parse(h.sessionStorage.getItem(CONVERSATION_KEY));assert.equal(fresh.talk,null);assert.equal(fresh.current,null);assert.equal(fresh.messages.some(m=>m.who==='user'),false);
+});
+test('stored conversation masks card numbers and expires',async()=>{
+ const h=harness({parse:async()=>({...parsed,pc_related:false})});
+ await h.flow.submit('카드 1234-5678-9012-3456 로 결제돼요?');
+ const rec=JSON.parse(h.sessionStorage.getItem(CONVERSATION_KEY));
+ assert.equal(JSON.stringify(rec).includes('9012'),false);assert.ok(JSON.stringify(rec).includes('[가림]'));
+ assert.equal(validConversation(rec,rec.saved_at+7*3600*1000),false);assert.equal(validConversation(rec,rec.saved_at+60000),true);
+ const old=createFlow(h.api,{uuid:()=>ID,sessionStorage:h.sessionStorage});
+ h.sessionStorage.setItem(CONVERSATION_KEY,JSON.stringify({...rec,saved_at:Date.now()-7*3600*1000}));
+ old.reset({restore:true});assert.equal(old.state.talk,null);
 });
