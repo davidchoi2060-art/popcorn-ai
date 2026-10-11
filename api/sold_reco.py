@@ -313,8 +313,12 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
         # (코덱스 #161 검수 경계: 최저가 요청이 예산 하한을 말없이 지웠다). pick 의 「이상」 처리와 같다.
         floor = {c: p for c, p in prods.items() if p["price"] is not None and p["price"] >= budget} \
             if budget is not None and bound == "이상" else {}
-        pool = floor if any(min_ok(p) for p in floor.values()) else prods
+        floor_ok = any(min_ok(p) for p in floor.values())
+        pool = floor if floor_ok else prods
         res, nav_note = _cheapest(fu, r, levels, pool, preferred, min_ok), X.NOTE_CHEAPEST
+        if budget is not None and bound == "이상" and not floor_ok:
+            # 하한을 풀었으면 그 사실을 밝힌다(2026-10-12 검수 5812 P2-2 -- 말없이 하한 아래 카드가 나갔다).
+            nav_note = X.NOTE_FLOOR_RELAXED
         for it in res["items"]:
             it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
     elif nav == X.CHEAPER and anchor is not None and anchor["price"] is not None:
