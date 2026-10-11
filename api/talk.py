@@ -224,6 +224,8 @@ REPLY_ROLE_GUIDE = ("PC 견적을 도와드리는 자리라 다른 이야기는 
 # 옛 이름 — 뜻이 「PC 아님 반송 문구」에서 「역할 안내 1회」로 바뀌었다. 지우지 않는다
 # (외부 참조 grep 2026-09-17: 없음. 되돌림 근거로만 남긴다).
 REPLY_NOT_PC = REPLY_ROLE_GUIDE
+# 게임 목록을 답한 턴의 마무리 -- 고른 게임으로 추천에 잇는다(2026-10-11).
+REPLY_GAME_PICK = "이 중 해 보실 게임을 골라 주시면 그 게임이 잘 돌아가는 PC를 찾아 드릴게요."
 REPLY_MAX_LEN = 200
 
 # ── 프롬프트 [잡담] 문단 — 허용/금지의 «경계» (2026-09-17) ────────────────────
@@ -1146,6 +1148,12 @@ def parse_talk(body: ParseBody, request: Request):
     # 2026-10-11 개발 서버: 모델 문장에 힌디어 낱말(「उपलब्ध한」)이 섞여 깨진 글자로 보였고,
     # 「150만원」을 「150만원대」로 받아 말했다. 화면에 내기 전에 걷는다(원문은 ai_reply 로 남는다).
     reply = TR.tidy_customer_text(reply, text)
+    # 2026-10-11 「요즘 많이 하는 게임 뭐 있어?」: 게임 목록을 답한 턴에 AI 의 되묻기
+    # (「특정 장르 있으세요?」)가 따로 놀았다. 목록을 준 뒤에는 서버 한 줄로 추천에 잇는다.
+    if ((ans.answer or "").strip() and len(ans.game_names) >= 2
+            and ans.narrowing == TS.NARROWING_WIDE and not released
+            and pc is not True and stage in (TS.STAGE_PC, TS.STAGE_OPEN)):
+        reply = REPLY_GAME_PICK
     # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
     # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
     # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.

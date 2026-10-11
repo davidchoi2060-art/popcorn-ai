@@ -205,6 +205,50 @@ class AdminRecord(unittest.TestCase):
         self.assertTrue(all(TX.kind_label(k) for k in keys))
 
 
+# 2026-10-11 개발 서버 실측 답(「요즘에 사람들이 많이하는 괜찮은 게임들 뭐가 있어?」) 그대로
+DEV_ANSWER = ('요즘 많이 하는 게임으로는 2026년 9월 17일 기준 게임트릭스 PC방 통계에서 다음 작품들이 확인됩니다.'
+              ' - 리그 오브 레전드: 전장 운영과 팀 대결을 즐기는 게임 - FC온라인: 축구 경기를 즐기는 스포츠 게임'
+              ' - 메이플스토리: 캐릭터 성장과 모험을 즐기는 다중접속 역할수행 게임'
+              ' 인기도 순으로는 리그 오브 레전드, FC온라인, 메이플스토리 순입니다.')
+
+
+class PopularGamesAnswer(unittest.TestCase):
+    def facts(self):
+        return [TA.GameFacts(name='리그 오브 레전드', grade='E'), TA.GameFacts(name='FC온라인', grade=None),
+                TA.GameFacts(name='메이플스토리', grade='L')]
+
+    def test_list_is_one_per_line_with_load_word_and_no_rank_repeat(self):
+        out = TA.tidy_game_list(DEV_ANSWER, self.facts())
+        lines = out.split('\n')
+        self.assertEqual(lines[1], '- 리그 오브 레전드: 전장 운영과 팀 대결을 즐기는 게임 (필요한 사양: 보통)')
+        self.assertEqual(lines[2], '- FC온라인: 축구 경기를 즐기는 스포츠 게임')      # 등급 없음 -> 안 붙인다
+        self.assertEqual(lines[3], '- 메이플스토리: 캐릭터 성장과 모험을 즐기는 다중접속 역할수행 게임 (필요한 사양: 가벼운 편)')
+        self.assertNotIn('인기도 순으로는', out)
+        self.assertEqual(len(lines), 4)
+
+    def test_plain_answer_untouched(self):
+        self.assertEqual(TA.tidy_game_list('발로란트는 팀 단위 총싸움 게임이에요.', self.facts()),
+                         '발로란트는 팀 단위 총싸움 게임이에요.')
+
+    def test_game_list_turn_ends_with_pick_line(self):
+        result = SimpleNamespace(text=_ai({'pc': False, 'state': {}, 'missing': ['usages'],
+                                           'reply': '혹시 특정 장르나 게임 스타일이 있으신가요?'}),
+                                 provider='t', model='t', tokens_in=1, elapsed_sec=0.1)
+        ans = TA.AnswerResult(answer='- 리그 오브 레전드: 팀 대전', narrowing=TS.NARROWING_WIDE,
+                              game_names=['리그 오브 레전드', 'FC온라인'])
+        with contextlib.ExitStack() as st:
+            st.enter_context(patch.object(talk.engine, 'connect', lambda: _Conn()))
+            st.enter_context(patch.object(talk.engine, 'begin', lambda: _Conn()))
+            st.enter_context(patch.object(talk.access_gate, 'check_rate', lambda *a, **k: None))
+            st.enter_context(patch.object(talk.TS, 'load_vocab', lambda conn: vocab()))
+            st.enter_context(patch.object(talk.TA, 'run_parallel', lambda a, b: (result, ans)))
+            st.enter_context(patch.object(talk.TA, 'is_game_related', lambda *a: True))
+            st.enter_context(patch.object(talk, '_record_hit', lambda *a, **k: None))
+            r = talk.parse_talk(talk.ParseBody(text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?'), request=None)
+        self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
+        self.assertEqual(r['answer'], '- 리그 오브 레전드: 팀 대전')
+
+
 class PromptCarriesExceptionGuide(unittest.TestCase):
     def test_prompt_has_exception_block(self):
         p = talk._build_prompt('ㅋㅋ', vocab())
