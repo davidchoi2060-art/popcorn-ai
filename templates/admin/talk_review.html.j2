@@ -80,6 +80,7 @@
   </div>
   <div class="tr-bar">
     <label><input type="checkbox" id="trFlagged" checked> 약속하는 말이 있는 답만</label>
+    <label><input type="checkbox" id="trUnread"> 조건을 하나도 못 읽은 질문만</label>
     <label>상태 <select id="trStatus"><option value="">전체</option><option>미확인</option><option>문제 있음</option><option>확인</option></select></label>
     <label><input type="checkbox" id="trTest"> 시험 문의 포함</label>
   </div>
@@ -112,6 +113,7 @@
   function qs(){
     var p = ['offset='+st.offset];
     if ($('trFlagged').checked) p.push('flagged=true');
+    if ($('trUnread').checked) p.push('unread=true');
     if ($('trStatus').value) p.push('status='+encodeURIComponent($('trStatus').value));
     if ($('trTest').checked) p.push('include_test=true');
     return '?'+p.join('&');
@@ -201,7 +203,9 @@
     $('trDrawer').hidden=false;
   }
   $('trClose').addEventListener('click',function(){ $('trDrawer').hidden=true; st.picked=null; });
-  ['trFlagged','trStatus','trTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  // 응답 패턴 「AI 가 되물은 질문」에서 오면(?unread=1) 그 묶음을 바로 보여 준다.
+  if (/[?&]unread=1(&|$)/.test(location.search)){ $('trUnread').checked=true; $('trFlagged').checked=false; }
+  ['trFlagged','trUnread','trStatus','trTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
   $('trPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
   $('trNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
   load();

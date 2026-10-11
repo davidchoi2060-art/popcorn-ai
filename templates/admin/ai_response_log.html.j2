@@ -111,6 +111,8 @@ button{font-family:inherit}
 .row .flag.on{color:var(--rv-amber)}
 
 /* ── 실측 0건 — 이유 그리드 ── */
+.reason-card .reason-link{display:inline-block;margin-top:8px;font:600 11px/1 var(--rv-font);color:var(--rv-link);text-decoration:none}
+.reason-card .reason-link:hover{text-decoration:underline}
 .reasons-empty{flex:1;min-height:0;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
 .reasons-empty .ti{font:600 14px/1.4 var(--rv-font)}
 .reasons-empty .ti b{color:oklch(0.5 0.14 55);font-weight:600}
@@ -198,8 +200,8 @@ button{font-family:inherit}
 {% block content %}
 <div class="banner" id="banner" data-keep="1">
   <span class="mark" id="bannerMark">▲ 기록 없음</span>
-  <span class="ti" id="bannerTitle">감사할 대상이 아직 생성되지 않습니다</span>
-  <span class="ds" id="bannerDesc">AI 호출·응답 텍스트를 남기는 계측 지점이 저장소 어디에도 없습니다.</span>
+  <span class="ti" id="bannerTitle">이 화면에는 기록이 없습니다 · 고객 상담 AI 답은 「AI 답 점검」에 있습니다</span>
+  <span class="ds" id="bannerDesc">근거 설명·운영 도우미·웹 사양 채움 작업은 질문과 답을 남기는 기록이 아직 없습니다.</span>
 </div>
 
 <div class="filterbar" data-keep="1">
@@ -418,10 +420,10 @@ button{font-family:inherit}
     $('bannerMark').textContent = preview ? '● 가상 데이터' : '▲ 기록 없음';
     $('bannerTitle').textContent = preview
       ? '실제 기록이 아닙니다 — 연동 후 이 화면이 어떻게 보일지 검토하기 위한 예시입니다'
-      : '감사할 대상이 아직 생성되지 않습니다';
+      : '이 화면에는 기록이 없습니다 · 고객 상담 AI 답은 「AI 답 점검」에 있습니다';
     $('bannerDesc').textContent = preview
       ? '실제 화면에서는 서버가 돌려준 기록만 표시하며, 이런 예시 행을 만들어 채우지 않습니다.'
-      : 'AI 호출·응답 텍스트를 남기는 계측 지점이 저장소 어디에도 없습니다(그레프 실측 0건). 목록 아래에 네 갈래 이유를 실측해 밝혀 두었습니다.';
+      : '근거 설명·운영 도우미·웹 사양 채움 작업은 질문과 답을 남기는 기록이 아직 없습니다. 목록 아래에 기록 갈래별 상태를 밝혀 두었습니다.';
   }
 
   function renderFilterBar() {
@@ -475,14 +477,15 @@ button{font-family:inherit}
     var reasons = S.server.reasons || [];
     $('tbody').innerHTML = '<div class="reasons-empty">' +
       '<div>' +
-        '<div class="ti">기록이 0건입니다 — 아직 아무도 안 써서가 아니라, <b>남기는 계측 지점이 없어서</b>입니다</div>' +
-        '<div class="ds">이 화면이 감사할 대상은 "AI가 무엇을 묻고 뭐라 답했나"입니다. 지금 저장소에는 그 텍스트를 남기는 경로가 없습니다. 후보였던 네 갈래가 각각 왜 못 쓰이는지는 아래와 같습니다 — 어느 하나라도 풀리면 이 화면에 행이 쌓이기 시작합니다.</div>' +
+        '<div class="ti">이 화면의 기록은 0건입니다 — <b>고객 상담 AI 답은 「AI 답 점검」 화면에 있습니다</b></div>' +
+        '<div class="ds">이 화면이 감사할 대상은 "AI가 무엇을 묻고 뭐라 답했나"입니다. 고객 상담 AI 답은 문의마다 「AI 답 점검」에 남습니다. 운영 작업의 질문과 답은 아직 남기는 경로가 없습니다. 기록 갈래별 상태는 아래와 같습니다.</div>' +
       '</div>' +
       '<div class="reason-grid">' + reasons.map(function (r) {
         return '<div class="reason-card">' +
           '<div class="hd"><span class="nm">' + esc(r.name) + '</span><span class="chip">' + esc(r.chip) + '</span></div>' +
           '<div class="why">' + esc(r.why) + '</div>' +
-          '<div class="src">' + esc(r.measured) + '</div></div>';
+          '<div class="src">' + esc(r.measured) + '</div>' +
+          (r.link && /^\/admin2\//.test(r.link) ? '<a class="reason-link" href="' + esc(r.link) + '">' + esc(r.link_label || '열기') + '</a>' : '') + '</div>';
       }).join('') + '</div>' +
       '<div class="precond">' + esc(S.server.note || '') + '</div>' +
       '</div>';

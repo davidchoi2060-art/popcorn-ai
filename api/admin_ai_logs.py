@@ -74,6 +74,11 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
     with engine.connect() as conn:
         cost_rows = conn.execute(text("SELECT count(*) FROM api_cost_logs")).scalar() or 0
         web_rows = conn.execute(text("SELECT count(*) FROM spec_web_suggestions")).scalar() or 0
+        # 2026-10-11 품질관리 F4: 고객 상담(`/api/talk/parse`)은 AI 를 부르고, 그 답은 0138 부터
+        # `talk_reply_reviews` 에 문의마다 남는다(관리자 「AI 답 점검」). 「호출 경로 없음」은 낡은 말이었다.
+        talk_calls = conn.execute(text(
+            "SELECT count(*) FROM talk_intent_hits WHERE llm_called")).scalar() or 0
+        talk_replies = conn.execute(text("SELECT count(*) FROM talk_reply_reviews")).scalar() or 0
 
     reasons = [
         {
@@ -103,10 +108,12 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
         {
             "key": "llm_calls",
             "name": "고객 상담 화면 AI 호출",
-            "chip": "호출 경로 없음",
-            "measured": "코드 확인 · 호출하는 곳 없음",
-            "why": ("연동 보류(2026-07-21 결정)로 호출 코드 자체가 없습니다. 호출이 "
-                    "없으니 남길 응답도 없습니다."),
+            "chip": "AI 답 점검에 기록",
+            "measured": f"AI 호출 문의 {talk_calls}건 · 답 기록 {talk_replies}건",
+            "why": ("고객 상담 화면은 문의마다 AI 를 부르고, 고객에게 나간 답은 「AI 답 점검」 "
+                    "화면에 문의마다 남습니다. 질문 원문은 대표 권한에서만 보입니다."),
+            "link": "/admin2/talk-review",
+            "link_label": "AI 답 점검 열기",
         },
     ]
 
@@ -118,8 +125,7 @@ def get_ai_response_log(task: str | None = None, model: str | None = None,
         "filters_echo": {"task": task, "model": model, "period": period,
                           "flagged": bool(flagged)},
         "reasons": reasons,
-        "note": ("기록이 0건인 것은 아직 아무도 안 써서가 아니라, 남기는 계측 지점이 "
-                 "저장소 어디에도 없어서입니다. 선행 조건은 ① 실 LLM 연동 재개"
-                 "(2026-07-21 보류, 별도 승인 필요) ② 운영 도우미 대화의 서버 전송 "
-                 "시작(현재는 브라우저 저장 전용)입니다."),
+        "note": ("고객 상담 AI 답은 「AI 답 점검」 화면에 남습니다. 이 화면이 0건인 것은 "
+                 "근거 설명·운영 도우미·웹 사양 채움 작업의 질문과 답을 남기는 기록이 "
+                 "아직 없어서입니다. 운영 도우미 대화는 브라우저에만 저장됩니다."),
     }

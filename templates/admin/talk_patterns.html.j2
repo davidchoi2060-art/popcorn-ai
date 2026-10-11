@@ -87,6 +87,7 @@
       <button type="button" id="tp-regress" class="tp-chip" aria-pressed="false" data-keep="1">점검용 접속 제외됨</button>
       <span class="tp-mono" style="font-size:9.5px;color:var(--rv-faint)">의도 미지정 질문</span>
     </div>
+    <div id="tp-askedback" class="tp-note" style="margin-bottom:8px"></div>
     <div id="tp-queue"></div>
   </section>
 
@@ -252,6 +253,10 @@
   $('tp-threshold').textContent=d.threshold;
   $('tp-qcount').textContent=d.total_hits+'건';
   var w=$('tp-queue');
+  /* F10: AI 가 조건을 못 읽고 되물어 답한 질문은 큐에 넣지 않고 따로 센다 — 원문과 답은 AI 답 점검에서 본다(F9). */
+  var ab=$('tp-askedback');
+  ab.innerHTML='AI가 조건을 못 읽고 되물어 답한 질문 <b class="tp-mono">'+(d.asked_back||0)+'건</b>은 이 큐에 넣지 않습니다.'
+   +(d.asked_back?' <a href="'+esc(d.review_link)+'">AI 답 점검에서 질문과 답 보기</a>':'');
   if(!d.groups.length){
    /* ⑧ 빈 큐는 «없는 이유»와 함께 말한다 — 0건을 지어내지 않는다. */
    w.innerHTML='<div style="padding:9px 12px;border-radius:7px;background:var(--rv-panel);'
