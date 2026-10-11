@@ -55,6 +55,7 @@ class InquiryBody(BaseModel):
     consent: StrictBool
     quote_id: UUID | None = None
     product_code: StrictInt | None = Field(default=None, gt=0)
+    configuration_id: str | None = Field(default=None, pattern=r'^A[0-9A-F]{16}$')
 
 
 def _clean(body: InquiryBody):
@@ -109,14 +110,21 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
                 qid = str(q['quote_id'])
                 snap_code = (q['product_snapshot'] or {}).get('product_code')
                 code = snap_code if type(snap_code) is int else code
+        cfg = None
+        if body.configuration_id is not None:
+            # 「새로 나온 PC」에서 온 신청만 잇는다 — 지금 공개 중인 신규 조립PC 일 때만(부품 상품화 4단계).
+            from .custom_pc import customer_list
+            if not customer_list(conn, [body.configuration_id]):
+                raise HTTPException(409, '이 PC는 지금 공개되어 있지 않아요. 목록을 새로 열어 확인해 주세요.')
+            cfg = body.configuration_id
         no = _no(conn)
         now = datetime.now(timezone.utc)
         conn.execute(text("""
             INSERT INTO purchase_inquiries
                 (inquiry_no, user_id, quote_id, product_code, topic, contact_name, contact_phone,
-                 contact_email, message, consent_at, data_origin, purge_at)
-            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge)
-        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 't': body.topic, 'n': name,
+                 contact_email, message, consent_at, data_origin, purge_at""" + (', configuration_id' if cfg else '') + """)
+            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge""" + (', :cfg' if cfg else '') + """)
+        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 't': body.topic, 'n': name,
                'p': phone, 'e': email, 'm': message, 'now': now,
                'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS)})
     log.info('[purchase-inquiry] %s topic_ok=%s quote=%s', no, True, qid is not None)

@@ -465,3 +465,6 @@ body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:6
 /* 부품 직접 바꾸기(api/mvp3_build): 구성표 줄 아래에 펼치는 선택지와 바꾼 줄 표시 */
 .build-options-row>td{padding-top:0}.build-options-row .part-options{margin-top:0}
 .build-changed .build-changed-note{margin:2px 0 0;font-size:14px;font-weight:600;color:var(--ink)}
+/* 「새로 나온 PC」 링크(부품 상품화 4단계 · new-pcs.html). */
+.topbar nav a.nav-link{display:flex;align-items:center;font-weight:600;font-size:16px;padding:6px 12px 6px 25px;color:var(--green);text-decoration:none;border-left:1px solid #d4dce2;white-space:nowrap}
+@media(max-width:760px){.topbar nav a.nav-link{font-size:14px;padding:6px}}
