@@ -39,16 +39,19 @@
       messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
       // 되살린 견적을 아직 다시 불러오기 전이면(selected 없음) 그 상품 번호를 지우지 않고 그대로 둔다.
       // 고를 때 조건(selection_state)도 함께 둔다 -- 그 뒤 조건을 바꿨으면 지금 조건의 추천에는 그 상품이 없을 수 있다.
-      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel),selection_state:M.object(state.selectionState)?M.copy(state.selectionState):null}
+      // 부품 바꾸기로 옮긴 PC 는 추천 목록에 없을 수 있어 어느 PC 의 어느 부품에서 옮겼는지(swap_from)도 둔다.
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel),selection_state:M.object(state.selectionState)?M.copy(state.selectionState):null,...(validSwapFrom(sel.swap_from)?{swap_from:M.copy(sel.swap_from)}:{})}
         :state.restoredCurrent?M.copy(state.restoredCurrent):null};
   }
+  function validSwapFrom(x){return M.object(x)&&Number.isSafeInteger(x.product_code)&&x.product_code>0&&['cpu','gpu','ram','ssd'].includes(x.slot);}
   function validConversation(r,now=Date.now()){
     return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=CONVERSATION_TTL_MS
       &&(r.talk===null||M.object(r.talk))&&(r.chat_flow===null||M.object(r.chat_flow))
       &&Array.isArray(r.history)&&r.history.length<=6&&r.history.every(h=>M.object(h)&&['user','assistant'].includes(h.role)&&typeof h.text==='string')
       &&Array.isArray(r.messages)&&r.messages.length<=CONVERSATION_MAX_MESSAGES&&r.messages.every(m=>M.object(m)&&['user','ai'].includes(m.who)&&typeof m.text==='string')
       &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes)
-        &&(r.current.selection_state===undefined||r.current.selection_state===null||M.object(r.current.selection_state)));
+        &&(r.current.selection_state===undefined||r.current.selection_state===null||M.object(r.current.selection_state))
+        &&(r.current.swap_from===undefined||validSwapFrom(r.current.swap_from)));
   }
   function createConversationStore(options){
     let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
@@ -235,8 +238,16 @@
       try{
         try{await recommendFor(op);}catch(error){if(!current(op))return;if(error?.name==='AbortError')throw error;latest=error;}
         if(!current(op))return;
-        const p=await findProduct(op,want.product_code,basis,{fresh:!!latest});
+        let p=await findProduct(op,want.product_code,basis,{fresh:!!latest});
         if(p===undefined||!current(op))return;
+        // 부품 바꾸기로 옮긴 PC 는 추천 목록에 없을 수 있다. 옮기기 전 PC 의 같은 부품 선택지에서 서버에 다시 찾는다.
+        if(!p&&validSwapFrom(want.swap_from)){
+          // 실패하면 바깥에서 「다시 불러오기」로 남긴다(상품 번호는 지우지 않는다).
+          const r=await api.partOptions(M.copy(basis),want.swap_from.product_code,want.swap_from.slot,{signal:op.signal});
+          if(!current(op))return;
+          const o=M.partOptions(r,want.swap_from.slot,want.swap_from.product_code).options.find(x=>x.product_code===want.product_code);
+          if(o){p=M.copy(o);delete p.swap;p.swap_from=M.copy(want.swap_from);}
+        }
         if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);
         if(!r||!current(op))return;
@@ -437,7 +448,7 @@
       const o=data.options.find(x=>x.product_code===code);if(!o)return;
       const before=state.selected;
       state.selectedContext=state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(before.index)&&g.products.some(x=>x.index===before.index&&x.product_code===before.product_code))||null;
-      const next=M.copy(o);delete next.swap;state.build=emptyBuild();
+      const next=M.copy(o);delete next.swap;next.swap_from={product_code:before.product_code,slot:data.slot};state.build=emptyBuild();
       state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;
       state.inquiry=emptyInquiry();state.parts=emptyParts();state.error=null;state.retry=null;
       const d=o.swap.price_diff,diff=d===0?'지금과 같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
