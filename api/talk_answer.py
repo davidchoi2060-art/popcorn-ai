@@ -88,6 +88,9 @@ _INLINE_ITEM = re.compile(r"\s+-\s+(?=\S)")
 _RANK_REPEAT = re.compile(r"(인기\S*\s*순(으로|위)?(는|로는)?|순위로는|순서로는)")
 
 
+_DATA_EXCUSE = re.compile(r"[ \t]*[^.\n]*(?:제공된|주어진|받은|저희)\s*자료[^.\n]*(?:없|부족)[^.\n]*\.?")
+
+
 def tidy_game_list(body: str, facts: list) -> str:
     """붙어 나온 게임 목록을 게임마다 줄을 바꾸고, 끝의 되풀이 순위 문장을 걷는다."""
     if not body or not facts:
@@ -113,7 +116,8 @@ def tidy_game_list(body: str, facts: list) -> str:
             if m and sum(1 for n in names if n in ln[m.start():]) >= 3:
                 ln = ln[:m.start()].rstrip()
         kept.append(ln)
-    return "\n".join(kept).strip()
+    # 「제공된 자료에는 … 없어」 같은 자료 사정 설명은 고객에게 하지 않는다(2026-10-11 개발 서버 실측)
+    return _DATA_EXCUSE.sub("", "\n".join(kept)).strip()
 
 
 # ── 1. DB 조회 계층 ────────────────────────────────────────────────────────
@@ -457,7 +461,7 @@ def build_answer_prompt(sentence: str, ev: Evidence, narrowing: str,
                      " 짧은 도입 한 문장 뒤, 게임마다 어떤 게임이고 어떤 점이 재미있는지 한두 문장씩 소개한다."
                      " 게임은 많아야 다섯 개까지만 고른다."
                      " **게임 이야기만 한다** - PC·견적 이야기는 꺼내지 않는다(서버가 끝에 가볍게 한 줄 붙인다)."
-                     " 마지막에 질문을 붙이지 않는다.")
+                     " 마지막에 질문을 붙이지 않는다. 자료에 무엇이 없다는 말은 하지 않고, 마지막 게임 소개로 끝낸다.")
         lines.append("[목록 형식] 게임을 여럿 소개하면 게임마다 줄을 바꾸고 「- 게임명: 설명」으로 시작한다."
                      " 목록 뒤에 같은 게임을 순위로 다시 늘어놓지 않는다.")
     elif narrowing == TS.NARROWING_NARROW:
