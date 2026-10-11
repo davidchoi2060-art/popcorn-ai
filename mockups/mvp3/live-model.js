@@ -112,7 +112,41 @@
     return {product_code:value.product_code,name:value.name,price:Number.isInteger(value.price)&&value.price>=0?value.price:null,
       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
       mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:productRole(value),over_budget:value.over_budget===true,
-      public_configuration:publicConfiguration(value.public_configuration,value.product_code)};
+      public_configuration:publicConfiguration(value.public_configuration,value.product_code),build:build(value.build)};
+  }
+  // 부품 직접 바꾸기(api/mvp3_build): 같은 PC 의 구성표에서 바꾼 줄들. 금액·차액은 서버가 준 값만 쓴다.
+  function buildPart(v){
+    return object(v)&&Number.isSafeInteger(v.product_code)&&v.product_code>0&&typeof v.name==='string'&&Number.isSafeInteger(v.price)
+      ?{product_code:v.product_code,name:v.name,price:v.price}:null;
+  }
+  function buildChanges(list){
+    if(!Array.isArray(list))return null;
+    const out=list.map(c=>{
+      const before=buildPart(c?.before),after=buildPart(c?.after);
+      if(!object(c)||!Number.isSafeInteger(c.ordinal)||c.ordinal<0||!text(c.slot)||!Number.isSafeInteger(c.delta)||!before||!after)return null;
+      return {ordinal:c.ordinal,slot:c.slot,label:text(c.label)||c.slot,quantity:Number.isSafeInteger(c.quantity)&&c.quantity>0?c.quantity:1,before,after,delta:c.delta};
+    });
+    return out.every(Boolean)?out:null;
+  }
+  function build(value){
+    if(!object(value)||!Number.isSafeInteger(value.base_price)||value.base_price<0)return null;
+    const changes=buildChanges(value.changes);
+    return changes&&changes.length?{base_price:value.base_price,changes}:null;
+  }
+  function buildQuote(value,baseCode){
+    const changes=buildChanges(value?.changes);
+    if(!object(value)||value.ok!==true||value.base_code!==baseCode||!Number.isSafeInteger(value.base_price)||!Number.isSafeInteger(value.total)||!changes)
+      throw new Error('바꾼 구성의 금액을 확인할 수 없어요.');
+    return {base_price:value.base_price,total:value.total,changes};
+  }
+  function buildOptions(value,baseCode,ordinal){
+    if(!object(value)||value.ok!==true||value.base_code!==baseCode||value.ordinal!==ordinal||!Number.isSafeInteger(value.total)||!Array.isArray(value.options))
+      throw new Error('바꿀 부품 선택지를 확인할 수 없어요.');
+    const options=value.options.map(o=>object(o)&&Number.isSafeInteger(o.product_code)&&o.product_code>0&&text(o.name).trim()&&
+      Number.isSafeInteger(o.price)&&Number.isSafeInteger(o.price_diff)&&Number.isSafeInteger(o.total)
+      ?{product_code:o.product_code,name:o.name,price:o.price,price_diff:o.price_diff,total:o.total}:null).filter(Boolean);
+    return {ordinal,label:text(value.label),current:buildPart(value.current),total:value.total,options,
+      checked:Number.isSafeInteger(value.checked)?value.checked:0,untested:Number.isSafeInteger(value.untested)?value.untested:0,note:text(value.note)};
   }
   function gameContext(value){
     if(!object(value)||!text(value.game_name).trim()||!object(value.source)||value.source.kind!=='game_customer_copy')return null;
@@ -202,6 +236,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,partOptions,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,partOptions,buildOptions,buildQuote,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

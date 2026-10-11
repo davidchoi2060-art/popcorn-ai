@@ -5,7 +5,8 @@
   function validPending(record){
     const p=record?.payload;
     return M.object(record)&&record.version===1&&/^[a-f0-9]{64}$/.test(record.binding)&&M.object(p)
-      &&Object.keys(p).sort().join(',')==='expected_price,product_code,request_id,state'
+      &&['expected_price,product_code,request_id,state','changes,expected_price,product_code,request_id,state'].includes(Object.keys(p).sort().join(','))
+      &&(p.changes===undefined||Array.isArray(p.changes)&&p.changes.length>0&&p.changes.length<=8&&p.changes.every(c=>M.object(c)&&Object.keys(c).sort().join(',')==='ordinal,product_code'&&Number.isSafeInteger(c.ordinal)&&c.ordinal>=0&&Number.isSafeInteger(c.product_code)&&c.product_code>0))
       &&M.uuid(p.request_id)&&Number.isInteger(p.product_code)&&p.product_code>0&&Number.isInteger(p.expected_price)&&p.expected_price>=0
       &&M.object(p.state)&&new TextEncoder().encode(JSON.stringify(p)).length<=16384;
   }
@@ -34,12 +35,16 @@
   }
   // 부품 바꾸기 칸의 상태. 열린 부품(slot)과 서버가 준 선택지만 든다.
   function emptyParts(){return {slot:null,data:null,error:''};}
+  // 부품 직접 바꾸기 칸(api/mvp3_build). 열린 구성표 줄(ordinal)과 서버가 준 선택지만 든다.
+  // 바꾼 결과는 선택한 상품의 build(기준 판매가 · 바꾼 줄)와 price(서버가 다시 계산한 합계)에 둔다.
+  function emptyBuild(){return {ordinal:null,data:null,error:''};}
+  function changesOf(p){return (p?.build?.changes||[]).map(c=>({ordinal:c.ordinal,product_code:c.after.product_code}));}
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),selectedContext:null};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -54,7 +59,7 @@
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
-        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),selectedContext:null});
+        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
@@ -120,19 +125,21 @@
     function select(index){
       if(state.phase)return;
       const p=state.groups.flatMap(g=>g.products).find(p=>p.index===index);if(!p)return;
-      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
     }
     function navigate(screen){
       if(['detail','final'].includes(screen)&&!state.selected)return;
       if(!['welcome','results','detail','final','saved'].includes(screen))return;
-      cancel();state.parts=emptyParts();state.screen=screen;state.error=null;state.retry=null;emit();
+      cancel();state.parts=emptyParts();state.build=emptyBuild();state.screen=screen;state.error=null;state.retry=null;emit();
     }
     async function save(){
       if(state.phase||state.pendingSave||state.pendingProblem||!state.selected||!state.selectionState||state.needsRefresh||state.savedQuote||!Number.isInteger(state.selected.price))return;
       const selected=M.copy(state.selected),selectionState=M.copy(state.selectionState);
-      const logical=JSON.stringify([selected.product_code,selected.price,selectionState]);
+      const changes=changesOf(selected);
+      const logical=JSON.stringify([selected.product_code,selected.price,selectionState,changes]);
       if(!saveIds.has(logical))saveIds.set(logical,uuid());
       const payload={request_id:saveIds.get(logical),product_code:selected.product_code,expected_price:selected.price,state:selectionState};
+      if(changes.length)payload.changes=changes;
       const op=begin('save');state.saveState='saving';emit();
       try{
         const binding=await api.prepareSave();if(!current(op))return;
@@ -189,7 +196,9 @@
         const url=M.safeUrl(r?.mall_url);
         if(r?.ok!==true||!url||r.quote_id!==q.id||!Number.isInteger(r.price_quoted))throw new Error('쇼핑몰 연결 응답을 확인할 수 없어요.');
         state.handoff={quote_id:q.id,handoff_no:M.text(r.handoff_no),mall_url:url,status:M.text(r.mall_status),
-          price_quoted:r.price_quoted,price_mall:Number.isInteger(r.price_mall)?r.price_mall:null};
+          price_quoted:r.price_quoted,price_mall:Number.isInteger(r.price_mall)?r.price_mall:null,
+          changes:Array.isArray(r.changes)?r.changes.filter(c=>M.object(c)&&Number.isSafeInteger(c.delta)).length:0,
+          delta:Array.isArray(r.changes)?r.changes.reduce((n,c)=>n+(Number.isSafeInteger(c?.delta)?c.delta:0),0):0};
       }catch(error){if(current(op))fail(error,{kind:'handoff'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
@@ -254,13 +263,54 @@
       const o=data.options.find(x=>x.product_code===code);if(!o)return;
       const before=state.selected;
       state.selectedContext=state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(before.index)&&g.products.some(x=>x.index===before.index&&x.product_code===before.product_code))||null;
-      const next=M.copy(o);delete next.swap;
+      const next=M.copy(o);delete next.swap;state.build=emptyBuild();
       state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;
       state.inquiry=emptyInquiry();state.parts=emptyParts();state.error=null;state.retry=null;
       const d=o.swap.price_diff,diff=d===0?'지금과 같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
       message(data.label+'를 '+o.swap.value+'로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겨서 금액은 '+o.price.toLocaleString('ko-KR')+'원('+diff+')이에요.'+
         o.swap.also.map(x=>' '+x.label+'도 '+x.from+'에서 '+x.to+'로 함께 바뀌어요.').join('')+' 파워·케이스 같은 나머지 부품은 부품 구성에서 확인해 주세요.');
       emit();
+    }
+    // 부품 직접 바꾸기(api/mvp3_build): 공개된 구성표의 한 줄을 호환되는 판매 부품으로 바꾼다.
+    // 상품번호는 그대로이고, 금액은 서버가 「PC 판매가 + 부품 가격 차이」로 다시 계산한 값만 쓴다.
+    async function openBuild(ordinal){
+      if(state.phase||!state.selected||!state.selectionState||state.screen!=='detail'||!Number.isSafeInteger(ordinal))return;
+      if(state.build.ordinal===ordinal&&(state.build.data||state.build.error)){state.build=emptyBuild();emit();return;}
+      state.parts=emptyParts();state.build={ordinal,data:null,error:''};
+      const base=state.selected.product_code,op=begin('build');
+      try{
+        const r=await api.buildOptions(M.copy(state.selectionState),base,changesOf(state.selected),ordinal,{signal:op.signal});
+        if(!current(op))return;
+        state.build.data=M.buildOptions(r,base,ordinal);
+      }catch(error){if(current(op))state.build.error=error?.message||'바꿀 부품을 불러오지 못했어요.';}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    function closeBuild(){if(state.phase==='build')cancel();state.build=emptyBuild();emit();}
+    async function applyBuild(changes,say){
+      const p=state.selected,base=p.product_code,op=begin('build');
+      try{
+        const q=M.buildQuote(await api.buildQuote(M.copy(state.selectionState),base,changes,{signal:op.signal}),base);
+        if(!current(op))return;
+        state.selected={...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes}:null};
+        state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;state.inquiry=emptyInquiry();state.build=emptyBuild();
+        message(say(q));
+      }catch(error){if(current(op))state.build.error=error?.message||'부품을 바꾸지 못했어요.';}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    function pickBuild(code){
+      const data=state.build.data;
+      if(state.phase||!data||!state.selected)return;
+      const o=data.options.find(x=>x.product_code===code);if(!o)return;
+      const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
+      const original=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal)?.before.product_code;
+      if(code!==original)changes.push({ordinal:data.ordinal,product_code:code});
+      const won=n=>n.toLocaleString('ko-KR')+'원';
+      return applyBuild(changes,q=>(data.label||'부품')+' 부품을 「'+o.name+'」 제품으로 바꿨어요. 호환 규칙을 다시 확인했고, 금액은 '+won(q.total)+'이에요(기본 구성 '+won(q.base_price)+
+        (q.total===q.base_price?'과 같아요).':(q.total>q.base_price?' + ':' - ')+won(Math.abs(q.total-q.base_price))+').'));
+    }
+    function resetBuild(){
+      if(state.phase||!state.selected?.build)return;
+      return applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 금액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
     }
     async function list(){
       const op=begin('list');state.screen='saved';emit();
@@ -277,7 +327,7 @@
     function load(id){
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
-      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
@@ -291,7 +341,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart};
+    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
   if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);

@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_offer, grid_public, visitor
+from . import access_gate, customer_pc_offer, grid_public, mvp3_build, visitor
 from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
@@ -35,6 +35,8 @@ class SaveBody(BaseModel):
     product_code: StrictInt = Field(gt=0)
     expected_price: StrictInt = Field(ge=0)
     state: dict
+    # 부품 직접 바꾸기(api/mvp3_build). 있으면 서버가 금액·호환을 다시 계산해 그 값으로 보관한다.
+    changes: list[mvp3_build.Change] = Field(default_factory=list, max_length=mvp3_build.MAX_CHANGES)
 
 
 def same_origin(request):
@@ -45,7 +47,10 @@ def same_origin(request):
 
 
 def fingerprint(body):
-    raw = json.dumps(body.model_dump(mode='json'), sort_keys=True, ensure_ascii=False, separators=(',', ':'))
+    dump = body.model_dump(mode='json')
+    if not dump.get('changes'):
+        dump.pop('changes', None)     # 부품을 바꾸지 않은 저장은 예전과 같은 지문이다
+    raw = json.dumps(dump, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
     if len(raw.encode('utf-8')) > 16384:
         raise HTTPException(422, '상담 조건이 너무 큽니다.')
     return hashlib.sha256(raw.encode('utf-8')).hexdigest()
@@ -141,14 +146,10 @@ def save_quote(body: SaveBody, request: Request, response: Response):
             state, _ = validate_state(body.state, load_vocab(conn))
     if previous:
         return {'ok': True, 'quote': with_live_offer([quote])[0]}
-    public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
-    if not in_recommendation(public, body.product_code):
-        # 「더 싸게」·「더 좋게」·추가 조건으로 본 카드는 조건만으로 다시 조회한 목록에 없을 수 있다.
-        # 같은 판매 원천에서 이 상담 용도의 최소 수준을 채우는 상품일 때만 받는다(api/sold_reco.eligible_item).
-        item = grid_public.eligible_sold_item(state.model_dump(), body.product_code)
-        if item is not None:
-            public = {'card_sets': [{'kind': 'sold', 'items': [item]}]}
-    product = selected_product(public, body.product_code, body.expected_price)
+    if body.changes:
+        product = built_product(state.model_dump(), body)
+    else:
+        product = recommended_product(state, body)
     params = {'id': str(uuid4()), 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
               'product': json.dumps(product, ensure_ascii=False),
               'state': json.dumps(state.model_dump(), ensure_ascii=False)}
@@ -166,3 +167,25 @@ def save_quote(body: SaveBody, request: Request, response: Response):
             raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
         quote = render_quote(row)
     return {'ok': True, 'quote': with_live_offer([quote])[0]}
+
+
+def built_product(state_raw, body):
+    """부품을 바꾼 견적 — 기준 PC 는 같은 판정(eligible_sold_item)으로, 금액은 서버가 다시 계산한다."""
+    item, q = mvp3_build.build_quote(state_raw, body.product_code, body.changes)
+    product = public_product(item)
+    if q['total'] != body.expected_price:
+        raise HTTPException(409, '상품 가격이 변경되었습니다. 다시 조회한 가격을 확인해 주세요.')
+    product['price'] = q['total']
+    product['build'] = {'base_price': q['base_price'], 'changes': q['changes'], 'compat': q['compat']}
+    return product
+
+
+def recommended_product(state, body):
+    public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
+    if not in_recommendation(public, body.product_code):
+        # 「더 싸게」·「더 좋게」·추가 조건으로 본 카드는 조건만으로 다시 조회한 목록에 없을 수 있다.
+        # 같은 판매 원천에서 이 상담 용도의 최소 수준을 채우는 상품일 때만 받는다(api/sold_reco.eligible_item).
+        item = grid_public.eligible_sold_item(state.model_dump(), body.product_code)
+        if item is not None:
+            public = {'card_sets': [{'kind': 'sold', 'items': [item]}]}
+    return selected_product(public, body.product_code, body.expected_price)

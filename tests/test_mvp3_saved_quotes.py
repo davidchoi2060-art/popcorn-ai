@@ -272,4 +272,26 @@ class SavedQuotesTest(unittest.TestCase):
         self.assertEqual(self.store.rows, [])
 
 
+    def test_changed_parts_saved_at_server_total(self):
+        built = {'base_price': 1500000, 'total': 1550000, 'compat': {'ok': True},
+                 'changes': [{'ordinal': 1, 'slot': 'CPU', 'delta': 50000}]}
+        with patch.object(m.mvp3_build, 'build_quote', return_value=(dict(PRODUCT), built)) as bq:
+            q = m.save_quote(body(expected_price=1550000, changes=[{'ordinal': 1, 'product_code': 102}]),
+                             request(), Response())['quote']
+            self.assertEqual(bq.call_args.args[1], 17)
+        self.assertEqual(q['product']['price'], 1550000)
+        self.assertEqual(q['product']['build']['base_price'], 1500000)
+        self.mocks[5].assert_not_called()   # 부품을 바꾼 저장은 추천을 다시 돌리지 않는다
+        with patch.object(m.mvp3_build, 'build_quote', return_value=(dict(PRODUCT), built)):
+            with self.assertRaises(HTTPException) as e:
+                m.save_quote(body(request_id=UUID(int=2), expected_price=1500000,
+                                  changes=[{'ordinal': 1, 'product_code': 102}]), request(), Response())
+        self.assertEqual(e.exception.status_code, 409)
+
+    def test_fingerprint_without_changes_is_unchanged(self):
+        plain = body()
+        self.assertEqual(m.fingerprint(plain), m.fingerprint(body(changes=[])))
+        self.assertNotEqual(m.fingerprint(plain), m.fingerprint(body(changes=[{'ordinal': 1, 'product_code': 2}])))
+
+
 if __name__ == '__main__': unittest.main()
