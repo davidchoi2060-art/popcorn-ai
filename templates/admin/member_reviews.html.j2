@@ -1,0 +1,232 @@
+{% extends "admin/_admin2_shell.html.j2" %}
+{#  후기 관리(ADM-CUS-020) — 구 관리자 `/admin/reviews.html` 을 admin2 로 옮긴 화면(2026-10-11).
+    · 화면은 서버 응답만으로 그린다. 못 불러오면 숫자는 「—」로 두고 이유를 적는다(0 은 「없다」는 주장).
+    · 처리는 서버만 한다. 화면이 상태를 먼저 바꿔 처리된 척하지 않는다.
+    · 구 화면 문구 「고객에게 사유 안내 발송」은 옮기지 않았다 — 실제로 아무것도 보내지 않는다.
+    · 「견적 근거 인용」은 운영자 선별 표시까지다. 고객 화면 사용은 미정(U-02)이라 그 사실을 밝힌다. #}
+
+{% block title %}후기 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+.mr-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px;max-width:1080px}
+.mr-head h1{margin:0;font:700 22px/1.35 var(--rv-font);color:var(--rv-ink)}
+.mr-head p{margin:4px 0 0;font:400 13px/1.6 var(--rv-font);color:var(--rv-muted)}
+.mr-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.mr-kpi{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:10px 14px}
+.mr-kpi span{display:block;font:400 12px/1.4 var(--rv-font);color:var(--rv-muted)}
+.mr-kpi b{font:700 20px/1.3 var(--font-num,var(--rv-font));color:var(--rv-ink)}
+.mr-kpi small{font:400 12px/1 var(--rv-font);color:var(--rv-faint);margin-left:3px}
+.mr-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.mr-chip{border:1px solid rgba(0,0,0,.14);background:var(--rv-card);border-radius:16px;padding:5px 12px;
+    font:500 12.5px/1.2 var(--rv-font);color:var(--rv-ink);cursor:pointer}
+.mr-chip[aria-pressed=true]{background:var(--rv-ink);border-color:var(--rv-ink);color:var(--rv-card)}
+.mr-chip:focus-visible,.mr-btn:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
+.mr-reload{margin-left:auto}
+.mr-note{margin:0;font:400 12.5px/1.6 var(--rv-font);color:var(--rv-muted)}
+.mr-list{display:flex;flex-direction:column;gap:8px}
+.mr-item{background:var(--rv-card);border:1px solid rgba(0,0,0,.1);border-radius:8px;padding:12px 16px;display:flex;flex-direction:column;gap:6px}
+.mr-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font:400 12.5px/1.5 var(--rv-font);color:var(--rv-muted)}
+.mr-stars{color:var(--rv-amber);letter-spacing:1px;font-size:14px}
+.mr-cust{font-weight:600;color:var(--rv-ink)}
+.mr-tag{border:1px solid rgba(0,0,0,.14);border-radius:10px;padding:1px 8px;font-size:11.5px;color:var(--rv-ink);background:var(--rv-canvas)}
+.mr-tag.warn{border-color:var(--rv-red);color:var(--rv-red)}
+.mr-tag.off{color:var(--rv-faint)}
+.mr-when{margin-left:auto;color:var(--rv-faint)}
+.mr-body{margin:0;font:400 13.5px/1.65 var(--rv-font);color:var(--rv-ink);white-space:pre-wrap;overflow-wrap:anywhere}
+.mr-report{margin:0;padding:6px 10px;border-radius:6px;background:var(--rv-amber-bg);font:400 12.5px/1.5 var(--rv-font);color:var(--rv-ink)}
+.mr-acts{display:flex;flex-wrap:wrap;gap:8px}
+.mr-btn{border:1px solid rgba(0,0,0,.16);background:var(--rv-card);border-radius:6px;padding:6px 12px;
+    font:600 12px/1.2 var(--rv-font);color:var(--rv-ink);cursor:pointer}
+.mr-btn.danger{color:var(--rv-red);border-color:var(--rv-red)}
+.mr-btn:disabled{opacity:.45;cursor:default}
+.mr-empty{background:var(--rv-card);border:1px dashed rgba(0,0,0,.16);border-radius:8px;padding:22px;text-align:center;
+    font:400 13px/1.6 var(--rv-font);color:var(--rv-muted)}
+.mr-empty.err{border-style:solid;border-color:var(--rv-red);color:var(--rv-red)}
+@media (max-width:768px){
+  .mr-wrap{padding:12px 12px 24px}
+  .mr-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mr-when{margin-left:0;flex-basis:100%}
+  .mr-reload{margin-left:0}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mr-wrap" data-screen-id="ADM-CUS-020" data-domain="member-reviews">
+  <header class="mr-head">
+    <h1>후기 관리</h1>
+    <p>구매한 고객이 남긴 후기를 봅니다. 신고된 후기를 숨기거나 그대로 두고, 숨긴 후기를 다시 게시합니다. 처리한 일은 바로 되돌릴 수 있습니다.</p>
+  </header>
+
+  <section class="mr-kpis" aria-label="후기 요약">
+    <div class="mr-kpi"><span>전체 후기</span><b id="kTotal">—</b><small>건</small></div>
+    <div class="mr-kpi"><span>평균 평점 (숨김 제외)</span><b id="kAvg">—</b><small>점</small></div>
+    <div class="mr-kpi"><span>신고 처리 대기</span><b id="kReported">—</b><small>건</small></div>
+    <div class="mr-kpi"><span>견적 근거 인용 표시</span><b id="kCite">—</b><small>건</small></div>
+  </section>
+
+  <div class="mr-bar" role="group" aria-label="상태로 거르기">
+    <button type="button" class="mr-chip" data-filter="" aria-pressed="true">전체</button>
+    <button type="button" class="mr-chip" data-filter="신고됨" aria-pressed="false">신고됨</button>
+    <button type="button" class="mr-chip" data-filter="게시" aria-pressed="false">게시</button>
+    <button type="button" class="mr-chip" data-filter="숨김" aria-pressed="false">숨김</button>
+    <button type="button" class="mr-btn mr-reload" id="mrReload">새로고침</button>
+  </div>
+  <p class="mr-note">「견적 근거 인용」은 견적 화면에 보여 줄 후보로 표시만 합니다. 고객 화면에는 아직 쓰이지 않습니다. 처리 버튼은 운영자 이상 권한에서만 누를 수 있습니다.</p>
+
+  <div class="mr-list" id="mrList" aria-live="polite"><div class="mr-empty">불러오는 중입니다.</div></div>
+</div>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function () {
+  var DASH = '—';
+  var rows = null, filter = '', loadErr = '';
+  var list = document.getElementById('mrList');
+  var ACT_DONE = { hide: '후기를 숨겼습니다.', keep: '신고를 검토하고 게시를 유지했습니다.',
+                   restore: '후기를 다시 게시했습니다.', cite_on: '견적 근거 인용으로 표시했습니다.',
+                   cite_off: '견적 근거 인용 표시를 해제했습니다.' };
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function shell() { return window.Admin2Shell || null; }
+  function toast(msg, kind, action, onAction) {
+    var s = shell();
+    if (s && s.toast) s.toast(msg, kind, action, onAction);
+  }
+  function canWrite() {
+    var s = shell();
+    return !!(s && s.canWrite && s.canWrite('operator'));
+  }
+  function errText(res, j) {
+    var d = j && j.detail;
+    if (typeof d === 'string') return d;
+    if (d && (d.detail || d.error)) return d.detail || d.error;
+    return '오류 ' + res.status;
+  }
+  function day(iso) {
+    if (!iso) return DASH;
+    var d = new Date(iso);
+    if (isNaN(d)) return DASH;
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function stars(n) {
+    n = Math.max(0, Math.min(5, Number(n) || 0));
+    return '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+  }
+
+  function kpis() {
+    var set = function (id, v) { document.getElementById(id).textContent = v; };
+    if (!rows) { ['kTotal', 'kAvg', 'kReported', 'kCite'].forEach(function (id) { set(id, DASH); }); return; }
+    var vis = rows.filter(function (r) { return r.state !== '숨김'; });
+    set('kTotal', rows.length.toLocaleString('ko-KR'));
+    set('kAvg', vis.length ? (vis.reduce(function (s, r) { return s + r.rating; }, 0) / vis.length).toFixed(1) : DASH);
+    set('kReported', rows.filter(function (r) { return r.state === '신고됨'; }).length.toLocaleString('ko-KR'));
+    set('kCite', rows.filter(function (r) { return r.cite; }).length.toLocaleString('ko-KR'));
+  }
+
+  function actions(r) {
+    var dis = canWrite() ? '' : ' disabled title="운영자 이상 권한이 필요합니다"';
+    var b = function (act, label, cls) {
+      return '<button type="button" class="mr-btn' + (cls ? ' ' + cls : '') + '" data-id="' + r.id + '" data-act="' + act + '"' + dis + '>' + label + '</button>';
+    };
+    if (r.state === '신고됨') return b('hide', '숨김 처리', 'danger') + b('keep', '게시 유지');
+    if (r.state === '게시') return b(r.cite ? 'cite_off' : 'cite_on', r.cite ? '견적 근거 인용 해제' : '견적 근거로 인용') + b('hide', '숨김 처리', 'danger');
+    if (r.state === '숨김') return b('restore', '게시 복원');
+    return '';
+  }
+
+  function render() {
+    kpis();
+    document.querySelectorAll('.mr-chip').forEach(function (c) {
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-filter') === filter));
+    });
+    if (!rows) {
+      list.innerHTML = '<div class="mr-empty' + (loadErr ? ' err' : '') + '">' + esc(loadErr || '불러오는 중입니다.') + '</div>';
+      return;
+    }
+    var shown = filter ? rows.filter(function (r) { return r.state === filter; }) : rows;
+    if (!shown.length) {
+      list.innerHTML = '<div class="mr-empty">' + (rows.length ? '이 상태의 후기가 없습니다.' : '등록된 후기가 없습니다.') + '</div>';
+      return;
+    }
+    list.innerHTML = shown.map(function (r) {
+      var stCls = r.state === '신고됨' ? ' warn' : (r.state === '숨김' ? ' off' : '');
+      return '<article class="mr-item">'
+        + '<div class="mr-meta">'
+        + '<span class="mr-stars" aria-label="평점 ' + esc(r.rating) + '점">' + stars(r.rating) + '</span>'
+        + '<span class="mr-cust">' + esc(r.cust || DASH) + '</span>'
+        + '<span class="mr-tag">구매 인증 · 주문 ' + esc(r.order || DASH) + '</span>'
+        + '<span class="mr-tag' + stCls + '">' + esc(r.state) + '</span>'
+        + (r.cite ? '<span class="mr-tag">견적 근거 인용 표시</span>' : '')
+        + '<span class="mr-when">' + esc(day(r.at)) + ' · ' + esc(r.item || DASH) + '</span>'
+        + '</div>'
+        + '<p class="mr-body">' + esc(r.body) + '</p>'
+        + (r.state === '신고됨' && r.note ? '<p class="mr-report">신고 메모 · ' + esc(r.note) + '</p>' : '')
+        + '<div class="mr-acts">' + actions(r) + '</div>'
+        + '</article>';
+    }).join('');
+  }
+
+  function load() {
+    return fetch('/api/admin/member-reviews', { credentials: 'same-origin' })
+      .then(function (res) {
+        if (!res.ok) throw new Error(res.status === 401 ? '로그인이 필요합니다.' : '목록을 불러오지 못했습니다 — 오류 ' + res.status);
+        return res.json();
+      })
+      .then(function (d) { rows = d.items || []; loadErr = ''; render(); });
+  }
+  function reload() {
+    return load().catch(function (e) {
+      if (rows) { toast('목록을 다시 불러오지 못했습니다. 새로고침해 주세요.', 'warn'); return; }
+      loadErr = (e && e.message) || '목록을 불러오지 못했습니다.';
+      render();
+    });
+  }
+
+  function undo(logId) {
+    fetch('/api/admin/member-reviews/undo/' + logId, { method: 'POST', credentials: 'same-origin' })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { res: res, j: j }; }); })
+      .then(function (x) {
+        if (!x.res.ok) { toast('되돌리지 못했습니다: ' + errText(x.res, x.j), 'err'); return; }
+        toast('되돌렸습니다. 후기 상태가 이전으로 돌아갔습니다.');
+        reload();
+      })
+      .catch(function () { toast('되돌리지 못했습니다: 네트워크 오류', 'err'); });
+  }
+
+  list.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-act]');
+    if (!b || b.disabled) return;
+    var id = Number(b.getAttribute('data-id')), act = b.getAttribute('data-act');
+    b.disabled = true;
+    fetch('/api/admin/member-reviews/' + id + '/moderate', {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: act })
+    })
+      .then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { return { res: res, j: j }; }); })
+      .then(function (x) {
+        if (!x.res.ok) { b.disabled = false; toast('처리하지 못했습니다: ' + errText(x.res, x.j), 'err'); return; }
+        var logId = x.j.undo_id;
+        toast(ACT_DONE[act] || '처리했습니다.', 'ok', logId ? '되돌리기' : null, logId ? function () { undo(logId); } : null);
+        reload();
+      })
+      .catch(function () { b.disabled = false; toast('처리하지 못했습니다: 네트워크 오류', 'err'); });
+  });
+
+  document.querySelectorAll('.mr-chip').forEach(function (c) {
+    c.addEventListener('click', function () { filter = c.getAttribute('data-filter'); render(); });
+  });
+  document.getElementById('mrReload').addEventListener('click', reload);
+
+  var s = shell();
+  if (s && s.meReady) s.meReady.then(render, render);
+  reload();
+})();
+</script>
+{% endblock %}

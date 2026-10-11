@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.testclient import TestClient
 
-from api.admin_page_intro import back_for, group_crumb
+from api.admin_page_intro import back_for, entries_for, group_crumb
 
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / 'api/admin_ui_commerce_orders.py'
@@ -22,7 +22,8 @@ NAV = ROOT / 'api/admin_nav.py'
 # 2026-10-11: 「고객 문의 · 보관 견적」(/admin2/mvp3-consults)·「판매 안내 자료」(/admin2/shop-notices)
 # ·「AI 답 점검」(/admin2/talk-review) 메뉴 추가로 기대 지문 갱신
 # 2026-10-11: 「쇼핑몰 가격 반영」(/admin2/mall-price) 메뉴 추가로 기대 지문 갱신
-NAV_BASELINE_AST_SHA = 'c73e4c32e2bbc02b9aa2bee8f10e318de2395d6e0a4d4bea9265c16d10a19b7e'
+# 2026-10-11: 신 관리자 「회원 관리」 묶음에 「후기 관리」(/admin2/member-reviews) 추가로 기대 지문 갱신
+NAV_BASELINE_AST_SHA = 'fd6814ea877837c58694384ab909eab20153951fba33fedd0ba79b4a35bfc6f9'
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'
@@ -73,7 +74,7 @@ def renderer(nav):
     env = dict(Request=Request, HTMLResponse=HTMLResponse,
                templates=Jinja2Templates(directory=str(ROOT / 'templates')),
                nav_for=nav['nav_for'], nav_counts=nav['counts'], new_admin_nav=nav['new_admin_nav'],
-               back_for=back_for, group_crumb=group_crumb)
+               back_for=back_for, entries_for=entries_for, group_crumb=group_crumb)
     return exec_selected(tree, path, env)['render']
 
 
