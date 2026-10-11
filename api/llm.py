@@ -932,6 +932,43 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 # ============================================================================
 # 공개 진입점 -- 모든 호출이 지나는 단일 자리
 # ============================================================================
+# ── 공급자 임시 우회 (2026-10-12 사장님 지시 「다른 API 를 일단 사용하자」) ─────────────
+# 한 공급자 계정이 통째로 막혔을 때(잔액 부족처럼 다른 공급자로 넘겨도 되는데 _is_fallback_eligible 이
+# 넘기지 않는 400) 서버 env 한 줄로 그 공급자 대신 다른 공급자를 부른다. 값이 없으면 아무것도 바뀌지 않는다.
+#   POPCORN_LLM_REROUTE=claude=codex:gpt-5.6-luna      (여럿이면 쉼표로)
+#   POPCORN_LLM_REROUTE=off                              (우회 끔)
+# env 가 없으면 REROUTE_DEFAULT 를 쓴다. 지금은 Anthropic 잔액 부족 동안 배포만으로 우회가 켜지도록
+# Claude -> OpenAI luna 다(서버 env 를 고칠 사람이 없는 시간이라). 잔액이 돌아오면 이 기본값을 ""로 되돌린다.
+# 대상 모델을 생략하거나 레지스트리에 없는 모델이면 대상 공급자의 default_model 을 쓴다.
+# 우회된 공급자는 폴백 순서에서도 뺀다(막힌 계정을 다시 부르지 않는다).
+REROUTE_ENV = "POPCORN_LLM_REROUTE"
+REROUTE_DEFAULT = "claude=codex:gpt-5.6-luna"
+
+
+def _reroutes() -> dict[str, tuple[str, str | None]]:
+    """env -> {막힌 공급자: (대신 부를 공급자, 모델|None)}. 형식이 틀린 항목은 버리고 로그만 남긴다."""
+    out: dict[str, tuple[str, str | None]] = {}
+    raw = os.environ.get(REROUTE_ENV)
+    raw = REROUTE_DEFAULT if raw is None else raw
+    if raw.strip().lower() == "off":
+        return out
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        src, _, dst = item.partition("=")
+        dst_p, _, dst_m = dst.strip().partition(":")
+        src, dst_p, dst_m = src.strip(), dst_p.strip(), dst_m.strip() or None
+        if src not in PROVIDERS or dst_p not in PROVIDERS or src == dst_p:
+            log.warning("[llm] %s entry ignored (unknown provider): %s", REROUTE_ENV, item)
+            continue
+        if dst_m is not None and dst_m not in PROVIDERS[dst_p].pricing:
+            log.warning("[llm] %s model %s not registered for %s - using default_model", REROUTE_ENV, dst_m, dst_p)
+            dst_m = None
+        out[src] = (dst_p, dst_m)
+    return out
+
+
 def call(prompt: str, *, provider: str | None = None, task_key: str | None = None,
          model: str | None = None, system: str | None = None,
          customer_facing: bool = False, max_output_tokens: int = 2048,
@@ -1024,10 +1061,17 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
             task_key, provider, model, task_provider, task_model, task_reason,
             resolved_provider, resolved_model or "(default_model)")
 
+    reroutes = _reroutes()
+    if resolved_provider in reroutes:
+        blocked = resolved_provider
+        resolved_provider, resolved_model = reroutes[blocked]
+        log.info("[llm] %s: %s rerouted to %s/%s", REROUTE_ENV, blocked, resolved_provider,
+                 resolved_model or "(default_model)")
+
     order = ([resolved_provider] if fallback_order == []
               else [resolved_provider] + [p for p in (fallback_order or
                                           _resolve_fallback_order(resolved_provider, task_key))
-                                  if p in PROVIDERS and p != resolved_provider])
+                                  if p in PROVIDERS and p != resolved_provider and p not in reroutes])
 
     attempts: list[tuple[str, Exception]] = []
     for i, prov in enumerate(order):
