@@ -168,6 +168,7 @@ from . import talk_rules as TR   # 문장 원문으로 AI state 를 바로잡는
 from . import shop_notices    # 관리자 「판매 안내 자료」 — 결제·배송·A/S 안내의 정본(2026-10-11)
 from . import talk_text_fixes as text_fixes    # 관리자 「해석 바로잡기」(0151)
 from . import talk_exceptions as TX   # 예외 입력 대응 -- 막지 않고 받아서 이끈다(2026-10-11)
+from . import talk_defaults as TD    # 답 먼저, 되묻기는 끝에 한 번 -- 기본 가정 사전(2026-10-11)
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -642,6 +643,8 @@ def _build_prompt(text: str, vocab: "TS.Vocab", prev_state: dict | None = None,
         "⑥ 우리가 할 일을 약속하지 않는다 -- 운영체제 설치·배송·설치·A/S·할인·여러 대 주문·"
         "모니터 포함·결제·담당자 연락을 「해 드릴게요」「확인했습니다」라고 말하지 않는다."
         " 램 용량·저장공간·그래픽카드 모델·케이스 색·소음 같은 조건을 「맞춰 드릴게요」라고 하지 않는다.",
+        "⑦ missing 이 없으면 예산·해상도·세부 조건을 되묻지 않는다 -- 예산이 없으면 서버가 가정을 밝히고"
+        " 카드를 바로 낸다. 「찾아드리겠습니다」처럼 앞으로 할 일만 말하지 않는다.",
         "pc 가 false 이면 위 [잡담] 규칙을 따른다 -- 비우지 말고 자연스럽게 응대한다.",
         "",
         "[이전까지 파악한 상태]",
@@ -1031,7 +1034,8 @@ def _quick_response(body: ParseBody, reply: str, exceptions: list) -> dict:
         "ok": True, "state": state.model_dump(), "missing": [], "dropped": [], "evidence": [],
         "reply": reply, "assumed": [], "pc_related": None, "constraints": _legacy_constraints(state),
         "note": None, "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=offered,
-                                                pc_declined=declined).model_dump(),
+                                                pc_declined=declined,
+                                                asked=TS.flow_asked(body.chat_flow)).model_dump(),
         "stage": TS.stage_for(turns), "answer": "", "sources": [], "narrowing": TS.NARROWING_WIDE,
         "answer_game_names": [], "answer_notice": None, "answer_filter": None,
         "answer_elapsed_sec": 0, "answer_error": None, "silent": False,
@@ -1196,6 +1200,12 @@ def parse_talk(body: ParseBody, request: Request):
     # (2026-10-10 점검 9·27번. 추천 단계는 #53 에서 같은 기준으로 이미 고쳤다).
     released = TR.release_unnamed_game(missing, state, prev_state_obj, TS.is_game_usage,
                                        TS.MISSING_GAME_GRADE)
+    # 「게임용 가장 싸게」처럼 가격 방향을 말했으면 게임 이름 없이도 FHD 기준으로 바로 카드를 낸다
+    # (api/talk_defaults -- 예산 대신 가격 방향이 기본값을 정한다).
+    pref = TD.price_pref(text)
+    if (not released and pref and missing == [TS.MISSING_GAME_GRADE]
+            and TR.unnamed_game(state)):
+        released = True
     if released:
         missing = []
     # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
@@ -1277,6 +1287,25 @@ def parse_talk(body: ParseBody, request: Request):
     if unreadable:
         exceptions.append("ai_unreadable")
         reply = TX.REPLY_AI_UNREADABLE
+    # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
+    asked_before = TS.flow_asked(body.chat_flow)
+    plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
+                and not notices and not laptop)
+    if plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
+        # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
+        label = TD.default_usage_label(vocab)
+        if label:
+            state = state.model_copy(update={"usages": [label]})
+            missing = TS.missing_for(state, vocab)
+            fit = TD._fit_usage(label)
+            reply = TD.no_usage_reply(TD.basis_work(fit) if fit else None)
+            log.info("[talk] answer-first: no usage after ask - assumed general use")
+    elif plain_pc and not missing and (
+            (asked_before and "?" in reply)
+            or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
+        reply = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage) or reply
+        log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
+                 pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
     reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
                                       top_spec_re=TR._TOP, uhd_re=TR._UHD,
                                       read_len=MAX_TEXT_LEN, masked=masked,
@@ -1376,7 +1405,9 @@ def parse_talk(body: ParseBody, request: Request):
         # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
         # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
         "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
-                                 pc_declined=pc_declined).model_dump(),
+                                 pc_declined=pc_declined,
+                                 asked=bool(missing) and pc is True and stage == TS.STAGE_PC
+                                 ).model_dump(),
         "stage": stage,
         # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
         # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,
