@@ -218,19 +218,23 @@ def visitor_detail(visitor: str, include_test: bool = False):
     with engine.connect() as conn:
         if uid is not None:
             hits = conn.execute(text(f"""
-                SELECT hit_id, created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, {HIT_IS_TEST} AS is_test
-                  FROM talk_intent_hits WHERE visitor_key = :k AND {hit_origin}
-                 ORDER BY created_at, hit_id LIMIT 500"""), {"k": str(uid)}).mappings().all()
+                SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
+                       intent_key, {HIT_IS_TEST} AS is_test,
+                       r.shown_reply, r.flags, r.status AS review_status
+                  FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
+                 WHERE visitor_key = :k AND {hit_origin}
+                 ORDER BY h.created_at, h.hit_id LIMIT 500"""), {"k": str(uid)}).mappings().all()
             quotes = conn.execute(text(f"""
                 SELECT quote_id, product_snapshot, talk_state, saved_at
                   FROM mvp3_saved_recommendations s WHERE user_id = :u AND {_saved_origin(include_test)}
                  ORDER BY saved_at, quote_id LIMIT 200"""), {"u": uid}).mappings().all()
         else:
             hits = conn.execute(text(f"""
-                SELECT hit_id, created_at, matched_terms, unmatched_n, answer_kind, llm_called,
-                       intent_key, {HIT_IS_TEST} AS is_test
-                  FROM talk_intent_hits WHERE hit_id = :h"""), {"h": hit_id}).mappings().all()
+                SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
+                       intent_key, {HIT_IS_TEST} AS is_test,
+                       r.shown_reply, r.flags, r.status AS review_status
+                  FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
+                 WHERE h.hit_id = :h"""), {"h": hit_id}).mappings().all()
             quotes = []
     if not hits and not quotes:
         raise HTTPException(404, "이 방문자의 기록이 없습니다")
@@ -240,6 +244,10 @@ def visitor_detail(visitor: str, include_test: bool = False):
         "terms": _terms(h["matched_terms"]), "unread": int(h["unmatched_n"] or 0),
         "ai_called": bool(h["llm_called"]), "intent_key": h["intent_key"],
         "test": bool(h["is_test"]),
+        # 고객이 본 AI 답(0138 이후 문의만 있다) — 점검은 「AI 답 점검」 화면에서 한다
+        "reply": None if h["review_status"] is None else {
+            "shown_reply": h["shown_reply"], "flags": list(h["flags"] or []),
+            "status": h["review_status"]},
     } for h in hits]
     for q in quotes:
         p = q["product_snapshot"] or {}

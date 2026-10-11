@@ -18,8 +18,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / 'api/admin_ui_commerce_orders.py'
 NAV = ROOT / 'api/admin_nav.py'
 # 2026-10-11: 「고객 문의 · 보관 견적」(/admin2/mvp3-consults)·「판매 안내 자료」(/admin2/shop-notices)
-# 메뉴 추가로 기대 지문 갱신
-NAV_BASELINE_AST_SHA = '3b7624dd9920c6116f9a007b807cbaf7c311a45d1d7b32ea474fa66d047ecb5c'
+# ·「AI 답 점검」(/admin2/talk-review) 메뉴 추가로 기대 지문 갱신
+NAV_BASELINE_AST_SHA = '1afbb115816896abe855dc000444c1c1fcf53fd4f6c2093de0fb83c2c09d715b'
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'
