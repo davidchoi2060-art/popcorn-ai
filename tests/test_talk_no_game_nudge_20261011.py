@@ -50,9 +50,21 @@ class NoGameNudgeInSmallTalk(unittest.TestCase):
                   history=[{'role': 'user', 'text': '게임 좋아해요'}])
         self.assertIn('게임', r['reply'])
 
-    def test_passing_mention_among_options_is_kept(self):
-        s = '주말에 쉬면서 친구들과 시간 보내거나, 좋아하는 게임이나 영화 봐도 괜찮을 것 같네요.'
-        self.assertEqual(_turn('주말 뭐 하지', s)['reply'], s)
+    def test_game_listed_among_options_is_taken_out_of_the_list(self):
+        # 2026-10-11 개발 서버 실측 문장들 -- 고객이 게임을 말하지 않았는데 할 거리로 끼워 넣었다.
+        cases = {
+            '심심해': ('그럴 땐 게임을 하거나 영상 봐도 좋지요.', '그럴 땐 영상 봐도 좋지요.'),
+            '비 오네': ('비 오는 날엔 실내에서 게임이나 영상 감상도 괜찮습니다.',
+                        '비 오는 날엔 실내에서 영상 감상도 괜찮습니다.'),
+            '주말 뭐 하지': ('집에서 쉬거나 게임, 영상 보는 것도 좋죠.', '집에서 쉬거나 영상 보는 것도 좋죠.'),
+        }
+        for text, (reply, want) in cases.items():
+            with self.subTest(text=text):
+                self.assertEqual(_turn(text, reply)['reply'], want)
+
+    def test_any_other_game_sentence_is_dropped(self):
+        r = _turn('주말 뭐 하지', '푹 쉬세요. 영화나 게임도 좋죠.')
+        self.assertEqual(r['reply'], '푹 쉬세요.')
 
     def test_prompt_says_not_to_open_with_games(self):
         self.assertIn('게임 이야기도 먼저 꺼내지 않는다', talk.SMALLTALK_BLOCK)

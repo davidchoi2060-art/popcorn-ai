@@ -264,10 +264,24 @@ def is_game_nudge(sentence: str) -> bool:
     return bool(_GAME_NUDGE.search(sentence) or sentence.rstrip().endswith(("?", "？")))
 
 
+# 「게임을 하거나 영상」·「게임이나 영화」·「게임, 영상」처럼 게임을 여러 할 거리 중 하나로 끼운 자리.
+# 그 항목만 빼면 나머지 문장이 그대로 선다(2026-10-11 개발 서버 실측 -- 프롬프트만으로 안 멈췄다).
+_GAME_OPTION = re.compile(r"(?:게임|겜)(?:을\s*하거나|하거나|이나|,)\s*")
+
+
 def drop_game_nudge(reply: str) -> str:
-    """고객이 게임을 꺼내지 않은 잡담 답에서 AI 가 먼저 건 게임 권유 문장을 걷는다."""
+    """고객이 게임을 꺼내지 않은 잡담 답에서 AI 가 먼저 꺼낸 게임 이야기를 걷는다.
+
+    할 거리 목록에 끼운 게임은 그 항목만 빼고, 그래도 게임이 남는 문장은 통째로 뺀다.
+    """
     parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
-    return "".join(p for p in parts if not is_game_nudge(p)).strip()
+    kept = []
+    for p in parts:
+        p = _GAME_OPTION.sub("", p)
+        if _GAME_WORD.search(p):
+            continue
+        kept.append(p)
+    return "".join(kept).strip()
 
 
 def is_pc_push(sentence: str) -> bool:
@@ -317,7 +331,8 @@ SMALLTALK_BLOCK = "\n".join([
     " 필요할 때 서버가 한 번만 붙인다. 고객이 PC·게임·사양·예산 이야기를 꺼내면 그때 자연스럽게 잇는다"
     " (사장님 2026-10-11 「너무 강제하면 고객은 짜증스럽다」).",
     "**게임 이야기도 먼저 꺼내지 않는다** -- 고객이 게임을 말하지 않았으면 「혹시 할 게임 있으세요?」·"
-    "「그럴 땐 게임하면 좋지요」·「요즘 이런 게임이 인기예요」처럼 게임 쪽으로 말을 걸지 않는다."
+    "「그럴 땐 게임하면 좋지요」·「요즘 이런 게임이 인기예요」처럼 게임 쪽으로 말을 걸지 않고,"
+    " 할 거리를 몇 가지 들 때도 게임은 넣지 않는다."
     " 고객이 게임을 물으면 그때는 충분히 답한다(사장님 2026-10-11 「게임 이런 건 빼고 편하게 대화로 상담」).",
 ])
 
