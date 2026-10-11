@@ -49,6 +49,8 @@ _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\
 # 「~하려면」「~필요해요」는 용도·게임·PC 를 말했을 때만 새 PC 질문이다. 부품을 말했으면(「PC 램 몇 기가 필요해요?」)
 # 부품 설명으로 둔다 -- 새 PC 용도를 되묻지 않게.
 _NEED = re.compile(r"하려면|쓰려면|필요해|필요한가|필요할까|뭐가\s*필요")
+# 「화이트 감성으로 100만원 PC」처럼 예산 금액과 PC 를 함께 말했으면 새 PC 질문이다(2026-10-12 개발 서버 -- 설명 없이 되묻기만 했다).
+_AMOUNT = re.compile(r"\d+\s*만\s*원|\d+\s*만\s*(원\s*)?대|\d{2,3}\s*만(?!\s*(시간|명|개|건))")
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
@@ -117,7 +119,8 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
     uses = bool(usage_hits(s, vocab)) or game
     build = bool((_REQUEST.search(s) and (uses or pc))
-                 or (_NEED.search(s) and (uses or (pc and not part)))) and not explain_part
+                 or (_NEED.search(s) and (uses or (pc and not part)))
+                 or (pc and not part and _AMOUNT.search(s))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
