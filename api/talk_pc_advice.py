@@ -188,7 +188,9 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "",
         "[쓰지 않는 것]",
         "- 가격·금액·예산 숫자(카드가 보여 준다).",
-        "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다.",
+        "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다."
+        + (" 고객이 직접 말한 모델명(%s)은 그대로 써서 비교해도 된다." % ", ".join(_models(sentence))
+           if _models(sentence) else ""),
         ("- 재고·할인·특정 기간을 우리 가게 약속처럼 단정하는 말." if topic == TOPIC_GENERAL
          or _GENERAL.search(sentence or "") else "- 재고·배송·할인·설치."),
         "- 질문 문장. 마지막 안내는 서버가 붙인다.",
@@ -209,17 +211,34 @@ _PRICE_WORDS = re.compile(r"\d+\s*만|\d+\s*원|원대|가격대")
 _STOCK_ONLY = ("재고", "품절", "입고")
 
 
-def clean(raw: str, topic: str | None = None) -> tuple[str, list[dict]]:
+def _norm(m: str) -> str:
+    return re.sub(r"\s+", "", m).lower()
+
+
+def _models(sentence: str) -> list[str]:
+    """고객 문장에 나온 부품 모델명(「RTX 5060」·「RTX 5060 Ti」) -- 고객이 직접 물은 모델은 설명에 남긴다."""
+    out: list[str] = []
+    for m in TF._RE_PART.finditer(sentence or ""):
+        if m.group(0).strip() not in out:
+            out.append(m.group(0).strip())
+    return out
+
+
+def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, list[dict]]:
     """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
     general = topic == TOPIC_GENERAL
     stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
+    asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
     for s in TF.split_sentences((raw or "").replace("**", "")):
+        # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
+        # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
+        foreign_model = any(_norm(m.group(0)) not in asked for m in TF._RE_PART.finditer(s))
         if TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s):
             dropped.append({"before": s, "reason": "price"})
-        elif TF._RE_PART.search(s):
+        elif foreign_model:
             dropped.append({"before": s, "reason": "part model"})
         elif any(w in s for w in stock):
             dropped.append({"before": s, "reason": "stock"})
@@ -255,7 +274,7 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         res.provider, res.model = out.provider, out.model
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
         res.log_id = out.log_id
-        body, dropped = clean(out.text, topic)
+        body, dropped = clean(out.text, topic, sentence)
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}

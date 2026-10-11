@@ -82,5 +82,25 @@ class Topics(unittest.TestCase):
                 self.assertIsNone(PA.topic_of(s, vocab()))
 
 
+class AskedModelsStay(unittest.TestCase):
+    RAW = ("RTX 5060 Ti는 RTX 5060보다 그래픽 메모리 여유가 있어요. QHD 게임이라면 차이가 커요. "
+           "RTX 4070이면 더 좋아요.")
+
+    def test_models_the_customer_named_stay(self):
+        body, dropped = PA.clean(self.RAW, PA.TOPIC_PART, "RTX 5060이랑 RTX 5060 Ti 차이가 뭐예요?")
+        self.assertIn("RTX 5060 Ti는", body)
+        self.assertNotIn("4070", body)                     # 고객이 말하지 않은 모델은 걷는다
+        self.assertEqual([d["reason"] for d in dropped], ["part model"])
+
+    def test_without_named_models_all_are_dropped(self):
+        body, _ = PA.clean(self.RAW, PA.TOPIC_PART, "그래픽카드 차이가 뭐예요?")
+        self.assertEqual(body, "QHD 게임이라면 차이가 커요.")
+
+    def test_prompt_allows_only_named_models(self):
+        p = PA.build_prompt("RTX 5060이랑 RTX 5060 Ti 차이가 뭐예요?", [], topic=PA.TOPIC_PART)
+        self.assertIn("고객이 직접 말한 모델명(RTX 5060, RTX 5060 Ti)", p)
+        self.assertNotIn("고객이 직접 말한 모델명", PA.build_prompt("램 차이", [], topic=PA.TOPIC_PART))
+
+
 if __name__ == "__main__":
     unittest.main()
