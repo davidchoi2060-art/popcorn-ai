@@ -369,6 +369,13 @@ class Codex1815Cases(unittest.TestCase):
         self.assertNotIn(TX.NOTE_REPEAT, r['reply'])
         self.assertFalse(r['handoff_offer'])
 
+    def test_english_words_are_not_read_as_after_service(self):
+        # 2026-10-11 개발 서버 실측: 「... 150만원 please」 에 A/S 안내가 나갔다(please 안의 «as»)
+        self.assertEqual(TR.purchase_topics('gaming pc under 150만원 please'), [])
+        for t in ('AS 기간 얼마나 돼요?', 'A/S 되나요', 'a/s 어디서 받아요', '에이에스 문의'):
+            with self.subTest(t=t):
+                self.assertIn('warranty', TR.purchase_topics(t))
+
     def test_prompt_covers_new_kinds(self):
         for word in ('다른 쇼핑몰', '개인정보', '주문·결제·환불', '여러 질문', '같은 말 반복', '(중략)'):
             with self.subTest(word=word):
