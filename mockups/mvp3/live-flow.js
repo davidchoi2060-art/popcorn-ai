@@ -32,12 +32,14 @@
     if(d.consent!==true)return '연락처를 받으려면 개인정보 수집에 동의해 주세요.';
     return '';
   }
+  // 부품 바꾸기 칸의 상태. 열린 부품(slot)과 서버가 준 선택지만 든다.
+  function emptyParts(){return {slot:null,data:null,error:''};}
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry()};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),selectedContext:null};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -52,7 +54,7 @@
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
-        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry()});
+        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),selectedContext:null});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
@@ -118,12 +120,12 @@
     function select(index){
       if(state.phase)return;
       const p=state.groups.flatMap(g=>g.products).find(p=>p.index===index);if(!p)return;
-      cancel();state.inquiry=emptyInquiry();state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
     }
     function navigate(screen){
       if(['detail','final'].includes(screen)&&!state.selected)return;
       if(!['welcome','results','detail','final','saved'].includes(screen))return;
-      cancel();state.screen=screen;state.error=null;state.retry=null;emit();
+      cancel();state.parts=emptyParts();state.screen=screen;state.error=null;state.retry=null;emit();
     }
     async function save(){
       if(state.phase||state.pendingSave||state.pendingProblem||!state.selected||!state.selectionState||state.needsRefresh||state.savedQuote||!Number.isInteger(state.selected.price))return;
@@ -231,6 +233,35 @@
       }catch(error){if(current(op))state.inquiry.error=error?.message||'구매 상담 신청을 보내지 못했어요.';}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    // 부품 바꾸기(api/mvp3_part_options): 고른 PC 에서 그 부품만 다른 판매 PC 들을 받아 온다.
+    // 고르면 그 판매 PC 가 새 선택이 된다 — 금액은 그 상품의 판매가이고, 보관·쇼핑몰 연결도 그 상품번호로 간다.
+    async function openParts(slot){
+      if(state.phase||!state.selected||!state.selectionState||state.screen!=='detail')return;
+      if(state.parts.slot===slot&&state.parts.data){state.parts=emptyParts();emit();return;}
+      state.parts={slot,data:null,error:''};
+      const base=state.selected.product_code,op=begin('parts');
+      try{
+        const r=await api.partOptions(M.copy(state.selectionState),base,slot,{signal:op.signal});
+        if(!current(op))return;
+        state.parts.data=M.partOptions(r,slot,base);
+      }catch(error){if(current(op))state.parts.error=error?.message||'부품 선택지를 불러오지 못했어요.';}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    function closeParts(){if(state.phase==='parts')cancel();state.parts=emptyParts();emit();}
+    function swapPart(code){
+      const data=state.parts.data;
+      if(state.phase||!data||!state.selected)return;
+      const o=data.options.find(x=>x.product_code===code);if(!o)return;
+      const before=state.selected;
+      state.selectedContext=state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(before.index)&&g.products.some(x=>x.index===before.index&&x.product_code===before.product_code))||null;
+      const next=M.copy(o);delete next.swap;
+      state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;
+      state.inquiry=emptyInquiry();state.parts=emptyParts();state.error=null;state.retry=null;
+      const d=o.swap.price_diff,diff=d===0?'지금과 같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
+      message(data.label+'를 '+o.swap.value+'로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겨서 금액은 '+o.price.toLocaleString('ko-KR')+'원('+diff+')이에요.'+
+        o.swap.also.map(x=>' '+x.label+'도 '+x.from+'에서 '+x.to+'로 함께 바뀌어요.').join('')+' 파워·케이스 같은 나머지 부품은 부품 구성에서 확인해 주세요.');
+      emit();
+    }
     async function list(){
       const op=begin('list');state.screen='saved';emit();
       try{
@@ -246,7 +277,7 @@
     function load(id){
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
-      cancel();state.inquiry=emptyInquiry();state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
@@ -260,7 +291,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire};
+    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart};
   }
   if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);

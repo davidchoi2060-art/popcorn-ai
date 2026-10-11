@@ -455,3 +455,10 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 @media(max-width:760px){.live-inquiry{padding:14px 16px}.live-inquiry-buttons button{flex:1}}
 /* 2026-10-11: the approved intro is the PC's own description, not the customer's condition. */
 body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:600;color:var(--muted);margin:4px 0 2px}
+/* 부품 바꾸기(api/mvp3_part_options) — 그 부품만 다른 판매 PC 선택지 */
+.live-capabilities h3{font-size:17px;margin:0 0 4px}.live-capabilities>div button .ui-icon{width:16px;height:16px;margin-right:6px;vertical-align:-3px}.live-capabilities>div button.is-active{background:var(--tint)}
+.part-options{margin-top:14px;padding:14px;background:white;border:1px solid var(--line);border-radius:10px}.part-options-head{display:flex;justify-content:space-between;align-items:center;gap:12px}.part-options-head h4{margin:0}
+.part-option-list{list-style:none;margin:10px 0 0;padding:0}.part-option{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.part-option-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.part-option-copy strong{font-size:16px}.part-option-name,.part-option-also{font-size:14px;color:var(--muted);overflow-wrap:anywhere}.part-option-copy .warn-text{font-size:14px}
+.part-option-price{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;font-variant-numeric:tabular-nums}.part-option-price span{font-size:14px;font-weight:600}
+@media(max-width:760px){.part-option{flex-direction:column;align-items:stretch}.part-option-price{align-items:stretch}.part-option-price button{width:100%}}

@@ -42,7 +42,7 @@
     }
     const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries'].includes(path)||HANDOFF_RE.test(path)))
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/part-options'].includes(path)||HANDOFF_RE.test(path)))
         ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'));
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
       if(!fetchImpl)throw new ApiError('서버 연결을 사용할 수 없어요.',0,'network');
@@ -97,6 +97,8 @@
       // 보관 견적을 팝콘PC 쇼핑몰로 넘긴다(api/mvp3_handoff.py). 결제는 쇼핑몰이 한다.
       handoff:async(quoteId,options={})=>{if(!primed){validList(await request('GET','/api/mvp3/saved-quotes?limit=1',null,options));primed=true;}
         return request('POST','/api/mvp3/saved-quotes/'+String(quoteId).toLowerCase()+'/handoff',null,{...options,existingKeyOnly:true});},
+      // 부품 바꾸기(api/mvp3_part_options.py): 고른 판매 PC 에서 그 부품만 다른 판매 PC 목록. 읽기만 한다.
+      partOptions:(state,productCode,slot,options)=>request('POST','/api/mvp3/part-options',{state,product_code:productCode,slot},options),
       // 구매 상담 신청(api/mvp3_purchase_inquiry.py). 연락처를 남길 뿐 주문·결제는 하지 않는다.
       inquiryForm:options=>request('GET','/api/mvp3/purchase-inquiries/form',null,options),
       inquiry:(payload,options)=>request('POST','/api/mvp3/purchase-inquiries',payload,options)};
