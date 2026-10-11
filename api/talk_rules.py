@@ -379,6 +379,11 @@ PURCHASE_TOPICS: tuple[tuple[str, str, re.Pattern, str], ...] = (
     ("warranty", "A/S·보증", re.compile(r"(?<![A-Za-z])a\s*/?\s*s(?![A-Za-z])|에이에스|보증|무상\s*수리|수리\s*(기간|받|해)", re.I),
      "보증 기간과 A/S 조건은 상품마다 달라 지금 자료로는 확인되지 않았어요."
      " 구매 전에 팝콘PC 쇼핑몰 상품 페이지에서 확인해 주세요."),
+    # 「배송 중에 취소할 수 있어?」는 취소 질문이다 -- 배송 안내가 아니라 아래 취소·환불 안내가 맞다
+    # (2026-10-12 개발 서버, 모델 luna: 취소를 물었는데 「배송과 설치 안내는 쇼핑몰에서 해요」가 나갔다).
+    ("refund", "취소·환불·반품", re.compile(r"취소|환불|반품|청약\s*철회"),
+     "취소·환불·반품 조건은 주문 단계와 상품마다 달라 지금 자료로는 확인되지 않았어요."
+     " 팝콘PC 쇼핑몰의 상품 페이지와 주문 내역에서 확인해 주세요."),
     ("delivery", "배송·설치", re.compile(r"배송|택배|출고|언제\s*(와|받|도착)|방문\s*설치|설치\s*기사|설치(도|까지)?\s*해\s*주"),
      "배송과 설치 안내는 팝콘PC 쇼핑몰에서 해요. 구매 전에 쇼핑몰 상품 페이지에서 확인해 주세요."),
 )
@@ -441,7 +446,15 @@ _TOP = re.compile(r"최고\s*(사양|옵션?|성능|급)|최상\s*(급|사양)|�
 def purchase_topics(text: str) -> list[str]:
     """문장에 들어 있는 구매·사후 주제 키 — 순서는 PURCHASE_TOPICS 순서."""
     t = text or ""
-    return [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+    hit = [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+    # 「배송 중에 취소」의 배송은 취소 시점이다 -- 배송 기간을 함께 묻지 않았으면 배송 안내는 빼고 취소 안내만 낸다
+    # (「배그PC 추천하고 배송일과 환불도 알려줘」는 둘 다 낸다).
+    if "refund" in hit and "delivery" in hit and not _DELIVERY_ASKED.search(t):
+        hit.remove("delivery")
+    return hit
+
+
+_DELIVERY_ASKED = re.compile(r"얼마나|언제|며칠|배송\s*일|걸려|걸리|도착|택배사")
 
 
 # 추천이 거르는 조건의 이름표 머리(unsupported_conditions 가 만드는 문자열과 같은 틀).
