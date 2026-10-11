@@ -81,6 +81,14 @@ def mentions_pc(sentence: str) -> bool:
     return bool(_PC_WORD.search(sentence or ""))
 
 
+def asks_for_pc(sentence: str, vocab) -> bool:
+    """PC 낱말이 없어도 PC 를 묻는 문장인가 -- 「~하려면 뭐가 필요해요?」이거나 게임 밖 용도(방송·편집)를 함께 말했다.
+    2026-10-12 개발 서버 「유튜브 방송하면서 게임도 하려면 뭐가 필요해요?」에 인기 게임 목록이 나갔다."""
+    from . import talk_schema as TS
+    s = sentence or ""
+    return bool(_NEED.search(s)) or any(not TS.is_game_usage(lb) for lb in usage_hits(s, vocab))
+
+
 def usage_hits(sentence: str, vocab) -> list[str]:
     """문장에 걸린 용도 라벨(용도 어휘의 매칭 낱말 기준). 없으면 []."""
     s = (sentence or "").lower()

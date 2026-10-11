@@ -614,7 +614,8 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         if not game_names and not game_genres:
             labels = PA.wants_advice(sentence, vocab, prev_state)
             # 「요즘 게임 추천해줘」는 게임 이야기다 -- PC 를 직접 말했을 때만 PC 설명으로 간다.
-            if labels is not None and not purchase and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence):
+            if (labels is not None and not purchase and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence)
+                    and not PA.asks_for_pc(sentence, vocab)):
                 labels = None
             topic = PA.topic_of(sentence, vocab) if labels is not None else None
         elif PA.pc_intent(sentence):
