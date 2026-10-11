@@ -50,7 +50,7 @@ test('first screen offers examples that fill the input without sending',async()=
   const h=harness(scripted());
   try{
     await until(()=>h.doc.querySelector('.tk-welcome'));
-    assert.match(h.text('.tk-welcome h1'),/무엇을 도와드릴까요/);
+    assert.match(h.text('.tk-welcome h1'),/어떤 PC를 찾고 계세요/);
     assert.equal(h.doc.querySelectorAll('[data-action=example]').length,3);
     assert.match(h.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);
     h.click('[data-action=example]');
