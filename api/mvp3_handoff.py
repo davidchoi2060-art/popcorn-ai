@@ -18,8 +18,14 @@
       handoffs.note         {"source":"mvp3","mvp3_quote_id":"<uuid>", ...}
       handoff_items         한 줄 · item_kind 'built_pc' · 상품코드 = 몰 pd_no
 
-■ 넘기기 직전 몰 가격·품절을 다시 본다 (`api/handoff.py` 와 같은 규칙)
-  다르면 고객에게 말한다. 조용히 바꾸지 않는다. 품절이어도 막지 않고 알린다.
+■ 넘기기 직전 몰 가격·품절을 다시 본다 — 2겹 실시간 안전장치(checkout · 2026-10-11)
+  다르면 고객에게 말한다. 품절이어도 막지 않고 알린다. 가격이 바뀌었으면
+  `api/mall_price_live.confirm()` 이 우리 판매가를 고치고 이력·확인 기록을 남기며,
+  여기서는 보관 견적의 가격도 쇼핑몰 가격으로 고친다(인계 기록에는 보던 가격과
+  쇼핑몰 가격을 둘 다 남긴다). 못 읽으면 막지 않고 「쇼핑몰에서 최종 확인」이라 말한다.
+  ⚠ 전에는 `mall.fetch_prices()`(부품용 product_detail.html)를 불러 완제품 PC 는 늘
+  「확인못함」이었다 — 그 주소는 완제품에 대해 첫 화면을 돌려준다. 이제 완제품은
+  system_detail.html 을 읽는다(`api/mall_price_reader`).
 
 ■ 부품을 바꾼 보관 견적(`product_snapshot.build`, api/mvp3_build)
   몰에는 바꾼 구성의 상품이 없다 — 몰 상품은 기준 PC 다. 그래서 몰 가격은 **기준 PC 판매가**와
@@ -37,7 +43,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import text
 
-from . import access_gate, mall, visitor
+from . import access_gate, mall_price_live, mall_price_reader, visitor
 from .db import engine
 from .handoff import _no
 from .mvp3_saved_quotes import owner_hash, same_origin
@@ -58,6 +64,11 @@ def _marker(quote_id: str) -> str:
     return '"mvp3_quote_id": "%s"' % quote_id
 
 
+def _mall_url(code):
+    # mvp3 가 넘기는 것은 완제품 한 대뿐이다(handoff_items.item_kind = 'built_pc').
+    return mall_price_reader.product_url(code, mall_price_reader.PC_PART_TYPE)
+
+
 def _build(product):
     """보관 견적의 부품 바꾸기 기록. 없거나 모양이 다르면 None(예전 보관 견적)."""
     b = product.get('build')
@@ -74,7 +85,7 @@ def _result(h, item, quote_id, build=None):
         'product_code': code, 'name': item['name_snap'],
         'price_quoted': item['price_quoted'], 'price_mall': item['price_mall'],
         'mall_status': item['mall_status'],
-        'mall_url': mall.DETAIL % code,
+        'mall_url': _mall_url(code),
         'changes': build['changes'] if build else [],
     }
 
@@ -127,11 +138,11 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
         raise HTTPException(409, '보관 견적의 상품 정보를 확인할 수 없습니다.')
 
     # 외부 조회는 트랜잭션 밖에서 한다(몰 응답을 기다리는 동안 DB 연결을 잡지 않는다).
-    got = (mall.fetch_prices([code]) or {}).get(code) or {}
-    price_mall = got.get('price') if got.get('ok') else None
+    check = mall_price_live.confirm('checkout', code, quoted, quote_id=qid, visitor_ref=uid)
+    price_mall = check['mall']
     if price_mall is None:
         status = '확인못함'
-    elif got.get('soldout'):
+    elif check.get('soldout'):
         status = '품절'
     elif price_mall != quoted:
         status = '가격변동'
@@ -163,6 +174,16 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
             params['ak'] = access_gate.new_key()
         hid = conn.execute(text(
             f"INSERT INTO handoffs ({cols}) VALUES ({vals}) RETURNING handoff_id"), params).scalar()
+        if price_mall is not None and price_mall != quoted:
+            # 보관 견적도 쇼핑몰 가격으로 고친다 — 고객이 다시 열어도 같은 값을 본다.
+            # 부품을 바꾼 견적이면 기준 PC 가격만 바뀐 것이다 — 총액은 쇼핑몰 가격 + 바꾼 부품 차액.
+            fixed = {'price': price_mall + delta, 'price_check': check}
+            if build:
+                fixed['build'] = dict(product['build'], base_price=price_mall)
+            conn.execute(text(
+                "UPDATE mvp3_saved_recommendations SET product_snapshot = product_snapshot || CAST(:f AS jsonb)"
+                " WHERE quote_id=:q AND user_id=:u AND owner_key_hash=:o"),
+                {'f': json.dumps(fixed, ensure_ascii=False), 'q': qid, 'u': uid, 'o': owner})
         conn.execute(text(
             "INSERT INTO handoff_items (handoff_id, line_no, product_code, item_kind,"
             " part_type, name_snap, price_quoted, price_mall, qty, mall_status)"
@@ -171,4 +192,5 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
     log.info('[mvp3-handoff] %s code=%s status_ok=%s', no, code, status == '확인됨')
     return {'ok': True, 'handoff_no': no, 'quote_id': qid, 'product_code': code, 'name': name,
             'price_quoted': quoted, 'price_mall': price_mall, 'mall_status': status,
-            'mall_url': mall.DETAIL % code, 'changes': build['changes'] if build else []}
+            'mall_url': _mall_url(code), 'changes': build['changes'] if build else [],
+            'price_check': check}

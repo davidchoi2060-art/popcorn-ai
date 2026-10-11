@@ -68,3 +68,24 @@
 공개 페이지 절반 넘게 실패 · 이미 다른 실행이 도는 중. 사유는 `mall_price_runs.fail_reason` 과 관리자
 화면에 남고, 타이머 실행이면 종료 코드 1 로 OnFailure 알림이 간다. 쿠키를 저장하지 않는 이유와
 A-124 와의 관계는 decision-log **A-143**.
+
+## 2겹 실시간 — 장바구니·결제 순간 (`api/mall_price_live.confirm`)
+
+    자리        cart      mvp3 「견적 보관」       (api/mvp3_saved_quotes.save_quote)
+                checkout  mvp3 「쇼핑몰에서 구매」 (api/mvp3_handoff.handoff_saved_quote)
+    읽기        mall_price_reader.read_price — 시간 제한 3초, 익명(고객이 보는 값)
+    같으면      확인 기록만 남긴다(outcome 'same') · 고객에게 아무 말 안 함
+    다르면      우리 판매가를 apply_changes(moment=cart|checkout)로 고친다 → 가격 이력 · 활동 로그 · 확인 기록
+                고객에게 서버 문장으로 알린다 · 보관 견적 가격도 쇼핑몰 가격으로 고친다
+                인계 기록(handoff_items)에는 보던 가격과 쇼핑몰 가격을 둘 다 남긴다
+    못 읽으면   막지 않는다 · 「현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다」 · outcome 'failed'
+
+- 판매가를 «안» 고치는 경우도 고객에게는 쇼핑몰 현재가를 알린다 — 고객이 실제로 결제하는 값이다.
+  잠긴 판매가(`locked`) · 30% 넘는 변동(`held`, 사람 확인) · 완제품 PC 가 아닌 상품(`held`) ·
+  그 사이 다른 경로가 바꿈(`stale`).
+- 고객이 일으킨 반영이라 `changed_by`·활동 로그 `operator_id` 는 비어 있다. 누가 봤는지는
+  확인 기록의 `quote_id`·`visitor_ref` 로 되짚는다.
+- 화면(mvp3)은 서버가 «바뀌었다»고 말하고 보던 가격이 요청 가격과 같을 때만 다른 가격의 보관을
+  받아들인다. 그 밖의 가격 불일치는 전처럼 거부한다(조용한 가격 교체 차단).
+- 이 변경 전에는 결제 순간 확인이 부품용 `product_detail.html` 을 읽어 완제품 PC 는 늘 「확인못함」이었고
+  쇼핑몰 링크도 첫 화면으로 갔다. 이제 완제품은 `system_detail.html` 을 읽고 그리로 보낸다.

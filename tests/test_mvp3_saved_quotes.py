@@ -28,6 +28,10 @@ LIVE = {'photo': {'state': 'available', 'kind': 'ai_assembly_example',
         'public_configuration': {'product_code': 17}}
 
 
+SAME = {'status': 'same', 'quoted': None, 'mall': None, 'diff': 0, 'saved': False, 'message': None,
+        'soldout': False, 'checked_at': '2026-10-11T01:00:00Z'}
+
+
 def body(**kwargs):
     return m.SaveBody(**{'request_id': UUID(int=1), 'product_code': 17, 'expected_price': 1500000,
                          'state': {'usages': ['게임']}, **kwargs})
@@ -75,6 +79,11 @@ class SavedQuotesTest(unittest.TestCase):
                         patch.object(m.grid_public, 'eligible_sold_item', return_value=None)]
         self.mocks = [p.start() for p in self.patches]
         self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
+        # 쇼핑몰 현재가 확인(api/mall_price_live)은 따로 둔다 — 위 목록의 위치 번호를 바꾸지 않게.
+        confirm = patch.object(m.mall_price_live, 'confirm',
+                               side_effect=lambda moment, code, quoted, **k: dict(SAME, quoted=quoted, mall=quoted))
+        self.confirm = confirm.start()
+        self.addCleanup(confirm.stop)
 
     def test_save_uses_server_product_and_filters_private_fields(self):
         q = m.save_quote(body(), request(), Response())['quote']
@@ -288,10 +297,56 @@ class SavedQuotesTest(unittest.TestCase):
                                   changes=[{'ordinal': 1, 'product_code': 102}]), request(), Response())
         self.assertEqual(e.exception.status_code, 409)
 
+    def test_changed_parts_compare_base_pc_and_shift_total(self):
+        # 쇼핑몰에 있는 것은 기준 PC 다. 기준 가격만 비교하고, 바뀐 만큼 총액도 옮긴다.
+        built = {'base_price': 1500000, 'total': 1550000, 'compat': {'ok': True},
+                 'changes': [{'ordinal': 1, 'slot': 'CPU', 'delta': 50000}]}
+        self.confirm.side_effect = lambda *a, **k: dict(SAME, status='changed', quoted=1500000, mall=1540000,
+                                                         diff=40000, saved=True, message='바뀜')
+        with patch.object(m.mvp3_build, 'build_quote', return_value=(dict(PRODUCT), built)):
+            q = m.save_quote(body(expected_price=1550000, changes=[{'ordinal': 1, 'product_code': 102}]),
+                             request(), Response())['quote']
+        self.assertEqual(self.confirm.call_args.args, ('cart', 17, 1500000))
+        self.assertEqual((q['product']['price'], q['product']['build']['base_price']), (1590000, 1540000))
+
     def test_fingerprint_without_changes_is_unchanged(self):
         plain = body()
         self.assertEqual(m.fingerprint(plain), m.fingerprint(body(changes=[])))
         self.assertNotEqual(m.fingerprint(plain), m.fingerprint(body(changes=[{'ordinal': 1, 'product_code': 2}])))
+
+    # 2겹 실시간 안전장치(cart) — api/mall_price_live.confirm 이 판정하고 여기서는 그 결과로 보관한다.
+    def test_cart_check_runs_once_with_the_stored_quote_id(self):
+        q = m.save_quote(body(), request(), Response())['quote']
+        confirm = self.confirm
+        confirm.assert_called_once()
+        args, kw = confirm.call_args
+        self.assertEqual(args, ('cart', 17, 1500000))
+        self.assertEqual((kw['quote_id'], kw['visitor_ref']), (q['id'], 11))
+        self.assertEqual(q['product']['price'], 1500000)
+        self.assertEqual(q['product']['price_check']['status'], 'same')
+
+    def test_changed_mall_price_is_saved_and_told(self):
+        changed = dict(SAME, status='changed', quoted=1500000, mall=1540000, diff=40000, saved=True,
+                       message='쇼핑몰 현재 가격이 1,500,000원에서 1,540,000원으로 바뀌었습니다. 바뀐 가격으로 보관했습니다.')
+        self.confirm.side_effect = lambda *a, **k: dict(changed)
+        q = m.save_quote(body(), request(), Response())['quote']
+        self.assertEqual(q['product']['price'], 1540000)
+        self.assertEqual(q['product']['price_check']['message'], changed['message'])
+        stored = self.store.rows[0]['product_snapshot']
+        self.assertEqual((stored['price'], stored['price_check']['quoted']), (1540000, 1500000))
+        self.assertFalse(stored['price_confirmed'])
+
+    def test_unchecked_mall_price_keeps_card_price_and_does_not_block(self):
+        self.confirm.side_effect = lambda *a, **k: dict(SAME, status='unchecked', quoted=1500000, diff=None,
+                                                         message='현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다')
+        q = m.save_quote(body(), request(), Response())['quote']
+        self.assertEqual(q['product']['price'], 1500000)
+        self.assertEqual(q['product']['price_check']['status'], 'unchecked')
+
+    def test_replay_does_not_check_the_mall_again(self):
+        m.save_quote(body(), request(), Response())
+        m.save_quote(body(), request(), Response())
+        self.assertEqual(self.confirm.call_count, 1)
 
 
 if __name__ == '__main__': unittest.main()

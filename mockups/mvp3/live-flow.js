@@ -165,7 +165,13 @@
       const response=await api.saveQuote(M.copy(record.payload),{signal:op.signal,existingKeyOnly:true});
       if(!current(op))return;
       const saved=M.quote(response?.quote);
-      if(response?.ok!==true||!saved||saved.product.product_code!==record.payload.product_code||saved.product.price!==record.payload.expected_price)
+      // 보관하는 순간 서버가 쇼핑몰 현재가와 비교한다(api/mall_price_live). 바뀌었으면 쇼핑몰 가격으로
+      // 보관하고 그 사실(보던 가격 = 요청 가격, 쇼핑몰 가격 = 보관 가격)을 함께 돌려준다. 그 경우만 다른 가격을 받는다.
+      // 서버가 쇼핑몰 가격으로 고쳐 보관했을 때만 다른 가격을 받는다. 부품을 바꾼 견적은 기준 PC 만
+      // 비교하므로 «바뀐 차액만큼 옮겨졌는가»로 확인한다(api/mvp3_saved_quotes).
+      const check=saved?.price_check,repriced=check?.status==='changed'&&Number.isSafeInteger(check.diff)
+        &&check.mall-check.quoted===check.diff&&saved?.product.price===record.payload.expected_price+check.diff;
+      if(response?.ok!==true||!saved||saved.product.product_code!==record.payload.product_code||(saved.product.price!==record.payload.expected_price&&!repriced))
         throw new Error('서버 보관 응답을 확인할 수 없어요.');
       try{journal.clear();state.pendingSave=null;state.pendingProblem='';pendingProduct=null;}
       catch{state.pendingProblem='보관은 완료됐지만 이 탭의 복구 기록을 정리하지 못했어요. 같은 요청 외에 새 보관을 보내지 않습니다.';}
@@ -199,6 +205,13 @@
           price_quoted:r.price_quoted,price_mall:Number.isInteger(r.price_mall)?r.price_mall:null,
           changes:Array.isArray(r.changes)?r.changes.filter(c=>M.object(c)&&Number.isSafeInteger(c.delta)).length:0,
           delta:Array.isArray(r.changes)?r.changes.reduce((n,c)=>n+(Number.isSafeInteger(c?.delta)?c.delta:0),0):0};
+        // 서버가 보관 견적도 쇼핑몰 가격으로 고쳤다(api/mvp3_handoff). 화면의 보관 가격도 같은 값으로 맞춘다.
+        // 부품을 바꾼 견적이면 쇼핑몰 가격은 기준 PC 값이라 바꾼 부품 차액을 더한다.
+        if(state.handoff.status==='가격변동'&&state.handoff.price_mall!==null){
+          const price=state.handoff.price_mall+state.handoff.delta;
+          q.product={...q.product,price};
+          if(state.selected?.product_code===q.product.product_code)state.selected={...state.selected,price};
+        }
       }catch(error){if(current(op))fail(error,{kind:'handoff'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }

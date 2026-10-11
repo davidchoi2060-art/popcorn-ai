@@ -346,12 +346,18 @@ function renderDetail(){
   const p=state.selected;
   actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('부품 바꾸기','part-focus','outline')+button('이 견적 저장하기','final','primary')+'</div>';actions.hidden=false;
 }
+// 보관하는 순간의 쇼핑몰 현재가 확인(api/mall_price_live). 같으면 말하지 않고, 바뀌었거나 못 읽었으면 서버 문장을 그대로 보인다.
+function priceCheckPanel(){
+  const q=state.savedQuote,c=q&&state.saveState==='saved'&&!(state.handoff&&state.handoff.quote_id===q.id)?q.price_check:null;
+  if(!c||c.status==='same'||!c.message)return '';
+  return '<section class="live-explanation live-price-check" role="status" data-price-check="'+esc(c.status)+'"><h3>'+(c.status==='changed'?'쇼핑몰 가격이 바뀌었어요':'쇼핑몰 가격 확인')+'</h3><p>'+esc(c.message)+'</p></section>';
+}
 // Mall handoff result (api/mvp3_handoff.py). Price differences are told, never hidden.
 function handoffPanel(h){
   const changed=h.status==='가격변동'&&Number.isInteger(h.price_mall),soldout=h.status==='품절',unknown=h.status==='확인못함';
-  const line=changed?'쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라요.':
+  const line=changed?'쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라 보관 견적을 쇼핑몰 가격으로 고쳤어요. 쇼핑몰에서는 바뀐 가격으로 결제됩니다.':
     soldout?'쇼핑몰에서 지금 품절로 표시돼요. 구매 전에 쇼핑몰에서 재고를 확인해주세요.':
-    unknown?'쇼핑몰 가격을 지금 확인하지 못했어요. 쇼핑몰 화면의 가격을 기준으로 확인해주세요.':
+    unknown?'현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다.':
     '쇼핑몰 가격도 '+money(h.price_quoted)+'으로 같아요.';
   return '<section class="live-explanation live-handoff" role="status"><h3>팝콘PC 쇼핑몰로 연결할 준비가 됐어요</h3><p>'+esc(line)+'</p>'+
     '<p><a class="primary" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a></p>'+
@@ -393,7 +399,7 @@ function renderFinal(){
   const saved=state.saveState==='saved',disabled=!!state.phase||saved||state.needsRefresh||state.selected.price===null||!!state.pendingSave||!!state.pendingProblem;
   view.innerHTML=button(uiIcon('arrow-left')+'상품 상세 다시 보기','edit','back final-back')+
     '<div class="final-title-row"><div><h2 tabindex="-1">최종 견적 확인</h2><span class="save-status '+(saved?'is-saved':'')+'">'+uiIcon(saved?'file-text':'warning-circle-fill')+label[state.saveState]+'</span></div><span class="data-note">보관은 상품·시점 가격의 참고 기록입니다.</span></div>'+
-    errorPanel()+productSummary()+productDetails(true)+finalConditions()+
+    errorPanel()+priceCheckPanel()+productSummary()+productDetails(true)+finalConditions()+
     '<footer class="final-footer"><p>'+uiIcon('info')+'<span>포함 품목과 보증 조건은 구매 전에 확인해주세요.</span></p><div><div class="final-buttons">'+button('다른 상품 비교','results','outline')+
     button(saved?'보관 완료':state.phase==='save'?'서버 확인 중…':state.pendingSave?'이전 보관 결과 확인 필요':'견적 보관하기','save','primary',disabled?'disabled':'')+
     (saved&&state.savedQuote&&!handoffDone?button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'팝콘PC 쇼핑몰에서 구매하기','handoff','primary',state.phase?'disabled':''):'')+
