@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
-"""쇼핑몰 가격 자동 갱신 한 번 돌리기 — 타이머(deploy/systemd/popcorn-mall-price.timer)와 사람이 함께 쓴다.
+"""쇼핑몰 가격 자동 갱신을 손으로 한 번 돌리기 (매일 06:00 · 13:00 KST 정기 실행은 API 안 스케줄러가 한다).
 
     python tools/mall_price_auto.py            # 수집 -> 비교 -> 판매가 반영 -> 실행 기록
     python tools/mall_price_auto.py --check    # 설정 이름과 «있는지»만 본다(값은 안 보인다, 요청 없음)
 
 하는 일은 전부 `api/mall_price_auto.run()` 이 한다. 관리자 화면 「지금 실행」과 같은 함수다.
-출력은 ASCII 만 쓴다(서버 stdout 이 cp949 — 슬라이스 40). 실패하면 종료 코드 1 이라
-systemd OnFailure 알림이 간다. 실패 사유 원문(한국어)은 관리자 화면 · mall_price_runs 에 남는다.
+출력은 ASCII 만 쓴다(서버 stdout 이 cp949 — 슬라이스 40). 실패하면 종료 코드 1.
+실패 사유 원문(한국어)은 관리자 화면 · mall_price_runs 에 남는다.
 """
 import argparse
 import json

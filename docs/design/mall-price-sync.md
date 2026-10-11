@@ -50,7 +50,9 @@
 
 ## 1겹 ② 자동 갱신 (`api/mall_price_auto.py`)
 
-    매일 06:00 · 13:00 KST   deploy/systemd/popcorn-mall-price.timer -> tools/mall_price_auto.py
+    매일 06:00 · 13:00 KST   API 프로세스 안 스케줄러(api/mall_price_auto.start_scheduler)
+                              놓친 시각은 3시간 안에 한 번 만회 · 끄기 MALL_PRICE_AUTO_SCHEDULE=off
+    손으로 한 번              tools/mall_price_auto.py [--check]
     관리자 「지금 실행」       POST /api/admin/mall-price/auto/run (owner) — 같은 함수, 뒤에서 돈다
     상태                      GET  /api/admin/mall-price/auto — 마지막 실행 · 마지막 성공 · 설정 유무
 
@@ -66,8 +68,13 @@
 
 실패로 끝내는 경우(판매가는 하나도 안 바꾼다): 로그인 거부 · 파일을 못 읽음 · 읽은 가격 0건 ·
 공개 페이지 절반 넘게 실패 · 이미 다른 실행이 도는 중. 사유는 `mall_price_runs.fail_reason` 과 관리자
-화면에 남고, 타이머 실행이면 종료 코드 1 로 OnFailure 알림이 간다. 쿠키를 저장하지 않는 이유와
+화면 「자동 갱신」에 남는다. 쿠키를 저장하지 않는 이유와
 A-124 와의 관계는 decision-log **A-143**.
+
+왜 systemd 타이머가 아닌가: 배포(`deploy/popcorn-ci deploy`)는 unit 을 설치하지 않고, 그 스크립트는 서버에
+고정된 사본이라 리포를 고쳐도 사람이 다시 설치하기 전에는 바뀌지 않는다. API 는 배포마다 재시작되므로
+앱 안에서 돌면 배포만으로 켜진다. 같은 DB 를 쓰는 프로세스가 여럿이어도 「그 시각 이후 auto 실행이 있나」를
+DB 로 보고, 겹침은 advisory lock 이 막는다. 루프백 DB(CI · 테스트)에서는 돌지 않는다.
 
 ## 2겹 실시간 — 장바구니·결제 순간 (`api/mall_price_live.confirm`)
 

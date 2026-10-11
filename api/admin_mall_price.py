@@ -39,6 +39,8 @@ from .pricing_write_guard_core import ProductScopeChanged
 from .timeutil import iso
 
 router = APIRouter(prefix="/api/admin", tags=["admin-mall-price"])
+# 자동 갱신(매일 06:00 · 13:00 KST)은 API 프로세스 안에서 돈다 — api/mall_price_auto.start_scheduler
+router.add_event_handler("startup", AUTO.start_scheduler)
 
 STAGE_DIR = os.path.join(os.environ.get("POPCORN_UPLOAD_DIR") or os.path.join(
     tempfile.gettempdir(), "popcorn-uploads"), "mall-price")

@@ -169,11 +169,57 @@ class RunTests(unittest.TestCase):
         self.assertEqual((out["ok"], out["held"], out["changed"]), (True, 1, 0))
         self.assertEqual(self.price(1), 1000)
 
+    def test_last_auto_start_is_an_aware_time_and_blocks_the_same_slot(self):
+        import datetime as dt
+        AUTO.begin("auto")
+        last = AUTO._last_auto_started()
+        now = dt.datetime.now(dt.timezone.utc)
+        self.assertIsNotNone(last.tzinfo)
+        self.assertLess(abs((now - last).total_seconds()), 120)
+        self.assertIsNone(AUTO.due_slot(now, last))
+
     def test_second_run_while_one_is_running_is_refused(self):
         AUTO.begin("manual", operator_id=None)
         with self.assertRaises(AUTO.AlreadyRunning):
             AUTO.begin("auto")
         self.assertEqual(AUTO.run("auto")["fail_reason"], "이미 실행 중입니다")
+
+
+class SchedulerTests(unittest.TestCase):
+    """API 안 스케줄러 — 매일 06:00 · 13:00 KST, 놓치면 3시간 안에 한 번 만회, 같은 시각은 한 번만."""
+
+    def at(self, day, h, m=0):
+        import datetime as dt
+        return dt.datetime(2026, 10, day, h, m, tzinfo=AUTO._KST)
+
+    def test_due_after_each_slot_once(self):
+        self.assertIsNone(AUTO.due_slot(self.at(11, 5, 59), self.at(10, 13, 1)))
+        self.assertEqual(AUTO.due_slot(self.at(11, 6, 1), self.at(10, 13, 1)), self.at(11, 6))
+        self.assertIsNone(AUTO.due_slot(self.at(11, 6, 2), self.at(11, 6, 1)))     # 이미 돌았다
+        self.assertEqual(AUTO.due_slot(self.at(11, 13, 0), self.at(11, 6, 1)), self.at(11, 13))
+        self.assertEqual(AUTO.due_slot(self.at(11, 6, 1), None), self.at(11, 6))
+
+    def test_missed_slot_is_caught_up_only_within_three_hours(self):
+        self.assertEqual(AUTO.due_slot(self.at(11, 8, 59), self.at(10, 13, 1)), self.at(11, 6))
+        self.assertIsNone(AUTO.due_slot(self.at(11, 9, 1), self.at(10, 13, 1)))
+        self.assertEqual(AUTO.due_slot(self.at(12, 0, 30), self.at(11, 6, 1)), None)  # 전날 13시는 지났다
+
+    def test_utc_now_is_read_in_korean_time(self):
+        import datetime as dt
+        now = dt.datetime(2026, 10, 10, 21, 5, tzinfo=dt.timezone.utc)     # = 10/11 06:05 KST
+        self.assertEqual(AUTO.due_slot(now, None), self.at(11, 6))
+
+    def test_scheduler_off_on_loopback_db_or_switch(self):
+        with patch.dict(os.environ, {"DATABASE_URL": "postgresql+psycopg2://ci:ci@127.0.0.1:5432/ci"}):
+            self.assertFalse(AUTO.scheduler_enabled())
+        with patch.dict(os.environ, {"DATABASE_URL": "postgresql+psycopg2://u:p@10.1.2.3:5432/db"}):
+            self.assertTrue(AUTO.scheduler_enabled())
+            with patch.dict(os.environ, {"MALL_PRICE_AUTO_SCHEDULE": "off"}):
+                self.assertFalse(AUTO.scheduler_enabled())
+
+    def test_api_starts_it_at_startup(self):
+        from api import admin_mall_price
+        self.assertIn(AUTO.start_scheduler, admin_mall_price.router.on_startup)
 
 
 if __name__ == "__main__":
