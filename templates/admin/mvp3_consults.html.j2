@@ -1,0 +1,167 @@
+{#
+  고객 문의 · 보관 견적 (ADM-ORD-011 · 가칭) — 2026-10-11 신설, 조회 전용
+
+  지금 쓰는 고객 화면(mvp3)의 문의(`talk_intent_hits`)와 「견적 보관하기」
+  (`mvp3_saved_recommendations`)를 방문자별로 묶어 본다. 데이터 =
+  `GET /api/admin/mvp3-consults` · 상세 `GET /api/admin/mvp3-consults/{visitor}`
+  (`api/admin_mvp3_consults.py` — 정직 표기 넷은 그 파일 docstring).
+
+  ■ 머리말(제목·설명·바로가기)은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
+  ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. `:root` 를 다시 정의하지 않는다. 외부 자원 0.
+  ■ 쓰기 버튼이 없다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}고객 문의 · 보관 견적{% endblock %}
+
+{% block head_extra %}
+<style>
+.mc-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:16px}
+.mc-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
+.mc-kpi{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:12px 14px}
+.mc-kpi b{display:block;font-family:var(--rv-mono);font-size:22px;color:var(--rv-ink)}
+.mc-kpi span{font-size:12.5px;color:var(--rv-muted)}
+.mc-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.mc-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--rv-ink-soft)}
+.mc-bar label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.mc-table{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;overflow-x:auto}
+.mc-table table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:760px}
+.mc-table th{background:var(--rv-panel);text-align:left;font-weight:600;color:var(--rv-ink-soft);padding:9px 12px;border-bottom:1px solid var(--rv-dim4);white-space:nowrap}
+.mc-table td{padding:9px 12px;border-bottom:1px solid var(--rv-panel2);vertical-align:top;color:var(--rv-ink)}
+.mc-table tbody tr{cursor:pointer}
+.mc-table tbody tr:hover,.mc-table tbody tr[aria-selected="true"]{background:var(--rv-panel2)}
+.mc-muted{color:var(--rv-faint)}
+.mc-chip{display:inline-block;border:1px solid var(--rv-dim3);border-radius:10px;padding:0 7px;margin:0 3px 3px 0;font-size:12px;color:var(--rv-ink-soft);background:var(--rv-canvas)}
+.mc-pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:13px}
+.mc-pager button,.mc-drawer header button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+.mc-pager button:disabled{opacity:.45;cursor:default}
+.mc-empty{padding:28px;text-align:center;color:var(--rv-muted)}
+.mc-drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.mc-drawer[hidden]{display:none}
+.mc-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
+.mc-drawer header h2{font-size:16px;margin:0}
+.mc-drawer .mc-body{overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.mc-ev{border:1px solid var(--rv-dim4);border-radius:8px;padding:10px 12px;font-size:13.5px}
+.mc-ev.saved{border-color:var(--rv-amber-line);background:var(--rv-amber-bg)}
+.mc-ev .mc-at{font-size:12px;color:var(--rv-muted);margin-bottom:4px}
+.mc-ev h3{font-size:14px;margin:2px 0 4px}
+.mc-ev ul{margin:4px 0 0 18px;padding:0;color:var(--rv-ink-soft)}
+@media (max-width:768px){
+  .mc-wrap{padding:12px 16px 24px}
+  .mc-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mc-wrap" data-keep="1">
+  <section class="mc-kpis" aria-label="요약">
+    <div class="mc-kpi"><b id="kHitsToday">—</b><span>오늘 문의</span></div>
+    <div class="mc-kpi"><b id="kSavedToday">—</b><span>오늘 보관 견적</span></div>
+    <div class="mc-kpi"><b id="kHits">—</b><span>전체 문의</span></div>
+    <div class="mc-kpi"><b id="kSaved">—</b><span>전체 보관 견적</span></div>
+    <div class="mc-kpi"><b id="kVisitors">—</b><span>방문자</span></div>
+  </section>
+  <p class="mc-note" id="mcNote"></p>
+  <div class="mc-bar">
+    <label><input type="checkbox" id="mcTest"> 시험 문의 포함</label>
+    <span class="mc-muted" id="mcTestNote"></span>
+  </div>
+  <div class="mc-table">
+    <table>
+      <thead><tr>
+        <th scope="col">마지막 활동</th><th scope="col">방문자</th><th scope="col">문의</th>
+        <th scope="col">마지막 문의에서 읽은 조건</th><th scope="col">보관 견적</th><th scope="col">마지막 보관 상품</th>
+      </tr></thead>
+      <tbody id="mcRows"><tr><td colspan="6" class="mc-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+  <div class="mc-pager">
+    <span id="mcPage" class="mc-muted"></span>
+    <button type="button" id="mcPrev" disabled>이전</button>
+    <button type="button" id="mcNext" disabled>다음</button>
+  </div>
+</div>
+
+<aside class="mc-drawer" id="mcDrawer" data-keep="1" hidden aria-labelledby="mcDrawerTitle">
+  <header><h2 id="mcDrawerTitle">방문자 기록</h2><button type="button" id="mcClose">닫기</button></header>
+  <div class="mc-body" id="mcDrawerBody"></div>
+</aside>
+{% endblock %}
+
+{% block foot_extra %}
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const num=n=>(typeof n==='number')?n.toLocaleString('ko-KR'):'—';
+  const won=n=>(typeof n==='number')?n.toLocaleString('ko-KR')+'원':'가격 없음';
+  const when=s=>s?new Date(s).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+  const chips=a=>(a&&a.length)?a.map(t=>'<span class="mc-chip">'+esc(t)+'</span>').join(''):'<span class="mc-muted">읽은 조건 없음</span>';
+  let offset=0,limit=50,lastLen=0,selected=null;
+
+  async function getJSON(url){
+    const r=await fetch(url,{credentials:'same-origin',cache:'no-store'});
+    if(r.status===401){location.href='/admin2/login';throw new Error('로그인이 필요합니다');}
+    if(!r.ok)throw new Error('불러오지 못했습니다 (오류 '+r.status+')');
+    return r.json();
+  }
+  function q(){return 'include_test='+($('mcTest').checked?'true':'false');}
+
+  async function load(){
+    $('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">불러오는 중입니다.</td></tr>';
+    let d;
+    try{d=await getJSON('/api/admin/mvp3-consults?offset='+offset+'&'+q());}
+    catch(e){$('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">'+esc(e.message)+'</td></tr>';return;}
+    const s=d.summary||{};
+    $('kHitsToday').textContent=num(s.hits_today);$('kSavedToday').textContent=num(s.saved_today);
+    $('kHits').textContent=num(s.hits);$('kSaved').textContent=num(s.saved);$('kVisitors').textContent=num(d.total_visitors);
+    $('mcNote').textContent=d.note||'';
+    $('mcTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 문의 '+num(d.test_excluded)+'건을 뺐습니다.':'');
+    limit=d.limit||50;lastLen=(d.items||[]).length;
+    if(!lastLen){$('mcRows').innerHTML='<tr><td colspan="6" class="mc-empty">아직 고객 문의가 없습니다.</td></tr>';}
+    else $('mcRows').innerHTML=d.items.map(it=>
+      '<tr data-v="'+esc(it.visitor)+'" tabindex="0" aria-selected="'+(it.visitor===selected)+'">'+
+      '<td class="num">'+esc(when(it.last_at))+'</td>'+
+      '<td>'+esc(it.visitor_label)+'</td>'+
+      '<td class="num">'+num(it.hits)+(it.ai_calls?' <span class="mc-muted">(AI '+num(it.ai_calls)+')</span>':'')+'</td>'+
+      '<td>'+(it.hits?chips(it.last_terms):'<span class="mc-muted">—</span>')+'</td>'+
+      '<td class="num">'+num(it.saved)+'</td>'+
+      '<td>'+(it.last_product?esc(it.last_product.name)+'<br><span class="num mc-muted">'+esc(won(it.last_product.price))+'</span>':'<span class="mc-muted">보관 없음</span>')+'</td></tr>').join('');
+    const page=Math.floor(offset/limit)+1,pages=Math.max(1,Math.ceil((d.total_visitors||0)/limit));
+    $('mcPage').textContent=page+' / '+pages+' 쪽 · 방문자 '+num(d.total_visitors)+'명';
+    $('mcPrev').disabled=offset===0;$('mcNext').disabled=lastLen<limit;
+  }
+
+  async function open(v){
+    selected=v;
+    for(const tr of document.querySelectorAll('#mcRows tr[data-v]'))tr.setAttribute('aria-selected',String(tr.dataset.v===v));
+    $('mcDrawer').hidden=false;$('mcDrawerBody').innerHTML='<p class="mc-muted">불러오는 중입니다.</p>';
+    let d;
+    try{d=await getJSON('/api/admin/mvp3-consults/'+encodeURIComponent(v)+'?'+q());}
+    catch(e){$('mcDrawerBody').innerHTML='<p>'+esc(e.message)+'</p>';return;}
+    $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved);
+    $('mcDrawerBody').innerHTML='<p class="mc-note">문의 원문은 보여 주지 않습니다. 읽어 낸 조건 이름만 보입니다.</p>'+
+      (d.timeline||[]).map(e=>e.kind==='saved'?
+        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관</div>'+
+        '<h3>'+esc(e.product.name||'상품명 없음')+'</h3>'+
+        '<div class="num">'+esc(won(e.product.price))+(e.product.role?' · '+esc(e.product.role):'')+(e.product.product_code?' · 상품 '+esc(e.product.product_code):'')+'</div>'+
+        (e.conditions.length?'<div>조건: '+chips(e.conditions)+'</div>':'')+
+        (e.product.reasons.length?'<ul>'+e.product.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')+'</div>'
+        :
+        '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+'</div>'+
+        '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div></div>'
+      ).join('');
+  }
+
+  $('mcRows').addEventListener('click',e=>{const tr=e.target.closest('tr[data-v]');if(tr)open(tr.dataset.v);});
+  $('mcRows').addEventListener('keydown',e=>{if(e.key==='Enter'){const tr=e.target.closest('tr[data-v]');if(tr)open(tr.dataset.v);}});
+  $('mcClose').addEventListener('click',()=>{$('mcDrawer').hidden=true;selected=null;
+    for(const tr of document.querySelectorAll('#mcRows tr[data-v]'))tr.setAttribute('aria-selected','false');});
+  $('mcPrev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);load();});
+  $('mcNext').addEventListener('click',()=>{offset+=limit;load();});
+  $('mcTest').addEventListener('change',()=>{offset=0;load();if(selected)open(selected);});
+  load();
+})();
+</script>
+{% endblock %}

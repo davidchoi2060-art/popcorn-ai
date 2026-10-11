@@ -88,6 +88,17 @@ def dashboard():
             " AND created_at >= :lo AND created_at < :hi"
             " AND EXISTS (SELECT 1 FROM quote_snapshots q WHERE q.session_id=s.session_id)"),
             _t_params).scalar_one()
+        # 지금 고객 화면(mvp3)은 consult_sessions 를 쓰지 않는다 — 위 sess_today 에 안 잡힌다.
+        # 그 화면이 남기는 두 표를 따로 센다(2026-10-11 품질관리). sessions_today 의 정의는
+        # 바꾸지 않는다(회귀 [4834] 가 견적 상담 기록 today 와의 일치를 본다).
+        # 시험 문의(data_origin='test')는 빼고, 보관 시각(timestamptz)은 naive UTC 로 맞춘다.
+        mvp3_hits_today = conn.execute(text(
+            "SELECT COUNT(*) FROM talk_intent_hits WHERE data_origin = 'real'"
+            " AND created_at >= :lo AND created_at < :hi"), _t_params).scalar_one()
+        mvp3_saved_today = conn.execute(text(
+            "SELECT COUNT(*) FROM mvp3_saved_recommendations"
+            " WHERE saved_at AT TIME ZONE 'UTC' >= :lo AND saved_at AT TIME ZONE 'UTC' < :hi"),
+            _t_params).scalar_one()
         orders = conn.execute(text(
             "SELECT status, COUNT(*) FROM orders GROUP BY status")).all()
         import_rows = one("SELECT COUNT(*) FROM csv_import_jobs")
@@ -109,6 +120,7 @@ def dashboard():
             "sessions_today": sess_today, "sessions_done": sess_done,
             "sessions_drop": sess_today - sess_done,
             "sessions_scope_note": scope_note(),   # A-81 — 왜 세션 수가 줄었는지(시험 운영 기간 제외)
+            "mvp3_inquiries_today": mvp3_hits_today, "mvp3_saved_today": mvp3_saved_today,
             "orders_total": sum(order_map.values()), "orders_active": active,
             "orders_by_status": [{"status": s, "count": n} for s, n in
                                  sorted(orders, key=lambda x: -x[1])],

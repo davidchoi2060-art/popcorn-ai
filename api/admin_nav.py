@@ -373,6 +373,9 @@ NAV = [
         ("추천 기준 보기", "/admin2/policy-weights", None),
         ("추천 가능 재고 현황", "/admin2/candidate-pool", None),
         ("견적 상담 기록", "/admin2/consult-sessions", None),
+        # 2026-10-11 품질관리 신설 — 지금 고객 화면(mvp3)은 consult_sessions 를 안 써서
+        # 위 화면에 안 잡힌다. 그 문의·보관 견적을 보는 자리(api/admin_mvp3_consults.py).
+        ("고객 문의 · 보관 견적", "/admin2/mvp3-consults", "신설(ADM-ORD-011 · 가칭) — mvp3 문의와 보관 견적"),
         ("부품 교체 · 클릭 기록", "/admin2/swap-click-logs", None),
     ]),
 
@@ -571,7 +574,7 @@ def new_admin_nav(current_path=''):
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders',)),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members',)),
         ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/product-fit')),
-        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/handoff-log', '/admin2/swap-click-logs')),
+        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/mvp3-consults', '/admin2/handoff-log', '/admin2/swap-click-logs')),
     ]
     return [dict(label=label, href=href, icon=icon, active=current_path.rstrip('/') in paths)
             for label, href, icon, paths in groups]

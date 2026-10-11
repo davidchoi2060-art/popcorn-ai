@@ -221,6 +221,8 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
     consult = {"value_fmt": "—", "status": "error", "reason": err_dash}
     quoted = {"value_fmt": "—", "status": "error", "reason": err_dash}
     drop_fmt = "—"
+    # 지금 고객 화면(mvp3) 문의·보관 — consult_sessions 밖이라 「상담」 수와 따로 보인다.
+    mvp3 = {"value_fmt": "—", "saved_fmt": "—", "status": "error", "reason": err_dash}
     if dash is not None:
         f = dash["flow"]
         # A-81 — 세션 수는 「시험 운영 기간」 제외분이다. 기존 title 툴팁 자리(에러 사유가
@@ -229,6 +231,10 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
         consult = {"value_fmt": f'{f["sessions_today"]:,}', "status": "ok", "reason": note}
         quoted = {"value_fmt": f'{f["sessions_done"]:,}', "status": "ok", "reason": note}
         drop_fmt = f'{f["sessions_drop"]:,}'
+        if f.get("mvp3_inquiries_today") is not None:
+            mvp3 = {"value_fmt": f'{f["mvp3_inquiries_today"]:,}',
+                    "saved_fmt": f'{f.get("mvp3_saved_today") or 0:,}', "status": "ok",
+                    "reason": "지금 고객 화면의 문의 수입니다. 시험 문의는 뺐습니다."}
     stock = {"status": "error", "label": "— 조회 실패", "reason": err_quality}
     if quality is not None:
         drift = quality["stock_drift"]
@@ -236,7 +242,8 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
             stock = {"status": "ok", "label": "✓ 이상 0건", "reason": None}
         else:
             stock = {"status": "warn", "label": f"⚠ 이상 {drift:,}건", "reason": None}
-    return {"consult": consult, "quoted": quoted, "drop_fmt": drop_fmt, "stock": stock}
+    return {"consult": consult, "quoted": quoted, "drop_fmt": drop_fmt, "stock": stock,
+            "mvp3": mvp3}
 
 
 def _mall_sync_view(st: dict | None, err) -> dict:
