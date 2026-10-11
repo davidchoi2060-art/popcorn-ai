@@ -276,6 +276,19 @@ def _uhd_rank(levels, usage, r):
     return max(r, min(hits)) if hits else r
 
 
+def _cheapest(usage, min_rank, levels, products, preferred, min_ok) -> dict:
+    """조건 안의 실제 최저가 한 장. 「가장 싸게」에 한 단계 위(수백만 원) 구성을 «추천»으로 함께 내밀지
+    않는다(2026-10-11 사장님 비교 -- 「개발자용 가장 저렴하게」에 248만원 카드). 더 높은 사양은 아래 빠른
+    선택이 연다. 후보가 없으면 pick 의 빈 결과(사유 포함)를 그대로 쓴다."""
+    ok = [p for p in products.values() if min_ok(p)]
+    if not ok:
+        return pick(usage, min_rank, None, None, levels, products, preferred)
+    first = min(ok, key=lambda p: (p["price"], p["code"] not in preferred))
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    more = any(p["price"] > first["price"] for p in ok)
+    return {"items": [_item(first, usage, levels_by, TAG_VALUE if more else TAG_RECOMMENDED, None, None)]}
+
+
 def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
     """한 용도의 카드 — 고객 추가 조건(wants)과 「더 싸게/더 좋게」(nav)를 반영한다."""
     min_ok = lambda p: p["price"] is not None and p["fit"].get(fu, {}).get("rank", 0) >= r  # noqa: E731
@@ -285,7 +298,14 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
     anchor = products.get(ex.get("anchor_code")) if ex.get("anchor_code") is not None else None
     nav, nav_note = ex.get("nav"), None
     res = None
-    if nav == X.CHEAPER and anchor is not None and anchor["price"] is not None:
+    if nav == X.CHEAPER and (ex.get("cheapest") or anchor is None):
+        # 「가장 싸게」(또는 기준 카드 없는 「싸게」) -- 앞 추천 카드와 상관없이 조건 안의 실제 최저가 한 장.
+        # 공개 승인 구성은 같은 가격일 때만 앞에 둔다(코덱스 #155 검수 P2-1·P2-2: 승인 우선이 최저가를
+        # 밀어내 「가장 싼 쪽」 안내와 카드가 어긋났다). 후보 범위(판매·적합 수준·조건)는 바꾸지 않는다.
+        res, nav_note = _cheapest(fu, r, levels, prods, preferred, min_ok), X.NOTE_CHEAPEST
+        for it in res["items"]:
+            it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
+    elif nav == X.CHEAPER and anchor is not None and anchor["price"] is not None:
         below = {c: p for c, p in prods.items() if p["price"] is not None and p["price"] < anchor["price"]}
         if any(min_ok(p) for p in below.values()):
             res = pick(fu, r, anchor["price"] - 1, "이하", levels, below, preferred)
@@ -294,13 +314,6 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
             nav_note = X.NOTE_CHEAPER
         else:
             nav_note = X.NOTE_CHEAPER_NONE
-    elif nav == X.CHEAPER:
-        res, nav_note = pick(fu, r, None, None, levels, prods, preferred), X.NOTE_CHEAPEST
-        # 「가장 싸게」에 한 단계 위(수백만 원) 구성을 «추천»으로 함께 내밀지 않는다(2026-10-11 사장님
-        # 비교 -- 「개발자용 가장 저렴하게」에 248만원 카드). 더 높은 사양은 아래 빠른 선택이 연다.
-        res["items"] = res["items"][:1]
-        for it in res["items"]:
-            it["over_budget"] = bool(budget is not None and bound != "이상" and it["price"] > budget)
     elif nav == X.BETTER and anchor is not None and anchor["price"] is not None:
         ap, ar = X.perf(anchor, fu), anchor["fit"].get(fu, {}).get("rank", 0)
         up = {c: p for c, p in prods.items() if c != anchor["code"] and p["price"] is not None

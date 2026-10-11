@@ -33,6 +33,9 @@ MAX_TEXT = 300
 _NUMBER_BUDGET = re.compile(r"\d+\s*(만|원|천)|[일이삼사오육칠팔구십백천]+\s*만")
 _CHEAPER = re.compile(r"(더|좀|조금|많이)\s*(싼|싸|저렴)|싸게|저렴하게|저렴한|가격.{0,4}(낮|내려|줄)|"
                       r"최저가|제일\s*싼|가장\s*싼|싼\s*(걸|거|것)|예산.{0,4}(낮|줄|내려)")
+# 「가장·제일·최대한 싸게 / 최저가」 -- 지금 보던 카드보다 «더» 싼 것이 아니라 조건 안의 최저가를 뜻한다
+# (코덱스 #155 검수 P2-1: 앞 추천이 있으면 상대 이동으로 읽혀 두 장이 다시 나왔다).
+_CHEAPEST = re.compile(r"(가장|제일|젤|최대한|최저)\s*(싼|싸|저렴)|최저\s*가|최소\s*(비용|가격|금액|예산)")
 _BETTER = re.compile(r"(더|좀|조금|훨씬)\s*(좋은|좋게|높은|나은|센|빠른|고급|비싼)|업그레이드|고사양|상위|"
                      r"한\s*단계\s*위|최고\s*사양|최고사양|최고로|풀옵|제일\s*좋은|가장\s*좋은|높은\s*사양|좋은\s*(걸|거|것)\s*으?로")
 _RAM = re.compile(r"(램|ram|메모리)\s*(?:은|는|을|를|도)?\s*(\d{1,3})\s*(?:gb|기가|g)?", re.I)
@@ -74,6 +77,8 @@ def extract(raw: str | None) -> dict:
     if not has_budget_number and not re.search(r"\d{2,}", s):
         if _CHEAPER.search(s):
             out["nav"] = CHEAPER
+            if _CHEAPEST.search(s):
+                out["cheapest"] = True
         elif _BETTER.search(s):
             out["nav"] = BETTER
     m = _RAM.search(s)

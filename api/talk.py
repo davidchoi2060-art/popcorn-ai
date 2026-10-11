@@ -1275,7 +1275,9 @@ def parse_talk(body: ParseBody, request: Request):
         reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
     # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
     # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
-    notices = TR.honest_notices(text, state, written_notices, prev_state_obj, custom_notices)
+    topic_notes = TR.topic_notices(text, written_notices, custom_notices)
+    cond_notes = TR.condition_notices(text, state, prev_state_obj)
+    notices = topic_notes + cond_notes
     if notices and stage == TS.STAGE_PC:
         reply = TR.honest_reply(notices, bool(state.usages), missing)
     if laptop and stage == TS.STAGE_PC:
@@ -1320,14 +1322,15 @@ def parse_talk(body: ParseBody, request: Request):
         reply = TX.REPLY_AI_UNREADABLE
     # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
     asked_before = TS.flow_asked(body.chat_flow)
+    # 램·SSD 같은 구성 조건 안내(cond_notes)는 설명과 함께 둔다 -- 판매 주제 안내만 설명을 대신한다.
     plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
-                and not notices and not laptop)
+                and not topic_notes and not laptop)
     # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
     # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
     explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
                  and getattr(ans, "topic", None) in ("part", "upgrade"))
     if plain_pc and explained and missing == [TS.MISSING_USAGES]:
-        reply = ""
+        reply = " ".join(cond_notes)
     elif plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
         # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
         label = TD.default_usage_label(vocab)
@@ -1335,14 +1338,16 @@ def parse_talk(body: ParseBody, request: Request):
             state = state.model_copy(update={"usages": [label]})
             missing = TS.missing_for(state, vocab)
             fit = TD._fit_usage(label)
-            reply = TD.no_usage_reply(TD.basis_work(fit) if fit else None)
+            reply = (TD.no_usage_reply(TD.basis_work(fit) if fit else None) + " " + " ".join(cond_notes)).strip()
             log.info("[talk] answer-first: no usage after ask - assumed general use")
     elif plain_pc and not missing and (
             # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
             (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
             or (asked_before and "?" in reply)
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
-        reply = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage) or reply
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage)
+        if first:
+            reply = (first + " " + " ".join(cond_notes)).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
                  pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
     reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
