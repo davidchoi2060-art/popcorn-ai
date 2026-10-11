@@ -54,8 +54,16 @@ class NoBranchQuestionAfterExplanation(unittest.TestCase):
         self.assertEqual(r["chat_flow"]["entry"], "upgrade")
 
     def test_without_explanation_the_branch_question_stays(self):
-        r = parse("PC에서 SSD가 왜 필요해요?", {}, "어떤 용도로 쓰실 PC인가요?")
+        # 2026-10-12: 한 턴에 질문은 하나까지 -- AI 답에 질문이 없을 때만 갈래 질문을 붙인다(코덱스 PR157 결정을
+        # 「질문이 하나도 없을 때」로 좁혀 읽음 · 사장님 원칙 「되묻기 최소」). 이전에는 AI 의 용도 질문 뒤에도 붙였다.
+        r = parse("PC에서 SSD가 왜 필요해요?", {}, "SSD는 저장 장치예요.")
         self.assertIn(TE.ASK, r["reply"])
+
+    def test_branch_question_is_not_added_after_the_ai_question(self):
+        for ai in ("어떤 용도로 쓰실 PC인가요?", "가격이 높아 당황스러우셨겠어요. 어떤 용도로 쓰실지 말씀해 주세요."):
+            r = parse("PC에서 SSD가 왜 필요해요?", {}, ai)
+            self.assertNotIn(TE.ASK, r["reply"], ai)
+            self.assertIn(ai, r["reply"])
 
 
 if __name__ == "__main__":
