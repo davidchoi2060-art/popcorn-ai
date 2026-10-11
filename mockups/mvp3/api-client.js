@@ -39,8 +39,9 @@
         accessKey=generated;return accessKey;
       }catch{throw new ApiError('브라우저에 보관 접근 키를 저장할 수 없어 견적 보관을 사용할 수 없어요. 상담은 계속할 수 있어요.',0,'storage_unavailable');}
     }
+    const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes'].includes(path))
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes'].includes(path)||HANDOFF_RE.test(path)))
         ||(method==='GET'&&/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path));
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
       if(!fetchImpl)throw new ApiError('서버 연결을 사용할 수 없어요.',0,'network');
@@ -84,7 +85,10 @@
       return request('POST','/api/mvp3/saved-quotes',payload,options);
     }
     return {request,parse:(payload,options)=>request('POST','/api/talk/parse',payload,options),
-      recommend:(state,options)=>request('POST','/api/grid/recommend',{state},options),listSaved,saveQuote,prepareSave};
+      recommend:(state,options)=>request('POST','/api/grid/recommend',{state},options),listSaved,saveQuote,prepareSave,
+      // 보관 견적을 팝콘PC 쇼핑몰로 넘긴다(api/mvp3_handoff.py). 결제는 쇼핑몰이 한다.
+      handoff:async(quoteId,options={})=>{if(!primed){validList(await request('GET','/api/mvp3/saved-quotes?limit=1',null,options));primed=true;}
+        return request('POST','/api/mvp3/saved-quotes/'+String(quoteId).toLowerCase()+'/handoff',null,{...options,existingKeyOnly:true});}};
   }
   const exported={ApiError,createClient,errorMessage,KEY};
   if(typeof module!=='undefined')module.exports=exported;else root.MVP3Api={...exported,...createClient()};

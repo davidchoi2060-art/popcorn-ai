@@ -343,7 +343,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
       + '<span class="sub">' + esc(period) + '</span></div>';
     html += '<div class="hl-kpi"><span class="lbl">라인</span><span class="val">' + fmt(lines.total) + '</span>'
       + '<span class="sub">부품 <b>' + fmt(lines.core_part) + '</b> · 조립비 <b>' + fmt(lines.assembly_service)
-      + '</b> · 주변기기 <b>' + fmt(lines.peripheral) + '</b></span></div>';
+      + '</b> · 주변기기 <b>' + fmt(lines.peripheral) + '</b>' + (lines.built_pc ? ' · 조립PC <b>' + fmt(lines.built_pc) + '</b>' : '') + '</span></div>';
     html += '<div class="hl-kpi"><span class="lbl">어긋난 라인</span><span class="val">' + k.mismatch.pct.toFixed(1) + '%</span>'
       + '<span class="sub">표본 ' + fmt(k.mismatch.sample) + '라인 중 ' + fmt(k.mismatch.n) + '라인(가격변동)</span></div>';
     html += '<div class="hl-kpi"><span class="lbl">우리 총액 합계</span><span class="val">' + won(k.quoted_sum.sum) + '</span>'
