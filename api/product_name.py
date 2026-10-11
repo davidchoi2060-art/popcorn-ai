@@ -134,6 +134,27 @@ def display_name(raw):
     return cut if len(cut) >= _MIN_LEN else raw
 
 
+# ── 판매 조립PC 상세 구성의 부품 이름 (2026-10-11 품질관리 R13 · 고객1 10번 · 고객3 F9) ──────
+# 상세 구성(`GET /api/customer/pc-offers/{code}` parts[].name)은 승인된 부품 설명의 이름을 싣는데,
+# 그 이름이 몰 원천에서 와서 「[회원가입 -2.5% 현금할인]」「- 단품판매불가」가 그대로 보였다.
+# 둘 다 판매조건이지 부품 정보가 아니다. 고객에게 보일 때만 뗀다 — 원천과 승인 기록은 그대로 둔다.
+#   「[병행]」「(벌크)」「(정품)」「[피씨디렉트/제이씨현]」은 유통 형태·수입사라 부품 정보다(남긴다).
+#   대괄호 판매조건은 그 대괄호만 뗀다 — 뒤에 오는 유통 표기까지 지우지 않는다.
+_SALE_BRACKET = re.compile(r"\s*\[[^\[\]]*회원가입[^\[\]]*\]")
+_SINGLE_UNSOLD = re.compile(r"\s*[-(\[]?\s*단품\s*판매\s*불가\s*[)\]]?")
+
+
+def part_display_name(raw):
+    """상세 구성 부품 이름 — 판매조건 대괄호·「단품판매불가」를 뗀다. 못 떼면 원천 그대로."""
+    if not raw or not isinstance(raw, str):
+        return raw
+    cut = _SALE_BRACKET.sub(" ", strip_html_display(raw))
+    cut = _SINGLE_UNSOLD.sub(" ", cut)
+    cut = display_name(re.sub(r"\s+", " ", cut).strip())
+    cut = re.sub(r"[\s\-·,/]+$", "", cut or "").strip()
+    return cut if len(cut) >= _MIN_LEN else raw
+
+
 # ── 판매 조립PC 카드 이름 (2026-10-10 상담 품질 점검 · 공통 문제 1) ──────────────
 # 몰의 조립PC 이름에는 광고 문구가 붙어 있다: 「[인기상품1위]」 · 「[화이트상품 1위] [13세대
 # 판매 2위] [게이밍 3위]」 · 「초저가 가성비짱」 · 「견적왕 추천PC」 · 내부 번호 「NO.04.98149」.

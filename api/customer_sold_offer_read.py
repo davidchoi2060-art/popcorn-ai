@@ -10,6 +10,8 @@ from copy import deepcopy
 from fastapi import HTTPException
 from sqlalchemy import text
 
+from .product_name import part_display_name
+
 
 def _deny():
     return {'status': 404, 'error': 'not_public'}
@@ -72,7 +74,8 @@ def _public_parts(parts, rows):
         name = content.get('name')
         role = content.get('role')
         facts = content.get('facts')
-        result.append(dict(ordinal=part['ordinal'], name=name if isinstance(name, str) else None,
+        # 판매조건 꼬리는 보일 때만 뗀다(R13) — 승인된 설명 원문은 그대로다.
+        result.append(dict(ordinal=part['ordinal'], name=part_display_name(name) if isinstance(name, str) else None,
                            description=role if isinstance(role, str) else None,
                            # A missing value is shown as unknown, never dropped or guessed.
                            specs=[dict(label=f['label'], value=f['value'] if isinstance(f.get('value'), str)
