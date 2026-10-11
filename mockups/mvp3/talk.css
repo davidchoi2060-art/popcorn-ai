@@ -1,0 +1,49 @@
+/* 2차 대화 화면(talk.html). 색은 styles.css 의 :root 값만 쓴다. 치수는 대표 화면 시안 확정 전 기본값이다. */
+.tk{height:auto;min-height:100%}
+.tk-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);height:calc(100dvh - 82px)}
+.tk-chat{display:flex;flex-direction:column;min-height:0;padding:20px clamp(16px,4vw,48px) 12px}
+.tk-log{flex:1;overflow:auto;padding:8px 0 16px;display:flex;flex-direction:column;gap:12px}
+.tk-welcome{max-width:680px;padding:24px 0 8px}.tk-welcome p{color:var(--muted)}
+.tk-examples{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tk-examples button{font-size:14px;padding:8px 12px}
+.tk-msg{max-width:min(680px,88%)}.tk-msg p{white-space:pre-wrap;margin:0}
+.tk-msg.is-user{align-self:flex-end;background:var(--green);color:white;border-radius:16px 16px 4px 16px;padding:10px 14px}
+.tk-msg.is-ai{align-self:flex-start;background:var(--tint);border-radius:16px 16px 16px 4px;padding:10px 14px}
+.tk-msg.is-error{border:1px solid var(--amber)}.tk-msg.is-error .muted{margin-top:4px}
+.tk-msg-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tk-msg-actions button{font-size:14px;padding:8px 12px}
+.tk-cards{align-self:stretch;max-width:900px}.tk-cards.is-past{opacity:.82}.tk-cards.is-empty p{color:var(--muted)}
+.tk-cards-note{color:var(--muted);font-size:14px}.tk-group{font-size:16px;margin:8px 0}
+.tk-card-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.tk-card{border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:6px;background:white}
+.tk-card .pill{align-self:flex-start}
+.tk-card.is-chosen{border-color:var(--green)}.tk-card h4{margin:4px 0 0}
+.tk-photo{margin:4px 0}.tk-photo img{width:100%;max-height:180px;object-fit:contain}.tk-photo figcaption{font-size:12px;color:var(--muted)}
+.tk-price{margin:0}.tk-price strong{font-size:20px}
+.tk-spec{margin:0;display:grid;gap:2px;font-size:14px}.tk-spec div{display:flex;gap:6px}.tk-spec dt{color:var(--muted);min-width:56px}.tk-spec dd{margin:0}
+.tk-reason{font-size:14px}
+.tk-card-actions,.tk-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tk-card-actions button,.tk-row button{font-size:14px;padding:8px 12px}
+.tk-chosen{font-size:14px;color:var(--green);align-self:center}
+.tk-status{color:var(--muted);font-size:14px;margin:4px 0}
+.tk-form{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:14px;padding:8px}
+.tk-form textarea{flex:1;border:0;resize:vertical;min-height:48px;max-height:40vh}.tk-form textarea:focus-visible{outline:none}
+.tk-count{font-size:12px;white-space:nowrap}.tk-foot{margin-top:6px}
+.tk-now{border-left:1px solid var(--line);overflow:auto;padding:20px;background:linear-gradient(120deg,#fafbf9,white)}
+.tk-now-toggle{display:none}
+.tk-now h2{font-size:20px;letter-spacing:0}.tk-now h3{font-size:18px;margin-top:4px}
+.tk-now-label{color:var(--green);font-size:14px;margin:12px 0 0}
+.tk-cond{font-size:14px;margin:4px 0}.tk-cond.is-new{color:var(--green)}
+.tk-note{font-size:14px;color:var(--amber)}
+.tk-save-state{font-size:14px;font-weight:600}
+.tk-buy,.tk-ask{margin-top:16px;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;gap:8px}.tk-ask button{font-size:14px;padding:8px 12px}
+.tk-link{display:inline-block;text-decoration:none;border-radius:9px;padding:10px 14px}
+.tk-inquiry{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.tk-field{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:14px}.tk-field input,.tk-field select,.tk-field textarea{border:1px solid var(--line);border-radius:8px;padding:8px}
+.tk-consent{display:flex;gap:8px;font-size:14px;margin:8px 0}
+@media (max-width:760px){
+  .tk-layout{display:flex;flex-direction:column;height:auto;min-height:calc(100dvh - 82px)}
+  .tk-now{order:-1;border-left:0;border-bottom:1px solid var(--line);padding:0;position:sticky;top:0;z-index:2;background:white;max-height:70dvh}
+  .tk-now-toggle{display:block;width:100%;text-align:left;padding:12px 16px;border-radius:0;font-weight:600}
+  .tk-now-body{display:none;padding:0 16px 16px}.tk-now.is-open .tk-now-body{display:block}
+  .tk-chat{padding:12px 16px}.tk-log{overflow:visible}
+  .tk-msg{max-width:92%}.tk-card-list{grid-template-columns:1fr}
+  .tk-form{position:sticky;bottom:0;background:white}
+}

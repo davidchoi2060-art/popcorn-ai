@@ -18,7 +18,7 @@ function harness({items,talkState={usages:['게임'],budget_won:1500000,game:{na
   w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async url=>{
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:url==='/api/grid/recommend'?response:{ok:true,quotes:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
-  }});w.eval(read('live-flow.js'));w.eval(read('app.js'));
+  }});w.eval(read('live-flow.js'));w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,errors,close:()=>dom.window.close()};
 }
 async function recommend(h){const d=h.w.document,input=d.querySelector('#request');input.value='배그 롤 150만원';input.dispatchEvent(new h.w.Event('input',{bubbles:true}));d.querySelector('#chat-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>d.querySelector('.live-product-card'));}

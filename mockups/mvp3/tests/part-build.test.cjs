@@ -48,7 +48,7 @@ function harness({quoteFail=false,total=1400000}={}){
   }});w.eval(read('live-flow.js'));
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {w,d:w.document,get flow(){return flow;},errors,calls,close:()=>dom.window.close()};
 }
 const text=e=>e.textContent.replace(/\s+/g,' ').trim();

@@ -27,7 +27,7 @@ function harness({saved=false,item={...product,photo:available},groups=null,quot
   }});w.eval(read('live-flow.js'));
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
-  w.eval(read('app.js'));
+  w.eval(read('live-photo.js'));w.eval(read('app.js'));
   return {dom,w,flow,calls,errors,response,original,before,quote,click:s=>w.document.querySelector(s).click(),close:()=>dom.window.close()};
 }
 async function recommend(h){const input=h.w.document.querySelector('#request');input.value='CODE/MOCK 사무용';input.dispatchEvent(new h.w.Event('input',{bubbles:true}));h.w.document.querySelector('#chat-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>h.w.document.querySelector('.live-product-card'));}

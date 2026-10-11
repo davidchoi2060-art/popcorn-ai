@@ -91,7 +91,7 @@ async function wholeApp(configuration){
     save:async()=>{calls.save++;throw Error('Save forbidden');}};
   w.eval(read('live-flow.js'));const factory=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=factory(...args);return flow;};
-  try{w.eval(read('app.js'));await flow.submit('CODE/MOCK 부품 슬롯 회귀');return {dom,flow,calls};}
+  try{w.eval(read('live-photo.js'));w.eval(read('app.js'));await flow.submit('CODE/MOCK 부품 슬롯 회귀');return {dom,flow,calls};}
   catch(error){dom.window.close();throw error;}
 }
 for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE']){
