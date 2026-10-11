@@ -41,12 +41,20 @@ _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\
                       r"어떤\s*(pc|피시|컴퓨터|컴|본체|사양)\S{0,2}\s*(좋|괜찮|필요|돼|되)|"
                       r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양|"
                       # 「예산 얼마나 잡아야」·「배그 돌아가는 컴퓨터」(2026-10-11 일반 AI 비교 R09·E13)
-                      r"얼마\S{0,2}\s*(잡|들|필요|있어야|정도|면\s*돼|면\s*되)|돌아가는|돌릴|돌리려", re.I)
+                      r"얼마\S{0,2}\s*(잡|들|필요|있어야|정도|면\s*돼|면\s*되)|돌아가는|돌릴|돌리려|"
+                      # 「사무용 컴퓨터 50만원으로 맞출 수 있어요?」·「회계 사무실 PC 5대 필요해요」·「4K 편집이랑 3D 렌더링
+                      # 같이 하려면?」·「공부용이랑 마인크래프트용 컴퓨터요」(2026-10-11 개발 서버 -- 설명 없이 되묻기만 했다)
+                      r"맞출|용\s*(pc|피시|컴퓨터|본체|데스크)", re.I)
+# 「~하려면」「~필요해요」는 용도·게임·PC 를 말했을 때만 새 PC 질문이다. 부품을 말했으면(「PC 램 몇 기가 필요해요?」)
+# 부품 설명으로 둔다 -- 새 PC 용도를 되묻지 않게.
+_NEED = re.compile(r"하려면|쓰려면|필요해|필요한가|필요할까|뭐가\s*필요")
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
 # 모니터는 뺀다 -- 「모니터 추천」은 크기 구간을 바로 보여 주는 별도 흐름이 있다(talk.MONITOR_BANDS).
-_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스", re.I)
+# 그래픽카드·CPU 모델명도 부품이다 -- 「RTX 5060이랑 RTX 5060 Ti 차이가 뭐예요?」가 「판단할 수 없어요」로 끝났다(2026-10-11).
+_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스|"
+                   r"(?<![a-z])(rtx|gtx|rx)\s*\d{3,4}|지포스|라데온|라이젠|ryzen", re.I)
 _ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|좋은|괜찮|비교|알려|궁금|역할|\?")
 _UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
 TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE, TOPIC_GENERAL = "build", "part", "upgrade", "general"
@@ -94,7 +102,9 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
     explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
-    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game)) and not explain_part
+    uses = bool(usage_hits(s, vocab)) or game
+    build = bool((_REQUEST.search(s) and (uses or pc))
+                 or (_NEED.search(s) and (uses or (pc and not part)))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
@@ -178,7 +188,9 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "",
         "[쓰지 않는 것]",
         "- 가격·금액·예산 숫자(카드가 보여 준다).",
-        "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다.",
+        "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다."
+        + (" 고객이 직접 말한 모델명(%s)은 그대로 써서 비교해도 된다." % ", ".join(_models(sentence))
+           if _models(sentence) else ""),
         ("- 재고·할인·특정 기간을 우리 가게 약속처럼 단정하는 말." if topic == TOPIC_GENERAL
          or _GENERAL.search(sentence or "") else "- 재고·배송·할인·설치."),
         "- 질문 문장. 마지막 안내는 서버가 붙인다.",
@@ -199,17 +211,34 @@ _PRICE_WORDS = re.compile(r"\d+\s*만|\d+\s*원|원대|가격대")
 _STOCK_ONLY = ("재고", "품절", "입고")
 
 
-def clean(raw: str, topic: str | None = None) -> tuple[str, list[dict]]:
+def _norm(m: str) -> str:
+    return re.sub(r"\s+", "", m).lower()
+
+
+def _models(sentence: str) -> list[str]:
+    """고객 문장에 나온 부품 모델명(「RTX 5060」·「RTX 5060 Ti」) -- 고객이 직접 물은 모델은 설명에 남긴다."""
+    out: list[str] = []
+    for m in TF._RE_PART.finditer(sentence or ""):
+        if m.group(0).strip() not in out:
+            out.append(m.group(0).strip())
+    return out
+
+
+def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, list[dict]]:
     """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
     general = topic == TOPIC_GENERAL
     stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
+    asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
     for s in TF.split_sentences((raw or "").replace("**", "")):
+        # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
+        # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
+        foreign_model = any(_norm(m.group(0)) not in asked for m in TF._RE_PART.finditer(s))
         if TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s):
             dropped.append({"before": s, "reason": "price"})
-        elif TF._RE_PART.search(s):
+        elif foreign_model:
             dropped.append({"before": s, "reason": "part model"})
         elif any(w in s for w in stock):
             dropped.append({"before": s, "reason": "stock"})
@@ -245,7 +274,7 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         res.provider, res.model = out.provider, out.model
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
         res.log_id = out.log_id
-        body, dropped = clean(out.text, topic)
+        body, dropped = clean(out.text, topic, sentence)
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}
