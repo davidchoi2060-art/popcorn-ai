@@ -217,6 +217,14 @@ def _work_items(wl: dict | None):
     return out, active_total
 
 
+# 2026-10-11 관리자 확인 §2 · 개편 17번: 문의 기록(talk_intent_hits)에는 어느 고객 화면에서
+# 왔는지가 없다. 같은 상담 경로(/api/talk/parse)를 쓰는 mvp2 문의도 함께 세어지므로 나눠 셀 수
+# 없다는 사실을 숫자 옆에 밝힌다(지어낸 구분을 하지 않는다).
+MVP3_COUNT_SCOPE = "모든 고객 화면 합계"
+MVP3_COUNT_NOTE = ("지금 고객 화면(mvp3)과 같은 상담 경로를 쓰는 다른 고객 화면(mvp2 등)의 문의가 함께"
+                   " 들어 있습니다. 문의 기록에 화면 구분이 없어 나눠 셀 수 없습니다. 시험 문의는 뺐습니다.")
+
+
 def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dict:
     consult = {"value_fmt": "—", "status": "error", "reason": err_dash}
     quoted = {"value_fmt": "—", "status": "error", "reason": err_dash}
@@ -234,7 +242,7 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
         if f.get("mvp3_inquiries_today") is not None:
             mvp3 = {"value_fmt": f'{f["mvp3_inquiries_today"]:,}',
                     "saved_fmt": f'{f.get("mvp3_saved_today") or 0:,}', "status": "ok",
-                    "reason": "지금 고객 화면의 문의 수입니다. 시험 문의는 뺐습니다."}
+                    "reason": MVP3_COUNT_NOTE}
     stock = {"status": "error", "label": "— 조회 실패", "reason": err_quality}
     if quality is not None:
         drift = quality["stock_drift"]
@@ -243,7 +251,7 @@ def _flow(dash: dict | None, quality: dict | None, err_dash, err_quality) -> dic
         else:
             stock = {"status": "warn", "label": f"⚠ 이상 {drift:,}건", "reason": None}
     return {"consult": consult, "quoted": quoted, "drop_fmt": drop_fmt, "stock": stock,
-            "mvp3": mvp3}
+            "mvp3": mvp3, "mvp3_scope": MVP3_COUNT_SCOPE}
 
 
 def _mall_sync_view(st: dict | None, err) -> dict:

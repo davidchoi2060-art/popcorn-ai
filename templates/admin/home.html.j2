@@ -192,7 +192,7 @@
       </span>
       <span class="arrow">·</span>
       <a class="metric" href="/admin2/mvp3-consults" title="{{ flow.mvp3.reason or '' }}">
-        <b>{{ flow.mvp3.value_fmt }}</b><span>고객 화면 문의{% if flow.mvp3.status == 'ok' %} (보관 {{ flow.mvp3.saved_fmt }}){% endif %}</span>
+        <b>{{ flow.mvp3.value_fmt }}</b><span>고객 화면 문의{% if flow.mvp3.status == 'ok' %} (보관 {{ flow.mvp3.saved_fmt }} · {{ flow.mvp3_scope }}){% endif %}</span>
       </a>
       <span class="arrow">→</span>
       <span class="pending">
