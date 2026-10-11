@@ -51,13 +51,19 @@ _NEED = re.compile(r"하려면|쓰려면|필요해|필요한가|필요할까|뭐
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
-# 모니터는 뺀다 -- 「모니터 추천」은 크기 구간을 바로 보여 주는 별도 흐름이 있다(talk.MONITOR_BANDS).
+# 모니터도 넣는다(2026-10-12) -- 크기 구간 흐름(talk.MONITOR_BANDS)은 백업 화면(mvp1)만 부르고 지금 화면(mvp3)은
+# 부르지 않아, 「모니터 어떤 거 사야 돼요?」에 본체 가격 안내만 나갔다.
 # 그래픽카드·CPU 모델명도 부품이다 -- 「RTX 5060이랑 RTX 5060 Ti 차이가 뭐예요?」가 「판단할 수 없어요」로 끝났다(2026-10-11).
-_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스|"
+_PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스|모니터|"
                    r"(?<![a-z])(rtx|gtx|rx)\s*\d{3,4}|지포스|라데온|라이젠|ryzen", re.I)
 _ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|좋은|괜찮|비교|알려|궁금|역할|\?")
 _UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
 TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE, TOPIC_GENERAL = "build", "part", "upgrade", "general"
+TOPIC_LAPTOP = "laptop"
+# 「이 가격이면 그냥 노트북 사는 게 낫지 않아요?」 -- 노트북을 팔지 않아도 데스크톱과 무엇이 다른지는 답할 수 있다
+# (2026-10-11 일반 AI 비교 R27: 「노트북은 판매하지 않습니다」와 되묻기만 나갔다).
+_LAPTOP_COMPARE = re.compile(r"(노트북|랩탑|랩톱|laptop|notebook).{0,20}(낫|나아|나을|나은|비교|차이|대신|vs|말고)|"
+                             r"(낫|나아|나을|나은|비교|차이|대신|vs|말고).{0,20}(노트북|랩탑|랩톱|laptop|notebook)", re.I)
 # 윈도우·배송·설치·환불·취소·보증·결제처럼 «일반 기준»은 말할 수 있는 구매 절차 질문(2026-10-11 일반 AI 비교
 # R12·R13·E42·E44: 「확인이 어렵다」로만 넘겨 손님에게 남는 것이 없었다). 우리 가게 조건은 아래 안내(reply)가 말한다.
 _GENERAL = re.compile(r"윈도우?|운영\s*체제|배송|택배|출고|도착|설치|환불|취소|반품|교환|보증|(?<![a-z])a\s*/?\s*s(?![a-z])|"
@@ -101,6 +107,8 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | general | None. game=True 면 게임 이름을 용도로 친다."""
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
+    if _LAPTOP_COMPARE.search(s) and not part:        # 「노트북 램 차이」는 부품 이야기다
+        return TOPIC_LAPTOP
     explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
     uses = bool(usage_hits(s, vocab)) or game
     build = bool((_REQUEST.search(s) and (uses or pc))
@@ -111,7 +119,7 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
         return TOPIC_UPGRADE
     if build:
         return TOPIC_BUILD
-    if part and _ASKS.search(s):
+    if part and (_ASKS.search(s) or _REQUEST.search(s)):     # 「모니터 추천해줘」·「램 추천해줘」
         return TOPIC_PART
     return None
 
@@ -157,6 +165,9 @@ _TOPIC_TASK = {
     TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
                    " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
                    " 특정 PC에 바로 장착된다고 단정하지 않는다.",
+    TOPIC_LAPTOP: "데스크톱(조립 PC)과 노트북을 이동·성능·발열과 소음·업그레이드·같은 돈으로 얻는 성능 기준으로"
+                  " 서너 문장 비교하고, 어떤 사람에게 어느 쪽이 맞는지 말한다. 우리 가게는 노트북을 팔지 않지만"
+                  " 노트북을 깎아내리지 않는다.",
     TOPIC_GENERAL: "고객이 물은 구매 절차(운영체제 설치·배송·설치·결제·환불·취소·보증 등)를 국내 조립 PC 쇼핑몰의"
                    " «일반적인» 기준으로 서너 문장 설명한다. 「보통」·「일반적으로」·「쇼핑몰마다 다르지만」처럼 말하고,"
                    " 우리 가게가 해 준다·가능하다고 약속하지 않는다. 고객이 직접 확인할 곳(상품 페이지·주문 내역·카드사)을"

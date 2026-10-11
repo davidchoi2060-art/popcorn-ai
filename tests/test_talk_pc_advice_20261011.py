@@ -88,7 +88,8 @@ class Topics(unittest.TestCase):
                         ("지금 쓰는 PC가 느려요", PA.TOPIC_UPGRADE),
                         ("램 업그레이드 하고 싶어요", PA.TOPIC_UPGRADE),
                         ("개발자용 PC를 가장 저렴하게 추천해줘", PA.TOPIC_BUILD),
-                        ("모니터 추천해줘", None), ("오늘 날씨 어때", None), ("개발이요", None)):
+                        # 모니터도 설명한다 -- 크기 구간 흐름은 지금 화면(mvp3)이 부르지 않는다(2026-10-12).
+                        ("모니터 추천해줘", PA.TOPIC_PART), ("오늘 날씨 어때", None), ("개발이요", None)):
             with self.subTest(s=s):
                 self.assertEqual(PA.topic_of(s, vocab()), want)
 
