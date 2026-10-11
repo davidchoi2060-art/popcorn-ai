@@ -440,3 +440,16 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 /* 2026-10-11 상담 주고받기: 세 장(알뜰 · 추천 · 더 높은 사양)과 카드 뒤 빠른 선택 */
 @media(min-width:1400px){.live-mode .quote-cards.has-three{grid-template-columns:repeat(3,minmax(0,1fr))}}
 .explore-choices{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0 0}
+/* 구매 상담 신청 칸 (2026-10-11): 연락처를 남기는 자리. 주문·결제는 하지 않는다. */
+.live-inquiry-open{margin:14px 0 0}
+.live-inquiry{border:1px solid var(--line);border-radius:12px;padding:18px 20px;max-width:640px}
+.live-inquiry-field{display:flex;flex-direction:column;gap:6px;margin:12px 0;font-size:14px}
+.live-inquiry-field span{color:var(--muted)}
+.live-inquiry-field :is(input,select,textarea){border:1px solid var(--line);border-radius:8px;padding:10px;color:var(--ink);background:#fff;width:100%}
+.live-inquiry-field textarea{resize:vertical;min-height:72px}
+.live-inquiry-hint{margin:-4px 0 4px}
+.live-inquiry-consent{display:flex;gap:10px;align-items:flex-start;font-size:14px;margin:14px 0;cursor:pointer}
+.live-inquiry-consent input{accent-color:var(--green);width:20px;height:20px;flex:none;margin-top:2px}
+.live-inquiry-error{color:var(--amber);font-size:14px}
+.live-inquiry-buttons{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+@media(max-width:760px){.live-inquiry{padding:14px 16px}.live-inquiry-buttons button{flex:1}}

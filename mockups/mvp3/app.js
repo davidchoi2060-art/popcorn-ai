@@ -290,6 +290,35 @@ function handoffPanel(h){
     '<p><a class="primary" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a></p>'+
     '<p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p></section>';
 }
+// 구매 상담 신청 칸(api/mvp3_purchase_inquiry.py). 주제·동의 문구는 서버가 준 것만 쓴다.
+// 연락처를 남길 뿐 주문·결제·가격 확정은 하지 않는다고 칸 안에서 먼저 말한다.
+function inquiryPanel(){
+  const q=state.inquiry;if(!q.open&&!q.done)return '';
+  if(q.done)return '<section class="live-explanation live-inquiry" role="status" data-inquiry-done><h3>구매 상담 신청</h3><p>'+esc(q.done.note)+'</p>'+
+    '<p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 아직 진행되지 않았어요.</p></section>';
+  const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft;
+  const err=q.error?'<p class="live-inquiry-error" role="alert">'+esc(q.error)+'</p>':'';
+  if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>구매 상담 신청</h3>'+
+    (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline'))+'</section>';
+  const field=(name,label,input)=>'<label class="live-inquiry-field"><span>'+label+'</span>'+input+'</label>';
+  const dis=busy?' disabled':'';
+  return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>구매 상담 신청</h3>'+
+    '<p class="muted">여러 대 구매 · 할인 · 세금계산서처럼 상담에서 정할 수 없는 내용은 팝콘PC 담당자가 연락드려 안내해요. 이 신청으로 주문이나 결제가 진행되지는 않아요.</p>'+
+    field('topic','문의 주제','<select data-inquiry="topic"'+dis+'><option value="">주제를 골라 주세요</option>'+q.meta.topics.map(t=>'<option'+(d.topic===t?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select>')+
+    field('name','이름 (선택)','<input data-inquiry="name" maxlength="30" autocomplete="name" value="'+esc(d.name)+'"'+dis+'>')+
+    field('phone','전화번호','<input data-inquiry="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'>')+
+    field('email','이메일','<input data-inquiry="email" type="email" maxlength="120" autocomplete="email" value="'+esc(d.email)+'"'+dis+'>')+
+    '<p class="muted live-inquiry-hint">전화번호나 이메일 중 하나는 적어 주세요.</p>'+
+    field('message','문의 내용 (선택)','<textarea data-inquiry="message" maxlength="500" rows="3"'+dis+'>'+esc(d.message)+'</textarea>')+
+    '<label class="live-inquiry-consent"><input type="checkbox" data-inquiry="consent"'+(d.consent?' checked':'')+dis+'><span>'+esc(q.meta.consent_text)+' 동의합니다.</span></label>'+
+    err+'<div class="live-inquiry-buttons">'+button('닫기','inquiry-close','outline',busy?'disabled':'')+
+    button(state.phase==='inquiry'?'보내는 중…':'신청 보내기','inquiry-send','primary',busy?'disabled':'')+'</div></section>';
+}
+function inquiryValues(){
+  const out={};
+  for(const e of view.querySelectorAll('[data-inquiry]'))out[e.dataset.inquiry]=e.type==='checkbox'?e.checked:e.value;
+  return out;
+}
 function renderFinal(){
   const handoffDone=!!(state.handoff&&state.savedQuote&&state.handoff.quote_id===state.savedQuote.id);
   const label={idle:'아직 보관 전',saving:'보관 확인 중',saved:'서버에 보관됨',uncertain:'보관 결과 미확인',failed:'보관되지 않음'};
@@ -302,6 +331,8 @@ function renderFinal(){
     (saved&&state.savedQuote&&!handoffDone?button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'팝콘PC 쇼핑몰에서 구매하기','handoff','primary',state.phase?'disabled':''):'')+
     '</div><small>'+(saved?'결제와 배송은 팝콘PC 쇼핑몰에서 진행돼요. 이 화면에서는 결제하지 않아요.':'주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다. 견적을 보관하면 팝콘PC 쇼핑몰 구매로 이어갈 수 있어요.')+'</small></div></footer>'+
     (handoffDone?handoffPanel(state.handoff):'')+
+    (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('여러 대 · 할인 · 세금계산서는 구매 상담 신청','inquiry-open','outline',state.phase?'disabled':'')+'</p>':'')+
+    inquiryPanel()+
     (state.savedQuote?'<p class="muted live-saved-note">보관일 '+esc(new Date(state.savedQuote.saved_at).toLocaleString('ko-KR'))+' · 이 브라우저의 보관 키로 접근합니다.</p>':'');
   actions.hidden=true;
 }
@@ -383,6 +414,9 @@ document.addEventListener('click',e=>{
     case 'back':back();break;
     case 'save':void flow.save();break;
     case 'handoff':void flow.handoff();break;
+    case 'inquiry-open':void flow.openInquiry();break;
+    case 'inquiry-close':flow.inquiryDraft(inquiryValues());flow.closeInquiry();break;
+    case 'inquiry-send':void flow.inquire(inquiryValues());break;
     case 'recover':void flow.recover();break;
     case 'load':flow.load(b.dataset.id);break;
     case 'retry':void flow.retry();break;
@@ -392,6 +426,9 @@ document.addEventListener('click',e=>{
 });
 function refreshDraftExplicitly(){setDraft(generatedDraft());$('#request').focus({preventScroll:true});}
 document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captureDraft();const n=Number(e.target.value);draft.budget_won=[100,150,200,250].includes(n)?n*10000:null;draft.budget_bound=draft.budget_won===null?null:'이하';if(!draft.draft_edited)refreshDraft();render();$('#gateway-budget')?.focus({preventScroll:true});}});
+// 신청 칸은 다시 그려져도 적던 값이 남게 입력마다 상태에 옮긴다(다시 그리지는 않는다).
+view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
+view.addEventListener('change',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 $('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
 $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;captureDraft();void submit(draft.draft_text,{fromInput:true});});
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});

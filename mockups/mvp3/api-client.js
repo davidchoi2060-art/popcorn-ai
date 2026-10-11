@@ -7,6 +7,7 @@
   function errorMessage(status,data){
     const detail=data&&data.detail, value=typeof detail==='object'&&detail?detail:data;
     const code=typeof value?.error==='string'?value.error:'';
+    if(status===422&&typeof detail==='string'&&detail.length<=120)return detail;
     if(status===429)return '요청이 많아 잠시 기다려야 해요. 잠시 후 다시 시도해주세요.';
     if(status===409)return '상품 가격이나 추천 조건이 달라졌어요. 최신 추천을 다시 확인해주세요.';
     if(status===401||status===403)return '이 브라우저의 보관 기록에 접근할 수 없어요. 보관 키와 브라우저 설정을 확인해주세요.';
@@ -41,8 +42,8 @@
     }
     const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes'].includes(path)||HANDOFF_RE.test(path)))
-        ||(method==='GET'&&/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path));
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries'].includes(path)||HANDOFF_RE.test(path)))
+        ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'));
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
       if(!fetchImpl)throw new ApiError('서버 연결을 사용할 수 없어요.',0,'network');
       const controller=new AbortController(), signal=options.signal;
@@ -95,7 +96,10 @@
         return request('POST','/api/grid/recommend',body,options);},listSaved,saveQuote,prepareSave,
       // 보관 견적을 팝콘PC 쇼핑몰로 넘긴다(api/mvp3_handoff.py). 결제는 쇼핑몰이 한다.
       handoff:async(quoteId,options={})=>{if(!primed){validList(await request('GET','/api/mvp3/saved-quotes?limit=1',null,options));primed=true;}
-        return request('POST','/api/mvp3/saved-quotes/'+String(quoteId).toLowerCase()+'/handoff',null,{...options,existingKeyOnly:true});}};
+        return request('POST','/api/mvp3/saved-quotes/'+String(quoteId).toLowerCase()+'/handoff',null,{...options,existingKeyOnly:true});},
+      // 구매 상담 신청(api/mvp3_purchase_inquiry.py). 연락처를 남길 뿐 주문·결제는 하지 않는다.
+      inquiryForm:options=>request('GET','/api/mvp3/purchase-inquiries/form',null,options),
+      inquiry:(payload,options)=>request('POST','/api/mvp3/purchase-inquiries',payload,options)};
   }
   const exported={ApiError,createClient,errorMessage,KEY};
   if(typeof module!=='undefined')module.exports=exported;else root.MVP3Api={...exported,...createClient()};

@@ -39,6 +39,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
 from . import talk_rules as TR
+from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST
 from .db import engine
 from .timeutil import iso, KST, kst_day_range
 
@@ -228,6 +229,12 @@ def visitor_detail(visitor: str, include_test: bool = False):
                 SELECT quote_id, product_snapshot, talk_state, saved_at
                   FROM mvp3_saved_recommendations s WHERE user_id = :u AND {_saved_origin(include_test)}
                  ORDER BY saved_at, quote_id LIMIT 200"""), {"u": uid}).mappings().all()
+            # 구매 상담 신청(0139) — 연락처는 싣지 않는다. 처리는 「구매 상담 신청」 화면에서 한다.
+            inquiries = conn.execute(text(f"""
+                SELECT i.inquiry_no, i.created_at, i.topic, i.status
+                  FROM purchase_inquiries i
+                 WHERE i.user_id = :u AND ({'TRUE' if include_test else 'NOT ' + INQUIRY_IS_TEST})
+                 ORDER BY i.created_at, i.inquiry_id LIMIT 100"""), {"u": uid}).mappings().all()
         else:
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
@@ -236,7 +243,8 @@ def visitor_detail(visitor: str, include_test: bool = False):
                   FROM talk_intent_hits h LEFT JOIN talk_reply_reviews r ON r.hit_id = h.hit_id
                  WHERE h.hit_id = :h"""), {"h": hit_id}).mappings().all()
             quotes = []
-    if not hits and not quotes:
+            inquiries = []
+    if not hits and not quotes and not inquiries:
         raise HTTPException(404, "이 방문자의 기록이 없습니다")
 
     timeline = [{
@@ -260,7 +268,11 @@ def visitor_detail(visitor: str, include_test: bool = False):
                         "reasons": [x for x in (p.get("reasons") or []) if isinstance(x, str)][:5]},
             "conditions": conditions(q["talk_state"]),
         })
+    for i in inquiries:
+        timeline.append({"kind": "inquiry", "at": iso(i["created_at"]),
+                         "inquiry_no": i["inquiry_no"], "topic": i["topic"], "status": i["status"]})
     timeline.sort(key=lambda e: e["at"] or "")
     return {"visitor": visitor, "visitor_known": uid is not None,
             "visitor_label": ("방문자 " + str(uid)) if uid is not None else "방문자 미확인",
-            "hits": len(hits), "saved": len(quotes), "timeline": timeline}
+            "hits": len(hits), "saved": len(quotes), "inquiries": len(inquiries),
+            "timeline": timeline}
