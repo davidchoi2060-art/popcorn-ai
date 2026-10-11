@@ -71,7 +71,10 @@ function proposalBlock(p,latest){
   const head=latest?'':'<p class="tk-cards-note">이전 제안 · 그때 조건('+esc(conditionsText(p.talk)||'조건 미확인')+') 기준 금액이에요.</p>';
   const many=p.groups.filter(g=>g.products.length).length>1;
   return '<div class="tk-cards'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+p.groups.filter(g=>g.products.length).map(g=>
-    (many&&g.usage?'<h3 class="tk-group">'+esc(g.usage)+'</h3>':'')+'<ul class="tk-card-list">'+g.products.map(x=>card(x,p,latest)).join('')+'</ul>').join('')+'</div>';
+    (many&&g.usage?'<h3 class="tk-group">'+esc(g.usage)+'</h3>':'')+
+    // 예산 안에 판매 구성이 없을 때 서버가 준 사유(「이 작업은 595,700원부터 가능합니다」)를 카드 위에 둔다 --
+    // 예산을 넘는 카드만 말없이 나오면 설명과 어긋나 보인다(2026-10-11 일반 AI 비교 R03).
+    (g.empty_note?'<p class="warn-text tk-group-note">'+esc(g.empty_note)+'</p>':'')+'<ul class="tk-card-list">'+g.products.map(x=>card(x,p,latest)).join('')+'</ul>').join('')+'</div>';
 }
 function card(x,p,latest){
   const chosen=state.selected?.product_code===x.product_code;
