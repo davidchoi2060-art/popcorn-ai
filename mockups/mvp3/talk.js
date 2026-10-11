@@ -68,10 +68,11 @@ function proposalBlock(p,latest){
   const products=p.groups.flatMap(g=>g.products);
   // 예산이 너무 낮아 카드를 안 낸 경우(「10만원」) 서버가 준 「○○원부터 가능합니다」를 그대로 보인다.
   const notes=[...new Set(p.groups.map(g=>g.empty_note).filter(Boolean))];
-  if(!products.length)return '<div class="tk-cards is-empty" data-proposal="'+p.id+'">'+
+  const head=latest?'':'<p class="tk-cards-note">이전 제안 · 그때 조건('+esc(conditionsText(p.talk)||'조건 미확인')+') 기준 금액이에요.</p>';
+  // 지난 제안은 비어 있어도 「이전 제안」 머리와 is-past 를 단다 -- 지난 「못 찾았어요」가 지금 답처럼 보였다(2026-10-12 검수 9da2 P2-2).
+  if(!products.length)return '<div class="tk-cards is-empty'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+
     (notes.length?notes.map(n=>'<p class="warn-text tk-group-note">'+esc(n)+'</p>').join(''):'<p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 사람에게 문의할 수 있어요.</p>')+
     (latest?button('사람에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
-  const head=latest?'':'<p class="tk-cards-note">이전 제안 · 그때 조건('+esc(conditionsText(p.talk)||'조건 미확인')+') 기준 금액이에요.</p>';
   const many=p.groups.filter(g=>g.products.length).length>1;
   return '<div class="tk-cards'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+p.groups.filter(g=>g.products.length).map(g=>
     (many&&g.usage?'<h3 class="tk-group">'+esc(g.usage)+'</h3>':'')+

@@ -9,7 +9,7 @@
 ■ 무엇을 하나
   [B] 는 원래 «게임 질문»에만 답했다(talk_answer.answer_path). 그래서 「개발자용 PC를 가장 저렴하게
   추천해줘」에는 위쪽 설명이 비고, 되묻기 한 줄과 카드만 나왔다. 이 모듈은 PC 구성 질문에
-  «무엇이 중요하고 무엇은 아껴도 되는지, 왜 그런지»를 서너 문장으로 먼저 답한다. 화면은 이 답을
+  «무엇이 중요하고 무엇은 아껴도 되는지, 왜 그런지»를 네다섯 문장으로 먼저 답한다. 화면은 이 답을
   말풍선 위쪽에, 가정 한 줄(api/talk_defaults)을 그 끝에, 추천 카드를 그 아래에 둔다.
 
 ■ 설명과 카드가 어긋나지 않게
@@ -31,10 +31,11 @@ from . import talk_filter as TF
 
 log = logging.getLogger(__name__)
 
-ADVICE_MAX_LEN = 480
+# 480자로는 일반 AI 대비 「설명이 얕다」가 네 번 연속 나왔다(2026-10-12 비교 네 번째 86개 -- 추천 질문 31개 중 28개).
+ADVICE_MAX_LEN = 700
 # 한국어는 글자당 토큰이 많다 -- 500 이면 설명이 「CPU는 높은 프」에서 끊겼다(2026-10-11 일반 AI 비교 R05·R23).
-ADVICE_MAX_TOKENS = 900
-ADVICE_TIMEOUT_SEC = 10
+ADVICE_MAX_TOKENS = 1300
+ADVICE_TIMEOUT_SEC = 12      # [B] 경로 전체 상한(talk_answer.PATH_B_TIMEOUT_SEC = 13) 안
 TASK_KEY = "task.talk_answer"
 
 _PC_WORD = re.compile(r"pc|피시|컴퓨터|컴\b|본체|데스크\s*[탑톱]|조립", re.I)
@@ -172,13 +173,17 @@ def basis_lines(conn, labels: list[str]) -> list[str]:
 
 
 _TOPIC_TASK = {
-    TOPIC_BUILD: "이 용도에 맞는 구성을 구체적으로 서너 문장 쓴다 -- CPU와 그래픽카드는 등급(보급형·중급형·상급형,"
-                 " 예시는 「RTX 5060급」처럼 급으로), 램과 SSD 는 용량, 그리고 시중 예상 가격대를 「시중에서는 보통"
+    TOPIC_BUILD: "이 용도에 맞는 구성을 구체적으로 네다섯 문장 쓴다 -- CPU와 그래픽카드는 등급과 급 예시를 둘 다"
+                 " (「중급형, 라이젠 5급·RTX 5060급」처럼), 램과 SSD 는 용량, 그리고 시중 예상 가격대를 「시중에서는 보통"
                  " ○○만원대」처럼 일반 시세로 말한다. 무엇은 아껴도 되는지와 그 이유도 말한다."
+                 " 고객이 해상도·주사율·프레임(FHD·QHD·4K·144Hz·240fps)이나 AI·영상·3D 작업을 말했으면 그 기준에 맞는"
+                 " 숫자(그래픽카드 VRAM ○GB 이상, 램 ○GB, 파워 ○W급)를 한 문장 넣는다."
                  " 고객이 싸게(최저가·가성비)를 말했으면 어디를 아끼고 어디는 지킬지, 좋은 것을 말했으면 어디에 더"
                  " 쓰면 체감이 큰지 말한다. 작업이 커지면(예: 도커·가상 머신 여러 개) 무엇이 더 필요해지는지도 한 문장 말해도 된다."
                  " 용도를 말하지 않았으면 용도에 따라 무엇이 달라지는지 짧게 설명한다.",
-    TOPIC_PART: "고객이 물은 부품의 역할과 차이, 고르는 기준을 서너 문장으로 쉽게 설명한다."
+    TOPIC_PART: "고객이 물은 부품의 역할과 차이, 고르는 기준을 네다섯 문장으로 쉽게 설명한다. 기준은 숫자로 말한다"
+                " (VRAM ○GB·램 ○GB·파워 ○W·코어 수처럼). 하나를 골라 달라고 하면 용도별로 「RTX 5060급」·「라이젠 5급」처럼"
+                " 급 예시를 들어 어느 쪽이 맞는지 말한다."
                 " 새 PC를 사라고 권하지 않는다.",
     TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
                    " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
@@ -187,7 +192,9 @@ _TOPIC_TASK = {
                   " 서너 문장 비교하고, 어떤 사람에게 어느 쪽이 맞는지 말한다. 우리 가게는 노트북을 팔지 않지만"
                   " 노트북을 깎아내리지 않는다.",
     TOPIC_GENERAL: "고객이 물은 구매 절차(운영체제 설치·배송·설치·결제·환불·취소·보증 등)를 국내 조립 PC 쇼핑몰의"
-                   " «일반적인» 기준으로 서너 문장 설명한다. 「보통」·「일반적으로」·「쇼핑몰마다 다르지만」처럼 말하고,"
+                   " «일반적인» 기준으로 네다섯 문장 설명한다. 흔한 기간·조건은 숫자로 말한다(예: 조립 PC 출고는 보통 ○~○영업일,"
+                   " 카드 결제 취소 환불은 보통 ○~○영업일, 단순 변심 청약철회는 전자상거래법상 받은 날부터 7일 이내,"
+                   " 부품 보증은 제조사 기준 보통 ○~○년). 「보통」·「일반적으로」·「쇼핑몰마다 다르지만」처럼 말하고,"
                    " 우리 가게가 해 준다·가능하다고 약속하지 않는다. 고객이 직접 확인할 곳(상품 페이지·주문 내역·카드사)을"
                    " 한 문장 알려 준다. 카드번호·주민번호 같은 정보는 상담 창에 적지 않아도 된다는 점은 필요할 때만 말한다."
                    " 다른 쇼핑몰·가격비교 사이트와 비교를 물으면 같은 부품 모델인지, 조립비·운영체제·배송·A/S 포함 여부를 맞춰"
@@ -258,10 +265,19 @@ def _norm(m: str) -> str:
     return re.sub(r"\s+", "", m).lower()
 
 
+# 모델명 대조용 -- talk_filter._RE_PART 와 같되 라이젠은 4자리 모델 번호까지 잡는다. 「라이젠 5」 까지만 보면
+# 고객이 「라이젠 5 7600」을 물었는데 「라이젠 5 9600」 문장이 남는다(2026-10-12 검수 9595 P2-1).
+_RE_MODEL = re.compile(
+    r"(?:RTX|GTX|RX|GT)\s?\d{3,4}\s?(?:Ti|TI|SUPER|XT)?|i[3579][-\s]?\d{4,5}"
+    r"|(?:라이젠|Ryzen)\s?\d(?:\s?\d{4}[A-Z0-9]*)?", re.IGNORECASE)
+_STORE_PRICE = re.compile(r"저희|우리(?!나라)|당사|팝콘|이\s*가게")
+_SERIES_ONLY = re.compile(r"^(라이젠|ryzen)\d$")
+
+
 def _models(sentence: str) -> list[str]:
     """고객 문장에 나온 부품 모델명(「RTX 5060」·「RTX 5060 Ti」) -- 고객이 직접 물은 모델은 설명에 남긴다."""
     out: list[str] = []
-    for m in TF._RE_PART.finditer(sentence or ""):
+    for m in _RE_MODEL.finditer(sentence or ""):
         if m.group(0).strip() not in out:
             out.append(m.group(0).strip())
     return out
@@ -272,7 +288,10 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
     general, build = topic == TOPIC_GENERAL, topic in (None, TOPIC_BUILD)
-    stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
+    # 본체 구성과 구매 절차(배송·설치 등)를 함께 물었으면 절차 설명 문장도 남긴다 -- 대신 가게 약속은 걷는다
+    # (2026-10-12 검수 9da2 P2-1 「배송」 한 단어로 배송 기준 문장이 통째로 걷혔다).
+    mixed = build and bool(_GENERAL.search(sentence or ""))
+    stock = _STOCK_ONLY if general or mixed else TF._LEXICON_STOCK
     asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
     sents = TF.split_sentences((raw or "").replace("**", ""))
@@ -283,16 +302,22 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
         # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
         # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
         # 「RTX 5060급」「i5 정도」처럼 등급 예시로 든 모델명은 남긴다(2026-10-12 -- 설명이 등급을 구체적으로 말하게).
-        foreign_model = any(_norm(m.group(0)) not in asked and not _TIER_AFTER.match(s, m.end())
-                            for m in TF._RE_PART.finditer(s))
-        market_price = build and "시중" in s and not any(p.search(s) for _label, p in PROMISE_PATTERNS)
+        # 고객이 말한 라이젠 모델의 시리즈(「라이젠 5 7600」을 물었을 때 「라이젠 5」)도 고객이 말한 것으로 본다.
+        foreign_model = any(_norm(m.group(0)) not in asked
+                            and not (_SERIES_ONLY.match(_norm(m.group(0)))
+                                     and any(a.startswith(_norm(m.group(0))) for a in asked))
+                            and not _TIER_AFTER.match(s, m.end())
+                            for m in _RE_MODEL.finditer(s))
+        # 「시중」 가격 문장은 남기되 같은 문장에 가게 가격(「저희 가격은 140만원」)이 섞이면 걷는다(2026-10-12 검수 9595 P2-3).
+        market_price = (build and "시중" in s and not _STORE_PRICE.search(s)
+                        and not any(p.search(s) for _label, p in PROMISE_PATTERNS))
         if (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s)) and not market_price:
             dropped.append({"before": s, "reason": "price"})
         elif foreign_model:
             dropped.append({"before": s, "reason": "part model"})
         elif any(w in s for w in stock):
             dropped.append({"before": s, "reason": "stock"})
-        elif general and any(p.search(s) for _label, p in PROMISE_PATTERNS):
+        elif (general or mixed) and any(p.search(s) for _label, p in PROMISE_PATTERNS):
             dropped.append({"before": s, "reason": "promise"})
         elif _BARE_YES.match(s):
             dropped.append({"before": s, "reason": "promise"})

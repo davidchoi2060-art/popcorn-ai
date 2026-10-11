@@ -30,6 +30,7 @@ WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monito
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
+_BUDGET_THEN_NUMBER = re.compile(r"예산\s*(?:은|는|이|을|를|도)?\s*\d")
 _NUMBER_BUDGET = re.compile(r"\d+\s*(만|원|천)|[일이삼사오육칠팔구십백천]+\s*만")
 _CHEAPER = re.compile(r"(더|좀|조금|많이)\s*(싼|싸|저렴)|싸게|저렴하게|저렴한|가격.{0,4}(낮|내려|줄)|"
                       r"최저가|제일\s*싼|가장\s*싼|싼\s*(걸|거|것)|예산.{0,4}(낮|줄|내려)")
@@ -38,7 +39,7 @@ _CHEAPER = re.compile(r"(더|좀|조금|많이)\s*(싼|싸|저렴)|싸게|저렴
 _CHEAPEST = re.compile(r"(가장|제일|젤|최대한|최저)\s*(싼|싸|저렴)|최저\s*가|최소\s*(비용|가격|금액|예산)")
 _BETTER = re.compile(r"(더|좀|조금|훨씬)\s*(좋은|좋게|높은|나은|센|빠른|고급|비싼)|업그레이드|고사양|상위|"
                      r"한\s*단계\s*위|최고\s*사양|최고사양|최고로|풀옵|제일\s*좋은|가장\s*좋은|높은\s*사양|좋은\s*(걸|거|것)\s*으?로")
-_SPEC_NUMBER = re.compile(r"(rtx|gtx|rx)?\s*\d+(?:\.\d+)?\s*(gb|기가|g|tb|테라|t|hz|헤르츠|인치|fps|프레임|ti|super|xt)(?![a-z])|(rtx|gtx|rx)\s*\d{3,4}", re.I)
+_SPEC_NUMBER = re.compile(r"(rtx|gtx|rx)?\s*\d+(?:\.\d+)?\s*(gb|기가(?!\s*막)|g|tb|테라|t|hz|헤르츠|인치|fps|프레임|ti|super|xt)(?![a-z])|(rtx|gtx|rx)\s*\d{3,4}", re.I)
 _RAM = re.compile(r"(램|ram|메모리)\s*(?:은|는|을|를|도)?\s*(\d{1,3})\s*(?:gb|기가|g)?", re.I)
 _RAM_MORE = re.compile(r"(램|ram|메모리)\s*(?:을|를|은|는|도)?\s*(?:좀|조금|많이)?\s*(더|늘|업|크게|넉넉)", re.I)
 _SSD = re.compile(r"(ssd|저장\s*공간|저장\s*장치|용량|하드)\s*(?:은|는|을|를|도)?\s*(\d+(?:\.\d+)?)\s*(tb|테라|t|gb|기가|g)", re.I)
@@ -73,7 +74,9 @@ def extract(raw: str | None) -> dict:
     out: dict = {}
     if not s.strip():
         return out
-    has_budget_number = bool(_NUMBER_BUDGET.search(s))
+    # 「예산 150」처럼 단위 없이 예산 뒤에 붙은 숫자도 예산이다. 「기가 막히게」는 용량 단위가 아니다
+    # (2026-10-12 검수 5812 P2-1 -- 「예산 150 기가 막히게 좋은 걸로」가 사양 숫자로 지워져 「더 좋게」로 읽혔다).
+    has_budget_number = bool(_NUMBER_BUDGET.search(s) or _BUDGET_THEN_NUMBER.search(s))
     # 「더 싸게 150으로」처럼 숫자가 있으면 예산 변경이다 — 해석(talk)이 예산을 바꾸므로 방향은 걸지 않는다.
     # 사양 숫자(램 64GB · SSD 1TB · RTX 5060 · 144Hz)는 예산 변경이 아니다 -- 지우고 본다(코덱스 #161 검수 경계:
     # 「램 64GB로 최대한 싸게」가 최저가를 못 읽었다).
@@ -275,6 +278,7 @@ NOTE_MULTI = "여러 대를 한 번에 맞추는 견적은 지금 못 맞춥니�
 NOTE_CHEAPER = "지금 보신 추천 구성보다 싼 PC를 보여 드려요."
 NOTE_CHEAPER_NONE = "지금 조건에서는 더 싼 PC가 없어요. 같은 목록을 다시 보여 드려요."
 NOTE_CHEAPEST = "조건에 맞는 PC를 가장 싼 것부터 보여 드려요."
+NOTE_FLOOR_RELAXED = "말씀하신 금액 이상에서는 조건에 맞는 PC가 없어 그보다 싼 PC까지 넓혀 보여 드려요."
 NOTE_BETTER = "지금 보신 추천 구성보다 사양이 높은 PC를 보여 드려요."
 NOTE_BETTER_NONE = "지금 조건에서는 더 높은 사양의 판매 PC가 없어요. 같은 목록을 다시 보여 드려요."
 NOTE_MORE_NO_ANCHOR = "어느 PC보다 크게 할지 몰라서 이번에는 반영하지 못했어요. 원하는 용량을 숫자로 말씀해 주세요."
