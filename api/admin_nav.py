@@ -415,6 +415,10 @@ NAV = [
         ("쇼핑몰 동기화", "/admin2/mall-sync", None),
         ("인계 기록", "/admin2/handoff-log", None),
         ("유입 성과", "/admin2/funnel-performance", "신설 — 인계 → 구매 전환"),
+        # 2026-10-11 신설(ADM-ORD-012) — 상담 화면에서 고객이 남긴 구매 상담 신청(여러 대·할인·
+        #   세금계산서·주문 희망)을 보고 처리 상태·담당·메모를 남긴다(api/admin_purchase_inquiries.py).
+        ("구매 상담 신청", "/admin2/purchase-inquiries",
+         "신설(ADM-ORD-012 · 가칭) 2026-10-11 — 연락처 · 상태 · 담당 · 메모"),
     ]),
 
     ("AI 관리", "cpu", [
@@ -578,7 +582,7 @@ def new_admin_nav(current_path=''):
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
         ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
-        ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders',)),
+        ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members',)),
         ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/talk-review', '/admin2/product-fit')),
         ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/mvp3-consults', '/admin2/handoff-log', '/admin2/swap-click-logs')),

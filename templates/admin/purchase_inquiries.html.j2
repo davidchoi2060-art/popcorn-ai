@@ -1,0 +1,195 @@
+{#
+  구매 상담 신청 (ADM-ORD-012 · 가칭) — 2026-10-11 신설
+
+  고객이 지금 고객 화면(mvp3)에서 연락처와 함께 남긴 구매 상담 신청(여러 대 구매 · 할인 ·
+  세금계산서 · 주문 희망)을 보고, 상태(대기 · 처리 중 · 완료) · 담당 · 메모를 남긴다.
+  데이터 = `GET /api/admin/purchase-inquiries` · 저장 `PUT /api/admin/purchase-inquiries/{id}`
+  (`api/admin_purchase_inquiries.py` — 개인정보 규칙은 그 파일 docstring).
+
+  ■ 머리말은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
+  ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. 외부 자원 0.
+  ■ 서버가 준 문자열은 textContent 로만 넣는다(innerHTML 금지).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}구매 상담 신청{% endblock %}
+
+{% block head_extra %}
+<style>
+.pi-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px}
+.pi-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.pi-kpi{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:12px 14px}
+.pi-kpi b{display:block;font-family:var(--rv-mono);font-size:22px;color:var(--rv-ink)}
+.pi-kpi span{font-size:12.5px;color:var(--rv-muted)}
+.pi-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.pi-side{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pi-box{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:10px 14px;font-size:13px}
+.pi-box h2{font-size:13.5px;margin:0 0 6px;color:var(--rv-ink-soft)}
+.pi-chip{display:inline-block;border:1px solid var(--rv-dim3);border-radius:10px;padding:0 7px;margin:0 3px 3px 0;font-size:12px;color:var(--rv-ink-soft);background:var(--rv-canvas)}
+.pi-chip.flag{border-color:var(--rv-amber-line);background:var(--rv-amber-bg);color:var(--rv-ink)}
+.pi-chip.bad{border-color:var(--rv-red);color:var(--rv-red)}
+.pi-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--rv-ink-soft)}
+.pi-bar label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.pi-bar select{font:inherit;border:1px solid var(--rv-dim3);border-radius:6px;padding:3px 6px;background:var(--rv-card);color:var(--rv-ink)}
+.pi-table{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;overflow-x:auto}
+.pi-table table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:820px}
+.pi-table th{background:var(--rv-panel);text-align:left;font-weight:600;color:var(--rv-ink-soft);padding:9px 12px;border-bottom:1px solid var(--rv-dim4);white-space:nowrap}
+.pi-table td{padding:9px 12px;border-bottom:1px solid var(--rv-panel2);vertical-align:top;color:var(--rv-ink)}
+.pi-table tbody tr{cursor:pointer}
+.pi-table tbody tr:hover,.pi-table tbody tr[aria-selected="true"]{background:var(--rv-panel2)}
+.pi-muted{color:var(--rv-faint)}
+.pi-at{font-family:var(--rv-mono);white-space:nowrap}
+.pi-pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:13px}
+.pi-pager button,.pi-drawer button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+.pi-pager button:disabled{opacity:.45;cursor:default}
+.pi-empty{padding:28px;text-align:center;color:var(--rv-muted)}
+.pi-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.pi-drawer[hidden]{display:none}
+.pi-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
+.pi-drawer header h2{font-size:16px;margin:0}
+.pi-body{overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.pi-lbl{font-size:12px;color:var(--rv-muted)}
+.pi-say{background:var(--rv-panel);border-radius:6px;padding:8px 10px;margin:0;white-space:pre-wrap}
+.pi-body textarea{width:100%;box-sizing:border-box;min-height:64px;font:inherit;border:1px solid var(--rv-dim3);border-radius:6px;padding:8px 10px;background:var(--rv-card);color:var(--rv-ink)}
+.pi-status{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pi-status label{display:flex;gap:5px;align-items:center;cursor:pointer}
+.pi-same{border:1px solid var(--rv-dim4);border-radius:8px;padding:8px 10px}
+.pi-msg{color:var(--rv-muted)}
+.pi-msg.err{color:var(--rv-red)}
+@media (max-width:768px){
+  .pi-wrap{padding:12px 16px 24px}
+  .pi-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pi-side{grid-template-columns:1fr}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pi-wrap" data-keep="1">
+  <section class="pi-kpis" aria-label="요약">
+    <div class="pi-kpi"><b id="kWait">—</b><span>대기</span></div>
+    <div class="pi-kpi"><b id="kDoing">—</b><span>처리 중</span></div>
+    <div class="pi-kpi"><b id="kDone">—</b><span>완료</span></div>
+  </section>
+  <p class="pi-note" id="piNote">고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.</p>
+  <p class="pi-note" id="piVisitor" aria-live="polite"></p>
+  <div class="pi-bar">
+    <label>상태 <select id="piStatus"><option value="">전체</option><option>대기</option><option>처리 중</option><option>완료</option></select></label>
+    <label><input type="checkbox" id="piTest"> 시험 신청 포함</label>
+    <span class="pi-muted" id="piTestNote"></span>
+  </div>
+  <div class="pi-table">
+    <table>
+      <thead><tr>
+        <th scope="col">신청 시각</th><th scope="col">번호</th><th scope="col">주제</th>
+        <th scope="col">연락처</th><th scope="col">상품</th><th scope="col">상태</th>
+      </tr></thead>
+      <tbody id="piRows"><tr><td colspan="6" class="pi-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pi-pager">
+    <span id="piPage" class="pi-muted"></span>
+    <button type="button" id="piPrev">이전</button><button type="button" id="piNext">다음</button>
+  </div>
+</div>
+<aside class="pi-drawer" id="piDrawer" hidden data-keep="1" aria-label="신청 상세">
+  <header><h2 id="piDTitle">신청 상세</h2><button type="button" id="piClose">닫기</button></header>
+  <div class="pi-body" id="piDBody"></div>
+</aside>
+<script>
+(function(){
+  var API = '/api/admin/purchase-inquiries';
+  var st = {offset:0, limit:50, picked:null, canWrite:false,
+            visitor: /^#u\d{1,12}$/.test(location.hash) ? location.hash.slice(1) : null};
+  var $ = function(id){ return document.getElementById(id); };
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function contact(it){ return [it.name, it.phone, it.email].filter(Boolean).join(' · ') || '—'; }
+  function qs(){
+    var p=['offset='+st.offset];
+    if ($('piStatus').value) p.push('status='+encodeURIComponent($('piStatus').value));
+    if ($('piTest').checked) p.push('include_test=true');
+    if (st.visitor) p.push('visitor='+encodeURIComponent(st.visitor));
+    return '?'+p.join('&');
+  }
+  function emptyRow(msg){ var b=$('piRows'); b.textContent=''; var tr=el('tr'); var td=el('td','pi-empty',msg); td.colSpan=6; tr.appendChild(td); b.appendChild(tr); }
+  function load(){
+    fetch(API+qs()).then(function(r){ if(!r.ok) throw new Error('신청 목록을 불러오지 못했습니다'); return r.json(); })
+    .then(function(d){
+      st.limit=d.limit; st.canWrite=d.can_write;
+      $('kWait').textContent=d.counts['대기']; $('kDoing').textContent=d.counts['처리 중']; $('kDone').textContent=d.counts['완료'];
+      $('piTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 신청 '+d.test_excluded+'건을 뺐습니다.':'');
+      $('piNote').textContent='고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.'
+        +(d.contact_masked?' 조회 권한에서는 연락처 가운데를 가립니다.':'');
+      var vf=$('piVisitor'); vf.textContent='';
+      if (st.visitor){
+        vf.appendChild(document.createTextNode('방문자 '+st.visitor.slice(1)+'의 신청만 보는 중입니다. '));
+        var all=el('a',null,'전체 보기'); all.href='#'; all.addEventListener('click',function(ev){ ev.preventDefault(); history.replaceState(null,'',location.pathname); st.visitor=null; st.offset=0; load(); });
+        vf.appendChild(all);
+      }
+      if (!d.items.length){ emptyRow('아직 구매 상담 신청이 없습니다.'); }
+      else {
+        var b=$('piRows'); b.textContent='';
+        d.items.forEach(function(it){
+          var tr=el('tr'); tr.setAttribute('data-i', it.inquiry_id);
+          if (st.picked===it.inquiry_id) tr.setAttribute('aria-selected','true');
+          tr.appendChild(el('td','pi-at',when(it.at)));
+          tr.appendChild(el('td',null,it.inquiry_no+(it.test?' (시험)':'')));
+          tr.appendChild(el('td',null,it.topic));
+          tr.appendChild(el('td',null,contact(it)));
+          tr.appendChild(el('td',it.product_name||it.product_code?null:'pi-muted',it.product_name||(it.product_code?'상품 '+it.product_code:'없음')));
+          tr.appendChild(el('td',null,it.status+(it.assignee?' · '+it.assignee:'')));
+          tr.addEventListener('click',function(){ open(it); });
+          b.appendChild(tr);
+        });
+      }
+      var from=d.total?d.offset+1:0, to=d.offset+d.items.length;
+      $('piPage').textContent='전체 '+d.total+'건 중 '+from+'–'+to;
+      $('piPrev').disabled=d.offset<=0; $('piNext').disabled=to>=d.total;
+    }).catch(function(e){ emptyRow(e.message); });
+  }
+  function line(b, label, value){ b.appendChild(el('span','pi-lbl',label)); b.appendChild(el('p','pi-say',value||'—')); }
+  function open(it){
+    st.picked=it.inquiry_id;
+    Array.prototype.forEach.call(document.querySelectorAll('#piRows tr'),function(r){ r.toggleAttribute('aria-selected', r.getAttribute('data-i')==String(it.inquiry_id)); });
+    $('piDTitle').textContent=it.inquiry_no+' · '+it.topic;
+    var b=$('piDBody'); b.textContent='';
+    line(b,'신청 시각',when(it.at));
+    line(b,'연락처',contact(it));
+    line(b,'문의 내용',it.message||'적지 않음');
+    line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음')+(it.quote_id?' (보관 견적)':''));
+    if (it.visitor){ var a=el('a',null,'이 방문자의 문의 · 보관 견적 보기'); a.href='/admin2/mvp3-consults#'+it.visitor; b.appendChild(a); }
+    b.appendChild(el('span','pi-lbl','연락처 보관 기한 '+when(it.purge_at)));
+    b.appendChild(el('span','pi-lbl','처리'));
+    var row=el('div','pi-status');
+    ['대기','처리 중','완료'].forEach(function(s){
+      var l=el('label'); var r=el('input'); r.type='radio'; r.name='piSt'; r.value=s; r.checked=it.status===s; r.disabled=!st.canWrite;
+      l.appendChild(r); l.appendChild(document.createTextNode(' '+s)); row.appendChild(l);
+    });
+    b.appendChild(row);
+    var ml=el('label'); var mine=el('input'); mine.type='checkbox'; mine.disabled=!st.canWrite;
+    ml.appendChild(mine); ml.appendChild(document.createTextNode(' 내가 맡기'+(it.assignee?' (지금 담당: '+it.assignee+')':'')));
+    var mr=el('div','pi-status'); mr.appendChild(ml); b.appendChild(mr);
+    var ta=el('textarea'); ta.maxLength=1000; ta.placeholder='연락 결과와 다음 할 일을 적습니다.'; ta.value=it.memo||''; ta.disabled=!st.canWrite; b.appendChild(ta);
+    var save=el('button',null,'저장'); save.disabled=!st.canWrite;
+    var msg=el('span','pi-msg', st.canWrite?(it.updated_at?'마지막 저장 '+when(it.updated_at):''):'조회 권한은 처리 결과를 저장할 수 없습니다.');
+    var ln=el('div','pi-status'); ln.appendChild(save); ln.appendChild(msg); b.appendChild(ln);
+    save.addEventListener('click',function(){
+      var picked=b.querySelector('input[name=piSt]:checked');
+      save.disabled=true; msg.className='pi-msg'; msg.textContent='저장하는 중입니다.';
+      fetch(API+'/'+it.inquiry_id,{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({status:picked?picked.value:'대기', memo:ta.value, assign_me:mine.checked})})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+      .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.detail)||'저장하지 못했습니다'); msg.textContent=x.d.note; save.disabled=false; load(); })
+      .catch(function(e){ msg.className='pi-msg err'; msg.textContent=e.message; save.disabled=false; });
+    });
+    $('piDrawer').hidden=false;
+  }
+  $('piClose').addEventListener('click',function(){ $('piDrawer').hidden=true; st.picked=null; });
+  ['piStatus','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  $('piPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
+  $('piNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
+  load();
+})();
+</script>
+{% endblock %}

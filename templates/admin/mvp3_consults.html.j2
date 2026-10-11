@@ -141,9 +141,13 @@
     let d;
     try{d=await getJSON('/api/admin/mvp3-consults/'+encodeURIComponent(v)+'?'+q());}
     catch(e){$('mcDrawerBody').innerHTML='<p>'+esc(e.message)+'</p>';return;}
-    $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved);
+    $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved)+(d.inquiries?' · 구매 상담 '+num(d.inquiries):'');
     $('mcDrawerBody').innerHTML='<p class="mc-note">문의 원문은 보여 주지 않습니다. 읽어 낸 조건 이름만 보입니다.</p>'+
-      (d.timeline||[]).map(e=>e.kind==='saved'?
+      (d.timeline||[]).map(e=>e.kind==='inquiry'?
+        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청</div>'+
+        '<div>'+esc(e.inquiry_no)+' · '+esc(e.topic)+' · '+esc(e.status)+
+        ' · <a href="/admin2/purchase-inquiries#'+esc(d.visitor)+'">연락처 · 처리 보기</a></div></div>'
+        :e.kind==='saved'?
         '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관</div>'+
         '<h3>'+esc(e.product.name||'상품명 없음')+'</h3>'+
         '<div class="num">'+esc(won(e.product.price))+(e.product.role?' · '+esc(e.product.role):'')+(e.product.product_code?' · 상품 '+esc(e.product.product_code):'')+'</div>'+
@@ -166,6 +170,8 @@
   $('mcNext').addEventListener('click',()=>{offset+=limit;load();});
   $('mcTest').addEventListener('change',()=>{offset=0;load();if(selected)open(selected);});
   load();
+  // 다른 화면(구매 상담 신청 등)에서 #u123 으로 오면 그 방문자 서랍을 바로 연다.
+  if(/^#[uh]\d{1,12}$/.test(location.hash))open(location.hash.slice(1));
 })();
 </script>
 {% endblock %}

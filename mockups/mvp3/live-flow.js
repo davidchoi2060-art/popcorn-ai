@@ -18,12 +18,26 @@
       clear(){target().removeItem(JOURNAL_KEY);}
     };
   }
+  // 구매 상담 신청 칸의 상태. 서버가 준 주제·동의 문구만 쓰고, 받은 신청 번호만 보여 준다.
+  function emptyInquiry(){return {open:false,meta:null,draft:{topic:'',name:'',phone:'',email:'',message:'',consent:false},done:null,error:''};}
+  const PHONE_RE=/^0\d{1,2}-?\d{3,4}-?\d{4}$/, EMAIL_RE=/^[^@\s]{1,64}@[^@\s]{1,100}\.[^@\s]{2,}$/;
+  function inquiryProblem(d,meta){
+    if(!meta||!meta.topics.includes(d.topic))return '문의 주제를 골라 주세요.';
+    const phone=String(d.phone||'').replace(/\s+/g,''),email=String(d.email||'').trim();
+    if(!phone&&!email)return '전화번호나 이메일 중 하나는 적어 주세요.';
+    if(phone&&!PHONE_RE.test(phone))return '전화번호 형식을 확인해 주세요. 예: 010-1234-5678';
+    if(email&&!EMAIL_RE.test(email))return '이메일 형식을 확인해 주세요.';
+    if(String(d.name||'').trim().length>30)return '이름은 30자 이내로 적어 주세요.';
+    if(String(d.message||'').trim().length>500)return '문의 내용은 500자 이내로 적어 주세요.';
+    if(d.consent!==true)return '연락처를 받으려면 개인정보 수집에 동의해 주세요.';
+    return '';
+  }
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:''};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry()};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options);
     function emit(){changed(state);}
     function cancel(){if(state.phase==='save')state.saveState=state.pendingSave?'uncertain':'idle';generation++;controller?.abort();controller=null;state.phase=null;}
@@ -38,7 +52,7 @@
     function reset(){
       cancel();Object.assign(state,{screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
-        wants:null,choices:[],anchorCode:null,pendingText:''});
+        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry()});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
       message('안녕하세요! 즐기는 게임과 예산을 알려주시면 나에게 맞는 PC를 함께 찾아드릴게요.');emit();
@@ -104,7 +118,7 @@
     function select(index){
       if(state.phase)return;
       const p=state.groups.flatMap(g=>g.products).find(p=>p.index===index);if(!p)return;
-      cancel();state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
+      cancel();state.inquiry=emptyInquiry();state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
     }
     function navigate(screen){
       if(['detail','final'].includes(screen)&&!state.selected)return;
@@ -177,6 +191,46 @@
       }catch(error){if(current(op))fail(error,{kind:'handoff'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    async function openInquiry(){
+      if(state.phase||!state.selected)return;
+      state.inquiry.open=true;state.inquiry.error='';
+      if(state.inquiry.meta){emit();return;}
+      const op=begin('inquiry-form');
+      try{
+        const r=await api.inquiryForm({signal:op.signal});
+        if(!current(op))return;
+        if(r?.ok!==true||!Array.isArray(r.topics)||!r.topics.length||r.topics.some(t=>typeof t!=='string')||typeof r.consent_text!=='string')
+          throw new Error('구매 상담 신청 양식을 불러오지 못했어요.');
+        state.inquiry.meta={topics:r.topics.slice(0,10),consent_text:r.consent_text};
+      }catch(error){if(current(op))state.inquiry.error=error?.message||'구매 상담 신청 양식을 불러오지 못했어요.';}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
+    function closeInquiry(){if(state.phase==='inquiry')return;state.inquiry.open=false;state.inquiry.error='';emit();}
+    function inquiryDraft(values){
+      const d=state.inquiry.draft;
+      for(const k of ['topic','name','phone','email','message'])if(typeof values?.[k]==='string')d[k]=values[k];
+      if(typeof values?.consent==='boolean')d.consent=values.consent;
+    }
+    async function inquire(values){
+      if(state.phase||!state.selected||!state.inquiry.open||state.inquiry.done)return;
+      inquiryDraft(values);
+      const d=state.inquiry.draft,problem=inquiryProblem(d,state.inquiry.meta);
+      if(problem){state.inquiry.error=problem;emit();return;}
+      const payload={topic:d.topic,consent:true};
+      const phone=d.phone.replace(/\s+/g,''),email=d.email.trim(),name=d.name.trim(),text=d.message.trim();
+      if(phone)payload.phone=phone;if(email)payload.email=email;if(name)payload.name=name;if(text)payload.message=text;
+      if(state.savedQuote&&M.uuid(state.savedQuote.id))payload.quote_id=state.savedQuote.id;
+      if(Number.isInteger(state.selected.product_code)&&state.selected.product_code>0)payload.product_code=state.selected.product_code;
+      const op=begin('inquiry');state.inquiry.error='';
+      try{
+        const r=await api.inquiry(payload,{signal:op.signal});
+        if(!current(op))return;
+        if(r?.ok!==true||typeof r.inquiry_no!=='string'||!/^PI-\d{1,12}$/.test(r.inquiry_no))throw new Error('구매 상담 신청 결과를 확인할 수 없어요.');
+        state.inquiry.done={inquiry_no:r.inquiry_no,note:M.text(r.note)};
+        state.inquiry.draft={topic:'',name:'',phone:'',email:'',message:'',consent:false};
+      }catch(error){if(current(op))state.inquiry.error=error?.message||'구매 상담 신청을 보내지 못했어요.';}
+      finally{if(current(op)){state.phase=null;controller=null;emit();}}
+    }
     async function list(){
       const op=begin('list');state.screen='saved';emit();
       try{
@@ -192,7 +246,7 @@
     function load(id){
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
-      cancel();state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
+      cancel();state.inquiry=emptyInquiry();state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
@@ -206,7 +260,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff};
+    return {state,reset,submit,refresh,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending};else root.MVP3LiveFlow={createFlow};
+  if(typeof module!=='undefined')module.exports={createFlow,JOURNAL_KEY,validPending,inquiryProblem};else root.MVP3LiveFlow={createFlow};
 })(typeof window==='undefined'?globalThis:window);
