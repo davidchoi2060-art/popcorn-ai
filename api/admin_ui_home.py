@@ -296,7 +296,7 @@ def _mall_sync_view(st: dict | None, err) -> dict:
         return {"status": "warn",
                 "text": f"⚠ 몰 갱신 — {when} 시작 후 {st['age_hours']:.0f}시간째 응답이 없습니다",
                 "reason": "실행이 끝나지 않았거나(오래 걸리는 중) 타이머가 멈췄을 수 있습니다"
-                          " — 서버에서 journalctl -u popcorn-mall-sync.service 로 확인하세요"}
+                          " — 갱신 작업의 서버 실행 기록을 확인해 주세요"}
 
     if st["state"] == "fail":
         reason = st.get("fail_reason") or "사유가 기록되지 않았습니다"
@@ -363,7 +363,7 @@ def _funnel_view(fn: dict | None, err) -> list:
     # 장바구니·몰 인계는 API 응답의 일부가 아니다 — decision-log UX-22가 명시한 빈 값
     # 두 종류를 그대로 옮긴다(장바구니 = 원천 없음, 몰 인계 = 향후 사용예정). 0을 넣지 않는다.
     rows.append({"label": "장바구니", "status": "empty", "value_fmt": "원천 없음", "pct": 0,
-                "reason": "carts 테이블 자체가 없습니다 — 원천 부재(funnel() 응답 그대로)"})
+                "reason": "상담 성과를 집계할 원천 자료가 없습니다"})
     rows.append({"label": "몰 인계", "status": "empty", "value_fmt": "향후 사용예정", "pct": 0,
                 "reason": "handoffs 기준 API 재정비가 선행되어야 합니다"})
     return rows
