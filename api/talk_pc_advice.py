@@ -199,6 +199,11 @@ _BUILD_WITH_GENERAL = (" 고객이 배송·설치·환불·운영체제 같은 �
                        " 한 문장 덧붙인다(우리 가게 약속은 하지 않는다).")
 
 
+# 「배송은 얼마나 걸려요?」에 운영체제·환불·보증까지 다 나열하고 정작 배송 기간은 말하지 않았다(2026-10-12 일반 AI 비교 R13).
+_GENERAL_FOCUS = (" 고객이 물은 항목만 답한다 -- 배송을 물으면 배송, 환불을 물으면 환불. 첫 문장에서 그 질문에 바로 답하고"
+                  " (예: 「조립 PC는 보통 결제 뒤 ○~○영업일 안에 출고돼요」), 묻지 않은 절차를 늘어놓지 않는다.")
+
+
 def build_prompt(sentence: str, basis: list[str], history: list | None = None,
                  topic: str = TOPIC_BUILD, games: list[str] | None = None) -> str:
     hist = ["%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in (history or [])][-4:]
@@ -207,7 +212,8 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "되묻기로 답을 미루지 않는다 - 고객은 이미 물었다.",
         "",
         "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD])
-        + (_BUILD_WITH_GENERAL if topic == TOPIC_BUILD and _GENERAL.search(sentence or "") else ""),
+        + (_BUILD_WITH_GENERAL if topic == TOPIC_BUILD and _GENERAL.search(sentence or "") else "")
+        + (_GENERAL_FOCUS if topic == TOPIC_GENERAL else ""),
         *(["[고객이 말한 게임] " + ", ".join(games) + " -- 게임 소개·역사·장르·인기 설명은 쓰지 않는다."
             " 이 게임들이 가벼운지 무거운지, 그래서 그래픽카드·CPU·램 중 무엇이 체감을 좌우하는지와 그에 맞는 등급을 말한다."]
           if games else []),

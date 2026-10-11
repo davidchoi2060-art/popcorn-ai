@@ -509,6 +509,15 @@ def condition_notices(text: str, state, prev_state=None) -> list[str]:
     return notes
 
 
+def drop_deferrals(reply: str) -> str:
+    """「다른 시스템에서 확인해 드립니다」「담당 팀이 안내해요」처럼 없는 곳으로 미루는 문장을 걷는다
+    (2026-10-12 일반 AI 비교 R26). 전부 그런 문장이면 그대로 둔다(빈 말풍선보다 낫다)."""
+    pat = dict(PROMISE_PATTERNS)["담당자·다른 단계로 미룸"]
+    sents = [x for x in re.split(r"(?<=[.!?。])\s+", reply or "") if x.strip()]
+    kept = [x for x in sents if not pat.search(x)]
+    return " ".join(kept).strip() if kept and len(kept) < len(sents) else (reply or "")
+
+
 def honest_reply(notes: list[str], has_usage: bool, missing: list[str], has_budget: bool = False) -> str:
     """고정 안내 + (카드를 못 내는 턴이면) 다음에 알려 줄 것 한 줄. 이미 말한 예산은 다시 묻지 않는다
     (2026-10-12 개발 서버 「화이트 감성으로 100만원 PC」 -> 「용도와 예산을 알려 주시면」)."""

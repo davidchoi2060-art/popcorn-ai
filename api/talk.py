@@ -1326,8 +1326,15 @@ def parse_talk(body: ParseBody, request: Request):
     topic_notes = TR.topic_notices(text, written_notices, custom_notices)
     cond_notes = TR.condition_notices(text, state, prev_state_obj)
     notices = topic_notes + cond_notes
+    if stage == TS.STAGE_PC:
+        reply = TR.drop_deferrals(reply)
     if notices and stage == TS.STAGE_PC:
-        reply = TR.honest_reply(notices, bool(state.usages), missing, has_budget=bool(state.budget_won))
+        # 배송·환불·보증만 물었고 위 설명([B])이 이미 답했으면 「용도와 예산을 알려 주시면」을 붙이지 않는다
+        # (2026-10-12 일반 AI 비교 R13·E44 -- 절차 질문 끝마다 PC 를 다시 물었다).
+        answered = (topic_notes and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
+                    and bool((getattr(ans, "answer", "") or "").strip()))
+        reply = TR.honest_reply(notices, bool(state.usages), [] if answered else missing,
+                                has_budget=bool(state.budget_won))
     if laptop and stage == TS.STAGE_PC:
         reply = TR.with_laptop_notice(reply)
     band_note = TR.budget_band_note(text)
