@@ -222,9 +222,9 @@ REPLY_FALLBACK_NO_CONS = "어떤 PC가 필요하신지 조금 더 말씀해 주�
 # **지금 규약**: 잡담을 «단계»로 받는다(카운터 계약은 talk_schema §1-b).
 #     1~3회차  모델 문장을 그대로 낸다(게임 추천·일상 대화 허용 — 프롬프트 [잡담] 문단이
 #              허용/금지 경계를 긋는다). 친근함 우선.
-#     4회차    역할 안내 1회 — 아래 REPLY_ROLE_GUIDE 로 **고정**한다(모델 문장을 쓰지 않는다).
-#              이 한 줄이 「다음부터는 답하지 않는다」는 양해까지 함께 구한다(③).
-#     5회차~   답변 문장을 내지 않는다(reply="" · silent=true). 화면은 말풍선을 만들지 않는다.
+#     ~~4회차  역할 안내 1회(REPLY_ROLE_GUIDE 고정) · 5회차~ 침묵~~ -- 2026-10-11 걷었다.
+#              사장님 「무조건 차단하면 안 된다」·「너무 강제하면 고객은 짜증스럽다」.
+#              지금은 몇 회차든 모델 문장을 내고, 3회차에 한 번만 PC 상담 권유 한 줄을 붙인다.
 #     PC 질문  즉시 복귀 + 카운터 0(④⑤) — 침묵 상태에서도 그렇다.
 # ⚠ 침묵은 «문장을 안 내는 것»이지 «LLM 을 안 부르는 것»이 아니다. ④를 지키려면 이번 말이
 #   PC 관련인지 판정해야 하고 그건 LLM 만 할 수 있다. 키워드로 미리 걸러 호출을 줄이지
@@ -235,8 +235,11 @@ REPLY_ROLE_GUIDE = ("PC 견적을 도와드리는 자리라 다른 이야기는 
 # 옛 이름 — 뜻이 「PC 아님 반송 문구」에서 「역할 안내 1회」로 바뀌었다. 지우지 않는다
 # (외부 참조 grep 2026-09-17: 없음. 되돌림 근거로만 남긴다).
 REPLY_NOT_PC = REPLY_ROLE_GUIDE
+# 잡담에 모델이 문장을 안 냈을 때의 최소 문장 -- 「여기까지만」 같은 끊는 말을 쓰지 않는다.
+REPLY_SMALLTALK_EMPTY = "편하게 이야기해 주세요. PC가 필요하시면 언제든 용도와 예산을 말씀해 주세요."
 # 게임 목록을 답한 턴의 마무리 -- 고른 게임으로 추천에 잇는다(2026-10-11).
 # 코덱스 1816 보강2 시안 문구(2026-10-11): 고를지 묻지 않고, 이어질 수 있다고만 알린다.
+SMALLTALK_INVITE_AT = TS.SMALLTALK_ALLOW_MAX   # 잡담 3회차에 한 번만 PC 상담을 권한다
 REPLY_GAME_PICK = "마음에 드는 게임이 있으면, 그 게임을 즐길 PC 구성도 함께 살펴볼 수 있어요."
 REPLY_MAX_LEN = 200
 
@@ -265,10 +268,9 @@ SMALLTALK_BLOCK = "\n".join([
     " 게임 부하 등급은 서버가 정하고 화면 카드가 보여준다. 모델이 말하면 카드와 어긋난다.",
     "잡담·범위 밖 질문도 일반 AI 와 대화하듯 **먼저 그 질문에 실제로 답한다**(존댓말 세 문장 이내)."
     " 되묻기만 하고 끝내지 않는다 -- 예: 저녁 메뉴를 물으면 메뉴 두세 가지를 골라 준다."
-    " 끝에 PC 이야기는 한 문장 정도로 가볍게 이어도 되고, 억지로 붙이지 않아도 된다"
-    " -- 서버가 때가 되면 역할을 안내한다."
-    " PC 이야기를 붙일 때는 「컴퓨터 맞출 생각 있으세요?」처럼 예/아니오로 묻지 않고"
-    " 「PC가 필요하시면 언제든 말씀해 주세요」처럼 이어질 수 있다고만 알린다(코덱스 1816 보강2).",
+    " **PC 이야기를 붙이지 않는다** -- 「컴퓨터 맞출 생각 있으세요?」 같은 권유도 하지 않는다."
+    " 필요할 때 서버가 한 번만 붙인다. 고객이 PC·게임·사양·예산 이야기를 꺼내면 그때 자연스럽게 잇는다"
+    " (사장님 2026-10-11 「너무 강제하면 고객은 짜증스럽다」).",
 ])
 
 # ── 프롬프트 [예외 입력] 문단 (2026-10-11 사장님 지시 「무조건 차단하면 안 된다」) ──────────
@@ -725,8 +727,7 @@ def _reply_text(obj: dict, pc, kept, stage: str = TS.STAGE_PC) -> str:
       침묵은 고객 쪽에서 보면 말을 씹힌 것이라 차단과 같다. 이제 모델 문장에 PC 상담으로
       돌아오는 한 줄(`TX.NOTE_SMALLTALK_LONG`)을 붙여 계속 답한다. 단계 이름 «silent» 는
       카운터 계약(talk_schema)이라 그대로 두고, 응답의 `silent` 는 항상 false 다.
-    - stage == guide   -> `REPLY_ROLE_GUIDE` 로 **고정**. 4회차 안내 1회는 서버 문장이다
-      (모델에게 맡기면 매번 다른 말이 나가고, 「다음부터 답하지 않는다」는 양해가 빠진다).
+    - stage == guide   -> ~~`REPLY_ROLE_GUIDE` 로 고정~~ 2026-10-11 걷었다. open 과 같다.
     - stage == open    -> **모델 문장을 그대로 쓴다**(2026-09-17 규약 변경). 게임 추천·
       일상 대화를 허용한 자리다. 경계(부품·가격·사양 판정·재고 금지)는 프롬프트
       `SMALLTALK_BLOCK` 이 긋는다 -- 문장을 버려서 막던 것을 규칙으로 막는 쪽으로 바꿨다.
@@ -734,20 +735,17 @@ def _reply_text(obj: dict, pc, kept, stage: str = TS.STAGE_PC) -> str:
       말풍선을 띄우지 않는다. 지어내지 않는 문장이다(조건·부품·가격 없음).
     - 길이는 `REPLY_MAX_LEN` 으로 자른다(두 문장 상한을 어긴 출력 방어).
     """
-    if stage == TS.STAGE_GUIDE:
-        return REPLY_ROLE_GUIDE
+    # 2026-10-11 사장님 「PC 로 귀결되겠지만 너무 강제하면 짜증스럽다」: 4회차 고정 안내(「여기까지만」)와
+    # 5회차부터 매번 붙이던 한 줄을 걷었다. 권유는 잡담 3회차에 «한 번»만 서버가 붙인다(parse 본문).
     r = obj.get("reply")
     r = r.strip() if isinstance(r, str) else ""
     if not r:
         if pc is False:
             # 잡담인데 모델이 문장을 안 냈다 -- 빈 말풍선 대신 역할 안내를 낸다.
             # 여기서 일상 대화를 «지어내지» 않는다(서버는 날씨를 모른다).
-            return REPLY_ROLE_GUIDE
+            return REPLY_SMALLTALK_EMPTY
         return REPLY_FALLBACK_HAS_CONS if kept else REPLY_FALLBACK_NO_CONS
-    r = r[:REPLY_MAX_LEN]
-    if stage == TS.STAGE_SILENT and TX.NOTE_SMALLTALK_LONG not in r:
-        r = (r.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
-    return r
+    return r[:REPLY_MAX_LEN]
 
 
 def _pc_verdict(obj: dict):
@@ -1181,7 +1179,12 @@ def parse_talk(body: ParseBody, request: Request):
     if ((ans.answer or "").strip() and len(ans.game_names) >= 2
             and ans.narrowing == TS.NARROWING_WIDE and not released
             and pc is not True and stage in (TS.STAGE_PC, TS.STAGE_OPEN)):
-        reply = REPLY_GAME_PICK
+        # 같은 상담에서 이미 한 번 권했으면 되풀이하지 않는다(답만 보인다).
+        said = any(r == "assistant" and REPLY_GAME_PICK in t for r, t in history)
+        reply = "" if said else REPLY_GAME_PICK
+    elif pc is False and turns == SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply:
+        # 잡담이 이어지면 세 번째에 «한 번만» 가볍게 권한다. 그 뒤로는 고객이 PC 이야기를 꺼낼 때 잇는다.
+        reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
     # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
     # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
     # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.

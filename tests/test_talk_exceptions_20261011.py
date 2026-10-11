@@ -85,9 +85,24 @@ class NeverBlocked(unittest.TestCase):
                                chat_flow={'smalltalk_turns': turns})
                 self.assertFalse(r['silent'])
                 self.assertTrue(r['reply'].strip())
+                # 사장님 2026-10-11 「너무 강제하면 짜증스럽다」: 4회차부터는 권유 줄을 붙이지 않는다.
+                self.assertEqual(r['reply'], '맛있는 걸 드세요!')
+                self.assertNotIn('여기까지만', r['reply'])
                 if r['stage'] == TS.STAGE_SILENT:
-                    self.assertIn(TX.NOTE_SMALLTALK_LONG, r['reply'])
                     self.assertIn('smalltalk_long', r['exceptions'])
+
+    def test_smalltalk_invites_to_pc_only_once(self):
+        """잡담 1·2회차는 답만, 3회차에 한 번만 PC 상담 한 줄."""
+        seen = []
+        for prev in (0, 1, 2, 3, 4):
+            r = _parse_raw('오늘 점심 뭐 먹지', raw_ai=_ai({'pc': False, 'state': {}, 'reply': '김치찌개 어떠세요?'}),
+                           chat_flow={'smalltalk_turns': prev})
+            seen.append(TX.NOTE_SMALLTALK_LONG in r['reply'])
+        self.assertEqual(seen, [False, False, True, False, False])
+
+    def test_smalltalk_empty_model_reply_does_not_cut_off(self):
+        r = _parse_raw('그냥 심심해서 들어왔어요', raw_ai=_ai({'pc': False, 'state': {}, 'reply': ''}), chat_flow={'smalltalk_turns': 3})
+        self.assertEqual(r['reply'], talk.REPLY_SMALLTALK_EMPTY)
 
 
 class KindsAndReplies(unittest.TestCase):
@@ -234,7 +249,7 @@ class PopularGamesAnswer(unittest.TestCase):
         self.assertEqual(TA.tidy_game_list('발로란트는 팀 단위 총싸움 게임이에요.', self.facts()),
                          '발로란트는 팀 단위 총싸움 게임이에요.')
 
-    def test_game_list_turn_ends_with_pick_line(self):
+    def test_game_list_turn_ends_with_pick_line(self, history=None):
         result = SimpleNamespace(text=_ai({'pc': False, 'state': {}, 'missing': ['usages'],
                                            'reply': '혹시 특정 장르나 게임 스타일이 있으신가요?'}),
                                  provider='t', model='t', tokens_in=1, elapsed_sec=0.1)
@@ -248,9 +263,20 @@ class PopularGamesAnswer(unittest.TestCase):
             st.enter_context(patch.object(talk.TA, 'run_parallel', lambda a, b: (result, ans)))
             st.enter_context(patch.object(talk.TA, 'is_game_related', lambda *a: True))
             st.enter_context(patch.object(talk, '_record_hit', lambda *a, **k: None))
-            r = talk.parse_talk(talk.ParseBody(text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?'), request=None)
-        self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
+            r = talk.parse_talk(talk.ParseBody(text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?',
+                                               history=history or []), request=None)
         self.assertEqual(r['answer'], '- 리그 오브 레전드: 팀 대전')
+        if history:
+            return r
+        self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
+
+    def test_game_pick_line_not_repeated(self):
+        """같은 상담에서 이미 권했으면 다음 게임 목록에는 그 줄을 다시 붙이지 않는다(강제 금지)."""
+        r = self.test_game_list_turn_ends_with_pick_line(history=[
+            {'role': 'user', 'text': '요즘 인기 게임 뭐 있어?'},
+            {'role': 'assistant', 'text': talk.REPLY_GAME_PICK}])
+        self.assertNotIn(talk.REPLY_GAME_PICK, r['reply'])
+        self.assertNotIn('특정 장르', r['reply'])
 
 
 # 코덱스 「고객상담 예외 질문 55개 · 응대 방향」(2026-10-11 1815) 입력 그대로.
