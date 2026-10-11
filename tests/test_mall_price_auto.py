@@ -86,6 +86,26 @@ class CollectPublicTests(unittest.TestCase):
         self.assertEqual(e.exception.args[1]["failed"], 2)
 
 
+    def test_reading_stops_before_a_live_run_could_look_dead(self):
+        # 코덱스 검수 #106·#109: 살아 있는 수집이 STALE_RUNNING 을 넘기면 다른 실행이 겹친다
+        t = [0.0]
+        def clock():
+            return t[0]
+        def read(code, pt):
+            t[0] += AUTO.COLLECT_LIMIT / 2 + 1
+            return {"ok": True, "price": 1000}
+        with self.assertRaises(AUTO.CollectError) as e:
+            AUTO.collect_public([(1, "x"), (2, "x"), (3, "x")], sleep=lambda s: None,
+                                read=read, clock=clock)
+        self.assertEqual(e.exception.args[1]["stopped_at"], 2)
+        self.assertLess(AUTO.COLLECT_LIMIT, 2 * 3600)            # STALE_RUNNING = 2 hours
+
+    def test_command_line_run_is_recorded_as_manual(self):
+        from tools import mall_price_auto as CLI
+        with patch.object(CLI.AUTO, "run", return_value={"ok": True}) as run:
+            self.assertEqual(CLI.main([]), 0)
+        run.assert_called_once_with("manual")
+
 @unittest.skipUnless(_local_url(), "루프백 Postgres 가 없어 DB 검사를 건너뜁니다")
 class RunTests(unittest.TestCase):
     @classmethod
@@ -178,6 +198,27 @@ class RunTests(unittest.TestCase):
         self.assertLess(abs((now - last).total_seconds()), 120)
         self.assertIsNone(AUTO.due_slot(now, last))
 
+    def test_slot_is_checked_again_inside_the_lock(self):
+        # 코덱스 검수 #106·#109: 잠금 밖에서 「미실행」을 읽은 두 프로세스가 같은 시각을 두 번 돌지 않는다
+        import datetime as dt
+        slot = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5)
+        first = AUTO.begin("auto", slot=slot)
+        AUTO.execute(first, "auto", collect_public_fn=lambda codes: ({1: 1000}, {"source": "pages"}))
+        with self.assertRaises(AUTO.SlotDone):
+            AUTO.begin("auto", slot=slot)
+        out = AUTO.run("auto", slot=slot)
+        self.assertEqual((out["ok"], out["run_id"]), (False, None))
+        with self.engine.connect() as c:
+            self.assertEqual(c.execute(self.text("SELECT count(*) FROM mall_price_runs")).scalar(), 1)
+
+    def test_manual_run_does_not_fill_the_scheduled_slot(self):
+        import datetime as dt
+        slot = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=5)
+        AUTO.execute(AUTO.begin("manual"), "manual",
+                     collect_public_fn=lambda codes: ({1: 1000}, {"source": "pages"}))
+        self.assertIsNone(AUTO._last_auto_started())
+        AUTO.begin("auto", slot=slot)                             # 정기 실행은 그대로 돈다
+
     def test_second_run_while_one_is_running_is_refused(self):
         AUTO.begin("manual", operator_id=None)
         with self.assertRaises(AUTO.AlreadyRunning):
@@ -221,6 +262,29 @@ class SchedulerTests(unittest.TestCase):
         from api import admin_mall_price
         self.assertIn(AUTO.start_scheduler, admin_mall_price.router.on_startup)
 
+
+
+class StageExpiryTests(unittest.TestCase):
+    """코덱스 검수 #99: 반영도 미리보기 보존 기한(1시간)을 직접 본다 — 다음 미리보기만 지우던 구멍."""
+
+    def test_old_preview_file_is_refused_and_removed(self):
+        import tempfile
+        import time
+        from fastapi import HTTPException
+        from api import admin_mall_price as AMP
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, "abc123.json")
+        with io.open(p, "w", encoding="utf-8") as f:
+            json.dump({"file_name": "a.csv", "prices": {"1": 1000}}, f)
+        old = time.time() - AMP.STAGE_TTL - 5
+        os.utime(p, (old, old))
+        with patch.object(AMP, "STAGE_DIR", d), \
+                patch.object(AMP, "_owner", return_value={"operator_id": 1}), \
+                patch.object(AMP, "engine", side_effect=AssertionError("DB 에 닿으면 안 된다")):
+            with self.assertRaises(HTTPException) as e:
+                AMP.apply(staging_id="abc123", token="t", include_parts=False)
+        self.assertEqual(e.exception.status_code, 410)
+        self.assertFalse(os.path.exists(p))
 
 if __name__ == "__main__":
     unittest.main()
