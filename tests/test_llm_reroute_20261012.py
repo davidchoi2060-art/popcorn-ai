@@ -26,8 +26,8 @@ class Reroute(unittest.TestCase):
             self.assertEqual(llm.call("hi", task_key="task.s1_parse", **kw), "ok")
         return seen
 
-    def test_no_env_uses_default_reroute(self):
-        self.assertEqual(self.run_call(None), [("codex", "gpt-5.6-luna")])
+    def test_no_env_keeps_claude(self):
+        self.assertEqual(self.run_call(None), [("claude", "claude-haiku-4-5-20251001")])
 
     def test_off_keeps_claude(self):
         self.assertEqual(self.run_call("off"), [("claude", "claude-haiku-4-5-20251001")])

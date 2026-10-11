@@ -937,12 +937,12 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 # 넘기지 않는 400) 서버 env 한 줄로 그 공급자 대신 다른 공급자를 부른다. 값이 없으면 아무것도 바뀌지 않는다.
 #   POPCORN_LLM_REROUTE=claude=codex:gpt-5.6-luna      (여럿이면 쉼표로)
 #   POPCORN_LLM_REROUTE=off                              (우회 끔)
-# env 가 없으면 REROUTE_DEFAULT 를 쓴다. 지금은 Anthropic 잔액 부족 동안 배포만으로 우회가 켜지도록
-# Claude -> OpenAI luna 다(서버 env 를 고칠 사람이 없는 시간이라). 잔액이 돌아오면 이 기본값을 ""로 되돌린다.
+# env 가 없으면 REROUTE_DEFAULT 를 쓴다(비어 있으면 우회 없음). 2026-10-12 Anthropic 잔액 부족 동안은
+# 「claude=codex:gpt-5.6-luna」였다(#191) -- 충전 뒤 비웠다. 다시 막히면 env 한 줄이나 이 기본값으로 켠다.
 # 대상 모델을 생략하거나 레지스트리에 없는 모델이면 대상 공급자의 default_model 을 쓴다.
 # 우회된 공급자는 폴백 순서에서도 뺀다(막힌 계정을 다시 부르지 않는다).
 REROUTE_ENV = "POPCORN_LLM_REROUTE"
-REROUTE_DEFAULT = "claude=codex:gpt-5.6-luna"
+REROUTE_DEFAULT = ""
 
 
 def _reroutes() -> dict[str, tuple[str, str | None]]:
