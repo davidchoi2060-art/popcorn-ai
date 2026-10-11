@@ -453,3 +453,5 @@ body.live-mode.original-flow .live-product-card .card-detail .ui-icon{width:18px
 .live-inquiry-error{color:var(--amber);font-size:14px}
 .live-inquiry-buttons{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
 @media(max-width:760px){.live-inquiry{padding:14px 16px}.live-inquiry-buttons button{flex:1}}
+/* 2026-10-11: the approved intro is the PC's own description, not the customer's condition. */
+body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:600;color:var(--muted);margin:4px 0 2px}

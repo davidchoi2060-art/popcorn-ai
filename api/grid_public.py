@@ -729,7 +729,8 @@ def _explore_input(body: RecommendBody, state: TalkState, talk_notes: list[str])
 CHOICE_LABELS = (("cheaper", "더 싼 PC 볼래요"), ("better", "더 높은 사양 볼래요"), ("change", "조건 바꿀게요"))
 
 
-def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str]):
+def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str],
+             budget_won: int | None = None):
     """판매 카드 뒤 빠른 선택 + 고객에게 할 말(반영한 조건 · 못 맞춘 조건 · 방향 안내 · 되묻기)."""
     if explore is None:
         return [], None
@@ -750,11 +751,12 @@ def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str])
             say(EXPLORE.unmet_sentence(label, why))
     if first is None:
         return [], None
+    if budget_won and first.get("empty_reason") == "예산 안 상품 없음":
+        say(EXPLORE.over_budget_sentence(budget_won))
     e = first.get("explore") or {}
     enabled = {"cheaper": bool(e.get("has_cheaper")), "better": bool(e.get("has_better")), "change": True}
     choices = [{"id": k, "label": label, "enabled": enabled[k]} for k, label in CHOICE_LABELS]
-    if enabled["cheaper"] or enabled["better"]:
-        talk_notes.append(EXPLORE.ASK_NEXT)
+    say(EXPLORE.ask_next(enabled["cheaper"], enabled["better"]))
     return choices, e.get("anchor_code")
 
 
@@ -905,7 +907,8 @@ def recommend(body: RecommendBody):
     if notes:
         log.info("[grid_public] recommend notes: %r", notes)
 
-    choices, anchor_code = _choices(card_sets, explore, talk_notes)
+    choices, anchor_code = _choices(card_sets, explore, talk_notes,
+                                    state.budget_won if state.budget_bound != "이상" else None)
     for cs in card_sets:
         cs.pop("explore", None)
 

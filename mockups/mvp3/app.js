@@ -185,12 +185,12 @@ function cardPartPhotos(product){
 function productCard(product,action='detail',id=product.index,comparison=null){
   const rows=M.cardSpecRows(product.spec),strong=recommendedCard(product),description=product.public_configuration?.description;
   const spec=rows.length?'<dl class="live-card-spec">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-product-spec">'+esc(M.specText(product.spec)||'정보 없음')+'</p>';
-  const intro=description?.intro||product.reasons[0]||'',title=description?.title||product.name;
+  const featured=Boolean(description?.intro),intro=description?.intro||M.cardFallbackIntro(product,comparison),title=description?.title||product.name;
   const sameBasis=comparison&&product.price_src&&product.price_src===comparison.price_src&&Number.isSafeInteger(product.price)&&Number.isSafeInteger(comparison.price);
   const delta=sameBasis?product.price-comparison.price:null;
   const difference=delta===null?'':delta===0?'다른 구성과 같은 금액이에요.':(comparison.tag||'다른 구성')+'보다 '+money(Math.abs(delta))+(delta>0?' 높아요.':' 낮아요.');
   return '<section class="quote-card live-product-card"><div class="live-card-heading"><div class="live-card-copy"><span class="pill '+(strong?'strong':'')+'">'+esc(product.tag||product.level||'판매 중 PC')+'</span>'+
-    '<h3>'+esc(title)+'</h3>'+(title!==product.name?'<p class="live-product-name">'+esc(product.name)+'</p>':'')+(intro?'<p class="live-card-intro">'+esc(intro)+'</p>':'')+'</div>'+productImage(product)+'</div>'+
+    '<h3>'+esc(title)+'</h3>'+(title!==product.name?'<p class="live-product-name">'+esc(product.name)+'</p>':'')+(intro?(featured?'<p class="live-card-intro-label">이 PC 특징</p>':'')+'<p class="live-card-intro">'+esc(intro)+'</p>':'')+'</div>'+productImage(product)+'</div>'+
     '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+cardPartPhotos(product)+
     (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+
     // Full reasons stay on the detail screen; the card keeps only the over-budget verdict.

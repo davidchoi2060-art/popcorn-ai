@@ -271,3 +271,24 @@ NOTE_BETTER = "지금 보신 추천 구성보다 사양이 높은 PC를 보여 �
 NOTE_BETTER_NONE = "지금 조건에서는 더 높은 사양의 판매 PC가 없어요. 같은 목록을 다시 보여 드려요."
 NOTE_MORE_NO_ANCHOR = "어느 PC보다 크게 할지 몰라서 이번에는 반영하지 못했어요. 원하는 용량을 숫자로 말씀해 주세요."
 ASK_NEXT = "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+# 2026-10-11 개발 서버 확인 후속: 되묻는 말은 실제로 누를 수 있는 단추만 말한다.
+ASK_CHEAPER_ONLY = "더 싼 PC도 보여 드릴까요? 아래에서 골라 주세요."
+ASK_BETTER_ONLY = "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+
+
+def over_budget_sentence(budget_won: int) -> str:
+    """예산 안에 맞는 판매 PC가 없어 예산을 넘는 가장 싼 PC만 보일 때 — 카드 상태와 같은 말."""
+    man = budget_won // 10000
+    amount = f"{man:,}만원" if budget_won % 10000 == 0 else f"{budget_won:,}원"
+    return f"{amount} 안에는 맞는 PC가 없어서 가장 가까운 PC를 보여 드려요."
+
+
+def ask_next(has_cheaper: bool, has_better: bool) -> str | None:
+    """켜진 빠른 선택에 맞는 되묻기. 둘 다 꺼져 있으면 말하지 않는다."""
+    if has_cheaper and has_better:
+        return ASK_NEXT
+    if has_cheaper:
+        return ASK_CHEAPER_ONLY
+    if has_better:
+        return ASK_BETTER_ONLY
+    return None

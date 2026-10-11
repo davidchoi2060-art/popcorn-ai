@@ -185,3 +185,20 @@ test('flow: a condition said while the server still asks rides along to the next
  await h.flow.submit('흰색 케이스로요');assert.equal(calls.length,0);await h.flow.submit('게임용 200');
  assert.deepEqual(calls,['흰색 케이스로요 / 게임용 200']);
 });
+
+test('card without an approved intro says what changed from the card before it, never the fit category',()=>{
+  const rec={tag:'추천 구성',role:'recommended',spec:{cpu:'i5-12400',gpu:'RTX 3050',vram_gb:6,ram_gb:16,ssd_gb:500}};
+  const premium={tag:'더 높은 사양',role:'premium',reasons:['게임 캐주얼 — 롤·발로란트'],spec:{cpu:'라이젠5 5600',gpu:'RX 7600',vram_gb:8,ram_gb:16,ssd_gb:1000}};
+  const line=M.cardFallbackIntro(premium,rec);
+  assert.match(line,/^추천 구성에서 CPU를 라이젠5 5600로, 그래픽카드를 RX 7600 · 8GB로, 저장공간을 .+로 바꿔 사양을 높인 구성이에요\.$/);
+  assert.doesNotMatch(line,/캐주얼/);
+  assert.equal(M.cardFallbackIntro({...rec,tag:'알뜰 구성'},rec),'');
+  assert.equal(M.cardFallbackIntro(premium,null),'');
+  assert.equal(M.cardFallbackIntro({...rec,role:'recommended',spec:{...rec.spec,ram_gb:32}},{...rec,tag:'알뜰 구성'}),'알뜰 구성에서 메모리를 32GB로 바꾼 구성이에요.');
+});
+test('card shows the approved intro under a small "이 PC 특징" label and drops the category fallback',()=>{
+  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
+  assert.match(app,/featured\?'<p class="live-card-intro-label">이 PC 특징<\/p>'/);
+  assert.match(app,/description\?\.intro\|\|M\.cardFallbackIntro\(product,comparison\)/);
+  assert.doesNotMatch(app,/const featured=[^\n]*product\.reasons\[0\]/);
+});
