@@ -289,13 +289,24 @@ def drop_game_nudge(reply: str) -> str:
     합성어(보드게임·미니게임·게임기) 속 게임은 홀로 선 낱말이 아니므로 건드리지 않는다.
     """
     parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
-    kept = []
+    kept, dropped = [], False
     for p in parts:
         p = _GAME_OPTION.sub("", p)
         if _GAME_STANDALONE.search(p):
+            dropped = True
             continue
-        kept.append(p)
+        kept.append(_drop_lead_connective(p) if dropped else p)
+        dropped = False
     return "".join(kept).strip()
+
+
+# 앞 문장을 걷은 뒤 남은 문장이 「혹은 책이나 음악…」처럼 이어 주는 말로 시작하면 그 말을 뗀다
+# (2026-10-12 개발 서버 「심심해」 -- 게임 권유 문장이 빠지고 「혹은」이 맨 앞에 남았다).
+_LEAD_CONNECTIVE = re.compile(r"^\s*(?:혹은|또는|아니면|그리고|그래도|그럼|그러면|또한|게다가)\s*,?\s*")
+
+
+def _drop_lead_connective(sentence: str) -> str:
+    return _LEAD_CONNECTIVE.sub("", sentence, count=1)
 
 
 def is_pc_push(sentence: str) -> bool:
@@ -309,7 +320,14 @@ def drop_pc_push(reply: str) -> str:
     문자열을 돌려주고, 부르는 쪽이 빈 말풍선 대신 기본 문장을 쓴다.
     """
     parts = [p for p in _SENTENCE.findall(reply or "") if p.strip()]
-    return "".join(p for p in parts if not is_pc_push(p)).strip()
+    kept, dropped = [], False
+    for p in parts:
+        if is_pc_push(p):
+            dropped = True
+            continue
+        kept.append(_drop_lead_connective(p) if dropped else p)
+        dropped = False
+    return "".join(kept).strip()
 
 
 SMALLTALK_INVITE_AT = TS.SMALLTALK_ALLOW_MAX   # 잡담 3회차에 한 번만 PC 상담을 권한다
