@@ -69,7 +69,52 @@ def cards(node):
             yield from cards(v)
 
 
+def expand(text):
+    """「LONG:<글자 수>:<끝 문장>」 -> 그 길이의 긴 글 + 끝 문장(긴 글 예외 점검용)."""
+    if text.startswith('LONG:'):
+        _, n, tail = text.split(':', 2)
+        body = '저는 게임을 오래 했어요. '
+        return (body * (int(n) // len(body) + 1))[:int(n)] + tail
+    return text
+
+
+def talk_cases(texts):
+    """여러 문장을 /api/talk/parse 에만 차례로 보내 고객이 보는 말을 표로 남긴다(추천은 안 부른다).
+
+    TEXT 를 « || » 로 나누면 이 모드다(2026-10-11 코덱스 예외 55개 대표 10개 점검).
+    HTTP 오류도 그 줄에 적는다 -- 「차단됐다」는 것 자체가 점검 결과다.
+    """
+    print('### 개발 서버 상담 문장 점검 (/api/talk/parse 만)')
+    print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
+    print()
+    for i, raw in enumerate(texts, 1):
+        text = expand(raw)
+        shown = raw if len(raw) <= 60 else raw[:60] + '...'
+        print(f'#### {i}. {shown!r} ({len(text)}자)')
+        try:
+            parsed, code, sec = post('/api/talk/parse', {'text': text})
+        except urllib.error.HTTPError as e:
+            body = (e.read() or b'')[:300].decode('utf-8', 'replace')
+            print(f'- HTTP {e.code}: {body!r}')
+            print()
+            continue
+        except Exception as e:
+            print(f'- 실패: {type(e).__name__}: {e}')
+            print()
+            continue
+        print(f'- HTTP {code}, {sec:.1f}s')
+        for key in ('pc_related', 'stage', 'missing', 'exceptions', 'handoff_offer', 'truncated'):
+            print(f'- {key}: {parsed.get(key)!r}')
+        for key in ('answer', 'reply'):
+            print(f'- {key}: {str(parsed.get(key) or "")[:600]!r}')
+        print()
+    return 0
+
+
 def main():
+    texts = [t.strip() for t in TEXT.split('||')]
+    if len(texts) > 1:
+        return talk_cases(texts)
     print('### 개발 서버 고객 추천 점검')
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
     print(f'- 문장: {TEXT}')
