@@ -23,7 +23,7 @@ class Clean(unittest.TestCase):
         raw = ("배그 FHD 라면 그래픽카드는 RTX 5060급, CPU는 중급형이면 충분해요. 램은 16GB, SSD는 1TB가 편해요. "
                "이 정도 구성은 시중에서는 보통 130만원대예요.")
         body, dropped = PA.clean(raw, PA.TOPIC_BUILD)
-        self.assertEqual(body, raw)
+        self.assertEqual(body, raw + " " + PA.NOTE_MARKET)   # 시중 시세와 카드 가격이 다를 수 있다는 한 줄(2026-10-12 R02)
         self.assertEqual(dropped, [])
 
     def test_shop_like_price_and_bare_model_are_dropped(self):

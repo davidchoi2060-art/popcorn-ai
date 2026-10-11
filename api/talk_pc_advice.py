@@ -229,6 +229,8 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
          or _GENERAL.search(sentence or "") else "- 재고·배송·할인·설치."),
         "- 질문 문장. 마지막 안내는 서버가 붙인다.",
         "- 카드나 견적을 찾아 주겠다·맞춰 주겠다는 약속.",
+        "- 우리 가게가 그 조건(저소음·화이트·브랜드 등)을 맞출 수 있다·가능하다는 답(「가능해요」). 그런 구성을 고르는"
+        " 요령만 말한다 -- 맞출 수 있는지는 아래 카드와 안내가 말한다.",
         "",
     ]
     if hist:
@@ -238,6 +240,9 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
     return "\n".join(lines)
 
 
+NOTE_MARKET = "시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요."
+# 「소음 적은 구성 가능해요?」에 「가능해요.」로 시작한 뒤 카드 안내가 「저소음 조건은 지금 못 맞춥니다」라 했다(R10).
+_BARE_YES = re.compile(r"^\s*(네[,.]?\s*)?(물론\s*)?(가능(해요|합니다)|돼요|됩니다|할\s*수\s*있어요)[.!]?\s*$")
 _PRICE_WORDS = re.compile(r"\d+\s*만|\d+\s*원|원대|가격대")
 
 
@@ -289,6 +294,8 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
             dropped.append({"before": s, "reason": "stock"})
         elif general and any(p.search(s) for _label, p in PROMISE_PATTERNS):
             dropped.append({"before": s, "reason": "promise"})
+        elif _BARE_YES.match(s):
+            dropped.append({"before": s, "reason": "promise"})
         elif _QUESTION.search(s):
             dropped.append({"before": s, "reason": "question"})
         else:
@@ -300,7 +307,11 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
             dropped.append({"before": k, "reason": "length"})
             continue
         body = (body + " " + k).strip()
-    return body[:ADVICE_MAX_LEN], dropped
+    # 시중 시세 문장이 남았으면 아래 카드(우리 판매가)와 다를 수 있다고 한 줄 밝힌다 -- 설명은 50~70만원대인데
+    # 카드는 89만원이라 어긋나 보였다(2026-10-12 일반 AI 비교 R02·R11).
+    if body and any("시중" in k for k in kept if k and k in body) and NOTE_MARKET not in body:
+        body = (body + " " + NOTE_MARKET).strip()
+    return body, dropped
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
