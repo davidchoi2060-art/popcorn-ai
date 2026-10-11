@@ -80,6 +80,8 @@ ROLE_OF = {TAG_VALUE: "value", TAG_RECOMMENDED: "recommended", TAG_REFERENCE: "r
 PREMIUM_STEP = 1.10
 # 예산이 있으면 그 안에서 가장 높은 사양을, 없으면 예산의 이 배까지에서 가장 싼 높은 사양을 보여 준다.
 PREMIUM_OVER_X = 1.3
+# 예산이 «가장 싼 판매 구성 × 이 비율» 밖이면 가장 가까운 카드도 내밀지 않는다(안내 한 줄만).
+FAR_BELOW_X = 0.5
 MAX_UPGRADE_HINTS = 2
 
 # 「다음 수준」 안내 — 고객 문구는 Codex 확정본 그대로(PR #2 댓글 6057234341, 2026-10-08).
@@ -211,6 +213,11 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
                           _item(_prefer(up, preferred), usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
 
     within = [p for p in ok if p["price"] <= budget_won]
+    if not within and budget_won < ok[0]["price"] * FAR_BELOW_X:
+        # 예산이 가장 싼 판매 구성의 절반도 안 되면(「10만원」에 480만원 카드) 카드는 오히려 설명과 어긋난다 --
+        # 카드 없이 얼마부터인지만 말한다(2026-10-11 배포 뒤 일반 AI 비교).
+        return {"items": [], "empty_reason": "예산이 너무 낮음",
+                "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다. 예산을 조금 올리시면 보여 드릴게요."}
     if not within:
         return {"items": [_item(ok[0], usage, levels_by, TAG_REFERENCE, budget_won, bound)],
                 "empty_reason": "예산 안 상품 없음",
