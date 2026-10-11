@@ -20,6 +20,7 @@ from sqlalchemy import text
 
 from .db import engine
 from .pc_review_specs import specs_for_review
+from .product_name import display_name
 from .recommend import _rule_applies
 from .taxonomy import SLOT_LABELS, slot_of
 
@@ -133,3 +134,22 @@ def catalog(state: Literal['', 'ready', 'no_product', 'not_on_sale', 'no_price',
     return dict(summary=summary, rule_count=rule_count, total=len(rows), offset=offset, limit=limit,
                 items=rows[offset:offset + limit], state_labels=STATE_LABELS,
                 note='판매가는 상품 관리의 판매가 그대로이며, 이 화면에서는 값을 바꾸지 않습니다.')
+
+
+# 판매중 완제품 PC 인데 구성표(BOM)가 붙지 않은 것 — 사진·부품 설명·부품 바꾸기가 모두 구성표에서 오므로
+# 이 PC 들은 고객 카드에서 그 셋이 비어 있다. 구성표 연결은 offer_id 'P{상품번호}' 다(pc_configuration_copy).
+NO_BOM_SQL = """SELECT p.product_code, p.product_name, p.sale_price, p.stock_qty
+  FROM products p
+ WHERE p.part_type = 'PC_COMPLETE' AND p.status = '판매중'
+   AND NOT EXISTS (SELECT 1 FROM pc_configuration_offers o WHERE o.offer_id = 'P' || p.product_code::text)
+ ORDER BY p.sale_price NULLS LAST, p.product_code"""
+
+
+@router.get('/api/admin/part-catalog/pcs-without-bom')
+def pcs_without_bom(offset: int = Query(0, ge=0), limit: int = Query(20, ge=1, le=100)):
+    with engine.connect() as c:
+        rows = [dict(r) for r in c.execute(text(NO_BOM_SQL)).mappings()]
+    items = [dict(product_code=r['product_code'], name=display_name(r['product_name']),
+                  sale_price=r['sale_price'], stock_qty=r['stock_qty']) for r in rows[offset:offset + limit]]
+    return dict(total=len(rows), offset=offset, limit=limit, items=items,
+                note='구성표가 없으면 고객 카드에 사진·부품 설명이 없고 부품 바꾸기를 할 수 없습니다.')
