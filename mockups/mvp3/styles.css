@@ -462,3 +462,6 @@ body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:6
 .part-option-copy{display:flex;flex-direction:column;gap:3px;min-width:0}.part-option-copy strong{font-size:16px}.part-option-name,.part-option-also{font-size:14px;color:var(--muted);overflow-wrap:anywhere}.part-option-copy .warn-text{font-size:14px}
 .part-option-price{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none;font-variant-numeric:tabular-nums}.part-option-price span{font-size:14px;font-weight:600}
 @media(max-width:760px){.part-option{flex-direction:column;align-items:stretch}.part-option-price{align-items:stretch}.part-option-price button{width:100%}}
+/* 부품 직접 바꾸기(api/mvp3_build): 구성표 줄 아래에 펼치는 선택지와 바꾼 줄 표시 */
+.build-options-row>td{padding-top:0}.build-options-row .part-options{margin-top:0}
+.build-changed .build-changed-note{margin:2px 0 0;font-size:14px;font-weight:600;color:var(--ink)}
