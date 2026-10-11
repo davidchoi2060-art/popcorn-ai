@@ -358,6 +358,11 @@ _STORAGE = re.compile(r"(\d{1,2})\s*(?:tb|테라)|(?:ssd|저장\s*공간|하드)
 _GPU = re.compile(r"\b(rtx|gtx|rx)\s*-?\s*(\d{3,4})\s*(ti|super|xt)?(?![0-9a-z])|지포스|라데온", re.I)
 _CPU = re.compile(r"\b(i[3579])\s*-?\s*\d{0,5}|\b라이젠\s*\d|\bryzen\s*\d", re.I)
 PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
+# 2026-10-11 품질관리 M6: 「4K 편집」「최고사양」은 추천이 거르지 않는데 AI 가 「맞춰 드릴게요」라
+# 답했다. 4K 는 게임 칸(state.game.resolution)에서만 추천에 쓰인다 — 비게임 tier_key 힌트는
+# 0105 로 축에서 사라졌다(api/grid_public). 「최고사양」은 어느 축에도 없다.
+_UHD = re.compile(r"(?<![0-9])4\s*k(?![a-z])|uhd|2160\s*p|4\s*케이", re.I)
+_TOP = re.compile(r"최고\s*(사양|옵션?|성능|급)|최상\s*(급|사양)|풀\s*옵|끝판|하이\s*엔드", re.I)
 
 
 def purchase_topics(text: str) -> list[str]:
@@ -404,6 +409,12 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     m = _STORAGE.search(t)
     if m:
         out.append("저장공간 " + ("%sTB" % m.group(1) if m.group(1) else "%sGB" % m.group(2)))
+    g = getattr(state, "game", None)
+    # 「4K 모니터」는 모니터 상품 이야기다(모니터 크기 구간이 답한다) — PC 조건으로 세지 않는다.
+    if _UHD.search(t) and "모니터" not in t and getattr(g, "resolution", None) != "4K":
+        out.append("4K 해상도")
+    if _TOP.search(t):
+        out.append("최고 사양")
     before = set(getattr(prev_state, "prefs", None) or [])
     for p in (getattr(state, "prefs", None) or []):
         if p in before:
