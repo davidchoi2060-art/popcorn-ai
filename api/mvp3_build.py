@@ -149,6 +149,10 @@ def settled(check, rules_by_key):
     if check['state'] == 'pass':
         return True
     rule = rules_by_key.get(check['key'].split(':')[0])
+    if check['state'] == 'unknown' and rule is not None and 'missing_slots' in check:
+        # 비교 쪽 줄이 아예 없을 때도 skip 규칙은 엔진처럼 넘긴다(예: 그래픽카드 없는 PC 의 파워 규칙).
+        # 대상 쪽 줄이 없으면(예: 보드 없는 구성의 소켓 규칙) 판정하지 못한 것이다.
+        return rule.get('null_ref_mode') == 'skip' and check['missing_slots'] == [rule['ref_slot']]
     return (check['state'] == 'unknown' and rule is not None and rule.get('null_ref_mode') == 'skip'
             and check.get('missing_fields') == [rule['ref_field']])
 
@@ -166,7 +170,11 @@ def refusal(checks, ordinals, slots, rules, display):
       빈 판정    그 슬롯에 걸린 규칙이 있는데 바꾼 줄을 본 판정이 하나도 없다 — 통과로 세지 않는다
     """
     by_key = {r['rule_key']: r for r in rules}
-    mine = [c for c in checks if (display and c['key'] == DISPLAY_KEY) or touches(c, ordinals)]
+    # 줄이 없어 줄 번호 없이 남은 규칙 판정도 바꾼 슬롯에 걸린 규칙이면 내 것이다 — 화면 출력 통과가
+    # 그 미판정을 가리지 않게 한다(2026-10-11 코덱스 검수 #121: CPU+GPU, 보드 없음).
+    mine = [c for c in checks if (display and c['key'] == DISPLAY_KEY) or touches(c, ordinals)
+            or (':' not in c['key'] and c['key'] in by_key
+                and slots & {by_key[c['key']]['slot'], by_key[c['key']]['ref_slot']})]
     failed = [c for c in mine if c['state'] == 'fail']
     if failed:
         return 'fail', failed

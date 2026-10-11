@@ -219,5 +219,45 @@ class DesktopRam(unittest.TestCase):
         self.assertIn('CPU-보드 소켓', e.exception.detail)
 
 
+
+class MissingLineRules(unittest.TestCase):
+    """코덱스 검수 #121: 줄이 없어 줄 번호 없이 남은 규칙 미판정을 화면 출력 통과가 가리면 안 된다."""
+
+    def test_cpu_swap_without_board_is_refused(self):
+        # CPU+GPU, 보드 없음: 소켓 규칙은 줄 번호 없는 unknown, 화면 출력은 pass 다.
+        bom = [dict(l) for l in BOM if l['slot'] != 'MB']
+        with patch.object(b, 'load_specs', return_value=SPECS), self.assertRaises(HTTPException) as e:
+            b.quote(Conn(), 1000000, bom, [change(1, 102)], RULES)
+        self.assertEqual(e.exception.status_code, 409)
+        self.assertIn('CPU-보드 소켓', e.exception.detail)
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            res = b.options_for(Conn([102, 103]), bom, 1, RULES)
+        self.assertEqual(res['options'], [])
+
+    def test_gpu_swap_without_board_is_refused(self):
+        rules = RULES + [dict(rule_key='gpu_slot', label='보드-그래픽카드 슬롯', slot='MB', field='pcie',
+                              ref_slot='GPU', ref_field='pcie', op='gte', part_types=[], null_ref_mode=None,
+                              ref_offset=None, detail_fmt=None)]
+        bom = [dict(l) for l in BOM if l['slot'] != 'MB']
+        with patch.object(b, 'load_specs', return_value=SPECS), self.assertRaises(HTTPException) as e:
+            b.quote(Conn(), 1000000, bom, [change(3, 302)], rules)
+        self.assertIn('보드-그래픽카드 슬롯', e.exception.detail)
+
+    def test_skip_rule_without_reference_line_is_still_settled(self):
+        # 그래픽카드 줄이 없는 PC 에서 파워 규칙(skip)은 엔진처럼 넘긴다 — CPU 교체를 막지 않는다.
+        bom = [dict(l) for l in BOM if l['slot'] != 'GPU']
+        with patch.object(b, 'load_specs', return_value=SPECS):
+            res = b.quote(Conn(), 1000000, bom, [change(1, 102)], RULES)
+        self.assertEqual(res['total'], 1050000)
+
+    def test_rule_of_other_slots_is_not_mine(self):
+        checks = [dict(key='power', label='파워 용량', state='unknown', missing_slots=['POWER']),
+                  dict(key='display_output', label='화면', state='pass')]
+        self.assertIsNone(b.refusal(checks + [dict(key='socket:2:1', label='소켓', state='pass')],
+                                    [1], {'CPU'}, RULES, True))
+        why = b.refusal(checks, [4], {'POWER'}, RULES, False)
+        self.assertEqual(why[0], 'unknown')
+
+
 if __name__ == '__main__':
     unittest.main()

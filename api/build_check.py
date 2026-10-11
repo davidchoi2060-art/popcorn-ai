@@ -46,7 +46,9 @@ def rule_checks(lines, specs, rules):
         left, right = by_slot.get(rule['slot'], []), by_slot.get(rule['ref_slot'], [])
         if not left or not right:
             checks.append(dict(key=rule['rule_key'], label=rule['label'], state='unknown',
-                               detail='대상 부품 또는 비교 부품 없음 · 내장/기본 포함 여부 근거 확인'))
+                               detail='대상 부품 또는 비교 부품 없음 · 내장/기본 포함 여부 근거 확인',
+                               missing_slots=[x for x, side in ((rule['slot'], left), (rule['ref_slot'], right))
+                                              if not side]))
             continue
         for p in left:
             s = specs.get(p['spec_key'], {})
