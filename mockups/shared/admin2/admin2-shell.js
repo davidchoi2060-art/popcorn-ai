@@ -146,6 +146,23 @@
     });
   })();
 
+  // ── 돌아가기 줄 (2026-10-11) — 셸이 그린 `#a2BackLink` 만 다룬다.
+  //    직전 화면이 바로 돌아갈 화면이면 링크 대신 브라우저 뒤로 가기를 쓴다 —
+  //    그쪽 화면의 스크롤·펼침 상태가 그대로 남는다. 아니면 평범한 링크로 간다.
+  (function initBackLink() {
+    var a = document.getElementById('a2BackLink');
+    if (!a) return;
+    a.addEventListener('click', function (ev) {
+      if (ev.defaultPrevented || ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+      var ref;
+      try { ref = new URL(document.referrer); } catch (e) { return; }
+      if (ref.origin !== location.origin || ref.pathname.replace(/\/$/, '') !== a.pathname.replace(/\/$/, '')) return;
+      if (window.history.length < 2) return;
+      ev.preventDefault();
+      window.history.back();
+    });
+  })();
+
   // ── 권한 표시 — `/api/admin/auth/me`를 화면마다 다시 부르지 않는다 ──────────
   var me = null;
   var resolveReady;

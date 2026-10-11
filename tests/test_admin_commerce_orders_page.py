@@ -14,6 +14,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.testclient import TestClient
 
+from api.admin_page_intro import back_for
+
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / 'api/admin_ui_commerce_orders.py'
 NAV = ROOT / 'api/admin_nav.py'
@@ -70,7 +72,8 @@ def renderer(nav):
     tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'render']
     env = dict(Request=Request, HTMLResponse=HTMLResponse,
                templates=Jinja2Templates(directory=str(ROOT / 'templates')),
-               nav_for=nav['nav_for'], nav_counts=nav['counts'], new_admin_nav=nav['new_admin_nav'])
+               nav_for=nav['nav_for'], nav_counts=nav['counts'], new_admin_nav=nav['new_admin_nav'],
+               back_for=back_for)
     return exec_selected(tree, path, env)['render']
 
 

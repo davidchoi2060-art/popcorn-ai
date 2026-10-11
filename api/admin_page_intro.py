@@ -367,3 +367,29 @@ def intro_for(path: str) -> dict | None:
         "group": group_title,
         "links": links,
     }
+
+
+# ── 돌아가기 줄 (2026-10-11 사장님 신고) ─────────────────────────────────────
+# 「사용·성능 자료」 화면 위쪽 카드를 누르면 다른 화면으로 가는데, 그 화면에는 원래
+# 화면으로 돌아오는 길이 없었다(신 관리자 모드는 머리말을 안 그리고, 구 관리자 모드의
+# 머리말은 다른 메뉴 묶음(「AI 관리」 등)의 카드를 보여 준다). 화면 배치 통일은 별도
+# 설계를 기다리고, 여기서는 «돌아가는 링크 한 줄»만 셸이 그린다.
+#   key   카드가 모여 있는 화면(돌아갈 곳)
+#   label 돌아가기 링크 문구 — 이름은 신 관리자 좌측 메뉴 이름과 같게 둔다
+#   from  그 화면의 카드·같은 메뉴 묶음으로 들어오는 화면들
+BACK_LINKS: dict[str, dict] = {
+    "/admin2/usage-floors": {
+        "label": "사용·성능 자료로 돌아가기",
+        "from": ("/admin2/game-copy-review", "/admin2/game-grades", "/admin2/talk-patterns",
+                 "/admin2/shop-notices", "/admin2/talk-review", "/admin2/product-fit"),
+    },
+}
+
+
+def back_for(path: str) -> dict | None:
+    """그 경로에서 돌아갈 화면 — 없으면 None. {href, label}."""
+    key = _norm(path)
+    for href, meta in BACK_LINKS.items():
+        if key in meta["from"]:
+            return {"href": href, "label": meta["label"]}
+    return None
