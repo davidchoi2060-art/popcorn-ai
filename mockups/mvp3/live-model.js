@@ -180,9 +180,18 @@
     const wants=object(value.wants)&&JSON.stringify(value.wants).length<=2048?copy(value.wants):null;
     return {talkNotes:notes,choices,anchorCode,wants};
   }
+  // 보관·구매 순간 쇼핑몰 현재가 확인 결과(api/mall_price_live.confirm). 문장은 서버가 준 것만 쓴다.
+  function priceCheck(value){
+    if(!object(value)||!['same','changed','unchecked'].includes(value.status))return null;
+    const int=v=>Number.isInteger(v)?v:null;
+    return {status:value.status,quoted:int(value.quoted),mall:int(value.mall),diff:int(value.diff),saved:value.saved===true,message:text(value.message),checked_at:text(value.checked_at)};
+  }
   function quote(value){
     if(!object(value)||!uuid(value.id)||!object(value.state)||typeof value.saved_at!=='string'||!/^\d{4}-\d\d-\d\dT/.test(value.saved_at)||!Number.isFinite(Date.parse(value.saved_at)))return null;
-    const p=product(value.product);return p&&p.price!==null?{id:value.id,product:p,state:copy(value.state),saved_at:value.saved_at}:null;
+    const p=product(value.product);if(!p||p.price===null)return null;
+    const out={id:value.id,product:p,state:copy(value.state),saved_at:value.saved_at},check=priceCheck(value.product.price_check);
+    if(check)out.price_check=check;
+    return out;
   }
   // 부품 바꾸기 응답(api/mvp3_part_options): 그 부품만 다른 판매 PC 들. 상품은 추천 카드와 같은 판정을 거치고,
   // 차액·함께 바뀌는 것은 서버가 준 값만 쓴다(화면이 금액을 더하거나 빼지 않는다).

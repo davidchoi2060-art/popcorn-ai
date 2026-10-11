@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_offer, grid_public, mvp3_build, visitor
+from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, visitor
 from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
@@ -150,7 +150,20 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         product = built_product(state.model_dump(), body)
     else:
         product = recommended_product(state, body)
-    params = {'id': str(uuid4()), 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
+    quote_id = str(uuid4())
+    # 2겹 실시간 안전장치(cart): 보관하는 순간 쇼핑몰 현재가와 비교한다. 다르면 우리 판매가를
+    # 고치고(api/mall_price_live) 고객에게 알린 뒤 쇼핑몰 가격으로 보관한다. 못 읽으면 막지 않는다.
+    # 쇼핑몰에 있는 것은 기준 PC 다 — 부품을 바꾼 견적은 기준 가격만 비교하고 차액만큼 총액을 옮긴다.
+    build = product.get('build')
+    quoted = build['base_price'] if build else product['price']
+    check = mall_price_live.confirm('cart', body.product_code, quoted,
+                                    quote_id=quote_id, visitor_ref=uid)
+    if check['status'] == 'changed':
+        product['price'] += check['mall'] - quoted
+        if build:
+            build['base_price'] = check['mall']
+    product['price_check'] = check
+    params = {'id': quote_id, 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
               'product': json.dumps(product, ensure_ascii=False),
               'state': json.dumps(state.model_dump(), ensure_ascii=False)}
     with engine.begin() as conn:
