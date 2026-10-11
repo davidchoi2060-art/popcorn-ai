@@ -166,6 +166,7 @@ from . import talk_schema as TS
 from . import talk_answer as TA
 from . import talk_rules as TR   # 문장 원문으로 AI state 를 바로잡는 규칙(2026-10-10)
 from . import shop_notices    # 관리자 「판매 안내 자료」 — 결제·배송·A/S 안내의 정본(2026-10-11)
+from . import talk_text_fixes as text_fixes    # 관리자 「해석 바로잡기」(0151)
 
 router = APIRouter(prefix="/api/talk", tags=["talk"])
 
@@ -796,7 +797,8 @@ def _legacy_constraints(state: "TS.TalkState") -> list:
 
 
 def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None = None,
-                      prev_usages: list | None = None) -> tuple:
+                      prev_usages: list | None = None,
+                      admin_fixes: list | None = None) -> tuple:
     """AI 가 낸 state(dict) -> (바로잡은 dict, 바로잡은 내역[{field, value, reason}]).
 
     `validate_state` **앞**에서 고친다 -- 그래야 게임명을 채웠을 때 확정 등급(catalog)이
@@ -809,6 +811,8 @@ def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None
       · 2026-10-11(고객3 F8): 문장에 작업 프로그램 이름(라이트룸·포토샵·프리미어…)이 있으면 그
         프로그램의 용도를 넣고, 문장에도 이전 턴에도 근거가 없는 다른 비게임 용도는 뺀다 —
         같은 문장이 턴마다 다른 용도로 읽히지 않게.
+      · 2026-10-11(개편 14번): 관리자가 «해석 바로잡기»에 등록한 표현이 문장에 있으면 맨 끝에
+        그 예산·해상도로 덮는다(`api/talk_text_fixes`). 관리자 규칙이 AI 와 위 규칙보다 이긴다.
     """
     raw = dict(raw) if isinstance(raw, dict) else {}
     fixes: list = []
@@ -876,6 +880,7 @@ def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None
             fixes.append({"field": "usages", "value": raw.get("usages"),
                           "reason": "문장의 작업 프로그램 이름으로 용도를 정함: " + ", ".join(implied)})
             raw["usages"] = new
+    fixes += text_fixes.apply(text, raw, admin_fixes)
     return raw, fixes
 
 
@@ -955,6 +960,8 @@ def parse_talk(body: ParseBody, request: Request):
         written_notices = shop_notices.load_written(conn)
         # 관리자가 직접 더한 안내 주제(0150) — 실패하면 빈 목록
         custom_notices = shop_notices.load_custom(conn)
+        # 관리자 「해석 바로잡기」(0151) — 실패하면 빈 목록
+        admin_fixes = text_fixes.load(conn)
 
     history = _trim_history(body.history)
     prev_ok = bool(body.state) and _prev_state_json(body.state) != _NO_PREV_STATE
@@ -1020,7 +1027,8 @@ def parse_talk(body: ParseBody, request: Request):
     # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
     raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab,
                                          prev_budget=prev_state_obj.budget_won if prev_state_obj else None,
-                                         prev_usages=list(prev_state_obj.usages) if prev_state_obj else None)
+                                         prev_usages=list(prev_state_obj.usages) if prev_state_obj else None,
+                                         admin_fixes=admin_fixes)
     state, dropped = TS.validate_state(raw_state, vocab)
     dropped.extend(fixes)
     # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이

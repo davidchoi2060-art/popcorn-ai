@@ -179,6 +179,26 @@
         <div class="tp-note" id="f-picked" style="color:var(--rv-faint)">목록에서 패턴을 고르면 상태를 바꿀 수 있습니다.</div>
       </section>
 
+      {# 해석 바로잡기 (2026-10-11 품질관리 · 개편 14번) — AI 가 잘못 읽은 표현을 관리자가
+         «표현 → 바로잡을 값»으로 등록한다. 상담이 AI 값 대신 이 값을 쓴다(`api/talk_text_fixes`).
+         새 규칙은 «미사용»으로 저장하고 «시험»으로 확인한 뒤 «사용»으로 올린다. 행을 지우지 않는다. #}
+      <section class="tp-card" id="tf-card" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" data-keep="1">
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+          <span style="font:600 13px/1.3 var(--font)">해석 바로잡기</span>
+          <span class="tp-note">AI가 잘못 읽은 표현을 바로잡을 값으로 등록합니다 · 예산 · 해상도</span>
+        </div>
+        <div id="tf-msg" class="tp-note" hidden></div>
+        <div id="tf-list" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding-top:7px;border-top:1px solid var(--outline-variant)">
+          <span class="tp-lbl">시험 — 문장을 등록된 «사용» 규칙과 새 규칙 칸의 값으로 읽어 봅니다(저장하지 않습니다)</span>
+          <div style="display:flex;gap:6px">
+            <input id="tf-try-in" class="tp-in" style="font-family:var(--font)" maxlength="300" placeholder="고객 문장">
+            <button type="button" class="tp-chip" id="tf-try" style="flex:none">시험</button>
+          </div>
+          <div id="tf-try-out" class="tp-note"></div>
+        </div>
+      </section>
+
       {# 원문 보관 — owner 전용. 내용은 펼치지 않는다 #}
       <section class="tp-card" id="tp-raw" style="flex:none;padding:11px 13px;display:flex;flex-direction:column;gap:8px" hidden>
         <div style="display:flex;align-items:baseline;gap:8px">
@@ -399,6 +419,76 @@
     load();})
    .catch(function(){say('err','서버에 연결하지 못했습니다');});});
 
+ load();
+})();
+</script>
+<script>
+/* 해석 바로잡기 (개편 14번) — 화면 글자는 전부 textContent 로 넣는다. */
+(function(){
+ var API='/api/admin/talk-text-fixes',meta=null;
+ var $=function(id){return document.getElementById(id);};
+ function el(tag,attrs,text){var e=document.createElement(tag);
+  Object.keys(attrs||{}).forEach(function(k){if(k==='style')e.style.cssText=attrs[k];else e.setAttribute(k,attrs[k]);});
+  if(text!=null)e.textContent=text;return e;}
+ function errText(r,d){var P=window.popcornProgress;return P&&P.errText?P.errText(d,r.status,'해석 바로잡기'):((d&&d.detail)||('오류 '+r.status));}
+ function msg(kind,t){var m=$('tf-msg');m.hidden=false;m.textContent=t;
+  m.style.color=kind==='err'?'var(--rv-red)':'var(--rv-green)';}
+ function field(lbl,input,w){var l=el('label',{style:'display:flex;flex-direction:column;gap:4px;'+(w?'flex:none;width:'+w:'flex:1;min-width:0')});
+  l.appendChild(el('span',{'class':'tp-lbl'},lbl));l.appendChild(input);return l;}
+ function sel(opts,val){var s=el('select',{'class':'tp-in',style:'font-family:var(--font)'});
+  opts.forEach(function(o){var op=el('option',{value:o[0]},o[1]);if(o[0]===(val==null?'':val))op.selected=true;s.appendChild(op);});return s;}
+ function card(it){
+  var isNew=!it,v=it||{phrase:'',kind:'예산',budget_man:null,budget_bound:null,resolution:null,memo:'',status:'미사용'};
+  var box=el('div',{style:'display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:7px;background:var(--rv-panel);border:1px '+(isNew?'dashed':'solid')+' var(--outline)'});
+  if(isNew)box.appendChild(el('span',{style:'font:600 11.5px/1.3 var(--font)'},'새 규칙 추가'));
+  var phrase=el('input',{'class':'tp-in',style:'font-family:var(--font)',maxlength:String(meta.phrase_rule.max),placeholder:'예: 백만원 언더'});phrase.value=v.phrase;
+  var kind=sel(meta.kinds.map(function(k){return [k,k];}),v.kind);
+  var r1=el('div',{style:'display:flex;gap:6px'});r1.appendChild(field('표현',phrase));r1.appendChild(field('종류',kind,'84px'));box.appendChild(r1);
+  var man=el('input',{'class':'tp-in',type:'number',min:'10',max:'5000',placeholder:'만원'});if(v.budget_man!=null)man.value=v.budget_man;
+  var bound=sel([['','경계 없음']].concat(meta.bounds.map(function(b){return [b,b];})),v.budget_bound||'');
+  var res=sel(meta.resolutions.map(function(x){return [x,x];}),v.resolution||meta.resolutions[0]);
+  var rb=el('div',{style:'display:flex;gap:6px'});rb.appendChild(field('예산(만원)',man));rb.appendChild(field('경계',bound,'96px'));
+  var rr=el('div',{style:'display:flex;gap:6px'});rr.appendChild(field('해상도',res));
+  box.appendChild(rb);box.appendChild(rr);
+  function sync(){var b=kind.value==='예산';rb.style.display=b?'flex':'none';rr.style.display=b?'none':'flex';}kind.addEventListener('change',sync);sync();
+  var memo=el('input',{'class':'tp-in',style:'font-family:var(--font)',maxlength:'200',placeholder:'메모(선택)'});memo.value=v.memo||'';
+  box.appendChild(field('메모',memo));
+  var foot=el('div',{style:'display:flex;gap:8px;align-items:center'});
+  var use=el('input',{type:'checkbox'});use.checked=v.status==='사용';
+  var ul=el('label',{style:'display:flex;gap:5px;align-items:center;font:500 11px/1 var(--font)'});ul.appendChild(use);ul.appendChild(document.createTextNode('사용'));
+  foot.appendChild(ul);foot.appendChild(el('span',{style:'flex:1'}));
+  if(it&&it.updated_at)foot.appendChild(el('span',{'class':'tp-note'},'수정 '+new Date(it.updated_at).toLocaleDateString('ko-KR')));
+  var save=el('button',{type:'button','class':'tp-btn'},isNew?'추가':'저장');foot.appendChild(save);box.appendChild(foot);
+  function body(){return {phrase:phrase.value,kind:kind.value,
+   budget_man:kind.value==='예산'&&man.value!==''?parseInt(man.value,10):null,
+   budget_bound:kind.value==='예산'?(bound.value||null):null,
+   resolution:kind.value==='해상도'?res.value:null,memo:memo.value,status:use.checked?'사용':'미사용'};}
+  if(isNew)box._draft=body;
+  save.addEventListener('click',function(){
+   fetch(isNew?API:API+'/'+it.fix_id,{method:isNew?'POST':'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body())})
+    .then(function(r){return r.json().then(function(d){return {r:r,d:d};});})
+    .then(function(x){if(!x.r.ok){msg('err',errText(x.r,x.d));return;}msg('ok',x.d.note);load();})
+    .catch(function(){msg('err','서버에 연결하지 못했습니다');});});
+  return box;}
+ var draftBox=null;
+ function render(items){var w=$('tf-list');w.textContent='';
+  if(!items.length)w.appendChild(el('div',{'class':'tp-note'},'등록된 규칙이 없습니다. 잘못 읽힌 표현이 보이면 아래에서 추가합니다.'));
+  items.forEach(function(it){w.appendChild(card(it));});
+  draftBox=card(null);w.appendChild(draftBox);}
+ function load(){
+  fetch(API).then(function(r){return r.json().then(function(d){return {r:r,d:d};});}).then(function(x){
+   if(!x.r.ok){$('tf-list').textContent='';msg('err',errText(x.r,x.d));$('tf-try').disabled=true;return;}
+   meta=x.d;render(x.d.items);}).catch(function(){msg('err','해석 바로잡기 목록을 불러오지 못했습니다');});}
+ $('tf-try').addEventListener('click',function(){
+  var out=$('tf-try-out'),b={sentence:$('tf-try-in').value};
+  if(draftBox&&draftBox._draft){var d=draftBox._draft();if(d.phrase.trim())b.draft=d;}
+  fetch(API+'/try',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})
+   .then(function(r){return r.json().then(function(d){return {r:r,d:d};});})
+   .then(function(x){out.textContent='';
+    if(!x.r.ok){out.style.color='var(--rv-red)';out.textContent=errText(x.r,x.d);return;}
+    out.style.color='';out.appendChild(el('div',{style:'font-weight:600'},x.d.note));
+    x.d.applied.forEach(function(a){out.appendChild(el('div',null,'· '+a));});})
+   .catch(function(){out.textContent='서버에 연결하지 못했습니다';});});
  load();
 })();
 </script>
