@@ -20,10 +20,14 @@
 total·done_total·drop_total은 consult_sessions 전체 기준(창 밖 포함) — 완주율 분모를
 200건 창이 아니라 전체로 잡을 수 있게 별도로 낸다.
 """
+import logging
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import text
+
+from .auth import current_operator
 
 from .timeutil import iso, KST, kst_day_range
 from .admin_products import PART_TYPE_LABELS
@@ -33,6 +37,11 @@ from .db import engine
 from .session_scope import session_scope_where, scope_note
 
 router = APIRouter(prefix="/api/admin")
+log = logging.getLogger(__name__)
+
+# 처리 기록(0152 · 2026-10-11 개편 16번) — 상담 원장은 그대로 두고 상태·메모만 따로 남긴다.
+NOTE_STATUSES = ("대기", "처리 중", "완료")
+NOTE_MEMO_MAX = 1000
 
 LIMIT = 200
 MODE_KO = {"guided": ("맡김", "primary"), "chat": ("함께", "info"),
@@ -117,6 +126,7 @@ def list_sessions(offset: int = 0):
             f" JOIN consult_sessions s ON s.session_id = q.session_id WHERE {scope}")).scalar_one()
         drop_total = total - done_total
 
+    notes = _load_notes([r["session_id"] for r in rows])
     by_session: dict = {}
     for q in snaps:
         by_session.setdefault(q["session_id"], []).append(q)
@@ -163,8 +173,14 @@ def list_sessions(offset: int = 0):
                 "companion": [{"name": c.get("name"), "price": c.get("price")}
                               for c in _companion(rep["companion"]) if isinstance(c, dict)],
             } if rep else None),
+            # 처리 기록 — 행이 없으면 «대기». notes 가 None 이면 표가 아직 없다(0152 전).
+            "note_status": (notes.get(r["session_id"], {}).get("status", "대기")
+                            if notes is not None else None),
+            "note_memo": (notes or {}).get(r["session_id"], {}).get("memo"),
+            "note_at": (notes or {}).get(r["session_id"], {}).get("at"),
         })
     return {"items": items, "today": today, "done": done, "drop": drop, "limit": LIMIT,
+            "notes_ready": notes is not None, "note_statuses": list(NOTE_STATUSES),
             "offset": offset, "total": total,
             "done_total": done_total, "drop_total": drop_total,
             "scope_note": scope_note(),   # A-81 — 아래 kpiCard(「전체 세션」)의 note 자리로 간다
@@ -175,3 +191,53 @@ def list_sessions(offset: int = 0):
                      " done/drop은 최신 %d건 창 기준이고, done_total/drop_total·total은"
                      # ⚠ 2026-08-20 정정 — A-81 로 「전체」가 아니게 됐다(시험 운영 기간 제외).
                      " consult_sessions 중 「시험 운영 기간」 제외 %d건 기준입니다." % (LIMIT, total))}
+
+
+def _load_notes(ids: list) -> dict | None:
+    """처리 기록 {session_id: {status, memo, at}}. 표가 없으면(0152 전) None — 목록은 그대로 나간다.
+
+    목록 본문과 다른 연결에서 읽는다(REPEATABLE READ 트랜잭션이 이 실패로 끊기지 않게).
+    """
+    if not ids:
+        ids = [0]
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(text(
+                "SELECT session_id, status, memo, updated_at FROM consult_session_notes"
+                " WHERE session_id = ANY(:ids)"), {"ids": ids}).mappings().all()
+    except Exception as e:                                    # noqa: BLE001
+        log.warning("[sessions] notes load failed - skipped: %s", type(e).__name__)
+        return None
+    return {r["session_id"]: {"status": r["status"], "memo": r["memo"], "at": iso(r["updated_at"])}
+            for r in rows}
+
+
+class NoteBody(BaseModel):
+    status: str
+    memo: str | None = None
+
+
+@router.put("/sessions/{session_id}/note")
+def save_note(session_id: int, body: NoteBody):
+    """상담 한 건의 처리 상태·메모를 저장한다(운영자 이상). 상담 원장은 건드리지 않는다."""
+    me = current_operator() or {}
+    if me.get("role") not in ("owner", "operator"):
+        raise HTTPException(403, "운영자 이상만 처리 기록을 남길 수 있습니다")
+    if body.status not in NOTE_STATUSES:
+        raise HTTPException(400, "상태는 대기 · 처리 중 · 완료 중 하나입니다")
+    memo = (body.memo or "").strip() or None
+    if memo and len(memo) > NOTE_MEMO_MAX:
+        raise HTTPException(400, "메모는 %d자까지 적을 수 있습니다" % NOTE_MEMO_MAX)
+    with engine.begin() as conn:
+        if not conn.execute(text("SELECT 1 FROM consult_sessions WHERE session_id = :i"),
+                            {"i": session_id}).first():
+            raise HTTPException(404, "없는 상담입니다")
+        conn.execute(text("""
+            INSERT INTO consult_session_notes (session_id, status, memo, updated_by)
+            VALUES (:i, :s, :m, :who)
+            ON CONFLICT (session_id) DO UPDATE
+               SET status = EXCLUDED.status, memo = EXCLUDED.memo,
+                   updated_by = EXCLUDED.updated_by, updated_at = now()"""),
+            {"i": session_id, "s": body.status, "m": memo, "who": me.get("operator_id")})
+    return {"ok": True, "session_id": session_id, "status": body.status, "memo": memo,
+            "note": "처리 기록을 저장했습니다."}
