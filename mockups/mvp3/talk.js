@@ -66,7 +66,10 @@ function conditionsText(talk){const c=M.conditions(talk);return c.length?c.join(
 // 말풍선 아래 추천 카드. 가장 최근 제안만 고를 수 있고, 지난 제안은 그때 값 그대로 「이전 제안」으로 둔다.
 function proposalBlock(p,latest){
   const products=p.groups.flatMap(g=>g.products);
-  if(!products.length)return '<div class="tk-cards is-empty" data-proposal="'+p.id+'"><p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 사람에게 문의할 수 있어요.</p>'+
+  // 예산이 너무 낮아 카드를 안 낸 경우(「10만원」) 서버가 준 「○○원부터 가능합니다」를 그대로 보인다.
+  const notes=[...new Set(p.groups.map(g=>g.empty_note).filter(Boolean))];
+  if(!products.length)return '<div class="tk-cards is-empty" data-proposal="'+p.id+'">'+
+    (notes.length?notes.map(n=>'<p class="warn-text tk-group-note">'+esc(n)+'</p>').join(''):'<p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 사람에게 문의할 수 있어요.</p>')+
     (latest?button('사람에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
   const head=latest?'':'<p class="tk-cards-note">이전 제안 · 그때 조건('+esc(conditionsText(p.talk)||'조건 미확인')+') 기준 금액이에요.</p>';
   const many=p.groups.filter(g=>g.products.length).length>1;
