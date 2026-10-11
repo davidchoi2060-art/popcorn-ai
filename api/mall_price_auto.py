@@ -254,7 +254,7 @@ def execute(run_id: int, moment: str, *, operator_id=None, collect_public_fn=Non
 
 
 def run(moment: str = "auto", *, operator_id=None) -> dict:
-    """한 번 돌린다(타이머 · 명령줄)."""
+    """한 번 돌린다(앱 안 스케줄러 · 명령줄)."""
     try:
         run_id = begin(moment, operator_id=operator_id)
     except AlreadyRunning as e:
@@ -268,3 +268,85 @@ def start_background(*, operator_id) -> int:
     threading.Thread(target=execute, args=(run_id, "manual"), kwargs={"operator_id": operator_id},
                      name="mall-price-manual-%d" % run_id, daemon=True).start()
     return run_id
+
+
+# ================================================================ 앱 안 스케줄러 ==
+# 배포(deploy/popcorn-ci deploy)는 systemd 타이머를 설치하지 않는다 — 그 스크립트는 서버에 고정된
+# 사본이라 리포를 고쳐도 사람이 다시 설치하기 전에는 바뀌지 않는다. 그래서 API 프로세스 안에서 돈다
+# (uvicorn 프로세스 하나 · 재시작마다 다시 뜬다). 끄려면 MALL_PRICE_AUTO_SCHEDULE=off.
+#
+# 같은 시각을 두 번 돌리지 않는다: 그 시각 이후 시작한 auto 실행이 있으면 건너뛴다(DB 로 판정 —
+# 같은 DB 를 쓰는 다른 프로세스가 있어도 한 번). 겹침은 begin() 의 advisory lock 이 막는다.
+# 서버가 그 시각에 꺼져 있었으면 CATCH_UP 안에서 켜질 때 한 번 만회한다(systemd Persistent 와 같은 뜻).
+
+SLOTS_KST = (6, 13)                    # 매일 06:00 · 13:00 한국 시각
+CATCH_UP = 3 * 3600                    # 이 시간 안이면 놓친 시각을 만회한다(초)
+TICK = 60                              # 몇 초마다 확인하나
+_KST = __import__("datetime").timezone(__import__("datetime").timedelta(hours=9))
+_scheduler = None
+
+
+def due_slot(now, last_auto_started):
+    """지금 돌려야 할 시각(aware datetime) 또는 None. now · last_auto_started 는 aware."""
+    import datetime as dt
+    local = now.astimezone(_KST)
+    slots = [local.replace(hour=h, minute=0, second=0, microsecond=0) for h in SLOTS_KST]
+    slots += [s - dt.timedelta(days=1) for s in slots]
+    past = [s for s in slots if s <= local]
+    if not past:
+        return None
+    slot = max(past)
+    if (local - slot).total_seconds() > CATCH_UP:
+        return None
+    if last_auto_started is not None and last_auto_started >= slot:
+        return None
+    return slot
+
+
+def _last_auto_started():
+    with engine.connect() as conn:
+        return conn.execute(text(
+            # started_at 은 TIMESTAMP(무시간대, 세션 시간대의 now()) — 같은 세션 시간대로 붙여 비교한다
+            "SELECT max(started_at) AT TIME ZONE current_setting('TimeZone')"
+            " FROM mall_price_runs WHERE moment='auto'")).scalar()
+
+
+def _tick():
+    import datetime as dt
+    now = dt.datetime.now(dt.timezone.utc)
+    last = _last_auto_started()
+    if due_slot(now, last) is not None:
+        res = run("auto")
+        log.info("[mall-price-auto] scheduled run ok=%s", res.get("ok"))
+
+
+def _loop(stop):
+    while not stop.wait(TICK):
+        try:
+            _tick()
+        except Exception:                                           # noqa: BLE001
+            log.exception("[mall-price-auto] scheduler tick failed")
+
+
+def scheduler_enabled() -> bool:
+    if (os.environ.get("MALL_PRICE_AUTO_SCHEDULE") or "on").lower() in ("off", "0", "false", "no"):
+        return False
+    # 루프백 DB(CI · 테스트 · 개인 로컬 DB)에서는 돌지 않는다 — 쇼핑몰에 요청을 보내지 않게.
+    from sqlalchemy.engine import make_url
+    try:
+        host = make_url(os.environ.get("DATABASE_URL") or "").host
+    except Exception:                                               # noqa: BLE001
+        return False
+    return bool(host) and host not in ("127.0.0.1", "localhost", "::1")
+
+
+def start_scheduler() -> None:
+    """API 시작 때 한 번(api/admin_mall_price 가 startup 에 건다)."""
+    global _scheduler
+    if _scheduler is not None or not scheduler_enabled():
+        return
+    stop = threading.Event()
+    t = threading.Thread(target=_loop, args=(stop,), name="mall-price-scheduler", daemon=True)
+    t.start()
+    _scheduler = (t, stop)
+    log.info("[mall-price-auto] scheduler started slots=%s KST", SLOTS_KST)
