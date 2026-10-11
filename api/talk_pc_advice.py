@@ -39,7 +39,9 @@ TASK_KEY = "task.talk_answer"
 _PC_WORD = re.compile(r"pc|피시|컴퓨터|컴\b|본체|데스크\s*[탑톱]|조립", re.I)
 _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\s*싶|구매|구입|구성|뭐가\s*좋|어떤\s*게\s*좋|짜\s*줘|짜\s*주|"
                       r"어떤\s*(pc|피시|컴퓨터|컴|본체|사양)\S{0,2}\s*(좋|괜찮|필요|돼|되)|"
-                      r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양", re.I)
+                      r"싸게|저렴|가성비|최저가|싼\s*(걸|거|것)|좋은\s*(걸|거|것)|최고\s*사양|"
+                      # 「예산 얼마나 잡아야」·「배그 돌아가는 컴퓨터」(2026-10-11 일반 AI 비교 R09·E13)
+                      r"얼마\S{0,2}\s*(잡|들|필요|있어야|정도|면\s*돼|면\s*되)|돌아가는|돌릴|돌리려", re.I)
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
 # 부품 질문(「SSD랑 메모리 차이가 뭐예요」)과 쓰던 PC 고민(「지금 쓰는 PC가 느려요」)도 설명을 먼저 한다
 # (코덱스 담당의견-최소차이-v1 §3 -- 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다).
@@ -81,11 +83,18 @@ def pc_intent(sentence: str) -> bool:
     return bool(_PC_WORD.search(s) or _PART.search(s) or _PC_INTENT.search(s))
 
 
+# 부품을 이해하려는 질문(「PC 메모리 구성과 SSD 차이가 뭐예요?」) -- 「구성」이 요청 낱말에 걸려도 사려는 말이
+# 없으면 새 PC 추천이 아니라 부품 설명이다(코덱스 PR157 검수 v1 P2-1).
+_EXPLAIN = re.compile(r"차이|역할|왜|무슨\s*(뜻|의미|역할)|뭐예요|뭔가요|뭐야|뭐에요|뭐죠|뭐지|설명")
+_BUY = re.compile(r"추천|사려|살려|살까|사고\s*싶|구매|구입|견적|맞춰|맞추|짜\s*줘|짜\s*주|\d+\s*만\s*원?|예산", re.I)
+
+
 def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | general | None. game=True 면 게임 이름을 용도로 친다."""
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
-    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game))
+    explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
+    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc or game)) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
