@@ -86,11 +86,13 @@ class ConditionKeepsExplanation(unittest.TestCase):
         self.assertIn("메모리 64GB", r["reply"])                  # 조건 안내는 짧게 곁들인다
         self.assertIn("가격대를 넓게", r["reply"])            # 가정 한 줄도 남는다
 
-    def test_purchase_topic_still_comes_first(self):
+    def test_purchase_topic_notice_comes_with_the_explanation(self):
+        # 판매 주제 안내는 가정 문장 대신 아래 줄에 나오고, 설명은 위에 남는다(test_talk_general_info 참조).
         ans = TA.AnswerResult(answer=ADVICE, narrowing=TS.NARROWING_WIDE, kind="pc_advice")
         r = parse("개발용 PC 추천해줘, 윈도우 설치돼서 오나요?", {"usages": ["개발"], "budget_won": None},
                   "개발용 PC를 찾고 계시는군요.", ans=ans)
-        self.assertEqual(r["answer"], "")
+        self.assertEqual(r["answer"], ADVICE)
+        self.assertIn("윈도우(운영체제)", r["reply"])
 
 
 if __name__ == "__main__":

@@ -46,7 +46,11 @@ _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\
 _PART = re.compile(r"ssd|hdd|하드|램|ram|메모리|그래픽\s*카드|글카|gpu|vga|cpu|씨피유|프로세서|파워|쿨러|메인\s*보드|케이스", re.I)
 _ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|좋은|괜찮|비교|알려|궁금|역할|\?")
 _UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
-TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE = "build", "part", "upgrade"
+TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE, TOPIC_GENERAL = "build", "part", "upgrade", "general"
+# 윈도우·배송·설치·환불·취소·보증·결제처럼 «일반 기준»은 말할 수 있는 구매 절차 질문(2026-10-11 일반 AI 비교
+# R12·R13·E42·E44: 「확인이 어렵다」로만 넘겨 손님에게 남는 것이 없었다). 우리 가게 조건은 아래 안내(reply)가 말한다.
+_GENERAL = re.compile(r"윈도우?|운영\s*체제|배송|택배|출고|도착|설치|환불|취소|반품|교환|보증|(?<![a-z])a\s*/?\s*s(?![a-z])|"
+                      r"에이에스|무상\s*수리|할부|결제|영수증|세금\s*계산서|중고", re.I)
 _PUBLIC_COND = re.compile(r"램 \d+GB 이상|SSD \d+GB 이상|그래픽 메모리 \d+GB 이상|외장 그래픽 필요|엔비디아 그래픽 필요")
 _QUESTION = re.compile(r"\?\s*$|까요\s*$|나요\s*$|세요\s*\?|신가요")
 
@@ -69,9 +73,12 @@ def topic_of(sentence: str, vocab) -> str | None:
     """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | None."""
     s = sentence or ""
     part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
+    build = bool(_REQUEST.search(s) and (usage_hits(s, vocab) or pc))
+    if _GENERAL.search(s) and not build:
+        return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
         return TOPIC_UPGRADE
-    if _REQUEST.search(s) and (usage_hits(s, vocab) or pc):
+    if build:
         return TOPIC_BUILD
     if part and _ASKS.search(s):
         return TOPIC_PART
@@ -119,7 +126,14 @@ _TOPIC_TASK = {
     TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
                    " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
                    " 특정 PC에 바로 장착된다고 단정하지 않는다.",
+    TOPIC_GENERAL: "고객이 물은 구매 절차(운영체제 설치·배송·설치·결제·환불·취소·보증 등)를 국내 조립 PC 쇼핑몰의"
+                   " «일반적인» 기준으로 서너 문장 설명한다. 「보통」·「일반적으로」·「쇼핑몰마다 다르지만」처럼 말하고,"
+                   " 우리 가게가 해 준다·가능하다고 약속하지 않는다. 고객이 직접 확인할 곳(상품 페이지·주문 내역·카드사)을"
+                   " 한 문장 알려 준다. 카드번호·주민번호 같은 정보는 상담 창에 적지 않아도 된다는 점은 필요할 때만 말한다.",
 }
+# 구성 추천과 배송·환불을 함께 물으면(「배그PC 추천하고 배송일과 환불도 알려줘」) 구성 설명 뒤에 일반 기준 한 문장.
+_BUILD_WITH_GENERAL = (" 고객이 배송·설치·환불·운영체제 같은 구매 절차도 물었으면 마지막에 국내 쇼핑몰의 일반적인 기준을"
+                       " 한 문장 덧붙인다(우리 가게 약속은 하지 않는다).")
 
 
 def build_prompt(sentence: str, basis: list[str], history: list | None = None,
@@ -129,7 +143,8 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "당신은 PC 판매점의 상담원이다. 고객이 PC 에 대해 물었다. 일반 AI 에게 물었을 때처럼 먼저 답한다.",
         "되묻기로 답을 미루지 않는다 - 고객은 이미 물었다.",
         "",
-        "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD]),
+        "[쓸 것] " + _TOPIC_TASK.get(topic, _TOPIC_TASK[TOPIC_BUILD])
+        + (_BUILD_WITH_GENERAL if topic == TOPIC_BUILD and _GENERAL.search(sentence or "") else ""),
         "[말투] 쉬운 한국어 존댓말(~요). 강조 기호(**)·목록 기호 없이 문장으로 쓴다. 감사 인사로 시작하지 않는다."
         " %d자 이내." % ADVICE_MAX_LEN,
         "",
@@ -140,7 +155,8 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         "[쓰지 않는 것]",
         "- 가격·금액·예산 숫자(카드가 보여 준다).",
         "- 특정 부품 모델명(RTX 4060·i5-14400·라이젠 5 7600 같은 것). 부품 종류 이름(그래픽카드·램·SSD·CPU)은 된다.",
-        "- 재고·배송·할인·설치.",
+        ("- 재고·할인·특정 기간을 우리 가게 약속처럼 단정하는 말." if topic == TOPIC_GENERAL
+         or _GENERAL.search(sentence or "") else "- 재고·배송·할인·설치."),
         "- 질문 문장. 마지막 안내는 서버가 붙인다.",
         "- 카드나 견적을 찾아 주겠다·맞춰 주겠다는 약속.",
         "",
@@ -155,16 +171,26 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
 _PRICE_WORDS = re.compile(r"\d+\s*만|\d+\s*원|원대|가격대")
 
 
-def clean(raw: str) -> tuple[str, list[dict]]:
-    """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다."""
+# 일반 기준 설명에서는 배송·할인 낱말이 곧 질문의 주제라 걷지 않는다 -- 재고 이야기만 걷는다.
+_STOCK_ONLY = ("재고", "품절", "입고")
+
+
+def clean(raw: str, topic: str | None = None) -> tuple[str, list[dict]]:
+    """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
+    일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
+    from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
+    general = topic == TOPIC_GENERAL
+    stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
     kept, dropped = [], []
     for s in TF.split_sentences((raw or "").replace("**", "")):
         if TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s):
             dropped.append({"before": s, "reason": "price"})
         elif TF._RE_PART.search(s):
             dropped.append({"before": s, "reason": "part model"})
-        elif any(w in s for w in TF._LEXICON_STOCK):
+        elif any(w in s for w in stock):
             dropped.append({"before": s, "reason": "stock"})
+        elif general and any(p.search(s) for _label, p in PROMISE_PATTERNS):
+            dropped.append({"before": s, "reason": "promise"})
         elif _QUESTION.search(s):
             dropped.append({"before": s, "reason": "question"})
         else:
@@ -195,7 +221,7 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         res.provider, res.model = out.provider, out.model
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
         res.log_id = out.log_id
-        body, dropped = clean(out.text)
+        body, dropped = clean(out.text, topic)
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}

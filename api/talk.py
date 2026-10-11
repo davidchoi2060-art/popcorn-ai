@@ -150,6 +150,7 @@ from sqlalchemy import bindparam, text   # /monitor-bands 가 집계 쿼리를 �
 from . import access_gate   # 방문자별 호출 횟수 제한의 단일 원천
 from . import visitor      # 방문자 키 — 자동 승격의 「서로 다른 사람」 판정에 쓴다
 from . import talk_entry as TE   # 상담 갈래(새 PC / 업그레이드 / 부품) 판정
+from . import talk_pc_advice as PA   # 구매 절차 일반 기준 설명 판정
 # 회귀 표식 판정의 단일 원천. 언더스코어 함수를 다른 모듈이 가져다 쓰는 것은 이 저장소의
 # 기존 관례다 — `api/expert.py` 가 같은 함수를 그렇게 쓴다(그 파일 상단 주석 참조).
 from .recommend import _resolve_data_origin
@@ -476,6 +477,9 @@ class ParseBody(BaseModel):
     # 시작했는지만 서버 로그에 센다 -- 문장은 찍지 않는다. `ENTRY_KEYS` 밖의 값은 「-」로 찍는다.
     entry: str | None = None
 
+
+# 일반 기준 설명을 지우지 않는 예외 -- 주문·환불 상태를 묻는 턴도 일반적인 환불 기간은 말해 줄 수 있다.
+GENERAL_OK_EXCEPTIONS = frozenset({"order_status"})
 
 # 시작 단추 키. 정본은 api/talk_entry.KEYS, 화면은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야
 # 센다(테스트가 대조한다).
@@ -1384,8 +1388,13 @@ def parse_talk(body: ParseBody, request: Request):
     #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
     answer = ans.answer or ""
     advice = getattr(ans, "kind", "game") == "pc_advice"
-    if advice and not plain_pc:
-        # PC 구성 설명은 평범한 PC 상담 턴에만 위에 둔다 -- 예외·안내·노트북 턴은 그 문장이 먼저다.
+    # 설명은 판매 안내(윈도우·배송·환불 등)와 함께 둔다 -- 위는 일반 기준·구성 설명, 아래 안내는 우리 가게에서
+    # 확인할 곳이다(2026-10-11 일반 AI 비교 「확인 가능한 일반 정보도 회피」 · 사장님 「답 먼저」).
+    # 예외 응대·노트북 턴은 그 문장이 먼저라 설명을 비운다. 주문·환불 상태 질문에도 일반 기준 설명은 남긴다.
+    general = advice and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
+    bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset())
+    if advice and (bad_exceptions or laptop
+                   or (not general and not (pc is True and stage == TS.STAGE_PC))):
         answer = ""
     if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
         # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
