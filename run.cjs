@@ -3,7 +3,8 @@
 // 카드마다 대표 사진·부품 사진·공개 구성 확인, save 표시 문의는 견적 보관(mvp3 마지막 단계)까지.
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const BASE='https://popcornai.co.kr', OUT=process.env.OUT||'out';
-const cases=JSON.parse(fs.readFileSync(path.join(__dirname,'cases.json'),'utf8'));
+const TAG=process.env.TAG||'';
+const cases=JSON.parse(fs.readFileSync(path.join(__dirname,'cases.json'),'utf8')).map(c=>({...c,turns:c.turns.map(t=>TAG+t)}));
 fs.mkdirSync(OUT,{recursive:true});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 let cookie='', accessKey='', lastParse=0, parseCount=0;
