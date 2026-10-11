@@ -604,15 +604,26 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         #   두 벌로 두면 「답은 하는데 카운터는 오르는」 어긋남이 생긴다.
         # 2026-10-11 사장님 「LLM에 먼저 보내 답하고 아래에 우리 제품」: PC 구성 질문은 게임 이야기가
         #   아니어도 일반 AI 처럼 먼저 설명한다(api/talk_pc_advice). 게임 이름·장르가 걸리면 기존 게임 답.
-        labels = None
-        if not extract_game_names(sentence, vocab) and not match_genres(sentence, vocab):
+        labels, games, topic = None, None, None
+        game_names, game_genres = extract_game_names(sentence, vocab), match_genres(sentence, vocab)
+        if not game_names and not game_genres:
             labels = PA.wants_advice(sentence, vocab, prev_state)
             # 「요즘 게임 추천해줘」는 게임 이야기다 -- PC 를 직접 말했을 때만 PC 설명으로 간다.
             if labels is not None and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence):
                 labels = None
+            topic = PA.topic_of(sentence, vocab) if labels is not None else None
+        elif PA.pc_intent(sentence):
+            # 게임 이름과 함께 PC 를 물으면(「120만원 롤·오버워치·로아 구성 짜줘」) 게임 소개가 아니라 그 게임에 맞는
+            # PC 설명을 먼저 한다(2026-10-11 일반 AI 비교 「묻지 않은 게임 소개」). 「롤 재밌어?」는 기존 게임 답.
+            topic = PA.topic_of(sentence, vocab, game=True)
+            if topic in (PA.TOPIC_BUILD, PA.TOPIC_PART, PA.TOPIC_UPGRADE):
+                prev = list(getattr(prev_state, "usages", None) or []) if prev_state is not None else []
+                game_label = next((lb for lb, _t in (getattr(vocab, "usages", None) or []) if TS.is_game_usage(lb)), None)
+                labels = PA.usage_hits(sentence, vocab) or prev or ([game_label] if game_label else [])
+                games = game_names or None
         if labels is not None:
             return PA.advise(conn_factory, sentence, labels, res, history=history,
-                             timeout_sec=timeout_sec, topic=PA.topic_of(sentence, vocab))
+                             timeout_sec=timeout_sec, topic=topic, games=games)
         if not is_game_related(sentence, vocab):
             res.elapsed_sec = round(time.time() - t0, 3)
             return res
