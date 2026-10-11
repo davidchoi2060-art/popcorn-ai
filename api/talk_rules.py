@@ -425,14 +425,38 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     return out if _all else [c for c in out if not _applied_by_recommend(c)]
 
 
-def honest_notices(text: str, state, written: dict | None = None, prev_state=None) -> list[str]:
+# 관리자가 직접 더한 안내 주제(표 `shop_notice_topics`, 0150 · 개편 12번). 낱말은 정규식이 아니라
+# 글자 그대로이고, 공백과 대소문자를 빼고 비교한다(「AMD」「amd」「인텔 이」 모두 같게).
+CUSTOM_KEYWORD_MIN = 2
+CUSTOM_KEYWORD_MAX = 30
+
+
+def norm_keyword(s: str) -> str:
+    return re.sub(r"\s+", "", s or "").casefold()
+
+
+def custom_topic_hits(text: str, custom: list | None) -> list[dict]:
+    """문장에 낱말이 하나라도 든 관리자 주제 — 관리자 화면 순서 그대로."""
+    t = norm_keyword(text)
+    out = []
+    for c in custom or []:
+        kws = [norm_keyword(k) for k in c.get("keywords") or [] if isinstance(k, str)]
+        if any(len(k) >= CUSTOM_KEYWORD_MIN and k in t for k in kws):
+            out.append(c)
+    return out
+
+
+def honest_notices(text: str, state, written: dict | None = None, prev_state=None,
+                   custom: list | None = None) -> list[str]:
     """말풍선을 바꿀 안내 문장들. 비어 있으면 AI reply 를 그대로 쓴다.
 
     `written` = 관리자가 적고 «사용»으로 둔 안내 {주제 키: 문장}. 있으면 기본 안내 대신 쓴다.
+    `custom` = 관리자가 직접 더한 주제 중 «사용»인 것 — 낱말이 문장에 있으면 그 안내를 쓴다.
     """
     written = written or {}
     hit = purchase_topics(text)
     notes = [written.get(key) or msg for key, _label, _pat, msg in PURCHASE_TOPICS if key in hit]
+    notes += [c["body"] for c in custom_topic_hits(text, custom) if c.get("body")]
     applied, conds = requested_conditions(text, state, prev_state)
     if applied:
         notes.append("말씀하신 " + " · ".join(applied) + " 조건으로 판매 중인 PC를 골라 볼게요."
