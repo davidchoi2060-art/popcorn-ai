@@ -36,7 +36,7 @@
 .mc-pager button,.mc-drawer header button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
 .mc-pager button:disabled{opacity:.45;cursor:default}
 .mc-empty{padding:28px;text-align:center;color:var(--rv-muted)}
-.mc-drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.mc-drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,calc(100vw / var(--a2-zoom,1)));background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
 .mc-drawer[hidden]{display:none}
 .mc-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
 .mc-drawer header h2{font-size:16px;margin:0}
@@ -63,6 +63,7 @@
     <div class="mc-kpi"><b id="kSaved">—</b><span>전체 보관 견적</span></div>
     <div class="mc-kpi"><b id="kVisitors">—</b><span>방문자</span></div>
   </section>
+  <div id="mcRawNotice"></div>
   <p class="mc-note" id="mcNote"></p>
   <div class="mc-bar">
     <label><input type="checkbox" id="mcTest"> 시험 문의 포함</label>
@@ -72,7 +73,7 @@
     <table>
       <thead><tr>
         <th scope="col">마지막 활동</th><th scope="col">방문자</th><th scope="col">문의</th>
-        <th scope="col">마지막 문의에서 읽은 조건</th><th scope="col">보관 견적</th><th scope="col">마지막 보관 상품</th>
+        <th scope="col">마지막 문의 · 읽은 조건</th><th scope="col">보관 견적</th><th scope="col">마지막 보관 상품</th>
       </tr></thead>
       <tbody id="mcRows"><tr><td colspan="6" class="mc-empty">불러오는 중입니다.</td></tr></tbody>
     </table>
@@ -91,6 +92,7 @@
 {% endblock %}
 
 {% block foot_extra %}
+<script src="/shared/admin2/raw-text.js?v=20261011"></script>
 <script>
 (function(){
   const $=id=>document.getElementById(id);
@@ -117,6 +119,7 @@
     const s=d.summary||{};
     $('kHitsToday').textContent=num(s.hits_today);$('kSavedToday').textContent=num(s.saved_today);
     $('kHits').textContent=num(s.hits);$('kSaved').textContent=num(s.saved);$('kVisitors').textContent=num(d.total_visitors);
+    $('mcRawNotice').innerHTML=RawText.notice(d.raw_notice);
     $('mcNote').textContent=d.note||'';
     $('mcTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 문의 '+num(d.test_excluded)+'건을 뺐습니다.':'');
     limit=d.limit||50;lastLen=(d.items||[]).length;
@@ -126,7 +129,7 @@
       '<td class="num">'+esc(when(it.last_at))+'</td>'+
       '<td>'+esc(it.visitor_label)+'</td>'+
       '<td class="num">'+num(it.hits)+(it.ai_calls?' <span class="mc-muted">(AI '+num(it.ai_calls)+')</span>':'')+'</td>'+
-      '<td>'+(it.hits?chips(it.last_terms):'<span class="mc-muted">—</span>')+'</td>'+
+      '<td>'+(it.hits?RawText.html(it.last_question)+'<div>'+chips(it.last_terms)+'</div>':'<span class="mc-muted">—</span>')+'</td>'+
       '<td class="num">'+num(it.saved)+'</td>'+
       '<td>'+(it.last_product?esc(it.last_product.name)+'<br><span class="num mc-muted">'+esc(won(it.last_product.price))+'</span>':'<span class="mc-muted">보관 없음</span>')+'</td></tr>').join('');
     const page=Math.floor(offset/limit)+1,pages=Math.max(1,Math.ceil((d.total_visitors||0)/limit));
@@ -142,7 +145,7 @@
     try{d=await getJSON('/api/admin/mvp3-consults/'+encodeURIComponent(v)+'?'+q());}
     catch(e){$('mcDrawerBody').innerHTML='<p>'+esc(e.message)+'</p>';return;}
     $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved)+(d.inquiries?' · 구매 상담 '+num(d.inquiries):'');
-    $('mcDrawerBody').innerHTML='<p class="mc-note">문의 원문은 보여 주지 않습니다. 읽어 낸 조건 이름만 보입니다.</p>'+
+    $('mcDrawerBody').innerHTML=RawText.notice(d.raw_notice)+
       (d.timeline||[]).map(e=>e.kind==='inquiry'?
         '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청</div>'+
         '<div>'+esc(e.inquiry_no)+' · '+esc(e.topic)+' · '+esc(e.status)+
@@ -155,6 +158,7 @@
         (e.product.reasons.length?'<ul>'+e.product.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')+'</div>'
         :
         '<div class="mc-ev"><div class="mc-at">'+esc(when(e.at))+' · 문의'+(e.ai_called?' · AI 사용':'')+(e.test?' · 시험':'')+'</div>'+
+        RawText.html(e.question)+
         '<div>'+chips(e.terms)+(e.unread?' <span class="mc-muted">못 읽은 조건 '+num(e.unread)+'개</span>':'')+'</div>'+
         (e.reply?'<div class="mc-reply">AI 답: '+esc(e.reply.shown_reply||'없음')+
           (e.reply.flags.length?' '+chips(e.reply.flags.map(f=>'⚠ '+f)):'')+

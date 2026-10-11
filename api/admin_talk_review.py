@@ -12,8 +12,8 @@
   ③ 집계: 표시 있는 답 · 상태별 · AI 답 실패 · 반영 못 한 조건별 · 문의 주제별
 
 ■ 정직 표기
-  · 고객 문장 원문은 싣지 않는다(원문 단건 열람은 미정 — req-talk-patterns §9 ㉢).
-    AI 답은 고객 말을 되짚을 수 있다 — 그래서 원문과 같은 보관 기한을 둔다.
+  · 고객 문장 원문을 답과 나란히 싣는다(2026-10-11 중헌 님 결정 — req-talk-patterns §9 ㉢).
+    표시 규칙은 `api/admin_raw_text.raw_view` 한 곳이다(보관 기한이 지난 원문은 내보내지 않는다).
   · 「약속하는 말」 표시는 단서이지 판정이 아니다. 판정은 관리자가 상태로 남긴다.
   · 이 표가 생기기 전(0138 이전) 문의는 답이 없다 — 그 사실을 `before_logging` 으로 센다.
   · 시험 문의(회귀 표식 · 「QA-」 이름표)는 기본으로 뺀다 — 「고객 문의 · 보관 견적」과 같은 기준.
@@ -24,6 +24,7 @@ from sqlalchemy import text
 
 from . import talk_rules as TR
 from .admin_mvp3_consults import HIT_IS_TEST, _terms
+from .admin_raw_text import NOTICE as RAW_NOTICE, raw_view
 from .admin_talk_patterns import NOTHING_READ
 from .auth import current_operator
 from .db import engine
@@ -47,6 +48,7 @@ def _row(r, same_n=None) -> dict:
     tags = [t for t in (r["matched_terms"] or []) if isinstance(t, str)]
     return {
         "hit_id": r["hit_id"], "at": iso(r["created_at"]),
+        "question": raw_view(r["raw_text"], r["raw_purge_at"]),
         "visitor": ("u" + r["visitor_key"]) if (r["visitor_key"] or "").isdigit() else None,
         "topics": _terms([t for t in tags if t.startswith(TR.TOPIC_TAG)]),
         "unapplied": [t[len(TR.UNAPPLIED_TAG):] for t in tags if t.startswith(TR.UNAPPLIED_TAG)],
@@ -63,6 +65,7 @@ def _row(r, same_n=None) -> dict:
 
 _SELECT = f"""
     SELECT h.hit_id, h.created_at, h.visitor_key, h.matched_terms, {HIT_IS_TEST} AS is_test,
+           h.raw_text, h.raw_purge_at,
            r.ai_reply, r.shown_reply, r.answer, r.answer_error, r.flags, r.question_key,
            r.status, r.memo, r.reviewed_at
       FROM talk_reply_reviews r JOIN talk_intent_hits h ON h.hit_id = r.hit_id
@@ -129,7 +132,7 @@ def list_reviews(offset: int = 0, status: str | None = None, flagged: bool = Fal
         "summary": {k: int(v or 0) for k, v in s.items()},
         "before_logging": int(before), "unapplied": unapplied, "topics": topics,
         "flag_kinds": [label for label, _ in TR.PROMISE_PATTERNS],
-        "include_test": include_test, "unread": unread,
+        "include_test": include_test, "unread": unread, "raw_notice": RAW_NOTICE,
     }
 
 

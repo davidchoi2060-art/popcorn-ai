@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from .auth import current_operator
+from .admin_raw_text import NOTICE as RAW_NOTICE
 from .db import engine
 from .timeutil import iso
 
@@ -105,7 +106,7 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
             "offset": offset, "limit": LIMIT,
             "counts": {s: int(counts.get(s, 0)) for s in STATUSES},
             "test_excluded": int(excluded), "include_test": include_test,
-            "contact_masked": not full, "can_write": full}
+            "contact_masked": not full, "can_write": full, "raw_notice": RAW_NOTICE}
 
 
 class UpdateBody(BaseModel):

@@ -43,7 +43,7 @@
 .pi-pager button,.pi-drawer button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
 .pi-pager button:disabled{opacity:.45;cursor:default}
 .pi-empty{padding:28px;text-align:center;color:var(--rv-muted)}
-.pi-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100vw);background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.pi-drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,calc(100vw / var(--a2-zoom,1)));background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
 .pi-drawer[hidden]{display:none}
 .pi-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
 .pi-drawer header h2{font-size:16px;margin:0}
@@ -71,6 +71,7 @@
     <div class="pi-kpi"><b id="kDoing">—</b><span>처리 중</span></div>
     <div class="pi-kpi"><b id="kDone">—</b><span>완료</span></div>
   </section>
+  <div id="piRawNotice"></div>
   <p class="pi-note" id="piNote">고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.</p>
   <p class="pi-note" id="piVisitor" aria-live="polite"></p>
   <div class="pi-bar">
@@ -96,6 +97,7 @@
   <header><h2 id="piDTitle">신청 상세</h2><button type="button" id="piClose">닫기</button></header>
   <div class="pi-body" id="piDBody"></div>
 </aside>
+<script src="/shared/admin2/raw-text.js?v=20261011"></script>
 <script>
 (function(){
   var API = '/api/admin/purchase-inquiries';
@@ -119,6 +121,7 @@
       st.limit=d.limit; st.canWrite=d.can_write;
       $('kWait').textContent=d.counts['대기']; $('kDoing').textContent=d.counts['처리 중']; $('kDone').textContent=d.counts['완료'];
       $('piTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 신청 '+d.test_excluded+'건을 뺐습니다.':'');
+      $('piRawNotice').innerHTML=RawText.notice(d.raw_notice);
       $('piNote').textContent='고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.'
         +(d.contact_masked?' 조회 권한에서는 연락처 가운데를 가립니다.':'');
       var vf=$('piVisitor'); vf.textContent='';
