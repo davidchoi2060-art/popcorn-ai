@@ -1898,3 +1898,18 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 고객 화면은 마지막 줄이 `release` 이고 그 판·부품 지문이 지금 구성과 같고 구성 상태가 `approved` 일 때만 공개 중으로 본다. 그 위에 요청마다 부품 판매중·판매가·호환(`api/build_check`)을 다시 보고, 하나라도 어긋나면 고객 화면에서 뺀다. 가격은 늘 지금 `products.sale_price` 합 + 조립비다(`api/custom_pc.py`).
 
 `purchase_inquiries.configuration_id`(TEXT, NULL 허용, FK `pc_configurations`)는 「새로 나온 PC」에서 남긴 구매 상담 신청을 그 구성에 잇는다. 이미 있는 행은 바꾸지 않는다. downgrade 는 공개 기록이나 연결된 신청이 하나라도 있으면 거부한다.
+
+### 35. 보관 기한 지난 개인정보 지우기 기록 `retention_purge_runs` (2026-10-11, 0153)
+
+고객 질문 원문(`talk_intent_hits.raw_text`) · AI 답(`talk_reply_reviews.ai_reply`·`shown_reply`·`answer`) · 구매 상담 연락처(`purchase_inquiries.contact_name`·`contact_phone`·`contact_email`·`message`)를 보관 기한이 지나면 비우는 일일 작업(`api/retention_purge.py`, 매일 04:00 KST)의 실행 기록이다. 행은 지우지 않고 값만 비운다. 운영자 메모는 지우지 않는다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| run_id | BIGSERIAL PK | |
+| moment | VARCHAR(8) | `auto`(정기) · `manual`(`tools/retention_purge.py`) |
+| dry_run | BOOLEAN | 미리보기면 TRUE — `counts` 는 지울 대상 건수 |
+| counts | JSONB | 표별 건수 `{talk_raw, talk_reply, inquiry_contact}` |
+| error | TEXT | 실패 사유(실패한 실행도 한 줄 남긴다) |
+| started_at · finished_at | TIMESTAMPTZ | |
+
+기본은 미리보기다. 실제로 비우는 것은 `RETENTION_PURGE_APPLY=on` 일 때만이다. `purchase_inquiries.contact_purged_at`(TIMESTAMPTZ)은 연락처를 비운 시각이고, 연락처 CHECK(전화 또는 이메일 필수)는 이 칸이 찬 행만 예외로 둔다. downgrade 는 비운 연락처나 실행 기록이 하나라도 있으면 거부한다.
