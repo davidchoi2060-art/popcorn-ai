@@ -90,13 +90,18 @@ def _fit_usage(label: str) -> str | None:
     return fit_usage(label)
 
 
-def basis_work(fit: str) -> str | None:
-    """추천 기준표에서 그 용도 1단계의 작업 설명. 못 읽으면 None(문장을 만들지 않는다)."""
+def basis_work(fit: str, level: str | None = None) -> str | None:
+    """추천 기준표에서 그 용도 1단계(level 을 주면 그 단계)의 작업 설명. 못 읽으면 None(문장을 만들지 않는다)."""
     try:
         with engine.connect() as conn:
-            row = conn.execute(text(
-                "SELECT work FROM product_fit_levels WHERE usage = :u ORDER BY level_rank LIMIT 1"),
-                {"u": fit}).first()
+            if level:
+                row = conn.execute(text(
+                    "SELECT work FROM product_fit_levels WHERE usage = :u AND level = :l LIMIT 1"),
+                    {"u": fit, "l": level}).first()
+            else:
+                row = conn.execute(text(
+                    "SELECT work FROM product_fit_levels WHERE usage = :u ORDER BY level_rank LIMIT 1"),
+                    {"u": fit}).first()
     except Exception:  # noqa: BLE001 - 기준 문장 하나 때문에 상담을 막지 않는다
         log.exception("[talk_defaults] fit level unavailable - basis omitted")
         return None
@@ -107,8 +112,11 @@ def _usage_name(label: str) -> str:
     return label[:-1] if label.endswith("용") else label
 
 
-def answer_first(state, pref: str | None, *, is_game_usage, work_of=None) -> str:
-    """카드를 내는 턴의 답 -- 「무엇을 기준으로 봤나」 한 줄 + 예산 가정 + 끝 안내 한 줄."""
+def answer_first(state, pref: str | None, *, is_game_usage, work_of=None, heavy=None) -> str:
+    """카드를 내는 턴의 답 -- 「무엇을 기준으로 봤나」 한 줄 + 예산 가정 + 끝 안내 한 줄.
+
+    heavy = reco_explore.heavy_levels(고객 문장). 고객이 한 단계 위 작업을 말했으면 카드도 그 단계부터 고르므로
+    (sold_reco._heavy_rank) 기준 줄도 그 단계로 쓰고, 「…하시면 한 단계 위」 끝 안내는 붙이지 않는다."""
     work_of = work_of or basis_work
     usages = list(getattr(state, "usages", None) or [])
     label = next((u for u in usages if not is_game_usage(u)), None)
@@ -116,10 +124,11 @@ def answer_first(state, pref: str | None, *, is_game_usage, work_of=None) -> str
     after = None
     if label is not None:
         fit = _fit_usage(label)
-        work = work_of(fit) if fit else None
+        level = (heavy or {}).get(fit or "")
+        work = (work_of(fit, level) if level else work_of(fit)) if fit else None
         if work:
             lines.append(f"{_usage_name(label)}용은 {work} 기준으로 봤어요.")
-        after = USAGE_AFTER.get(fit or "")
+        after = None if level else USAGE_AFTER.get(fit or "")
     elif usages:
         g = getattr(state, "game", None)
         if g is None or not g.resolution:
