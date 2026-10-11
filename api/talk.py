@@ -795,7 +795,8 @@ def _legacy_constraints(state: "TS.TalkState") -> list:
     return out
 
 
-def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None = None) -> tuple:
+def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None = None,
+                      prev_usages: list | None = None) -> tuple:
     """AI 가 낸 state(dict) -> (바로잡은 dict, 바로잡은 내역[{field, value, reason}]).
 
     `validate_state` **앞**에서 고친다 -- 그래야 게임명을 채웠을 때 확정 등급(catalog)이
@@ -805,6 +806,9 @@ def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None
       · 2026-10-11(R8): 「100만원대」는 그 자릿수 구간 끝까지(이하)로, 「롤 120」의 맨 숫자는
         만원으로 읽는다. 작업 프로그램(프리미어·포토샵…)만 말했는데 AI 가 문장에 없는 게임을
         넣었으면 그 게임과 게임 용도를 뺀다.
+      · 2026-10-11(고객3 F8): 문장에 작업 프로그램 이름(라이트룸·포토샵·프리미어…)이 있으면 그
+        프로그램의 용도를 넣고, 문장에도 이전 턴에도 근거가 없는 다른 비게임 용도는 뺀다 —
+        같은 문장이 턴마다 다른 용도로 읽히지 않게.
     """
     raw = dict(raw) if isinstance(raw, dict) else {}
     fixes: list = []
@@ -859,6 +863,19 @@ def _apply_text_rules(text: str, raw, vocab: "TS.Vocab", prev_budget: int | None
             raw["game"] = g
             fixes.append({"field": "game.names", "value": names,
                           "reason": "문장에서 게임 이름을 찾아 채움: " + ", ".join(found)})
+    implied = TR.usages_from_programs(text, vocab.usages)
+    if implied:
+        ai_usages = [u for u in raw["usages"] if isinstance(u, str)] \
+            if isinstance(raw.get("usages"), list) else []
+        before = set(prev_usages or [])
+        keep = [u for u in ai_usages
+                if u in implied or u in before or TS.is_game_usage(u)
+                or TR.usage_supported_by_text(text, u, vocab.usages)]
+        new = keep + [u for u in implied if u not in keep]
+        if new != ai_usages:
+            fixes.append({"field": "usages", "value": raw.get("usages"),
+                          "reason": "문장의 작업 프로그램 이름으로 용도를 정함: " + ", ".join(implied)})
+            raw["usages"] = new
     return raw, fixes
 
 
@@ -1000,7 +1017,8 @@ def parse_talk(body: ParseBody, request: Request):
     # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
     # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
     raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab,
-                                         prev_budget=prev_state_obj.budget_won if prev_state_obj else None)
+                                         prev_budget=prev_state_obj.budget_won if prev_state_obj else None,
+                                         prev_usages=list(prev_state_obj.usages) if prev_state_obj else None)
     state, dropped = TS.validate_state(raw_state, vocab)
     dropped.extend(fixes)
     # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
