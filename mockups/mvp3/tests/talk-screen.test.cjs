@@ -260,3 +260,14 @@ test('opening details of another card asks before replacing the chosen quote',as
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+test('cards over the budget come with the server reason above them',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:['사무용'],budget_won:500000,budget_bound:'이하'},missing:[],reply:'사무용 50만원으로 볼게요.',pc_related:true}}
+    :url==='/api/grid/recommend'?{data:{ok:true,card_sets:[{kind:'sold',usage:'사무용',empty_reason:'예산 안 상품 없음',empty_note:'이 작업은 595,700원부터 가능합니다.',
+      items:[pc(301,'CODE/MOCK D',595700)]}],needs:[],assumed:[]}}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    await h.say('사무용 50만원');
+    assert.equal(h.text('.tk-cards .tk-group-note'),'이 작업은 595,700원부터 가능합니다.');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
