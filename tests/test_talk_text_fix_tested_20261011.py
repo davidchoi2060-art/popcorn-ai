@@ -147,6 +147,24 @@ class TestedBeforeUse(unittest.TestCase):
         self.assertEqual(r['budget_won'], 900_000)
         self.expect(409, lambda: AF.save_fix(short_id, self.body(status='사용')))
 
+    def test_value_changed_during_test_is_not_a_pass(self):
+        # 시험이 규칙을 읽은 뒤 기록하기 전에 다른 사람이 값을 바꾼 경우(코덱스 검수 #131)
+        fid = AF.add_fix(self.body())['fix_id']
+        real_load = AF.TF.load
+
+        def load_then_change(conn):
+            with self.engine.begin() as c:
+                c.execute(self.text('UPDATE talk_text_fixes SET budget_won = 1200000 WHERE fix_id = :i'), {'i': fid})
+            return real_load(conn)
+
+        with patch.object(AF.TF, 'load', load_then_change):
+            r = AF.try_sentence(AF.TryBody(sentence='백만원 언더로', fix_id=fid))
+        self.assertFalse(r['tested'])
+        self.assertIn('바뀌었습니다', r['note'])
+        self.assertFalse(AF.list_fixes()['items'][0]['tested'])
+        self.expect(409, lambda: AF.save_fix(fid, self.body(status='사용')))
+        self.expect(409, lambda: AF.save_fix(fid, self.body(status='사용', budget_man=120)))
+
     def test_unknown_rule(self):
         self.expect(404, lambda: AF.try_sentence(AF.TryBody(sentence='백만원 언더', fix_id=999)))
         self.expect(404, lambda: AF.save_fix(999, self.body()))

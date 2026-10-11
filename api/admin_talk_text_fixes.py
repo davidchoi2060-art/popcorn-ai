@@ -206,16 +206,22 @@ def try_sentence(body: TryBody):
     if picked is not None:
         out["tested"] = _used(sentence, rules, picked)
         if out["tested"]:
+            # 읽은 값 그대로일 때만 남긴다. 그사이 다른 사람이 값을 바꿨으면 0행 — 통과로 안내하지 않는다
+            # (코덱스 검수 #131).
             with engine.begin() as conn:
-                conn.execute(text(
+                n = conn.execute(text(
                     "UPDATE talk_text_fixes SET tested_sig = :s, tested_at = now(), tested_by = :who"
                     " WHERE fix_id = :id AND phrase_norm = :n AND kind = :k"
                     " AND budget_won IS NOT DISTINCT FROM :b AND budget_bound IS NOT DISTINCT FROM :bb"
                     " AND resolution IS NOT DISTINCT FROM :r"),
                     {"s": sig(picked), "who": me.get("operator_id"), "id": picked["fix_id"],
                      "n": picked["phrase_norm"], "k": picked["kind"], "b": picked["budget_won"],
-                     "bb": picked["budget_bound"], "r": picked["resolution"]})
-            out["note"] = "이 규칙이 문장에 맞았습니다. 이 값으로 «사용»으로 올릴 수 있습니다."
+                     "bb": picked["budget_bound"], "r": picked["resolution"]}).rowcount
+            if n:
+                out["note"] = "이 규칙이 문장에 맞았습니다. 이 값으로 «사용»으로 올릴 수 있습니다."
+            else:
+                out["tested"] = False
+                out["note"] = "시험하는 동안 이 규칙의 값이 바뀌었습니다. 목록을 새로 불러와 다시 시험해 주세요."
         else:
             out["note"] = "이 규칙이 문장에 쓰이지 않았습니다. 표현이 든 문장으로 다시 시험해 주세요."
     return out
