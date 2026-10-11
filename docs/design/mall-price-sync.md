@@ -47,3 +47,24 @@
 
     상품코드  자체상품코드 > 상품번호 > pd_no > 상품코드   (쇼핑몰 pd_no = 우리 product_code)
     가격      일반회원 > 판매가 > 가격                     (일반회원 = 카탈로그 적재가 판매가로 쓰는 열)
+
+## 1겹 ② 자동 갱신 (`api/mall_price_auto.py`)
+
+    매일 06:00 · 13:00 KST   deploy/systemd/popcorn-mall-price.timer -> tools/mall_price_auto.py
+    관리자 「지금 실행」       POST /api/admin/mall-price/auto/run (owner) — 같은 함수, 뒤에서 돈다
+    상태                      GET  /api/admin/mall-price/auto — 마지막 실행 · 마지막 성공 · 설정 유무
+
+어디서 읽나 — 앞의 것이 설정돼 있으면 그것만 쓴다.
+
+| 길 | 조건 | 방식 |
+|---|---|---|
+| 관리자 상품엑셀 | `MALL_ADMIN_ID` · `MALL_ADMIN_PW` · `MALL_EXPORT_URL` 셋 다 있음 | 실행마다 로그인 → 파일 한 번 받기 → 업로드와 같은 해석 |
+| 공개 상품 페이지 | 위가 없음(기본) | 판매중 완제품 PC 를 1.5초 간격으로 하나씩 읽기, 상한 `MALL_PRICE_MAX_READS`(3000) |
+
+설정은 서버 `/etc/popcorn-ai.env` 에만 둔다. 화면과 API 는 «있는지»만 말하고 값은 돌려주지 않는다.
+`MALL_EXPORT_DATA` 는 내려받기가 POST 일 때 보낼 폼 본문이다(필요할 때만).
+
+실패로 끝내는 경우(판매가는 하나도 안 바꾼다): 로그인 거부 · 파일을 못 읽음 · 읽은 가격 0건 ·
+공개 페이지 절반 넘게 실패 · 이미 다른 실행이 도는 중. 사유는 `mall_price_runs.fail_reason` 과 관리자
+화면에 남고, 타이머 실행이면 종료 코드 1 로 OnFailure 알림이 간다. 쿠키를 저장하지 않는 이유와
+A-124 와의 관계는 decision-log **A-143**.
