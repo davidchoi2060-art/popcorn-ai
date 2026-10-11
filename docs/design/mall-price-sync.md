@@ -96,3 +96,13 @@ DB 로 보고, 겹침은 advisory lock 이 막는다. 루프백 DB(CI · 테스�
   받아들인다. 그 밖의 가격 불일치는 전처럼 거부한다(조용한 가격 교체 차단).
 - 이 변경 전에는 결제 순간 확인이 부품용 `product_detail.html` 을 읽어 완제품 PC 는 늘 「확인못함」이었고
   쇼핑몰 링크도 첫 화면으로 갔다. 이제 완제품은 `system_detail.html` 을 읽고 그리로 보낸다.
+- 부품을 바꾼 보관 견적(`product_snapshot.build`, `api/mvp3_build`)은 몰 상품이 «기준 PC» 하나뿐이라
+  쇼핑몰 가격을 기준 PC 판매가(`build.base_price`)와 비교한다. 바뀌면 총액은 «쇼핑몰 가격 + 바꾼 부품 차액»이
+  되고, 인계 기록 `note.build` 에 바꾼 부품을 남긴다.
+
+## 남은 일
+
+- 쇼핑몰 관리자 계정을 서버 `/etc/popcorn-ai.env` 에 넣는다(`MALL_ADMIN_ID` · `MALL_ADMIN_PW` ·
+  `MALL_EXPORT_URL`). 넣기 전까지 자동 갱신은 공개 상품 페이지를 읽는다(동작은 한다, 느리다).
+  넣은 뒤 `tools/mall_price_auto.py --check` 로 로그인·파일 읽기만 먼저 확인한다.
+- 배포 뒤 첫 실행 결과(반영 · 보류 · 실패 건)는 관리자 「쇼핑몰 가격 반영」 화면의 자동 갱신 칸에서 본다.
