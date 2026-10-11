@@ -245,10 +245,19 @@ def _norm(m: str) -> str:
     return re.sub(r"\s+", "", m).lower()
 
 
+# 모델명 대조용 -- talk_filter._RE_PART 와 같되 라이젠은 4자리 모델 번호까지 잡는다. 「라이젠 5」 까지만 보면
+# 고객이 「라이젠 5 7600」을 물었는데 「라이젠 5 9600」 문장이 남는다(2026-10-12 검수 9595 P2-1).
+_RE_MODEL = re.compile(
+    r"(?:RTX|GTX|RX|GT)\s?\d{3,4}\s?(?:Ti|TI|SUPER|XT)?|i[3579][-\s]?\d{4,5}"
+    r"|(?:라이젠|Ryzen)\s?\d(?:\s?\d{4}[A-Z0-9]*)?", re.IGNORECASE)
+_STORE_PRICE = re.compile(r"저희|우리(?!나라)|당사|팝콘|이\s*가게")
+_SERIES_ONLY = re.compile(r"^(라이젠|ryzen)\d$")
+
+
 def _models(sentence: str) -> list[str]:
     """고객 문장에 나온 부품 모델명(「RTX 5060」·「RTX 5060 Ti」) -- 고객이 직접 물은 모델은 설명에 남긴다."""
     out: list[str] = []
-    for m in TF._RE_PART.finditer(sentence or ""):
+    for m in _RE_MODEL.finditer(sentence or ""):
         if m.group(0).strip() not in out:
             out.append(m.group(0).strip())
     return out
@@ -259,7 +268,10 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
     general, build = topic == TOPIC_GENERAL, topic in (None, TOPIC_BUILD)
-    stock = _STOCK_ONLY if general else TF._LEXICON_STOCK
+    # 본체 구성과 구매 절차(배송·설치 등)를 함께 물었으면 절차 설명 문장도 남긴다 -- 대신 가게 약속은 걷는다
+    # (2026-10-12 검수 9da2 P2-1 「배송」 한 단어로 배송 기준 문장이 통째로 걷혔다).
+    mixed = build and bool(_GENERAL.search(sentence or ""))
+    stock = _STOCK_ONLY if general or mixed else TF._LEXICON_STOCK
     asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
     sents = TF.split_sentences((raw or "").replace("**", ""))
@@ -270,16 +282,22 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
         # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
         # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
         # 「RTX 5060급」「i5 정도」처럼 등급 예시로 든 모델명은 남긴다(2026-10-12 -- 설명이 등급을 구체적으로 말하게).
-        foreign_model = any(_norm(m.group(0)) not in asked and not _TIER_AFTER.match(s, m.end())
-                            for m in TF._RE_PART.finditer(s))
-        market_price = build and "시중" in s and not any(p.search(s) for _label, p in PROMISE_PATTERNS)
+        # 고객이 말한 라이젠 모델의 시리즈(「라이젠 5 7600」을 물었을 때 「라이젠 5」)도 고객이 말한 것으로 본다.
+        foreign_model = any(_norm(m.group(0)) not in asked
+                            and not (_SERIES_ONLY.match(_norm(m.group(0)))
+                                     and any(a.startswith(_norm(m.group(0))) for a in asked))
+                            and not _TIER_AFTER.match(s, m.end())
+                            for m in _RE_MODEL.finditer(s))
+        # 「시중」 가격 문장은 남기되 같은 문장에 가게 가격(「저희 가격은 140만원」)이 섞이면 걷는다(2026-10-12 검수 9595 P2-3).
+        market_price = (build and "시중" in s and not _STORE_PRICE.search(s)
+                        and not any(p.search(s) for _label, p in PROMISE_PATTERNS))
         if (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s)) and not market_price:
             dropped.append({"before": s, "reason": "price"})
         elif foreign_model:
             dropped.append({"before": s, "reason": "part model"})
         elif any(w in s for w in stock):
             dropped.append({"before": s, "reason": "stock"})
-        elif general and any(p.search(s) for _label, p in PROMISE_PATTERNS):
+        elif (general or mixed) and any(p.search(s) for _label, p in PROMISE_PATTERNS):
             dropped.append({"before": s, "reason": "promise"})
         elif _QUESTION.search(s):
             dropped.append({"before": s, "reason": "question"})
