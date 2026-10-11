@@ -136,9 +136,19 @@ class SpectrumTest(unittest.TestCase):
             cs = S.card_sets(state, ['게임'], [], [], None, None)[0]
         self.assertEqual(codes(cs)[-1], (4, 'premium'))
 
-    def test_reference_only_gets_no_higher_card(self):
+    def test_reference_only_gets_no_higher_card_beyond_the_limit(self):
+        # 예산을 넘는 최저가(130만)보다 높은 사양이 예산의 1.3배(117만) 안에 없으면 한 장 그대로.
         cs = sets(TalkState(**GAME, budget_won=900000, budget_bound='이하'))[0]
         self.assertEqual(codes(cs), [(2, 'reference')])
+
+    def test_over_budget_cheapest_still_gets_a_higher_card(self):
+        # 2026-10-11 개발 서버 「배그와 롤 150만원」: 예산 초과 한 장만 나와 고를 폭이 없었다.
+        cs = sets(TalkState(**GAME, budget_won=1250000, budget_bound='이하'))[0]
+        self.assertEqual(codes(cs), [(2, 'reference'), (3, 'premium')])
+        self.assertTrue(cs['items'][-1]['over_budget'])
+        self.assertLessEqual(cs['items'][-1]['price'], 1250000 * S.PREMIUM_OVER_X)
+        self.assertEqual(cs['explore']['anchor_code'], 2)
+        self.assertTrue(cs['explore']['has_better'])
 
 
 class ConditionTest(unittest.TestCase):
