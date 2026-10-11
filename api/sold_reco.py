@@ -230,14 +230,19 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
 
 def premium_item(res, usage, min_rank, budget_won, bound, levels, products,
                  preferred=frozenset()) -> dict | None:
-    """추천 구성 다음 한 장 — 「더 높은 사양」. 추천 구성이 없거나(예산 안 상품 없음) 더 높은 것이 없으면 None.
+    """추천 구성 다음 한 장 — 「더 높은 사양」. 더 높은 것이 없으면 None.
+
+    예산 안 상품이 없어 「예산을 넘는 최저가」 한 장만 있으면 그 카드를 기준으로 삼는다(2026-10-11
+    개발 서버 「배그와 롤 150만원」: 한 장만 보여 고를 폭이 없었다). 이때도 예산의 PREMIUM_OVER_X 배 안만.
 
     예산(이하) 안에 추천 구성보다 분명히 높은 사양이 있으면 그중 가장 높은 것, 없으면 예산의
     PREMIUM_OVER_X 배 안에서 가장 싼 높은 사양(over_budget 으로 표시). 예산이 없으면 가장 싼 높은 사양.
     어느 경우든 공개 승인 구성(사진·소개 글이 있는 것, preferred)을 먼저 고른다 — pick 과 같은 순서 힌트.
     """
     pub = lambda p: p["code"] in preferred  # noqa: E731
-    rec = next((i for i in res.get("items") or [] if i["role"] == "recommended"), None)
+    items = res.get("items") or []
+    rec = next((i for i in items if i["role"] == "recommended"), None) \
+        or next((i for i in items if i["role"] == "reference"), None)
     if rec is None or rec["product_code"] not in products:
         return None
     base = products[rec["product_code"]]
@@ -316,7 +321,7 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
             res["items"].append(extra)
     # 다음 선택지 — 지금 화면의 추천 구성(없으면 마지막 카드)을 기준으로 더 싼 것·더 높은 것이 있나.
     items = res["items"]
-    base_item = next((i for i in items if i["role"] == "recommended"), items[-1] if items else None)
+    base_item = next((i for i in items if i["role"] in ("recommended", "reference")), items[-1] if items else None)
     base = products.get(base_item["product_code"]) if base_item else None
     has_cheaper = has_better = False
     if base is not None:
