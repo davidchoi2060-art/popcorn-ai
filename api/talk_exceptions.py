@@ -357,7 +357,10 @@ def _drop_promises(out: str) -> str:
     kept = [x for x in sents if not any(p.search(x) for _label, p in PROMISE_PATTERNS)]
     if len(kept) == len(sents):
         return out
-    return " ".join([NOTE_COMPETITOR] + [x for x in kept if NOTE_COMPETITOR not in x]).strip()
+    kept = [x for x in kept if NOTE_COMPETITOR not in x]
+    if kept:      # 걷은 문장을 가리키던 「그전에」는 따라 뺀다
+        kept[0] = re.sub(r"^\s*그\s*전에\s*,?\s*", "", kept[0])
+    return " ".join([NOTE_COMPETITOR] + kept).strip()
 
 
 def _add(out: str, note: str) -> str:

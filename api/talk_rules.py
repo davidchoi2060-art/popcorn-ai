@@ -328,7 +328,8 @@ def mentions_laptop(text: str) -> bool:
 # 남긴다(코덱스 #177~#181 검수 P2-5: 「노트북은 판매」 접두만 보고 정책 설명까지 지웠다).
 _LAPTOP_SAME = re.compile(r"(노트북|랩탑)\S*\s*(은|는)?\s*(판매|취급)\s*(하지\s*않|안\s*(해|하)|되지\s*않|안\s*돼)|"
                           r"(노트북|랩탑)\S*\s*(은|는)?\s*(팔지\s*않|안\s*팔)|"
-                          r"(조립\s*pc|데스크\s*[탑톱])\S*\s*만\s*(판매|취급|다루)", re.I)
+                          r"(조립\s*pc|데스크\s*[탑톱])\S*\s*만\s*(판매|취급|다루)|"
+                          r"(조립\s*pc|데스크\s*[탑톱])\S*\s*(을|를)?\s*전문", re.I)
 _SENT_END = re.compile(r"(?<=[.!?。])\s+")
 
 
@@ -398,6 +399,23 @@ _RAM = re.compile(r"(?:램|메모리|ram)\s*(\d{1,3})\s*(?:gb|기가|g)(?![a-z])
 _STORAGE = re.compile(r"(\d{1,2})\s*(?:tb|테라)|(?:ssd|저장\s*공간|하드)\s*(\d{3,4})\s*(?:gb|기가)", re.I)
 _GPU = re.compile(r"\b(rtx|gtx|rx)\s*-?\s*(\d{3,4})\s*(ti|super|xt)?(?![0-9a-z])|지포스|라데온", re.I)
 _CPU = re.compile(r"\b(i[3579])\s*-?\s*\d{0,5}|\b라이젠\s*\d|\bryzen\s*\d", re.I)
+# 「지금 쓰는 컴퓨터가 i5-8400에 GTX 1060인데 업그레이드할까요?」의 부품은 «지금 가진 PC» 이야기다 -- 원하는
+# 조건으로 읽으면 「GTX 1060 조건으로 판매 중인 PC를 골라 볼게요」가 된다(2026-10-12 개발 서버). 그 마디만 뺀다
+# (「…1060인데 4070 들어간 걸로」의 4070 은 남는다).
+_CURRENT_PC = re.compile(r"(지금|현재|기존|원래)\s*(제가\s*)?(쓰는|쓰고\s*있는|사용\s*중인|사용하는|사용하고\s*있는|가진|가지고\s*있는)?\s*"
+                         r"(내\s*|제\s*)?(컴퓨터|컴|pc|본체|데스크\s*[탑톱])\S*|"
+                         r"(쓰는|쓰고\s*있는|사용\s*중인|가진|가지고\s*있는)\s*(컴퓨터|컴|pc|본체)\S*|"
+                         r"(내|제)\s*(컴퓨터|컴|pc|본체)\s*(는|가|은|이)", re.I)
+_CLAUSE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|[.,?!\n])")
+
+
+def drop_current_pc(text: str) -> str:
+    """지금 가진 PC 를 설명하는 마디를 뺀 문장."""
+    m = _CURRENT_PC.search(text or "")
+    if not m:
+        return text or ""
+    end = _CLAUSE_END.search(text, m.end())
+    return text[:m.start()] + (text[end.end():] if end else "")
 PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
 # 2026-10-11 품질관리 M6: 「4K 편집」「최고사양」은 추천이 거르지 않는데 AI 가 「맞춰 드릴게요」라
 # 답했다. 4K 는 게임 칸(state.game.resolution)에서만 추천에 쓰인다 — 비게임 tier_key 힌트는
@@ -436,7 +454,7 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     state.prefs 는 누적이라, 이전 턴에 이미 있던 선호는 다시 말하지 않는다(매 턴 같은
     안내가 되풀이되면 AI 답이 영영 안 보인다).
     """
-    t = text or ""
+    t = drop_current_pc(text or "")
     out = []
     m = _GPU.search(t)
     if m:
@@ -524,7 +542,9 @@ def honest_reply(notes: list[str], has_usage: bool, missing: list[str], has_budg
     """고정 안내 + (카드를 못 내는 턴이면) 다음에 알려 줄 것 한 줄. 이미 말한 예산은 다시 묻지 않는다
     (2026-10-12 개발 서버 「화이트 감성으로 100만원 PC」 -> 「용도와 예산을 알려 주시면」)."""
     out = " ".join(notes)
-    if missing:
+    # 안내 문장이 이미 무엇을 알려 달라고 했으면 한 번 더 묻지 않는다(2026-10-12 개발 서버 「모니터도 같이
+    # 사야 하는데」 -> 「본체 예산을 알려 주시면…」 뒤에 「용도와 예산을 알려 주시면…」).
+    if missing and "알려 주시면" not in out:
         if not has_usage:
             out += (" 어떤 용도로 쓰실지 알려 주시면 맞는 PC를 찾아 드릴게요." if has_budget
                     else " 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요.")
@@ -544,7 +564,8 @@ PROMISE_PATTERNS: tuple[tuple[str, re.Pattern], ...] = (
     ("확인했다는 말", re.compile(r"확인(했|하였)습니다|확인\s*됐|접수(했|됐|되었)")),
     ("가능하다는 단정", re.compile(r"(포함|설치|배송|할인|발행|결제)[^.?!]{0,8}가능(합니다|해요)")),
     # 2026-10-12 개발 서버 「다나와가 더 싸던데요」 -> 「저희도 맞춰드릴 수 있습니다」(가격 맞춤 약속)
-    ("가격 맞춤 약속", re.compile(r"(저희|우리)도\s*(가격을?\s*)?맞춰|더\s*(싸게|저렴하게)\s*(해|드|맞춰)|"
+    # 「저희도 비슷하게 맞춰볼 수 있어요」처럼 사이에 낱말이 끼어도 같다(같은 날 재점검).
+    ("가격 맞춤 약속", re.compile(r"(저희|우리)도\s*(?:[^\s.?!]+\s+){0,2}맞(춰|출|추)|더\s*(싸게|저렴하게)\s*(해|드|맞춰)|"
                                 r"최저가\s*(보장|로\s*맞춰|에\s*맞춰)")),
     ("담당자·다른 단계로 미룸", re.compile(r"담당\s*(팀|자|부서)|다른\s*(부서|시스템)|(구매|주문|결제|상품\s*확정)\s*(단계|후)에?서?\s*(안내|확인)")),
 )
