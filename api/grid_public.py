@@ -755,7 +755,8 @@ def _choices(card_sets: list[dict], explore: dict | None, talk_notes: list[str],
     if first is None:
         return [], None
     if budget_won and first.get("empty_reason") == "예산 안 상품 없음":
-        say(EXPLORE.over_budget_sentence(budget_won))
+        ref = next((i for i in first.get("items") or [] if i.get("role") == "reference"), None)
+        say(EXPLORE.over_budget_sentence(budget_won, ref.get("price") if ref else None))
     e = first.get("explore") or {}
     enabled = {"cheaper": bool(e.get("has_cheaper")), "better": bool(e.get("has_better")), "change": True}
     choices = [{"id": k, "label": label, "enabled": enabled[k]} for k, label in CHOICE_LABELS]
