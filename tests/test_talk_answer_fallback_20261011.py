@@ -101,3 +101,32 @@ class AdminFlag(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class DataExcuseTrim(unittest.TestCase):
+    """2026-10-11 개발 서버: 인기 게임 답 끝에 「제공된 자료에는 … 없어」가 붙었다 -- 걷는다."""
+
+    def test_trailing_excuse_removed(self):
+        from types import SimpleNamespace as NS
+        body = ("요즘 인기 게임이에요.\n- 발로란트: 라이엇 게임즈의 슈팅 게임이에요.\n"
+                "- 서든어택: 넥슨의 슈팅 게임이에요. 제공된 자료에는 각 게임의 세부 재미 요소가 없어,"
+                " 확인된 장르와 인기도 중심으로 소개해 드렸습니다.")
+        out = TA.tidy_game_list(body, [NS(name="발로란트"), NS(name="서든어택")])
+        self.assertNotIn("자료", out)
+        self.assertTrue(out.endswith("넥슨의 슈팅 게임이에요."))
+
+    def test_normal_text_kept(self):
+        from types import SimpleNamespace as NS
+        body = "- 발로란트: 자료 화면이 깔끔한 슈팅 게임이에요.\n- 롤: 팀 전략 게임이에요."
+        self.assertEqual(TA.tidy_game_list(body, [NS(name="발로란트"), NS(name="롤")]), body)
+
+
+class WidePromptGeneralAI(unittest.TestCase):
+    """사장님 기준(2026-10-11): 인기 게임 답은 일반 AI 수준 -- 노는 방식·재미는 일반 지식, 순위는 한 번만."""
+
+    def test_wide_prompt_allows_gameplay_knowledge_and_single_rank_mention(self):
+        ev = TA.Evidence()
+        p = TA.build_answer_prompt("요즘 인기 게임 뭐 있어?", ev, TA.TS.NARROWING_WIDE)
+        self.assertIn("일반 지식으로 말해도 된다", p)
+        self.assertIn("도입에서 한 번만", p)
+        self.assertIn("[근거] 에 적힌 것만", p)
