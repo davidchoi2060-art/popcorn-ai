@@ -132,6 +132,14 @@ test('quick replies follow what the consultation asks: usage question gets usage
 test('the landing chat box hands its text to the talk screen through tab storage, not the address',()=>{
   const h=harness({hash:''});const d=h.w.document;
   const form=d.querySelector('#gateway-chat');assert.ok(form);
+  // 사장님 확정 시안 01(큰카드 입구 v3): 안내 문구, 보내기 단추 안 화살표, 카드 아래 상담 링크와 안내 한 줄.
+  assert.equal(d.querySelector('.gateway-intro p').textContent,'PC로 할 일이나 궁금한 점을 편하게 말씀해 주세요.');
+  assert.equal(d.querySelector('.gateway-intro h1 span'),null,'heading is one colour');
+  assert.ok(form.querySelector('.gateway-button img[src$="paper-plane-tilt-fill.svg"]'));
+  const talk=d.querySelector('.gateway-more [data-action="gateway-talk"]');assert.ok(talk);
+  assert.match(talk.textContent,/아직 정하지 못했나요\? 편하게 상담하기/);assert.match(talk.textContent,/어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요\./);
+  assert.ok(talk.querySelector('img[src$="chat-circle.svg"]'));assert.ok(d.querySelector('.gateway-more [data-action="gateway-use"]'));
+  assert.deepEqual([...d.querySelectorAll('[data-action="gateway-start"] .entry-icons')].map(e=>[...e.querySelectorAll('img')].map(i=>i.getAttribute('src').split('/').pop())),[['monitor.svg'],['gear.svg'],['cpu.svg','memory.svg']]);
   form.dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
   assert.equal(d.querySelector('#gateway-chat-status').hidden,false);assert.equal(h.w.sessionStorage.getItem('popcorn-mvp3-first-message-v1'),null);
   const box=d.querySelector('#gateway-text');box.value='  지금 쓰는 PC가 느려요  ';box.dispatchEvent(new h.w.Event('input',{bubbles:true}));

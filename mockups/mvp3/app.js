@@ -4,9 +4,10 @@ const DIRECT_ACTION='gateway-talk';
 // 어느 갈래든 같은 대화 화면으로 들어가고, 고른 갈래의 첫 문장 초안만 입력창에 넣어 둔다(보내지 않는다).
 // 키는 talk.js STARTERS 와 같다. 예전 두 갈래(용도부터 / 바로 상담)로 되돌리려면 GATEWAY_PATHS 를 null 로 둔다.
 const GATEWAY_PATHS=[
-  ['computer-tower','새 PC 고르기','어떤 일에 쓸지부터 함께 정리해요.','새 PC 상담 시작','new_pc'],
-  ['wrench','쓰던 PC 업그레이드','불편한 점과 바꾸고 싶은 부품을 말씀해 주세요.','업그레이드 상담 시작','upgrade'],
-  ['cpu','부품·구성 알아보기','부품의 차이와 내게 필요한 구성을 물어보세요.','부품 상담 시작','parts']];
+  // 아이콘은 사장님 확정 시안 01(큰카드 입구 v3): 모니터 / 톱니 / CPU+메모리. 둘 이상이면 나란히 그린다.
+  [['monitor'],'새 PC 고르기','어떤 일에 쓸지부터 함께 정리해요.','새 PC 상담 시작','new_pc'],
+  [['gear'],'쓰던 PC 업그레이드','불편한 점과 바꾸고 싶은 부품을 말씀해 주세요.','업그레이드 상담 시작','upgrade'],
+  [['cpu','memory'],'부품·구성 알아보기','부품의 차이와 내게 필요한 구성을 물어보세요.','부품 상담 시작','parts']];
 // 처음 화면 채팅창에 쓴 글(사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」). 글은 주소에
 // 싣지 않고(접속 기록에 남는다) 이 탭 보관함에 잠깐 두고 대화 화면으로 간다. 대화 화면이 꺼내 바로 보내고,
 // 서버가 글 내용으로 세 갈래 중 하나를 고른다(api/talk_entry). 키는 talk.js FIRST_KEY 와 같다.
@@ -57,12 +58,13 @@ function focusSurface(){
 }
 function renderGateway(){
   const icon=name=>uiIcon(name),arrow=icon('arrow-right');
-  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어떤 PC</span>가 필요하세요?</h1><p>하려는 일을 적거나,<br class="mobile-break"> 아래에서 골라 주세요.</p></div>'+
-    '<form id="gateway-chat" class="gateway-chat"><label class="sr-only" for="gateway-text">PC로 할 일이나 궁금한 점</label><textarea id="gateway-text" rows="2" maxlength="2000" placeholder="PC로 할 일이나 궁금한 점을 적어주세요.">'+esc(gatewayText)+'</textarea><button type="submit" class="gateway-button">보내기</button></form><p id="gateway-chat-status" class="gateway-chat-status" role="status" aria-live="polite" hidden></p>'+
+  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen is-v3"><div class="gateway-intro"><h1 tabindex="-1">어떤 PC가 필요하세요?</h1><p>PC로 할 일이나 궁금한 점을 편하게 말씀해 주세요.</p></div>'+
+    '<form id="gateway-chat" class="gateway-chat"><label class="sr-only" for="gateway-text">PC로 할 일이나 궁금한 점</label><textarea id="gateway-text" rows="3" maxlength="2000" placeholder="PC로 할 일이나 궁금한 점을 적어주세요.">'+esc(gatewayText)+'</textarea><button type="submit" class="gateway-button">보내기 '+uiIcon('paper-plane-tilt-fill')+'</button></form><p id="gateway-chat-status" class="gateway-chat-status" role="status" aria-live="polite" hidden></p>'+
     '<div class="gateway-choices is-three">'+
-    GATEWAY_PATHS.map(([image,title,text,go,key])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><span class="entry-action">'+go+' '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
-    '</div><p class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</p><div class="gateway-more">'+button('아직 정하지 못했나요? 편하게 상담하기 '+arrow,DIRECT_ACTION,'continue-draft')+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
-    (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></section>';
+    GATEWAY_PATHS.map(([images,title,text,go,key])=>button('<span class="entry-icons">'+images.map(image=>uiIcon(image,'entry-icon')).join('')+'</span><span class="entry-copy"><h2>'+title+'</h2><p>'+text+'</p></span><span class="entry-action"><span class="entry-action-label">'+go+'</span> '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
+    '</div><div class="gateway-more">'+button(uiIcon('chat-circle','talk-icon')+'<span class="talk-copy"><strong>아직 정하지 못했나요? 편하게 상담하기 '+arrow+'</strong><small class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</small></span>',DIRECT_ACTION,'gateway-talk-link')+
+    '<div class="gateway-more-links">'+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
+    (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></div></section>';
   else if(ui.surface==='gateway')gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
     [['game-controller','용도부터 시작하기','게임, 작업, 일상 중 필요한 용도부터 골라요.','예산은 아직 몰라도 괜찮아요.','gateway-use'],['chat-circle','바로 상담하기','원하는 사양이나 조건을 자유롭게 이야기해 주세요.','생각해 둔 조건부터 말해 주세요.',DIRECT_ACTION]].map(([image,title,text,small,action])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><small>'+small+'</small><span class="entry-action">'+title+' '+arrow+'</span>',action,'entry-card')).join('')+'</div><p class="change-note">선택한 방식은 언제든 바꿀 수 있어요.</p>'+(draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</section>';
   else gateway.innerHTML=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+

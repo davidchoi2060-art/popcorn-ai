@@ -28,7 +28,8 @@ class StarterKeys(unittest.TestCase):
     def test_landing_paths_use_the_same_keys(self):
         app = (ROOT / "mockups/mvp3/app.js").read_text(encoding="utf-8")
         block = app[app.index("const GATEWAY_PATHS=["):app.index("]];", app.index("const GATEWAY_PATHS=[")) + 3]
-        self.assertEqual(set(re.findall(r"'([a-z_]+)'\]", block)), set(talk.ENTRY_KEYS))
+        # 줄 끝 키만 센다 -- 줄 앞 아이콘 목록(['cpu','memory'])도 같은 꼴로 끝나므로 뒤가 줄바꿈·끝인 것만.
+        self.assertEqual(set(re.findall(r"'([a-z_]+)'\](?=\]|,\s*\n)", block)), set(talk.ENTRY_KEYS))
 
     def test_starters_do_not_lead_with_games(self):
         # 사장님 2026-10-11 「게임.. 뭐 이런건 빼고」 -- 시작 단추가 게임 탐색을 권하지 않는다.
