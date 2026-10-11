@@ -22,9 +22,14 @@ class Routing(unittest.TestCase):
                 self.assertEqual(PA.wants_advice(s, vocab()), want)
 
     def test_not_advice(self):
-        for s in ("개발이요", "오늘 날씨 어때", "배송은 언제 와요"):
+        for s in ("개발이요", "오늘 날씨 어때"):
             with self.subTest(s=s):
                 self.assertIsNone(PA.wants_advice(s, vocab()))
+
+    def test_delivery_question_gets_the_general_answer(self):
+        # 2026-10-11 일반 AI 비교(R12·R13): 배송·환불은 「확인이 어렵다」만 하지 않고 일반 기준을 먼저 답한다.
+        self.assertEqual(PA.topic_of("배송은 언제 와요", vocab()), PA.TOPIC_GENERAL)
+        self.assertEqual(PA.wants_advice("배송은 언제 와요", vocab()), [])
 
     def test_game_talk_stays_on_game_path(self):
         seen = []
