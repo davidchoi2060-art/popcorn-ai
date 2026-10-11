@@ -1351,10 +1351,17 @@ def parse_talk(body: ParseBody, request: Request):
     # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
     explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
                  and getattr(ans, "topic", None) in ("part", "upgrade"))
+    # 모델명을 말한 질문(「RTX 5070 들어간 PC」)은 일반 용도를 가정하면 카드가 어긋나므로 기존대로 용도를 묻는다.
+    build_explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+                       and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not PA.TF._RE_PART.search(text)
+                       # 아무 조건도 없는 「PC 추천해줘」는 용도를 한 번 묻는다(코덱스 PR157 검수) -- 예산·선호를 말했을 때만.
+                       and bool(state.budget_won or getattr(state, "prefs", None) or cond_notes))
     if plain_pc and explained and missing == [TS.MISSING_USAGES]:
         reply = " ".join(cond_notes)
-    elif plain_pc and asked_before and missing == [TS.MISSING_USAGES]:
+    elif plain_pc and (asked_before or build_explained) and missing == [TS.MISSING_USAGES]:
         # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
+        # 구성 설명을 먼저 한 턴도 같다(2026-10-12 일반 AI 비교 R10·R11: 「조용한 PC」·「화이트 100만원대」에 설명 뒤
+        # 용도만 되묻고 카드가 없었다 -- 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
         label = TD.default_usage_label(vocab)
         if label:
             state = state.model_copy(update={"usages": [label]})
