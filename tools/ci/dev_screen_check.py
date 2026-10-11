@@ -178,6 +178,10 @@ def main():
     rec, s2, t2 = post('/api/grid/recommend', {'state': state})
     found = list(cards(rec))
     print(f'- /api/grid/recommend: HTTP {s2}, {t2:.1f}s, 카드 {len(found)}개')
+    for g in (rec.get('card_sets') or []) if isinstance(rec, dict) else []:
+        if isinstance(g, dict):
+            print(f"- 묶음 {g.get('usage')!r}: empty_reason={g.get('empty_reason')!r} empty_note={g.get('empty_note')!r}"
+                  f" over_budget={[i.get('over_budget') for i in (g.get('items') or []) if isinstance(i, dict)]}")
     print()
     print('| 상품 | 이름 | 가격 | 대표 사진 | 공개 구성 | 부품 사진 url |')
     print('|---|---|---|---|---|---|')
