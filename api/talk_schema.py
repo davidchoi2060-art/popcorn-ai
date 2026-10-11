@@ -140,6 +140,9 @@ class ChatFlow(BaseModel):
     pc_declined: bool = False
     # 앞 턴이 카드를 막고 되물었나(용도·게임 등급). 되묻기는 연속 두 번 하지 않는다(api/talk_defaults).
     asked: bool = False
+    # 상담 갈래(api/talk_entry) -- 정한 갈래와 「한 번 되물었나」. 갈래는 첫 응대만 바꾼다.
+    entry: str | None = None
+    entry_asked: bool = False
 
 
 def flow_flags(raw) -> tuple[bool, bool]:

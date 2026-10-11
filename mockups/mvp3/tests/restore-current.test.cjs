@@ -146,3 +146,45 @@ test('the first screen keeps its existing 409 path (fresh recommendation)',async
   const f=make({prepareSave:async()=>BIND,saveQuote:async()=>{throw Object.assign(new Error('x'),{status:409});}},storage());f.reset();
   await f.submit('150만원 게임용');f.select(0);await f.save();assert.equal(f.state.retry.kind,'recommend');
 });
+// 코덱스 #145 검수 보완(2026-10-11): 보관 견적을 열어도 이미 권했거나 거절한 사실은 이어진다.
+test('opening a saved quote keeps the offer and refusal flags but restarts the small-talk count',()=>{
+  const f=keep({},storage());f.reset();
+  const q={id:QID,product,state:talk,saved_at:'2026-10-11T09:00:00+00:00'};
+  f.state.quotes=[q];f.state.chatFlow={smalltalk_turns:2,pc_offered:true,pc_declined:true};f.load(QID);
+  assert.deepEqual(f.state.chatFlow,{pc_offered:true,pc_declined:true});
+  f.state.chatFlow={smalltalk_turns:2};f.load(QID);assert.equal(f.state.chatFlow,null);
+});
+// 코덱스 PR147 검수 보완(2026-10-11): 가격 재확인에서 부품 재계산이 실패하면 고른 구성을 바꾸지 않는다.
+test('a failed parts re-calc during the price re-check keeps the chosen build and the lock',async()=>{
+  const ss=storage();let mode='throw';const saves=[];
+  const f=keep({buildQuote:async()=>{if(mode==='throw')throw Object.assign(new Error('잠시 후'),{status:503});
+      if(mode==='partial')return {ok:true,base_code:101,base_price:1430000,total:1430000,changes:[]};
+      return {ok:true,base_code:101,base_price:1430000,total:1490000,changes:[change]};},
+    saveQuote:async p=>{saves.push(p);throw new Error('no');}},ss);f.reset();
+  await f.submit('150만원 게임용');f.select(0);
+  const chosen={...f.state.selected,price:1480000,build:{base_price:1430000,changes:[change],warnings:[]}};
+  f.state.selected=JSON.parse(JSON.stringify(chosen));f.state.needsRefresh=true;
+  for(const m of ['throw','partial']){
+    mode=m;await f.reprice();
+    assert.deepEqual(f.state.selected,chosen,m+': chosen build untouched');
+    assert.equal(f.state.needsRefresh,true,m+': still locked');assert.equal(f.state.retry.kind,'reprice');
+    assert.match(f.state.error.message,/고른 구성을 그대로 두었어요/);
+    await f.save();assert.equal(saves.length,0,m+': no save while unresolved');
+  }
+  mode='ok';await f.retry();
+  assert.equal(f.state.needsRefresh,false);assert.equal(f.state.selected.price,1490000);
+  assert.deepEqual(f.state.selected.build.changes,[change]);
+});
+// 코덱스 PR147 검수 보완(2026-10-11): 최신 조건 조회가 실패해도 고를 때 조건으로 고른 견적은 복원한다.
+test('a failed latest-condition lookup still restores the quote from its own conditions',async()=>{
+  const ss=storage();seed(ss,{product_code:101,changes:[],selection_state:talk});
+  const asked=[];
+  const f=keep({recommend:async s=>{asked.push(s.budget_won);if(s.budget_won===1000000)throw Object.assign(new Error('잠시 후'),{status:503});return reco;}},ss);
+  f.reset({restore:true});f.state.talk=talk100;
+  await f.resume();
+  assert.deepEqual(asked,[1000000,1500000]);
+  assert.equal(f.state.selected.product_code,101);assert.deepEqual(f.state.selectionState,talk);assert.deepEqual(f.state.talk,talk100);
+  assert.equal(f.state.restoredCurrent,null);
+  assert.equal(f.state.retry.kind,'recommend','the latest-condition failure is reported on its own');
+  assert.match(f.state.messages.at(-1).text,/다시 불러왔어요/);
+});

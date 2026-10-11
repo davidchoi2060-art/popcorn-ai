@@ -139,7 +139,7 @@
       state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
-    async function submit(raw,{repeat=false}={}){
+    async function submit(raw,{repeat=false,entry=null}={}){
       const text=String(raw||'').trim();
       if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),previousTalk=state.talk,op=begin('talk');
@@ -147,7 +147,9 @@
       // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
       let prior=null;
       try{
-        const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
+        // entry: 대화 화면 시작 단추로 시작한 문장이면 그 단추 키(서버가 로그로만 센다).
+        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous};if(entry)payload.entry=entry;
+        const response=await api.parse(payload,{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
         // 잡담·범위 밖 질문이 조건을 바꾸지 않았으면 보던 견적을 지우지 않는다(코덱스 1816 「앞서 말한 조건과 보던 견적을 잃지 않기」).
@@ -203,17 +205,22 @@
       return p&&M.copy(p);
     }
     // 바꿨던 부품을 서버 계산으로 다시 적용한다. 못 하면 기본 구성으로 두고 그 사실을 note 로 돌려준다.
-    async function reapply(op,p,basis,changes){
+    // strict(가격 재확인)면 기본·일부 적용 구성으로 바꾸지 않고 던진다 -- 고객이 고른 부품 구성은 그대로 두고
+    // 다시 시도하게 한다. 다른 구성은 고객이 따로 고른다(코덱스 PR147 검수 1).
+    async function reapply(op,p,basis,changes,{strict=false}={}){
       if(!changes.length)return {product:p,note:''};
-      try{
-        const q=M.buildQuote(await api.buildQuote(M.copy(basis),p.product_code,M.copy(changes),{signal:op.signal}),p.product_code);
+      const keep=()=>Object.assign(new Error('바꿨던 부품을 지금 금액으로 다시 계산하지 못해 고른 구성을 그대로 두었어요. 잠시 뒤 다시 확인하거나, 부품 구성에서 다른 부품으로 바꿔 주세요.'),{code:'build_unavailable'});
+      let q;
+      try{q=M.buildQuote(await api.buildQuote(M.copy(basis),p.product_code,M.copy(changes),{signal:op.signal}),p.product_code);}
+      catch(error){
         if(!current(op))return null;
-        return {product:{...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null},
-          note:q.changes.length<changes.length?' 바꿨던 부품 중 일부는 지금 다시 적용할 수 없어 기본 구성으로 두었어요.':' 바꿨던 부품도 다시 적용했어요.'};
-      }catch{
-        if(!current(op))return null;
+        if(strict)throw keep();
         return {product:p,note:' 바꿨던 부품은 다시 적용하지 못해 기본 구성으로 보여 드려요. 부품 구성에서 다시 바꿀 수 있어요.'};
       }
+      if(!current(op))return null;
+      if(strict&&q.changes.length<changes.length)throw keep();
+      return {product:{...p,price:q.total,build:q.changes.length?{base_price:q.base_price,changes:q.changes,warnings:q.warnings}:null},
+        note:q.changes.length<changes.length?' 바꿨던 부품 중 일부는 지금 다시 적용할 수 없어 기본 구성으로 두었어요.':' 바꿨던 부품도 다시 적용했어요.'};
     }
     // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 고를 때 조건으로 서버에 다시 묻고,
     // 같은 상품 번호가 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
@@ -222,16 +229,20 @@
       const want=state.restoredCurrent;
       if(state.phase||!want||!state.talk)return;
       const basis=M.object(want.selection_state)?want.selection_state:state.talk,op=begin('recommend');
+      // 최신 조건 추천이 실패해도 고를 때 조건으로 고른 견적은 따로 복원한다(코덱스 PR147 검수 2).
+      // 최신 조건 실패는 복원 뒤 「새 추천을 불러오지 못했어요」로 따로 알린다.
+      let latest=null;
       try{
-        await recommendFor(op);
+        try{await recommendFor(op);}catch(error){if(!current(op))return;if(error?.name==='AbortError')throw error;latest=error;}
         if(!current(op))return;
-        const p=await findProduct(op,want.product_code,basis);
+        const p=await findProduct(op,want.product_code,basis,{fresh:!!latest});
         if(p===undefined||!current(op))return;
         if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);
         if(!r||!current(op))return;
         state.selected=r.product;state.selectionState=M.copy(basis);state.selectedContext=null;state.screen='detail';
         state.restoredCurrent=null;message('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
+        if(latest)fail(latest,{kind:'recommend'});
       }catch(error){if(current(op))fail(error,{kind:'resume'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
@@ -245,7 +256,7 @@
         const found=await findProduct(op,p.product_code,basis,{fresh:true});
         if(found===undefined||!current(op))return;
         if(!found){message('「'+p.name+'」은 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 다른 구성을 골라 주세요.');return;}
-        const r=await reapply(op,found,basis,changesOf(p));
+        const r=await reapply(op,found,basis,changesOf(p),{strict:true});
         if(!r||!current(op))return;
         const won=n=>Number.isInteger(n)?n.toLocaleString('ko-KR')+'원':'금액 미확인';
         state.selected={...r.product,index:p.index};state.needsRefresh=false;state.saveState='idle';state.savedQuote=null;state.handoff=null;
@@ -487,10 +498,18 @@
       }catch(error){if(current(op))fail(error,{kind:'list'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
+    // 보관 견적을 열어도 같은 상담이다(대화가 남는다). 잡담 횟수는 새로 세되, 이미 PC 상담을 권했거나
+    // 고객이 거절한 사실은 이어 준다 -- 열자마자 다시 권하지 않게(코덱스 #145 검수 3). 「새 상담」만 지운다.
+    function offerFlags(flow){
+      const f=M.object(flow)?flow:{},keep={};
+      if(f.pc_offered===true)keep.pc_offered=true;
+      if(f.pc_declined===true)keep.pc_declined=true;
+      return Object.keys(keep).length?keep:null;
+    }
     function load(id){
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
-      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=null;state.history=[];
+      cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.talk=M.copy(q.state);state.chatFlow=offerFlags(state.chatFlow);state.history=[];
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
