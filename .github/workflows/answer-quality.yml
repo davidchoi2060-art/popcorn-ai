@@ -112,7 +112,7 @@ jobs:
 
   report:
     needs: [plan, compare]
-    if: always() && needs.plan.outputs.run == 'true'
+    if: ${{ !cancelled() && needs.plan.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
