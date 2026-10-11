@@ -253,6 +253,27 @@ class ReaderTests(unittest.TestCase):
             r = RD.read_price(111, "GPU", timeout=1)
         self.assertEqual((r["ok"], r["price"]), (True, 410000))
 
+    def test_part_read_passes_its_own_timeout_without_touching_the_global(self):
+        # 코덱스 검수 #99: 전역 mall.TIMEOUT 을 잠깐 바꾸면 동시에 도는 다른 요청의 제한도 바뀐다
+        from api import mall, mall_price_reader as RD
+        seen = []
+        html = ('<input type="hidden" name="pd_no" value="111">'
+                '<input type="hidden" name="price" value="410000">').encode()
+
+        class Body(io.BytesIO):
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+
+        def fake(req, timeout=0):
+            seen.append((timeout, mall.TIMEOUT))
+            return Body(html)
+        before = mall.TIMEOUT
+        from unittest.mock import patch
+        with patch("urllib.request.urlopen", fake):
+            RD.read_price(111, "GPU", timeout=2.5)
+        self.assertEqual(seen, [(2.5, before)])
+        self.assertEqual(mall.TIMEOUT, before)
+
 
 def _upgrade_sql(src: str):
     """마이그레이션 upgrade() 안의 op.execute 문자열을 꺼낸다(실행하지 않고 AST 로 읽는다)."""

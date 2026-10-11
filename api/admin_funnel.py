@@ -136,7 +136,9 @@ HANDOFF_MIGRATION_FILE = "db/migrations/versions/0042_handoffs.py"
 
 TIER_LABELS = {"highend": "고성능형", "recommend": "추천형", "value": "가성비형"}
 TIER_ORDER = ["highend", "recommend", "value"]      # 계약 §④㉮ 표기 순서 그대로
-MALL_STATUS_ORDER = ["확인됨", "가격변동", "확인못함"]  # `api/handoff.py`가 쓰는 3값 전부
+# `api/handoff.py`의 3값 + mvp3 인계(`api/mvp3_handoff.py`)의 「품절」. 빠뜨리면 합계에는 들어가고
+# 칸에는 없어 칸의 합이 합계와 달라진다(2026-10-11 코덱스 검수 #102 지적 반영).
+MALL_STATUS_ORDER = ["확인됨", "가격변동", "품절", "확인못함"]
 
 # 카드 ④㉯·⑤ 링크 대상 — 경로로 판정한다(라벨 아님). `admin_ui_swap_click_logs.py`가
 # 겪은 사고(라벨 리네임으로 조회가 조용히 깨짐)와 같은 이유로 `admin_ui_handoff_log.py`·

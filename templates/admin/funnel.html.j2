@@ -187,6 +187,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
 .fn-pricechip .p{font:400 10.5px/1 var(--rv-mono);color:var(--rv-faint);min-width:38px;text-align:right}
 .fn-pricechip.unk .n{color:var(--rv-red)}
 .fn-pricechip.chg .n{color:var(--rv-amber)}
+.fn-pricechip.sold .n{color:var(--rv-red)}
 
 #fnSignals p{margin:0 0 8px;font:400 11.5px/1.65 var(--rv-font);color:var(--rv-ink-soft)}
 #fnSignals p:last-child{margin-bottom:0}
@@ -496,7 +497,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(m.pct_of_saved) + '</span><span class="fn-conn-arrow">→</span></div>'
       + '<div class="fn-stage end"><div class="fn-stage-lbl">쇼핑몰 인계</div><div class="fn-stage-val num">' + fmt(m.saved_handed_off) + '</div><div class="fn-stage-sub">그 견적 중 넘어간 것</div></div>';
     var L = m.lines;
-    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['확인못함', 'unk']];
+    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['품절', 'sold'], ['확인못함', 'unk']];
     $('fnMvp3Price').innerHTML = L.total ? order.map(function (pair) {
       var row = L[pair[0]] || { n: 0, pct: null };
       return '<div class="fn-pricechip ' + pair[1] + '"><span class="lbl">' + esc(pair[0]) + '</span>'
@@ -531,7 +532,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
   // `L.total` 을 같은 줄에 한 번 더 적는 것뿐이라 서버 변경은 필요 없었다.
   function renderPriceCheck(d) {
     var L = d.price_check.lines;
-    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['확인못함', 'unk']];
+    var order = [['확인됨', 'ok'], ['가격변동', 'chg'], ['품절', 'sold'], ['확인못함', 'unk']];
     $('fnPriceChips').innerHTML = order.map(function (pair) {
       var key = pair[0], cls = pair[1], row = L[key] || { n: 0, pct: null };
       return '<div class="fn-pricechip ' + cls + '"><span class="lbl">' + esc(key) + '</span>'
