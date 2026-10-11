@@ -8,6 +8,7 @@
 
 ■ 가격은 현재값이다
   `products.sale_price` 가 있으면 그것, 없으면 평가 당시 몰 수집가(`price_src` 로 밝힌다).
+  판매가는 마지막 변경 날짜와 경로를 함께 밝힌다(R10 · `price_basis`).
   `products.status` 가 품절·단종·삭제대기면 뺀다. 평가 때 제외한 상품(품절 표시·
   상세 없음·테스트)도 뺀다.
 
@@ -16,10 +17,14 @@
   더 싼 상품으로 충족  더 싼 가격대에만 있다 — 이 가격대에 따로 둘 이유가 없다
   보유 상품 없음   어느 가격대에도 없다 — 상품을 새로 만들지 검토할 자리
 """
+from datetime import timedelta, timezone
+
 from fastapi import APIRouter
 from sqlalchemy import text
 
 from .db import engine
+
+KST = timezone(timedelta(hours=9))
 
 router = APIRouter(prefix="/api/admin")
 
@@ -45,6 +50,21 @@ def band_of(price):
     return None
 
 
+# 2026-10-11 품질관리 R10: 카드가 「현재 판매가」라고 적었는데 그 값은 9/28 쇼핑몰 CSV 적재에서
+# 멈춰 있었고, 쇼핑몰 조립PC 가격은 부품값에 따라 계속 움직였다(6개 모두 차이). 값은 그대로 두고
+# 그 값이 언제 어디서 온 것인지를 밝힌다. 이력 시각은 서버 UTC 라 한국 날짜로 바꿔 적는다.
+PRICE_CONFIRM = "구매할 때 확정"
+
+
+def price_basis(sale_at, reason):
+    """판매가 출처 문구 — 마지막 판매가 변경 날짜와 경로. 이력이 없으면 기준일을 모른다고 적는다."""
+    if sale_at is None:
+        return "쇼핑몰 판매가(기준일 미확인) · " + PRICE_CONFIRM
+    day = sale_at + timedelta(hours=9) if sale_at.tzinfo is None else sale_at.astimezone(KST)
+    where = "쇼핑몰 가격" if reason == "csv" else "판매가"
+    return f"{day.month}월 {day.day}일 기준 {where} · {PRICE_CONFIRM}"
+
+
 def load():
     """(levels, products{code: dict}, fits{code: {usage: rank}}) — 판매 가능 상품만."""
     with engine.connect() as conn:
@@ -53,7 +73,11 @@ def load():
         rows = conn.execute(text(
             "SELECT f.product_code, f.crawl_name, f.crawl_price, f.mall_url, f.excluded, f.includes,"
             " f.spec, f.balance, f.dominated_by, f.evaluated_at,"
-            " p.sale_price, p.status, p.product_name"
+            " p.sale_price, p.status, p.product_name,"
+            " (SELECT h.changed_at FROM product_price_history h WHERE h.product_code = f.product_code"
+            "   AND h.field = 'sale' ORDER BY h.changed_at DESC LIMIT 1) AS sale_at,"
+            " (SELECT h.reason FROM product_price_history h WHERE h.product_code = f.product_code"
+            "   AND h.field = 'sale' ORDER BY h.changed_at DESC LIMIT 1) AS sale_reason"
             " FROM product_fit_products f LEFT JOIN products p ON p.product_code = f.product_code")).all()
         fit_rows = conn.execute(text(
             "SELECT product_code, usage, level, level_rank, blocked FROM product_usage_fit")).all()
@@ -66,7 +90,7 @@ def load():
         price = m["sale_price"] if live_price else m["crawl_price"]
         products[m["product_code"]] = {
             "code": m["product_code"], "name": m["crawl_name"], "price": price,
-            "price_src": "현재 판매가" if live_price else "몰 수집가(2026-09-25)",
+            "price_src": price_basis(m["sale_at"], m["sale_reason"]) if live_price else "몰 수집가(2026-09-25)",
             "status": m["status"], "url": m["mall_url"], "includes": m["includes"],
             "spec": m["spec"], "balance": m["balance"], "dominated_by": m["dominated_by"],
             "band": band_of(price), "fit": {},
