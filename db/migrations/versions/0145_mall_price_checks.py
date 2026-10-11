@@ -24,12 +24,12 @@
   mall_price_checkout, 배치 되돌림은 각 사유 + _undo). 이 두 표는 그 옆의 «왜·언제 확인했나» 기록이다.
 
 Revision ID: 0145
-Revises: 0144
+Revises: 0140
 """
 from alembic import op
 
 revision = "0145"
-down_revision = "0144"
+down_revision = "0140"
 branch_labels = None
 depends_on = None
 
