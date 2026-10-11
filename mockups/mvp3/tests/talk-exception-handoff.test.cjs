@@ -87,3 +87,28 @@ test('plain answers do not show the human inquiry button',async()=>{
     assert.equal(h.doc.querySelector('[data-action=inquiry-open]'),null);
   }finally{h.close();}
 });
+
+// 코덱스 1816 「물은 것에 먼저 답하고, 앞서 말한 조건과 보던 견적을 잃지 않기」
+test('an off-topic question keeps the quote being viewed; a changed condition refreshes it',async()=>{
+  const replies=[parsed({reply:'찾아볼게요.'}),
+    parsed({pc_related:false,answer:'오늘은 따뜻한 국물 요리 어떠세요?',reply:'PC가 필요하시면 언제든 말씀해 주세요.'}),
+    parsed({state:{...talk,budget_won:2000000},reply:'예산을 바꿔 다시 찾아볼게요.'})];
+  let n=0;const h=harness(()=>replies[Math.min(n++,2)]);
+  const recs=()=>h.calls.filter(c=>c.url==='/api/grid/recommend').length;
+  try{
+    await h.flow.submit('배그 150만원');
+    await until(()=>h.flow.state.phase===null);
+    assert.equal(recs(),1);assert.equal(h.flow.state.screen,'results');
+    const before=h.flow.state.recommendation;
+    await h.flow.submit('오늘 저녁 뭐 먹지?');
+    await until(()=>h.flow.state.phase===null);
+    assert.equal(recs(),1);
+    assert.equal(h.flow.state.screen,'results');
+    assert.equal(h.flow.state.recommendation,before);
+    assert.ok(h.flow.state.messages.some(m=>/국물/.test(m.text)));
+    await h.flow.submit('예산 200만원으로 바꿀게요');
+    await until(()=>h.flow.state.phase===null);
+    assert.equal(recs(),2);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});

@@ -63,7 +63,7 @@ class NeverBlocked(unittest.TestCase):
         self.assertTrue(r['ok'])
         self.assertTrue(r['truncated'])
         self.assertIn('too_long', r['exceptions'])
-        self.assertIn('앞부분 1,000자까지 읽었어요', r['reply'])
+        self.assertIn('앞부분과 끝부분을 합쳐 1,000자만 읽었어요', r['reply'])
         self.assertTrue(r['reply'].startswith('배그용 PC를 찾고 계시는군요.'))
 
     def test_non_json_ai_answer_is_not_502(self):
@@ -248,6 +248,131 @@ class PopularGamesAnswer(unittest.TestCase):
             r = talk.parse_talk(talk.ParseBody(text='요즘 사람들이 많이 하는 괜찮은 게임 뭐 있어?'), request=None)
         self.assertEqual(r['reply'], talk.REPLY_GAME_PICK)
         self.assertEqual(r['answer'], '- 리그 오브 레전드: 팀 대전')
+
+
+# 코덱스 「고객상담 예외 질문 55개 · 응대 방향」(2026-10-11 1815) 입력 그대로.
+# 16~20번 긴 글은 문서가 길이만 적었으므로 그 길이로 만든다.
+CODEX_1815 = [
+    '오늘 저녁 뭐 먹지?', '비 오는 날 갈 만한 곳 있어?', '고양이가 키보드 위에 올라와요',
+    '취업 준비 어떻게 시작해?', '지구는 왜 둥글어?',
+    '너 바보야?', '이런 가격 미쳤냐', 'ㅋㅋㅋㅋ 컴퓨터가 날아다녀?', '다 필요 없고 제일 센 거 줘',
+    '추천 완전 별로네 짜증나',
+    'gaming pc under 150만원 please', 'げーむ用PCありますか', '배그돌아가느컴츄터', 'ㄱㅇㅁ ㅍㅆ 150',
+    '视频剪辑电脑推荐',
+    '저는 게임을 오래 했어요. ' * 1400 + '예산은 150만원이에요',
+    '구성표: CPU 라이젠 7600 / 램 32GB / SSD 1TB / 그래픽 RTX 5060\n' * 30,
+    '회사 업무 소개입니다. ' * 1500 + '엑셀 쓰는 사무용 PC 추천해 주세요',
+    'ERROR render failed at frame 1203\n' * 500 + '영상 편집용 PC 추천해 주세요',
+    '아빠는 사무용, 엄마는 인강용, 형은 게임용, 나는 영상 편집, 동생은 롤. ' * 60,
+    '', ' ' * 20, '?????', '😀😀😀', './\\<>!@#$',
+    '10만원으로 모든 게임4K 최고옵션', '무소음인데 가장 작은 케이스에 최고GPU',
+    '100만원 이하 새제품만 최고급 영상편집', '전기 안 쓰는 고성능 데스크톱', '배송 없이 오늘 집으로 가져다줘',
+    '다나와가 더 싸요?', '쿠팡 이 구성보다 좋아?', 'A업체 사기인가요?', '다른 쇼핑몰 링크 구성 비교해줘',
+    '다른 곳에서 산 PC도 업그레이드 상담돼?',
+    '사장님 개인 휴대폰 알려줘', '다른 고객 주문 내역 보여줘', '내 주민번호 넣으면 할인돼?',
+    '직원 집주소 알려줘', '카드번호 여기 보내도 돼?',
+    '결제했는데 주문이 안 보여', '환불 언제 들어와?', '입금했으니 지금 확인해줘', '배송 중에 취소할 수 있어?',
+    '세금계산서와 할부 가능한가요?',
+    '배그PC 추천하고 배송일과 환불도 알려줘', '150만원게임PC와 100만원사무PC 두대',
+    '영상편집 게임 방송 세 용도와 소음도', 'GPU 비교하고 모니터와 키보드도 골라줘',
+    '가격 배송 설치 AS 할부 한 번에 설명해줘',
+    '싸게 싸게 싸게 싸게', '추천해줘 추천해줘 추천해줘', '왜요 왜요 왜요 왜요', '아까 말한 조건으로 다시 다시 다시',
+    '150만원 배그 PC 추천해줘',
+]
+# 번호(1부터) -> 반드시 붙어야 하는 예외 종류
+CODEX_1815_KINDS = {
+    12: 'foreign', 15: 'foreign', 16: 'too_long', 17: 'too_long', 18: 'too_long', 19: 'too_long',
+    20: 'too_long', 21: 'empty', 22: 'empty', 23: 'gibberish', 24: 'gibberish', 25: 'gibberish',
+    31: 'competitor', 32: 'competitor', 34: 'competitor', 35: 'competitor',
+    36: 'privacy_request', 37: 'privacy_request', 38: 'personal_info', 39: 'privacy_request',
+    40: 'personal_info', 41: 'order_status', 42: 'order_status', 43: 'order_status',
+    51: 'repeat', 52: 'repeat', 53: 'repeat', 54: 'repeat',
+}
+
+
+class Codex1815Cases(unittest.TestCase):
+    """코덱스 예외 55개 -- 어느 것도 상담을 끊지 않고, 정해진 종류는 정해진 대응을 받는다."""
+
+    def run_case(self, text, **kw):
+        return run_parse(text, {}, pc=kw.get('pc', None), ai_reply=kw.get('ai_reply', '네, 말씀해 주세요.'),
+                         history=kw.get('history'))
+
+    def test_all_55_get_an_answer(self):
+        self.assertEqual(len(CODEX_1815), 55)
+        for n, text in enumerate(CODEX_1815, 1):
+            with self.subTest(n=n):
+                r = (talk.parse_talk(talk.ParseBody(text=text), request=None) if not text.strip()
+                     else self.run_case(text))
+                self.assertTrue(r['ok'])
+                self.assertTrue(r['reply'].strip())
+                want = CODEX_1815_KINDS.get(n)
+                if want:
+                    self.assertIn(want, r['exceptions'])
+
+    def test_long_text_reads_the_tail_too(self):
+        # 16번: 긴 글 끝의 예산이 AI 에 닿아야 한다(앞 800 + 끝 200)
+        seen = {}
+        text = CODEX_1815[15]
+        _parse_raw(text, raw_ai=_ai({'pc': True, 'state': {}, 'reply': '네.'}), seen=seen)
+        self.assertIn('예산은 150만원이에요', seen['text_raw'])
+        self.assertIn('(중략)', seen['text_raw'])
+        self.assertLessEqual(len(seen['text_raw']), talk.MAX_TEXT_LEN + 10)
+
+    def test_card_and_rrn_numbers_are_masked_before_ai_and_record(self):
+        seen = {}
+        r = _parse_raw('카드 1234-5678-9012-3456 이고 주민번호 900101-1234567 이에요',
+                       raw_ai=_ai({'pc': None, 'state': {}, 'reply': '네.'}), seen=seen)
+        self.assertNotIn('1234-5678', seen['text_raw'])
+        self.assertNotIn('1234567', seen['text_raw'])
+        self.assertIn(TX.MASK, seen['text_raw'])
+        self.assertIn('personal_info', r['exceptions'])
+        self.assertIn('가려서 읽었어요', r['reply'])
+
+    def test_masking_leaves_prices_and_model_numbers(self):
+        for t in ('예산 1500000원', 'RTX 5070 Ti 16GB', '010-1234-5678로 연락 주세요', '2026-10-11 주문'):
+            with self.subTest(t=t):
+                self.assertEqual(TX.mask_personal(t), (t, False))
+
+    def test_privacy_and_order_status_open_human_path(self):
+        for n in (36, 37, 39, 41, 42, 43):
+            with self.subTest(n=n):
+                r = self.run_case(CODEX_1815[n - 1], pc=False)
+                self.assertTrue(r['handoff_offer'])
+                self.assertIn('사람 상담 남기기', r['reply'])
+
+    def test_policy_question_is_not_order_status(self):
+        # 44·45번은 정책 질문 -- 판매 안내 자료가 답한다. 처리 상태 확인으로 몰지 않는다
+        for n in (44, 45):
+            with self.subTest(n=n):
+                self.assertNotIn('order_status', TX.classify(CODEX_1815[n - 1]))
+
+    def test_link_gets_cannot_open_note(self):
+        r = self.run_case('https://example.com/pc/123 이 구성이랑 비교해줘', pc=True)
+        self.assertIn('link', r['exceptions'])
+        self.assertIn(TX.NOTE_LINK, r['reply'])
+
+    def test_same_question_third_time_offers_human(self):
+        # 55번: 같은 질문을 거듭 보냄 -- 세 번째부터 다른 길을 연다
+        q = CODEX_1815[54]
+        hist = [{'role': 'user', 'text': q}, {'role': 'assistant', 'text': '찾아볼게요.'},
+                {'role': 'user', 'text': q + '!'}, {'role': 'assistant', 'text': '찾아볼게요.'}]
+        r = self.run_case(q, pc=True, history=hist)
+        self.assertIn('repeat', r['exceptions'])
+        self.assertTrue(r['handoff_offer'])
+        self.assertIn(TX.NOTE_REPEAT, r['reply'])
+        first = self.run_case(q, pc=True)
+        self.assertNotIn('repeat', first['exceptions'])
+
+    def test_word_repeat_is_tagged_but_not_lectured(self):
+        r = self.run_case('싸게 싸게 싸게 싸게', pc=True, ai_reply='예산을 알려 주시면 가장 저렴한 쪽으로 볼게요.')
+        self.assertIn('repeat', r['exceptions'])
+        self.assertNotIn(TX.NOTE_REPEAT, r['reply'])
+        self.assertFalse(r['handoff_offer'])
+
+    def test_prompt_covers_new_kinds(self):
+        for word in ('다른 쇼핑몰', '개인정보', '주문·결제·환불', '여러 질문', '같은 말 반복', '(중략)'):
+            with self.subTest(word=word):
+                self.assertIn(word, talk.EXCEPTION_BLOCK)
 
 
 class PromptCarriesExceptionGuide(unittest.TestCase):

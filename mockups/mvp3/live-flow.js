@@ -3,7 +3,7 @@
   const M=typeof module!=='undefined'?require('./live-model.js'):root.MVP3LiveModel;
   const JOURNAL_KEY='popcorn-mvp3-pending-save-v1';
   // 상담 한 번에 읽는 글자 수 -- 서버 api/talk.py MAX_TEXT_LEN 과 같다. 넘는 글은 서버가 앞부분만 읽고 알린다.
-  const MAX_TEXT=1000;
+  const MAX_TEXT=20000;
   function validPending(record){
     const p=record?.payload;
     return M.object(record)&&record.version===1&&/^[a-f0-9]{64}$/.test(record.binding)&&M.object(p)
@@ -89,8 +89,10 @@
         const response=await api.parse({text,state:state.talk,chat_flow:state.chatFlow,history:previous},{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
+        // 잡담·범위 밖 질문이 조건을 바꾸지 않았으면 보던 견적을 지우지 않는다(코덱스 1816 「앞서 말한 조건과 보던 견적을 잃지 않기」).
+        const keep=!!state.recommendation&&(response.pc_related===false||!!response.fallback)&&JSON.stringify(response.state)===JSON.stringify(state.talk);
         state.talk=M.copy(response.state);state.chatFlow=M.object(response.chat_flow)?M.copy(response.chat_flow):null;
-        state.history.push({role:'user',text});
+        state.history.push({role:'user',text:text.slice(0,1000)});
         const answer=M.text(response.answer),reply=M.text(response.reply);
         if(!response.silent){
           if(answer.trim()){message(answer,'ai');state.history.push({role:'assistant',text:answer.slice(0,300)});}
@@ -98,7 +100,9 @@
         }
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
-        state.history=state.history.slice(-6);state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
+        state.history=state.history.slice(-6);
+        if(keep)return true;
+        state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         state.selected=null;state.selectionState=null;state.savedQuote=null;state.saveState='idle';state.groups=[];state.recommendation=null;state.needsRefresh=false;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.

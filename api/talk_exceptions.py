@@ -35,10 +35,16 @@ KINDS: tuple[tuple[str, str], ...] = (
     ("self_harm", "자해·자살 신호"),
     ("prompt_injection", "역할 바꾸기 시도"),
     ("human", "사람 상담 요청"),
+    ("personal_info", "민감 정보 입력"),
+    ("privacy_request", "남의 개인정보 요청"),
+    ("order_status", "주문·결제·환불 확인 요청"),
     ("abuse", "욕설·장난"),
     ("gibberish", "알아볼 수 없는 입력"),
     ("foreign", "외국어"),
     ("contradiction", "모순된 조건"),
+    ("repeat", "같은 말 반복"),
+    ("link", "링크 붙여 넣기"),
+    ("competitor", "다른 쇼핑몰 비교"),
     ("too_long", "아주 긴 글"),
     ("off_topic", "주제 밖 이야기"),
     ("smalltalk_long", "잡담 계속"),
@@ -70,7 +76,18 @@ NOTE_CONTRADICTION = ("말씀하신 예산으로는 원하시는 사양을 맞�
                       " 예산 안에서 가장 가까운 구성을 보여 드릴게요. 사양이 더 중요하면 예산을 알려 주세요.")
 NOTE_LOW_BUDGET = ("말씀하신 예산으로는 새 조립 PC를 찾기 어려울 수 있어요."
                    " 찾는 대로 보여 드리고, 맞는 상품이 없으면 그렇다고 말씀드릴게요.")
-NOTE_TOO_LONG = "글이 길어 앞부분 %s자까지 읽었어요. 빠진 내용이 있으면 나눠서 말씀해 주세요."
+NOTE_TOO_LONG = ("글이 길어 앞부분과 끝부분을 합쳐 %s자만 읽었어요."
+                 " 빠진 내용이 있으면 용도와 예산부터 나눠서 말씀해 주세요.")
+# 2026-10-11 코덱스 예외 55개(1815) 36~55번 대응
+NOTE_PERSONAL = "카드번호·주민번호·비밀번호 같은 정보는 상담 창에 적지 않으셔도 돼요."
+NOTE_PERSONAL_MASKED = " 적어 주신 번호는 가려서 읽었어요."
+NOTE_PRIVACY = ("다른 분의 연락처·주소·주문 내역 같은 개인정보는 알려 드릴 수 없어요."
+                " 문의는 아래 「사람 상담 남기기」로 남겨 주세요.")
+NOTE_ORDER_STATUS = ("주문·결제·환불 처리 상태는 제가 여기서 확인할 수 없어요."
+                     " 아래 「사람 상담 남기기」에 연락처를 남겨 주시면 담당자가 확인해 연락드려요.")
+NOTE_LINK = "링크 안의 내용은 제가 열어 볼 수 없어요. 비교할 구성과 금액을 글로 적어 주시면 함께 볼게요."
+NOTE_REPEAT = ("같은 말씀을 여러 번 하셨네요. 제 답이 부족했다면 원하시는 조건을 하나만 더 알려 주시거나,"
+               " 아래 「사람 상담 남기기」를 눌러 주세요.")
 NOTE_SMALLTALK_LONG = "PC가 필요하시면 언제든 용도와 예산을 말씀해 주세요."
 REPLY_AI_UNREADABLE = ("방금 말씀을 제가 잘 정리하지 못했어요. 한 번만 다르게 말씀해 주시거나,"
                        " 사람 상담을 원하시면 아래 「사람 상담 남기기」를 눌러 주세요.")
@@ -101,6 +118,27 @@ _ABUSE = re.compile(
     r"씨\s*발|시\s*발|ㅅ\s*ㅂ|ㅆ\s*ㅂ|씨\s*바|병\s*신|ㅂ\s*ㅅ|개\s*새\s*끼|개\s*색\s*기|좆|ㅈ\s*같|지\s*랄|"
     r"꺼\s*져|닥\s*쳐|엿\s*먹|fuck|shit|bitch",
     re.I)
+# 민감 정보 -- 번호 자체(가려서 읽는다)와 그 이름을 꺼낸 말(안내 한 줄)을 따로 본다.
+_RRN = re.compile(r"(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)")
+_CARD = re.compile(r"(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)")
+_PERSONAL_WORD = re.compile(r"주민\s*(등록)?\s*번호|카드\s*번호|계좌\s*비밀\s*번호|비밀\s*번호|cvc|cvv|보안\s*코드", re.I)
+MASK = "[가림]"
+# 남의 개인정보 -- 제3자(사장·직원·다른 고객 …) + 연락처·주소·주문 내역 + 알려/보여 달라는 말
+_PRIVACY_REQ = re.compile(
+    r"(사장|대표|직원|담당자|기사|다른\s*(고객|사람|분|회원|손님)|남의|그\s*사람)\S{0,6}\s*"
+    r"(개인\s*)?(휴대\s*폰|핸드\s*폰|전화\s*번호|연락처|번호|집\s*주소|주소|주문\s*내역|구매\s*내역|개인\s*정보|이름|계좌)"
+    r"\S{0,4}\s*(좀\s*)?(알려|보여|가르쳐|줘|주세요|공개|뭐)")
+# 내 주문의 처리 상태 확인 -- 정책 질문(「배송 며칠?」)은 판매 안내 자료가 답하므로 여기 넣지 않는다.
+_ORDER_STATUS = re.compile(
+    r"(결제|입금|송금|주문|구매)\s*(했는데|했으니|했어요|했어|했습니다|한\s*지|완료\s*했)|"
+    r"환불\S{0,4}\s*(언제|아직|안\s*(들어|와|됐|되))|"
+    r"(주문|결제|입금)\S{0,4}\s*(안\s*(보|떠|돼|되|들어)|확인\s*(해|좀|부탁))|"
+    r"(배송|택배)\S{0,4}\s*(어디|언제\s*와|안\s*와|조회)")
+_LINK = re.compile(r"https?://|www\.|\b[a-z0-9-]+\.(com|co\.kr|kr|net)\b", re.I)
+_COMPETITOR = re.compile(r"다나와|쿠팡|11번가|지마켓|G마켓|옥션|컴퓨존|아이코다|네이버\s*쇼핑|"
+                         r"다른\s*(쇼핑몰|업체|곳|가게|사이트)|타\s*(업체|사이트)", re.I)
+_REPEAT_WORD = re.compile(r"(\S{1,8})(?:\s+\1){2,}")
+REPEAT_SAME_TURNS = 2       # 같은 문장을 이전에 두 번 보냈으면(이번이 세 번째) 반복으로 본다
 _HANGUL_SYL = re.compile(r"[가-힣]")
 _LATIN = re.compile(r"[A-Za-z]")
 _DIGIT = re.compile(r"[0-9]")
@@ -163,6 +201,32 @@ def foreign_language(text: str) -> str | None:
     return None
 
 
+def mask_personal(text: str) -> tuple[str, bool]:
+    """주민번호·카드번호 모양의 숫자를 가린다 -> (가린 문장, 가렸는가).
+
+    AI 에게 보내기 전·문의 기록에 남기기 전에 부른다. 번호를 «읽지» 않아도 상담은 된다.
+    """
+    t = text or ""
+    out = _CARD.sub(MASK, _RRN.sub(MASK, t))
+    return out, out != t
+
+
+def _norm(t: str) -> str:
+    return re.sub(r"[\s.,!?~]+", "", (t or "").lower())
+
+
+def repeated(text: str, history: list | None) -> str | None:
+    """같은 말 반복 -- 'turns'(같은 문장을 거듭 보냄) | 'words'(한 문장 안 되풀이) | None."""
+    n = _norm(text)
+    if n and history:
+        same = sum(1 for role, t in history if role == "user" and _norm(t) == n)
+        if same >= REPEAT_SAME_TURNS:
+            return "turns"
+    if _REPEAT_WORD.search(text or ""):
+        return "words"
+    return None
+
+
 def _budget(state) -> int | None:
     b = getattr(state, "budget_won", None)
     return b if isinstance(b, int) and b > 0 else None
@@ -189,7 +253,8 @@ def contradiction(text: str, state, top_spec_re, uhd_re) -> str | None:
 
 
 def classify(text: str, *, state=None, pc=None, stage: str | None = None,
-             truncated: bool = False, top_spec_re=None, uhd_re=None) -> list[str]:
+             truncated: bool = False, top_spec_re=None, uhd_re=None,
+             masked: bool = False, history: list | None = None) -> list[str]:
     """고객 문장 -> 예외 종류 키 목록(우선순위 순서). 빈 목록이면 평범한 문장이다."""
     t = text or ""
     found: set[str] = set()
@@ -199,6 +264,12 @@ def classify(text: str, *, state=None, pc=None, stage: str | None = None,
         found.add("prompt_injection")
     if _HUMAN.search(t):
         found.add("human")
+    if masked or _PERSONAL_WORD.search(t) or MASK in t:
+        found.add("personal_info")
+    if _PRIVACY_REQ.search(t):
+        found.add("privacy_request")
+    if _ORDER_STATUS.search(t):
+        found.add("order_status")
     if _ABUSE.search(t):
         found.add("abuse")
     if is_gibberish(t):
@@ -208,6 +279,12 @@ def classify(text: str, *, state=None, pc=None, stage: str | None = None,
     if state is not None and top_spec_re is not None and uhd_re is not None \
             and contradiction(t, state, top_spec_re, uhd_re):
         found.add("contradiction")
+    if repeated(t, history):
+        found.add("repeat")
+    if _LINK.search(t):
+        found.add("link")
+    if _COMPETITOR.search(t):
+        found.add("competitor")
     if truncated:
         found.add("too_long")
     if pc is False:
@@ -218,14 +295,17 @@ def classify(text: str, *, state=None, pc=None, stage: str | None = None,
 
 
 def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
-            top_spec_re=None, uhd_re=None, read_len: int = 0) -> tuple[str, bool]:
+            top_spec_re=None, uhd_re=None, read_len: int = 0, masked: bool = False,
+            history: list | None = None) -> tuple[str, bool]:
     """(지금까지 정해진 고객 문장, 예외 종류) -> (내보낼 문장, 사람 상담 길을 띄울지).
 
     바꿔 말하는 것은 자해 신호·역할 바꾸기 시도 둘뿐이고(안전 최소 보호), 나머지는
     AI 가 PC 이야기로 받았으면 그 문장을 살린 채 한 줄만 덧붙인다.
     """
     ks = set(kinds)
-    handoff = bool(ks & {"human", "ai_unreadable"})
+    handoff = bool(ks & {"human", "ai_unreadable", "privacy_request", "order_status"})
+    if "repeat" in ks and repeated(text, history) == "turns":
+        handoff = True
     if "self_harm" in ks:
         return REPLY_SELF_HARM, False
     if "prompt_injection" in ks:
@@ -244,9 +324,23 @@ def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
         note = NOTE_CONTRADICTION if kind == "top_spec" else NOTE_LOW_BUDGET
         if note not in out:
             out = (out.rstrip() + " " + note).strip()
+    if "personal_info" in ks:
+        out = _add(out, NOTE_PERSONAL + (NOTE_PERSONAL_MASKED if masked else ""))
+    if "privacy_request" in ks:
+        out = _add(out, NOTE_PRIVACY)
+    if "order_status" in ks and "human" not in ks:
+        out = _add(out, NOTE_ORDER_STATUS)
+    if "link" in ks:
+        out = _add(out, NOTE_LINK)
+    if "repeat" in ks and repeated(text, history) == "turns":
+        out = _add(out, NOTE_REPEAT)
     if "too_long" in ks and read_len:
-        out = (out.rstrip() + " " + NOTE_TOO_LONG % format(read_len, ",")).strip()
+        out = _add(out, NOTE_TOO_LONG % format(read_len, ","))
     return out, handoff
+
+
+def _add(out: str, note: str) -> str:
+    return out if note in out else (out.rstrip() + " " + note).strip()
 
 
 def tags(kinds: list[str]) -> list[str]:
