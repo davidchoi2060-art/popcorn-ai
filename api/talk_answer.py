@@ -60,8 +60,10 @@ log = logging.getLogger(__name__)
 # ── 상한 (설계서 §1-1 · §6-2) ───────────────────────────────────────────────
 ANSWER_MAX_LEN = 600        # `reply` 200자와 **독립**이다. 서로를 죽이지 않는다
 ANSWER_MAX_TOKENS = 900     # 실측 out 95~319 -> 900
-ANSWER_TIMEOUT_SEC = 8      # 답변 LLM 상한(설계서 §4-2)
-PATH_B_TIMEOUT_SEC = 10     # [B] 경로 전체 상한
+# 2026-10-11 대화체로 바꾼 뒤(사장님 「기존 AI와 대화하듯이」) 개발 서버에서 「요즘 인기 게임」 답이
+# 8초 상한에 걸려 짧은 기본 소개로 떨어졌다 -- 게임마다 한두 문장을 쓰면 출력이 길어진다.
+ANSWER_TIMEOUT_SEC = 12     # 답변 LLM 상한(설계서 §4-2 의 8초에서 늘림)
+PATH_B_TIMEOUT_SEC = 13     # [B] 경로 전체 상한
 # 자유 답변 모델 — 설계서 §5-3 제안. 좌표 추출(task.s1_parse)은 haiku 그대로 둔다.
 #   gpt-5.6-luna: 3.27초 · 입력 $0.2 / 출력 $1.2 per 1M · **날짜·출처를 스스로 인용**
 #   같은 근거를 준 haiku 는 순위 수치를 빠뜨렸다. 건당 비용 +8%.
@@ -453,6 +455,7 @@ def build_answer_prompt(sentence: str, ev: Evidence, narrowing: str,
     if narrowing == TS.NARROWING_WIDE:
         lines.append("[이번 답변] 고객이 아직 둘러보는 중이다. 일반 AI 와 대화하듯 자연스럽고 친근하게 답한다."
                      " 짧은 도입 한 문장 뒤, 게임마다 어떤 게임이고 어떤 점이 재미있는지 한두 문장씩 소개한다."
+                     " 게임은 많아야 다섯 개까지만 고른다."
                      " **게임 이야기만 한다** - PC·견적 이야기는 꺼내지 않는다(서버가 끝에 가볍게 한 줄 붙인다)."
                      " 마지막에 질문을 붙이지 않는다.")
         lines.append("[목록 형식] 게임을 여럿 소개하면 게임마다 줄을 바꾸고 「- 게임명: 설명」으로 시작한다."
@@ -510,11 +513,33 @@ def fallback_intro(ev: "Evidence") -> str:
         if f.copy_spec:
             out.append("%s: %s" % (f.name, f.copy_spec.strip()))
             continue
-        bits = [b for b in (("장르 " + f.genre) if f.genre else None,
-                            ("제작 " + f.vendor) if f.vendor else None) if b]
-        if bits:
-            out.append("%s: %s" % (f.name, " · ".join(bits)))
-    return scrub_internal_source_names(" / ".join(out))[:ANSWER_MAX_LEN]
+        # 대화체 한 문장(2026-10-11 「기존 AI와 대화하듯이」) -- 「장르 X · 제작 Y」 나열을 쓰지 않는다
+        if f.genre and f.vendor:
+            out.append("%s %s 만든 %s 장르 게임이에요." % (_topic(f.name), _subj(f.vendor), f.genre))
+        elif f.genre:
+            out.append("%s %s 장르 게임이에요." % (_topic(f.name), f.genre))
+        elif f.vendor:
+            out.append("%s %s 만든 게임이에요." % (_topic(f.name), _subj(f.vendor)))
+    return scrub_internal_source_names("\n".join(out))[:ANSWER_MAX_LEN]
+
+
+def _has_final(word: str) -> bool:
+    """마지막 글자에 받침이 있는가(한글이 아니면 숫자·영문 끝소리로 대강 본다)."""
+    w = (word or "").strip()
+    if not w:
+        return False
+    c = w[-1]
+    if "가" <= c <= "힣":
+        return (ord(c) - 0xAC00) % 28 != 0
+    return c.lower() in "0136789lmnr"
+
+
+def _topic(word: str) -> str:
+    return word + ("은" if _has_final(word) else "는")
+
+
+def _subj(word: str) -> str:
+    return word + ("이" if _has_final(word) else "가")
 
 
 def _grade_of(ev: Evidence) -> str | None:
