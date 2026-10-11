@@ -1,0 +1,24 @@
+# 팝콘PC AI — 쇼핑몰 가격 자동 갱신 타이머 (2026-10-11 신설)
+#
+# 하루 두 번: 06:00 · 13:00 한국 시각.
+#   06:00  가게 문 열기 전 — 밤사이 쇼핑몰에서 바뀐 가격을 아침 첫 손님 전에 맞춘다
+#   13:00  점심 무렵 — 오전에 쇼핑몰 관리자가 고친 가격을 오후 전에 맞춘다
+# 다나와 시세(01:00 매월 · 05:00 월요일)와 겹치지 않고, 대상 서버도 다르다.
+# 실행 사이에 바뀐 가격은 2겹(장바구니 · 결제 이동 순간 확인, api/mall_price_live)이 잡는다.
+#
+# 설치 전 확인: systemd-analyze calendar '*-*-* 06,13:00:00 Asia/Seoul'
+# 시간대 접미사가 안 먹히면 아래 UTC 줄로 바꾼다(06:00 KST = 21:00 UTC 전날, 13:00 KST = 04:00 UTC).
+
+[Unit]
+Description=팝콘PC AI 쇼핑몰 가격 자동 갱신 — 매일 06:00 · 13:00 KST
+Documentation=file:///srv/popcorn-ai/docs/design/mall-price-sync.md
+
+[Timer]
+# OnCalendar=*-*-* 21,04:00:00
+OnCalendar=*-*-* 06,13:00:00 Asia/Seoul
+Persistent=true
+RandomizedDelaySec=300
+Unit=popcorn-mall-price.service
+
+[Install]
+WantedBy=timers.target

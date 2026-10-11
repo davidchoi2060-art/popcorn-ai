@@ -2,7 +2,7 @@
   쇼핑몰 가격 반영 (ADM-PRC-070 · 가칭) — 2026-10-11 신설
 
   두 겹 안전장치를 한 화면에서 본다.
-    1겹 배치    파일 올리기(이 화면) · 자동 갱신 하루 1~2회 · 바로 실행
+    1겹 배치    파일 올리기 · 자동 갱신 하루 2회(api/mall_price_auto) · 지금 실행
     2겹 실시간  장바구니에 넣는 순간 · 결제로 넘어가는 순간
   데이터 = `api/admin_mall_price.py` · 반영 규칙 = `api/mall_price.py`.
 
@@ -48,6 +48,16 @@
 <div class="mp-wrap" data-keep="1">
   <p class="mp-note">고객 카드 가격은 쇼핑몰 판매가를 따릅니다. 가격은 두 겹으로 맞춥니다. 1겹은 배치(파일 올리기 · 자동 갱신), 2겹은 고객이 장바구니에 넣거나 결제로 넘어가는 순간의 확인입니다. 바뀐 가격은 모두 가격 이력에 남고, 배치는 실행 단위로 되돌릴 수 있습니다.</p>
 
+
+  <section class="mp-card" id="mpAuto">
+    <h2>자동 갱신</h2>
+    <p class="mp-note" id="mpAutoHow">불러오는 중입니다.</p>
+    <div class="mp-stats" id="mpAutoStats"></div>
+    <div class="mp-row">
+      <button class="pri" id="mpAutoBtn">지금 실행</button>
+      <span class="mp-msg" id="mpAutoMsg"></span>
+    </div>
+  </section>
 
   <section class="mp-card" id="mpUpload">
     <h2>파일로 반영</h2>
@@ -200,7 +210,40 @@
       });
     }).catch(function(e){ var tb=$('mpRuns'); tb.textContent=''; var tr=el('tr'); var c=td(e.message); c.colSpan=11; tr.appendChild(c); tb.appendChild(tr); });
   }
-  window.mpReloadRuns = function(){ loadRuns(); loadChecks(); };
+  window.mpReloadRuns = function(){ loadRuns(); loadChecks(); loadAuto(); };
+
+  // ── 자동 갱신 ──
+  var autoTimer = null;
+  function autoLine(label, r){
+    var s = el('span', 'mp-stat');
+    s.appendChild(el('b', null, label));
+    if(!r){ s.appendChild(document.createTextNode('기록 없음')); return s; }
+    var res = r.ok === null ? '진행 중' : r.ok ? '성공 · 바꿈 ' + won(r.changed) + '건 · 보류 ' + won(r.held) + '건' : '실패 · ' + (r.fail_reason || '');
+    s.appendChild(document.createTextNode(when(r.started_at) + ' · ' + r.moment_label + ' · ' + res));
+    if(r.ok === false) s.classList.add('up');
+    return s;
+  }
+  function loadAuto(){
+    call(API + '/auto').then(function(d){
+      $('mpAutoHow').textContent = d.schedule + ' 쇼핑몰 판매가를 읽어 완제품 PC 판매가에 반영합니다. ' +
+        (d.source === 'export' ? '쇼핑몰 관리자로 로그인해 상품엑셀을 내려받아 읽습니다.' :
+         '지금은 공개 상품 페이지를 하나씩 읽습니다(1.5초 간격). 관리자 상품엑셀로 읽으려면 서버 설정 ' + d.settings.names.slice(0,3).join(' · ') + ' 이 필요합니다.') +
+        ' 30% 넘게 움직인 상품은 바꾸지 않고 보류합니다.';
+      var st = $('mpAutoStats'); st.textContent = '';
+      st.appendChild(autoLine('마지막 실행 ', d.last));
+      if(d.last && d.last_ok && d.last.run_id !== d.last_ok.run_id) st.appendChild(autoLine('마지막 성공 ', d.last_ok));
+      var running = d.last && d.last.ok === null;
+      $('mpAutoBtn').disabled = running;
+      clearTimeout(autoTimer);
+      if(running) autoTimer = setTimeout(function(){ loadAuto(); loadRuns(); }, 10000);
+    }).catch(function(e){ $('mpAutoHow').textContent = e.message; });
+  }
+  $('mpAutoBtn').addEventListener('click', function(){
+    if(!confirm('지금 쇼핑몰 가격을 읽어 완제품 PC 판매가에 반영합니다.')) return;
+    $('mpAutoBtn').disabled = true; $('mpAutoMsg').className='mp-msg'; $('mpAutoMsg').textContent='';
+    call(API + '/auto/run', {method:'POST'}).then(function(d){ $('mpAutoMsg').textContent = d.note; loadAuto(); loadRuns(); })
+      .catch(function(e){ $('mpAutoMsg').className='mp-msg err'; $('mpAutoMsg').textContent=e.message; $('mpAutoBtn').disabled=false; });
+  });
 
   // ── 가격 확인 기록 ──
   var moment = '', page = 1, size = 50, total = 0;
@@ -233,7 +276,7 @@
       $('mpPage').textContent = '전체 ' + total.toLocaleString('ko-KR') + '건 중 ' + page + '쪽';
     }).catch(function(e){ var tb=$('mpChecks'); tb.textContent=''; var tr=el('tr'); var c=td(e.message); c.colSpan=9; tr.appendChild(c); tb.appendChild(tr); });
   }
-  loadRuns(); loadChecks();
+  loadRuns(); loadChecks(); loadAuto();
 })();
 </script>
 {% endblock %}

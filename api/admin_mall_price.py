@@ -11,6 +11,10 @@
                                바뀌어 내용이 달라졌으면 409 — 다른 내용을 보고 확인하는 사고를 막는다.
   ③ POST /mall-price/runs/{id}/undo   그 실행을 통째로 되돌린다.
 
+자동 갱신(1겹 배치 ②, api/mall_price_auto):
+  GET  /mall-price/auto         마지막 자동·바로 실행 결과와 설정 «이름·유무»(값은 절대 안 준다)
+  POST /mall-price/auto/run     「지금 실행」 — 실행 행을 만들고 수집은 뒤에서 돈다(대표만)
+
 조회: GET /mall-price/runs (실행 기록) · GET /mall-price/checks (가격 확인 기록 — 배치와
 실시간 두 겹이 같은 표에 있다, moment 로 거른다).
 
@@ -28,6 +32,7 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from sqlalchemy import text
 
 from . import mall_price as MP
+from . import mall_price_auto as AUTO
 from .auth import current_operator, current_operator_id
 from .db import engine
 from .pricing_write_guard_core import ProductScopeChanged
@@ -210,3 +215,40 @@ def checks(moment: str = "", product_code: int | None = None, run_id: int | None
         "outcome": r["outcome"], "outcome_label": OUTCOME_KO[r["outcome"]], "note": r["note"],
         "source_url": r["source_url"], "quote_id": str(r["quote_id"]) if r["quote_id"] else None,
     } for r in rows]}
+
+
+# ================================================================ 자동 갱신 ==
+
+def _run_row(r):
+    if r is None:
+        return None
+    return {"run_id": r["run_id"], "moment": r["moment"], "moment_label": MOMENT_KO[r["moment"]],
+            "source": r["source"], "started_at": iso(r["started_at"]), "finished_at": iso(r["finished_at"]),
+            "ok": r["ok"], "fail_reason": r["fail_reason"], "changed": r["changed_count"],
+            "held": r["held_count"], "matched": r["matched_count"], "detail": r["detail"]}
+
+
+@router.get("/mall-price/auto")
+def auto_status():
+    with engine.connect() as conn:
+        last = conn.execute(text(
+            "SELECT * FROM mall_price_runs WHERE moment IN ('auto','manual')"
+            " ORDER BY run_id DESC LIMIT 1")).mappings().first()
+        last_ok = conn.execute(text(
+            "SELECT * FROM mall_price_runs WHERE moment IN ('auto','manual') AND ok"
+            " ORDER BY run_id DESC LIMIT 1")).mappings().first()
+    cfg = AUTO.settings()
+    return {"last": _run_row(last), "last_ok": _run_row(last_ok),
+            "source": "export" if cfg["login"] and cfg["export_url"] else "pages",
+            "settings": cfg, "schedule": "매일 06:00 · 13:00 (한국 시각)"}
+
+
+@router.post("/mall-price/auto/run")
+def auto_run():
+    me = _owner()
+    try:
+        run_id = AUTO.start_background(operator_id=me.get("operator_id") or current_operator_id())
+    except AUTO.AlreadyRunning as e:
+        raise HTTPException(409, "이미 실행 중입니다 (실행 #%s)" % e.args[0])
+    return {"ok": True, "run_id": run_id,
+            "note": "쇼핑몰 가격 읽기를 시작했습니다. 끝나면 실행 기록에 결과가 남습니다."}
