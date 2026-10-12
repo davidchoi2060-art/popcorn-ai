@@ -368,6 +368,31 @@ def with_laptop_notice(reply: str) -> str:
 # 기본 안내는 «사실»만 말한다: 이 화면은 주문·결제를 받지 않는다 · 추천은 한 대 · 본체 가격
 # 기준이다 · 상품마다 다른 것은 상품 페이지에서 확인한다. 연락처·일정을 지어내지 않는다.
 
+# 「모니터가 4대 임」·「모니터 두 대」·「듀얼 모니터」 -- 모니터 «개수»는 PC 를 여러 대 사겠다는 말이 아니다
+# (2026-10-12 사장님 시험: 「…두루두루 사용하는데, 모니터가 4대 임」에 「여러 대 구매는 쇼핑몰에서」·「한 대 기준으로
+# 보여 드려요」가 나갔다). 수량 판정은 이 부분을 지운 문장으로 하고, 추천은 이 수로 화면 출력 조건을 건다.
+_KO_NUM = {"두": 2, "세": 3, "네": 4, "다섯": 5, "여섯": 6, "일곱": 7, "여덟": 8}
+_MONITOR_COUNT = re.compile(
+    r"(?:모니터|화면|디스플레이)\s*(?:가|를|는|도|이|은|만)?\s*(?:총\s*)?(?P<a>[2-8]|두|세|네|다섯|여섯|일곱|여덟)\s*(?:대|개|장)"
+    r"|(?P<b>[2-8]|두|세|네|다섯|여섯)\s*(?:대|개)\s*(?:의\s*)?(?:모니터|화면)"
+    r"|(?P<c>듀얼|트리플|쿼드)\s*모니터")
+_MONITOR_WORD = {"듀얼": 2, "트리플": 3, "쿼드": 4}
+
+
+def monitor_count(text: str | None) -> int | None:
+    """고객이 쓰는(쓸) 모니터 수. 말하지 않았으면 None. 여럿이면 가장 큰 수."""
+    best = None
+    for m in _MONITOR_COUNT.finditer(text or ""):
+        v = m.group("a") or m.group("b")
+        n = _MONITOR_WORD[m.group("c")] if m.group("c") else (int(v) if v.isdigit() else _KO_NUM[v])
+        best = n if best is None else max(best, n)
+    return best
+
+
+def drop_monitor_count(text: str | None) -> str:
+    return _MONITOR_COUNT.sub(" ", text or "")
+
+
 # (주제 키, 관리자 화면 이름, 고객 문장 판정, 기본 안내)
 PURCHASE_TOPICS: tuple[tuple[str, str, re.Pattern, str], ...] = (
     ("os", "운영체제(윈도우) 설치", re.compile(r"윈도우?|운영\s*체제|\bos\b|윈\s*1[01]", re.I),
@@ -526,7 +551,9 @@ _TOP = re.compile(r"최고\s*(사양|옵션?|성능|급)|최상\s*(급|사양)|�
 def purchase_topics(text: str) -> list[str]:
     """문장에 들어 있는 구매·사후 주제 키 — 순서는 PURCHASE_TOPICS 순서."""
     t = text or ""
-    hit = [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+    no_monitors = drop_monitor_count(t)
+    hit = [key for key, _label, pat, _ in PURCHASE_TOPICS
+           if pat.search(no_monitors if key == "quantity" else t)]
     # 「배송 중에 취소」의 배송은 취소 시점이다 -- 배송 기간을 함께 묻지 않았으면 배송 안내는 빼고 취소 안내만 낸다
     # (「배그PC 추천하고 배송일과 환불도 알려줘」는 둘 다 낸다).
     # 「배송 중에」처럼 배송이 취소·환불의 «시점»만 꾸미면 배송 안내를 빼고, 배송·설치를 따로 물었으면 둘 다 낸다

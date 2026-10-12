@@ -253,7 +253,9 @@ def premium_item(res, usage, min_rank, budget_won, bound, levels, products,
     rank = lambda p: p["fit"].get(usage, {}).get("rank", 0)  # noqa: E731
     bp = X.perf(base, usage)
     better = [p for p in products.values()
-              if p["code"] not in shown and p["price"] is not None and rank(p) >= min_rank
+              # 추천 구성보다 낮은 수준은 «더 높은 사양»이 아니다(2026-10-12 사장님 시험: 추천 「사무용 쾌적」 옆
+              # 「더 높은 사양」 카드가 「사무용 기본」이었다 -- 그래픽은 높아도 사무용 기준으로는 한 단계 아래).
+              if p["code"] not in shown and p["price"] is not None and rank(p) >= max(min_rank, rank(base))
               and p["price"] > base["price"]
               and (rank(p) > rank(base) or X.perf(p, usage) >= bp * PREMIUM_STEP)]
     if not better:
