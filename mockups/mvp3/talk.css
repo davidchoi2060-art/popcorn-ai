@@ -21,6 +21,8 @@
 .tk-spec{margin:0;display:grid;gap:2px;font-size:14px}.tk-spec div{display:flex;gap:6px}.tk-spec dt{color:var(--muted);min-width:56px}.tk-spec dd{margin:0}
 .tk-reason{font-size:14px}
 .tk-card-actions,.tk-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tk-card-actions button,.tk-row button{font-size:14px;padding:8px 12px}
+.tk-next{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tk-next button{font-size:15px;padding:10px 16px}
+.tk-cond-form{margin-top:8px;padding:12px;border:1px solid var(--line);border-radius:12px;background:white;max-width:420px}
 .tk-chosen{font-size:14px;color:var(--green);align-self:center}
 .tk-status{color:var(--muted);font-size:14px;margin:4px 0}
 .tk-form{display:flex;gap:8px;align-items:flex-end;border:1px solid var(--line);border-radius:14px;padding:8px}
@@ -45,5 +47,6 @@
   .tk-now-body{display:none;padding:0 16px 16px}.tk-now.is-open .tk-now-body{display:block}
   .tk-chat{padding:12px 16px}.tk-log{overflow:visible}
   .tk-msg{max-width:92%}.tk-card-list{grid-template-columns:1fr}
+  .tk-next button{flex:1 1 auto}.tk-cond-form{max-width:none}
   .tk-form{position:sticky;bottom:0;background:white}
 }
