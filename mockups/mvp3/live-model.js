@@ -75,7 +75,8 @@
         (p.pseudo&&(p.name!==null||p.description!==null||p.specs.length)))return null;
       ordinals.add(p.ordinal);
       parts.push({ordinal:p.ordinal,slot:p.slot,quantity:p.quantity,pseudo:p.pseudo,name:p.name,description:p.description,
-        specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p)});
+        specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p),
+        price:!p.pseudo&&positive(p.price)?p.price:null});
     }
     const price=value.price,stock=value.stock,c=value.compatibility,photo=value.photo,conditions={};
     if(!object(price)||!['confirmed','snapshot','estimated','needs_reconfirmation','unknown'].includes(price.state)||

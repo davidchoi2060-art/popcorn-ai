@@ -260,12 +260,12 @@ function publicBomDetails(configuration,p,information,finalOnly){
     return '<tr data-part="bom-'+part.ordinal+'"><td colspan="3"><details class="public-bom-disclosure" data-detail="bom-'+part.ordinal+'"><summary>'+
       '<div class="final-part-description">'+uiIcon(icon,'part-symbol')+'<div><h4><span>'+esc(label)+'</span><span class="part-name">'+esc(part.name||'정보 없음')+'</span><span class="public-bom-quantity">수량 '+part.quantity+'</span></h4><p>'+esc(part.description||'정보 없음')+'</p>'+
       '<span class="public-bom-toggle"><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
-      '<span class="final-part-price">미확인</span><span class="final-part-change">'+changeButton(part,label,finalOnly,open,id)+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
+      '<span class="final-part-price">'+partLinePrice(part)+'</span><span class="final-part-change">'+changeButton(part,label,finalOnly,open,id)+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
       (part.photo?.state==='approved'?'<figure class="public-bom-photo" data-product-photo><img data-product-image src="'+esc(part.photo.url)+'" alt="'+esc(part.name||label)+' 부품 사진" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>부품 사진을 불러오지 못했습니다</p></figure>':'<div class="public-bom-photo">정보 없음</div>')+'<div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
       '<p class="public-bom-unavailable" id="'+id+'">'+(swap?(finalOnly?'부품 질문은 아직 지원하지 않아요. 부품은 「상품 상세 다시 보기」에서 바꿀 수 있어요.':'부품 질문은 아직 지원하지 않아요. 이 부품은 오른쪽 「변경」으로 바꿀 수 있어요.'):'부품 질문은 아직 지원하지 않아요. 이 줄은 바꿀 수 없어요.')+'</p></div></div></details></td></tr>'+(open?buildRow():'');
   }).join('');
-  const b=p.build,foot=b?'<tr><th scope="row">기본 구성 금액</th><td colspan="2">'+money(b.base_price)+'</td></tr><tr><th scope="row">부품 변경</th><td colspan="2">'+signedMoney(p.price-b.base_price)+'</td></tr><tr><th scope="row">바꾼 구성 금액</th><td colspan="2">'+money(p.price)+'</td></tr>'
-    :'<tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr>';
+  const b=p.build,foot=otherRow(configuration,b?b.base_price:p.price)+(b?'<tr><th scope="row">기본 구성 금액</th><td colspan="2">'+money(b.base_price)+'</td></tr><tr><th scope="row">부품 변경</th><td colspan="2">'+signedMoney(p.price-b.base_price)+'</td></tr><tr><th scope="row">바꾼 구성 금액</th><td colspan="2">'+money(p.price)+'</td></tr>'
+    :'<tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr>');
   return '<section class="final-parts public-bom"><h3>부품 구성과 선택 이유</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
     '<thead><tr><th scope="col">부품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody>'+rows+'</tbody><tfoot>'+foot+'</tfoot></table></div></section>'+
     (finalOnly?'<details class="public-bom-information" data-detail="spec"><summary>추천 근거·변경 안내 펼치기</summary><div class="final-part-expanded">'+information+'</div></details>':information);
@@ -275,6 +275,21 @@ function publicBomDetails(configuration,p,information,finalOnly){
 function changeButton(part,label,finalOnly,open,id){
   if(part.pseudo||finalOnly)return button('변경','unavailable','outline small','disabled aria-describedby="'+id+'"');
   return button('변경','build-options','outline small'+(open?' is-active':''),'data-ordinal="'+part.ordinal+'" aria-expanded="'+open+'" aria-label="'+esc(label)+' 바꾸기"'+(state.phase?' disabled':''));
+}
+// 부품 줄 금액 = 부품 판매가 × 수량(서버 parts[].price). 값이 없으면 지어내지 않는다.
+// 서비스 줄(pseudo)은 따로 값이 없어 아래 「조립·기타」에 들어간다.
+function partLinePrice(part){
+  if(part.pseudo)return '조립·기타에 포함';
+  return Number.isSafeInteger(part.price)?money(part.price*part.quantity):'가격 확인 중';
+}
+// 「조립·기타」 = PC 금액 − 부품 판매가 합(2026-10-12 사장님 「추천한대로」). 바꾼 구성은 기본 구성 금액에서
+// 원래 부품 합을 빼므로 차이가 그대로다. 값이 빠진 부품이 있으면 차이를 계산하지 않고 그렇다고 말한다.
+function otherRow(configuration,total){
+  const parts=configuration.parts.filter(x=>!x.pseudo);
+  if(!Number.isSafeInteger(total)||parts.some(x=>!Number.isSafeInteger(x.price)))
+    return '<tr class="other-row"><th scope="row">조립·기타</th><td colspan="2">가격 확인 중인 부품이 있어 계산하지 않았어요</td></tr>';
+  const other=total-parts.reduce((sum,x)=>sum+x.price*x.quantity,0);
+  return '<tr class="other-row"><th scope="row">조립·기타</th><td colspan="2">'+(other<0?signedMoney(other):money(other))+' <small class="muted">PC 금액과 부품 판매가 합의 차이</small></td></tr>';
 }
 function buildChangedRow(part,label,icon,c,finalOnly,open){
   const id='bom-unavailable-'+part.ordinal;
