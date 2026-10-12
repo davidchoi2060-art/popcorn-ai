@@ -236,8 +236,11 @@ def changed_lines(conn, bom, changes):
 def quantity_usage(conn, lines):
     """메인보드·메모리·저장장치 줄이 쓰는 자리(api/mvp3_quantity.usage)."""
     codes = sorted({l['product_code'] for l in lines if l['slot'] in ('MB', 'RAM', 'SSD', 'HDD') and l['product_code']})
-    raws = {r['product_code']: r['spec_source_text'] for r in conn.execute(text(PARTS_SQL), dict(codes=codes)).mappings()} if codes else {}
-    return QTY.usage(lines, load_specs(conn, codes), raws)
+    rows = list(conn.execute(text(PARTS_SQL), dict(codes=codes)).mappings()) if codes else []
+    raws = {r['product_code']: r['spec_source_text'] for r in rows}
+    # 묶음(8Gx2)은 상품명이 말한다 -- 줄 이름이 비어 있거나 다르게 줄었어도 상품 원래 이름으로 본다.
+    names = {r['product_code']: r['product_name'] for r in rows}
+    return QTY.usage(lines, load_specs(conn, codes), raws, names)
 
 
 def quote(conn, base_price, bom, changes, rules=None):
