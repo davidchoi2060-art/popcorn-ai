@@ -73,13 +73,46 @@ function proposalBlock(p,latest){
   // 지난 제안은 비어 있어도 「이전 제안」 머리와 is-past 를 단다 -- 지난 「못 찾았어요」가 지금 답처럼 보였다(2026-10-12 검수 9da2 P2-2).
   if(!products.length)return '<div class="tk-cards is-empty'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+
     (notes.length?notes.map(n=>'<p class="warn-text tk-group-note">'+esc(n)+'</p>').join(''):'<p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 사람에게 문의할 수 있어요.</p>')+
-    (latest?button('사람에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
+    (latest?nextChoices(false)+button('사람에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
   const many=p.groups.filter(g=>g.products.length).length>1;
   return '<div class="tk-cards'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+p.groups.filter(g=>g.products.length).map(g=>
     (many&&g.usage?'<h3 class="tk-group">'+esc(g.usage)+'</h3>':'')+
     // 예산 안에 판매 구성이 없을 때 서버가 준 사유(「이 작업은 595,700원부터 가능합니다」)를 카드 위에 둔다 --
     // 예산을 넘는 카드만 말없이 나오면 설명과 어긋나 보인다(2026-10-11 일반 AI 비교 R03).
-    (g.empty_note?'<p class="warn-text tk-group-note">'+esc(g.empty_note)+'</p>':'')+'<ul class="tk-card-list">'+g.products.map(x=>card(x,p,latest)).join('')+'</ul>').join('')+'</div>';
+    (g.empty_note?'<p class="warn-text tk-group-note">'+esc(g.empty_note)+'</p>':'')+'<ul class="tk-card-list">'+g.products.map(x=>card(x,p,latest)).join('')+'</ul>').join('')+
+    (latest?nextChoices(true):'')+'</div>';
+}
+// 카드 바로 아래 「다음 선택」 단추(2026-10-12 사장님 결정 · 카드 검수 C2 「아래에서 골라 주세요」인데 단추가 없음).
+// 더 싼 PC · 더 높은 사양은 되묻지 않고 같은 조건으로 바로 다음 카드를 부른다(서버 choices · 옛 화면 app.js 와 같은 호출).
+// 서버가 그 방향에 판매 PC가 없다고 한 단추(enabled=false)는 내지 않는다 -- 눌러도 같은 목록이다.
+// 조건 바꾸기만 예산·용도 칸을 연다. 카드가 없을 때는 조건 바꾸기만 둔다.
+const CHOICE_TEXT={cheaper:'더 싼 PC',better:'더 높은 사양',change:'조건 바꾸기'};
+let condOpen=false;
+function nextChoices(withCards){
+  const dis=state.phase?' disabled':'';
+  const list=withCards?(state.choices||[]).filter(c=>c.enabled):[];
+  let html=list.filter(c=>c.id!=='change').map(c=>button(CHOICE_TEXT[c.id],'explore','outline','data-dir="'+c.id+'" data-label="'+esc(c.label)+'"'+dis)).join('');
+  html+=button(CHOICE_TEXT.change,'cond-open','outline','aria-expanded="'+condOpen+'"'+dis);
+  return '<div class="tk-next" role="group" aria-label="다음 선택">'+html+'</div>'+(condOpen?conditionForm():'');
+}
+// 예산·용도 칸. 지금 조건을 미리 채우고, 바꾼 것만 한 문장으로 상담에 보낸다(서버가 같은 규칙으로 다시 찾는다).
+function conditionForm(){
+  const t=state.talk||{},won=Number.isInteger(t.budget_won)?Math.round(t.budget_won/10000):'';
+  const usage=Array.isArray(t.usages)?t.usages.filter(x=>typeof x==='string').join(', '):'';
+  const dis=state.phase?' disabled':'';
+  return '<form class="tk-cond-form" data-cond-form aria-label="조건 바꾸기">'+
+    '<label class="tk-field"><span>예산 (만원)</span><input data-cond="budget" type="number" inputmode="numeric" min="10" max="5000" step="1" value="'+esc(won)+'"'+dis+'></label>'+
+    '<label class="tk-field"><span>용도</span><input data-cond="usage" maxlength="60" placeholder="예: 게임, 4K 영상 편집, 사무용" value="'+esc(usage)+'"'+dis+'></label>'+
+    '<div class="tk-row">'+button('닫기','cond-close','outline',dis.trim())+'<button type="submit" class="primary"'+dis+'>이 조건으로 다시 찾기</button></div></form>';
+}
+function conditionSentence(form){
+  const t=state.talk||{},parts=[];
+  const won=Number(form.querySelector('[data-cond=budget]').value),usage=form.querySelector('[data-cond=usage]').value.trim();
+  const before=Number.isInteger(t.budget_won)?Math.round(t.budget_won/10000):null;
+  if(Number.isFinite(won)&&won>0&&won!==before)parts.push('예산은 '+Math.round(won)+'만원으로');
+  const was=Array.isArray(t.usages)?t.usages.join(', '):'';
+  if(usage&&usage!==was)parts.push('용도는 '+usage+'(으)로');
+  return parts.length?parts.join(', ')+' 바꿀게요.':'';
 }
 function card(x,p,latest){
   const chosen=state.selected?.product_code===x.product_code;
@@ -239,10 +272,13 @@ document.addEventListener('click',e=>{
     case 'reprice':void flow.reprice();break;
     case 'handoff':void flow.handoff();break;
     case 'retry':void flow.retry();break;
+    case 'explore':condOpen=false;void flow.explore(b.dataset.dir,b.dataset.label);break;
+    case 'cond-open':condOpen=!condOpen;render();if(condOpen)log.querySelector('[data-cond=budget]')?.focus({preventScroll:true});break;
+    case 'cond-close':condOpen=false;render();break;
     case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
-    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;flow.reset();input.value='';count();}break;
+    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;condOpen=false;flow.reset();input.value='';count();}break;
     case 'toggle-now':{const open=$('#tk-now').classList.toggle('is-open');b.setAttribute('aria-expanded',String(open));break;}
   }
 });
@@ -250,6 +286,13 @@ document.addEventListener('input',e=>{if(e.target.closest('[data-inquiry]'))flow
 document.addEventListener('change',e=>{if(e.target.closest('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 $('#tk-old').addEventListener('click',()=>markFromTalk(null));
 $('#tk-form').addEventListener('submit',e=>{e.preventDefault();void send();});
+log.addEventListener('submit',e=>{
+  const form=e.target.closest('[data-cond-form]');if(!form)return;e.preventDefault();
+  if(state.phase)return;
+  const text=conditionSentence(form);
+  if(!text){status.textContent='바꿀 예산이나 용도를 적어 주세요.';status.hidden=false;return;}
+  condOpen=false;void flow.submit(text);
+});
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void send();}});
 
 flow.reset({restore:true});

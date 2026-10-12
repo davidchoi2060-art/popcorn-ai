@@ -159,13 +159,15 @@
       const parsed=M.recommendations(response);
       state.recommendation=parsed;state.groups=parsed.groups;state.assumed=parsed.assumed;state.missing=parsed.needs;
       state.wants=parsed.wants;state.choices=parsed.choices;state.anchorCode=parsed.anchorCode;
-      // 이 추천이 어느 말 뒤에 나왔는지 남긴다. 대화 화면은 그 말풍선 아래에 카드를 붙이고, 지난 제안은
-      // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
-      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
       // What the server could and could not do with the request, then the follow-up question.
       // 되살린 대화를 다시 열 때(notes=false)는 같은 안내·다음 질문이 이미 대화에 있다 -- 다시 붙이지 않는다
       // (2026-10-12 카드 검수 X3: 「더 싼 PC나 더 높은 사양도…」가 상세 왕복마다 1→3→5개로 쌓였다).
       for(const note of notes?parsed.talkNotes:[]){message(note);state.history.push({role:'assistant',text:note.slice(0,300)});}
+      // 이 추천이 어느 말 뒤에 나왔는지 남긴다. 대화 화면은 그 말풍선 아래에 카드를 붙이고, 지난 제안은
+      // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
+      // 안내(예산·못 맞춘 조건·되묻기) 다음에 남긴다: AI 설명 -> 예산 안내 -> 카드 -> 다음 선택 단추 순서
+      // (2026-10-12 사장님 결정 · 카드 검수 C1 「예산 안내가 카드 아래 말풍선으로 붙음」).
+      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
       state.history=state.history.slice(-6);
       if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
       state.screen='results';
