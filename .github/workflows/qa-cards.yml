@@ -12,12 +12,13 @@ jobs:
     timeout-minutes: 25
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
-        entry: [new_pc, upgrade, parts, chat, talk, root]
-        vp: [PC, 모바일]
-        exclude:
-          - entry: root
-            vp: 모바일
+        include:
+          - {entry: upgrade, vp: 모바일}
+          - {entry: upgrade, vp: PC}
+          - {entry: parts, vp: PC}
+          - {entry: talk, vp: 모바일}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,4 +62,4 @@ jobs:
           git add -A
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "qa cards run ${GITHUB_RUN_ID}"
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/qa-cards-20261012-results
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/qa-cards-20261012-results2
