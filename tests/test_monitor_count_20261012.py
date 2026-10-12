@@ -35,10 +35,12 @@ class MonitorCountIsNotQuantity(unittest.TestCase):
 
 
 class ExplainFirst(unittest.TestCase):
-    def test_monitor_setup_gets_build_explanation(self):
+    # 「모니터가 4대」 이어 말은 규칙(topic_of)이 아니라 이어 답하기(topic_in_context -> TOPIC_FOLLOW, #228)가 AI 를 부른다.
+    def test_monitor_setup_calls_ai_in_context(self):
         v = Vocab(tiers=[], grades=[], confirmed_games={}, all_game_names=[], usages=[("사무용", ["사무"])],
                   genres=[], genre_aliases={}, game_aliases={})
-        self.assertEqual(PA.topic_of(SENT, v), PA.TOPIC_BUILD)
+        hist = [("user", "PC 부품이나 구성에서 궁금한 점이 있어요."), ("assistant", "사무용이면 램 16GB 구성이 무난해요.")]
+        self.assertEqual(PA.topic_in_context(SENT, v, None, hist), PA.TOPIC_FOLLOW)
         self.assertEqual(PA.topic_of("듀얼 모니터 차이가 뭐예요", v), PA.TOPIC_PART)
 
 
