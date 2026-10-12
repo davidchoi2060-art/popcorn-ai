@@ -449,10 +449,13 @@ function renderFinal(){
     '<footer class="final-footer"><p>'+uiIcon('info')+'<span>포함 품목과 보증 조건은 구매 전에 확인해주세요.</span></p><div><div class="final-buttons">'+button('다른 상품 비교','results','outline')+
     button(saved?'보관 완료':state.phase==='save'?'서버 확인 중…':state.pendingSave?'이전 보관 결과 확인 필요':'견적 보관하기','save','primary',disabled?'disabled':'')+
     (saved&&state.savedQuote&&!handoffDone?button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'팝콘PC 쇼핑몰에서 구매하기','handoff','primary',state.phase?'disabled':''):'')+
+    // 인계가 끝나도 단추 자리를 비우지 않는다(2026-10-12 사장님 「클릭했더니 없어져 버리고」) — 같은 자리에서 쇼핑몰을 연다.
+    (handoffDone?'<a class="primary final-mall-link" href="'+esc(state.handoff.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a>':'')+
     '</div><small>'+(saved?'결제와 배송은 팝콘PC 쇼핑몰에서 진행돼요. 이 화면에서는 결제하지 않아요.':'주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다. 견적을 보관하면 팝콘PC 쇼핑몰 구매로 이어갈 수 있어요.')+'</small></div></footer>'+
-    (handoffDone?handoffPanel(state.handoff):'')+
-    (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('여러 대 · 할인 · 세금계산서는 구매 상담 신청','inquiry-open','outline',state.phase?'disabled':'')+'</p>':'')+
-    inquiryPanel()+
+    // 쇼핑몰 연결과 구매 상담은 화면 폭 전체에 나란히 둔다(2026-10-12 사장님 「한쪽으로 쏠려 있고, 아래쪽에 있는지도 몰랐어」).
+    '<div class="final-next">'+(handoffDone?handoffPanel(state.handoff):'')+
+    (!state.inquiry.open&&!state.inquiry.done?'<section class="live-explanation live-inquiry live-inquiry-open"><h3>구매 상담 신청</h3><p class="muted">여러 대 구매 · 할인 · 세금계산서는 팝콘PC 담당자가 연락드려 안내해요.</p>'+button('구매 상담 신청하기','inquiry-open','outline',state.phase?'disabled':'')+'</section>':'')+
+    inquiryPanel()+'</div>'+
     (state.savedQuote?'<p class="muted live-saved-note">보관일 '+esc(new Date(state.savedQuote.saved_at).toLocaleString('ko-KR'))+' · 이 브라우저의 보관 키로 접근합니다.</p>':'');
   actions.hidden=true;
 }

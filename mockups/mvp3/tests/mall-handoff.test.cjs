@@ -50,6 +50,10 @@ test('saved quote shows the mall purchase button and posts once with the quote i
     assert.match(view.textContent,/910,000원/);
     assert.match(view.textContent,/900,000원/);
     assert.equal(view.querySelector('[data-action=handoff]'),null,'button replaced by the result');
+    // 2026-10-12 사장님 「클릭했더니 없어져 버리고」: 단추 자리에 쇼핑몰 링크가 남는다.
+    const kept=view.querySelector('.final-buttons a.final-mall-link');
+    assert.equal(kept.getAttribute('href'),MALL);assert.equal(kept.getAttribute('target'),'_blank');
+    assert.ok(view.querySelector('.final-next .live-handoff'),'handoff result sits in the full-width next-step row');
     await new Promise(r=>setTimeout(r,50));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
