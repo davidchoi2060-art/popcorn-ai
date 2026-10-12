@@ -316,3 +316,17 @@ test('an explain-only answer does not call the recommendation',async()=>{
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+// 2026-10-12 사장님 결정 「크게」: 카드 맨 위에 작업 수준(용도 수준 / 작업)을 크게 둔다 -- 사양표 아래 작은 줄이 아니다.
+test('card shows the work level big at the top, above the name',async()=>{
+  const fit={...pc(301,'CODE/MOCK 영상',3230400),reasons:['영상편집 쾌적 — 4K 편집']};
+  const h=harness((url)=>url==='/api/talk/parse'?{data:{ok:true,state:t150,missing:[],reply:'찾아볼게요.',pc_related:true}}
+    :url==='/api/grid/recommend'?{data:reco([fit])}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    await h.say('4K 영상 편집');
+    const card=h.doc.querySelector('.tk-card'),line=card.querySelector('.tk-fit');
+    assert.equal(line.querySelector('strong').textContent,'영상편집 쾌적');assert.equal(line.querySelector('span').textContent,'4K 편집');
+    assert.ok(line.compareDocumentPosition(card.querySelector('h4'))&h.w.Node.DOCUMENT_POSITION_FOLLOWING,'before the product name');
+    assert.equal(card.querySelectorAll('.tk-reason').length,0,'not repeated as a small line');
+  }finally{h.close();}
+});

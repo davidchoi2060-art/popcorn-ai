@@ -114,13 +114,20 @@ function conditionSentence(form){
   if(usage&&usage!==was)parts.push('용도는 '+usage+'(으)로');
   return parts.length?parts.join(', ')+' 바꿀게요.':'';
 }
+// 이 PC로 할 수 있는 작업 수준(서버 reasons[0] = 「용도 수준 — 작업」, api/sold_reco._item)을 카드 맨 위에 크게 둔다.
+// 예: 「영상편집 쾌적」 / 「4K 편집」. 전에는 사양표 아래 작은 줄이라 한눈에 안 보였다(2026-10-12 사장님 결정 「크게」).
+function fitLine(x){
+  const r=Array.isArray(x.reasons)&&typeof x.reasons[0]==='string'?x.reasons[0].trim():'';
+  if(!r)return '';
+  const i=r.indexOf(' — '),head=i>0?r.slice(0,i).trim():r,work=i>0?r.slice(i+3).trim():'';
+  return '<p class="tk-fit"><strong>'+esc(head)+'</strong>'+(work?'<span>'+esc(work)+'</span>':'')+'</p>';
+}
 function card(x,p,latest){
   const chosen=state.selected?.product_code===x.product_code;
-  const reason=Array.isArray(x.reasons)&&x.reasons[0]?'<p class="tk-reason">'+esc(x.reasons[0])+'</p>':'';
   const gap=budgetGap(x,p.talk);
-  return '<li class="tk-card'+(chosen?' is-chosen':'')+'"><span class="pill">'+esc(x.tag||x.level||'판매 중 PC')+'</span><h4>'+esc(x.name)+'</h4>'+photo(x)+
+  return '<li class="tk-card'+(chosen?' is-chosen':'')+'"><span class="pill">'+esc(x.tag||x.level||'판매 중 PC')+'</span>'+fitLine(x)+'<h4>'+esc(x.name)+'</h4>'+photo(x)+
     '<p class="tk-price"><strong>'+money(x.price)+'</strong> <span class="muted">'+esc(x.price_src||'가격 기준 미확인')+'</span></p>'+
-    (gap?'<p class="'+(x.price>p.talk?.budget_won&&p.talk?.budget_bound!=='이상'?'warn-text':'muted')+'">'+esc(gap)+'</p>':'')+specList(x.spec)+reason+
+    (gap?'<p class="'+(x.price>p.talk?.budget_won&&p.talk?.budget_bound!=='이상'?'warn-text':'muted')+'">'+esc(gap)+'</p>':'')+specList(x.spec)+
     (latest?'<div class="tk-card-actions">'+button('상세 보기','detail','outline','data-index="'+x.index+'"')+
       (chosen?'<span class="tk-chosen">지금 견적으로 고른 구성</span>':button('이 구성 선택','choose','primary','data-index="'+x.index+'"'))+'</div>':'')+'</li>';
 }
