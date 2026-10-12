@@ -70,13 +70,18 @@ class Cards(unittest.TestCase):
         got = [i["product_code"] for i in cs["items"]]
         self.assertTrue(got)
         self.assertFalse({21, 22, 23} & set(got), got)
-        self.assertIn("모니터 4대 연결(외장 그래픽카드)", cs["explore"]["applied"])
+        self.assertIn("외장 그래픽카드", cs["explore"]["applied"])
 
     def test_premium_not_below_recommended_level(self):
         cs = sets({"wants": {"heavy": {"사무용": "쾌적"}}})
         prem = [i for i in cs["items"] if i["role"] == "premium"]
         for i in prem:
             self.assertNotEqual(i["product_code"], 23)
+
+    def test_ports_note_does_not_promise(self):
+        note = X.NOTE_MONITOR_PORTS.format(n=4)
+        self.assertIn("출력 단자 수", note)
+        self.assertNotIn("연결돼요", note)
 
     def test_screen_round_trip(self):
         self.assertEqual(X.clean_wants({"monitors": 4}), {"monitors": 4})
