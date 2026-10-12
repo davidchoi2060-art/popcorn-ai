@@ -50,7 +50,7 @@ async function runJob(browser,job){
     await sleep(500);
   }
   const snap=()=>page.evaluate(()=>[...document.querySelectorAll('#tk-log > *')].map(k=>({kind:k.classList.contains('tk-cards')?'cards':k.classList.contains('is-user')?'user':k.classList.contains('is-ai')?'ai':k.className,text:k.innerText.trim().slice(0,3000),html:k.classList.contains('is-user')?k.innerHTML.slice(0,400):undefined,past:k.classList.contains('is-past')})));
-  const cardInfo=()=>page.$$eval('.tk-cards:not(.is-past) .tk-card',cs=>cs.map(c=>({pill:c.querySelector('.pill')?.innerText.trim(),fit:c.querySelector('.tk-fit')?.innerText.trim()||null,name:c.querySelector('h4')?.innerText.trim(),group:c.closest('.tk-cards').querySelector('.tk-group')?.innerText.trim()||null,price:c.querySelector('.tk-price strong')?.innerText.trim(),gap:[...c.querySelectorAll('p.muted,p.warn-text')].map(p=>p.innerText.trim()).filter(t=>/예산/.test(t))[0]||null,spec:[...c.querySelectorAll('.tk-spec div, .tk-spec li, dl div')].map(d=>d.innerText.replace(/\s+/g,' ').trim())})));
+  const cardInfo=()=>page.$$eval('.tk-cards:not(.is-past) .tk-card',cs=>cs.map(c=>({pill:c.querySelector('.pill')?.innerText.trim(),fit:c.querySelector('.tk-fit')?.innerText.trim()||null,name:c.querySelector('h4')?.innerText.trim(),group:(()=>{let e=c.closest('ul.tk-card-list');while(e&&(e=e.previousElementSibling)){if(e.matches('h3.tk-group'))return e.innerText.trim();if(e.matches('ul.tk-card-list'))break;}return null;})(),note:(()=>{const u=c.closest('ul.tk-card-list');const n=u?.previousElementSibling;return n&&n.matches('.tk-group-note')?n.innerText.trim():null;})(),price:c.querySelector('.tk-price strong')?.innerText.trim(),gap:[...c.querySelectorAll('p.muted,p.warn-text')].map(p=>p.innerText.trim()).filter(t=>/예산/.test(t))[0]||null,spec:[...c.querySelectorAll('.tk-spec div, .tk-spec li, dl div')].map(d=>d.innerText.replace(/\s+/g,' ').trim())})));
   async function afterTurn(n,sent,ms){
     const s=await snap();const i=s.map(x=>x.kind).lastIndexOf('user');const after=s.slice(i+1);
     const ai=after.filter(x=>x.kind==='ai').map(x=>x.text);const ci=after.findIndex(x=>x.kind==='cards'&&!x.past);
@@ -69,8 +69,9 @@ async function runJob(browser,job){
   function judgeCards(t){
     const c=t.cards,need=['game','heavy','edit'].includes(sc.kind),iss=[];
     if(t.aiAbove!==true)iss.push('카드 위 AI 설명 없음');if(t.aiBelow)iss.push('카드 아래 AI 말풍선: 「'+t.aiBelowText.join(' / ').slice(0,120)+'」');
-    if(/아래에서 골라/.test(t.ai.join(' '))&&!t.aiBelow)iss.push('「아래에서 골라 주세요」');
+    const firstGroup=c[0]?.group||null;
     c.forEach((x,i)=>{
+      if(firstGroup&&x.group!==firstGroup&&/사무/.test(x.group||''))return; // 두 번째 사무용 묶음은 기록만
       const g=x.spec.find(s=>/그래픽|GPU|VGA/i.test(s))||'';
       if(need&&(!g||/내장|없음|UHD|Iris|Radeon Graphics|정보 없음/i.test(g)))iss.push('카드'+(i+1)+' 그래픽카드 없음/내장 「'+(g||'줄 없음')+'」');
       const p=won(x.price);if(sc.budget&&p){const r=p/(sc.budget*10000);if(r>1.15)iss.push('카드'+(i+1)+' 예산의 '+Math.round(r*100)+'%');}
@@ -79,7 +80,8 @@ async function runJob(browser,job){
       if(sc.kind==='office'&&/고사양 게임|게임 QHD|게임 FHD/.test(why))iss.push('카드'+(i+1)+' 사무용인데 게임 이유');
       if(x.spec.join(' ').includes('정보 없음'))iss.push('카드'+(i+1)+' 「정보 없음」');
     });
-    if(sc.budget&&c.length){const ins=c.map(x=>won(x.price)).filter(p=>p&&p<=sc.budget*10000);const first=won(c[0].price);if(ins.length&&first>sc.budget*10000)iss.push('예산 안 카드가 있는데 첫 카드가 예산 초과');}
+    if(need&&/사무/.test(firstGroup||''))iss.push('첫 묶음이 사무용 「'+firstGroup+'」');
+    if(sc.budget&&c.length){const ins=c.filter(x=>x.group===firstGroup).map(x=>won(x.price)).filter(p=>p&&p<=sc.budget*10000);const first=won(c[0].price);if(ins.length&&first>sc.budget*10000)iss.push('예산 안 카드가 있는데 첫 카드가 예산 초과');}
     return iss;
   }
   // ---------- 옛 상담 화면(index) ----------
@@ -135,6 +137,14 @@ async function runJob(browser,job){
     const lay=extra.layout[extra.layout.length-1];if(lay?.main?.overflowX||lay?.alt390?.overflowX)iss.push('가로 넘침 '+(lay.main.overflowX?lay.main.scrollWidth:lay.alt390.scrollWidth)+'px');
     row(label,d.rows.length>0&&!iss.length,'부품 '+d.rows.length+'줄 · 부품합 '+sumP.toLocaleString()+'원 · 「'+d.foot.join(' / ')+'」'+(iss.length?' ‖ 문제: '+iss.join('; '):''),sh);
     return d;
+  }
+  async function reopenDetail(label){
+    await page.locator('#tk-now-body [data-action="open-detail"]').first().click();await page.waitForURL(/index\.html/,{timeout:20000}).catch(()=>{});
+    await page.waitForSelector('#view .final-table',{timeout:30000}).catch(()=>{});await sleep(1500);
+    const ok=/#detail/.test(page.url())&&await page.locator('#view .final-table').count()>0;
+    if(!ok)row(label,false,'「구성 자세히 보기」를 눌렀는데 상세가 아님 · 주소 '+page.url().replace(BASE,'')+' · 제목 「'+(await page.locator('#view h2:visible').first().innerText().catch(()=>''))+'」',await shots('상세재진입실패'));
+    if(!ok){await page.goto(BASE+'/mvp3/talk.html',{waitUntil:'networkidle'}).catch(()=>{});await sleep(2000);const d=page.locator('.tk-cards:not(.is-past) [data-action="detail"]').first();if(await d.count()){await d.click();await page.waitForURL(/#detail/,{timeout:20000}).catch(()=>{});await page.waitForSelector('#view .final-table',{timeout:30000}).catch(()=>{});await sleep(1500);}row(label+' · 카드 「상세 보기」로 다시 시도',/#detail/.test(page.url()),'주소 '+page.url().replace(BASE,''));}
+    return ok;
   }
   async function toFinalAndBuy(){
     const fin=page.locator('#actions [data-action="final"]');
@@ -255,7 +265,7 @@ async function runJob(browser,job){
       }
       if(sc.expectNoCards){row('C/E 카드 없어야 함',!t.cards.length,'카드 '+t.cards.length+'장');return;}
       if(!t.cards.length){row('S3 카드',false,'카드 없음 '+(t.cardsEmptyText||'').slice(0,200),await shots('카드없음'));return;}
-      const iss=judgeCards(t);extra.cards=t.cards;
+      const iss=judgeCards(t);extra.cards=t.cards;const nextBtns=await page.$$eval('.tk-cards:not(.is-past) [data-action="explore"], .tk-cards:not(.is-past) [data-action="cond-open"]',b=>b.map(x=>x.innerText.trim()));if(/아래에서 골라/.test(t.ai.join(' '))&&!nextBtns.length)iss.push('「아래에서 골라 주세요」인데 고를 단추 없음');extra.nextButtons=nextBtns;
       row('S3 카드',!iss.length,t.cards.map((x,i)=>(i+1)+') ['+(x.group||'-')+'] '+x.name+' '+x.price+' · '+(x.fit||'')+(x.gap?' · '+x.gap:'')).join(' / ')+(iss.length?' ‖ 문제: '+iss.join('; '):''),await shots('카드'));
       if(sc.op==='reload'){await page.reload({waitUntil:'networkidle'});await sleep(2500);const c2=await cardInfo();row('E16 새로고침 · 카드 화면',c2.length===t.cards.length,'카드 '+t.cards.length+' → '+c2.length+'장',await shots('새로고침-카드',{alt:false}));}
       if(sc.op==='rotate'){await page.setViewportSize({width:844,height:390});await sleep(800);const l=await layout(page);const f=await shots('회전-카드',{alt:false});await page.setViewportSize({width:390,height:844});row('E19 회전 · 카드',!l.overflowX,'844×390 넘침 '+(l.overflowX?l.scrollWidth+'px':'없음'),f);}
@@ -291,7 +301,7 @@ async function runJob(browser,job){
         const tg=page.locator('[data-action="toggle-now"]');if(await tg.isVisible().catch(()=>false)&&!(await page.$eval('#tk-now',e=>e.classList.contains('is-open'))))await tg.click();
         const now=await page.$eval('#tk-now-body',e=>e.innerText).catch(()=>'');
         row('A 대화로 돌아가기 '+(k+1)+'회',/지금 선택한 구성/.test(now),'AI 말풍선 '+counts.map(c=>c.ai).join('→')+'개 · 지금 견적 「'+now.replace(/\s+/g,' ').slice(0,140)+'」',await shots('대화복귀'+(k+1),{alt:k===0}));
-        if(k<rt-1||!sc.talkSave){await page.locator('#tk-now-body [data-action="open-detail"]').first().click();await page.waitForURL(/#detail/,{timeout:20000}).catch(()=>{});await sleep(2500);}
+        if(k<rt-1||!sc.talkSave){if(!(await reopenDetail('A 대화 → 상세 다시 열기 '+(k+1)+'회')))break;}
       }
       if(counts.length>1)row('A 왕복해도 말풍선 안 쌓임',counts[counts.length-1].ai===counts[0].ai,'AI 말풍선 '+counts.map(c=>c.ai).join(' → '));
       if(sc.talkSave&&/talk\.html/.test(page.url())){
@@ -299,7 +309,7 @@ async function runJob(browser,job){
         if(await sv.count()){await sv.click();await talkIdle(60000).catch(()=>{});const st=await page.$eval('#tk-now-body .tk-save-state',e=>e.innerText).catch(()=>'');row('A 대화 화면 견적 저장',/저장했어요/.test(st),st,await shots('대화저장',{alt:false}));
           const ho=page.locator('#tk-now-body [data-action="handoff"]');if(await ho.count()){await ho.click();await talkIdle(60000).catch(()=>{});const link=page.locator('#tk-now-body a.tk-link');row('A 대화 화면 쇼핑몰 이어가기',await link.count()>0,(await link.count())?'링크 '+await link.getAttribute('href'):'링크 안 나옴',await shots('대화쇼핑몰',{alt:false}));}}
         else row('A 대화 화면 견적 저장',false,'저장 단추 없음');
-        await page.locator('#tk-now-body [data-action="open-detail"]').first().click();await page.waitForURL(/#detail/,{timeout:20000}).catch(()=>{});await sleep(2500);
+        await reopenDetail('A 저장·쇼핑몰 뒤 상세 다시 열기');
       }
     }
     await toFinalAndBuy();
