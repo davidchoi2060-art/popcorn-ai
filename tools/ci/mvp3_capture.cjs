@@ -9,7 +9,7 @@
 //   BASE   https://popcornai.co.kr
 //   CASES  「파일이름=상담 문장」을 | 로 구분 (예: 배그롤150=배그와 롤 150만원|사무용100=사무용 100만원)
 //   OUT    캡처를 쓸 폴더
-//   PAGES  index(옛 상담 화면) · talk(대화 화면 talk.html)를 쉼표로. 기본 「index,talk」.
+//   PAGES  index(옛 상담 화면) · talk(대화 화면 talk.html)를 쉼표로. 기본 「talk」(옛 화면은 #202 뒤 상담창이 걷혀 입력칸을 못 찾는다 -- 필요하면 index 를 직접 준다).
 //          대화 화면은 「AI 설명 -> 안내 -> 카드 -> 다음 선택 단추」 순서를 함께 적는다(2026-10-12).
 const {chromium}=require('playwright');
 const fs=require('fs'),path=require('path');
@@ -20,7 +20,7 @@ const CASES=(process.env.CASES||'').split('|').map(x=>x.trim()).filter(Boolean).
   const i=x.indexOf('=');return i>0?{name:x.slice(0,i).trim(),text:x.slice(i+1).trim()}:{name:x.replace(/[^\p{L}\p{N}_-]+/gu,''),text:x};
 });
 if(!CASES.length){console.error('CASES 가 비어 있습니다');process.exit(2);}
-const PAGES=(process.env.PAGES||'index,talk').split(',').map(x=>x.trim()).filter(x=>x==='index'||x==='talk');
+const PAGES=(process.env.PAGES||'talk').split(',').map(x=>x.trim()).filter(x=>x==='index'||x==='talk');
 fs.mkdirSync(OUT,{recursive:true});
 
 async function loadImages(page){
