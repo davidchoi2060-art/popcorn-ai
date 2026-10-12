@@ -20,7 +20,8 @@
                         원본 PNG 는 그대로 두고, 판정·URL 계약도 그대로다(2026-10-11 개편 18번).
 
 ■ 공개 아님은 전부 같은 404 — 미승인·철회·근거 변경·판매중 아님·증빙 확인 불가를 구분해
-  알려 주지 않는다. 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
+  알려 주지 않는다. PC 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
+  parts[].price 는 부품 판매가(`products.sale_price`, 부품 바꾸기와 같은 원천)이고 없으면 null 이다.
 """
 import hashlib
 import io
@@ -135,13 +136,22 @@ def _public_offer(conn, product_code):
         return None, None
     offer = result["data"]
     identity = offer["configuration_id"]
-    codes = {r["ordinal"]: r["explanation_code"] for r in conn.execute(text(
-        "SELECT ordinal, explanation_code FROM pc_configuration_parts"
-        " WHERE configuration_id=:id AND NOT pseudo"), {"id": identity}).mappings()}
+    # 부품 판매가는 부품 바꾸기(api/mvp3_build.BOM_SQL)와 같은 원천·같은 결합으로 읽는다 -- 줄 금액과
+    # 「변경」의 차액이 서로 다른 값을 말하지 않게. 값이 없거나 0 이하면 지어내지 않고 null 이다.
+    rows = list(conn.execute(text(
+        "SELECT pp.ordinal, pp.explanation_code, p.sale_price FROM pc_configuration_parts pp"
+        " LEFT JOIN product_explanations e ON e.source_product_code = pp.explanation_code"
+        " LEFT JOIN products p ON p.product_code = e.product_code"
+        " WHERE pp.configuration_id=:id AND NOT pp.pseudo"), {"id": identity}).mappings())
+    codes = {r["ordinal"]: r["explanation_code"] for r in rows}
+    prices = {r["ordinal"]: r.get("sale_price") for r in rows}
     for part in offer["parts"]:
         code = None if part["pseudo"] else codes.get(part["ordinal"])
         part["photo"] = ({"state": "approved", "url": f"/api/product-images/{code}/detail"}
                          if type(code) is int else {"state": "none", "url": None})
+        price = None if part["pseudo"] else prices.get(part["ordinal"])
+        # 상세 화면의 부품별 금액(2026-10-12 사장님 「추천한대로」: 부품 판매가 + 「조립·기타」 한 줄)
+        part["price"] = price if type(price) is int and price > 0 else None
     job = conn.execute(text(
         "SELECT job_id, visual_basis, asset FROM pc_media_jobs"
         " WHERE configuration_id=:id AND selected AND status='ready'"), {"id": identity}).mappings().first()

@@ -22,11 +22,12 @@ import re
 from sqlalchemy import text
 
 from .db import engine
+from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_weighed
 
 log = logging.getLogger("reco_explore")
 
 CHEAPER, BETTER = "cheaper", "better"
-WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd")
+WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy")
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
@@ -54,6 +55,34 @@ _MONITOR_OWNED = re.compile(r"모니터.{0,6}(있|보유|가지)")
 _MULTI = re.compile(r"(\d{1,3})\s*대")
 _MULTI_WORD = re.compile(r"여러\s*대|대량|단체")
 _UHD = re.compile(r"4\s*k|uhd|4천", re.I)
+# 고객이 «한 단계 위 작업»을 직접 말했으면 그 용도의 추천 기준표(product_fit_levels) 그 단계부터 고른다
+# (2026-10-11 사장님 비교 R25 「엑셀 대용량 파일 돌리는 회계 사무실 PC」: 설명은 램 32GB 를 말했는데 카드는
+# 램 8GB 1단계 PC 가 먼저 나왔다). 낱말은 기준표의 작업 설명(tools/product_fit.py)에 적힌 것만 쓴다 --
+# 추론하지 않는다. 4K 는 위 `uhd` 가 따로 맡는다.
+HEAVY_WORK = (
+    ("사무용", "쾌적", re.compile(r"(대용량|큰|무거운)\s*엑셀|엑셀\s*(파일\s*)?(이\s*|가\s*)?(대용량|커|큰|무거)|"
+                                  r"듀얼\s*모니터|모니터\s*(두|2)\s*대|탭\s*(을\s*)?수십", re.I)),
+    ("주식·트레이딩", "쾌적", re.compile(r"모니터\s*([4-9]|네|다섯|여섯)\s*대|hts\s*(를\s*)?여러", re.I)),
+    ("개발", "쾌적", re.compile(r"도커|docker|컨테이너", re.I)),
+    ("개발", "전문", re.compile(r"가상\s*머신|\bvm\b|대형\s*빌드", re.I)),
+    ("디자인·조판", "쾌적", re.compile(r"(대형|큰)\s*psd|라이트\s*룸|lightroom", re.I)),
+    ("영상편집", "쾌적", re.compile(r"색\s*보정", re.I)),
+    ("영상편집", "전문", re.compile(r"8\s*k\b|다중\s*트랙", re.I)),
+    ("캐드·설계", "쾌적", re.compile(r"솔리드\s*웍스|solidworks|레빗|revit|인벤터|inventor|3d\s*모델링", re.I)),
+    ("캐드·설계", "전문", re.compile(r"\bbim\b|대형\s*어셈블리|구조\s*해석", re.I)),
+    ("음악 작업", "쾌적", re.compile(r"오케스트라|샘플\s*라이브러리", re.I)),
+)
+HEAVY_KEYS = frozenset((u, lv) for u, lv, _ in HEAVY_WORK)
+
+
+def heavy_levels(raw: str | None) -> dict:
+    """고객 문장 -> {기준표 용도: 단계}. 한 용도에 둘이 걸리면 뒤(더 높은) 단계."""
+    s = (raw or "")[:MAX_TEXT]
+    out: dict = {}
+    for usage, level, pat in HEAVY_WORK:
+        if pat.search(s):
+            out[usage] = level
+    return out
 
 
 def _ssd_gb(num: str, unit: str) -> int | None:
@@ -87,22 +116,27 @@ def extract(raw: str | None) -> dict:
                 out["cheapest"] = True
         elif _BETTER.search(s):
             out["nav"] = BETTER
-    m = _RAM.search(s)
+    # 「16기가면 충분해요 아니면 32기가?」는 견주는 질문이라 사양 숫자로 거르지 않는다(talk_rules.drop_weighed).
+    # 견주는 마디만 빼고 읽는다 -- 「램 64GB는 꼭 넣고 SSD는 1TB 아니면 2TB」의 램 64GB 는 조건이다.
+    # 지금 가진 PC 설명(「지금 쓰는 컴퓨터가 i5-8400에 GTX 1060인데」)의 부품도 원하는 조건이 아니다 -- 상담 안내와 같은
+    # 판정(talk_rules.drop_current_pc)으로 뺀다. CPU 모델 번호(i5-8400)는 그래픽카드 번호로 읽지 않는다.
+    c = drop_weighed(drop_current_pc(s))
+    m = _RAM.search(c)
     if m and 4 <= int(m.group(2)) <= 256:
         out["min_ram_gb"] = int(m.group(2))
     elif _RAM_MORE.search(s):
         out.setdefault("more", []).append("ram")
-    m = _SSD.search(s) or None
+    m = _SSD.search(c)
     gb = _ssd_gb(m.group(2), m.group(3)) if m else None
     if gb is None:
-        t = _TB.search(s)
+        t = _TB.search(c)
         gb = _ssd_gb(t.group(1), t.group(2)) if t else None
     if gb is not None:
         out["min_ssd_gb"] = gb
     elif _SSD_MORE.search(s):
         out.setdefault("more", []).append("ssd")
-    if _GPU_CONTEXT.search(s):
-        for g in _GPU.finditer(s):
+    if _GPU_CONTEXT.search(c):
+        for g in _GPU.finditer(_CPU_MODEL.sub(" ", c)):
             n = int(g.group(2))
             if n % 10 or not 1000 <= n <= 9999:
                 continue
@@ -122,6 +156,9 @@ def extract(raw: str | None) -> dict:
         out["multi"] = True
     if _UHD.search(s):
         out["uhd"] = True
+    heavy = heavy_levels(s)
+    if heavy:
+        out["heavy"] = heavy
     return out
 
 
@@ -140,6 +177,11 @@ def clean_wants(raw) -> dict:
     for k in ("white", "silent", "monitor", "uhd"):
         if raw.get(k) is True:
             out[k] = True
+    h = raw.get("heavy")
+    if isinstance(h, dict):
+        h = {u: lv for u, lv in h.items() if (u, lv) in HEAVY_KEYS}
+        if h:
+            out["heavy"] = h
     return out
 
 

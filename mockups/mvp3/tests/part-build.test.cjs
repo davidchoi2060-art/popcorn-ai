@@ -145,3 +145,22 @@ test('the summary keeps the budget line after a change and judges it on the new 
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+// 2026-10-12 카드 검수 X1: 부품을 바꾼 뒤에도 상세 제목 아래에 기본 구성 이름만 있었다.
+test('after a part change the detail says the product name is the base build and names the changed part',async()=>{
+  const h=harness();try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-build-option]'));
+    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    await until(()=>h.flow.state.selected.price===1400000);
+    assert.equal(text(d.querySelector('.live-summary [data-changed-parts]')),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 램 32GB');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('changed spec rows replace only the changed slots and drop the old GPU memory row',()=>{
+  const M=require('../live-model.js'),spec={cpu:'i5-12400F',gpu:'RTX 5060',ram_gb:16,ssd_gb:500,vram_gb:8};
+  const build={changes:[{slot:'SSD',label:'저장장치',after:{name:'PNY CS900 1TB'}},{slot:'GPU',label:'그래픽카드',after:{name:'RTX 5050'}}]};
+  assert.deepEqual(M.changedSpecRows(M.specRows(spec),build),[['CPU','i5-12400F'],['GPU','RTX 5050 (바꾼 부품)'],['메모리','16GB'],['저장장치','PNY CS900 1TB (바꾼 부품)']]);
+  assert.deepEqual(M.changedSpecRows(M.cardSpecRows(spec),null),M.cardSpecRows(spec));
+  assert.equal(M.changedPartsNote(null),'');
+});

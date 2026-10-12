@@ -35,6 +35,16 @@ def load_schema():
 TS = load_schema()
 
 
+def load_rules():
+    spec = importlib.util.spec_from_file_location('_talk_rules_scope_test', ROOT / 'api/talk_rules.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+TR = load_rules()      # talk_rules 는 다른 모듈을 읽지 않는다(DB 무관)
+
+
 def vocab(*, confirmed=None, listed=None):
     return TS.Vocab(
         grades=[{'grade': 'E'}, {'grade': 'C'}],
@@ -144,7 +154,8 @@ class GameScopeTests(unittest.TestCase):
                '_game_context': context, 'assumed': [], 'ai_estimated': [],
                'DEFAULT_RESOLUTION': TS.DEFAULT_RESOLUTION,
                'ASSUMED_RESOLUTION': 'game.resolution=1080p', 'conn': None, 'vocab': v,
-               'body': None, 'talk_notes': [], '_explore_input': lambda b, st, tn: (st, None)}
+               'body': None, 'talk_notes': [], '_explore_input': lambda b, st, tn: (st, None),
+               'TR': TR}
         exec(compile(ast.Module(body=branch.body, type_ignores=[]), 'grid sold branch', 'exec'), env)
         cards.assert_called_once_with(grid_state, [], [], env['notes'], v, None)
         context.assert_not_called()

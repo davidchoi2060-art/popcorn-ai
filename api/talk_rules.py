@@ -287,10 +287,21 @@ UNNAMED_GAME_REPLY = ("즐겨 하시는 게임을 알려 주시면 "
                       "용도와 예산에 맞춰 안내하겠습니다.")
 
 
-def unnamed_game(state) -> bool:
-    """게임 계열 용도인데 게임 이름이 하나도 없는가."""
+# 「스팀 인디(통칭)」처럼 이름 끝에 (통칭)이 붙은 것은 특정 게임이 아니라 장르 묶음이다 -- 등급 조사 대상에서
+# 원천 제외됐다(0091). 그래서 등급이 영영 없고, 이름 있는 게임의 「적합성 확인 전 보류」로 다루면 카드가 나오지 않는다
+# (코덱스 #194 검수 P2-1: 상담은 FHD 기준이라 답하는데 추천은 카드를 비웠다). 이름 없는 게임과 같이 해상도 기준으로 본다.
+_GENERIC_GAME = re.compile(r"\(통칭\)\s*$")
+
+
+def specific_game_names(state) -> list[str]:
+    """장르 통칭을 뺀 실제 게임 이름."""
     g = getattr(state, "game", None)
-    return g is None or not g.names
+    return [n for n in (getattr(g, "names", None) or []) if not _GENERIC_GAME.search(n or "")]
+
+
+def unnamed_game(state) -> bool:
+    """게임 계열 용도인데 (장르 통칭 말고) 게임 이름이 하나도 없는가."""
+    return not specific_game_names(state)
 
 
 def release_unnamed_game(missing: list[str], state, prev_state, is_game_usage,
@@ -379,6 +390,11 @@ PURCHASE_TOPICS: tuple[tuple[str, str, re.Pattern, str], ...] = (
     ("warranty", "A/S·보증", re.compile(r"(?<![A-Za-z])a\s*/?\s*s(?![A-Za-z])|에이에스|보증|무상\s*수리|수리\s*(기간|받|해)", re.I),
      "보증 기간과 A/S 조건은 상품마다 달라 지금 자료로는 확인되지 않았어요."
      " 구매 전에 팝콘PC 쇼핑몰 상품 페이지에서 확인해 주세요."),
+    # 「배송 중에 취소할 수 있어?」는 취소 질문이다 -- 배송 안내가 아니라 아래 취소·환불 안내가 맞다
+    # (2026-10-12 개발 서버, 모델 luna: 취소를 물었는데 「배송과 설치 안내는 쇼핑몰에서 해요」가 나갔다).
+    ("refund", "취소·환불·반품", re.compile(r"취소|환불|반품|청약\s*철회"),
+     "취소·환불·반품 조건은 주문 단계와 상품마다 달라 지금 자료로는 확인되지 않았어요."
+     " 팝콘PC 쇼핑몰의 상품 페이지와 주문 내역에서 확인해 주세요."),
     ("delivery", "배송·설치", re.compile(r"배송|택배|출고|언제\s*(와|받|도착)|방문\s*설치|설치\s*기사|설치(도|까지)?\s*해\s*주"),
      "배송과 설치 안내는 팝콘PC 쇼핑몰에서 해요. 구매 전에 쇼핑몰 상품 페이지에서 확인해 주세요."),
 )
@@ -406,16 +422,99 @@ _CURRENT_PC = re.compile(r"(지금|현재|기존|원래)\s*(제가\s*)?(쓰는|�
                          r"(내\s*|제\s*)?(컴퓨터|컴|pc|본체|데스크\s*[탑톱])\S*|"
                          r"(쓰는|쓰고\s*있는|사용\s*중인|가진|가지고\s*있는)\s*(컴퓨터|컴|pc|본체)\S*|"
                          r"(내|제)\s*(컴퓨터|컴|pc|본체)\s*(는|가|은|이)", re.I)
-_CLAUSE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|[.,?!\n])")
+
+
+# 「지금 쓰는 컴퓨터에 RTX 4070을 달고 싶어요」는 가진 PC 설명이 아니라 새로 달 부품 요청이다 -- 그 마디는 남긴다
+# (코덱스 #188 검수 P2: 마디째 지워 그래픽카드 조건 안내가 빠졌다).
+_WANT_PART = re.compile(r"달(고|아|려|면)|바꾸(고|려)|바꿔|교체|장착|넣(고|으려|어)|업그레이드\s*(하고|하려|할|해)|추가")
+
+
+# 지금 PC 설명은 쉼표로 사양을 늘어놓고(「지금 PC는 i5-9400F, GTX1660, 램 16GB예요」), 다음 문장에 사양만 따로
+# 적기도 한다(「지금 PC가 너무 느려요. i5-9400F, GTX1660, 램 16GB예요.」). 첫 마디 하나만 지우면 남은 사양을
+# 「말씀하신 GTX 1660 · 메모리 16GB 조건」으로 읽었다(2026-10-12 카드 검수 · 개발 서버 재현).
+_PIECE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|,)")
+_SENTENCE_END = re.compile(r"[.?!\n]")
+_TURN_POINT = ("인데", "는데", "이고", "이라서", "라서", "이에요", "예요", "입니다", "이거든요")
+_PART_SPEC = (_CPU, _GPU, _RAM, _STORAGE)
+
+
+def _sentence_end(text: str, pos: int) -> int:
+    m = _SENTENCE_END.search(text, pos)
+    return m.end() if m else len(text)
+
+
+def _current_pc_cut(text: str, start: int, pos: int) -> int:
+    """start 에서 시작한 지금 PC 설명이 끝나는 자리. 원하는 부품을 말한 조각(「RTX 4070을 달고 싶어요」)은
+    남기고, 「인데·이고」 같은 마디 끝을 만나면 거기서 멈춘다(뒤는 새 마디다)."""
+    stop = _sentence_end(text, pos)
+    piece_start = start
+    while True:
+        pe = _PIECE_END.search(text, pos, stop)
+        piece_stop = pe.end() if pe else stop
+        if _WANT_PART.search(text[piece_start:piece_stop]):
+            return piece_start
+        if not pe or pe.group() in _TURN_POINT:
+            return piece_stop
+        pos = piece_start = piece_stop
+
+
+def _spec_only_sentence(sentence: str) -> bool:
+    """사양만 늘어놓은 문장인가(원하는 말·예산이 없다)."""
+    return (any(r.search(sentence) for r in _PART_SPEC) and not _WANT_PART.search(sentence)
+            and not _MAN.search(sentence) and not _WON.search(sentence))
 
 
 def drop_current_pc(text: str) -> str:
-    """지금 가진 PC 를 설명하는 마디를 뺀 문장."""
-    m = _CURRENT_PC.search(text or "")
-    if not m:
-        return text or ""
-    end = _CLAUSE_END.search(text, m.end())
-    return text[:m.start()] + (text[end.end():] if end else "")
+    """지금 가진 PC 를 설명하는 마디를 모두 뺀 문장. 바로 뒤에 사양만 늘어놓은 문장도 그 설명으로 본다."""
+    out = text or ""
+    pos = 0
+    while True:
+        m = _CURRENT_PC.search(out, pos)
+        if not m:
+            return out
+        cut = _current_pc_cut(out, m.start(), m.end())
+        if cut == m.start():
+            pos = m.end()
+            continue
+        # 지금 PC 문장을 통째로 지웠으면 이어지는 「사양만 있는 문장」도 같은 설명이다.
+        end = _sentence_end(out, m.start())
+        if not out[cut:end].strip(" .?!\n"):
+            cut = end
+        if cut == end:
+            while cut < len(out):
+                nxt = _sentence_end(out, cut)
+                if not _spec_only_sentence(out[cut:nxt]):
+                    break
+                cut = nxt
+        out = out[:m.start()] + out[cut:]
+        pos = m.start()
+
+
+# 「램 16기가면 충분해요 아니면 32기가 사야 돼요?」는 둘을 견주는 질문이다 -- 조건으로 읽으면 「메모리 16GB
+# 조건으로 골라 볼게요」가 된다(2026-10-12 개발 서버, 모델 luna). 견주는 문장에서는 부품 숫자를 조건으로
+# 쓰지 않고 설명(AI 답)에 맡긴다. 「16기가면 충분할까요?」처럼 충분한지 묻는 것도 같다.
+_WEIGH = re.compile(r"아니면|(?<![a-z])vs(?![a-z])|또는|둘\s*중|(어느|뭐)\s*(게|것이|쪽이|가)\s*(더\s*)?(나아|낫|좋|맞)|"
+                    r"중에\s*(뭐|어느)|면\s*(충분|될까|되나|돼요\?|되요\?)|충분\s*(할까|한가|하나|해요\?|해\?|할지)", re.I)
+
+
+def weighs_options(text: str) -> bool:
+    """부품 사양을 견주거나 충분한지 묻는 문장인가(조건이 아니라 질문이다)."""
+    return bool(_WEIGH.search(text or ""))
+
+
+# 「램 64GB는 꼭 넣고 SSD는 1TB 아니면 2TB 중 뭐가 좋나요?」 -- 견주는 것은 SSD 마디뿐이다. 마디 단위로 보고
+# 견주는 마디만 뺀다(코덱스 #194 검수 P2-2: 문장 전체를 보아 정한 램 64GB 까지 빠졌다).
+_CLAUSE_SPLIT = re.compile(r"[,.;\n]|(?<=고)\s+|\s+그리고\s+")
+
+
+def drop_weighed(text: str) -> str:
+    """견주거나 충분한지 묻는 마디를 뺀 문장 -- 남은 마디의 부품 숫자만 조건이다."""
+    t = text or ""
+    if not weighs_options(t):
+        return t
+    return " ".join(c for c in _CLAUSE_SPLIT.split(t) if c and c.strip() and not weighs_options(c))
+
+
 PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
 # 2026-10-11 품질관리 M6: 「4K 편집」「최고사양」은 추천이 거르지 않는데 AI 가 「맞춰 드릴게요」라
 # 답했다. 4K 는 게임 칸(state.game.resolution)에서만 추천에 쓰인다 — 비게임 tier_key 힌트는
@@ -427,7 +526,20 @@ _TOP = re.compile(r"최고\s*(사양|옵션?|성능|급)|최상\s*(급|사양)|�
 def purchase_topics(text: str) -> list[str]:
     """문장에 들어 있는 구매·사후 주제 키 — 순서는 PURCHASE_TOPICS 순서."""
     t = text or ""
-    return [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+    hit = [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
+    # 「배송 중에 취소」의 배송은 취소 시점이다 -- 배송 기간을 함께 묻지 않았으면 배송 안내는 빼고 취소 안내만 낸다
+    # (「배그PC 추천하고 배송일과 환불도 알려줘」는 둘 다 낸다).
+    # 「배송 중에」처럼 배송이 취소·환불의 «시점»만 꾸미면 배송 안내를 빼고, 배송·설치를 따로 물었으면 둘 다 낸다
+    # (코덱스 #195 검수: 「배송 중에 취소는 언제까지」에 배송 안내가 붙었고, 「반품 조건 + 방문 설치도 해 주나요」에는
+    # 설치 안내가 빠졌다).
+    if "refund" in hit and "delivery" in hit:
+        rest = _DELIVERY_WHEN.sub(" ", t)
+        if not dict((k, p) for k, _l, p, _d in PURCHASE_TOPICS)["delivery"].search(rest):
+            hit.remove("delivery")
+    return hit
+
+
+_DELIVERY_WHEN = re.compile(r"배송\s*(중|전|후|도중|완료|받기\s*전|오기\s*전)\s*(에|이|에는|이라도|이면|인데)?|(택배|배송)\s*비")
 
 
 # 추천이 거르는 조건의 이름표 머리(unsupported_conditions 가 만드는 문자열과 같은 틀).
@@ -447,6 +559,18 @@ def requested_conditions(text: str, state, prev_state=None) -> tuple[list[str], 
             [c for c in conds if not _applied_by_recommend(c)])
 
 
+# 「RAM 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.」는 설명을 바라는 말이다 -- 부품 숫자를 조건으로
+# 읽어 「메모리 16GB 조건으로 판매 중인 PC를 골라 볼게요」와 카드 3장을 냈다(2026-10-12 카드 검수 X2).
+# 이런 문장은 조건으로 읽지 않고, 화면은 추천을 부르지 않는다(응답 explain_only).
+_EXPLAIN_ONLY = re.compile(r"추천\s*(은|는|까지는)?\s*(아직\s*)?(필요\s*없|안\s*해\s*(도|주셔도))|추천\s*(말고|없이)\s*(설명|차이|기준|비교)|"
+                           r"(차이|기준|비교)\s*만(?!\s*(으로|가지고))")
+
+
+def explain_only(text: str) -> bool:
+    """추천 없이 설명만 바라는 문장인가."""
+    return bool(_EXPLAIN_ONLY.search(text or ""))
+
+
 def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False) -> list[str]:
     """추천이 반영하지 않는 조건 — 고객 문장과 검증된 state 에서만 읽는다.
     (_all=True 면 추천이 거르는 조건까지 모두 — requested_conditions 가 나눈다.)
@@ -454,7 +578,10 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     state.prefs 는 누적이라, 이전 턴에 이미 있던 선호는 다시 말하지 않는다(매 턴 같은
     안내가 되풀이되면 AI 답이 영영 안 보인다).
     """
+    if explain_only(text):
+        return []
     t = drop_current_pc(text or "")
+    t = drop_weighed(t)
     out = []
     m = _GPU.search(t)
     if m:

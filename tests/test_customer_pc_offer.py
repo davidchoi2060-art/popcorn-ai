@@ -43,6 +43,7 @@ class Rows:
 class Conn:
     def __init__(self, job):
         self.job, self.sql, self.options, self.began, self.rolled_back = job, [], {}, False, False
+        self.part_price = 250000
 
     def execution_options(self, **kw):
         self.options.update(kw); return self
@@ -55,7 +56,7 @@ class Conn:
     def execute(self, statement, params=None):
         q = str(statement); self.sql.append(q)
         if "FROM pc_configuration_parts" in q:
-            return Rows([{"ordinal": 0, "explanation_code": 4321}])
+            return Rows([{"ordinal": 0, "explanation_code": 4321, "sale_price": self.part_price}])
         if "FROM pc_media_jobs" in q:
             return Rows([deepcopy(self.job)] if self.job else [])
         return Rows([])
@@ -121,6 +122,15 @@ class CustomerPcOfferTest(unittest.TestCase):
         # 가격은 이 경로가 지어내지 않는다
         self.assertEqual(config["price"]["state"], "unknown")
         self.assertIsNone(config["price"]["amount"])
+
+    def test_part_sale_price_is_passed_and_pseudo_or_missing_is_null(self):
+        # 2026-10-12 사장님 「추천한대로」: 상세 화면 부품별 금액 + 「조립·기타」 한 줄. 부품 바꾸기와 같은 원천.
+        parts = self.get("/99413").json()["public_configuration"]["parts"]
+        self.assertEqual((parts[0]["price"], parts[1]["price"]), (250000, None))
+        self.assertTrue(any("LEFT JOIN products p ON p.product_code = e.product_code" in q for q in self.conn.sql))
+        for bad in (None, 0, -5):
+            self.conn.part_price = bad
+            self.assertIsNone(self.get("/99413").json()["public_configuration"]["parts"][0]["price"])
 
     def test_snapshot_is_repeatable_read_read_only_and_rolled_back(self):
         self.get("/99413")

@@ -337,6 +337,18 @@ REPLY_SMALLTALK_FOLLOW = "궁금하거나 불편한 점이 있으면 편하게 �
 ONE_LINER_MAX = 40
 
 
+# 한 턴에 질문은 하나까지 -- AI 답이 이미 무엇을 묻고 있으면(「어떤 용도로 쓰실지 말씀해 주세요.」) 갈래 질문을
+# 붙이지 않는다. 「이런 가격 미쳤냐」·「ㅋㅋㅋㅋ 컴퓨터가 날아다녀?」에 질문 두 개가 잇달아 나갔다(2026-10-12 개발
+# 서버, 모델 luna · 사장님 원칙 「되묻기 최소」). 갈래 질문은 답에 질문이 하나도 없을 때만 붙는다.
+# 물음표는 문장 끝 물음표만 센다 -- 「물음표(?)는…」처럼 괄호·따옴표 안 물음표는 질문이 아니다(코덱스 #196 검수 P3).
+# 「말씀해 주실래요.」·「알려 주시겠어요.」처럼 물음표 없는 부탁도 질문이다(같은 검수 P2).
+_ASKING = re.compile(r"(?<![(「『'\"])\?(?![)」』'\"])|(알려|말씀해|말해)\s*주(세요|시면|실래요|시겠어요|시겠습니까|실\s*수\s*있)")
+
+
+def _asks_already(reply: str) -> bool:
+    return bool(_ASKING.search(reply or ""))
+
+
 def _count_sentences(text: str) -> int:
     return len([p for p in _SENTENCE.findall(text or "") if p.strip()])
 
@@ -1258,7 +1270,19 @@ def parse_talk(body: ParseBody, request: Request):
 
     unreadable = False
     try:
-        obj = _extract_json(result.text)
+        try:
+            obj = _extract_json(result.text)
+        except Exception as first:
+            # 형식이 깨진 응답은 가끔이다(2026-10-12 개발 서버: 같은 업그레이드 문장 3번 중 1번, 모델 luna).
+            # 고객에게 「다르게 말해 달라」고 하기 전에 한 번만 다시 묻는다. 다시 물어도 깨지거나 실패하면
+            # 아래 「못 읽었다」 길로 간다 -- 이 턴을 502 로 끊지 않는다.
+            log.warning("[talk] non-JSON response from %s/%s, retry once: %s",
+                        result.provider, result.model, first)
+            try:
+                result = _call_a()
+            except llm.LLMError as e:
+                raise ValueError(f"retry failed: {type(e).__name__}") from e
+            obj = _extract_json(result.text)
     except Exception as e:
         # 모델이 형식을 어긴 것도 실패다 -- 빈 조건으로 뭉개면 "못 읽었다"와
         # "AI가 깨졌다"를 화면이 구분하지 못한다.
@@ -1297,6 +1321,9 @@ def parse_talk(body: ParseBody, request: Request):
     # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
     # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
     # 본체 구성 설명(build)일 때만 -- 「게임용 PC 램 역할이 뭐예요?」 같은 부품 설명 뒤에 추천을 열지 않는다(2026-10-12 검수 9595 P2-2).
+    # 장르 통칭 이름(「스팀 인디(통칭)」)만 있어도 같다(TR.unnamed_game) -- 설명이 이미 나갔는데 「주로 어떤 게임을 하실
+    # 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 실제 게임 이름이 있는데 등급이 없으면 추천(grid_public)이
+    # 「적합성 확인 전 보류」로 카드를 비우므로 여기서도 풀지 않는다(코덱스 #194 검수 P2-1 -- 답과 카드가 어긋났다).
     if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
             and getattr(ans, "kind", "game") == "pc_advice" and getattr(ans, "topic", None) == PA.TOPIC_BUILD
             and (ans.answer or "").strip()):
@@ -1409,7 +1436,10 @@ def parse_talk(body: ParseBody, request: Request):
     # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
     asked_before = TS.flow_asked(body.chat_flow)
     # 램·SSD 같은 구성 조건 안내(cond_notes)는 설명과 함께 둔다 -- 판매 주제 안내만 설명을 대신한다.
-    plain_pc = (not exceptions and pc is True and stage == TS.STAGE_PC
+    # 한 문장 안 되풀이(「싸게 싸게 싸게 싸게」)는 응대 문장을 바꾸지 않는 예외라 평범한 PC 문장으로 본다 -- 막으면 용도만
+    # 되묻고 카드가 없었다(2026-10-12 개발 서버, 모델 luna). 같은 문장을 거듭 보낸 반복(turns)은 기존대로 사람 상담 길이다.
+    soft_exc = {"repeat"} if TX.repeated(text, history) == "words" else set()
+    plain_pc = (not (set(exceptions) - soft_exc) and pc is True and stage == TS.STAGE_PC
                 and not topic_notes and not laptop)
     # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
     # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
@@ -1422,7 +1452,8 @@ def parse_talk(body: ParseBody, request: Request):
                        and bool(state.budget_won or getattr(state, "prefs", None) or cond_notes))
     if plain_pc and explained and missing == [TS.MISSING_USAGES]:
         reply = " ".join(cond_notes)
-    elif plain_pc and (asked_before or build_explained) and missing == [TS.MISSING_USAGES]:
+    # 가격 방향(「싸게」·「좋은 걸로」)을 말했으면 그것도 조건이다 -- 용도를 되묻지 않고 일반 용도로 카드를 낸다.
+    elif plain_pc and (asked_before or build_explained or pref) and missing == [TS.MISSING_USAGES]:
         # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
         # 구성 설명을 먼저 한 턴도 같다(2026-10-12 일반 AI 비교 R10·R11: 「조용한 PC」·「화이트 100만원대」에 설명 뒤
         # 용도만 되묻고 카드가 없었다 -- 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
@@ -1431,14 +1462,21 @@ def parse_talk(body: ParseBody, request: Request):
             state = state.model_copy(update={"usages": [label]})
             missing = TS.missing_for(state, vocab)
             fit = TD._fit_usage(label)
-            reply = (TD.no_usage_reply(TD.basis_work(fit) if fit else None) + " " + " ".join(cond_notes)).strip()
+            price_line = TD.PREF_LINE.get(pref, "") if pref and state.budget_won is None else ""
+            reply = " ".join(x for x in (TD.no_usage_reply(TD.basis_work(fit) if fit else None), price_line,
+                                         " ".join(cond_notes)) if x).strip()
             log.info("[talk] answer-first: no usage after ask - assumed general use")
     elif plain_pc and not missing and (
             # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
             (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
             or (asked_before and "?" in reply)
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage)
+        # 카드는 화면이 들고 있는 조건(wants.heavy)을 계속 쓴다 -- 이번 문장에 작업 낱말이 없으면 앞서 말한 작업으로
+        # 기준 줄을 맞춘다(코덱스 #194 검수 P2-3: 「대용량 엑셀」 뒤 「조금 더 싸게」에 카드는 쾌적, 기준 줄은 기본이었다).
+        # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
+        heavy = TD.X.heavy_levels(text) or next(
+            (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy)
         if first:
             reply = (first + " " + " ".join(cond_notes)).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
@@ -1461,7 +1499,7 @@ def parse_talk(body: ParseBody, request: Request):
     # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
     if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
             and not exceptions and not notices and not laptop and not handoff_offer
-            and TE.ASK not in reply):
+            and TE.ASK not in reply and not _asks_already(reply)):
         reply = (reply.rstrip() + " " + TE.ASK).strip()
         entry_asked, entry_src = True, "ask"
     log.info("[talk] entry: key=%s src=%s", entry or "-", entry_src)
@@ -1604,6 +1642,8 @@ def parse_talk(body: ParseBody, request: Request):
         "exceptions": exceptions,
         # 참이면 화면이 「사람 상담 남기기」(구매 상담 신청, 주제 「기타」)를 띄운다.
         "handoff_offer": handoff_offer,
+        # 참이면 고객이 추천 없이 설명만 바랐다(「차이만 설명해 주세요」) -- 화면은 추천 카드를 부르지 않는다.
+        "explain_only": TR.explain_only(text),
         # "ai_unreadable" 이면 AI 응답을 못 읽은 턴이다 -- state 는 이전 그대로이고,
         # 화면은 추천을 다시 부르지 않는다.
         "fallback": "ai_unreadable" if unreadable else None,

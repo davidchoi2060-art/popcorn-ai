@@ -44,6 +44,27 @@
     const from=text(comparison.tag)||'앞의 구성';
     return from+'에서 '+parts.join(', ')+(product.role==='premium'?' 바꿔 사양을 높인 구성이에요.':' 바꾼 구성이에요.');
   }
+  // 부품을 바꾼 구성(build.changes)은 사양 줄도 바꾼 부품으로 보인다. 바꾼 부품의 용량·코어 수는 서버가 주지 않으므로
+  // 지어내지 않고 부품 이름을 그대로 쓴다(2026-10-12 카드 검수 X1: SSD 1TB 로 바꿔도 「저장장치 500GB SSD」로 남았다).
+  // 바꾼 부품 칸 -> 바꿔 쓸 사양 줄 이름(카드·상세 두 표기) · 더는 맞지 않아 뺄 줄.
+  const CHANGE_ROWS={CPU:[['CPU'],[]],GPU:[['GPU'],['GPU 메모리']],RAM:[['RAM','메모리'],[]],SSD:[['저장장치'],[]],HDD:[['저장장치'],[]]};
+  function changedSpecRows(rows,build){
+    const changes=object(build)&&Array.isArray(build.changes)?build.changes:[];
+    const names=new Map(),drop=new Set();
+    for(const c of changes){
+      const rule=CHANGE_ROWS[String(c?.slot||'').toUpperCase()];
+      if(!rule||!c.after?.name)continue;
+      for(const label of rule[0])names.set(label,[...(names.get(label)||[]),c.after.name]);
+      for(const label of rule[1])drop.add(label);
+    }
+    return rows.filter(([label])=>!drop.has(label)).map(([label,value])=>names.has(label)?[label,names.get(label).join(', ')+' (바꾼 부품)']:[label,value]);
+  }
+  // 상품 이름은 쇼핑몰의 기본 구성 이름이다. 부품을 바꿨으면 이름 아래에 무엇을 바꿨는지 밝힌다.
+  function changedPartsNote(build){
+    const changes=object(build)&&Array.isArray(build.changes)?build.changes:[];
+    const list=changes.filter(c=>c?.after?.name).map(c=>(text(c.label)||c.slot)+' '+c.after.name);
+    return list.length?'상품 이름은 기본 구성 기준이에요. 바꾼 부품: '+list.join(', '):'';
+  }
   function specText(spec){return typeof spec==='string'?spec:specRows(spec).map(([label,value])=>label+' '+value).join('\n');}
   function safeUrl(value){
     if(typeof value!=='string')return null;
@@ -75,7 +96,8 @@
         (p.pseudo&&(p.name!==null||p.description!==null||p.specs.length)))return null;
       ordinals.add(p.ordinal);
       parts.push({ordinal:p.ordinal,slot:p.slot,quantity:p.quantity,pseudo:p.pseudo,name:p.name,description:p.description,
-        specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p)});
+        specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p),
+        price:!p.pseudo&&positive(p.price)?p.price:null});
     }
     const price=value.price,stock=value.stock,c=value.compatibility,photo=value.photo,conditions={};
     if(!object(price)||!['confirmed','snapshot','estimated','needs_reconfirmation','unknown'].includes(price.state)||
@@ -257,6 +279,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,customItem,partOptions,buildOptions,buildQuote,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,changedSpecRows,changedPartsNote,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,customItem,partOptions,buildOptions,buildQuote,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

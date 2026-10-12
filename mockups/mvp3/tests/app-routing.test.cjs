@@ -17,13 +17,13 @@ function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve
 async function until(check){for(let i=0;i<80;i++){if(check())return;await tick();}throw Error('probe did not settle');}
 function standard(url){return url==='/api/talk/parse'?parsed:url==='/api/grid/recommend'?recommendation:empty;}
 const active=[];
-function harness({hash='#welcome',respond=standard,journal=null}={}){
+function harness({hash='#welcome',respond=standard,journal=null,fromTalk=false}={}){
   const disposed=deferred(),calls=[],errors=[];
   const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'http://qa.invalid/'+hash,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   Object.defineProperty(w,'crypto',{value:webcrypto});
-  w.localStorage.setItem(KEY,ACCESS);if(journal)w.sessionStorage.setItem(JOURNAL,journal);
+  w.localStorage.setItem(KEY,ACCESS);if(journal)w.sessionStorage.setItem(JOURNAL,journal);if(fromTalk)w.sessionStorage.setItem('popcorn-mvp3-from-talk-v1',JSON.stringify({focus:'parts'}));
   w.eval(read('live-model.js'));w.eval(read('api-client.js'));
   w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async(url,options)=>{
     const call={url,method:options.method,body:options.body?JSON.parse(options.body):null,signal:options.signal,headers:options.headers};calls.push(call);
@@ -148,4 +148,14 @@ test('the landing chat box hands its text to the talk screen through tab storage
   assert.equal(saved.text,'지금 쓰는 PC가 느려요');assert.ok(Number.isFinite(saved.at));
   assert.equal(h.calls.length,0,'the landing screen itself sends nothing');
   h.errors.splice(0,h.errors.length,...h.errors.filter(m=>!/navigation/i.test(m)));
+});
+test('first question header hides once the customer has spoken (2026-10-12 owner report)',async()=>{
+  const h=harness(),intro=h.w.document.querySelector('#chat-body .chat-intro');assert.equal(intro.hidden,false);
+  await h.flow.submit('게임용 PC 추천해줘');await until(()=>h.flow.state.phase===null);assert.equal(intro.hidden,true);
+});
+test('detail opened from the talk screen hides the old consultation panel; direct entry keeps it (2026-10-12 card review)',()=>{
+  const css=read('styles.css');assert.match(css,/body\[data-from-talk="1"\] \.workspace>\.chat\{display:none\}/);
+  assert.match(css,/@media\(max-width:760px\)\{body \.topbar\{flex-wrap:wrap\}body \.topbar nav\{flex-wrap:wrap;max-width:100%\}body \.topbar nav>\*\{white-space:nowrap\}\}/);
+  const a=harness({fromTalk:true});assert.equal(a.w.document.body.dataset.fromTalk,'1');assert.equal(a.w.document.querySelector('#back-to-talk').hidden,false);
+  const b=harness();assert.equal(b.w.document.body.dataset.fromTalk,undefined);assert.equal(b.w.document.querySelector('#back-to-talk').hidden,true);
 });

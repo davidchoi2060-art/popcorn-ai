@@ -285,3 +285,34 @@ test('a budget far below the cheapest PC shows only the server line, no cards',a
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+// 2026-10-12 카드 검수 X1: SSD 를 1TB 로 바꿔도 지금 견적 사양은 「저장장치 500GB SSD」, 쇼핑몰 연결은 기본 구성 안내 없이 열렸다.
+test('the current quote shows the changed part instead of the base spec and says the name is the base build',async()=>{
+  const ss=storage();
+  ss.setItem('popcorn-mvp3-conversation-v1',JSON.stringify({version:1,saved_at:Date.now(),talk:t150,chat_flow:null,history:[],messages:[{who:'user',text:'150만원 게임용'}],
+    current:{product_code:101,changes:[{ordinal:1,product_code:502}],selection_state:t150}}));
+  const ssd={ordinal:1,slot:'SSD',label:'저장장치',quantity:1,before:{product_code:501,name:'SSD 512GB',price:50000},after:{product_code:502,name:'PNY CS900 1TB',price:100000},delta:50000};
+  const h=harness((url)=>url==='/api/grid/recommend'?{data:reco([pc(101,'CODE/MOCK A',1450000)])}
+    :url==='/api/mvp3/build/quote'?{data:{ok:true,base_code:101,base_price:1450000,total:1500000,changes:[ssd]}}:{data:{ok:true,quotes:[],has_more:false}},ss);
+  try{
+    await until(()=>h.text('#tk-now-body .tk-price').includes('1,500,000원'));
+    const body=h.text('#tk-now-body');
+    assert.match(body,/상품 이름은 기본 구성 기준이에요\. 바꾼 부품: 저장장치 PNY CS900 1TB/);
+    assert.match(body,/저장장치PNY CS900 1TB \(바꾼 부품\)/);
+    assert.ok(!body.includes('512GB SSD'));
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+// 2026-10-12 카드 검수 X2: 「차이만 설명해 주세요 · 아직 추천은 필요 없어요」에도 설명 뒤 카드 3장이 나왔다.
+test('an explain-only answer does not call the recommendation',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:t150,missing:[],pc_related:true,explain_only:true,
+      answer:'16GB는 문서·게임에, 32GB는 영상 편집에 여유가 있어요.',reply:''}}
+    :url==='/api/grid/recommend'?{data:reco([pc(101,'CODE/MOCK A',1450000)])}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    await h.say('RAM 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.');
+    assert.ok(!h.calls.some(c=>c.url==='/api/grid/recommend'));
+    assert.match(h.text('#tk-log'),/32GB는 영상 편집에 여유/);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
