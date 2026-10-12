@@ -143,7 +143,8 @@ test('opening the talk page without a landing start keeps the earlier talk',asyn
   const ss=storage();const a=harness(scripted(),ss);
   try{await a.say('150만원 게임용');}finally{a.close();}
   const b=harness(scripted(),ss);
-  try{await until(()=>/150만원 게임용/.test(b.text('#tk-log')));}finally{b.close();}
+  // 되살린 대화가 추천 카드까지 다시 불러온 뒤 닫는다(#229 -- 새로고침해도 카드가 남는다).
+  try{await until(()=>/150만원 게임용/.test(b.text('#tk-log'))&&b.doc.querySelector('.tk-card')&&!b.doc.querySelector('#tk-send').disabled);await tick();}finally{b.close();}
 });
 test('an old landing sentence is dropped instead of being sent later',async()=>{
   const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'예전 글',at:Date.now()-3600000}));

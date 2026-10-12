@@ -78,9 +78,16 @@ def _build(product):
     return {'base_price': b['base_price'], 'changes': changes} if changes else None
 
 
+def _sets(product):
+    """보관 견적의 대수(api/mvp3_saved_quotes SaveBody.sets). 없거나 모양이 다르면 1대."""
+    n = (product or {}).get('sets')
+    return n if type(n) is int and 1 <= n <= 10 else 1
+
+
 def _result(h, item, quote_id, build=None):
     code = item['product_code']
     return {
+        'sets': item.get('qty') or 1,
         'ok': True, 'handoff_no': h['handoff_no'], 'quote_id': quote_id,
         'product_code': code, 'name': item['name_snap'],
         'price_quoted': item['price_quoted'], 'price_mall': item['price_mall'],
@@ -98,7 +105,7 @@ def _existing(conn, quote_id):
     if not h:
         return None
     item = conn.execute(text(
-        "SELECT product_code, name_snap, price_quoted, price_mall, mall_status"
+        "SELECT product_code, name_snap, price_quoted, price_mall, mall_status, qty"
         " FROM handoff_items WHERE handoff_id=:h ORDER BY line_no LIMIT 1"),
         {'h': h['handoff_id']}).mappings().first()
     return (h, item) if item else None
@@ -149,6 +156,7 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
     else:
         status = '확인됨'
     name = product.get('name') or ('상품 %d' % code)
+    sets = _sets(product)     # 같은 구성 여러 대 -- 인계 합계는 한 대 금액 × 대수, 쇼핑몰 줄 수량도 대수다
 
     with engine.begin() as conn:
         # 견적 하나에 잠금을 먼저 잡고 기존 기록을 본다. 채번 잠금(_no)만으로는 같은 견적의 동시 요청
@@ -162,12 +170,14 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
         gate_on = access_gate.column_ready(conn, 'handoffs')
         delta = sum(c['delta'] for c in build['changes']) if build else 0
         note = {'source': 'mvp3', 'mvp3_quote_id': qid, 'unknown': [code] if status == '확인못함' else []}
+        if sets > 1:
+            note['sets'] = sets
         if build:
             note['build'] = {'base_price': quoted, 'changes': [
                 {k: c.get(k) for k in ('ordinal', 'slot', 'quantity', 'before', 'after', 'delta')} for c in build['changes']]}
         note = json.dumps(note, ensure_ascii=False)
-        params = {'no': no, 'u': uid, 'tq': total,
-                  'tm': (price_mall if price_mall is not None else quoted) + delta,
+        params = {'no': no, 'u': uid, 'tq': total * sets,
+                  'tm': ((price_mall if price_mall is not None else quoted) + delta) * sets,
                   'chk': price_mall is not None, 'ch': 1 if status == '가격변동' else 0,
                   'so': 1 if status == '품절' else 0, 'note': note}
         cols = ('handoff_no, session_id, snapshot_id, quote_type, member_id, user_id,'
@@ -191,10 +201,10 @@ def handoff_saved_quote(quote_id: UUID, request: Request, response: Response):
         conn.execute(text(
             "INSERT INTO handoff_items (handoff_id, line_no, product_code, item_kind,"
             " part_type, name_snap, price_quoted, price_mall, qty, mall_status)"
-            " VALUES (:h, 1, :c, 'built_pc', NULL, :nm, :pq, :pm, 1, :st)"),
-            {'h': hid, 'c': code, 'nm': name, 'pq': quoted, 'pm': price_mall, 'st': status})
+            " VALUES (:h, 1, :c, 'built_pc', NULL, :nm, :pq, :pm, :n, :st)"),
+            {'h': hid, 'c': code, 'nm': name, 'pq': quoted, 'pm': price_mall, 'n': sets, 'st': status})
     log.info('[mvp3-handoff] %s code=%s status_ok=%s', no, code, status == '확인됨')
-    return {'ok': True, 'handoff_no': no, 'quote_id': qid, 'product_code': code, 'name': name,
+    return {'ok': True, 'handoff_no': no, 'quote_id': qid, 'product_code': code, 'name': name, 'sets': sets,
             'price_quoted': quoted, 'price_mall': price_mall, 'mall_status': status,
             'mall_url': _mall_url(code), 'changes': build['changes'] if build else [],
             'price_check': check}
