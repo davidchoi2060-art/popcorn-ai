@@ -15,10 +15,7 @@ jobs:
       max-parallel: 1
       matrix:
         include:
-          - {entry: upgrade, vp: 모바일}
-          - {entry: upgrade, vp: PC}
-          - {entry: parts, vp: PC}
-          - {entry: talk, vp: 모바일}
+          - {entry: extra, vp: PC}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,7 +32,7 @@ jobs:
           ENTRY: ${{ matrix.entry }}
           VP: ${{ matrix.vp }}
           OUT: ${{ runner.temp }}/out
-        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node qa-cards/run.cjs
+        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node qa-cards/${{ matrix.entry == 'extra' && 'extra' || 'run' }}.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -62,4 +59,4 @@ jobs:
           git add -A
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "qa cards run ${GITHUB_RUN_ID}"
           auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
-          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/qa-cards-20261012-results2
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/qa-cards-20261012-results3
