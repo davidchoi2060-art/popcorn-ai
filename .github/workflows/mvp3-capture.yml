@@ -23,6 +23,9 @@ on:
       pages:
         description: 'index(옛 상담 화면) · talk(대화 화면)를 쉼표로'
         default: 'talk'
+      qty:
+        description: '1 이면 메모리·저장장치 수량 한도와 수량 칸을 함께 캡처'
+        default: '0'
   pull_request:
     paths:
       - .github/workflows/mvp3-capture.yml
@@ -60,6 +63,7 @@ jobs:
           CASES: ${{ inputs.cases || '배그롤150=배그와 롤 150만원으로 추천해줘|롤150=롤 150만원으로 추천해줘|사무용100=사무용 100만원으로 추천해줘' }}
           OUT: ${{ runner.temp }}/mvp3-captures
           PAGES: ${{ inputs.pages || 'talk' }}
+          QTY: ${{ inputs.qty || '1' }}
         run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node tools/ci/mvp3_capture.cjs
       - name: 캡처 올리기
         if: always()
