@@ -7,8 +7,9 @@
 흐름 (질문 하나당)
   ① 우리 답     POST {BASE}/api/talk/parse  -- 화면(mockups/mvp3/live-flow.js)과 같은 본문.
                 손님이 보는 말풍선 = answer + 빈 줄 + reply (silent 면 말풍선 없음). 화면 규칙 그대로.
-  ② 일반 AI 답  Claude API, 시스템 지시문 없이 질문만. 모델은 api/llm.py 의 Claude 기본 모델
-                (`default_model=`)을 그대로 읽는다 -- 따로 적으면 한쪽만 바뀐다.
+  ② 일반 AI 답  Claude API, 시스템 지시문 없이 질문만. 모델은 QUALITY_MODEL(기본 Sonnet 5.5).
+                2026-10-12 사장님 「추천한대로」: 상담 서버의 Claude 기본 모델(Opus)을 따라가던 탓에
+                하룻밤 700문항쯤 돌면서 Anthropic 잔액이 바닥났다. 비교용은 값싼 모델로 따로 둔다.
   ③ 심판        같은 모델이 두 답을 A/B 로 받아(순서는 질문마다 섞는다 -- 앞자리 편향 방지)
                 「우리가 못함 / 비슷함 / 우리가 나음」과 이유 한 줄을 낸다.
 
@@ -71,6 +72,8 @@ def load_questions(subset: str, shard: str | None) -> list[dict]:
     qs = json.loads(QUESTIONS.read_text(encoding="utf-8"))["questions"]
     if subset == "pr":
         qs = [q for q in qs if q.get("pr")]
+    elif subset == "smoke":
+        qs = [q for q in qs if q["id"] in SMOKE_IDS]
     elif subset != "all":
         ids = {s.strip() for s in subset.split(",")}
         qs = [q for q in qs if q["id"] in ids]
@@ -182,21 +185,25 @@ def ours_for(q: dict) -> dict:
 
 
 # ── ② 일반 AI · ③ 심판 ──────────────────────────────────────────────────────
+# 비교용 모델 -- 상담 서버 모델(api/llm.py)과 일부러 갈랐다(머리말 ②). 생각 깊이(effort)도 낮춘다:
+# 일반 AI 는 채팅창 기본에 가까운 medium, 심판은 A/B 하나 고르는 일이라 low.
+QUALITY_MODEL = "claude-sonnet-5-5"
+GENERIC_EFFORT = "medium"
+JUDGE_EFFORT = "low"
+# 배포마다 도는 작은 점검(--subset smoke) -- PC 추천 · 부품 질문 · 구매 절차 하나씩.
+SMOKE_IDS = ("R01", "R07", "R12")
+
+
 def repo_model() -> str:
-    """api/llm.py 의 Claude 기본 모델 -- 저장소 설정을 따른다(QUALITY_MODEL 로 덮을 수 있다)."""
-    if os.environ.get("QUALITY_MODEL"):
-        return os.environ["QUALITY_MODEL"]
-    src = (ROOT / "api" / "llm.py").read_text(encoding="utf-8")
-    m = re.search(r'key="claude".*?default_model="([^"]+)"', src, re.S)
-    if not m:
-        raise SystemExit("api/llm.py 에서 Claude 기본 모델을 찾지 못했다")
-    return m.group(1)
+    """비교에 쓰는 Claude 모델 -- QUALITY_MODEL 환경변수로 덮을 수 있다."""
+    return os.environ.get("QUALITY_MODEL", "").strip() or QUALITY_MODEL
 
 
 _client = None
 
 
-def _claude(messages: list, system: str | None = None, max_tokens: int = 8000) -> str:
+def _claude(messages: list, system: str | None = None, max_tokens: int = 8000,
+            effort: str | None = None) -> str:
     global _client
     import anthropic
     if _client is None:
@@ -204,6 +211,8 @@ def _claude(messages: list, system: str | None = None, max_tokens: int = 8000) -
     kw = {"model": repo_model(), "max_tokens": max_tokens, "messages": messages}
     if system:
         kw["system"] = system
+    if effort:
+        kw["output_config"] = {"effort": effort}
     resp = _client.messages.create(**kw)
     out = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text").strip()
     if not out:
@@ -221,7 +230,7 @@ def ask_generic(q: dict) -> str:
     out = ""
     for _ in range(int(q.get("repeat") or 1)):
         msgs.append({"role": "user", "content": text})
-        out = _claude(msgs)
+        out = _claude(msgs, effort=GENERIC_EFFORT)
         msgs.append({"role": "assistant", "content": out})
     return out
 
@@ -259,7 +268,8 @@ def judge(q: dict, ours: str, generic: str, rng: random.Random) -> dict:
         q_text = q_text[:1200] + "\n...(중략)...\n" + q_text[-600:]
     prompt = ("손님 질문:\n%s\n\n좋은 답의 기준: %s\n\n[답 A]\n%s\n\n[답 B]\n%s"
               % (q_text if q_text.strip() else "(빈 입력)", q["criterion"], a or "(빈 답)", b or "(빈 답)"))
-    raw = _claude([{"role": "user", "content": prompt}], system=JUDGE_SYSTEM, max_tokens=4000)
+    raw = _claude([{"role": "user", "content": prompt}], system=JUDGE_SYSTEM, max_tokens=4000,
+                  effort=JUDGE_EFFORT)
     m = re.search(r"\{.*\}", raw, re.S)
     try:
         j = json.loads(m.group(0)) if m else {}
@@ -389,7 +399,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
-    r.add_argument("--subset", default="pr", help="pr | all | 쉼표로 구분한 번호")
+    r.add_argument("--subset", default="pr", help="smoke | pr | all | 쉼표로 구분한 번호")
     r.add_argument("--shard", default=None, help="i/n -- 질문을 n 묶음으로 나눈 것 중 i 번째")
     r.add_argument("--out", required=True)
     r.add_argument("--seed", type=int, default=20261011)
