@@ -85,6 +85,18 @@ _GOOD_NEG = re.compile(r"^.{0,10}?(?:필요\s*(?:는|가)?\s*없|상관\s*없|�
 HEAVY_KEYS = frozenset([(u, lv) for u, lv, _ in HEAVY_WORK] + [(u, GOOD_LEVEL) for u in GOOD_USAGES])
 
 
+def uhd_level(fit: str | None) -> str | None:
+    """비게임 용도의 «4K 작업» 단계 이름(기준표 작업 설명에 4K 가 든 가장 낮은 단계). 없으면 None.
+
+    추천(sold_reco._uhd_rank)은 고객이 4K 를 말하면 이 단계부터 고른다 -- 상담 안내(talk_rules)와 기준 줄
+    (talk_defaults)이 같은 판정을 쓰게 한곳에 둔다(2026-10-12 코덱스 24조합 검수: 영상편집 6조합 모두 「4K 는 아직
+    반영하지 못해요」라 하면서 카드는 「4K 편집·색보정·효과」였다)."""
+    if not fit or fit == "게임":          # 게임은 해상도(state.game.resolution)가 수준을 정한다
+        return None
+    from tools.product_fit import REQUIREMENTS   # 기준표 정본(product_fit_levels 시드) -- DB 없이 읽는다
+    return next((lv for lv, work, _c in REQUIREMENTS.get(fit, []) if "4K" in work), None)
+
+
 def wants_good(raw: str | None) -> bool:
     s = (raw or "")[:MAX_TEXT]
     return any(not _GOOD_NEG.search(s[m.end():]) for m in _GOOD.finditer(s))

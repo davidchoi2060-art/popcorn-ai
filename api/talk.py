@@ -1490,9 +1490,16 @@ def parse_talk(body: ParseBody, request: Request):
         # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
         heavy = TD.X.heavy_levels(text) or next(
             (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy)
+        # 4K 도 같다 -- 화면은 앞서 한 번 말한 4K 를 wants.uhd 로 계속 들고 있다(reco_explore.merge).
+        uhd = bool(TD.X._UHD.search(text or "")) or any(r == "user" and TD.X._UHD.search(t or "") for r, t in history)
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy, uhd=uhd)
         if first:
             reply = (first + " " + " ".join(cond_notes)).strip()
+        elif getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
+            # 설명이 위에 나가고 덧붙일 기준 줄이 없으면 AI 확인 문장을 내지 않는다 -- 「본체 60만원 이하 예산으로
+            # 구성을 준비해드리겠습니다」 바로 아래에 59만원 넘는 카드가 나왔다(2026-10-12 코덱스 24조합 검수 3번).
+            # 예산 안 카드가 있는지는 카드 묶음의 안내(grid_public)가 말한다.
+            reply = " ".join(cond_notes).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
                  pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
     reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
@@ -1543,12 +1550,23 @@ def parse_talk(body: ParseBody, request: Request):
     answer = TR.tidy_customer_text(answer, text)
     # 설명의 「시중에서는 보통 ○○만원대」를 아래 카드 가격 범위로 맞춘다(2026-10-12 중헌 님 3번 -- 설명과 카드 가격이
     # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
-    if answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing and "시중" in answer:
+    # 파워·그래픽카드·SSD·해상도도 같다 -- 카드보다 높은 사양을 기본처럼 말한 문장은 걷고 실제 카드 사양 한 문장을 붙인다
+    # (2026-10-12 코덱스 24조합 검수 2번: 「650W급 이상」 아래 600W 카드 · 「RTX 5070급·750W·QHD」 아래 5060·600W·FHD 카드).
+    if (answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing
+            and not TR.explain_only(text)):
         try:
-            from .grid_public import sold_card_prices    # 추천 쪽 모듈 -- 이 턴에만 읽는다
-            answer = PA.align_market_price(answer, sold_card_prices(state.model_dump(), text))
-        except Exception as e:  # noqa: BLE001 - 가격 맞추기는 곁가지다. 실패해도 설명은 나간다
-            log.warning("[talk] market price align skipped: %s", type(e).__name__)
+            from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 이 턴에만 읽는다
+            items = sold_card_items(state.model_dump(), text)
+            if "시중" in answer:
+                answer = PA.align_market_price(answer, [it["price"] for it in items
+                                                        if type(it.get("price")) is int and it["price"] > 0])
+            g = state.game
+            fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
+            answer, spec_dropped = PA.align_card_specs(answer, items, fhd_game=fhd_game)
+            if spec_dropped and isinstance(ans.filter_report, dict):
+                ans.filter_report.setdefault("dropped", []).extend(spec_dropped)
+        except Exception as e:  # noqa: BLE001 - 카드 맞추기는 곁가지다. 실패해도 설명은 나간다
+            log.warning("[talk] card align skipped: %s", type(e).__name__)
     if notes_deferred and not answer.strip():
         # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
         reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()

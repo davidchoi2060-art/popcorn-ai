@@ -112,11 +112,22 @@ def _usage_name(label: str) -> str:
     return label[:-1] if label.endswith("용") else label
 
 
-def answer_first(state, pref: str | None, *, is_game_usage, work_of=None, heavy=None) -> str:
+def _higher_level(fit: str, a: str | None, b: str | None) -> str | None:
+    """기준표 순서로 더 높은 단계(둘 중 하나가 없으면 다른 쪽)."""
+    if not a or not b:
+        return a or b
+    from tools.product_fit import REQUIREMENTS
+    order = [lv for lv, _w, _c in REQUIREMENTS.get(fit, [])]
+    return max(a, b, key=lambda lv: order.index(lv) if lv in order else -1)
+
+
+def answer_first(state, pref: str | None, *, is_game_usage, work_of=None, heavy=None, uhd: bool = False) -> str:
     """카드를 내는 턴의 답 -- 「무엇을 기준으로 봤나」 한 줄 + 예산 가정 + 끝 안내 한 줄.
 
     heavy = reco_explore.heavy_levels(고객 문장). 고객이 한 단계 위 작업을 말했으면 카드도 그 단계부터 고르므로
-    (sold_reco._heavy_rank) 기준 줄도 그 단계로 쓰고, 「…하시면 한 단계 위」 끝 안내는 붙이지 않는다."""
+    (sold_reco._heavy_rank) 기준 줄도 그 단계로 쓰고, 「…하시면 한 단계 위」 끝 안내는 붙이지 않는다.
+    uhd = 고객이 4K 를 말했다. 4K 작업 단계가 있는 용도(영상편집)는 카드가 그 단계부터 나오므로(sold_reco._uhd_rank)
+    기준 줄도 그 단계로 쓴다(2026-10-12 코덱스 24조합 검수 1번: 카드는 4K 편집인데 「FHD 컷편집 기준」이라 했다)."""
     work_of = work_of or basis_work
     usages = list(getattr(state, "usages", None) or [])
     label = next((u for u in usages if not is_game_usage(u)), None)
@@ -125,6 +136,8 @@ def answer_first(state, pref: str | None, *, is_game_usage, work_of=None, heavy=
     if label is not None:
         fit = _fit_usage(label)
         level = (heavy or {}).get(fit or "")
+        if uhd and fit:
+            level = _higher_level(fit, level, X.uhd_level(fit))
         work = (work_of(fit, level) if level else work_of(fit)) if fit else None
         if work:
             lines.append(f"{_usage_name(label)}용은 {work} 기준으로 봤어요.")
