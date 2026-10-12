@@ -28,6 +28,7 @@ from sqlalchemy import bindparam, text
 
 from . import llm
 from . import talk_filter as TF
+from .talk_rules import monitor_count
 
 log = logging.getLogger(__name__)
 
@@ -137,7 +138,10 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
                  or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
                  # 「사무용 80만원」 -- PC 낱말·요청 낱말 없이 용도와 예산만 말해도 새 PC 이야기다. 설명 없이
                  # 「문서 작업 중심인가요?」 질문만 나갔다(2026-10-12 Claude 복귀 뒤 점검).
-                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
+                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
+                 # 「…두루두루 쓰는데 모니터가 4대」 -- 쓰는 환경을 말하면 구성 설명이 먼저다(2026-10-12 사장님 시험:
+                 # 설명 없이 안내 세 줄과 카드만 나갔다). 모니터 여러 대는 그래픽 출력 조건이 달라지는 구성 이야기다.
+                 or (monitor_count(s) or 0) >= 2) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):

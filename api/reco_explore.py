@@ -22,12 +22,12 @@ import re
 from sqlalchemy import text
 
 from .db import engine
-from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_weighed
+from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_monitor_count, drop_weighed, monitor_count
 
 log = logging.getLogger("reco_explore")
 
 CHEAPER, BETTER = "cheaper", "better"
-WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy")
+WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors")
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
@@ -97,6 +97,12 @@ def heavy_levels(raw: str | None) -> dict:
     for usage, level, pat in HEAVY_WORK:
         if pat.search(s):
             out[usage] = level
+    # 「모니터가 4대」처럼 조사가 붙어도 기준표의 「듀얼 모니터」(사무용 쾌적)·「모니터 4대 이상」(주식 쾌적)으로 읽는다.
+    mons = monitor_count(s) or 0
+    if mons >= 2:
+        out.setdefault("사무용", "쾌적")
+    if mons >= 4:
+        out.setdefault("주식·트레이딩", "쾌적")
     return out
 
 
@@ -166,9 +172,12 @@ def extract(raw: str | None) -> dict:
         out["silent"] = True
     if _MONITOR.search(s) and not _MONITOR_OWNED.search(s):
         out["monitor"] = True
-    m = _MULTI.search(s)
+    m = _MULTI.search(drop_monitor_count(s))        # 「모니터가 4대」는 여러 대 구매가 아니다
     if (m and 2 <= int(m.group(1)) <= 500) or _MULTI_WORD.search(s):
         out["multi"] = True
+    mons = monitor_count(s)
+    if mons and mons >= MONITORS_NEED_DGPU:
+        out["monitors"] = mons
     if _UHD.search(s):
         out["uhd"] = True
     heavy = heavy_levels(s)
@@ -192,6 +201,9 @@ def clean_wants(raw) -> dict:
     for k in ("white", "silent", "monitor", "uhd"):
         if raw.get(k) is True:
             out[k] = True
+    n = raw.get("monitors")
+    if type(n) is int and MONITORS_NEED_DGPU <= n <= 8:
+        out["monitors"] = n
     h = raw.get("heavy")
     if isinstance(h, dict):
         h = {u: lv for u, lv in h.items() if (u, lv) in HEAVY_KEYS}
@@ -269,6 +281,18 @@ def _spec(p, k):
     return v if type(v) in (int, float) else None
 
 
+# 이 수 이상의 모니터는 외장 그래픽카드로만 맞춘다.
+MONITORS_NEED_DGPU = 3
+_NO_OUTPUT_GPU = re.compile(r"내장|H100", re.I)    # 내장 그래픽 · 화면 출력이 없는 데이터센터 카드
+
+
+def has_display_gpu(p: dict) -> bool:
+    """외장 그래픽카드(화면 출력 있음)가 든 PC 인가. 그래픽 이름이 없으면 False(모르는 것을 있다고 하지 않는다)."""
+    sp = p.get("spec") if isinstance(p.get("spec"), dict) else {}
+    g = sp.get("gpu")
+    return isinstance(g, str) and bool(g.strip()) and not _NO_OUTPUT_GPU.search(g)
+
+
 def build_filters(wants: dict, products: dict, tags_loader=None) -> list[tuple[str, str, object]]:
     """wants -> [(key, 고객 이름표, 판정 함수 | 못 정한 사유 str)]. 순서가 우선순위다."""
     out = []
@@ -296,6 +320,10 @@ def build_filters(wants: dict, products: dict, tags_loader=None) -> list[tuple[s
         if wants.get(key):
             tags = tags if tags is not None else (tags_loader or part_tags)()
             out.append((key, label, lambda p, k=key, t=tags: bool(t.get(p["code"], {}).get(k))))
+    if wants.get("monitors"):
+        # 내장 그래픽 보드는 화면 출력이 보통 2~3개라 모니터 3대 이상은 외장 그래픽카드가 있어야 한다
+        # (2026-10-12 사장님 시험 「모니터가 4대」에 내장 그래픽 PC 두 장이 나왔다). 단자 수 자료는 없어 외장 여부로 본다.
+        out.append(("monitors", f"모니터 {wants['monitors']}대 연결(외장 그래픽카드)", has_display_gpu))
     if wants.get("monitor"):
         out.append(("monitor", "모니터 포함",
                     lambda p: isinstance(p.get("includes"), str) and "모니터" in p["includes"]))
