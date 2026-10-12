@@ -720,6 +720,8 @@ def _explore_input(body: RecommendBody, state: TalkState, talk_notes: list[str])
             wants[key] = True
     if ex.get("multi"):
         talk_notes.append(EXPLORE.NOTE_MULTI)
+    if wants.get("monitors"):
+        talk_notes.append(EXPLORE.NOTE_MONITOR_PORTS.format(n=wants["monitors"]))
     nav = body.nav if body.nav in (EXPLORE.CHEAPER, EXPLORE.BETTER) else ex.get("nav")
     explore = {"wants": wants, "nav": nav, "anchor_code": body.anchor_code}
     # 「가장 싸게」는 고객 문장에서만 읽는다 -- 「더 싼 PC 볼래요」 단추(body.nav)는 지금 카드 기준 이동이다.

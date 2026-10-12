@@ -35,10 +35,12 @@ class MonitorCountIsNotQuantity(unittest.TestCase):
 
 
 class ExplainFirst(unittest.TestCase):
-    def test_monitor_setup_gets_build_explanation(self):
+    # 「모니터가 4대」 이어 말은 규칙(topic_of)이 아니라 이어 답하기(topic_in_context -> TOPIC_FOLLOW, #228)가 AI 를 부른다.
+    def test_monitor_setup_calls_ai_in_context(self):
         v = Vocab(tiers=[], grades=[], confirmed_games={}, all_game_names=[], usages=[("사무용", ["사무"])],
                   genres=[], genre_aliases={}, game_aliases={})
-        self.assertEqual(PA.topic_of(SENT, v), PA.TOPIC_BUILD)
+        hist = [("user", "PC 부품이나 구성에서 궁금한 점이 있어요."), ("assistant", "사무용이면 램 16GB 구성이 무난해요.")]
+        self.assertEqual(PA.topic_in_context(SENT, v, None, hist), PA.TOPIC_FOLLOW)
         self.assertEqual(PA.topic_of("듀얼 모니터 차이가 뭐예요", v), PA.TOPIC_PART)
 
 
@@ -70,13 +72,18 @@ class Cards(unittest.TestCase):
         got = [i["product_code"] for i in cs["items"]]
         self.assertTrue(got)
         self.assertFalse({21, 22, 23} & set(got), got)
-        self.assertIn("모니터 4대 연결(외장 그래픽카드)", cs["explore"]["applied"])
+        self.assertIn("외장 그래픽카드", cs["explore"]["applied"])
 
     def test_premium_not_below_recommended_level(self):
         cs = sets({"wants": {"heavy": {"사무용": "쾌적"}}})
         prem = [i for i in cs["items"] if i["role"] == "premium"]
         for i in prem:
             self.assertNotEqual(i["product_code"], 23)
+
+    def test_ports_note_does_not_promise(self):
+        note = X.NOTE_MONITOR_PORTS.format(n=4)
+        self.assertIn("출력 단자 수", note)
+        self.assertNotIn("연결돼요", note)
 
     def test_screen_round_trip(self):
         self.assertEqual(X.clean_wants({"monitors": 4}), {"monitors": 4})

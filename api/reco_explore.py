@@ -323,7 +323,9 @@ def build_filters(wants: dict, products: dict, tags_loader=None) -> list[tuple[s
     if wants.get("monitors"):
         # 내장 그래픽 보드는 화면 출력이 보통 2~3개라 모니터 3대 이상은 외장 그래픽카드가 있어야 한다
         # (2026-10-12 사장님 시험 「모니터가 4대」에 내장 그래픽 PC 두 장이 나왔다). 단자 수 자료는 없어 외장 여부로 본다.
-        out.append(("monitors", f"모니터 {wants['monitors']}대 연결(외장 그래픽카드)", has_display_gpu))
+        # 이름표는 «외장 그래픽카드»까지만 말한다 -- 단자 수 자료가 없어 「모니터 4대 연결」을 장담하지 못한다
+        # (2026-10-12 배포 확인: 고른 RTX 3050 6GB 는 출력 단자가 3개인 제품이었다). 단자 확인 안내는 NOTE_MONITOR_PORTS.
+        out.append(("monitors", "외장 그래픽카드", has_display_gpu))
     if wants.get("monitor"):
         out.append(("monitor", "모니터 포함",
                     lambda p: isinstance(p.get("includes"), str) and "모니터" in p["includes"]))
@@ -359,6 +361,8 @@ def applied_sentence(labels: list[str]) -> str:
     return "「" + "」 「".join(labels) + "」 조건에 맞는 PC만 골랐어요."
 
 
+NOTE_MONITOR_PORTS = ("그래픽카드마다 화면 출력 단자 수가 달라요. 모니터 {n}대를 함께 연결하려면 상품 상세에서"
+                      " 그래픽카드 출력 단자 수를 꼭 확인해 주세요.")
 NOTE_MULTI = "여러 대를 한 번에 맞추는 견적은 지금 못 맞춥니다. 한 대 기준으로 보여 드려요."
 NOTE_CHEAPER = "지금 보신 추천 구성보다 싼 PC를 보여 드려요."
 NOTE_CHEAPER_NONE = "지금 조건에서는 더 싼 PC가 없어요. 같은 목록을 다시 보여 드려요."
