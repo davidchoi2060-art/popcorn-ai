@@ -499,15 +499,18 @@ def part_options(state, game_usages, other_usages, code, slot, notes, vocab=None
 
 
 def _targets(state, game_usages, other_usages, levels, vocab, notes):
+    # 게임 묶음을 맨 앞에 둔다(2026-10-12 사장님 시험 「배그·롤 · 사무용 · 150만원」: 사무용 묶음이 먼저 와서
+    # 그래픽카드 없는 오피스 PC 892,800원이 첫 카드가 됐고, 첫 묶음 기준인 「예산 안 게임 PC 없음」 안내도
+    # 사라졌다). 게임은 용도 중 가장 높은 사양을 요구하므로 첫 카드·안내 문장은 게임 기준으로 정한다.
     targets = []
+    if game_usages:
+        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
     for u in other_usages:
         fu = fit_usage(u)
         if fu is None:
             notes.append(f"sold: usage '{u}' has no fit mapping - skipped")
             continue
         targets.append((u, fu, 1))
-    if game_usages:
-        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
     return targets
 
 
