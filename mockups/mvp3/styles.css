@@ -498,3 +498,8 @@ body.live-mode.original-flow .live-card-intro-label{font-size:13px;font-weight:6
  .is-v3 .entry-copy{flex:1;min-width:0}.is-v3 .entry-card h2{font-size:21px}.gateway-root .is-v3 .entry-card p{font-size:15px;margin:4px 0 0;min-height:0}
  .is-v3 .entry-action{flex:none;align-self:center;margin:0;width:48px;height:48px;min-height:48px;padding:0;border:0;border-radius:50%;background:color-mix(in srgb,var(--gateway-green) 12%,#fff)}.is-v3 .entry-action-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
  .is-v3 .gateway-more{margin-top:26px;padding-top:22px}.gateway-root .is-v3 .talk-icon{width:26px;height:26px}.is-v3 .talk-copy strong{display:block;font-size:17px}.gateway-root .is-v3 .talk-copy strong .ui-icon{display:inline-block;vertical-align:-4px;margin-left:6px}.is-v3 .talk-copy .change-note{font-size:14px}.is-v3 .gateway-more-links{margin-left:42px}}
+/* 대화 화면에서 온 상세: 옛 상담창 없이 상세만(2026-10-12 카드 검수) */
+body[data-from-talk="1"] .workspace{grid-template-columns:minmax(0,1fr)}
+body[data-from-talk="1"] .workspace>.chat{display:none}
+/* 좁은 화면 상단 메뉴: 글자가 한 자씩 세로로 꺾이며 화면 폭을 넘던 것을 줄바꿈으로(2026-10-12 카드 검수, 390폭에서 487px) */
+@media(max-width:760px){body .topbar{flex-wrap:wrap}body .topbar nav{flex-wrap:wrap;max-width:100%}body .topbar nav>*{white-space:nowrap}}

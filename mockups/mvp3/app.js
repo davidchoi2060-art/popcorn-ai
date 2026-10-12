@@ -24,7 +24,9 @@ const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state;
 // 보이고, 「부품 바꾸기」로 넘어왔으면 상세가 열린 뒤 부품 바꾸기 칸으로 옮긴다. 대화·견적은 같은 탭 보관으로 온다.
 const FROM_TALK_KEY='popcorn-mvp3-from-talk-v1';
 const arrival=(()=>{try{const raw=sessionStorage.getItem(FROM_TALK_KEY);sessionStorage.removeItem(FROM_TALK_KEY);const v=raw?JSON.parse(raw):null;return v&&typeof v==='object'?{focus:v.focus==='parts'}:null;}catch{return null;}})();
-if(arrival)$('#back-to-talk').hidden=false;
+// 대화 화면에서 온 상세에는 옛 상담창을 붙이지 않는다 -- 대화는 「대화로 돌아가기」로 이어 간다(2026-10-12 카드 검수:
+// 상세 왼쪽·모바일 위쪽에 옛 상담창 「어떤 PC를 찾으세요?」가 통째로 나왔다).
+if(arrival){$('#back-to-talk').hidden=false;document.body.dataset.fromTalk='1';}
 let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='',enteringRoute=true;
 const draft={version:1,start_mode:null,usage_choice:null,budget_won:null,budget_bound:null,draft_text:'',draft_edited:false};
 const ui={surface:!location.hash||location.hash==='#start'?'gateway':location.hash==='#purpose'?'usage':'consultation',epoch:window.crypto.randomUUID?window.crypto.randomUUID():Array.from(window.crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16)).join('-')};
