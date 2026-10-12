@@ -192,7 +192,7 @@ def main():
     state = parsed.get('state')
     print(f'- /api/talk/parse: HTTP {s1}, {t1:.1f}s, state 키 {sorted(state) if isinstance(state, dict) else state!r}')
     # 고객이 실제로 보는 말풍선(답변·되묻기)도 함께 남긴다 -- 예외 질문 점검용(2026-10-11).
-    for key in ('pc_related', 'stage', 'narrowing', 'missing', 'answer_game_names', 'exceptions'):
+    for key in ('pc_related', 'stage', 'narrowing', 'missing', 'answer_game_names', 'exceptions', 'elapsed_sec', 'answer_elapsed_sec', 'answer_error'):
         print(f'- {key}: {parsed.get(key)!r}')
     for key in ('answer', 'reply'):
         print(f'- {key}: {str(parsed.get(key) or "")[:800]!r}')
