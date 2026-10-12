@@ -257,7 +257,8 @@ _GENERAL_FOCUS = (" 고객이 물은 항목만 답한다 -- 배송을 물으면 
 
 
 def build_prompt(sentence: str, basis: list[str], history: list | None = None,
-                 topic: str = TOPIC_BUILD, games: list[str] | None = None) -> str:
+                 topic: str = TOPIC_BUILD, games: list[str] | None = None,
+                 shop_notes: list[str] | None = None) -> str:
     hist = ["%s: %s" % ("고객" if r == "user" else "상담원", t) for r, t in (history or [])][-4:]
     lines = [
         "당신은 PC 판매점의 상담원이다. 고객이 PC 에 대해 물었다. 일반 AI 에게 물었을 때처럼 먼저 답한다.",
@@ -296,6 +297,11 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         " 요령만 말한다 -- 맞출 수 있는지는 아래 카드와 안내가 말한다.",
         "",
     ]
+    if shop_notes:
+        # 관리자 「판매 안내 자료」(또는 기본 안내) -- 고정 문구로 내보내던 것을 AI 가 읽는 사실로 넘긴다.
+        lines += ["[우리 가게 안내 - 사실이다. 고객이 대화에서 실제로 그 주제를 물었을 때만, 내용을 바꾸지 말고 자기 말로"
+                  " 마지막에 한두 문장으로 전한다. 문장의 낱말만 비슷하고 다른 뜻이면(예: 「모니터가 4대」는 PC 여러 대 구매가"
+                  " 아니다) 쓰지 않는다. 안내에 없는 약속을 더하지 않는다]", *("- " + n for n in shop_notes), ""]
     if hist:
         lines += ["[대화 이력 - 오래된 것부터]", *hist,
                   "이미 한 설명을 그대로 되풀이하지 않는다. 이번 문장이 더한 것만 짧게 보탠다.", ""]
@@ -339,14 +345,15 @@ def _models(sentence: str) -> list[str]:
     return out
 
 
-def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, list[dict]]:
+def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool = False) -> tuple[str, list[dict]]:
     """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
     from .talk_rules import PROMISE_PATTERNS        # talk_rules 가 이 모듈을 읽지 않으므로 순환은 없다
     general, build = topic == TOPIC_GENERAL, topic in (None, TOPIC_BUILD)
     # 본체 구성과 구매 절차(배송·설치 등)를 함께 물었으면 절차 설명 문장도 남긴다 -- 대신 가게 약속은 걷는다
     # (2026-10-12 검수 9da2 P2-1 「배송」 한 단어로 배송 기준 문장이 통째로 걷혔다).
-    mixed = build and bool(_GENERAL.search(sentence or ""))
+    # strict = 판매 안내를 넘긴 턴 -- 안내를 전하면서 가게 약속을 덧붙이는 문장은 걷는다.
+    mixed = (build and bool(_GENERAL.search(sentence or ""))) or strict
     stock = _STOCK_ONLY if general or mixed else TF._LEXICON_STOCK
     asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
@@ -396,7 +403,8 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
-           timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD, games: list[str] | None = None):
+           timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD, games: list[str] | None = None,
+           shop_notes: list[str] | None = None):
     """[B] 의 PC 갈래 -- res(AnswerResult)를 채워 돌려준다. 예외를 올리지 않는다."""
     t0 = time.time()
     res.kind = "pc_advice"
@@ -408,13 +416,13 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         except Exception as e:  # noqa: BLE001 - 기준표를 못 읽어도 일반 설명은 낸다
             log.warning("[talk-advice] fit levels unavailable: %s", type(e).__name__)
             basis = []
-        out = llm.call(build_prompt(sentence, basis, history, topic, games), task_key=TASK_KEY,
+        out = llm.call(build_prompt(sentence, basis, history, topic, games, shop_notes), task_key=TASK_KEY,
                        customer_facing=True, max_output_tokens=ADVICE_MAX_TOKENS,
                        timeout_sec=int(min(ADVICE_TIMEOUT_SEC, timeout_sec)))
         res.provider, res.model = out.provider, out.model
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
         res.log_id = out.log_id
-        body, dropped = clean(out.text, topic, sentence)
+        body, dropped = clean(out.text, topic, sentence, strict=bool(shop_notes))
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}

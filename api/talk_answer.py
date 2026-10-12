@@ -582,6 +582,7 @@ def _grade_of(ev: Evidence) -> str | None:
 def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                 prev_state: "TS.TalkState | None" = None,
                 history: list | None = None,
+                shop_notes: list[str] | None = None,
                 allow_web: bool = True,
                 timeout_sec: float = PATH_B_TIMEOUT_SEC) -> AnswerResult:
     """★ [B] 경로 — 근거 수집 -> 자유 답변 -> **필터** -> 유도.
@@ -618,6 +619,9 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                     and not PA.asks_for_pc(sentence, vocab)):
                 labels = None
             topic = PA.topic_in_context(sentence, vocab, prev_state, history) if labels is not None else None
+            if labels is None and shop_notes:
+                # 판매 안내 주제가 걸린 문장은 AI 가 그 안내를 읽고 답한다(고정 문구로 바꿔치기하지 않는다 -- talk.parse_talk).
+                labels, topic = [], PA.TOPIC_GENERAL
         elif PA.pc_intent(sentence):
             # 게임 이름과 함께 PC 를 물으면(「120만원 롤·오버워치·로아 구성 짜줘」) 게임 소개가 아니라 그 게임에 맞는
             # PC 설명을 먼저 한다(2026-10-11 일반 AI 비교 「묻지 않은 게임 소개」). 「롤 재밌어?」는 기존 게임 답.
@@ -629,7 +633,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                 games = game_names or None
         if labels is not None:
             return PA.advise(conn_factory, sentence, labels, res, history=history,
-                             timeout_sec=timeout_sec, topic=topic, games=games)
+                             timeout_sec=timeout_sec, topic=topic, games=games, shop_notes=shop_notes)
         if not is_game_related(sentence, vocab):
             res.elapsed_sec = round(time.time() - t0, 3)
             return res
