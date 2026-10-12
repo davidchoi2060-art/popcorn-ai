@@ -56,7 +56,9 @@
     const sel=state.selected;
     // 추천 조건(wants: 4K·램 하한 등 글에서 읽은 것)도 둔다 -- 없으면 옛 화면이 같은 조건의 추천을 다시 받지 못해
     // 대화 화면에서 고른 PC 를 찾지 못한다(2026-10-12 카드 검수: 4K 영상 PC 127317 이 사라짐).
-    return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,...(M.object(state.wants)?{wants:M.copy(state.wants)}:{}),
+    // shown: 이 대화에서 추천 카드를 이미 보여 줬는지. 카드는 보관하지 않으므로(값이 시간이 지나면 틀린다) 새로고침하면
+    // 같은 조건으로 서버에 다시 묻는다 -- 없으면 「아래에서 골라 주세요」만 남고 고를 카드가 사라진다(2026-10-12 고객단 끝까지 검수 E16).
+    return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,...(M.object(state.wants)?{wants:M.copy(state.wants)}:{}),...(state.recommendation||state.restoredShown?{shown:true}:{}),
       chat_flow:M.object(state.chatFlow)?M.copy(state.chatFlow):null,
       history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
       messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
@@ -116,7 +118,7 @@
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,selectionWants:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null,proposals:[]};
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null,restoredShown:false,proposals:[]};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
     // 화면을 그릴 때마다 대화 상태를 이 탭에 남긴다. 보관이 막혀 있어도 상담은 그대로 간다.
     function remember(){try{conversation.write(conversationSnapshot(state));}catch{}}
@@ -134,7 +136,7 @@
       state.retry=retry;
     }
     function reset({restore=false}={}){
-      cancel();Object.assign(state,{restoredCurrent:null,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
+      cancel();Object.assign(state,{restoredCurrent:null,restoredShown:false,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,selectionWants:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
         wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
@@ -147,7 +149,7 @@
       if(saved){
         state.talk=saved.talk;state.chatFlow=saved.chat_flow;state.history=saved.history;state.wants=M.object(saved.wants)?saved.wants:null;
         if(saved.messages.length)state.messages=saved.messages;
-        state.restoredCurrent=saved.current;
+        state.restoredCurrent=saved.current;state.restoredShown=saved.shown===true;
       }
       emit();
     }
@@ -225,10 +227,11 @@
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
       return true;
     }
-    async function refresh(){
+    // notes=false: 되살린 대화에 카드만 다시 붙인다(같은 안내·다음 질문은 이미 대화에 있다).
+    async function refresh({notes=true}={}){
       if(!state.talk||state.phase)return;
       const op=begin('recommend');
-      try{await recommendFor(op);}catch(error){if(current(op))fail(error,{kind:'recommend'});}
+      try{await recommendFor(op,{},{notes});state.restoredShown=false;}catch(error){if(current(op))fail(error,{kind:'recommend'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
     }
     // 고른 상품을 고를 때 조건(basis)으로 서버에 다시 묻는다. 지금 조건이 고를 때와 같으면 방금 받은 추천에서

@@ -75,7 +75,7 @@ test('the inquiry follows the button it was opened with',async()=>{
 test('the retry button keeps the general inquiry wording',()=>{
   const app=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
   assert.match(app,/button\('다시 불러오기','inquiry-open','outline',human\?'data-human="1"':''\)/);
-  assert.match(app,/state\.restoredCurrent&&state\.talk\)void flow\.resume\(\)/);
+  assert.match(app,/state\.restoredCurrent&&state\.talk\)\{restoring=true;void flow\.resume\(\)/);
 });
 
 // 코덱스 PR142·143 검수 보완(2026-10-11): 대화 화면(keepCurrent)에서 조건을 바꾼 뒤에도 지금 견적을 지킨다.
