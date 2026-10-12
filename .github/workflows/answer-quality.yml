@@ -1,139 +1,20 @@
-# 상담 AI 답 품질 비교 — 같은 질문을 우리 상담 AI 와 일반 AI(Claude)에 던지고 AI 심판이 나란히 채점한다.
-#
-# 2026-10-11 사장님: 손님은 일반 AI 와 비교한다. 한 번이라도 바보 같은 답을 하면 다시 안 온다.
-# 그래서 「우리가 못함」이 하나라도 나오면 빨간불이다(도구·질문: tools/quality/).
-#
-# 언제 도나
-#   ① 배포가 끝난 뒤 — 그 배포 커밋이 상담 AI 파일을 건드렸으면 질문 20개(pr=true)로 비교하고
-#      「우리가 못함」이 있으면 빨간불. **PR 단계가 아니라 배포 뒤인 이유**: 비교 대상은 개발 서버에
-#      실제로 떠 있는 상담 AI 다. PR 코드를 띄우려면 DB·3사 AI 키가 있는 우리 서버에서 PR 코드를
-#      돌려야 하는데, 이 저장소는 공개라 deploy.yml 머리말대로 그 길을 열지 않는다.
-#   ② 손으로 실행 — 전체 86개(3묶음 병렬) 또는 20개.
-#   ③ 비교 도구·질문을 고친 PR — 전체 86개를 돌려 결과만 남긴다(빨간불로 막지 않는다: 그 PR 의
-#      코드가 아니라 지금 배포된 상담 AI 를 재는 것이라서).
-#
-# 비밀값은 ANTHROPIC_API_KEY 하나(일반 AI·심판). self-hosted 러너를 쓰지 않는다.
-# 개발 서버에는 공개 상담 API(/api/talk/parse)만 부른다. 방문자 한도(분당 5 · 하루 40)를 지키려고
-# 13초 간격으로 부르고 전체 실행은 세 러너로 나눈다.
+# 프로브 브랜치 전용(병합 금지): Anthropic 키가 살아 있는지 Haiku 에 짧은 메시지 1회만 보낸다.
 name: 상담 답 품질 비교
-
 on:
-  workflow_run:
-    workflows: ['배포']
-    types: [completed]
   workflow_dispatch:
-    inputs:
-      subset:
-        description: '질문 묶음 — all(86개) 또는 pr(20개)'
-        default: all
-      gate:
-        description: '「우리가 못함」이 있으면 빨간불'
-        type: boolean
-        default: true
-  pull_request:
-    paths:
-      - 'tools/quality/**'
-      - '.github/workflows/answer-quality.yml'
-
 permissions:
   contents: read
-
-# 배포 뒤 실행은 취소하지 않고 줄 세운다. 상담 AI 와 무관한 배포가 몇 분 뒤 이어져도
-# 진행 중이던 비교를 끊지 않게 하려는 것이다(2026-10-11 연속 배포로 세 번 연달아 취소됨).
-concurrency:
-  group: answer-quality-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'workflow_run' }}
-
 jobs:
-  plan:
+  ping:
     runs-on: ubuntu-latest
-    if: >-
-      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-    outputs:
-      run: ${{ steps.p.outputs.run }}
-      subset: ${{ steps.p.outputs.subset }}
-      shards: ${{ steps.p.outputs.shards }}
-      gate: ${{ steps.p.outputs.gate }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2
-      - id: p
-        shell: bash
-        run: |
-          case "${{ github.event_name }}" in
-            workflow_run)
-              changed=$(git diff --name-only HEAD~1 HEAD || true)
-              echo "바뀐 파일:"; echo "$changed"
-              if echo "$changed" | grep -Eq '^(api/talk[^/]*\.py|api/llm\.py|api/game_copy\.py|api/wiki_fetch\.py|api/shop_notices[^/]*\.py|tools/quality/)'; then
-                echo "run=true" >> "$GITHUB_OUTPUT"
-              else
-                echo "run=false" >> "$GITHUB_OUTPUT"; echo "상담 AI 파일 변경 없음 — 건너뜀"
-              fi
-              echo "subset=pr" >> "$GITHUB_OUTPUT"; echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; echo "gate=true" >> "$GITHUB_OUTPUT" ;;
-            workflow_dispatch)
-              echo "run=true" >> "$GITHUB_OUTPUT"
-              echo "subset=${{ inputs.subset }}" >> "$GITHUB_OUTPUT"
-              if [ "${{ inputs.subset }}" = "all" ]; then echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT"; else echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; fi
-              echo "gate=${{ inputs.gate }}" >> "$GITHUB_OUTPUT" ;;
-            pull_request)
-              echo "run=true" >> "$GITHUB_OUTPUT"; echo "subset=all" >> "$GITHUB_OUTPUT"
-              echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT"; echo "gate=false" >> "$GITHUB_OUTPUT" ;;
-          esac
-
-  compare:
-    needs: plan
-    if: needs.plan.outputs.run == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: ${{ fromJson(needs.plan.outputs.shards) }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - run: pip install 'anthropic~=0.122'
-      - name: 질문 던지기 · 채점
+      - name: Haiku 1회 호출
         env:
-          BASE: https://popcornai.co.kr
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python tools/quality/compare.py run --subset "${{ needs.plan.outputs.subset }}" --shard "${{ matrix.shard }}" --out out
-      - id: name
-        run: echo "n=shard-$(echo '${{ matrix.shard }}' | tr '/' '-')" >> "$GITHUB_OUTPUT"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: answer-quality-${{ steps.name.outputs.n }}
-          path: out/
-
-  report:
-    needs: [plan, compare]
-    if: ${{ !cancelled() && needs.plan.outputs.run == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: answer-quality-shard-*
-          path: shards
-      - name: 합치기 · 판정
-        run: >-
-          python tools/quality/compare.py combine shards/*
-          --report report/answer-quality.md --summary "$GITHUB_STEP_SUMMARY" --print-rows --require-judge
-          ${{ needs.plan.outputs.gate == 'true' && '--gate' || '' }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: answer-quality-report
-          path: report/
+        run: |
+          code=$(curl -sS -o out.json -w '%{http_code}' https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
+            -d '{"model":"claude-haiku-5-5","max_tokens":5,"messages":[{"role":"user","content":"ping"}]}')
+          echo "HTTP $code"
+          python3 -c "import json;d=json.load(open('out.json'));print(d.get('type'), (d.get('error') or {}).get('message','ok')[:200])"
+          test "$code" = 200
