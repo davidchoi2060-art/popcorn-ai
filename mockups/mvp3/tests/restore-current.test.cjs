@@ -188,3 +188,24 @@ test('a failed latest-condition lookup still restores the quote from its own con
   assert.equal(f.state.retry.kind,'recommend','the latest-condition failure is reported on its own');
   assert.match(f.state.messages.at(-1).text,/다시 불러왔어요/);
 });
+// 2026-10-12 카드 검수: 대화 화면에서 4K 영상 PC(글에서 읽은 추천 조건 wants)를 고르고 「부품 바꾸기」로 옛 화면에
+// 가면, 옛 화면이 wants 없이 추천을 다시 받아 다른 PC 만 보여 주고 고른 PC 를 못 찾았다.
+const otherReco={...reco,card_sets:[{kind:'sold',usage:'영상',items:[{...product,product_code:202,name:'다른 PC'}]}]};
+const uhdOnly=async(s,o,extra)=>extra&&extra.wants&&extra.wants.uhd===true?reco:otherReco;
+test('resume sends the recommendation wants restored from the conversation and finds the chosen PC',async()=>{
+  const ss=storage();ss.setItem(CONVERSATION_KEY,JSON.stringify({version:1,saved_at:Date.now(),talk,wants:{uhd:true},chat_flow:null,history:[],messages:[],current:{product_code:101,changes:[],selection_state:talk,selection_wants:{uhd:true}}}));
+  const f=make({recommend:uhdOnly},ss);f.reset({restore:true});assert.deepEqual(f.state.wants,{uhd:true});await f.resume();
+  assert.equal(f.state.screen,'detail');assert.equal(f.state.selected.product_code,101);
+  assert.deepEqual(stored(ss),{product_code:101,changes:[],selection_state:talk,selection_wants:{uhd:true}});
+});
+test('the lookup for the chosen PC itself carries the wants it was chosen with',async()=>{
+  const ss=storage();seed(ss,{product_code:101,changes:[],selection_state:talk,selection_wants:{uhd:true}});
+  const f=make({recommend:uhdOnly},ss);f.reset({restore:true});await f.resume();
+  assert.equal(f.state.selected.product_code,101);assert.doesNotMatch(f.state.messages.at(-1).text,/찾지 못했어요/);
+});
+test('selecting a card keeps the wants of that recommendation in the stored conversation',()=>{
+  const ss=storage();const f=make({},ss);f.reset();
+  f.state.talk=talk;f.state.wants={uhd:true,min_ram_gb:32};f.state.groups=[{products:[{...product,index:0}]}];f.select(0);
+  const rec=JSON.parse(ss.getItem(CONVERSATION_KEY));assert.deepEqual(rec.wants,{uhd:true,min_ram_gb:32});
+  assert.deepEqual(rec.current.selection_wants,{uhd:true,min_ram_gb:32});
+});
