@@ -138,13 +138,20 @@ def _public_offer(conn, product_code):
     identity = offer["configuration_id"]
     # 부품 판매가는 부품 바꾸기(api/mvp3_build.BOM_SQL)와 같은 원천·같은 결합으로 읽는다 -- 줄 금액과
     # 「변경」의 차액이 서로 다른 값을 말하지 않게. 값이 없거나 0 이하면 지어내지 않고 null 이다.
+    # 근거 없는 판매가는 고객에게 내지 않는다(2026-10-12 사장님 「처음부터 가격 이상한 내용이 오류로 나오고」):
+    # 공급처 표(product_supplier_prices · 유일한 공급처·가격 원천)에 지금 공급 가능한 행이 하나도 없으면 -- 행이 없거나
+    # 전부 품절 -- 판매가가 무엇을 근거로 했는지 되짚을 수 없다. 그 줄은 null(「가격 확인 중」)이고 「조립·기타」도
+    # 계산하지 않는다. 값을 고치는 것이 아니라 보여 줄지만 정한다.
     rows = list(conn.execute(text(
-        "SELECT pp.ordinal, pp.explanation_code, p.sale_price FROM pc_configuration_parts pp"
+        "SELECT pp.ordinal, pp.explanation_code, p.sale_price,"
+        " EXISTS (SELECT 1 FROM product_supplier_prices sp WHERE sp.product_code = p.product_code"
+        " AND sp.supply_state = '가능') AS has_supply"
+        " FROM pc_configuration_parts pp"
         " LEFT JOIN product_explanations e ON e.source_product_code = pp.explanation_code"
         " LEFT JOIN products p ON p.product_code = e.product_code"
         " WHERE pp.configuration_id=:id AND NOT pp.pseudo"), {"id": identity}).mappings())
     codes = {r["ordinal"]: r["explanation_code"] for r in rows}
-    prices = {r["ordinal"]: r.get("sale_price") for r in rows}
+    prices = {r["ordinal"]: r.get("sale_price") if r.get("has_supply") is True else None for r in rows}
     for part in offer["parts"]:
         code = None if part["pseudo"] else codes.get(part["ordinal"])
         part["photo"] = ({"state": "approved", "url": f"/api/product-images/{code}/detail"}
