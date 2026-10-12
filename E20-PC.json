@@ -1,0 +1,447 @@
+{
+  "id": "E20",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "game",
+    "budget": 150,
+    "text": "배그 150만원 PC 추천해줘",
+    "op": "twotabs"
+  },
+  "at": "2026-10-12T07:35:45.284Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E20-PC-01-첫화면-첫화면.png",
+        "E20-PC-01-첫화면-전체.png",
+        "E20-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 첫 답 「램은 16GB, SSD는 480GB 이상을 기본으로 잡으면 되고, 더 여유로운 게임 설치 공간을 원하면 SSD만 추가해도 돼요. 시중에서는 보통 본체 기준 130~150만원이에요. 예산을 아끼려면 화이트 외관이나 고급 쿨러·메인보드에서 줄이고, 그래픽카드와 CPU 성능은 지키는 편이 배」",
+      "shots": [
+        "E20-PC-02-대화1-첫화면.png",
+        "E20-PC-02-대화1-전체.png",
+        "E20-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "E20 두 탭",
+      "ok": true,
+      "symptom": "둘째 탭에서 고른 「오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]」 · 첫 탭 새로고침 뒤 지금 견적 「지금 견적 구성을 선택하면 여기에 모아둘게요. 지금 조건 · 고사양 게임 · 예산 1,500,000원 · 배그 사람에게 문의하기 구매를 확정한 뒤에도 상담사가 전화로 구성을 함께 」 · 첫 탭 내 말 1개",
+      "shots": [
+        "E20-PC-03-둘째탭-첫화면.png",
+        "E20-PC-03-둘째탭-전체.png",
+        "E20-PC-04-첫탭새로고침-첫화면.png",
+        "E20-PC-04-첫탭새로고침-전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 124,400원 높아요 / 2) [-] 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 241,000원 높아요 ‖ 문제: 카드2 예산의 116%; 「아래에서 골라 주세요」인데 고를 단추 없음",
+      "shots": [
+        "E20-PC-05-카드-첫화면.png",
+        "E20-PC-05-카드-전체.png",
+        "E20-PC-05-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "배그 150만원 PC 추천해줘",
+      "ms": null,
+      "ai": [
+        "램은 16GB, SSD는 480GB 이상을 기본으로 잡으면 되고, 더 여유로운 게임 설치 공간을 원하면 SSD만 추가해도 돼요. 시중에서는 보통 본체 기준 130~150만원이에요. 예산을 아끼려면 화이트 외관이나 고급 쿨러·메인보드에서 줄이고, 그래픽카드와 CPU 성능은 지키는 편이 배그 프레임에 유리해요. QHD나 144Hz를 목표로 하면 RTX 5060 Ti급 이상으로 그래픽카드에 더 투자하는 구성이 좋아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그 150만원 PC 추천해줘</p>"
+    },
+    {
+      "turn": 1,
+      "sent": "(둘째 탭) 사무용 80만원",
+      "ms": null,
+      "ai": [
+        "대용량 엑셀이나 여러 창을 쾌적하게 쓰려면 램 16GB와 SSD 480GB를 추천하고, 문서·웹·화상회의만 한다면 램 8GB와 SSD 240GB도 최소 기준으로 사용할 수 있어요. 전용 그래픽카드는 사무용에서 체감이 작으므로 아끼고, 대신 램과 SSD에 투자하면 다중 작업과 프로그램 실행 속도에 더 도움이 돼요. 시중에서는 보통 70~80만원이에요. 더 여유로운 저장 공간이나 탭 수십 개, 듀얼 모니터를 원하면 SSD와 램을 기준보다 큰 용량으로 선택하면 돼요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 기준으로 봤어요. 큰 엑셀 파일이나 모니터 두 대를 쓰시면 한 단계 위 구성이 맞아요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": [
+        {
+          "pill": "알뜰 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "593,400원",
+          "gap": "예산보다 206,600원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "실버 [12400/8G/256GB/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "668,900원",
+          "gap": "예산보다 131,100원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "892,800원",
+          "gap": "예산보다 92,800원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>사무용 80만원 PC 추천해 주세요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:35:22.047Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:23.510Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:24.245Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:24.317Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:35.700Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:37.244Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:38.130Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:38.195Z",
+      "m": "GET",
+      "u": "/api/customer/products/113330/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:35:38.237Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 167535,
+          "textRight": 20375,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2342,
+          "textLeft": 118705,
+          "textRight": 57145,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1401,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2099,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "둘째탭",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 178494,
+          "textRight": 45151,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 653,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 628,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "첫탭새로고침",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 88320,
+          "textRight": 20375,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 88320,
+          "textRight": 20375,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 873,
+          "textLeft": 58420,
+          "textRight": 38203,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 774,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 124,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,741,000원",
+        "gap": "예산보다 241,000원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

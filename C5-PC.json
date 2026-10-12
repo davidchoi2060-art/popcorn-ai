@@ -1,0 +1,583 @@
+{
+  "id": "C5",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "game",
+    "budget": 150,
+    "text": "배그 150만원 PC 추천해줘",
+    "then": [
+      "배그 150만원 PC 추천해줘",
+      "배그 150만원 PC 추천해줘"
+    ]
+  },
+  "at": "2026-10-12T07:32:04.606Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "C5-PC-01-첫화면-첫화면.png",
+        "C5-PC-01-첫화면-전체.png",
+        "C5-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 첫 답 「램은 16GB, SSD는 480GB를 기본으로 구성하고, 파워는 650W급을 선택하면 안정적이에요. 시중에서는 보통 130~150만원 구성이 많아요. 화려한 RGB, 고급 케이스, 메인보드 부가기능은 아껴도 성능 차이가 작으므로 그래픽카드와 CPU에 예산을 우선 배분하는 것이 좋아요. 」",
+      "shots": [
+        "C5-PC-02-대화1-첫화면.png",
+        "C5-PC-02-대화1-전체.png",
+        "C5-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 이어서 「배그 150만원 PC 추천해줘」",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 9초 · 첫 답 「배틀그라운드는 FHD에서 그래픽카드와 CPU를 함께 타는 편이라, 중급형인 라이젠 5급·코어 i5급 CPU와 RTX 5060급 그래픽카드 조합이 적합해요. 램은 16GB, SSD는 480GB를 기준으로 하고, FHD 높음 옵션 60fps 이상을 목표로 그래픽카드는 VRAM 8GB 이상과」",
+      "shots": [
+        "C5-PC-03-이어서1-첫화면.png",
+        "C5-PC-03-이어서1-전체.png",
+        "C5-PC-03-이어서1-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 이어서 「배그 150만원 PC 추천해줘」",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 10초 · 첫 답 「램은 16GB, SSD는 480GB를 최소로 유지하고, 고급 케이스·RGB·메인보드 부가기능에서 아끼는 편이 체감 손해가 적어요. 시중에서는 보통 160만원대 구성이 많아 예산 안에서는 저장공간을 더 늘리기보다 기본 용량을 지키는 쪽이 현실적이에요. QHD나 144Hz 이상을 원하면 그」",
+      "shots": [
+        "C5-PC-04-이어서2-첫화면.png",
+        "C5-PC-04-이어서2-전체.png",
+        "C5-PC-04-이어서2-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 이어서 · 턴별 카드",
+      "ok": null,
+      "symptom": "턴1: 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원, 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 / 턴2: 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원, 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 / 턴3: 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원, 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원",
+      "shots": []
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 124,400원 높아요 / 2) [-] 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 241,000원 높아요 ‖ 문제: 카드2 예산의 116%",
+      "shots": [
+        "C5-PC-05-카드-첫화면.png",
+        "C5-PC-05-카드-전체.png",
+        "C5-PC-05-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "배그 150만원 PC 추천해줘",
+      "ms": null,
+      "ai": [
+        "램은 16GB, SSD는 480GB를 기본으로 구성하고, 파워는 650W급을 선택하면 안정적이에요. 시중에서는 보통 130~150만원 구성이 많아요. 화려한 RGB, 고급 케이스, 메인보드 부가기능은 아껴도 성능 차이가 작으므로 그래픽카드와 CPU에 예산을 우선 배분하는 것이 좋아요. QHD 고주사율을 원하면 그래픽카드를 한 단계 높이고 SSD는 960GB급으로 선택하는 쪽이 체감이 커요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그 150만원 PC 추천해줘</p>"
+    },
+    {
+      "turn": 2,
+      "sent": "배그 150만원 PC 추천해줘",
+      "ms": 8982,
+      "ai": [
+        "배틀그라운드는 FHD에서 그래픽카드와 CPU를 함께 타는 편이라, 중급형인 라이젠 5급·코어 i5급 CPU와 RTX 5060급 그래픽카드 조합이 적합해요. 램은 16GB, SSD는 480GB를 기준으로 하고, FHD 높음 옵션 60fps 이상을 목표로 그래픽카드는 VRAM 8GB 이상과 650W급 파워를 선택하는 게 좋아요. 시중에서는 보통 160만원대 구성이 많아 150만원 예산에서는 그래픽카드 등급이나 저장공간을 조금 낮춰야 해요. RGB, 고급 케이스, 메인보드 부가기능은 아껴도 체감이 작고, 그래픽카드와 CPU 성능은 지키는 편이 좋습니다. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그 150만원 PC 추천해줘</p>"
+    },
+    {
+      "turn": 3,
+      "sent": "배그 150만원 PC 추천해줘",
+      "ms": 9829,
+      "ai": [
+        "램은 16GB, SSD는 480GB를 최소로 유지하고, 고급 케이스·RGB·메인보드 부가기능에서 아끼는 편이 체감 손해가 적어요. 시중에서는 보통 160만원대 구성이 많아 예산 안에서는 저장공간을 더 늘리기보다 기본 용량을 지키는 쪽이 현실적이에요. QHD나 144Hz 이상을 원하면 그래픽카드 등급을 우선 높여야 하고, FHD 60fps 기준이라면 CPU와 그래픽카드의 균형이 중요해요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그 150만원 PC 추천해줘</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:31:36.969Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:38.300Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:38.927Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:39.171Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:47.660Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:48.988Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:31:59.233Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:00.551Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 165521,
+          "textRight": 20375,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 627,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2342,
+          "textLeft": 117489,
+          "textRight": 56347,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1401,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2099,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "이어서1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 343088,
+          "textRight": 23624,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4363,
+          "textLeft": 234299,
+          "textRight": 120301,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 3422,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 4120,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "이어서2",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 502415,
+          "textRight": 26873,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 6307,
+          "textLeft": 340830,
+          "textRight": 176294,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 5367,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 6065,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 502415,
+          "textRight": 26873,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 6307,
+          "textLeft": 340830,
+          "textRight": 176294,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 5367,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 6065,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 124,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,741,000원",
+        "gap": "예산보다 241,000원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

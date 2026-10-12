@@ -1,0 +1,1622 @@
+{
+  "id": "A1",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "full",
+    "follow": true,
+    "kind": "heavy",
+    "budget": 150,
+    "text": "배그랑 롤 해요. 고사양 게임도 하고 가끔 문서 작업도 해요. 예산은 150만원이에요.",
+    "changePart": true,
+    "roundtrip": 2,
+    "talkSave": true,
+    "mobile": true
+  },
+  "at": "2026-10-12T07:21:06.161Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "A1-PC-01-첫화면-첫화면.png",
+        "A1-PC-01-첫화면-전체.png",
+        "A1-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 5장 · 첫 답 「배그와 고사양 게임은 롤보다 무거워서, 롤은 CPU보다 그래픽카드와 전체적인 게임 등급에서 체감이 크고 배그·최신 게임은 그래픽카드가 특히 중요해요. FHD 기준으로 CPU는 중급형인 라이젠 5급·코어 i5급, 그래픽카드는 중급형 이상인 RTX 5060급·RX 9060급 구성이 적당해요」",
+      "shots": [
+        "A1-PC-02-대화1-첫화면.png",
+        "A1-PC-02-대화1-전체.png",
+        "A1-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [고사양 게임] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 124,400원 높아요 / 2) [고사양 게임] 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 241,000원 높아요 / 3) [사무용] 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 593,400원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 906,600원 낮아요 / 4) [사무용] 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원 · 사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 · 예산보다 607,200원 낮아요 / 5) [사무용] 골드 [14400F/16GB/256GB/RTX3050] 1,338,500원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 161,500원 낮아요 ‖ 문제: 카드2 예산의 116%",
+      "shots": [
+        "A1-PC-03-카드-첫화면.png",
+        "A1-PC-03-카드-전체.png",
+        "A1-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 550,500원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 1,624,400원」 ‖ 문제: 그래픽카드 금액 「가격 확인 중」; 메모리 금액 「가격 확인 중」; P2 부품합 550,500 + 기타 0 ≠ 합계 1,624,400",
+      "shots": [
+        "A1-PC-04-S4 상세-첫화면.png",
+        "A1-PC-04-S4 상세-전체.png",
+        "A1-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「골드 인텔 [12400F/16GB/500GB/RTX5060]」 1,624,400원 · 상세 「상품 참고 금액 1,624,400원」",
+      "shots": []
+    },
+    {
+      "step": "A 부품 바꾸기 (그래픽카드 바꾸기)",
+      "ok": true,
+      "symptom": "후보 12개 · 바뀐 줄 「그래픽카드 GIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트 수량 1 바꾼 부품 · 원래 부품: PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스 상세 펼치기 -48,200원 변경」 · 합계 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요  / 기본 구성 금액 1,624,400원  / 부품 변경 -48,200원  / 바꾼 구성 금액 1,576,200원 」 · 예산보다 76,200원 높아요 · 제목 그대로(X1)",
+      "shots": [
+        "A1-PC-05-변경후보-첫화면.png",
+        "A1-PC-05-변경후보-전체.png",
+        "A1-PC-06-부품바꾼뒤-첫화면.png",
+        "A1-PC-06-부품바꾼뒤-전체.png",
+        "A1-PC-06-부품바꾼뒤-390전체.png"
+      ]
+    },
+    {
+      "step": "A 대화로 돌아가기 1회",
+      "ok": true,
+      "symptom": "AI 말풍선 6개 · 지금 견적 「지금 견적 지금 선택한 구성 골드 인텔 [12400F/16GB/500GB/RTX5060] 상품 이름은 기본 구성 기준이에요. 바꾼 부품: 그래픽카드 GIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트 AI 조립 예시 이미지」",
+      "shots": [
+        "A1-PC-07-대화복귀1-첫화면.png",
+        "A1-PC-07-대화복귀1-전체.png",
+        "A1-PC-07-대화복귀1-390전체.png"
+      ]
+    },
+    {
+      "step": "A 대화로 돌아가기 2회",
+      "ok": true,
+      "symptom": "AI 말풍선 6→6개 · 지금 견적 「지금 견적 지금 선택한 구성 골드 인텔 [12400F/16GB/500GB/RTX5060] 상품 이름은 기본 구성 기준이에요. 바꾼 부품: 그래픽카드 GIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트 AI 조립 예시 이미지」",
+      "shots": [
+        "A1-PC-08-대화복귀2-첫화면.png",
+        "A1-PC-08-대화복귀2-전체.png"
+      ]
+    },
+    {
+      "step": "A 왕복해도 말풍선 안 쌓임",
+      "ok": true,
+      "symptom": "AI 말풍선 6 → 6",
+      "shots": []
+    },
+    {
+      "step": "A 대화 화면 견적 저장",
+      "ok": true,
+      "symptom": "견적을 저장했어요.",
+      "shots": [
+        "A1-PC-09-대화저장-첫화면.png",
+        "A1-PC-09-대화저장-전체.png"
+      ]
+    },
+    {
+      "step": "A 대화 화면 쇼핑몰 이어가기",
+      "ok": true,
+      "symptom": "링크 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149",
+      "shots": [
+        "A1-PC-10-대화쇼핑몰-첫화면.png",
+        "A1-PC-10-대화쇼핑몰-전체.png"
+      ]
+    },
+    {
+      "step": "S5 최종 견적 확인",
+      "ok": false,
+      "symptom": "총액 1,576,200원 · 부품합 502,300 · 조립·기타 0 · 상태 「서버에 보관됨」 · 좌:우 글자 2.1:1 · 구매 단추 659px ‖ 문제: P2 부품합 502,300 + 기타 0 ≠ 총액 1,576,200",
+      "shots": [
+        "A1-PC-11-최종견적-첫화면.png",
+        "A1-PC-11-최종견적-전체.png",
+        "A1-PC-11-최종견적-390전체.png"
+      ]
+    },
+    {
+      "step": "D2 화면 폭별 최종 견적",
+      "ok": null,
+      "symptom": "320폭 좌:우 1.6 넘침 · 390폭 좌:우 2.5 · 1280폭 좌:우 2.0 · 1920폭 좌:우 2.1 · 2560폭 좌:우 2.1",
+      "shots": [
+        "A1-PC-D2-320.png",
+        "A1-PC-D2-390.png",
+        "A1-PC-D2-1280.png",
+        "A1-PC-D2-1920.png",
+        "A1-PC-D2-2560.png"
+      ]
+    },
+    {
+      "step": "S6 쇼핑몰 구매 단추",
+      "ok": false,
+      "symptom": "단추 사라짐 · 결과 칸 화면 안 「팝콘PC 쇼핑몰로 연결할 준비가 됐어요 쇼핑몰 가격도 1,624,400원으로 같아요. 쇼핑몰 상품 페이지 열기 쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 1개(차액 -48,200원)는 연결 번호 HO-1027로 기록해 두었어요. 주문할 때」 ‖ 문제: P1 쇼핑몰 1,624,400원 ≠ 견적 1,576,200원, 차이 안내 없음",
+      "shots": [
+        "A1-PC-12-쇼핑몰단추후-첫화면.png",
+        "A1-PC-12-쇼핑몰단추후-전체.png"
+      ]
+    },
+    {
+      "step": "S7 쇼핑몰 상품 페이지",
+      "ok": true,
+      "symptom": "링크 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149 → https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149 · 「프리미엄팝콘피씨=조립1위」",
+      "shots": [
+        "A1-PC-99-쇼핑몰.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "배그랑 롤 해요. 고사양 게임도 하고 가끔 문서 작업도 해요. 예산은 150만원이에요.",
+      "ms": null,
+      "ai": [
+        "배그와 고사양 게임은 롤보다 무거워서, 롤은 CPU보다 그래픽카드와 전체적인 게임 등급에서 체감이 크고 배그·최신 게임은 그래픽카드가 특히 중요해요. FHD 기준으로 CPU는 중급형인 라이젠 5급·코어 i5급, 그래픽카드는 중급형 이상인 RTX 5060급·RX 9060급 구성이 적당해요. 램은 16GB, SSD는 480GB 이상을 기본으로 하고, 문서 작업은 이 정도면 충분하며 저장공간이 부족할 때만 더 큰 SSD를 선택하면 돼요. 시중에서는 보통 140만~150만원 구성이 많아요. 예산은 케이스의 화려한 기능과 RGB, 필요 이상의 CPU에 아끼고 그래픽카드와 16GB 램, 480GB SSD는 지키는 것이 게임 체감과 가성비에 유리해요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 기준으로 봤어요. 큰 엑셀 파일이나 모니터 두 대를 쓰시면 한 단계 위 구성이 맞아요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": "고사양 게임",
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": "고사양 게임",
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "알뜰 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": "사무용",
+          "note": null,
+          "price": "593,400원",
+          "gap": "예산보다 906,600원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": "사무용",
+          "note": null,
+          "price": "892,800원",
+          "gap": "예산보다 607,200원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "골드 [14400F/16GB/256GB/RTX3050]",
+          "group": "사무용",
+          "note": null,
+          "price": "1,338,500원",
+          "gap": "예산보다 161,500원 낮아요",
+          "spec": [
+            "CPU i5-14400",
+            "GPU RTX 3050 6GB",
+            "RAM 16GB",
+            "저장장치 256GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그랑 롤 해요. 고사양 게임도 하고 가끔 문서 작업도 해요. 예산은 150만원이에요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:19:57.369Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:00.623Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:02.213Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:03.271Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:03.315Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:03.398Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:03.424Z",
+      "m": "GET",
+      "u": "/api/customer/products/90678/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:08.486Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:09.661Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:12.735Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/options",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:14.525Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/quote",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:21.995Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:22.695Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/quote",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:24.040Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:24.040Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:24.040Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:24.042Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:24.085Z",
+      "m": "GET",
+      "u": "/api/customer/products/90678/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:27.495Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:28.243Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/quote",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:28.823Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:33.137Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:33.835Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/quote",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:34.625Z",
+      "m": "GET",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:34.882Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:34.990Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:35.016Z",
+      "m": "GET",
+      "u": "/api/customer/products/90678/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:35.041Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:35.086Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:36.602Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:38.373Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes/882e88a7-ac85-4a08-9446-c45781e27fcf/handoff",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:42.478Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:45.081Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:45.777Z",
+      "m": "POST",
+      "u": "/api/mvp3/build/quote",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:46.344Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 304
+    },
+    {
+      "at": "2026-10-12T07:20:49.596Z",
+      "m": "GET",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:51.300Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:20:58.898Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes/cbd43108-6a92-4f8f-a8e6-ec45b3cc4fde/handoff",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 292428,
+          "textRight": 49023,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 77,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 77,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4012,
+          "textLeft": 229678,
+          "textRight": 97649,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1636,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2172,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2730,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3262,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3769,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 292428,
+          "textRight": 49023,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 239,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 239,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 981,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 981,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 819,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4660,
+          "textLeft": 229678,
+          "textRight": 97649,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1636,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2334,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3054,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3748,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 4417,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 324770,
+          "textRight": 161152,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3700,
+          "textLeft": 337059,
+          "textRight": 137085,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "변경후보",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 463190,
+          "textRight": 210207,
+          "ctas": [
+            {
+              "text": "이걸로 바꾸기",
+              "top": 892,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 992,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1092,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1192,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1292,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1392,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1492,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1592,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1692,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1792,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1892,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이걸로 바꾸기",
+              "top": 1992,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "부품바꾼뒤",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 344046,
+          "textRight": 158927,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4019,
+          "textLeft": 348471,
+          "textRight": 140144,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "대화복귀1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 351111,
+          "textRight": 107449,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": -7,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 573,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 573,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 573,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "견적 저장",
+              "top": 709,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4305,
+          "textLeft": 269159,
+          "textRight": 121981,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 2330,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2888,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3420,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3927,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "대화복귀2",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 351111,
+          "textRight": 107449,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 76,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "견적 저장",
+              "top": 709,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화저장",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 351111,
+          "textRight": 120591,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 46,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "저장 완료",
+              "top": 920,
+              "inFirstView": false,
+              "disabled": true
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화쇼핑몰",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 351111,
+          "textRight": 140896,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 46,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "저장 완료",
+              "top": 585,
+              "inFirstView": true,
+              "disabled": true
+            },
+            {
+              "text": "쇼핑몰에서 구매 이어가기",
+              "top": 654,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "최종견적",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 355018,
+          "textRight": 171673,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 659,
+              "inFirstView": true,
+              "disabled": true
+            },
+            {
+              "text": "팝콘PC 쇼핑몰에서 구매하기",
+              "top": 659,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3766,
+          "textLeft": 364707,
+          "textRight": 147220,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 3340,
+              "inFirstView": false,
+              "disabled": true
+            },
+            {
+              "text": "팝콘PC 쇼핑몰에서 구매하기",
+              "top": 3340,
+              "inFirstView": false,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "쇼핑몰단추후",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 383900,
+          "textRight": 182353,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 659,
+              "inFirstView": true,
+              "disabled": true
+            },
+            {
+              "text": "쇼핑몰 상품 페이지 열기",
+              "top": 659,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "쇼핑몰 상품 페이지 열기",
+              "top": 830,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": "고사양 게임",
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 124,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+        "group": "고사양 게임",
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,741,000원",
+        "gap": "예산보다 241,000원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "알뜰 구성",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+        "group": "사무용",
+        "note": null,
+        "price": "593,400원",
+        "gap": "예산보다 906,600원 낮아요",
+        "spec": [
+          "CPU i3-12100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+        "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+        "group": "사무용",
+        "note": null,
+        "price": "892,800원",
+        "gap": "예산보다 607,200원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU 인텔 UHD(내장)",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "골드 [14400F/16GB/256GB/RTX3050]",
+        "group": "사무용",
+        "note": null,
+        "price": "1,338,500원",
+        "gap": "예산보다 161,500원 낮아요",
+        "spec": [
+          "CPU i5-14400",
+          "GPU RTX 3050 6GB",
+          "RAM 16GB",
+          "저장장치 256GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+        "price": 159500,
+        "priceText": "159,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+        "price": 42600,
+        "priceText": "42,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "앱코 U30 마린 블랙 (미들타워)",
+        "price": 39500,
+        "priceText": "39,500원"
+      },
+      {
+        "where": "최종",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+        "price": 159500,
+        "priceText": "159,500원"
+      },
+      {
+        "where": "최종",
+        "part": "그래픽카드",
+        "name": "GIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트",
+        "price": -48200,
+        "priceText": "-48,200원"
+      },
+      {
+        "where": "최종",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "최종",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "최종",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "최종",
+        "part": "COOLER",
+        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "최종",
+        "part": "POWER",
+        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+        "price": 42600,
+        "priceText": "42,600원"
+      },
+      {
+        "where": "최종",
+        "part": "케이스",
+        "name": "앱코 U30 마린 블랙 (미들타워)",
+        "price": 39500,
+        "priceText": "39,500원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "budgetLine": "예산보다 124,400원 높아요",
+        "issues": [
+          "P2 부품합 550,500 + 기타 0 ≠ 총액 1,624,400"
+        ]
+      },
+      {
+        "where": "최종",
+        "sumP": 502300,
+        "etc": null,
+        "total": 1576200,
+        "base": 1624400,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "기본 구성 금액 1,624,400원",
+          "부품 변경 -48,200원",
+          "바꾼 구성 금액 1,576,200원"
+        ],
+        "budgetLine": "예산보다 76,200원 높아요",
+        "issues": [
+          "P2 부품합 502,300 + 기타 0 ≠ 총액 1,576,200"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "159,500원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+            "desc": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "저장장치",
+            "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "212,400원"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "19,500원"
+          },
+          {
+            "part": "POWER",
+            "name": "마이크로닉스 COOLMAX ELITE II 600W",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "42,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "앱코 U30 마린 블랙 (미들타워)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "39,500원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "title": "할 일도 하고 게임도 즐기는 나만의 PC",
+        "sum": "할 일도 하고 게임도 즐기는 나만의 PC\n\n골드 인텔 [12400F/16GB/500GB/RTX5060]\n\n게임과 영상 편집을 모두 생각하신다면, 부품 구성이 즐기는 게임과 사용하시는 편집 프로그램에 맞는지 살펴보세요.\n\n1,624,400원\n\n예산보다 124,400원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상",
+          "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400
+      }
+    ],
+    "D2_320": {
+      "vw": 320,
+      "vh": 900,
+      "scrollWidth": 378,
+      "overflowX": true,
+      "docHeight": 4327,
+      "textLeft": 316155,
+      "textRight": 194236,
+      "ctas": [
+        {
+          "text": "보관 완료",
+          "top": 3878,
+          "inFirstView": false,
+          "disabled": true
+        },
+        {
+          "text": "팝콘PC 쇼핑몰에서 구매하기",
+          "top": 3878,
+          "inFirstView": false,
+          "disabled": false
+        }
+      ]
+    },
+    "D2_390": {
+      "vw": 390,
+      "vh": 900,
+      "scrollWidth": 390,
+      "overflowX": false,
+      "docHeight": 3766,
+      "textLeft": 364707,
+      "textRight": 147220,
+      "ctas": [
+        {
+          "text": "보관 완료",
+          "top": 3340,
+          "inFirstView": false,
+          "disabled": true
+        },
+        {
+          "text": "팝콘PC 쇼핑몰에서 구매하기",
+          "top": 3340,
+          "inFirstView": false,
+          "disabled": false
+        }
+      ]
+    },
+    "D2_1280": {
+      "vw": 1280,
+      "vh": 900,
+      "scrollWidth": 1280,
+      "overflowX": false,
+      "docHeight": 900,
+      "textLeft": 352010,
+      "textRight": 174681,
+      "ctas": [
+        {
+          "text": "보관 완료",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": true
+        },
+        {
+          "text": "팝콘PC 쇼핑몰에서 구매하기",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": false
+        }
+      ]
+    },
+    "D2_1920": {
+      "vw": 1920,
+      "vh": 900,
+      "scrollWidth": 1920,
+      "overflowX": false,
+      "docHeight": 900,
+      "textLeft": 357754,
+      "textRight": 168937,
+      "ctas": [
+        {
+          "text": "보관 완료",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": true
+        },
+        {
+          "text": "팝콘PC 쇼핑몰에서 구매하기",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": false
+        }
+      ]
+    },
+    "D2_2560": {
+      "vw": 2560,
+      "vh": 900,
+      "scrollWidth": 2560,
+      "overflowX": false,
+      "docHeight": 900,
+      "textLeft": 357754,
+      "textRight": 168937,
+      "ctas": [
+        {
+          "text": "보관 완료",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": true
+        },
+        {
+          "text": "팝콘PC 쇼핑몰에서 구매하기",
+          "top": 659,
+          "inFirstView": true,
+          "disabled": false
+        }
+      ]
+    },
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

@@ -1,0 +1,309 @@
+{
+  "id": "E26",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "game",
+    "budget": 150,
+    "text": "<b>배그</b> 150만원 <script>alert(1)</script>"
+  },
+  "at": "2026-10-12T07:40:56.353Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E26-PC-01-첫화면-첫화면.png",
+        "E26-PC-01-첫화면-전체.png",
+        "E26-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 첫 답 「배그를 FHD 높음 옵션에서 쾌적하게 즐기려면 중급형 CPU인 라이젠 5급과 중급형 그래픽카드인 RTX 5060급 조합이 적당해요. 램은 16GB 이상, SSD는 480GB 이상으로 구성하면 게임 설치와 일반 사용에 무난해요. 본체 기준 시중에서는 보통 130~150만원이에요. 예산을 」",
+      "shots": [
+        "E26-PC-02-대화1-첫화면.png",
+        "E26-PC-02-대화1-전체.png",
+        "E26-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 124,400원 높아요 / 2) [-] 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 241,000원 높아요 ‖ 문제: 카드2 예산의 116%",
+      "shots": [
+        "E26-PC-03-카드-첫화면.png",
+        "E26-PC-03-카드-전체.png",
+        "E26-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "<b>배그</b> 150만원 <script>alert(1)</script>",
+      "ms": null,
+      "ai": [
+        "배그를 FHD 높음 옵션에서 쾌적하게 즐기려면 중급형 CPU인 라이젠 5급과 중급형 그래픽카드인 RTX 5060급 조합이 적당해요. 램은 16GB 이상, SSD는 480GB 이상으로 구성하면 게임 설치와 일반 사용에 무난해요. 본체 기준 시중에서는 보통 130~150만원이에요. 예산을 아끼려면 화려한 케이스나 RGB, 최고급 SSD 속도에서 줄이고, 그래픽카드와 파워서플라이의 품질은 지키는 편이 체감과 안정성에 좋아요. FHD 144Hz를 목표로 경쟁 게임을 많이 한다면 그래픽카드는 RTX 5060급 이상을 우선하고, 더 여유를 원하면 램을 32GB로 선택하면 돼요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>&lt;b&gt;배그&lt;/b&gt; 150만원 &lt;script&gt;alert(1)&lt;/script&gt;</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:40:51.078Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:40:52.327Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:40:53.003Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:40:53.235Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 186516,
+          "textRight": 22788,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 627,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2445,
+          "textLeft": 132487,
+          "textRight": 64757,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1504,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2202,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 186516,
+          "textRight": 22788,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2445,
+          "textLeft": 132487,
+          "textRight": 64757,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1504,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2202,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 124,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,741,000원",
+        "gap": "예산보다 241,000원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

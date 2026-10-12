@@ -1,0 +1,173 @@
+{
+  "id": "E03",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "text": "무소음인데 가장 작은 케이스에 제일 센 그래픽카드요."
+  },
+  "at": "2026-10-12T07:33:40.332Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E03-PC-01-첫화면-첫화면.png",
+        "E03-PC-01-첫화면-전체.png",
+        "E03-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 첫 답 「말씀하신 조용한 PC(저소음) 조건으로 판매 중인 PC를 골라 볼게요. 맞추지 못하는 조건은 추천 카드와 함께 알려 드려요. 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요.」",
+      "shots": [
+        "E03-PC-02-대화1-첫화면.png",
+        "E03-PC-02-대화1-전체.png",
+        "E03-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "카드 없음 ",
+      "shots": [
+        "E03-PC-03-카드없음-첫화면.png",
+        "E03-PC-03-카드없음-전체.png",
+        "E03-PC-03-카드없음-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "무소음인데 가장 작은 케이스에 제일 센 그래픽카드요.",
+      "ms": null,
+      "ai": [
+        "말씀하신 조용한 PC(저소음) 조건으로 판매 중인 PC를 골라 볼게요. 맞추지 못하는 조건은 추천 카드와 함께 알려 드려요. 용도와 예산을 알려 주시면 맞는 PC를 찾아 드릴게요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>무소음인데 가장 작은 케이스에 제일 센 그래픽카드요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:33:36.571Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 27786,
+          "textRight": 18260,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 25367,
+          "textRight": 13135,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 365,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드없음",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 27786,
+          "textRight": 18260,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 25367,
+          "textRight": 13135,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 365,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

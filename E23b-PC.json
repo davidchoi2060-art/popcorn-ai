@@ -1,0 +1,133 @@
+{
+  "id": "E23b",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "expectNoCards": true,
+    "text": "오늘 저녁 뭐 먹지?"
+  },
+  "at": "2026-10-12T07:37:04.988Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E23b-PC-01-첫화면-첫화면.png",
+        "E23b-PC-01-첫화면-전체.png",
+        "E23b-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 첫 답 「저녁 메뉴는 정말 고민되죠. 남은 음식이 있으면 그걸 활용하거나, 간단하게 국밥이나 우동, 파스타 같은 한두 가지를 빨리 준비할 수 있어요. 요즘 날씨나 기분에 따라 골라도 좋습니다.」",
+      "shots": [
+        "E23b-PC-02-대화1-첫화면.png",
+        "E23b-PC-02-대화1-전체.png",
+        "E23b-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "C/E 카드 없어야 함",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "오늘 저녁 뭐 먹지?",
+      "ms": null,
+      "ai": [
+        "저녁 메뉴는 정말 고민되죠. 남은 음식이 있으면 그걸 활용하거나, 간단하게 국밥이나 우동, 파스타 같은 한두 가지를 빨리 준비할 수 있어요. 요즘 날씨나 기분에 따라 골라도 좋습니다."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>오늘 저녁 뭐 먹지?</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:37:02.819Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 27729,
+          "textRight": 14840,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 21902,
+          "textRight": 13123,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 339,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

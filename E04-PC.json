@@ -1,0 +1,248 @@
+{
+  "id": "E04",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "text": "게임용 PC 1만원이요."
+  },
+  "at": "2026-10-12T07:34:00.676Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E04-PC-01-첫화면-첫화면.png",
+        "E04-PC-01-첫화면-전체.png",
+        "E04-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「즐겨 하시는 게임을 알려 주시면 용도와 예산에 맞춰 안내하겠습니다. 말씀하신 예산으로는 새 조립 PC를 찾기 어려울 수 있어요. 찾는 대로 보여 드리고, 맞는 상품이 없으면 그렇다고 말씀드릴게요.」",
+      "shots": [
+        "E04-PC-02-대화1-첫화면.png",
+        "E04-PC-02-대화1-전체.png",
+        "E04-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 1,614,400원 높아요",
+      "shots": [
+        "E04-PC-03-카드-첫화면.png",
+        "E04-PC-03-카드-전체.png",
+        "E04-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "게임용 PC 1만원이요.",
+      "ms": null,
+      "ai": [
+        "즐겨 하시는 게임을 알려 주시면 용도와 예산에 맞춰 안내하겠습니다. 말씀하신 예산으로는 새 조립 PC를 찾기 어려울 수 있어요. 찾는 대로 보여 드리고, 맞는 상품이 없으면 그렇다고 말씀드릴게요.",
+        "1만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 1,614,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 1,614,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>게임용 PC 1만원이요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:33:56.105Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:56.798Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:57.603Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 90814,
+          "textRight": 18196,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1440,
+          "textLeft": 66797,
+          "textRight": 31705,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1197,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 90814,
+          "textRight": 18196,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1440,
+          "textLeft": 66797,
+          "textRight": 31705,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1197,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 1,614,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

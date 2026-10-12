@@ -1,0 +1,173 @@
+{
+  "id": "E27",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "text": "제 카드번호 1234-5678-9012-3456이에요, 전화 010-1234-5678"
+  },
+  "at": "2026-10-12T07:38:04.190Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E27-PC-01-첫화면-첫화면.png",
+        "E27-PC-01-첫화면-전체.png",
+        "E27-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 첫 답 「카드번호나 전화번호는 적지 않으셔도 괜찮습니다. 궁금하거나 불편한 점이 있으면 편하게 더 말씀해 주세요. 이어서 같이 이야기해 볼게요. 카드번호·주민번호·비밀번호 같은 정보는 상담 창에 적지 않으셔도 돼요. 적어 주신 번호는 가려서 읽었어요.」",
+      "shots": [
+        "E27-PC-02-대화1-첫화면.png",
+        "E27-PC-02-대화1-전체.png",
+        "E27-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "카드 없음 ",
+      "shots": [
+        "E27-PC-03-카드없음-첫화면.png",
+        "E27-PC-03-카드없음-전체.png",
+        "E27-PC-03-카드없음-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "제 카드번호 1234-5678-9012-3456이에요, 전화 010-1234-5678",
+      "ms": null,
+      "ai": [
+        "카드번호나 전화번호는 적지 않으셔도 괜찮습니다. 궁금하거나 불편한 점이 있으면 편하게 더 말씀해 주세요. 이어서 같이 이야기해 볼게요. 카드번호·주민번호·비밀번호 같은 정보는 상담 창에 적지 않으셔도 돼요. 적어 주신 번호는 가려서 읽었어요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>제 카드번호 1234-5678-9012-3456이에요, 전화 010-1234-5678</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:38:00.351Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 38103,
+          "textRight": 18260,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 31093,
+          "textRight": 17726,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 416,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드없음",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 38103,
+          "textRight": 18260,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 31093,
+          "textRight": 17726,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 416,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

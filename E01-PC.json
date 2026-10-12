@@ -1,0 +1,489 @@
+{
+  "id": "E01",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "heavy",
+    "budget": 150,
+    "text": "사무용인데 사이버펑크도 최고 옵션으로 돌리고 싶어요. 150만원."
+  },
+  "at": "2026-10-12T07:32:46.145Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E01-PC-01-첫화면-첫화면.png",
+        "E01-PC-01-첫화면-전체.png",
+        "E01-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 5장 · 첫 답 「사무용 기본은 램 8GB·SSD 240GB 이상이면 되지만, 사이버펑크 최고 옵션까지 고려하면 중급형 CPU인 라이젠 5급과 상급 그래픽카드인 RTX 5070급, 램 16GB, SSD 480GB 구성이 적합해요. 레이트레이싱을 켜는 게임용이라면 그래픽카드는 VRAM 12GB 이상, 파워」",
+      "shots": [
+        "E01-PC-02-대화1-첫화면.png",
+        "E01-PC-02-대화1-전체.png",
+        "E01-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [고사양 게임] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 124,400원 높아요 / 2) [고사양 게임] 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 241,000원 높아요 / 3) [사무용] 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 593,400원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 906,600원 낮아요 / 4) [사무용] 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원 · 사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 · 예산보다 607,200원 낮아요 / 5) [사무용] 골드 [14400F/16GB/256GB/RTX3050] 1,338,500원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 161,500원 낮아요 ‖ 문제: 카드2 예산의 116%",
+      "shots": [
+        "E01-PC-03-카드-첫화면.png",
+        "E01-PC-03-카드-전체.png",
+        "E01-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "사무용인데 사이버펑크도 최고 옵션으로 돌리고 싶어요. 150만원.",
+      "ms": null,
+      "ai": [
+        "사무용 기본은 램 8GB·SSD 240GB 이상이면 되지만, 사이버펑크 최고 옵션까지 고려하면 중급형 CPU인 라이젠 5급과 상급 그래픽카드인 RTX 5070급, 램 16GB, SSD 480GB 구성이 적합해요. 레이트레이싱을 켜는 게임용이라면 그래픽카드는 VRAM 12GB 이상, 파워는 650W급을 기준으로 고르는 편이 좋아요. 시중에서는 보통 150만원이며, QHD 최고 옵션이나 높은 프레임을 원하면 그래픽카드를 더 높은 등급으로 올리는 만큼 다른 부품이나 저장장치에서 절약해야 해요. 문서·웹 위주라면 8GB·240GB로 낮출 수 있지만, 게임 설치 공간까지 생각하면 16GB·480GB를 유지하는 것이 좋아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 기준으로 봤어요. 큰 엑셀 파일이나 모니터 두 대를 쓰시면 한 단계 위 구성이 맞아요. 말씀하신 최고 사양 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": "고사양 게임",
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": "고사양 게임",
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "알뜰 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": "사무용",
+          "note": null,
+          "price": "593,400원",
+          "gap": "예산보다 906,600원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": "사무용",
+          "note": null,
+          "price": "892,800원",
+          "gap": "예산보다 607,200원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "골드 [14400F/16GB/256GB/RTX3050]",
+          "group": "사무용",
+          "note": null,
+          "price": "1,338,500원",
+          "gap": "예산보다 161,500원 낮아요",
+          "spec": [
+            "CPU i5-14400",
+            "GPU RTX 3050 6GB",
+            "RAM 16GB",
+            "저장장치 256GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>사무용인데 사이버펑크도 최고 옵션으로 돌리고 싶어요. 150만원.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:32:39.512Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:41.998Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:43.390Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:43.420Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:43.443Z",
+      "m": "GET",
+      "u": "/api/customer/products/90678/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:43.478Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:43.491Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 303163,
+          "textRight": 48063,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 76,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 76,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4711,
+          "textLeft": 237328,
+          "textRight": 100734,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1687,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2385,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3105,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3800,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 4469,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 303163,
+          "textRight": 48063,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 238,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 238,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 980,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 980,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 980,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4711,
+          "textLeft": 237328,
+          "textRight": 100734,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1687,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2385,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3105,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 3800,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 4469,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": "고사양 게임",
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 124,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+        "group": "고사양 게임",
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,741,000원",
+        "gap": "예산보다 241,000원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "알뜰 구성",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+        "group": "사무용",
+        "note": null,
+        "price": "593,400원",
+        "gap": "예산보다 906,600원 낮아요",
+        "spec": [
+          "CPU i3-12100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+        "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+        "group": "사무용",
+        "note": null,
+        "price": "892,800원",
+        "gap": "예산보다 607,200원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU 인텔 UHD(내장)",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "골드 [14400F/16GB/256GB/RTX3050]",
+        "group": "사무용",
+        "note": null,
+        "price": "1,338,500원",
+        "gap": "예산보다 161,500원 낮아요",
+        "spec": [
+          "CPU i5-14400",
+          "GPU RTX 3050 6GB",
+          "RAM 16GB",
+          "저장장치 256GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

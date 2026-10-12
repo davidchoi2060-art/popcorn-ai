@@ -1,0 +1,368 @@
+{
+  "id": "E22c",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "edit",
+    "text": "视频剪辑电脑推荐"
+  },
+  "at": "2026-10-12T07:36:42.196Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E22c-PC-01-첫화면-첫화면.png",
+        "E22c-PC-01-첫화면-전체.png",
+        "E22c-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": false,
+      "symptom": "AI 답 2개 · 되묻기 2개 · 카드 3장 · 첫 답 「영상편집용 PC를 찾고 계시는군요. 예산은 어느 정도 생각하고 계세요? 지금은 한국어로만 상담하고 있어요. 쓰실 용도와 예산을 한국어로 알려 주시면 맞는 PC를 찾아 드릴게요.」 ‖ 문제: 되묻기 2개",
+      "shots": [
+        "E22c-PC-02-대화1-첫화면.png",
+        "E22c-PC-02-대화1-전체.png",
+        "E22c-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브) / 2) [-] 다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070] 3,230,400원 · 영상편집 쾌적\n4K 편집·색보정·효과 / 3) [-] [팝콘피씨] 라이젠 5세대[7800X3D/32G/1TB/RX9070XT] 3,954,100원 · 영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브)",
+      "shots": [
+        "E22c-PC-03-카드-첫화면.png",
+        "E22c-PC-03-카드-전체.png",
+        "E22c-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "视频剪辑电脑推荐",
+      "ms": null,
+      "ai": [
+        "영상편집용 PC를 찾고 계시는군요. 예산은 어느 정도 생각하고 계세요? 지금은 한국어로만 상담하고 있어요. 쓰실 용도와 예산을 한국어로 알려 주시면 맞는 PC를 찾아 드릴게요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 2,
+      "cards": [
+        {
+          "pill": "알뜰 구성",
+          "fit": "영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브)",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": null,
+          "price": "1,624,400원",
+          "gap": null,
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "영상편집 쾌적\n4K 편집·색보정·효과",
+          "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+          "group": null,
+          "note": null,
+          "price": "3,230,400원",
+          "gap": null,
+          "spec": [
+            "CPU 코어 울트라7 265",
+            "GPU RTX 5070 · 12GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브)",
+          "name": "[팝콘피씨] 라이젠 5세대[7800X3D/32G/1TB/RX9070XT]",
+          "group": null,
+          "note": null,
+          "price": "3,954,100원",
+          "gap": null,
+          "spec": [
+            "CPU 라이젠7 7800X3D",
+            "GPU RX 9070 XT · 16GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>视频剪辑电脑推荐</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:36:36.163Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:38.079Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:39.092Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:39.102Z",
+      "m": "GET",
+      "u": "/api/customer/products/127317/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:39.378Z",
+      "m": "GET",
+      "u": "/api/customer/products/128601/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 113038,
+          "textRight": 41981,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 635,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2542,
+          "textLeft": 107422,
+          "textRight": 38145,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 999,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1649,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2299,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 113038,
+          "textRight": 41981,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 767,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2542,
+          "textLeft": 107422,
+          "textRight": 38145,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 999,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1649,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2299,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "알뜰 구성",
+        "fit": "영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브)",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": null,
+        "price": "1,624,400원",
+        "gap": null,
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "영상편집 쾌적\n4K 편집·색보정·효과",
+        "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+        "group": null,
+        "note": null,
+        "price": "3,230,400원",
+        "gap": null,
+        "spec": [
+          "CPU 코어 울트라7 265",
+          "GPU RTX 5070 · 12GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "영상편집 기본\n프리미어·다빈치 FHD 컷편집 (유튜브)",
+        "name": "[팝콘피씨] 라이젠 5세대[7800X3D/32G/1TB/RX9070XT]",
+        "group": null,
+        "note": null,
+        "price": "3,954,100원",
+        "gap": null,
+        "spec": [
+          "CPU 라이젠7 7800X3D",
+          "GPU RX 9070 XT · 16GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 싼 PC",
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

@@ -1,0 +1,268 @@
+{
+  "id": "E25",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "op": "junk",
+    "expectNoCards": true,
+    "text": ""
+  },
+  "at": "2026-10-12T07:40:38.558Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E25-PC-01-첫화면-첫화면.png",
+        "E25-PC-01-첫화면-전체.png",
+        "E25-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "E25 첫 화면 빈 입력",
+      "ok": true,
+      "symptom": "주소 /mvp3/#start · 안내 「PC로 할 일이나 궁금한 점을 적어주세요.」",
+      "shots": [
+        "E25-PC-02-빈입력-첫화면.png",
+        "E25-PC-02-빈입력-전체.png"
+      ]
+    },
+    {
+      "step": "E25 첫 화면 공백 20개",
+      "ok": true,
+      "symptom": "주소 /mvp3/#start",
+      "shots": []
+    },
+    {
+      "step": "E25 대화 화면 빈 보내기",
+      "ok": true,
+      "symptom": "parse 호출 0번",
+      "shots": []
+    },
+    {
+      "step": "E25 「?????」",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 3초 · 첫 답 「입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요.」",
+      "shots": [
+        "E25-PC-03-잡문1-첫화면.png",
+        "E25-PC-03-잡문1-전체.png"
+      ]
+    },
+    {
+      "step": "E25 「?????」 카드 없음",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    },
+    {
+      "step": "E25 「😀😀😀」",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 3초 · 첫 답 「입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요.」",
+      "shots": [
+        "E25-PC-04-잡문2-첫화면.png",
+        "E25-PC-04-잡문2-전체.png"
+      ]
+    },
+    {
+      "step": "E25 「😀😀😀」 카드 없음",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    },
+    {
+      "step": "E25 「./\\<>!@#$」",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 3초 · 첫 답 「입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요.」",
+      "shots": [
+        "E25-PC-05-잡문3-첫화면.png",
+        "E25-PC-05-잡문3-전체.png"
+      ]
+    },
+    {
+      "step": "E25 「./\\<>!@#$」 카드 없음",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "?????",
+      "ms": 3411,
+      "ai": [
+        "입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>?????</p>"
+    },
+    {
+      "turn": 2,
+      "sent": "😀😀😀",
+      "ms": 2580,
+      "ai": [
+        "입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>😀😀😀</p>"
+    },
+    {
+      "turn": 3,
+      "sent": "./\\<>!@#$",
+      "ms": 2860,
+      "ai": [
+        "입력하신 내용을 잘 알아보지 못했어요. 「롤 하고 예산 100만원」처럼 용도와 예산을 적어 주시면 바로 찾아볼게요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>./\\&lt;&gt;!@#$</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:40:31.291Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:40:34.309Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:40:37.605Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "빈입력",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1255,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "잡문1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 19654,
+          "textRight": 13358,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "잡문2",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 33011,
+          "textRight": 14498,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "잡문3",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 46368,
+          "textRight": 15847,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

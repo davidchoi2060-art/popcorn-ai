@@ -1,0 +1,133 @@
+{
+  "id": "E23c",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "expectNoCards": true,
+    "text": "추천 완전 별로네 짜증나"
+  },
+  "at": "2026-10-12T07:37:16.187Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E23c-PC-01-첫화면-첫화면.png",
+        "E23c-PC-01-첫화면-전체.png",
+        "E23c-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 첫 답 「불편하셨군요. 혹시 어떤 부분이 마음에 안 드셨는지 알려주시면, 다시 맞춰볼 수 있어요.」",
+      "shots": [
+        "E23c-PC-02-대화1-첫화면.png",
+        "E23c-PC-02-대화1-전체.png",
+        "E23c-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "C/E 카드 없어야 함",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "추천 완전 별로네 짜증나",
+      "ms": null,
+      "ai": [
+        "불편하셨군요. 혹시 어떤 부분이 마음에 안 드셨는지 알려주시면, 다시 맞춰볼 수 있어요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>추천 완전 별로네 짜증나</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:37:13.999Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 16671,
+          "textRight": 15486,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 15632,
+          "textRight": 8981,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 326,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

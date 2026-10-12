@@ -1,0 +1,133 @@
+{
+  "id": "E23a",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "expectNoCards": true,
+    "text": "너 바보야?"
+  },
+  "at": "2026-10-12T07:36:53.589Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E23a-PC-01-첫화면-첫화면.png",
+        "E23a-PC-01-첫화면-전체.png",
+        "E23a-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 1개 · 카드 0장 · 첫 답 「기분 상하셨네요. 무엇을 원하셨는데 잘못 도와드렸거나 답답하신 부분이 있으신 걸까요? 편하게 말씀해 주시면 도와드리겠습니다.」",
+      "shots": [
+        "E23a-PC-02-대화1-첫화면.png",
+        "E23a-PC-02-대화1-전체.png",
+        "E23a-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "C/E 카드 없어야 함",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "너 바보야?",
+      "ms": null,
+      "ai": [
+        "기분 상하셨네요. 무엇을 원하셨는데 잘못 도와드렸거나 답답하신 부분이 있으신 걸까요? 편하게 말씀해 주시면 도와드리겠습니다."
+      ],
+      "questions": 1,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>너 바보야?</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:36:51.423Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 21687,
+          "textRight": 13890,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 18767,
+          "textRight": 9266,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 314,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

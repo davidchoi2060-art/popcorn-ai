@@ -1,0 +1,249 @@
+{
+  "id": "E10",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "game",
+    "budget": 100,
+    "text": "발로 옵치 롤 겜컴 ㄱㄱ 백만"
+  },
+  "at": "2026-10-12T07:34:18.531Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E10-PC-01-첫화면-첫화면.png",
+        "E10-PC-01-첫화면-전체.png",
+        "E10-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「요청하신 게임은 리그 오브 레전드, 발로란트, 오버워치 2입니다. 리그 오브 레전드는 라이엇 게임즈가 제작한 온라인 전투 게임이고, 발로란트는 라이엇 게임즈의 총싸움 게임입니다. 오버워치 2는 블리자드가 제작한 총싸움 게임입니다. 세 게임 모두 여러 사람이 함께 플레이하는 게임이며, 리」",
+      "shots": [
+        "E10-PC-02-대화1-첫화면.png",
+        "E10-PC-02-대화1-전체.png",
+        "E10-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 624,400원 높아요 ‖ 문제: 카드1 예산의 162%",
+      "shots": [
+        "E10-PC-03-카드-첫화면.png",
+        "E10-PC-03-카드-전체.png",
+        "E10-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "발로 옵치 롤 겜컴 ㄱㄱ 백만",
+      "ms": null,
+      "ai": [
+        "요청하신 게임은 리그 오브 레전드, 발로란트, 오버워치 2입니다. 리그 오브 레전드는 라이엇 게임즈가 제작한 온라인 전투 게임이고, 발로란트는 라이엇 게임즈의 총싸움 게임입니다. 오버워치 2는 블리자드가 제작한 총싸움 게임입니다. 세 게임 모두 여러 사람이 함께 플레이하는 게임이며, 리그 오브 레전드는 윈도우와 맥OS에서 플레이할 수 있습니다.\n\n발로란트, 오버워치, 리그 오브 레전드를 하려고 하시는군요. 천만원대로 맞춰 찾아봐 드릴게요.",
+        "100만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 624,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 624,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>발로 옵치 롤 겜컴 ㄱㄱ 백만</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:34:13.919Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:14.609Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:15.326Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 120264,
+          "textRight": 21328,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1593,
+          "textLeft": 84391,
+          "textRight": 44245,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1350,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 120264,
+          "textRight": 21328,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1593,
+          "textLeft": 84391,
+          "textRight": 44245,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1350,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 624,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

@@ -1,0 +1,520 @@
+{
+  "id": "B30",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "office",
+    "budget": 50,
+    "text": "사무용 컴퓨터 50만원 정도로 맞출 수 있어요?"
+  },
+  "at": "2026-10-12T07:30:31.247Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B30-PC-01-첫화면-첫화면.png",
+        "B30-PC-01-첫화면-전체.png",
+        "B30-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 2장 · 첫 답 「그래픽카드는 별도 외장그래픽보다 인텔 내장그래픽급이나 라데온 내장그래픽급으로 구성하면 비용을 줄일 수 있고, 사무 작업에는 충분해요. 시중에서는 보통 40만~50만원이에요. 외장 그래픽카드와 큰 저장장치는 아껴도 되지만, SSD는 HDD보다 체감 속도가 좋아서 유지하는 편이 좋고, 대용」",
+      "shots": [
+        "B30-PC-02-대화1-첫화면.png",
+        "B30-PC-02-대화1-전체.png",
+        "B30-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 593,400원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 93,400원 높아요 / 2) [-] 실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730] 626,700원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 126,700원 높아요 ‖ 문제: 카드1 예산의 119%; 카드2 예산의 125%",
+      "shots": [
+        "B30-PC-03-카드-첫화면.png",
+        "B30-PC-03-카드-전체.png",
+        "B30-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 405,300원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 593,400원」 ‖ 문제: 그래픽카드 금액 「별도 부품 없음」; 저장장치 금액 「가격 확인 중」; COOLER 금액 「가격 확인 중」; P2 부품합 405,300 + 기타 0 ≠ 합계 593,400",
+      "shots": [
+        "B30-PC-04-S4 상세-첫화면.png",
+        "B30-PC-04-S4 상세-전체.png",
+        "B30-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]」 593,400원 · 상세 「상품 참고 금액 593,400원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "사무용 컴퓨터 50만원 정도로 맞출 수 있어요?",
+      "ms": null,
+      "ai": [
+        "그래픽카드는 별도 외장그래픽보다 인텔 내장그래픽급이나 라데온 내장그래픽급으로 구성하면 비용을 줄일 수 있고, 사무 작업에는 충분해요. 시중에서는 보통 40만~50만원이에요. 외장 그래픽카드와 큰 저장장치는 아껴도 되지만, SSD는 HDD보다 체감 속도가 좋아서 유지하는 편이 좋고, 대용량 엑셀이나 탭 수십 개·듀얼 모니터를 함께 쓰면 램 16GB와 SSD 480GB 이상으로 올리는 것이 적합해요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 기준으로 봤어요. 큰 엑셀 파일이나 모니터 두 대를 쓰시면 한 단계 위 구성이 맞아요.",
+        "50만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 93,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": "이 작업은 593,400원부터 가능합니다.",
+          "price": "593,400원",
+          "gap": "예산보다 93,400원 높아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": "이 작업은 593,400원부터 가능합니다.",
+          "price": "626,700원",
+          "gap": "예산보다 126,700원 높아요",
+          "spec": [
+            "CPU i3-14100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>사무용 컴퓨터 50만원 정도로 맞출 수 있어요?</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:30:20.552Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:21.883Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:23.163Z",
+      "m": "GET",
+      "u": "/api/customer/products/113313/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:23.202Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:27.619Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:28.589Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 180932,
+          "textRight": 21449,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2419,
+          "textLeft": 130637,
+          "textRight": 60992,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1478,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2176,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 180932,
+          "textRight": 21449,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 818,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 818,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2419,
+          "textLeft": 130637,
+          "textRight": 60992,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1478,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2176,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 303348,
+          "textRight": 163131,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3461,
+          "textLeft": 316910,
+          "textRight": 135518,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+        "group": null,
+        "note": "이 작업은 593,400원부터 가능합니다.",
+        "price": "593,400원",
+        "gap": "예산보다 93,400원 높아요",
+        "spec": [
+          "CPU i3-12100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730]",
+        "group": null,
+        "note": "이 작업은 593,400원부터 가능합니다.",
+        "price": "626,700원",
+        "gap": "예산보다 126,700원 높아요",
+        "spec": [
+          "CPU i3-14100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크",
+        "price": 148900,
+        "priceText": "148,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "별도 그래픽카드 없음",
+        "price": null,
+        "priceText": "별도 부품 없음"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (8GB) PC4-25600",
+        "price": 112900,
+        "priceText": "112,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "AONE TFX-500P KC",
+        "price": 29600,
+        "priceText": "29,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "DAVEN N1 MESH (블랙)",
+        "price": 36900,
+        "priceText": "36,900원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 405300,
+        "etc": null,
+        "total": 593400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 593,400원"
+        ],
+        "budgetLine": "예산보다 93,400원 높아요",
+        "issues": [
+          "P2 부품합 405,300 + 기타 0 ≠ 총액 593,400"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "148,900원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "별도 그래픽카드 없음",
+            "desc": "CPU 내장 그래픽으로 화면을 출력하는 구성이에요.",
+            "price": "별도 부품 없음"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (8GB) PC4-25600",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "112,900원"
+          },
+          {
+            "part": "저장장치",
+            "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "POWER",
+            "name": "AONE TFX-500P KC",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "29,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "DAVEN N1 MESH (블랙)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "36,900원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 593,400원"
+        ],
+        "title": "슬림한 본체로 정리하는 문서·인터넷 작업 공간",
+        "sum": "슬림한 본체로 정리하는 문서·인터넷 작업 공간\n\n오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]\n\nCore i3-12100의 내장 그래픽을 사용하는 구성입니다. 별도 그래픽카드 없이 8GB 메모리와 256GB SSD를 담아 문서 작성·자료 검색·온라인 강의 같은 사용을 고려했습니다. 슬림 케이스를 사용하므로 놓을 자리와 연결할 기기를 함께 살펴보세요.\n\n593,400원\n\n예산보다 93,400원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 405300,
+        "etc": null,
+        "total": 593400
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

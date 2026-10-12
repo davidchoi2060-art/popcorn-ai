@@ -1,0 +1,242 @@
+{
+  "id": "C3",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "text": "10만원으로 모든 게임 4K 최고옵션"
+  },
+  "at": "2026-10-12T07:32:25.199Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "C3-PC-01-첫화면-첫화면.png",
+        "C3-PC-01-첫화면-전체.png",
+        "C3-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「말씀하신 최고 사양 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요. 말씀하신 예산으로는 원하시는 사양을 맞추기 어려울 수 있어요. 예산 안에서 가장 가까운 구성을 보여 드릴게요. 사양이 더 중요하면 예산을 알려 주세요.」",
+      "shots": [
+        "C3-PC-02-대화1-첫화면.png",
+        "C3-PC-02-대화1-전체.png",
+        "C3-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080] 4,811,500원 · 게임 4K\n최신 대작 4K 높음 옵션 · 예산보다 4,711,500원 높아요",
+      "shots": [
+        "C3-PC-03-카드-첫화면.png",
+        "C3-PC-03-카드-전체.png",
+        "C3-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "10만원으로 모든 게임 4K 최고옵션",
+      "ms": null,
+      "ai": [
+        "말씀하신 최고 사양 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요. 말씀하신 예산으로는 원하시는 사양을 맞추기 어려울 수 있어요. 예산 안에서 가장 가까운 구성을 보여 드릴게요. 사양이 더 중요하면 예산을 알려 주세요.",
+        "10만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 4,711,500원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+          "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+          "group": null,
+          "note": "이 작업은 4,811,500원부터 가능합니다.",
+          "price": "4,811,500원",
+          "gap": "예산보다 4,711,500원 높아요",
+          "spec": [
+            "CPU 코어 울트라7 265K",
+            "GPU RTX 5080 · 16GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>10만원으로 모든 게임 4K 최고옵션</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:32:20.921Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:32:21.198Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 98735,
+          "textRight": 21021,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1270,
+          "textLeft": 74030,
+          "textRight": 33894,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1027,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 98735,
+          "textRight": 21021,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1270,
+          "textLeft": 74030,
+          "textRight": 33894,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1027,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+        "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+        "group": null,
+        "note": "이 작업은 4,811,500원부터 가능합니다.",
+        "price": "4,811,500원",
+        "gap": "예산보다 4,711,500원 높아요",
+        "spec": [
+          "CPU 코어 울트라7 265K",
+          "GPU RTX 5080 · 16GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

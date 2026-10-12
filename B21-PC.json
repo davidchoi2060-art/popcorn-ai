@@ -1,0 +1,512 @@
+{
+  "id": "B21",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "office",
+    "budget": 100,
+    "text": "문서 작업, 큰 엑셀, 웹, 화상회의용이에요. 예산은 100만원이에요.",
+    "mobile": false
+  },
+  "at": "2026-10-12T07:27:26.367Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B21-PC-01-첫화면-첫화면.png",
+        "B21-PC-01-첫화면-전체.png",
+        "B21-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 2개 · 되묻기 0개 · 카드 2장 · 첫 답 「문서 작업, 큰 엑셀, 웹, 화상회의에는 중급형 CPU인 라이젠 5급·코어 i5급과 내장그래픽급인 라데온 내장그래픽·인텔 UHD급 구성이 적합해요. 큰 엑셀과 여러 창을 쾌적하게 쓰려면 램 16GB, SSD 480GB를 기준으로 고르세요. 그래픽카드는 게임이나 3D 작업이 없으므로 별도」",
+      "shots": [
+        "B21-PC-02-대화1-첫화면.png",
+        "B21-PC-02-대화1-전체.png",
+        "B21-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원 · 사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 · 예산보다 107,200원 낮아요 / 2) [-] 오피스 초슬림/미니타워[8600G/16G/500G/Radeon 7] 1,195,100원 · 사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 · 예산보다 195,100원 높아요 ‖ 문제: 카드2 예산의 120%",
+      "shots": [
+        "B21-PC-03-카드-첫화면.png",
+        "B21-PC-03-카드-전체.png",
+        "B21-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 555,600원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 892,800원」 ‖ 문제: 그래픽카드 금액 「별도 부품 없음」; 메모리 금액 「가격 확인 중」; COOLER 금액 「가격 확인 중」; P2 부품합 555,600 + 기타 0 ≠ 합계 892,800",
+      "shots": [
+        "B21-PC-04-S4 상세-첫화면.png",
+        "B21-PC-04-S4 상세-전체.png",
+        "B21-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「오피스 초슬림/미니타워[12400/16G/500G/UHD 730]」 892,800원 · 상세 「상품 참고 금액 892,800원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "문서 작업, 큰 엑셀, 웹, 화상회의용이에요. 예산은 100만원이에요.",
+      "ms": null,
+      "ai": [
+        "문서 작업, 큰 엑셀, 웹, 화상회의에는 중급형 CPU인 라이젠 5급·코어 i5급과 내장그래픽급인 라데온 내장그래픽·인텔 UHD급 구성이 적합해요. 큰 엑셀과 여러 창을 쾌적하게 쓰려면 램 16GB, SSD 480GB를 기준으로 고르세요. 그래픽카드는 게임이나 3D 작업이 없으므로 별도 그래픽카드를 생략하고 램과 SSD에 예산을 쓰는 편이 체감이 크며, 시중에서는 보통 70만~100만원이에요. 더 많은 파일을 저장하거나 대용량 엑셀을 자주 다룬다면 SSD는 더 여유 있는 용량을 선택할 수 있지만, 예산 안에서는 램 16GB를 먼저 지키는 것이 좋아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 기준으로 봤어요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "892,800원",
+          "gap": "예산보다 107,200원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[8600G/16G/500G/Radeon 7]",
+          "group": null,
+          "note": null,
+          "price": "1,195,100원",
+          "gap": "예산보다 195,100원 높아요",
+          "spec": [
+            "CPU 라이젠5 8600G",
+            "GPU AMD Radeon(내장 2CU)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>문서 작업, 큰 엑셀, 웹, 화상회의용이에요. 예산은 100만원이에요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:27:16.694Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:27:17.289Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:27:18.001Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:27:22.785Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:27:23.818Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 172708,
+          "textRight": 21764,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 571,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2147,
+          "textLeft": 127318,
+          "textRight": 56258,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1427,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1904,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 172708,
+          "textRight": 21764,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 571,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2147,
+          "textLeft": 127318,
+          "textRight": 56258,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1427,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1904,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 287777,
+          "textRight": 163374,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3377,
+          "textLeft": 310345,
+          "textRight": 126763,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "추천 구성",
+        "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+        "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+        "group": null,
+        "note": null,
+        "price": "892,800원",
+        "gap": "예산보다 107,200원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU 인텔 UHD(내장)",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+        "name": "오피스 초슬림/미니타워[8600G/16G/500G/Radeon 7]",
+        "group": null,
+        "note": null,
+        "price": "1,195,100원",
+        "gap": "예산보다 195,100원 높아요",
+        "spec": [
+          "CPU 라이젠5 8600G",
+          "GPU AMD Radeon(내장 2CU)",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400 (엘더레이크)(벌크)",
+        "price": 197000,
+        "priceText": "197,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "별도 그래픽카드 없음",
+        "price": null,
+        "priceText": "별도 부품 없음"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "AONE TFX-500P KC",
+        "price": 29600,
+        "priceText": "29,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "DAVEN N1 MESH (화이트)",
+        "price": 39600,
+        "priceText": "39,600원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 555600,
+        "etc": null,
+        "total": 892800,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 892,800원"
+        ],
+        "budgetLine": "예산보다 107,200원 낮아요",
+        "issues": [
+          "P2 부품합 555,600 + 기타 0 ≠ 총액 892,800"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i5-12세대 12400 (엘더레이크)(벌크)",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "197,000원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "별도 그래픽카드 없음",
+            "desc": "CPU 내장 그래픽으로 화면을 출력하는 구성이에요.",
+            "price": "별도 부품 없음"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "저장장치",
+            "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "212,400원"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "POWER",
+            "name": "AONE TFX-500P KC",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "29,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "DAVEN N1 MESH (화이트)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "39,600원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 892,800원"
+        ],
+        "title": "슬림한 본체로 정리하는 문서·인터넷 작업 공간",
+        "sum": "슬림한 본체로 정리하는 문서·인터넷 작업 공간\n\n오피스 초슬림/미니타워[12400/16G/500G/UHD 730]\n\nCore i5-12400의 내장 그래픽을 사용하는 구성입니다. 별도 그래픽카드 없이 16GB 메모리와 500GB SSD를 담아 문서 작성·자료 검색·온라인 강의 같은 사용을 고려했습니다. 슬림 케이스를 사용하므로 놓을 자리와 연결할 기기를 함께 살펴보세요.\n\n892,800원\n\n예산보다 107,200원 낮아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터"
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 555600,
+        "etc": null,
+        "total": 892800
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

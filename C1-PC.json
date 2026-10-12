@@ -1,0 +1,133 @@
+{
+  "id": "C1",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "none",
+    "expectNoCards": true,
+    "text": "램 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요."
+  },
+  "at": "2026-10-12T07:31:46.012Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "C1-PC-01-첫화면-첫화면.png",
+        "C1-PC-01-첫화면-전체.png",
+        "C1-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 첫 답 「램 16GB는 웹서핑, 문서 작업, 영상 시청, 일반적인 게임처럼 기본적인 PC 사용에 적합해요. 32GB는 여러 프로그램을 동시에 띄우거나 고사양 게임, 사진·영상 편집, 대용량 문서 작업을 할 때 더 여유롭고 끊김이 적어요. 램이 부족하면 프로그램을 많이 실행할수록 PC가 느려질 수」",
+      "shots": [
+        "C1-PC-02-대화1-첫화면.png",
+        "C1-PC-02-대화1-전체.png",
+        "C1-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "C/E 카드 없어야 함",
+      "ok": true,
+      "symptom": "카드 0장",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "램 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.",
+      "ms": null,
+      "ai": [
+        "램 16GB는 웹서핑, 문서 작업, 영상 시청, 일반적인 게임처럼 기본적인 PC 사용에 적합해요. 32GB는 여러 프로그램을 동시에 띄우거나 고사양 게임, 사진·영상 편집, 대용량 문서 작업을 할 때 더 여유롭고 끊김이 적어요. 램이 부족하면 프로그램을 많이 실행할수록 PC가 느려질 수 있지만, 사용량이 16GB 안팎이라면 32GB로 바꿔도 체감 차이는 크지 않을 수 있어요. 따라서 일반 사용은 16GB, 멀티태스킹이나 작업용까지 고려하면 32GB가 적합해요.\n\n램 용량 차이는 여러 프로그램을 동시에 돌릴 때 체감되는데, 16GB는 일반적인 브라우징이나 문서 작업에 충분하고 32GB는 영상 편집·3D 작업·여러 개 앱을 함께 실행할 때 더 여유로워요. 필요하신 용도가 정해지면 말씀해 주세요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>램 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:31:43.773Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 89460,
+          "textRight": 18260,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 61284,
+          "textRight": 38892,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 710,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

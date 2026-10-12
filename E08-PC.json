@@ -1,0 +1,369 @@
+{
+  "id": "E08",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "game",
+    "budget": 200,
+    "text": "100~200만원 사이 게임 PC"
+  },
+  "at": "2026-10-12T07:33:40.709Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E08-PC-01-첫화면-첫화면.png",
+        "E08-PC-01-첫화면-전체.png",
+        "E08-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 2개 · 되묻기 1개 · 카드 3장 · 첫 답 「사이버펑크 2077은 비교적 무거운 게임이라 FHD 높음 옵션 60fps 기준으로 중급형, 라이젠 5급 CPU와 RTX 5060 Ti급 그래픽카드 구성이 적합해요. 램은 16GB, SSD는 480GB 이상으로 맞추고, 더 여유를 원하면 램 32GB나 SSD 960GB를 선택하면 돼요. 」",
+      "shots": [
+        "E08-PC-02-대화1-첫화면.png",
+        "E08-PC-02-대화1-전체.png",
+        "E08-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 375,600원 낮아요 / 2) [-] [7500F/16G/512GB/RTX5060] 1,771,800원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 228,200원 낮아요 / 3) [-] [14400F/32G/1TB/RTX5060Ti] 1,871,100원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 128,900원 낮아요",
+      "shots": [
+        "E08-PC-03-카드-첫화면.png",
+        "E08-PC-03-카드-전체.png",
+        "E08-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "100~200만원 사이 게임 PC",
+      "ms": null,
+      "ai": [
+        "사이버펑크 2077은 비교적 무거운 게임이라 FHD 높음 옵션 60fps 기준으로 중급형, 라이젠 5급 CPU와 RTX 5060 Ti급 그래픽카드 구성이 적합해요. 램은 16GB, SSD는 480GB 이상으로 맞추고, 더 여유를 원하면 램 32GB나 SSD 960GB를 선택하면 돼요. 시중에서는 보통 140~180만원대에 형성되는 구성으로 볼 수 있어요. 예산을 아끼려면 RGB 케이스나 고급 쿨러·메인보드에서 줄이고, 체감이 큰 그래픽카드와 기본적인 파워 품질은 지키는 편이 좋아요. QHD로 즐기려면 그래픽카드를 RTX 5070급으로 올리고 SSD 960GB를 고려하는 식으로 그래픽카드에 우선 투자하면 돼요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": [
+        {
+          "pill": "알뜰 구성",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": null,
+          "price": "1,624,400원",
+          "gap": "예산보다 375,600원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "[7500F/16G/512GB/RTX5060]",
+          "group": null,
+          "note": null,
+          "price": "1,771,800원",
+          "gap": "예산보다 228,200원 낮아요",
+          "spec": [
+            "CPU 라이젠5 7500F",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 512GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "[14400F/32G/1TB/RTX5060Ti]",
+          "group": null,
+          "note": null,
+          "price": "1,871,100원",
+          "gap": "예산보다 128,900원 낮아요",
+          "spec": [
+            "CPU i5-14400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>100~200만원 사이 게임 PC</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:33:34.836Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:36.680Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:37.665Z",
+      "m": "GET",
+      "u": "/api/customer/products/129823/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:37.667Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:37.685Z",
+      "m": "GET",
+      "u": "/api/customer/products/129804/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 180645,
+          "textRight": 43965,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 631,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 631,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2957,
+          "textLeft": 144229,
+          "textRight": 67713,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1376,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2045,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2714,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 180645,
+          "textRight": 43965,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 818,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 793,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 793,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2957,
+          "textLeft": 144229,
+          "textRight": 67713,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1376,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2045,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2714,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "알뜰 구성",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": null,
+        "price": "1,624,400원",
+        "gap": "예산보다 375,600원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "[7500F/16G/512GB/RTX5060]",
+        "group": null,
+        "note": null,
+        "price": "1,771,800원",
+        "gap": "예산보다 228,200원 낮아요",
+        "spec": [
+          "CPU 라이젠5 7500F",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 512GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "[14400F/32G/1TB/RTX5060Ti]",
+        "group": null,
+        "note": null,
+        "price": "1,871,100원",
+        "gap": "예산보다 128,900원 낮아요",
+        "spec": [
+          "CPU i5-14400",
+          "GPU RTX 5060 Ti 8GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 싼 PC",
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

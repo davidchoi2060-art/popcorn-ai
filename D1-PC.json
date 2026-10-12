@@ -1,0 +1,135 @@
+{
+  "id": "D1",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "none",
+    "follow": true,
+    "op": "addresses"
+  },
+  "at": "2026-10-12T07:39:02.485Z",
+  "rows": [
+    {
+      "step": "D1 주소 /",
+      "ok": false,
+      "symptom": "→ /mvp1/main-landing.html · 제목 「모든 견적에는 이유가 있습니다.」",
+      "shots": [
+        "D1-PC-01-주소_-첫화면.png",
+        "D1-PC-01-주소_-전체.png"
+      ]
+    },
+    {
+      "step": "D1 주소 /mvp3/",
+      "ok": true,
+      "symptom": "→ /mvp3/#start · 제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "D1-PC-02-주소_mvp3_-첫화면.png",
+        "D1-PC-02-주소_mvp3_-전체.png"
+      ]
+    },
+    {
+      "step": "D1 주소 /mvp3/index.html",
+      "ok": true,
+      "symptom": "→ /mvp3/index.html#start · 제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "D1-PC-03-주소_mvp3_index_html-첫화면.png",
+        "D1-PC-03-주소_mvp3_index_html-전체.png"
+      ]
+    },
+    {
+      "step": "D1 주소 /mvp3/talk.html",
+      "ok": true,
+      "symptom": "→ /mvp3/talk.html · 제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "D1-PC-04-주소_mvp3_talk_html-첫화면.png",
+        "D1-PC-04-주소_mvp3_talk_html-전체.png"
+      ]
+    }
+  ],
+  "turns": [],
+  "api": [
+    {
+      "at": "2026-10-12T07:38:48.720Z",
+      "m": "GET",
+      "u": "/api/showcase",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:38:49.455Z",
+      "m": "GET",
+      "u": "/api/auth/me",
+      "s": 503
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "주소_",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 3730,
+          "textLeft": 357668,
+          "textRight": 215232,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "주소_mvp3_",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "주소_mvp3_index_html",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "주소_mvp3_talk_html",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 30036,
+          "textRight": 12598,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 251,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "pageErrors": [
+      "console: Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    ],
+    "dialogs": []
+  }
+}

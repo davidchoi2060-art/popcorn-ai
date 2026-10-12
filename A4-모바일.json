@@ -1,0 +1,744 @@
+{
+  "id": "A4",
+  "mode": "모바일",
+  "scenario": {
+    "entry": "card:upgrade",
+    "depth": "full",
+    "follow": true,
+    "kind": "none",
+    "budget": 60,
+    "text": "지금 i5-8400, GTX 1060, 램 16GB예요. 60만원 안에서 업그레이드할까요 새로 살까요?",
+    "mobile": true
+  },
+  "at": "2026-10-12T07:23:13.628Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "A4-모바일-01-첫화면-첫화면.png",
+        "A4-모바일-01-첫화면-전체.png"
+      ]
+    },
+    {
+      "step": "S2 입구 → 대화 화면 초안",
+      "ok": true,
+      "symptom": "초안 「지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.」 · 자동 전송 안 됨",
+      "shots": [
+        "A4-모바일-02-입구-첫화면.png",
+        "A4-모바일-02-입구-전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 7초 · 첫 답 「현재 i5-8400, GTX 1060, 램 16GB 구성은 문서 작업과 일반적인 게임에는 아직 사용할 수 있지만, 부팅과 프로그램 실행이 느리다면 저장장치의 종류·상태·남은 공간을 먼저 살펴보는 게 좋아요. 게임에서 끊김이나 프레임 저하가 주된 불편이면 그래픽카드와 CPU 성능을 확인하」",
+      "shots": [
+        "A4-모바일-03-대화1-첫화면.png",
+        "A4-모바일-03-대화1-전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴2 「FHD 144Hz 모니터 써요.」",
+      "ok": false,
+      "symptom": "AI 답 1개 · 되묻기 2개 · 카드 0장 · 4초 · 첫 답 「FHD 144Hz라면 고주사율 게임을 주로 하시는 건가요? 아니면 현재 PC에서 가장 불편한 작업이 뭔가요?」 ‖ 문제: 되묻기 2개",
+      "shots": [
+        "A4-모바일-04-대화2-첫화면.png",
+        "A4-모바일-04-대화2-전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴3 「그냥 알아서 추천해 주세요.」",
+      "ok": true,
+      "symptom": "AI 답 2개 · 되묻기 0개 · 카드 2장 · 6초 · 첫 답 「하실 일을 아직 몰라서 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 같은 일반 용도를 가정했어요. 하실 일을 알려 주시면 그에 맞춰 다시 볼 수 있어요.」",
+      "shots": [
+        "A4-모바일-05-대화3-첫화면.png",
+        "A4-모바일-05-대화3-전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 593,400원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 6,600원 낮아요 / 2) [-] 실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730] 626,700원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 26,700원 높아요",
+      "shots": [
+        "A4-모바일-06-카드-첫화면.png",
+        "A4-모바일-06-카드-전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 405,300원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 593,400원」 ‖ 문제: 그래픽카드 금액 「별도 부품 없음」; 저장장치 금액 「가격 확인 중」; COOLER 금액 「가격 확인 중」; P2 부품합 405,300 + 기타 0 ≠ 합계 593,400",
+      "shots": [
+        "A4-모바일-07-S4 상세-첫화면.png",
+        "A4-모바일-07-S4 상세-전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]」 593,400원 · 상세 「상품 참고 금액 593,400원」",
+      "shots": []
+    },
+    {
+      "step": "S5 최종 견적 확인",
+      "ok": false,
+      "symptom": "총액 593,400원 · 부품합 405,300 · 조립·기타 0 · 상태 「서버에 보관됨」 · 좌:우 글자 2.3:1 · 구매 단추 2912px ‖ 문제: P2 부품합 405,300 + 기타 0 ≠ 총액 593,400; 구매 단추가 첫 화면 밖(2912px)",
+      "shots": [
+        "A4-모바일-08-최종견적-첫화면.png",
+        "A4-모바일-08-최종견적-전체.png"
+      ]
+    },
+    {
+      "step": "S6 쇼핑몰 구매 단추",
+      "ok": true,
+      "symptom": "단추 사라짐 · 결과 칸 화면 안 「팝콘PC 쇼핑몰로 연결할 준비가 됐어요 쇼핑몰 가격도 593,400원으로 같아요. 쇼핑몰 상품 페이지 열기 연결 번호 HO-1033 · 결제·배송·보증은 쇼핑몰에서 안내해요.」",
+      "shots": [
+        "A4-모바일-09-쇼핑몰단추후-첫화면.png",
+        "A4-모바일-09-쇼핑몰단추후-전체.png"
+      ]
+    },
+    {
+      "step": "S7 쇼핑몰 상품 페이지",
+      "ok": true,
+      "symptom": "링크 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=113835 → https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=113835 · 「프리미엄팝콘피씨=조립1위」",
+      "shots": [
+        "A4-모바일-99-쇼핑몰.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "지금 쓰는 PC에서 불편한 점을 상담하고 싶어요. 지금 i5-8400, GTX 1060, 램 16GB예요. 60만원 안에서 업그레이드할까요 새로 살까요?",
+      "ms": 7428,
+      "ai": [
+        "현재 i5-8400, GTX 1060, 램 16GB 구성은 문서 작업과 일반적인 게임에는 아직 사용할 수 있지만, 부팅과 프로그램 실행이 느리다면 저장장치의 종류·상태·남은 공간을 먼저 살펴보는 게 좋아요. 게임에서 끊김이나 프레임 저하가 주된 불편이면 그래픽카드와 CPU 성능을 확인하고, 여러 프로그램을 동시에 사용할 때 버벅이면 메모리 사용량과 슬롯 상태를 점검해 보세요. 업그레이드는 저장장치나 특정 부품만 부족할 때 유리하고, CPU·그래픽카드·저장장치를 함께 바꿔야 한다면 새 PC가 성능 균형을 맞추기 쉬워요. 현재 PC에서는 SSD인지 HDD인지, 저장장치 건강 상태와 여유 공간, 메모리 슬롯 수, 메인보드와 파워서플라이 규격을 확인한 뒤 호환 가능한 부품인지 판단해야 해요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>지금 쓰는 PC에서 불편한 점을 상담하고 싶어요. 지금 i5-8400, GTX 1060, 램 16GB예요. 60만원 안에서 업그레이드할까요 새로 살까요?</p>"
+    },
+    {
+      "turn": 2,
+      "sent": "FHD 144Hz 모니터 써요.",
+      "ms": 3858,
+      "ai": [
+        "FHD 144Hz라면 고주사율 게임을 주로 하시는 건가요? 아니면 현재 PC에서 가장 불편한 작업이 뭔가요?"
+      ],
+      "questions": 2,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>FHD 144Hz 모니터 써요.</p>"
+    },
+    {
+      "turn": 3,
+      "sent": "그냥 알아서 추천해 주세요.",
+      "ms": 5691,
+      "ai": [
+        "하실 일을 아직 몰라서 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 같은 일반 용도를 가정했어요. 하실 일을 알려 주시면 그에 맞춰 다시 볼 수 있어요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "593,400원",
+          "gap": "예산보다 6,600원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "626,700원",
+          "gap": "예산보다 26,700원 높아요",
+          "spec": [
+            "CPU i3-14100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>그냥 알아서 추천해 주세요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:22:41.453Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:45.807Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:50.790Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:51.977Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:52.651Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:52.841Z",
+      "m": "GET",
+      "u": "/api/customer/products/113313/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:55.899Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:22:57.034Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:00.300Z",
+      "m": "GET",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:02.325Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:04.819Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes/8af3ce62-57df-48ef-8ffe-bb02e5281742/handoff",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "입구",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 25489,
+          "textRight": 9525,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 295,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 63912,
+          "textRight": 45061,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 710,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화2",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 975,
+          "textLeft": 71474,
+          "textRight": 53098,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화3",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2539,
+          "textLeft": 146607,
+          "textRight": 82347,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1760,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2296,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2701,
+          "textLeft": 146607,
+          "textRight": 82347,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1760,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2458,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3555,
+          "textLeft": 319724,
+          "textRight": 134664,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "최종견적",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3339,
+          "textLeft": 325742,
+          "textRight": 142358,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 2912,
+              "inFirstView": false,
+              "disabled": true
+            },
+            {
+              "text": "팝콘PC 쇼핑몰에서 구매하기",
+              "top": 2912,
+              "inFirstView": false,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "쇼핑몰단추후",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3545,
+          "textLeft": 338172,
+          "textRight": 149486,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 2912,
+              "inFirstView": false,
+              "disabled": true
+            },
+            {
+              "text": "쇼핑몰 상품 페이지 열기",
+              "top": 2912,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "쇼핑몰 상품 페이지 열기",
+              "top": 3137,
+              "inFirstView": false,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "cards": [
+      {
+        "pill": "추천 구성",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+        "group": null,
+        "note": null,
+        "price": "593,400원",
+        "gap": "예산보다 6,600원 낮아요",
+        "spec": [
+          "CPU i3-12100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "실버 사무용 3위 신제품 인텔14세대 [14100/8G/256GB/UHD 730]",
+        "group": null,
+        "note": null,
+        "price": "626,700원",
+        "gap": "예산보다 26,700원 높아요",
+        "spec": [
+          "CPU i3-14100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크",
+        "price": 148900,
+        "priceText": "148,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "별도 그래픽카드 없음",
+        "price": null,
+        "priceText": "별도 부품 없음"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (8GB) PC4-25600",
+        "price": 112900,
+        "priceText": "112,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "AONE TFX-500P KC",
+        "price": 29600,
+        "priceText": "29,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "DAVEN N1 MESH (블랙)",
+        "price": 36900,
+        "priceText": "36,900원"
+      },
+      {
+        "where": "최종",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크",
+        "price": 148900,
+        "priceText": "148,900원"
+      },
+      {
+        "where": "최종",
+        "part": "그래픽카드",
+        "name": "별도 그래픽카드 없음",
+        "price": null,
+        "priceText": "별도 부품 없음"
+      },
+      {
+        "where": "최종",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (8GB) PC4-25600",
+        "price": 112900,
+        "priceText": "112,900원"
+      },
+      {
+        "where": "최종",
+        "part": "저장장치",
+        "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "최종",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "최종",
+        "part": "COOLER",
+        "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "최종",
+        "part": "POWER",
+        "name": "AONE TFX-500P KC",
+        "price": 29600,
+        "priceText": "29,600원"
+      },
+      {
+        "where": "최종",
+        "part": "케이스",
+        "name": "DAVEN N1 MESH (블랙)",
+        "price": 36900,
+        "priceText": "36,900원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 405300,
+        "etc": null,
+        "total": 593400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 593,400원"
+        ],
+        "budgetLine": "예산보다 6,600원 낮아요",
+        "issues": [
+          "P2 부품합 405,300 + 기타 0 ≠ 총액 593,400"
+        ]
+      },
+      {
+        "where": "최종",
+        "sumP": 405300,
+        "etc": null,
+        "total": 593400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 593,400원"
+        ],
+        "budgetLine": "예산보다 6,600원 낮아요",
+        "issues": [
+          "P2 부품합 405,300 + 기타 0 ≠ 총액 593,400"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "148,900원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "별도 그래픽카드 없음",
+            "desc": "CPU 내장 그래픽으로 화면을 출력하는 구성이에요.",
+            "price": "별도 부품 없음"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (8GB) PC4-25600",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "112,900원"
+          },
+          {
+            "part": "저장장치",
+            "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "앱코 자이로스 95XF V2 1700 ONLY FRGB",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "POWER",
+            "name": "AONE TFX-500P KC",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "29,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "DAVEN N1 MESH (블랙)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "36,900원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 593,400원"
+        ],
+        "title": "슬림한 본체로 정리하는 문서·인터넷 작업 공간",
+        "sum": "슬림한 본체로 정리하는 문서·인터넷 작업 공간\n\n오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]\n\nCore i3-12100의 내장 그래픽을 사용하는 구성입니다. 별도 그래픽카드 없이 8GB 메모리와 256GB SSD를 담아 문서 작성·자료 검색·온라인 강의 같은 사용을 고려했습니다. 슬림 케이스를 사용하므로 놓을 자리와 연결할 기기를 함께 살펴보세요.\n\n593,400원\n\n예산보다 6,600원 낮아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 405300,
+        "etc": null,
+        "total": 593400
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

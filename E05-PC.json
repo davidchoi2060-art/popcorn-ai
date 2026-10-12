@@ -1,0 +1,368 @@
+{
+  "id": "E05",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "heavy",
+    "text": "게임용 PC 예산 1억이에요."
+  },
+  "at": "2026-10-12T07:34:22.924Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E05-PC-01-첫화면-첫화면.png",
+        "E05-PC-01-첫화면-전체.png",
+        "E05-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 2개 · 되묻기 1개 · 카드 3장 · 첫 답 「게임용으로 예산 1억 원이면 최고급 부품을 여러 대 맞출 수 있지만, 한 대 기준으로는 전액을 쓸 필요가 없어요. 4K 고주사율까지 노리면 그래픽카드 VRAM 24GB 이상과 파워 1000W급을 지키는 편이 좋고, 시중에서는 보통 600만~900만원대예요. 체감 성능은 비싼 케이스나 과」",
+      "shots": [
+        "E05-PC-02-대화1-첫화면.png",
+        "E05-PC-02-대화1-전체.png",
+        "E05-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": true,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 98,395,600원 낮아요 / 2) [-] 익스트림 [AMD 9800x3d/32G/1TB/RTX5080] 4,998,900원 · 게임 4K\n최신 대작 4K 높음 옵션 · 예산보다 95,021,100원 낮아요 / 3) [-] 익스트림 [14900KF/32G/1TB/RTX5090] 12,808,300원 · 게임 4K\n최신 대작 4K 높음 옵션 · 예산보다 87,211,700원 낮아요",
+      "shots": [
+        "E05-PC-03-카드-첫화면.png",
+        "E05-PC-03-카드-전체.png",
+        "E05-PC-03-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "게임용 PC 예산 1억이에요.",
+      "ms": null,
+      "ai": [
+        "게임용으로 예산 1억 원이면 최고급 부품을 여러 대 맞출 수 있지만, 한 대 기준으로는 전액을 쓸 필요가 없어요. 4K 고주사율까지 노리면 그래픽카드 VRAM 24GB 이상과 파워 1000W급을 지키는 편이 좋고, 시중에서는 보통 600만~900만원대예요. 체감 성능은 비싼 케이스나 과도한 램·저장장치보다 그래픽카드와 모니터에 더 투자하는 것이 크며, 나머지 예산은 아껴도 게임 성능 차이가 거의 없어요. FHD나 QHD만 사용한다면 그래픽카드 등급을 낮춰도 충분하고, 해상도와 주사율에 따라 적정 구성이 크게 달라져요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요. 주로 하는 게임을 알려 주시면 그 게임 기준으로 다시 볼 수 있어요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": [
+        {
+          "pill": "알뜰 구성",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": null,
+          "price": "1,624,400원",
+          "gap": "예산보다 98,395,600원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+          "name": "익스트림 [AMD 9800x3d/32G/1TB/RTX5080]",
+          "group": null,
+          "note": null,
+          "price": "4,998,900원",
+          "gap": "예산보다 95,021,100원 낮아요",
+          "spec": [
+            "CPU 라이젠7 9800X3D",
+            "GPU RTX 5080 · 16GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+          "name": "익스트림 [14900KF/32G/1TB/RTX5090]",
+          "group": null,
+          "note": null,
+          "price": "12,808,300원",
+          "gap": "예산보다 87,211,700원 낮아요",
+          "spec": [
+            "CPU i9-14900K",
+            "GPU RTX 5090 · 32GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>게임용 PC 예산 1억이에요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:34:16.137Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:18.959Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:20.192Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:20.719Z",
+      "m": "GET",
+      "u": "/api/customer/products/126028/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:34:20.735Z",
+      "m": "GET",
+      "u": "/api/customer/products/113180/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 181332,
+          "textRight": 41409,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 656,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 635,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 635,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2658,
+          "textLeft": 145285,
+          "textRight": 66464,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1376,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1908,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2415,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 181332,
+          "textRight": 41409,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 818,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 797,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 797,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2982,
+          "textLeft": 145285,
+          "textRight": 66464,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1376,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2070,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2739,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "알뜰 구성",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": null,
+        "price": "1,624,400원",
+        "gap": "예산보다 98,395,600원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+        "name": "익스트림 [AMD 9800x3d/32G/1TB/RTX5080]",
+        "group": null,
+        "note": null,
+        "price": "4,998,900원",
+        "gap": "예산보다 95,021,100원 낮아요",
+        "spec": [
+          "CPU 라이젠7 9800X3D",
+          "GPU RTX 5080 · 16GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+        "name": "익스트림 [14900KF/32G/1TB/RTX5090]",
+        "group": null,
+        "note": null,
+        "price": "12,808,300원",
+        "gap": "예산보다 87,211,700원 낮아요",
+        "spec": [
+          "CPU i9-14900K",
+          "GPU RTX 5090 · 32GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 싼 PC",
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

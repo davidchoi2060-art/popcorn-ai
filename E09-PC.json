@@ -1,0 +1,438 @@
+{
+  "id": "E09",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": true,
+    "kind": "game",
+    "budget": 150,
+    "text": "ㅂㄱ ㄹ 하는 컴 150"
+  },
+  "at": "2026-10-12T07:34:02.456Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "E09-PC-01-첫화면-첫화면.png",
+        "E09-PC-01-첫화면-전체.png",
+        "E09-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 1개 · 카드 0장 · 첫 답 「무엇을 하실 컴퓨터인지 다시 말씀해 주실까요? 예를 들어 게임, 영상 편집, 업무 같은 용도를 알려 주세요.」",
+      "shots": [
+        "E09-PC-02-대화1-첫화면.png",
+        "E09-PC-02-대화1-전체.png",
+        "E09-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴2 「FHD 144Hz 모니터 써요.」",
+      "ok": true,
+      "symptom": "AI 답 2개 · 되묻기 1개 · 카드 3장 · 6초 · 첫 답 「하실 일을 아직 몰라서 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 같은 일반 용도를 가정했어요. 하실 일을 알려 주시면 그에 맞춰 다시 볼 수 있어요.」",
+      "shots": [
+        "E09-PC-03-대화2-첫화면.png",
+        "E09-PC-03-대화2-전체.png",
+        "E09-PC-03-대화2-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 593,400원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 906,600원 낮아요 / 2) [-] 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원 · 사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 · 예산보다 607,200원 낮아요 / 3) [-] 골드 [14400F/16GB/256GB/RTX3050] 1,338,500원 · 사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) · 예산보다 161,500원 낮아요 ‖ 문제: 카드1 그래픽카드 없음/내장 「GPU 인텔 UHD(내장)」; 카드1 이유가 사무용 「사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 알뜰 구성」; 카드2 그래픽카드 없음/내장 「GPU 인텔 UHD(내장)」; 카드2 이유가 사무용 「사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터 추천 구성」; 카드3 이유가 사무용 「사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 더 높은 사양」",
+      "shots": [
+        "E09-PC-04-카드-첫화면.png",
+        "E09-PC-04-카드-전체.png",
+        "E09-PC-04-카드-390전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "ㅂㄱ ㄹ 하는 컴 150",
+      "ms": null,
+      "ai": [
+        "무엇을 하실 컴퓨터인지 다시 말씀해 주실까요? 예를 들어 게임, 영상 편집, 업무 같은 용도를 알려 주세요."
+      ],
+      "questions": 1,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>ㅂㄱ ㄹ 하는 컴 150</p>"
+    },
+    {
+      "turn": 2,
+      "sent": "FHD 144Hz 모니터 써요.",
+      "ms": 5644,
+      "ai": [
+        "하실 일을 아직 몰라서 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 같은 일반 용도를 가정했어요. 하실 일을 알려 주시면 그에 맞춰 다시 볼 수 있어요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": [
+        {
+          "pill": "알뜰 구성",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "593,400원",
+          "gap": "예산보다 906,600원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ]
+        },
+        {
+          "pill": "추천 구성",
+          "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": null,
+          "note": null,
+          "price": "892,800원",
+          "gap": "예산보다 607,200원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "name": "골드 [14400F/16GB/256GB/RTX3050]",
+          "group": null,
+          "note": null,
+          "price": "1,338,500원",
+          "gap": "예산보다 161,500원 낮아요",
+          "spec": [
+            "CPU i5-14400",
+            "GPU RTX 3050 6GB",
+            "RAM 16GB",
+            "저장장치 256GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>FHD 144Hz 모니터 써요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:33:51.137Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:56.738Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:58.467Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:59.552Z",
+      "m": "GET",
+      "u": "/api/customer/products/113836/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:59.558Z",
+      "m": "GET",
+      "u": "/api/customer/products/90678/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:33:59.617Z",
+      "m": "GET",
+      "u": "/api/customer/products/113835/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 18723,
+          "textRight": 17728,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 16848,
+          "textRight": 9323,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 351,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "대화2",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 128829,
+          "textRight": 46391,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2842,
+          "textLeft": 117421,
+          "textRight": 46143,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1235,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1930,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2599,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 128829,
+          "textRight": 46391,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 819,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 819,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 819,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 2842,
+          "textLeft": 117421,
+          "textRight": 46143,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1235,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 1930,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 2599,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "알뜰 구성",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+        "group": null,
+        "note": null,
+        "price": "593,400원",
+        "gap": "예산보다 906,600원 낮아요",
+        "spec": [
+          "CPU i3-12100",
+          "GPU 인텔 UHD(내장)",
+          "RAM 8GB",
+          "저장장치 256GB SSD"
+        ]
+      },
+      {
+        "pill": "추천 구성",
+        "fit": "사무용 쾌적\n대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+        "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+        "group": null,
+        "note": null,
+        "price": "892,800원",
+        "gap": "예산보다 607,200원 낮아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU 인텔 UHD(내장)",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      },
+      {
+        "pill": "더 높은 사양",
+        "fit": "사무용 기본\n문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+        "name": "골드 [14400F/16GB/256GB/RTX3050]",
+        "group": null,
+        "note": null,
+        "price": "1,338,500원",
+        "gap": "예산보다 161,500원 낮아요",
+        "spec": [
+          "CPU i5-14400",
+          "GPU RTX 3050 6GB",
+          "RAM 16GB",
+          "저장장치 256GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 싼 PC",
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

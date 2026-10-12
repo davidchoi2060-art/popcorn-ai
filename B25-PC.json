@@ -1,0 +1,458 @@
+{
+  "id": "B25",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "heavy",
+    "budget": 200,
+    "text": "배틀그라운드 QHD 144Hz로 하고 싶어요. 예산 200만원."
+  },
+  "at": "2026-10-12T07:29:58.103Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B25-PC-01-첫화면-첫화면.png",
+        "B25-PC-01-첫화면-전체.png",
+        "B25-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「배틀그라운드는 QHD 고주사율에서 그래픽카드 체감이 가장 크고, CPU도 평균 프레임과 순간 끊김에 영향을 주므로 중상급형 라이젠 7급·코어 i7급과 상급형 RTX 5070급·RX 9070급 구성이 적합해요. QHD 144Hz 기준 그래픽카드는 VRAM 12GB 이상, 램 16GB, S」",
+      "shots": [
+        "B25-PC-02-대화1-첫화면.png",
+        "B25-PC-02-대화1-전체.png",
+        "B25-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] [9600X/16G/1TB/RTX5070] 2,623,200원 · 게임 QHD\n최신 대작 QHD 높음 옵션 · 예산보다 623,200원 높아요 ‖ 문제: 카드1 예산의 131%",
+      "shots": [
+        "B25-PC-03-카드-첫화면.png",
+        "B25-PC-03-카드-전체.png",
+        "B25-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": true,
+      "symptom": "부품 8줄 · 부품합 2,419,500원 · 「조립·기타 203,700원 PC 금액과 부품 판매가 합의 차이 / 상품 참고 금액 2,623,200원」",
+      "shots": [
+        "B25-PC-04-S4 상세-첫화면.png",
+        "B25-PC-04-S4 상세-전체.png",
+        "B25-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「[9600X/16G/1TB/RTX5070]」 2,623,200원 · 상세 「상품 참고 금액 2,623,200원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "배틀그라운드 QHD 144Hz로 하고 싶어요. 예산 200만원.",
+      "ms": null,
+      "ai": [
+        "배틀그라운드는 QHD 고주사율에서 그래픽카드 체감이 가장 크고, CPU도 평균 프레임과 순간 끊김에 영향을 주므로 중상급형 라이젠 7급·코어 i7급과 상급형 RTX 5070급·RX 9070급 구성이 적합해요. QHD 144Hz 기준 그래픽카드는 VRAM 12GB 이상, 램 16GB, SSD 960GB, 파워 700W급을 맞추는 것이 좋아요. 시중에서는 보통 190~200만원 구성이며, 예산을 아끼려면 RGB·고급 케이스와 필요 이상의 저장장치 속도에서 줄이고 그래픽카드와 CPU는 지키는 편이 체감이 커요. 144Hz를 안정적으로 유지하거나 경쟁 게임 위주라면 그래픽카드 등급을 한 단계 높이는 데 추가 비용을 쓰는 것이 가장 효과적이에요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n배틀그라운드를 1440p, 144Hz로 즐기려고 하시는군요. 200만원 예산으로 맞춰 드리겠습니다.",
+        "200만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 623,200원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 QHD\n최신 대작 QHD 높음 옵션",
+          "name": "[9600X/16G/1TB/RTX5070]",
+          "group": null,
+          "note": "이 작업은 2,623,200원부터 가능합니다.",
+          "price": "2,623,200원",
+          "gap": "예산보다 623,200원 높아요",
+          "spec": [
+            "CPU 라이젠5 9600X",
+            "GPU RTX 5070 · 12GB",
+            "RAM 16GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배틀그라운드 QHD 144Hz로 하고 싶어요. 예산 200만원.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:29:48.100Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:48.821Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:49.605Z",
+      "m": "GET",
+      "u": "/api/customer/products/129832/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:54.476Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:55.658Z",
+      "m": "GET",
+      "u": "/api/customer/products/129832/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 162106,
+          "textRight": 24452,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1849,
+          "textLeft": 111694,
+          "textRight": 61064,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1606,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 162106,
+          "textRight": 24452,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1849,
+          "textLeft": 111694,
+          "textRight": 61064,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1606,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 339291,
+          "textRight": 164503,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3682,
+          "textLeft": 347421,
+          "textRight": 142433,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 QHD\n최신 대작 QHD 높음 옵션",
+        "name": "[9600X/16G/1TB/RTX5070]",
+        "group": null,
+        "note": "이 작업은 2,623,200원부터 가능합니다.",
+        "price": "2,623,200원",
+        "gap": "예산보다 623,200원 높아요",
+        "spec": [
+          "CPU 라이젠5 9600X",
+          "GPU RTX 5070 · 12GB",
+          "RAM 16GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "AMD 라이젠5-6세대 9600X (그래니트 릿지) (멀티팩(정품))",
+        "price": 269100,
+        "priceText": "269,100원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "ZOTAC GAMING 지포스 RTX 5070 SOLID OC D7 12GB",
+        "price": 1278000,
+        "priceText": "1,278,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "ESSENCORE KLEVV DDR5-5600 CL46 AMD 파인인포 (16GB)",
+        "price": 337000,
+        "priceText": "337,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "BIWIN Black Opal NV3500 M.2 NVMe (1TB)",
+        "price": 235100,
+        "priceText": "235,100원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "ASRock B650M Pro X3D 대원씨티에스/에즈윈/디앤디컴",
+        "price": 148900,
+        "priceText": "148,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "쿨러마스터 HYPER 212 SPECTRUM V3 ARGB",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "쿨러마스터 MWE GOLD 750 V3 ATX3.1 블랙",
+        "price": 83700,
+        "priceText": "83,700원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "마이크로닉스 WIZMAX CHILL 세븐팬",
+        "price": 48200,
+        "priceText": "48,200원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 2419500,
+        "etc": 203700,
+        "total": 2623200,
+        "base": null,
+        "foot": [
+          "조립·기타 203,700원 PC 금액과 부품 판매가 합의 차이",
+          "상품 참고 금액 2,623,200원"
+        ],
+        "budgetLine": "예산보다 623,200원 높아요",
+        "issues": []
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "AMD 라이젠5-6세대 9600X (그래니트 릿지) (멀티팩(정품))",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "269,100원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "ZOTAC GAMING 지포스 RTX 5070 SOLID OC D7 12GB",
+            "desc": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+            "price": "1,278,000원"
+          },
+          {
+            "part": "메모리",
+            "name": "ESSENCORE KLEVV DDR5-5600 CL46 AMD 파인인포 (16GB)",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "337,000원"
+          },
+          {
+            "part": "저장장치",
+            "name": "BIWIN Black Opal NV3500 M.2 NVMe (1TB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "235,100원"
+          },
+          {
+            "part": "메인보드",
+            "name": "ASRock B650M Pro X3D 대원씨티에스/에즈윈/디앤디컴",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "148,900원"
+          },
+          {
+            "part": "COOLER",
+            "name": "쿨러마스터 HYPER 212 SPECTRUM V3 ARGB",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "19,500원"
+          },
+          {
+            "part": "POWER",
+            "name": "쿨러마스터 MWE GOLD 750 V3 ATX3.1 블랙",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "83,700원"
+          },
+          {
+            "part": "케이스",
+            "name": "마이크로닉스 WIZMAX CHILL 세븐팬",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "48,200원"
+          }
+        ],
+        "foot": [
+          "조립·기타 203,700원 PC 금액과 부품 판매가 합의 차이",
+          "상품 참고 금액 2,623,200원"
+        ],
+        "title": "게임 화면의 화질과 움직임을 함께 고민한다면",
+        "sum": "게임 화면의 화질과 움직임을 함께 고민한다면\n\n[9600X/16G/1TB/RTX5070]\n\nRyzen 5 9600X와 RTX 5070 12GB를 중심으로 구성했습니다. 높은 화질이나 프레임을 목표로 PC를 고를 때, 주로 즐기는 게임과 모니터를 기준으로 비교해 보세요. 저장공간은 1TB SSD입니다. 시스템 메모리는 16GB입니다.\n\n2,623,200원\n\n예산보다 623,200원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "게임 QHD — 최신 대작 QHD 높음 옵션",
+          "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 2419500,
+        "etc": 203700,
+        "total": 2623200
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

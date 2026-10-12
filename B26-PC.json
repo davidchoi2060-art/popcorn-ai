@@ -1,0 +1,351 @@
+{
+  "id": "B26",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "heavy",
+    "budget": 400,
+    "text": "최신 고사양 게임을 4K로 하고 싶어요. 예산 400만원."
+  },
+  "at": "2026-10-12T07:30:23.178Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B26-PC-01-첫화면-첫화면.png",
+        "B26-PC-01-첫화면-전체.png",
+        "B26-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「즐겨 하시는 게임을 알려 주시면 용도와 예산에 맞춰 안내하겠습니다.」",
+      "shots": [
+        "B26-PC-02-대화1-첫화면.png",
+        "B26-PC-02-대화1-전체.png",
+        "B26-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080] 4,811,500원 · 게임 4K\n최신 대작 4K 높음 옵션 · 예산보다 811,500원 높아요 ‖ 문제: 카드1 예산의 120%",
+      "shots": [
+        "B26-PC-03-카드-첫화면.png",
+        "B26-PC-03-카드-전체.png",
+        "B26-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 1줄 · 부품합 4,811,500원 · 「상품 참고 금액 4,811,500원」 ‖ 문제: 그래픽카드 줄 없음/정보 없음",
+      "shots": [
+        "B26-PC-04-S4 상세-첫화면.png",
+        "B26-PC-04-S4 상세-전체.png",
+        "B26-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]」 4,811,500원 · 상세 「상품 참고 금액 4,811,500원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "최신 고사양 게임을 4K로 하고 싶어요. 예산 400만원.",
+      "ms": null,
+      "ai": [
+        "즐겨 하시는 게임을 알려 주시면 용도와 예산에 맞춰 안내하겠습니다.",
+        "400만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 811,500원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+          "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+          "group": null,
+          "note": "이 작업은 4,811,500원부터 가능합니다.",
+          "price": "4,811,500원",
+          "gap": "예산보다 811,500원 높아요",
+          "spec": [
+            "CPU 코어 울트라7 265K",
+            "GPU RTX 5080 · 16GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>최신 고사양 게임을 4K로 하고 싶어요. 예산 400만원.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:30:13.700Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:14.005Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:30:19.515Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 74016,
+          "textRight": 22740,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1193,
+          "textLeft": 63606,
+          "textRight": 21062,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 950,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 74016,
+          "textRight": 22740,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 657,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1193,
+          "textLeft": 63606,
+          "textRight": 21062,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 950,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 121897,
+          "textRight": 26695,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1836,
+          "textLeft": 97241,
+          "textRight": 37546,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 4K\n최신 대작 4K 높음 옵션",
+        "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+        "group": null,
+        "note": "이 작업은 4,811,500원부터 가능합니다.",
+        "price": "4,811,500원",
+        "gap": "예산보다 811,500원 높아요",
+        "spec": [
+          "CPU 코어 울트라7 265K",
+          "GPU RTX 5080 · 16GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "조립 PC",
+        "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+        "price": 4811500,
+        "priceText": "4,811,500원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 4811500,
+        "etc": 0,
+        "total": 4811500,
+        "base": null,
+        "foot": [
+          "상품 참고 금액 4,811,500원"
+        ],
+        "budgetLine": "예산보다 811,500원 높아요",
+        "issues": []
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "조립 PC",
+            "name": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+            "desc": "등록된 판매 상품의 구성입니다.",
+            "price": "4,811,500원"
+          }
+        ],
+        "foot": [
+          "상품 참고 금액 4,811,500원"
+        ],
+        "title": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]",
+        "sum": "익스트림 [인텔 15세대 애로우레이크][265K/32G/1TB/RTX5080]\n\n게임 4K — 최신 대작 4K 높음 옵션\n\n4,811,500원\n\n예산보다 811,500원 높아요\n\n정보 없음",
+        "reasons": [
+          "게임 4K — 최신 대작 4K 높음 옵션"
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 4811500,
+        "etc": 0,
+        "total": 4811500
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

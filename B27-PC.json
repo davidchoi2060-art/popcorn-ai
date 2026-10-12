@@ -1,0 +1,460 @@
+{
+  "id": "B27",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "game",
+    "budget": 120,
+    "text": "120만원으로 롤, 오버워치2, 로스트아크 할 건데 구성 좀 짜줘"
+  },
+  "at": "2026-10-12T07:29:14.645Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B27-PC-01-첫화면-첫화면.png",
+        "B27-PC-01-첫화면-전체.png",
+        "B27-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「램은 16GB, SSD는 480GB로 구성하면 롤·오버워치2·로스트아크를 설치하고 즐기기에 기본 조건을 충족해요. 롤은 비교적 가벼운 편이지만 오버워치2와 로스트아크는 그래픽카드와 CPU의 균형이 체감에 영향을 주므로, 그래픽카드를 지나치게 낮추기보다 이 등급을 지키는 편이 좋아요. 시」",
+      "shots": [
+        "B27-PC-02-대화1-첫화면.png",
+        "B27-PC-02-대화1-전체.png",
+        "B27-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 · 게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상 · 예산보다 424,400원 높아요 ‖ 문제: 카드1 예산의 135%",
+      "shots": [
+        "B27-PC-03-카드-첫화면.png",
+        "B27-PC-03-카드-전체.png",
+        "B27-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 550,500원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 1,624,400원」 ‖ 문제: 그래픽카드 금액 「가격 확인 중」; 메모리 금액 「가격 확인 중」; P2 부품합 550,500 + 기타 0 ≠ 합계 1,624,400",
+      "shots": [
+        "B27-PC-04-S4 상세-첫화면.png",
+        "B27-PC-04-S4 상세-전체.png",
+        "B27-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「골드 인텔 [12400F/16GB/500GB/RTX5060]」 1,624,400원 · 상세 「상품 참고 금액 1,624,400원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "120만원으로 롤, 오버워치2, 로스트아크 할 건데 구성 좀 짜줘",
+      "ms": null,
+      "ai": [
+        "램은 16GB, SSD는 480GB로 구성하면 롤·오버워치2·로스트아크를 설치하고 즐기기에 기본 조건을 충족해요. 롤은 비교적 가벼운 편이지만 오버워치2와 로스트아크는 그래픽카드와 CPU의 균형이 체감에 영향을 주므로, 그래픽카드를 지나치게 낮추기보다 이 등급을 지키는 편이 좋아요. 시중에서는 보통 120만원이며, 예산을 아끼려면 케이스와 RGB·저장장치 용량을 줄이고 CPU와 그래픽카드는 유지하는 것이 좋아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "120만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 424,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 424,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>120만원으로 롤, 오버워치2, 로스트아크 할 건데 구성 좀 짜줘</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:29:04.092Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:04.882Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:05.581Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:11.191Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:29:12.484Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 135369,
+          "textRight": 24820,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1670,
+          "textLeft": 95076,
+          "textRight": 51021,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1427,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 135369,
+          "textRight": 24820,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 789,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1670,
+          "textLeft": 95076,
+          "textRight": 51021,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1427,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 324096,
+          "textRight": 161209,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3605,
+          "textLeft": 332701,
+          "textRight": 140747,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+        "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+        "group": null,
+        "note": "이 작업은 1,624,400원부터 가능합니다.",
+        "price": "1,624,400원",
+        "gap": "예산보다 424,400원 높아요",
+        "spec": [
+          "CPU i5-12400",
+          "GPU RTX 5060 · 8GB",
+          "RAM 16GB",
+          "저장장치 500GB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+        "price": 159500,
+        "priceText": "159,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+        "price": 42600,
+        "priceText": "42,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "앱코 U30 마린 블랙 (미들타워)",
+        "price": 39500,
+        "priceText": "39,500원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "budgetLine": "예산보다 424,400원 높아요",
+        "issues": [
+          "P2 부품합 550,500 + 기타 0 ≠ 총액 1,624,400"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "159,500원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+            "desc": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "저장장치",
+            "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "212,400원"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "19,500원"
+          },
+          {
+            "part": "POWER",
+            "name": "마이크로닉스 COOLMAX ELITE II 600W",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "42,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "앱코 U30 마린 블랙 (미들타워)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "39,500원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "title": "할 일도 하고 게임도 즐기는 나만의 PC",
+        "sum": "할 일도 하고 게임도 즐기는 나만의 PC\n\n골드 인텔 [12400F/16GB/500GB/RTX5060]\n\n게임과 영상 편집을 모두 생각하신다면, 부품 구성이 즐기는 게임과 사용하시는 편집 프로그램에 맞는지 살펴보세요.\n\n1,624,400원\n\n예산보다 424,400원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상",
+          "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

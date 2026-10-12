@@ -1,0 +1,579 @@
+{
+  "id": "A2",
+  "mode": "모바일",
+  "scenario": {
+    "entry": "chip",
+    "depth": "full",
+    "follow": true,
+    "kind": "game",
+    "budget": 150,
+    "usage": "game",
+    "budgetSel": "150",
+    "mobile": true
+  },
+  "at": "2026-10-12T07:23:31.261Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "A2-모바일-01-첫화면-첫화면.png",
+        "A2-모바일-01-첫화면-전체.png"
+      ]
+    },
+    {
+      "step": "S2 칩 → 상담 초안",
+      "ok": true,
+      "symptom": "초안 「게임에 쓸 PC를 찾고 있어요. 예산은 150만원 이하예요.」 · 주소 /mvp3/#welcome",
+      "shots": [
+        "A2-모바일-02-칩선택-첫화면.png",
+        "A2-모바일-02-칩선택-전체.png"
+      ]
+    },
+    {
+      "step": "S2 옛 화면 답 턴1",
+      "ok": true,
+      "symptom": "AI 「더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요.」",
+      "shots": [
+        "A2-모바일-03-옛화면대화1-첫화면.png",
+        "A2-모바일-03-옛화면대화1-전체.png"
+      ]
+    },
+    {
+      "step": "S3 옛 화면 추천 목록",
+      "ok": true,
+      "symptom": "2개 · 1) 예산을 넘는 최저가 할 일도 하고 게임도 즐기는 나만의 PC 골드 인텔 [12400F/16GB/500GB/RTX5060] 이 PC 특징 게임과 영상 편집을 모두 생각하신다면, 부품 구성이 즐기는 게임과 사용하시는 편 / 2) 더 높은 사양 할 일도 하고 게임도 즐기는 나만의 PC 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 이 PC 특징 Core i5-12400F와 RTX 5060 Ti 8GB를 담아, 평소 ",
+      "shots": [
+        "A2-모바일-04-옛화면카드-첫화면.png",
+        "A2-모바일-04-옛화면카드-전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 550,500원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 1,624,400원」 ‖ 문제: 그래픽카드 금액 「가격 확인 중」; 메모리 금액 「가격 확인 중」; P2 부품합 550,500 + 기타 0 ≠ 합계 1,624,400",
+      "shots": [
+        "A2-모바일-05-S4 상세-첫화면.png",
+        "A2-모바일-05-S4 상세-전체.png"
+      ]
+    },
+    {
+      "step": "S5 최종 견적 확인",
+      "ok": false,
+      "symptom": "총액 1,624,400원 · 부품합 550,500 · 조립·기타 0 · 상태 「서버에 보관됨」 · 좌:우 글자 2.5:1 · 구매 단추 3786px ‖ 문제: P2 부품합 550,500 + 기타 0 ≠ 총액 1,624,400; 구매 단추가 첫 화면 밖(3786px)",
+      "shots": [
+        "A2-모바일-06-최종견적-첫화면.png",
+        "A2-모바일-06-최종견적-전체.png"
+      ]
+    },
+    {
+      "step": "S6 쇼핑몰 구매 단추",
+      "ok": false,
+      "symptom": "단추 남음 · 결과 칸 없음 ‖ 문제: 결과 칸 안 나옴",
+      "shots": [
+        "A2-모바일-07-쇼핑몰단추후-첫화면.png",
+        "A2-모바일-07-쇼핑몰단추후-전체.png"
+      ]
+    }
+  ],
+  "turns": [],
+  "api": [
+    {
+      "at": "2026-10-12T07:23:16.137Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:17.272Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:17.910Z",
+      "m": "GET",
+      "u": "/api/product-images/109547/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:17.921Z",
+      "m": "GET",
+      "u": "/api/product-images/124852/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:17.950Z",
+      "m": "GET",
+      "u": "/api/product-images/113685/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:17.954Z",
+      "m": "GET",
+      "u": "/api/product-images/110964/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.067Z",
+      "m": "GET",
+      "u": "/api/product-images/128462/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.290Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.397Z",
+      "m": "GET",
+      "u": "/api/product-images/129250/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.438Z",
+      "m": "GET",
+      "u": "/api/product-images/123395/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.532Z",
+      "m": "GET",
+      "u": "/api/product-images/121242/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.623Z",
+      "m": "GET",
+      "u": "/api/product-images/124631/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.789Z",
+      "m": "GET",
+      "u": "/api/product-images/120943/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:18.853Z",
+      "m": "GET",
+      "u": "/api/product-images/124985/detail",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:19.011Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:20.248Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:24.935Z",
+      "m": "GET",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:27.089Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:23:29.012Z",
+      "m": "POST",
+      "u": "/api/mvp3/saved-quotes/90255495-775d-446c-905d-0b10d05a0b7a/handoff",
+      "s": 502
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "칩선택",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 922,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "옛화면대화1",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3216,
+          "textLeft": 129510,
+          "textRight": 36225,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "옛화면카드",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3216,
+          "textLeft": 129510,
+          "textRight": 36225,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4288,
+          "textLeft": 340473,
+          "textRight": 136731,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "최종견적",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4212,
+          "textLeft": 359343,
+          "textRight": 146065,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 3786,
+              "inFirstView": false,
+              "disabled": true
+            },
+            {
+              "text": "팝콘PC 쇼핑몰에서 구매하기",
+              "top": 3786,
+              "inFirstView": false,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "쇼핑몰단추후",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 4371,
+          "textLeft": 366965,
+          "textRight": 150239,
+          "ctas": [
+            {
+              "text": "보관 완료",
+              "top": 3945,
+              "inFirstView": false,
+              "disabled": true
+            },
+            {
+              "text": "팝콘PC 쇼핑몰에서 구매하기",
+              "top": 3945,
+              "inFirstView": false,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "oldMessages": [
+      {
+        "who": "ai",
+        "text": "안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요."
+      },
+      {
+        "who": "user",
+        "text": "게임에 쓸 PC를 찾고 있어요. 예산은 150만원 이하예요."
+      },
+      {
+        "who": "ai",
+        "text": "게임 종류와 해상도에 따라 달라지지만, 최신 대작을 FHD 높음 옵션으로 즐긴다면 중급형 CPU인 라이젠 5급과 중급형 그래픽카드인 RTX 5060급 구성이 잘 맞아요. 램은 16GB 이상, SSD는 480GB 이상을 기준으로 잡고, 시중에서는 보통 120만~150만원이에요. 롤·발로란트·피파·메이플 같은 캐주얼 게임만 한다면 보급형 그래픽카드와 SSD 240GB 이상으로 낮춰 비용을 아낄 수 있지만, 최신 게임까지 고려하면 그래픽카드와 SSD 용량은 지키는 편이 좋아요. QHD로 즐기거나 더 큰 게임을 많이 설치한다면 그래픽카드를 한 단계 높이고 SSD 960GB 이상으로 늘리는 쪽이 체감이 커요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요. 주로 하는 게임을 알려 주시면 그 게임 기준으로 다시 볼 수 있어요."
+      },
+      {
+        "who": "ai",
+        "text": "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요."
+      },
+      {
+        "who": "ai",
+        "text": "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      }
+    ],
+    "oldCards": [
+      "예산을 넘는 최저가 할 일도 하고 게임도 즐기는 나만의 PC 골드 인텔 [12400F/16GB/500GB/RTX5060] 이 PC 특징 게임과 영상 편집을 모두 생각하신다면, 부품 구성이 즐기는 게임과 사용하시는 편집 프로그램에 맞는지 살펴보세요. AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음 1,624,400원 10월 11일 기준 쇼핑몰 가격 · 구매할 때 확정 CPU i5-12400 GPU RTX 5060 · 8GB RAM 16GB 저장장치 500GB SSD CPU 그래픽카드 메모리 저장장치 메인보드 쿨러 파워 케이",
+      "더 높은 사양 할 일도 하고 게임도 즐기는 나만의 PC 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 이 PC 특징 Core i5-12400F와 RTX 5060 Ti 8GB를 담아, 평소 작업과 게임을 한 PC에서 이용하려는 분께 소개합니다. 500GB SSD를 사용하며, 즐기는 게임과 동시에 켜 둘 프로그램에 맞춰 구성을 살펴볼 수 있어요. 시스템 메모리는 16GB입니다. AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음 1,741,000원 10월 11일 기준 쇼핑몰 가격 · 구매할 때 확정 C"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+        "price": 159500,
+        "priceText": "159,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+        "price": 42600,
+        "priceText": "42,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "앱코 U30 마린 블랙 (미들타워)",
+        "price": 39500,
+        "priceText": "39,500원"
+      },
+      {
+        "where": "최종",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+        "price": 159500,
+        "priceText": "159,500원"
+      },
+      {
+        "where": "최종",
+        "part": "그래픽카드",
+        "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "최종",
+        "part": "메모리",
+        "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "최종",
+        "part": "저장장치",
+        "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+        "price": 212400,
+        "priceText": "212,400원"
+      },
+      {
+        "where": "최종",
+        "part": "메인보드",
+        "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+        "price": 77000,
+        "priceText": "77,000원"
+      },
+      {
+        "where": "최종",
+        "part": "COOLER",
+        "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+        "price": 19500,
+        "priceText": "19,500원"
+      },
+      {
+        "where": "최종",
+        "part": "POWER",
+        "name": "마이크로닉스 COOLMAX ELITE II 600W",
+        "price": 42600,
+        "priceText": "42,600원"
+      },
+      {
+        "where": "최종",
+        "part": "케이스",
+        "name": "앱코 U30 마린 블랙 (미들타워)",
+        "price": 39500,
+        "priceText": "39,500원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "budgetLine": "예산보다 124,400원 높아요",
+        "issues": [
+          "P2 부품합 550,500 + 기타 0 ≠ 총액 1,624,400"
+        ]
+      },
+      {
+        "where": "최종",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "budgetLine": "예산보다 124,400원 높아요",
+        "issues": [
+          "P2 부품합 550,500 + 기타 0 ≠ 총액 1,624,400"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "159,500원"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스",
+            "desc": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "메모리",
+            "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "저장장치",
+            "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "212,400원"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "77,000원"
+          },
+          {
+            "part": "COOLER",
+            "name": "ABKO 자이로스 120X4 FRGB (블랙)",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "19,500원"
+          },
+          {
+            "part": "POWER",
+            "name": "마이크로닉스 COOLMAX ELITE II 600W",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "42,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "앱코 U30 마린 블랙 (미들타워)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "39,500원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 1,624,400원"
+        ],
+        "title": "할 일도 하고 게임도 즐기는 나만의 PC",
+        "sum": "상담 초안\n\n게임 · 150만원 이하\n\n선택한 조건을 입력창에서 확인하고 수정해 주세요.\n\n선택 조건으로 초안 바꾸기",
+        "reasons": [
+          "게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상",
+          "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/#detail",
+        "sumP": 550500,
+        "etc": null,
+        "total": 1624400
+      }
+    ],
+    "pageErrors": [
+      "console: Failed to load resource: the server responded with a status of 502 (Bad Gateway)"
+    ],
+    "dialogs": []
+  }
+}

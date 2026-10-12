@@ -1,0 +1,461 @@
+{
+  "id": "B15",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "detail",
+    "follow": true,
+    "kind": "edit",
+    "budget": 100,
+    "text": "프리미어로 4K 컷 편집하고 자막 넣어요. 예산은 100만원이에요.",
+    "mobile": false
+  },
+  "at": "2026-10-12T07:25:57.657Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "B15-PC-01-첫화면-첫화면.png",
+        "B15-PC-01-첫화면-전체.png",
+        "B15-PC-01-첫화면-390전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 3개 · 되묻기 0개 · 카드 1장 · 첫 답 「프리미어로 4K 컷 편집과 자막을 넣는 용도라면 영상편집 쾌적형 구성이 적합해요. CPU는 중상급형, 라이젠 7급·코어 i7급을 선택하고 그래픽카드는 VRAM 12GB 이상인 RTX 5060 Ti급·RTX 5070급 외장 그래픽이 좋아요. 램은 32GB, SSD는 960GB 이상으로 구」",
+      "shots": [
+        "B15-PC-02-대화1-첫화면.png",
+        "B15-PC-02-대화1-전체.png",
+        "B15-PC-02-대화1-390전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "1) [-] 다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070] 3,230,400원 · 영상편집 쾌적\n4K 편집·색보정·효과 · 예산보다 2,230,400원 높아요 ‖ 문제: 카드1 예산의 323%",
+      "shots": [
+        "B15-PC-03-카드-첫화면.png",
+        "B15-PC-03-카드-전체.png",
+        "B15-PC-03-카드-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 상세",
+      "ok": false,
+      "symptom": "부품 8줄 · 부품합 1,785,100원 · 「조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요 / 상품 참고 금액 3,230,400원」 ‖ 문제: CPU 금액 「가격 확인 중」; 메모리 금액 「가격 확인 중」; 메인보드 금액 「가격 확인 중」; P2 부품합 1,785,100 + 기타 0 ≠ 합계 3,230,400",
+      "shots": [
+        "B15-PC-04-S4 상세-첫화면.png",
+        "B15-PC-04-S4 상세-전체.png",
+        "B15-PC-04-S4 상세-390전체.png"
+      ]
+    },
+    {
+      "step": "S4 카드와 같은 상품·금액",
+      "ok": true,
+      "symptom": "카드 「다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]」 3,230,400원 · 상세 「상품 참고 금액 3,230,400원」",
+      "shots": []
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "프리미어로 4K 컷 편집하고 자막 넣어요. 예산은 100만원이에요.",
+      "ms": null,
+      "ai": [
+        "프리미어로 4K 컷 편집과 자막을 넣는 용도라면 영상편집 쾌적형 구성이 적합해요. CPU는 중상급형, 라이젠 7급·코어 i7급을 선택하고 그래픽카드는 VRAM 12GB 이상인 RTX 5060 Ti급·RTX 5070급 외장 그래픽이 좋아요. 램은 32GB, SSD는 960GB 이상으로 구성하고 파워는 750W급을 권장해요. 시중에서는 보통 150만~200만원대라 100만원 예산에는 다소 부족할 수 있어요. 예산을 맞추려면 케이스 디자인과 RGB, 저장장치 추가 비용은 아껴도 되지만 램 32GB와 VRAM 12GB 이상 그래픽카드는 유지하는 편이 편집 체감에 유리해요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n영상편집용은 프리미어·다빈치 FHD 컷편집 (유튜브) 기준으로 봤어요. 4K 편집이나 색보정까지 하시면 사양이 달라져요. 말씀하신 4K 해상도 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.",
+        "100만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 2,230,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "영상편집 쾌적\n4K 편집·색보정·효과",
+          "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+          "group": null,
+          "note": "이 작업은 3,230,400원부터 가능합니다.",
+          "price": "3,230,400원",
+          "gap": "예산보다 2,230,400원 높아요",
+          "spec": [
+            "CPU 코어 울트라7 265",
+            "GPU RTX 5070 · 12GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>프리미어로 4K 컷 편집하고 자막 넣어요. 예산은 100만원이에요.</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:25:47.714Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:25:48.327Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:25:49.080Z",
+      "m": "GET",
+      "u": "/api/customer/products/127317/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:25:54.134Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:25:55.080Z",
+      "m": "GET",
+      "u": "/api/customer/products/127317/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 1224,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        }
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 176866,
+          "textRight": 21956,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1900,
+          "textLeft": 122901,
+          "textRight": 64617,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1657,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "카드",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 176866,
+          "textRight": 21956,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 788,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1900,
+          "textLeft": 122901,
+          "textRight": 64617,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 1657,
+              "inFirstView": false,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 785,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      },
+      {
+        "step": "S4 상세",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 342444,
+          "textRight": 166718,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 827,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 3540,
+          "textLeft": 349462,
+          "textRight": 145837,
+          "ctas": [
+            {
+              "text": "이 견적 저장하기",
+              "top": 792,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        }
+      }
+    ],
+    "cards": [
+      {
+        "pill": "예산을 넘는 최저가",
+        "fit": "영상편집 쾌적\n4K 편집·색보정·효과",
+        "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+        "group": null,
+        "note": "이 작업은 3,230,400원부터 가능합니다.",
+        "price": "3,230,400원",
+        "gap": "예산보다 2,230,400원 높아요",
+        "spec": [
+          "CPU 코어 울트라7 265",
+          "GPU RTX 5070 · 12GB",
+          "RAM 32GB",
+          "저장장치 1TB SSD"
+        ]
+      }
+    ],
+    "nextButtons": [
+      "더 높은 사양",
+      "조건 바꾸기"
+    ],
+    "parts": [
+      {
+        "where": "S4 상세",
+        "part": "CPU",
+        "name": "[병행] 인텔 코어 울트라7 시리즈2 265 [벌크]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "그래픽카드",
+        "name": "PALIT 지포스 RTX 5070 Infinity 3 D7 12GB 이엠텍",
+        "price": 1272900,
+        "priceText": "1,272,900원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메모리",
+        "name": "ESSENCORE KLEVV DDR5-5600 CL46 32GB [16G x 2]",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "저장장치",
+        "name": "마이크론 Crucial P310 M.2 NVMe 아스크텍 (1TB)",
+        "price": 302800,
+        "priceText": "302,800원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "메인보드",
+        "name": "GIGABYTE B860M AORUS ELITE",
+        "price": null,
+        "priceText": "가격 확인 중"
+      },
+      {
+        "where": "S4 상세",
+        "part": "COOLER",
+        "name": "오쓰 CV-620 (블랙)",
+        "price": 34400,
+        "priceText": "34,400원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "POWER",
+        "name": "마이크로닉스 Classic II 풀체인지 700W 80PLUS실버 ATX3.1",
+        "price": 81600,
+        "priceText": "81,600원"
+      },
+      {
+        "where": "S4 상세",
+        "part": "케이스",
+        "name": "3RSYS R640 Quiet 블랙 (미들타워)",
+        "price": 93400,
+        "priceText": "93,400원"
+      }
+    ],
+    "prices": [
+      {
+        "where": "S4 상세",
+        "sumP": 1785100,
+        "etc": null,
+        "total": 3230400,
+        "base": null,
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 3,230,400원"
+        ],
+        "budgetLine": "예산보다 2,230,400원 높아요",
+        "issues": [
+          "P2 부품합 1,785,100 + 기타 0 ≠ 총액 3,230,400"
+        ]
+      }
+    ],
+    "detail": [
+      {
+        "label": "S4 상세",
+        "rows": [
+          {
+            "part": "CPU",
+            "name": "[병행] 인텔 코어 울트라7 시리즈2 265 [벌크]",
+            "desc": "프로그램의 명령과 연산을 처리하는 중심 부품입니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "그래픽카드",
+            "name": "PALIT 지포스 RTX 5070 Infinity 3 D7 12GB 이엠텍",
+            "desc": "게임 화면과 그래픽 연산을 처리합니다. GPU 가속을 지원하는 작업에도 사용됩니다.",
+            "price": "1,272,900원"
+          },
+          {
+            "part": "메모리",
+            "name": "ESSENCORE KLEVV DDR5-5600 CL46 32GB [16G x 2]",
+            "desc": "실행 중인 프로그램의 데이터를 임시로 보관합니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "저장장치",
+            "name": "마이크론 Crucial P310 M.2 NVMe 아스크텍 (1TB)",
+            "desc": "운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.",
+            "price": "302,800원"
+          },
+          {
+            "part": "메인보드",
+            "name": "GIGABYTE B860M AORUS ELITE",
+            "desc": "CPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.",
+            "price": "가격 확인 중"
+          },
+          {
+            "part": "COOLER",
+            "name": "오쓰 CV-620 (블랙)",
+            "desc": "CPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.",
+            "price": "34,400원"
+          },
+          {
+            "part": "POWER",
+            "name": "마이크로닉스 Classic II 풀체인지 700W 80PLUS실버 ATX3.1",
+            "desc": "컴퓨터의 각 부품에 필요한 전력을 공급합니다.",
+            "price": "81,600원"
+          },
+          {
+            "part": "케이스",
+            "name": "3RSYS R640 Quiet 블랙 (미들타워)",
+            "desc": "부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.",
+            "price": "93,400원"
+          }
+        ],
+        "foot": [
+          "조립·기타 가격 확인 중인 부품이 있어 계산하지 않았어요",
+          "상품 참고 금액 3,230,400원"
+        ],
+        "title": "게임 화면의 화질과 움직임을 함께 고민한다면",
+        "sum": "게임 화면의 화질과 움직임을 함께 고민한다면\n\n다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]\n\nCore Ultra 7 265와 RTX 5070 12GB를 중심으로 구성했습니다. 높은 화질이나 프레임을 목표로 PC를 고를 때, 주로 즐기는 게임과 모니터를 기준으로 비교해 보세요. 저장공간은 1TB SSD입니다. 시스템 메모리는 32GB입니다.\n\n3,230,400원\n\n예산보다 2,230,400원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음",
+        "reasons": [
+          "영상편집 쾌적 — 4K 편집·색보정·효과",
+          "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.",
+          "다음 수준을 고려한다면 메모리 용량을 늘려 보세요."
+        ],
+        "ask": false,
+        "url": "https://popcornai.co.kr/mvp3/index.html#detail",
+        "sumP": 1785100,
+        "etc": null,
+        "total": 3230400
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}

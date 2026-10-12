@@ -1,0 +1,173 @@
+{
+  "id": "E21",
+  "mode": "PC",
+  "scenario": {
+    "entry": "chat",
+    "depth": "cards",
+    "follow": false,
+    "kind": "game",
+    "budget": 150,
+    "text": "배그 150만원 PC 추천해줘",
+    "op": "offline"
+  },
+  "at": "2026-10-12T07:36:20.582Z",
+  "rows": [
+    {
+      "step": "E21 끊긴 동안",
+      "ok": false,
+      "symptom": "상태 「」 · 오류 「」 · 다시 보내기 단추 있음",
+      "shots": [
+        "E21-PC-01-끊김중-첫화면.png",
+        "E21-PC-01-끊김중-전체.png"
+      ]
+    },
+    {
+      "step": "E21 다시 연결 뒤",
+      "ok": true,
+      "symptom": "parse 1번 · 카드 2장 · 내 말 1개",
+      "shots": [
+        "E21-PC-02-다시연결-첫화면.png",
+        "E21-PC-02-다시연결-전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "배그 150만원 PC 추천해줘",
+      "ms": null,
+      "ai": [
+        "배틀그라운드는 최신 대작 게임에 가까워 그래픽카드 체감이 가장 크고, CPU도 교전 상황의 프레임을 받쳐줘야 하므로 FHD 높음 옵션 기준 중급형 구성이 좋아요. 라이젠 5급 CPU와 RTX 5060 Ti급 그래픽카드, 램 16GB, SSD 480GB 조합을 추천해요. 시중에서는 보통 150만원 구성이며, 더 여유를 원하면 SSD만 960GB로 선택하면 됩니다. 메인보드·RGB·케이스 디자인은 아껴도 성능 차이가 작지만, 그래픽카드와 파워·냉각 부품은 지나치게 낮추지 않는 편이 좋아요. QHD 높음 옵션이나 더 높은 프레임을 원하면 그래픽카드를 한 단계 올리는 데 예산을 우선 배분하세요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        },
+        {
+          "pill": "더 높은 사양",
+          "fit": "게임 FHD\n최신 대작 FHD 높음 옵션 60fps 이상",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "note": "이 작업은 1,624,400원부터 가능합니다.",
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ]
+        }
+      ],
+      "cardsEmptyText": null,
+      "aiAbove": true,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>배그 150만원 PC 추천해줘</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:36:18.399Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:19.636Z",
+      "m": "POST",
+      "u": "/api/grid/recommend",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:20.354Z",
+      "m": "GET",
+      "u": "/api/customer/products/98149/representative-image",
+      "s": 200
+    },
+    {
+      "at": "2026-10-12T07:36:20.582Z",
+      "m": "GET",
+      "u": "/api/customer/products/121228/representative-image",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "끊김중",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 25363,
+          "textRight": 15847,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "다시연결",
+        "main": {
+          "vw": 1440,
+          "vh": 900,
+          "scrollWidth": 1440,
+          "overflowX": false,
+          "docHeight": 900,
+          "textLeft": 189845,
+          "textRight": 20375,
+          "ctas": [
+            {
+              "text": "이 구성 선택",
+              "top": 729,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "이 구성 선택",
+              "top": 567,
+              "inFirstView": true,
+              "disabled": false
+            },
+            {
+              "text": "보내기",
+              "top": 801,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "pageErrors": [
+      "console: Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+    ],
+    "dialogs": []
+  }
+}

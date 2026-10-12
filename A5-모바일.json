@@ -1,0 +1,161 @@
+{
+  "id": "A5",
+  "mode": "모바일",
+  "scenario": {
+    "entry": "card:parts",
+    "depth": "full",
+    "follow": false,
+    "kind": "none",
+    "budget": null,
+    "text": "RTX 5060이랑 5060 Ti 차이가 뭐예요?",
+    "mobile": true
+  },
+  "at": "2026-10-12T07:30:43.589Z",
+  "rows": [
+    {
+      "step": "S1 첫 화면",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」",
+      "shots": [
+        "A5-모바일-01-첫화면-첫화면.png",
+        "A5-모바일-01-첫화면-전체.png"
+      ]
+    },
+    {
+      "step": "S2 입구 → 대화 화면 초안",
+      "ok": true,
+      "symptom": "초안 「PC 부품이나 구성에서 궁금한 점이 있어요.」 · 자동 전송 안 됨",
+      "shots": [
+        "A5-모바일-02-입구-첫화면.png",
+        "A5-모바일-02-입구-전체.png"
+      ]
+    },
+    {
+      "step": "S2 대화 턴1",
+      "ok": true,
+      "symptom": "AI 답 1개 · 되묻기 0개 · 카드 0장 · 7초 · 첫 답 「1920×1080 해상도에서 일반 게임을 주로 하면 RTX 5060급으로 충분하고, 2560×1440 해상도나 고해상도 텍스처·생성형 작업을 하면 RTX 5060 Ti급이 더 여유로워요. VRAM은 기본 게임 위주면 8GB급, 고해상도·모드·영상 작업을 오래 하려면 16GB급을 우선 보」",
+      "shots": [
+        "A5-모바일-03-대화1-첫화면.png",
+        "A5-모바일-03-대화1-전체.png"
+      ]
+    },
+    {
+      "step": "S3 카드",
+      "ok": false,
+      "symptom": "카드 없음 ",
+      "shots": [
+        "A5-모바일-04-카드없음-첫화면.png",
+        "A5-모바일-04-카드없음-전체.png"
+      ]
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "PC 부품이나 구성에서 궁금한 점이 있어요. RTX 5060이랑 5060 Ti 차이가 뭐예요?",
+      "ms": 7142,
+      "ai": [
+        "1920×1080 해상도에서 일반 게임을 주로 하면 RTX 5060급으로 충분하고, 2560×1440 해상도나 고해상도 텍스처·생성형 작업을 하면 RTX 5060 Ti급이 더 여유로워요. VRAM은 기본 게임 위주면 8GB급, 고해상도·모드·영상 작업을 오래 하려면 16GB급을 우선 보세요. 전원 공급 장치는 그래픽카드에 맞춰 정격 파워 600W 이상인지 확인하고, 실제 선택은 게임 해상도와 원하는 그래픽 품질을 기준으로 하면 돼요.\n\n말씀하신 그래픽카드 RTX 5060 조건으로 판매 중인 PC를 골라 볼게요. 맞추지 못하는 조건은 추천 카드와 함께 알려 드려요."
+      ],
+      "questions": 0,
+      "cards": [],
+      "cardsEmptyText": null,
+      "aiAbove": null,
+      "aiBelow": false,
+      "aiBelowText": [],
+      "error": [],
+      "userHtml": "<p>PC 부품이나 구성에서 궁금한 점이 있어요. RTX 5060이랑 5060 Ti 차이가 뭐예요?</p>"
+    }
+  ],
+  "api": [
+    {
+      "at": "2026-10-12T07:30:42.206Z",
+      "m": "POST",
+      "u": "/api/talk/parse",
+      "s": 200
+    }
+  ],
+  "extra": {
+    "layout": [
+      {
+        "step": "첫화면",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 1118,
+          "textLeft": 0,
+          "textRight": 0,
+          "ctas": []
+        },
+        "alt390": null
+      },
+      {
+        "step": "입구",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 844,
+          "textLeft": 25489,
+          "textRight": 9525,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 295,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "대화1",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 52164,
+          "textRight": 33876,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 633,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      },
+      {
+        "step": "카드없음",
+        "main": {
+          "vw": 390,
+          "vh": 844,
+          "scrollWidth": 390,
+          "overflowX": false,
+          "docHeight": 858,
+          "textLeft": 52164,
+          "textRight": 33876,
+          "ctas": [
+            {
+              "text": "보내기",
+              "top": 633,
+              "inFirstView": true,
+              "disabled": false
+            }
+          ]
+        },
+        "alt390": null
+      }
+    ],
+    "pageErrors": [],
+    "dialogs": []
+  }
+}
