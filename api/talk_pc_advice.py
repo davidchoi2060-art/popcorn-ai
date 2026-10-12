@@ -334,6 +334,9 @@ def clean(raw: str, topic: str | None = None, sentence: str = "") -> tuple[str, 
             dropped.append({"before": s, "reason": "stock"})
         elif (general or mixed) and any(p.search(s) for _label, p in PROMISE_PATTERNS):
             dropped.append({"before": s, "reason": "promise"})
+        elif TF.is_data_excuse(s):
+            # 「배틀그라운드는 확인된 자료가 없어」 -- 내부 자료 사정은 고객에게 말하지 않는다(2026-10-12 사장님 시험).
+            dropped.append({"before": s, "reason": "data excuse"})
         elif _BARE_YES.match(s):
             dropped.append({"before": s, "reason": "promise"})
         elif _QUESTION.search(s):

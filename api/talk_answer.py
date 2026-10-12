@@ -89,23 +89,17 @@ _INLINE_ITEM = re.compile(r"\s+-\s+(?=\S)")
 _RANK_REPEAT = re.compile(r"(인기\S*\s*순(으로|위)?(는|로는)?|순위로는|순서로는)")
 
 
-_DATA_EXCUSE = re.compile(r"[ \t]*[^.\n]*(?:제공된|주어진|받은|저희)\s*자료[^.\n]*(?:없|부족)[^.\n]*\.?")
-# 고객이 알아야 할 한계(최신 순위·기준일·확인하지 못한 수치)는 같은 모양이어도 지우지 않는다
-# (코덱스 #140 검수: 내부 자료 사정과 고객용 불확실성을 구분하지 않으면 중요한 한계까지 숨긴다).
-# 성능·호환·동작을 단정하거나 보장할 수 없다는 말도 고객용 한계다(코덱스 #145 검수 4) -- 최신·기준 낱말이
-# 없어도 남긴다. 「세부 재미 요소가 없어」처럼 답을 못 한 내부 사정만 걷는다.
-_CUSTOMER_LIMIT = re.compile(r"(?:최신|기준|시점|날짜|순위|확인(?:하지|할\s*수|이\s*어렵|되지)|달라질|바뀔"
-                             r"|단정|보장|장담|성능|호환|동작|사양|정확)")
-
-
+# 판정은 talk_filter 한 곳에 둔다(PC 설명 경로도 같은 판정을 쓴다).
 def _drop_data_excuse(text: str) -> str:
-    return _DATA_EXCUSE.sub(lambda m: m.group(0) if _CUSTOMER_LIMIT.search(m.group(0)) else "", text)
+    return TF.drop_data_excuse(text)
 
 
 def tidy_game_list(body: str, facts: list) -> str:
     """붙어 나온 게임 목록을 게임마다 줄을 바꾸고, 끝의 되풀이 순위 문장을 걷는다."""
-    if not body or not facts:
+    if not body:
         return body
+    if not facts:
+        return _drop_data_excuse(body).strip()
     names = [f.name for f in facts if getattr(f, "name", None)]
     out = body
     if "\n" not in out and len(_INLINE_ITEM.findall(out)) >= 2:
@@ -677,6 +671,10 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         body = scrub_internal_source_names(fr.text)[:ANSWER_MAX_LEN]
         # 목록 다듬기는 자른 뒤에 한다 -- 등급 말(게임당 15자 안팎)만큼 상한을 넘을 수 있다.
         body = tidy_game_list(body, ev.facts)
+        if not body:
+            # 자료 사정 문장만 남았다가 걷혀 비었다 -- 소개를 비워 두지 않고 우리 사실로 짧게 낸다.
+            body = fallback_intro(ev)
+            res.fallback = bool(body)
         res.filter_report = {
             "kept": fr.kept, "replaced": fr.replaced, "dropped": fr.dropped,
             "gate_hit": fr.gate_hit,
