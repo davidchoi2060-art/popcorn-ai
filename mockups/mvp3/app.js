@@ -139,6 +139,9 @@ function renderMessages(){
       '안녕하세요! 어떤 용도로 쓰실 PC인지와<br>예산을 알려주시면 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
     scrollToLatest();lastMessages=key;
   }
+  // 고객이 한 번 말한 뒤에는 첫 질문 머리말을 감춘다(2026-10-12 사장님 「계속 어떤 PC를 찾으세요? 이게 나오는데」).
+  // 고정 머리말이 대화 위에 남아 같은 질문을 계속 되묻는 것처럼 읽혔다.
+  $('#chat-body .chat-intro').hidden=state.messages.some(x=>x.who==='user');
   const examples=$('#start-examples');examples.hidden=state.screen!=='welcome';
   if(!examples.hidden)examples.innerHTML=[['game-controller','배그와 롤, 150만원으로 추천해줘'],['video-camera','영상 편집용 PC가 필요해요'],['question','아직 잘 모르겠어요']].map(pair=>
     button(uiIcon(pair[0])+'<span>'+pair[1]+'</span>'+uiIcon('caret-right','example-chevron'),'prompt','start-example','data-text="'+pair[1]+'" '+(state.phase?'disabled':''))).join('');
