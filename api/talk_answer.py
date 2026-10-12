@@ -606,12 +606,12 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
             # 설명해줘」에 게임 소개가 나갔다).
             game_names, game_genres = [], []
         if not game_names and not game_genres:
-            labels = PA.wants_advice(sentence, vocab, prev_state)
+            labels = PA.wants_advice(sentence, vocab, prev_state, history)
             # 「요즘 게임 추천해줘」는 게임 이야기다 -- PC 를 직접 말했을 때만 PC 설명으로 간다.
             if (labels is not None and not purchase and is_game_related(sentence, vocab) and not PA.mentions_pc(sentence)
                     and not PA.asks_for_pc(sentence, vocab)):
                 labels = None
-            topic = PA.topic_of(sentence, vocab) if labels is not None else None
+            topic = PA.topic_in_context(sentence, vocab, prev_state, history) if labels is not None else None
         elif PA.pc_intent(sentence):
             # 게임 이름과 함께 PC 를 물으면(「120만원 롤·오버워치·로아 구성 짜줘」) 게임 소개가 아니라 그 게임에 맞는
             # PC 설명을 먼저 한다(2026-10-11 일반 AI 비교 「묻지 않은 게임 소개」). 「롤 재밌어?」는 기존 게임 답.

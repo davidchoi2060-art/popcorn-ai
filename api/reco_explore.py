@@ -22,12 +22,12 @@ import re
 from sqlalchemy import text
 
 from .db import engine
-from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_weighed
+from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_monitor_count, drop_weighed, monitor_count
 
 log = logging.getLogger("reco_explore")
 
 CHEAPER, BETTER = "cheaper", "better"
-WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy")
+WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors")
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
@@ -72,16 +72,37 @@ HEAVY_WORK = (
     ("캐드·설계", "전문", re.compile(r"\bbim\b|대형\s*어셈블리|구조\s*해석", re.I)),
     ("음악 작업", "쾌적", re.compile(r"오케스트라|샘플\s*라이브러리", re.I)),
 )
-HEAVY_KEYS = frozenset((u, lv) for u, lv, _ in HEAVY_WORK)
+# 「성능 좋은 사무용 컴퓨터」처럼 작업 없이 성능만 높여 달라고 하면 그 용도의 «쾌적»(기준표 2단계)부터 고른다
+# (2026-10-12 사장님 시험 「지금 사무용으로 쓸만한 성능좋은 컴퓨터」: 1단계 사무용 기본 카드가 나왔다).
+# 게임은 해상도가 수준을 정하므로 넣지 않는다. 작업 낱말(HEAVY_WORK)이 같이 걸리면 그쪽이 이긴다.
+GOOD_LEVEL = "쾌적"
+GOOD_USAGES = ("사무용", "주식·트레이딩", "개발", "디자인·조판", "영상편집", "3D 렌더링", "캐드·설계",
+               "음악 작업", "방송·스트리밍", "로컬 AI")
+_GOOD = re.compile(r"성능\s*(?:이|은|도|만)?\s*(?:좋|뛰어|빵빵|우수|높|괜찮)|좋은\s*성능|고성능|"
+                   r"사양\s*(?:이|은|도)?\s*(?:좋|높|빵빵)|빵빵한|쌩쌩한|넉넉한\s*(?:사양|성능)")
+# 「성능 좋을 필요 없어요」·「고성능은 필요 없고」는 성능을 높여 달라는 말이 아니다.
+_GOOD_NEG = re.compile(r"^.{0,10}?(?:필요\s*(?:는|가)?\s*없|상관\s*없|안\s*(?:좋아도|필요)|필요\s*없|아니어도|않아도)")
+HEAVY_KEYS = frozenset([(u, lv) for u, lv, _ in HEAVY_WORK] + [(u, GOOD_LEVEL) for u in GOOD_USAGES])
+
+
+def wants_good(raw: str | None) -> bool:
+    s = (raw or "")[:MAX_TEXT]
+    return any(not _GOOD_NEG.search(s[m.end():]) for m in _GOOD.finditer(s))
 
 
 def heavy_levels(raw: str | None) -> dict:
     """고객 문장 -> {기준표 용도: 단계}. 한 용도에 둘이 걸리면 뒤(더 높은) 단계."""
     s = (raw or "")[:MAX_TEXT]
-    out: dict = {}
+    out: dict = {u: GOOD_LEVEL for u in GOOD_USAGES} if wants_good(s) else {}
     for usage, level, pat in HEAVY_WORK:
         if pat.search(s):
             out[usage] = level
+    # 「모니터가 4대」처럼 조사가 붙어도 기준표의 「듀얼 모니터」(사무용 쾌적)·「모니터 4대 이상」(주식 쾌적)으로 읽는다.
+    mons = monitor_count(s) or 0
+    if mons >= 2:
+        out.setdefault("사무용", "쾌적")
+    if mons >= 4:
+        out.setdefault("주식·트레이딩", "쾌적")
     return out
 
 
@@ -151,9 +172,12 @@ def extract(raw: str | None) -> dict:
         out["silent"] = True
     if _MONITOR.search(s) and not _MONITOR_OWNED.search(s):
         out["monitor"] = True
-    m = _MULTI.search(s)
+    m = _MULTI.search(drop_monitor_count(s))        # 「모니터가 4대」는 여러 대 구매가 아니다
     if (m and 2 <= int(m.group(1)) <= 500) or _MULTI_WORD.search(s):
         out["multi"] = True
+    mons = monitor_count(s)
+    if mons and mons >= MONITORS_NEED_DGPU:
+        out["monitors"] = mons
     if _UHD.search(s):
         out["uhd"] = True
     heavy = heavy_levels(s)
@@ -177,6 +201,9 @@ def clean_wants(raw) -> dict:
     for k in ("white", "silent", "monitor", "uhd"):
         if raw.get(k) is True:
             out[k] = True
+    n = raw.get("monitors")
+    if type(n) is int and MONITORS_NEED_DGPU <= n <= 8:
+        out["monitors"] = n
     h = raw.get("heavy")
     if isinstance(h, dict):
         h = {u: lv for u, lv in h.items() if (u, lv) in HEAVY_KEYS}
@@ -254,6 +281,18 @@ def _spec(p, k):
     return v if type(v) in (int, float) else None
 
 
+# 이 수 이상의 모니터는 외장 그래픽카드로만 맞춘다.
+MONITORS_NEED_DGPU = 3
+_NO_OUTPUT_GPU = re.compile(r"내장|H100", re.I)    # 내장 그래픽 · 화면 출력이 없는 데이터센터 카드
+
+
+def has_display_gpu(p: dict) -> bool:
+    """외장 그래픽카드(화면 출력 있음)가 든 PC 인가. 그래픽 이름이 없으면 False(모르는 것을 있다고 하지 않는다)."""
+    sp = p.get("spec") if isinstance(p.get("spec"), dict) else {}
+    g = sp.get("gpu")
+    return isinstance(g, str) and bool(g.strip()) and not _NO_OUTPUT_GPU.search(g)
+
+
 def build_filters(wants: dict, products: dict, tags_loader=None) -> list[tuple[str, str, object]]:
     """wants -> [(key, 고객 이름표, 판정 함수 | 못 정한 사유 str)]. 순서가 우선순위다."""
     out = []
@@ -281,6 +320,10 @@ def build_filters(wants: dict, products: dict, tags_loader=None) -> list[tuple[s
         if wants.get(key):
             tags = tags if tags is not None else (tags_loader or part_tags)()
             out.append((key, label, lambda p, k=key, t=tags: bool(t.get(p["code"], {}).get(k))))
+    if wants.get("monitors"):
+        # 내장 그래픽 보드는 화면 출력이 보통 2~3개라 모니터 3대 이상은 외장 그래픽카드가 있어야 한다
+        # (2026-10-12 사장님 시험 「모니터가 4대」에 내장 그래픽 PC 두 장이 나왔다). 단자 수 자료는 없어 외장 여부로 본다.
+        out.append(("monitors", f"모니터 {wants['monitors']}대 연결(외장 그래픽카드)", has_display_gpu))
     if wants.get("monitor"):
         out.append(("monitor", "모니터 포함",
                     lambda p: isinstance(p.get("includes"), str) and "모니터" in p["includes"]))

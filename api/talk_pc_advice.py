@@ -28,6 +28,7 @@ from sqlalchemy import bindparam, text
 
 from . import llm
 from . import talk_filter as TF
+from .talk_rules import monitor_count
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +65,10 @@ _ASKS = re.compile(r"차이|뭐|무엇|뭔가|어떤|어느|왜|필요|좋아|�
 _UPGRADE = re.compile(r"느려|느리|버벅|끊겨|끊김|렉\b|렉이|업그레이드|교체|바꾸|바꿀|늘리|늘릴|증설|오래\s*된|쓰던")
 TOPIC_BUILD, TOPIC_PART, TOPIC_UPGRADE, TOPIC_GENERAL = "build", "part", "upgrade", "general"
 TOPIC_LAPTOP = "laptop"
+# 상담 중 고객이 이어서 한 말(환경·용도 설명 등) -- 위 규칙 낱말에 안 걸려도 AI 가 대화 전체를 읽고 답한다
+# (2026-10-12 사장님 캡처: 「업무·학교·개인 용도로 두루두루, 모니터가 4대 임」에 AI 설명 없이 고정 안내만 나갔다.
+#  사장님 「고객 소통채널은 LLM 이 되어야 함 · 말귀를 못 알아듣고 우리 하고 싶은 말만 한다」).
+TOPIC_FOLLOW = "follow"
 # 「이 가격이면 그냥 노트북 사는 게 낫지 않아요?」 -- 노트북을 팔지 않아도 데스크톱과 무엇이 다른지는 답할 수 있다
 # (2026-10-11 일반 AI 비교 R27: 「노트북은 판매하지 않습니다」와 되묻기만 나갔다).
 _LAPTOP_COMPARE = re.compile(r"(노트북|랩탑|랩톱|laptop|notebook).{0,20}(낫|나아|나을|나은|비교|차이|대신|vs|말고)|"
@@ -133,7 +138,10 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
                  or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
                  # 「사무용 80만원」 -- PC 낱말·요청 낱말 없이 용도와 예산만 말해도 새 PC 이야기다. 설명 없이
                  # 「문서 작업 중심인가요?」 질문만 나갔다(2026-10-12 Claude 복귀 뒤 점검).
-                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
+                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
+                 # 「…두루두루 쓰는데 모니터가 4대」 -- 쓰는 환경을 말하면 구성 설명이 먼저다(2026-10-12 사장님 시험:
+                 # 설명 없이 안내 세 줄과 카드만 나갔다). 모니터 여러 대는 그래픽 출력 조건이 달라지는 구성 이야기다.
+                 or (monitor_count(s) or 0) >= 2) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
@@ -145,9 +153,37 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     return None
 
 
-def wants_advice(sentence: str, vocab, prev_state=None) -> list[str] | None:
+# 인사·맞장구만 한 말은 이어 답하지 않는다 -- 「감사합니다」에 PC 설명을 붙이지 않게.
+_ACK_ONLY = re.compile(r"^\W*(감사|고마|고맙|ㅋ|ㅎ|ㄳ|안녕|수고|좋아요|네\b|넵|예\b|오케이|ok|알겠|잘\s*봤)", re.I)
+
+
+def _in_consult(prev_state, history) -> bool:
+    """이미 PC 상담이 진행 중인가 -- 앞 턴에 용도·예산을 읽었거나, 상담원이 한 번이라도 답했다."""
+    if prev_state is not None and (getattr(prev_state, "usages", None) or getattr(prev_state, "budget_won", None)):
+        return True
+    return any(r == "assistant" for r, _t in (history or []))
+
+
+def topic_in_context(sentence: str, vocab, prev_state=None, history=None) -> str | None:
+    """topic_of 에 대화 맥락을 더한다 -- 규칙 낱말에 안 걸려도 상담 중 고객이 이어 말했으면 TOPIC_FOLLOW.
+
+    규칙(topic_of)은 «어떤 설명을 할지» 고르는 데만 쓴다. «설명을 할지 말지»를 규칙이 막지 않는다
+    -- 막으면 손님 말에 AI 답 없이 고정 안내만 나간다. 잡담이면 [A] 판정(pc=false)이 이 답을 화면에서 뺀다
+    (talk.parse_talk 「answer = ""」 갈래)."""
+    t = topic_of(sentence, vocab)
+    if t is not None:
+        return t
+    s = (sentence or "").strip()
+    if not s or (len(s) <= 12 and _ACK_ONLY.match(s)):
+        return None
+    if usage_hits(s, vocab) or pc_intent(s) or _in_consult(prev_state, history):
+        return TOPIC_FOLLOW
+    return None
+
+
+def wants_advice(sentence: str, vocab, prev_state=None, history=None) -> list[str] | None:
     """PC 설명을 먼저 해 줄 문장인가 -> 설명에 쓸 용도 라벨 목록(빈 목록 가능). 아니면 None."""
-    if topic_of(sentence, vocab) is None:
+    if topic_in_context(sentence, vocab, prev_state, history) is None:
         return None
     prev = list(getattr(prev_state, "usages", None) or []) if prev_state is not None else []
     return usage_hits(sentence, vocab) or prev
@@ -204,6 +240,11 @@ _TOPIC_TASK = {
                    " 다른 쇼핑몰·가격비교 사이트와 비교를 물으면 같은 부품 모델인지, 조립비·운영체제·배송·A/S 포함 여부를 맞춰"
                    " 비교하는 요령을 말한다. 업체를 믿을 수 있는지 물으면 사업자 정보·통신판매업 신고·안전결제·후기처럼 확인할"
                    " 방법을 말하고, 어느 업체도 좋다·나쁘다·사기다 단정하지 않는다.",
+    TOPIC_FOLLOW: "대화 이력과 이번 문장을 함께 읽고, 고객이 이번에 한 말에 바로 답한다. 고객이 쓰는 환경(모니터 대수·해상도,"
+                  " 설치 공간, 소음, 함께 쓰는 장비)이나 용도를 말했으면 그 조건 때문에 PC에서 무엇이 필요해지는지"
+                  " 숫자로 서너 문장 설명한다(예: 모니터 여러 대면 그래픽 출력 단자 수와 외장 그래픽카드가 필요한지)."
+                  " 고객 말을 다른 뜻으로 바꿔 읽지 않는다 -- 예를 들어 「모니터가 4대」는 PC를 4대 산다는 말이 아니라"
+                  " 모니터 4대를 연결해 쓴다는 말이다. 앞서 한 설명은 되풀이하지 않는다.",
 }
 # 구성 추천과 배송·환불을 함께 물으면(「배그PC 추천하고 배송일과 환불도 알려줘」) 구성 설명 뒤에 일반 기준 한 문장.
 _BUILD_WITH_GENERAL = (" 고객이 배송·설치·환불·운영체제 같은 구매 절차도 물었으면 마지막에 국내 쇼핑몰의 일반적인 기준을"
