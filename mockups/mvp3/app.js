@@ -27,6 +27,9 @@ const arrival=(()=>{try{const raw=sessionStorage.getItem(FROM_TALK_KEY);sessionS
 // 대화 화면에서 온 상세에는 옛 상담창을 붙이지 않는다 -- 대화는 「대화로 돌아가기」로 이어 간다(2026-10-12 카드 검수:
 // 상세 왼쪽·모바일 위쪽에 옛 상담창 「어떤 PC를 찾으세요?」가 통째로 나왔다).
 if(arrival){$('#back-to-talk').hidden=false;document.body.dataset.fromTalk='1';}
+// restoring: 처음 열 때 보관된 견적·추천을 다시 불러오는 동안. 그 사이 화면이 바뀌어도 방문 기록을 늘리지 않는다 --
+// 늘리면 대화 화면에서 상세로 온 고객이 「뒤로」를 눌렀을 때 대화가 아니라 빈 첫 화면이 나온다(2026-10-12 고객단 끝까지 검수 E15).
+let restoring=false;
 let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='',enteringRoute=true;
 const draft={version:1,start_mode:null,usage_choice:null,budget_won:null,budget_bound:null,draft_text:'',draft_edited:false};
 const ui={surface:!location.hash||location.hash==='#start'?'gateway':location.hash==='#purpose'?'usage':'consultation',epoch:window.crypto.randomUUID?window.crypto.randomUUID():Array.from(window.crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16)).join('-')};
@@ -488,7 +491,7 @@ function render(){
   if(ui.surface==='consultation'){
     if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled)?.focus({preventScroll:true});}
     else{view.scrollTop=0;view.querySelector('h2')?.focus({preventScroll:true});if(mobile.matches)window.scrollTo(0,0);}
-    if(!enteringRoute&&lastScreen!==state.screen&&location.hash!=='#'+state.screen)history.pushState({screen:state.screen},'','#'+state.screen);
+    if(!enteringRoute&&lastScreen!==state.screen&&location.hash!=='#'+state.screen)history[restoring?'replaceState':'pushState']({screen:state.screen},'','#'+state.screen);
   }else{
     if(!enteringRoute)history.replaceState(uiEntry(),'',uiHash());
     const target=gatewayFocus?.id?$('#'+gatewayFocus.id):gatewayFocus?.usage?gateway.querySelector('[data-usage="'+gatewayFocus.usage+'"]'):gatewayFocus?.action?gateway.querySelector('[data-action="'+gatewayFocus.action+'"]'):gatewayFocus?.heading?gateway.querySelector('h1'):null;
@@ -514,9 +517,9 @@ function enterRoute(hash,initial=false){
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
     if(screen==='saved')openSaved();else flow.navigate(screen);
     // 새로고침 전에 보던 견적이 있으면 같은 조건으로 다시 물어 그 상품을 다시 연다(값은 지금 기준).
-    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk)void flow.resume();
+    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk){restoring=true;void flow.resume().finally(()=>{restoring=false;});}
     // 고른 견적 없이 조건만 넘어왔으면(대화 화면의 「기존 상담 화면」) 그 조건으로 추천을 다시 받아 추천 목록을 연다.
-    else if(initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk)void flow.refresh();
+    else if(initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk){restoring=true;void flow.refresh().finally(()=>{restoring=false;});}
   }finally{enteringRoute=false;}
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}

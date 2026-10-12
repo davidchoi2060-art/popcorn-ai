@@ -304,6 +304,8 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isCompo
 
 flow.reset({restore:true});
 if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
+// 고른 구성 없이 카드만 보던 중 새로고침했으면 같은 조건으로 카드를 다시 받는다(값은 지금 기준 · AI 호출 없음).
+else if(state.restoredShown&&state.talk)void flow.refresh({notes:false});
 // 처음 화면과 오갈 때 보내지 않은 입력 문장을 넘긴다(코덱스 #148 검수 P2). 받은 문장은 입력 칸에 채우기만 한다.
 const draftHandoff=LF.createDraftHandoff();
 window.addEventListener('pagehide',()=>{draftHandoff.put(input.value);});
