@@ -104,6 +104,17 @@ def _counts() -> dict:
             "reported": int(reported), "rules": int(rules)}
 
 
+def _target(raw) -> str:
+    """대상 칸 — 쇼핑몰 가격 반영 기록의 내부 표기(run:4 · cart)를 읽을 수 있는 말로 바꾼다."""
+    if not raw:
+        return "—"
+    raw = str(raw)
+    if raw.startswith("run:") and raw[4:].isdigit():
+        return f"{raw[4:]}회차 실행"
+    from .admin_mall_price import MOMENT_KO
+    return MOMENT_KO.get(raw, raw)
+
+
 def _recent_logs(limit: int = 10) -> list:
     from .admin_activity_logs import ACTION_LABELS, KIND_LABELS
     with engine.connect() as conn:
@@ -112,11 +123,15 @@ def _recent_logs(limit: int = 10) -> list:
             " l.created_at FROM admin_operator_activity_logs l"
             " LEFT JOIN admin_operators o USING (operator_id)"
             " ORDER BY l.log_id DESC LIMIT :n"), {"n": limit}).mappings().all()
+    # 화면에 내부 코드(영문)를 그대로 내지 않는다 — 이름표가 없는 동작은 「기타 처리」로 쓰고
+    # 원래 코드는 title 로만 남긴다. 담당자가 없는 행은 사람이 아니라 자동 작업이 남긴 기록이다.
     return [{"at": _fmt_time(r["created_at"]) or "—",
-             "kind": KIND_LABELS.get(r["target_kind"], r["target_kind"]),
-             "target": r["target_id"] or "—",
-             "action": ACTION_LABELS.get(r["action"], r["action"]),
-             "operator": r["operator"]} for r in rows]
+             "kind": KIND_LABELS.get(r["target_kind"], "기타 업무"),
+             "target": _target(r["target_id"]),
+             "action": ACTION_LABELS.get(r["action"], "기타 처리"),
+             "code": r["action"],
+             "operator": r["operator"] if r["operator"] not in (None, "", "—") else "자동 작업"}
+            for r in rows]
 
 
 def _releases() -> dict:

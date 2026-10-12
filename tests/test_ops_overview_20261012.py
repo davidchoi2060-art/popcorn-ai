@@ -110,6 +110,24 @@ class Build(unittest.TestCase):
             self.assertIn(path + "?from=overview", hrefs)
 
 
+class RecentLogs(unittest.TestCase):
+    def test_internal_codes_are_not_shown_as_text(self):
+        rows = [{"created_at": None, "target_kind": "zzz", "target_id": "run:4",
+                 "action": "mall_price_apply_unknown", "operator": "—"}]
+        conn = mock.MagicMock()
+        conn.__enter__.return_value.execute.return_value.mappings.return_value.all.return_value = rows
+        with mock.patch.object(OV.engine, "connect", return_value=conn):
+            out = OV._recent_logs()[0]
+        self.assertEqual((out["kind"], out["action"], out["operator"]), ("기타 업무", "기타 처리", "자동 작업"))
+        self.assertEqual((out["code"], out["target"]), ("mall_price_apply_unknown", "4회차 실행"))
+
+    def test_mall_price_actions_have_korean_labels(self):
+        from api.admin_activity_logs import ACTION_LABELS
+        for code in ("mall_price_apply", "mall_price_undo", "ai_integration_limit_clear"):
+            self.assertIn(code, ACTION_LABELS)
+        self.assertEqual(OV._target("cart"), "장바구니")
+
+
 class Shell(unittest.TestCase):
     def test_overview_is_first_in_new_menu(self):
         nav = new_admin_nav('/admin2/')
