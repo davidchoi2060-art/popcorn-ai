@@ -422,7 +422,6 @@ _CURRENT_PC = re.compile(r"(지금|현재|기존|원래)\s*(제가\s*)?(쓰는|�
                          r"(내\s*|제\s*)?(컴퓨터|컴|pc|본체|데스크\s*[탑톱])\S*|"
                          r"(쓰는|쓰고\s*있는|사용\s*중인|가진|가지고\s*있는)\s*(컴퓨터|컴|pc|본체)\S*|"
                          r"(내|제)\s*(컴퓨터|컴|pc|본체)\s*(는|가|은|이)", re.I)
-_CLAUSE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|[.,?!\n])")
 
 
 # 「지금 쓰는 컴퓨터에 RTX 4070을 달고 싶어요」는 가진 PC 설명이 아니라 새로 달 부품 요청이다 -- 그 마디는 남긴다
@@ -430,16 +429,65 @@ _CLAUSE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예�
 _WANT_PART = re.compile(r"달(고|아|려|면)|바꾸(고|려)|바꿔|교체|장착|넣(고|으려|어)|업그레이드\s*(하고|하려|할|해)|추가")
 
 
+# 지금 PC 설명은 쉼표로 사양을 늘어놓고(「지금 PC는 i5-9400F, GTX1660, 램 16GB예요」), 다음 문장에 사양만 따로
+# 적기도 한다(「지금 PC가 너무 느려요. i5-9400F, GTX1660, 램 16GB예요.」). 첫 마디 하나만 지우면 남은 사양을
+# 「말씀하신 GTX 1660 · 메모리 16GB 조건」으로 읽었다(2026-10-12 카드 검수 · 개발 서버 재현).
+_PIECE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|,)")
+_SENTENCE_END = re.compile(r"[.?!\n]")
+_TURN_POINT = ("인데", "는데", "이고", "이라서", "라서", "이에요", "예요", "입니다", "이거든요")
+_PART_SPEC = (_CPU, _GPU, _RAM, _STORAGE)
+
+
+def _sentence_end(text: str, pos: int) -> int:
+    m = _SENTENCE_END.search(text, pos)
+    return m.end() if m else len(text)
+
+
+def _current_pc_cut(text: str, start: int, pos: int) -> int:
+    """start 에서 시작한 지금 PC 설명이 끝나는 자리. 원하는 부품을 말한 조각(「RTX 4070을 달고 싶어요」)은
+    남기고, 「인데·이고」 같은 마디 끝을 만나면 거기서 멈춘다(뒤는 새 마디다)."""
+    stop = _sentence_end(text, pos)
+    piece_start = start
+    while True:
+        pe = _PIECE_END.search(text, pos, stop)
+        piece_stop = pe.end() if pe else stop
+        if _WANT_PART.search(text[piece_start:piece_stop]):
+            return piece_start
+        if not pe or pe.group() in _TURN_POINT:
+            return piece_stop
+        pos = piece_start = piece_stop
+
+
+def _spec_only_sentence(sentence: str) -> bool:
+    """사양만 늘어놓은 문장인가(원하는 말·예산이 없다)."""
+    return (any(r.search(sentence) for r in _PART_SPEC) and not _WANT_PART.search(sentence)
+            and not _MAN.search(sentence) and not _WON.search(sentence))
+
+
 def drop_current_pc(text: str) -> str:
-    """지금 가진 PC 를 설명하는 마디를 뺀 문장."""
-    m = _CURRENT_PC.search(text or "")
-    if not m:
-        return text or ""
-    end = _CLAUSE_END.search(text, m.end())
-    clause = text[m.start():end.end() if end else len(text)]
-    if _WANT_PART.search(clause):
-        return text
-    return text[:m.start()] + (text[end.end():] if end else "")
+    """지금 가진 PC 를 설명하는 마디를 모두 뺀 문장. 바로 뒤에 사양만 늘어놓은 문장도 그 설명으로 본다."""
+    out = text or ""
+    pos = 0
+    while True:
+        m = _CURRENT_PC.search(out, pos)
+        if not m:
+            return out
+        cut = _current_pc_cut(out, m.start(), m.end())
+        if cut == m.start():
+            pos = m.end()
+            continue
+        # 지금 PC 문장을 통째로 지웠으면 이어지는 「사양만 있는 문장」도 같은 설명이다.
+        end = _sentence_end(out, m.start())
+        if not out[cut:end].strip(" .?!\n"):
+            cut = end
+        if cut == end:
+            while cut < len(out):
+                nxt = _sentence_end(out, cut)
+                if not _spec_only_sentence(out[cut:nxt]):
+                    break
+                cut = nxt
+        out = out[:m.start()] + out[cut:]
+        pos = m.start()
 
 
 # 「램 16기가면 충분해요 아니면 32기가 사야 돼요?」는 둘을 견주는 질문이다 -- 조건으로 읽으면 「메모리 16GB
