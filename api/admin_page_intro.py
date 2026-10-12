@@ -50,6 +50,7 @@ INTRO: dict[str, dict] = {
     },
     "/admin2/categories-v2": {"short": "판매 분류 나무 관리"},
     "/admin2/part-explanations": {"short": "부품 설명 검토"},
+    "/admin2/customer-bom-gaps": {"short": "고객 화면 빈칸 · 운영자 확인"},
     "/admin2/pc-workspace": {"short": "제품별 할 일과 AI 제안"},
     "/admin2/pc-configurations": {"short": "조립PC 목록과 부품"},
     "/admin2/configuration-consultation": {"short": "추천 결과 미리 시험"},
@@ -401,6 +402,14 @@ BACK_LINKS: dict[str, dict] = {
         "group": "주문 운영",
         "from": ("/admin2/payment-records",),
         "entries": (("결제·정산 기록", "/admin2/payment-records"),),
+        "crumb_on_hub": False,
+    },
+    # 고객 화면 부품 정보 확인(2026-10-12 사장님 「크롤링으로도 안 되면 운영자가」). 부품 관리 화면에 들어가는 링크를 둔다.
+    "/admin2/part-explanations": {
+        "label": "부품 관리로 돌아가기",
+        "group": "부품 관리",
+        "from": ("/admin2/customer-bom-gaps",),
+        "entries": (("고객 화면 부품 정보 확인", "/admin2/customer-bom-gaps"),),
         "crumb_on_hub": False,
     },
 }

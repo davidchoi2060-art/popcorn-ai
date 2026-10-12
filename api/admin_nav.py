@@ -346,6 +346,7 @@ NAV = [
         ("상품 분류 관리", "/admin2/categories-v2", None),   # 2026-09-09 신규(v2)로 교체 — 구 /admin2/categories(ADM-CAT-010)는 P-09 동결
         ("상품 관리", "/admin2/products", None),
         ("부품 설명 관리", "/admin2/part-explanations", "사양 근거와 고객 설명 초안 검토"),
+        ("고객 화면 부품 정보 확인", "/admin2/customer-bom-gaps", "가격 확인 중 · 구성표 없음 -- 팝콘PC 확인 뒤 운영자 확인"),   # 2026-10-12 사장님 「크롤링으로도 안 되면 운영자가」
         ("처리할 일 · AI 도움", "/admin2/pc-workspace", "제품 검토 작업과 AI 설명 제안"),
         ("조립PC 제품군", "/admin2/pc-configurations", "확정 구성 목록과 전체 부품 조회"),
         ("추천 테스트", "/admin2/configuration-consultation", "LLM 조건 확인과 구성 목록 비교·상담 검토"),
@@ -590,7 +591,7 @@ def new_admin_nav(current_path=''):
         ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
-        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
+        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/customer-bom-gaps')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries', '/admin2/payment-records')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members', '/admin2/member-reviews')),
