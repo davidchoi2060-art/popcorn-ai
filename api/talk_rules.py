@@ -559,6 +559,18 @@ def requested_conditions(text: str, state, prev_state=None) -> tuple[list[str], 
             [c for c in conds if not _applied_by_recommend(c)])
 
 
+# 「RAM 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.」는 설명을 바라는 말이다 -- 부품 숫자를 조건으로
+# 읽어 「메모리 16GB 조건으로 판매 중인 PC를 골라 볼게요」와 카드 3장을 냈다(2026-10-12 카드 검수 X2).
+# 이런 문장은 조건으로 읽지 않고, 화면은 추천을 부르지 않는다(응답 explain_only).
+_EXPLAIN_ONLY = re.compile(r"추천\s*(은|는|까지는)?\s*(아직\s*)?(필요\s*없|안\s*해\s*(도|주셔도))|추천\s*(말고|없이)\s*(설명|차이|기준|비교)|"
+                           r"(차이|기준|비교)\s*만(?!\s*(으로|가지고))")
+
+
+def explain_only(text: str) -> bool:
+    """추천 없이 설명만 바라는 문장인가."""
+    return bool(_EXPLAIN_ONLY.search(text or ""))
+
+
 def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False) -> list[str]:
     """추천이 반영하지 않는 조건 — 고객 문장과 검증된 state 에서만 읽는다.
     (_all=True 면 추천이 거르는 조건까지 모두 — requested_conditions 가 나눈다.)
@@ -566,6 +578,8 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     state.prefs 는 누적이라, 이전 턴에 이미 있던 선호는 다시 말하지 않는다(매 턴 같은
     안내가 되풀이되면 AI 답이 영영 안 보인다).
     """
+    if explain_only(text):
+        return []
     t = drop_current_pc(text or "")
     t = drop_weighed(t)
     out = []

@@ -303,3 +303,16 @@ test('the current quote shows the changed part instead of the base spec and says
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+// 2026-10-12 카드 검수 X2: 「차이만 설명해 주세요 · 아직 추천은 필요 없어요」에도 설명 뒤 카드 3장이 나왔다.
+test('an explain-only answer does not call the recommendation',async()=>{
+  const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:t150,missing:[],pc_related:true,explain_only:true,
+      answer:'16GB는 문서·게임에, 32GB는 영상 편집에 여유가 있어요.',reply:''}}
+    :url==='/api/grid/recommend'?{data:reco([pc(101,'CODE/MOCK A',1450000)])}:{data:{ok:true,quotes:[],has_more:false}});
+  try{
+    await h.say('RAM 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.');
+    assert.ok(!h.calls.some(c=>c.url==='/api/grid/recommend'));
+    assert.match(h.text('#tk-log'),/32GB는 영상 편집에 여유/);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
