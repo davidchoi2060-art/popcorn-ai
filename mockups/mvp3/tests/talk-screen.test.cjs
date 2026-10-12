@@ -106,6 +106,45 @@ test('a sentence typed on the landing chat box is sent once on arrival without a
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+// 2026-10-12 중헌 님 고객단 1·2번: 홈으로 돌아와 다른 상담을 고르거나 채팅창에 새로 적으면 지난 대화·조건·지금 견적을 비우고 시작한다.
+test('a landing path after an earlier talk starts a fresh consultation',async()=>{
+  const ss=storage();const a=harness(scripted(),ss);
+  try{await a.say('150만원 게임용');a.doc.querySelector('[data-action=choose][data-index="1"]').click();await tick();}finally{a.close();}
+  const b=harness(scripted(),ss,'https://qa.invalid/mvp3/talk.html?start=parts');
+  try{
+    await until(()=>b.doc.querySelector('.tk-welcome'));
+    assert.equal(b.doc.querySelector('#tk-input').value,'PC 부품이나 구성에서 궁금한 점이 있어요.');
+    assert.doesNotMatch(b.text('#tk-log'),/150만원 게임용/);
+    assert.match(b.text('#tk-now-body'),/구성을 선택하면 여기에 모아둘게요/);
+    assert.doesNotMatch(b.text('#tk-now-body'),/지금 조건/);
+    await tick();assert.deepEqual(b.calls.map(c=>c.url),[],'the earlier quote is not reopened');
+    b.doc.querySelector('#tk-form').dispatchEvent(new b.w.Event('submit',{bubbles:true,cancelable:true}));
+    await until(()=>b.calls.some(c=>c.url==='/api/talk/parse'));
+    const sent=b.calls.find(c=>c.url==='/api/talk/parse').body;
+    assert.equal(sent.state,null);assert.deepEqual(sent.history,[]);
+    await until(()=>!b.doc.querySelector('#tk-send').disabled&&b.doc.querySelector('.tk-card'));
+    assert.deepEqual(b.errors,[]);
+  }finally{b.close();}
+});
+test('a sentence typed on the landing chat box after an earlier talk starts fresh too',async()=>{
+  const ss=storage();const a=harness(scripted(),ss);
+  try{await a.say('150만원 게임용');}finally{a.close();}
+  ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'사무용 컴퓨터요',at:Date.now()}));
+  const b=harness(scripted(),ss);
+  try{
+    await until(()=>b.calls.some(c=>c.url==='/api/talk/parse'));
+    const sent=b.calls.find(c=>c.url==='/api/talk/parse').body;
+    assert.equal(sent.text,'사무용 컴퓨터요');assert.equal(sent.state,null);assert.deepEqual(sent.history,[]);
+    await until(()=>!b.doc.querySelector('#tk-send').disabled&&b.doc.querySelector('.tk-card'));
+    assert.doesNotMatch(b.text('#tk-log'),/150만원 게임용/);
+  }finally{b.close();}
+});
+test('opening the talk page without a landing start keeps the earlier talk',async()=>{
+  const ss=storage();const a=harness(scripted(),ss);
+  try{await a.say('150만원 게임용');}finally{a.close();}
+  const b=harness(scripted(),ss);
+  try{await until(()=>/150만원 게임용/.test(b.text('#tk-log')));}finally{b.close();}
+});
 test('an old landing sentence is dropped instead of being sent later',async()=>{
   const ss=storage();ss.setItem('popcorn-mvp3-first-message-v1',JSON.stringify({text:'예전 글',at:Date.now()-3600000}));
   const h=harness(scripted(),ss);
@@ -318,7 +357,7 @@ test('an explain-only answer does not call the recommendation',async()=>{
 });
 
 // 2026-10-12 사장님 결정 「크게」: 카드 맨 위에 작업 수준(용도 수준 / 작업)을 크게 둔다 -- 사양표 아래 작은 줄이 아니다.
-test('card shows the work level big at the top, above the name',async()=>{
+test('card shows the work level big at the top, and no product name over the photo',async()=>{
   const fit={...pc(301,'CODE/MOCK 영상',3230400),reasons:['영상편집 쾌적 — 4K 편집']};
   const h=harness((url)=>url==='/api/talk/parse'?{data:{ok:true,state:t150,missing:[],reply:'찾아볼게요.',pc_related:true}}
     :url==='/api/grid/recommend'?{data:reco([fit])}:{data:{ok:true,quotes:[],has_more:false}});
@@ -326,7 +365,9 @@ test('card shows the work level big at the top, above the name',async()=>{
     await h.say('4K 영상 편집');
     const card=h.doc.querySelector('.tk-card'),line=card.querySelector('.tk-fit');
     assert.equal(line.querySelector('strong').textContent,'영상편집 쾌적');assert.equal(line.querySelector('span').textContent,'4K 편집');
-    assert.ok(line.compareDocumentPosition(card.querySelector('h4'))&h.w.Node.DOCUMENT_POSITION_FOLLOWING,'before the product name');
+    assert.ok(line.compareDocumentPosition(card.querySelector('.tk-price'))&h.w.Node.DOCUMENT_POSITION_FOLLOWING,'before the price');
+    // 2026-10-12 중헌 님 고객단 4번: 사진 위 상품명은 아래 사양과 겹쳐 뺐다.
+    assert.equal(card.querySelector('h4'),null);assert.doesNotMatch(card.textContent,/CODE\/MOCK 영상/);
     assert.equal(card.querySelectorAll('.tk-reason').length,0,'not repeated as a small line');
   }finally{h.close();}
 });

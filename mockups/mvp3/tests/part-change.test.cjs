@@ -23,6 +23,7 @@ function harness({options=[swapped,bigger],fail=false}={}){
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   w.HTMLElement.prototype.scrollIntoView=function(){};
+  const tabs=[];w.open=()=>{const t={opener:w,document:{title:''},location:{href:''},closed:false,close(){t.closed=true;}};tabs.push(t);return t;};
   Object.defineProperty(w,'crypto',{value:webcrypto});w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
   w.eval(read('live-model.js'));w.eval(read('api-client.js'));
   w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async(url,init)=>{
@@ -39,7 +40,7 @@ function harness({options=[swapped,bigger],fail=false}={}){
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
   w.eval(read('live-photo.js'));w.eval(read('app.js'));
-  return {w,d:w.document,get flow(){return flow;},errors,calls,close:()=>dom.window.close()};
+  return {w,d:w.document,get flow(){return flow;},errors,calls,tabs,close:()=>dom.window.close()};
 }
 const text=e=>e.textContent.replace(/\s+/g,' ').trim();
 async function toDetail(h){

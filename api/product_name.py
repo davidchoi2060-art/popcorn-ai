@@ -224,3 +224,37 @@ def match_storage_shorthand(name, spec):
         return "[" + "/".join(tokens) + "]"
 
     return _SPEC_BRACKET.sub(fix, name)
+
+
+# ── 판매 조립PC 카드의 케이스 · 파워 줄 (2026-10-12 중헌 님 고객단 4번) ─────────────────
+# 카드 사진 위 상품명(「오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]」)은 아래 사양 줄과 겹쳐 뺐고, 대신
+# 사양에 케이스와 파워를 더한다. 원천은 몰이 공개한 그 PC 의 구성 원문(`products.spec_source_text`,
+# 「케이스@@…,@@파워@@…」)이다 -- tools/builtpc_parse 와 같은 모양을 읽는다(그 모듈은 불러오면 콘솔·.env 를
+# 건드려 여기서 다시 적는다). 고르지 않은 옵션(「선택하세요」)과 사양 설명 대괄호(「[정격 600W / …]」)는 뺀다.
+_BOM_SLOTS = {"케이스": "case", "파워": "psu"}
+_BOM_UNSELECTED = re.compile(r"선택하세요|선택안함|선택 안함|해당없음")
+_BOM_SPEC_BRACKET = re.compile(r"\[[^\[\]]*(?:정격|높이|크기|TDP|보증|모듈러|:)[^\[\]]*\]")
+_BOM_QTY = re.compile(r"\*\s*\d+\s*개")
+_BOM_MAX = 48
+
+
+def pc_case_psu(spec_source_text):
+    """판매 조립PC 구성 원문 -> {'case': 이름, 'psu': 이름} (찾은 것만). 못 읽으면 {}."""
+    if not spec_source_text or not isinstance(spec_source_text, str) or "@@" not in spec_source_text:
+        return {}
+    out = {}
+    for chunk in spec_source_text.split(",@@"):
+        if "@@" not in chunk:
+            continue
+        slot, val = chunk.split("@@", 1)
+        key = _BOM_SLOTS.get(re.sub(r"\s+", "", strip_html_display(slot) or ""))
+        if key is None or key in out:
+            continue
+        val = strip_html_display(val) or ""
+        if not val.strip() or _BOM_UNSELECTED.search(val):
+            continue
+        name = part_display_name(_BOM_QTY.sub(" ", _BOM_SPEC_BRACKET.sub(" ", val)))
+        name = re.sub(r"\s+", " ", name or "").strip(" ,/-")
+        if len(name) >= _MIN_LEN:
+            out[key] = name if len(name) <= _BOM_MAX else name[:_BOM_MAX - 1].rstrip() + "…"
+    return out

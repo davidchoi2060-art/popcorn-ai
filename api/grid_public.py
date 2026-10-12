@@ -790,6 +790,25 @@ def eligible_sold_item(state_raw: dict, code: int) -> dict | None:
     return item
 
 
+def sold_card_prices(state_raw: dict, text_raw: str | None = None) -> list[int]:
+    """상담 설명의 가격대를 카드에 맞추는 용도(api/talk_pc_advice.align_market_price): 이 조건으로 지금
+    추천 카드에 나올 판매 PC 가격들. 추천(`recommend`)과 같은 나눔·같은 고객 문장 해석을 쓰고, 사진·추정 기록
+    같은 곁가지는 하지 않는다(읽기만). 못 구하면 []."""
+    notes: list[str] = []
+    with engine.connect() as conn:
+        vocab = load_vocab(conn)
+        state, _ = validate_state(state_raw, vocab)
+    state, explore = _explore_input(RecommendBody(state=state_raw, text=(text_raw or "")[:300] or None), state, [])
+    game_usages = [u for u in state.usages if is_game_usage(u)]
+    game_grade = state.game.grade if (game_usages and state.game) else None
+    # recommend() 와 같은 나눔 -- 장르 통칭만 있으면 이름 없는 게임으로 본다(TR.unnamed_game).
+    sold_games = game_usages if (game_grade is not None or TR.unnamed_game(state)) else []
+    others = [u for u in state.usages if not is_game_usage(u)]
+    sets = SOLD.card_sets(state, sold_games, others, notes, vocab, explore)
+    return [it["price"] for cs in sets if cs.get("kind") == "sold" for it in cs.get("items") or []
+            if type(it.get("price")) is int and it["price"] > 0]
+
+
 def sold_part_options(state_raw: dict, code: int, slot: str) -> dict | None:
     """부품 바꾸기(api/mvp3_part_options): 고른 판매 PC 에서 그 부품만 다른 판매 PC 들. 공개 구성도 붙인다."""
     notes: list[str] = []

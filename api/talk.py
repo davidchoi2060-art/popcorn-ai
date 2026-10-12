@@ -1541,6 +1541,14 @@ def parse_talk(body: ParseBody, request: Request):
     if set(exceptions) & {"self_harm", "prompt_injection"}:
         answer = ""        # 안전 최소 보호 -- 이때는 서버 문장 한 줄만 낸다
     answer = TR.tidy_customer_text(answer, text)
+    # 설명의 「시중에서는 보통 ○○만원대」를 아래 카드 가격 범위로 맞춘다(2026-10-12 중헌 님 3번 -- 설명과 카드 가격이
+    # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
+    if answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing and "시중" in answer:
+        try:
+            from .grid_public import sold_card_prices    # 추천 쪽 모듈 -- 이 턴에만 읽는다
+            answer = PA.align_market_price(answer, sold_card_prices(state.model_dump(), text))
+        except Exception as e:  # noqa: BLE001 - 가격 맞추기는 곁가지다. 실패해도 설명은 나간다
+            log.warning("[talk] market price align skipped: %s", type(e).__name__)
     if notes_deferred and not answer.strip():
         # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
         reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()

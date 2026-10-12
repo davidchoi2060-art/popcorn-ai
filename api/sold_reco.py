@@ -122,6 +122,7 @@ def upgrade_hints(blocked) -> list[str]:
     return out[:MAX_UPGRADE_HINTS]
 PUBLIC_SPEC_TEXT = ("cpu", "gpu")
 PUBLIC_SPEC_NUM = ("ram_gb", "ssd_gb", "vram_gb")
+PUBLIC_SPEC_PART = ("case", "psu")     # card_spec 이 몰 구성 원문에서 더한다
 
 
 def public_spec(spec):
@@ -132,8 +133,17 @@ def public_spec(spec):
     if not isinstance(spec, dict):
         return None
     return {k: v for k, v in spec.items()
-            if (k in PUBLIC_SPEC_TEXT and isinstance(v, str))
+            if (k in PUBLIC_SPEC_TEXT + PUBLIC_SPEC_PART and isinstance(v, str))
             or (k in PUBLIC_SPEC_NUM and type(v) in (int, float) and v >= 0)}
+
+
+def card_spec(p):
+    """카드 사양 = 공개 사양 + 케이스·파워 이름(몰 구성 원문, 2026-10-12 중헌 님 고객단 4번). 못 읽은 줄은 넣지 않는다."""
+    spec = public_spec(p.get("spec"))
+    extra = {k: v for k, v in (p.get("case_psu") or {}).items() if k in PUBLIC_SPEC_PART and isinstance(v, str) and v}
+    if not extra:
+        return spec
+    return {**(spec if isinstance(spec, dict) else {}), **extra}
 
 
 def fit_usage(label: str | None) -> str | None:
@@ -156,7 +166,7 @@ def _item(p, usage, levels_by, tag, budget_won, bound):
     return {
         "product_code": p["code"], "name": match_storage_shorthand(card_name(p["name"]), p["spec"]),
         "price": p["price"],
-        "price_src": p["price_src"], "mall_url": p["url"], "spec": public_spec(p["spec"]),
+        "price_src": p["price_src"], "mall_url": p["url"], "spec": card_spec(p),
         "level": f["level"], "tag": tag, "role": ROLE_OF[tag],
         "over_budget": over, "reasons": reasons,
     }
