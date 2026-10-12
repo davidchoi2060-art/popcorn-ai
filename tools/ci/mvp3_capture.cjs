@@ -9,6 +9,8 @@
 //   BASE   https://popcornai.co.kr
 //   CASES  「파일이름=상담 문장」을 | 로 구분 (예: 배그롤150=배그와 롤 150만원|사무용100=사무용 100만원)
 //   OUT    캡처를 쓸 폴더
+//   PAGES  index(옛 상담 화면) · talk(대화 화면 talk.html)를 쉼표로. 기본 「index,talk」.
+//          대화 화면은 「AI 설명 -> 안내 -> 카드 -> 다음 선택 단추」 순서를 함께 적는다(2026-10-12).
 const {chromium}=require('playwright');
 const fs=require('fs'),path=require('path');
 
@@ -18,6 +20,7 @@ const CASES=(process.env.CASES||'').split('|').map(x=>x.trim()).filter(Boolean).
   const i=x.indexOf('=');return i>0?{name:x.slice(0,i).trim(),text:x.slice(i+1).trim()}:{name:x.replace(/[^\p{L}\p{N}_-]+/gu,''),text:x};
 });
 if(!CASES.length){console.error('CASES 가 비어 있습니다');process.exit(2);}
+const PAGES=(process.env.PAGES||'index,talk').split(',').map(x=>x.trim()).filter(x=>x==='index'||x==='talk');
 fs.mkdirSync(OUT,{recursive:true});
 
 async function loadImages(page){
@@ -26,6 +29,48 @@ async function loadImages(page){
   await page.waitForFunction(()=>[...document.querySelectorAll('.live-product-card img')].every(i=>i.complete),null,{timeout:30000}).catch(()=>{});
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.waitForTimeout(500);
+}
+
+// 대화 화면: 입력창에 문장을 넣어 보내고, 최신 카드·단추와 대화 칸의 차례를 남긴다.
+async function captureTalk(browser,c){
+  const r={name:c.name+'-대화',text:c.text,cards:[],errors:[],shots:[]};
+  const ctx=await browser.newContext({viewport:{width:1440,height:1000},locale:'ko-KR',timezoneId:'Asia/Seoul'});
+  const page=await ctx.newPage();
+  page.on('pageerror',e=>r.errors.push('pageerror: '+e.message));
+  page.on('console',m=>{if(m.type()==='error')r.errors.push('console: '+m.text());});
+  try{
+    await page.goto(BASE+'/mvp3/talk.html',{waitUntil:'networkidle',timeout:60000});
+    await page.fill('#tk-input',c.text);
+    await page.press('#tk-input','Enter');
+    await page.waitForSelector('.tk-cards:not(.is-past), .tk-msg.is-error',{timeout:90000});
+    await page.waitForFunction(()=>!document.querySelector('#tk-send').disabled,null,{timeout:90000}).catch(()=>{});
+    await page.waitForTimeout(500);
+    r.alert=await page.$eval('.tk-msg.is-error',e=>e.innerText.trim()).catch(()=>null);
+    r.order=await page.$$eval('#tk-log > *',els=>els.map(e=>e.classList.contains('tk-cards')?'카드':e.classList.contains('is-user')?'손님':e.classList.contains('is-ai')?'AI: '+e.textContent.trim().slice(0,40):e.className));
+    r.buttons=await page.$$eval('.tk-cards:not(.is-past) .tk-next button',bs=>bs.map(b=>b.textContent.trim()));
+    r.cards=await page.$$eval('.tk-cards:not(.is-past) .tk-card',cards=>cards.map(card=>({
+      tag:card.querySelector('.pill')?.textContent.trim()||null,
+      name:card.querySelector('h4')?.textContent.trim()||null,
+      fit:card.querySelector('.tk-fit')?.innerText.replace(/\s+/g,' ').trim()||null,
+      part_photos:[],broken_images:[...card.querySelectorAll('img')].filter(i=>i.complete&&i.naturalWidth===0).length})));
+    // 최신 카드 묶음이 화면 위쪽에 오게 둔다(그 위 안내 말풍선도 보이게 조금 위에서).
+    await page.evaluate(()=>{const log=document.querySelector('#tk-log'),last=[...document.querySelectorAll('.tk-cards:not(.is-past)')].pop();
+      if(last&&log)log.scrollTop=Math.max(0,last.offsetTop-log.offsetTop-260);});
+    const pc=path.join(OUT,r.name+'-PC.png');
+    await page.screenshot({path:pc});r.shots.push(pc);
+    await page.setViewportSize({width:390,height:900});
+    await page.waitForTimeout(300);
+    const mobile=path.join(OUT,r.name+'-모바일.png');
+    await page.screenshot({path:mobile,fullPage:true});r.shots.push(mobile);
+    r.overflow_px=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
+  }catch(e){
+    r.errors.push('capture: '+e.message.split('\n')[0]);
+    const fail=path.join(OUT,r.name+'-실패.png');
+    await page.screenshot({path:fail,fullPage:true}).catch(()=>{});
+    if(fs.existsSync(fail))r.shots.push(fail);
+  }
+  await ctx.close();
+  return r;
 }
 
 async function capture(browser,c){
@@ -77,15 +122,22 @@ async function capture(browser,c){
 (async()=>{
   const browser=await chromium.launch();
   const results=[];
-  for(const c of CASES)results.push(await capture(browser,c));
+  for(const c of CASES){
+    if(PAGES.includes('index'))results.push(await capture(browser,c));
+    if(PAGES.includes('talk'))results.push(await captureTalk(browser,c));
+  }
   await browser.close();
   fs.writeFileSync(path.join(OUT,'summary.json'),JSON.stringify({base:BASE,taken_at:new Date().toISOString(),results},null,2));
   const lines=['### mvp3 화면 캡처 ('+BASE+')',''];
   for(const r of results){
     lines.push('**'+r.name+'** — 「'+r.text+'」');
     if(r.alert)lines.push('- 화면 오류 안내: '+r.alert.replace(/\s+/g,' '));
+    if(r.order)lines.push('- 대화 차례: '+r.order.join(' / '));
+    if(r.buttons)lines.push('- 카드 아래 단추: '+(r.buttons.join(' · ')||'없음'));
+    if(r.overflow_px)lines.push('- 가로 넘침 '+r.overflow_px+'px');
     for(const k of r.cards){
       const ok=k.part_photos.filter(p=>p.loaded).length;
+      if(k.fit!==undefined){lines.push('- '+(k.tag||'')+' · '+(k.fit||'작업 수준 없음')+' · '+(k.name||'')+(k.broken_images?' · 깨진 이미지 '+k.broken_images:''));continue;}
       lines.push('- '+(k.tag||'')+' · '+(k.name||'')+' · 대표 사진 '+(k.main_photo_text||k.main_photo||'없음')+' · 부품 사진 '+ok+'/'+k.part_photos.length+'장 표시'+(k.broken_images?' · 깨진 이미지 '+k.broken_images:''));
     }
     if(!r.cards.length&&!r.alert)lines.push('- 카드 없음');
