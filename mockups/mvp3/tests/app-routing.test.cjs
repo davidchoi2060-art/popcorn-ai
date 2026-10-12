@@ -149,3 +149,7 @@ test('the landing chat box hands its text to the talk screen through tab storage
   assert.equal(h.calls.length,0,'the landing screen itself sends nothing');
   h.errors.splice(0,h.errors.length,...h.errors.filter(m=>!/navigation/i.test(m)));
 });
+test('first question header hides once the customer has spoken (2026-10-12 owner report)',async()=>{
+  const h=harness(),intro=h.w.document.querySelector('#chat-body .chat-intro');assert.equal(intro.hidden,false);
+  await h.flow.submit('게임용 PC 추천해줘');await until(()=>h.flow.state.phase===null);assert.equal(intro.hidden,true);
+});
