@@ -125,6 +125,9 @@
     function begin(phase){cancel();controller=new AbortController();state.phase=phase;state.error=null;state.retry=null;emit();return {id:generation,signal:controller.signal};}
     function current(op){return op.id===generation&&!op.signal.aborted;}
     function message(text,who='ai',extra={}){if(typeof text==='string'&&text.trim())state.messages.push({text,who,...extra});}
+    // 상세 화면을 다녀오면 대화를 되살려 같은 견적을 다시 연다. 그때마다 같은 안내가 붙지 않게 바로 앞과 같은 말은 다시 넣지 않는다
+    // (2026-10-12 카드 검수 X3: 고객이 말하지 않았는데 「새로고침 전에 보던…」이 왕복마다 쌓였다).
+    function messageOnce(text){const last=state.messages[state.messages.length-1];if(!(last&&last.who==='ai'&&last.text===text))message(text);}
     function fail(error,retry){
       state.error={message:error?.message||'요청을 처리하지 못했어요.',status:error?.status||0,code:error?.code||'invalid_response',
         retryAfter:error?.retryAfter||0,retryAt:Date.now()+(error?.retryAfter||0)*1000};
@@ -148,7 +151,7 @@
       }
       emit();
     }
-    async function recommendFor(op,extra={}){
+    async function recommendFor(op,extra={},{notes=true}={}){
       state.phase='recommend';emit();
       const response=await api.recommend(state.talk,{signal:op.signal},{wants:state.wants,anchor_code:state.anchorCode,...extra});
       if(!current(op))return;
@@ -160,7 +163,9 @@
       // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
       state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
       // What the server could and could not do with the request, then the follow-up question.
-      for(const note of parsed.talkNotes){message(note);state.history.push({role:'assistant',text:note.slice(0,300)});}
+      // 되살린 대화를 다시 열 때(notes=false)는 같은 안내·다음 질문이 이미 대화에 있다 -- 다시 붙이지 않는다
+      // (2026-10-12 카드 검수 X3: 「더 싼 PC나 더 높은 사양도…」가 상세 왕복마다 1→3→5개로 쌓였다).
+      for(const note of notes?parsed.talkNotes:[]){message(note);state.history.push({role:'assistant',text:note.slice(0,300)});}
       state.history=state.history.slice(-6);
       if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
       state.screen='results';
@@ -261,7 +266,7 @@
       // 최신 조건 실패는 복원 뒤 「새 추천을 불러오지 못했어요」로 따로 알린다.
       let latest=null;
       try{
-        try{await recommendFor(op);}catch(error){if(!current(op))return;if(error?.name==='AbortError')throw error;latest=error;}
+        try{await recommendFor(op,{},{notes:false});}catch(error){if(!current(op))return;if(error?.name==='AbortError')throw error;latest=error;}
         if(!current(op))return;
         const wantWants=M.object(want.selection_wants)?want.selection_wants:null;
         let p=await findProduct(op,want.product_code,basis,{fresh:!!latest,wants:wantWants});
@@ -278,11 +283,11 @@
           // 다시 찾는다(코덱스 PR158 검수 v1 신규 후보).
           p={...p,swap_from:M.copy(want.swap_from)};
         }
-        if(!p){state.restoredCurrent=null;message('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
+        if(!p){state.restoredCurrent=null;messageOnce('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);
         if(!r||!current(op))return;
         state.selected=r.product;state.selectionState=M.copy(basis);state.selectionWants=wantWants&&M.copy(wantWants);state.selectedContext=null;state.screen='detail';
-        state.restoredCurrent=null;message('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
+        state.restoredCurrent=null;messageOnce('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
         if(latest)fail(latest,{kind:'recommend'});
       }catch(error){if(current(op))fail(error,{kind:'resume'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
