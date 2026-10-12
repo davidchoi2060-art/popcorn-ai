@@ -84,6 +84,11 @@
 (function () {
   var DASH = '—';
   var rows = null, filter = '', loadErr = '';
+  // 「운영 현황」 카드처럼 주소에 state= 가 오면 그 칩으로 연다(칩에 있는 값만 받는다).
+  (function () {
+    var v = new URLSearchParams(location.search).get('state');
+    if (v && document.querySelector('.mr-chip[data-filter="' + CSS.escape(v) + '"]')) filter = v;
+  })();
   var list = document.getElementById('mrList');
   var ACT_DONE = { hide: '후기를 숨겼습니다.', keep: '신고를 검토하고 게시를 유지했습니다.',
                    restore: '후기를 다시 게시했습니다.', cite_on: '견적 근거 인용으로 표시했습니다.',
