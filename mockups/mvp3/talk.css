@@ -20,6 +20,7 @@
 .tk-price{margin:0}.tk-price strong{font-size:20px}
 .tk-spec{margin:0;display:grid;gap:2px;font-size:14px}.tk-spec div{display:flex;gap:6px}.tk-spec dt{color:var(--muted);min-width:56px}.tk-spec dd{margin:0}
 .tk-reason{font-size:14px}
+.tk-fit{margin:2px 0 0;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:10px;background:var(--tint)}.tk-fit strong{font-size:19px;line-height:1.3;color:var(--green)}.tk-fit span{font-size:16px;font-weight:600;line-height:1.35}
 .tk-card-actions,.tk-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.tk-card-actions button,.tk-row button{font-size:14px;padding:8px 12px}
 .tk-chosen{font-size:14px;color:var(--green);align-self:center}
 .tk-status{color:var(--muted);font-size:14px;margin:4px 0}
