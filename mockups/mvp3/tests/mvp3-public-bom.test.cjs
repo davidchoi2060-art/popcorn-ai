@@ -58,7 +58,9 @@ test('pseudo and multiple SSD rows use ordinal keys and quantities without guess
   const f=fixture();f.parts.push(...[2,3].map(ordinal=>({...clone(f.parts[0]),ordinal,slot:'SSD',quantity:ordinal,name:'SSD'})));
   const html=render(f);assert.equal((html.match(/<tr data-part="bom-/g)||[]).length,5);
   assert.match(html,/data-detail="bom-2"/);assert.match(html,/data-detail="bom-3"/);assert.match(html,/수량 3/);assert.match(html,/서비스/);
-  assert.equal((html.match(/class="final-part-price">미확인/g)||[]).length,5);assert.match(html,/900,000원/);
+  // 2026-10-12: 고정 「미확인」 대신 부품 판매가. 값이 없는 줄은 「가격 확인 중」, 서비스 줄은 「조립·기타에 포함」.
+  assert.equal((html.match(/class="final-part-price">가격 확인 중/g)||[]).length,4);assert.equal((html.match(/class="final-part-price">조립·기타에 포함/g)||[]).length,1);
+  assert.doesNotMatch(html,/class="final-part-price">미확인/);assert.match(html,/900,000원/);assert.match(html,/가격 확인 중인 부품이 있어 계산하지 않았어요/);
   assert.doesNotMatch(html,/100원|fake\.png|<img[^>]+(?:merchant|photo)/);assert.match(html,/disabled aria-describedby="bom-unavailable-/);
 });
 test('missing spec values and parts without specs read 정보 없음 (2026-10-10 owner decision)',()=>{
@@ -106,7 +108,7 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
         const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);
         assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,3);
         const row=doc.querySelector('tr[data-part="bom-0"]');assert.ok(row.querySelector('h4').textContent.includes(slot));
-        assert.equal(row.querySelector('.final-part-price').textContent,'미확인');
+        assert.equal(row.querySelector('.final-part-price').textContent,'가격 확인 중');
         const details=row.querySelector('details');details.open=true;h.flow.emit();
         assert.equal(doc.querySelector('details[data-detail="bom-0"]').open,true);
         assert.match(doc.querySelector('.public-bom-role').textContent,slot==='CPU'?/프로그램의 명령/:/등록된 사양과 설명/);
@@ -119,3 +121,17 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
   });
 }
 module.exports={fixture,render};
+test('part sale prices show per line and the gap to the PC price is one 조립·기타 row (2026-10-12 owner decision)',()=>{
+  const f=fixture();f.parts[0].price=300000;f.parts[1].price=200000;f.parts.push({...clone(f.parts[0]),ordinal:2,slot:'SSD',quantity:2,name:'SSD',price:50000});
+  const out=M.publicConfiguration(f,99413);assert.deepEqual(out.parts.map(x=>x.price),[300000,200000,50000,null]);
+  const html=render(f);assert.match(html,/class="final-part-price">300,000원/);assert.match(html,/class="final-part-price">100,000원/);
+  assert.match(html,/class="final-part-price">조립·기타에 포함/);
+  // 900,000 - (300,000 + 200,000 + 50,000 x 2) = 300,000
+  assert.match(html,/<th scope="row">조립·기타<\/th><td colspan="2">300,000원 /);assert.doesNotMatch(html,/미확인/);
+});
+test('parts summing above the PC price show a signed 조립·기타; pseudo or bad prices are never shown',()=>{
+  const f=fixture();f.parts[0].price=600000;f.parts[1].price=400000;f.parts[2].price=5000;
+  const out=M.publicConfiguration(f,99413);assert.equal(out.parts[2].price,null);
+  assert.match(render(f),/<th scope="row">조립·기타<\/th><td colspan="2">-100,000원 /);
+  for(const bad of [0,-1,1.5,'300000',Number.MAX_SAFE_INTEGER+1]){const g=fixture();g.parts[0].price=bad;assert.equal(M.publicConfiguration(g,99413).parts[0].price,null);}
+});
