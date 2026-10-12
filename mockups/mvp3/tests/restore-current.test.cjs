@@ -209,3 +209,15 @@ test('selecting a card keeps the wants of that recommendation in the stored conv
   const rec=JSON.parse(ss.getItem(CONVERSATION_KEY));assert.deepEqual(rec.wants,{uhd:true,min_ram_gb:32});
   assert.deepEqual(rec.current.selection_wants,{uhd:true,min_ram_gb:32});
 });
+// 2026-10-12 카드 검수 X3: 상세↔대화를 오갈 때마다 고객이 말하지 않았는데 같은 다음 질문과 「새로고침 전에 보던…」 안내가 쌓였다.
+test('going back and forth between pages does not pile up the same follow-up question or notice',async()=>{
+  const ss=storage();const ask='더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요.';
+  ss.setItem(CONVERSATION_KEY,JSON.stringify({version:1,saved_at:Date.now(),talk,chat_flow:null,history:[],
+    messages:[{who:'user',text:'150만원 게임용'},{who:'ai',text:ask}],current:{product_code:101,changes:[]}}));
+  const api={recommend:async()=>({...reco,talk_notes:[ask],choices:[{id:'cheaper',label:'더 싼 PC',enabled:true}]})};
+  for(let trip=0;trip<3;trip++){const f=make(api,ss);f.reset({restore:true});await f.resume();assert.equal(f.state.selected.product_code,101);}
+  const texts=JSON.parse(ss.getItem(CONVERSATION_KEY)).messages.map(m=>m.text);
+  assert.equal(texts.filter(t=>t===ask).length,1);
+  assert.equal(texts.filter(t=>/새로고침 전에 보던/.test(t)).length,1);
+  assert.equal(texts.filter(t=>t==='150만원 게임용').length,1);
+});
