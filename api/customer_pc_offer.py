@@ -40,6 +40,7 @@ from PIL import Image, UnidentifiedImageError
 from sqlalchemy import text
 
 from .db import engine
+from .customer_bom_gaps import EVIDENCE_SQL as BOM_EVIDENCE_SQL
 from .customer_sold_offer_read import read_customer_sold_offer
 from .pc_publication_source_reader import make_source_reader
 from .product_images import MEDIA_BUCKET, read_image
@@ -142,10 +143,13 @@ def _public_offer(conn, product_code):
     # 공급처 표(product_supplier_prices · 유일한 공급처·가격 원천)에 지금 공급 가능한 행이 하나도 없으면 -- 행이 없거나
     # 전부 품절 -- 판매가가 무엇을 근거로 했는지 되짚을 수 없다. 그 줄은 null(「가격 확인 중」)이고 「조립·기타」도
     # 계산하지 않는다. 값을 고치는 것이 아니라 보여 줄지만 정한다.
+    # 공급처 표에 근거가 없어도 팝콘PC 공개 페이지에서 «판매중 · 같은 가격»으로 확인했거나 운영자가 직접 확인해 확정했으면
+    # (최근 EVIDENCE_DAYS 안 · 지금 판매가와 같을 때만) 근거로 본다(2026-10-12 사장님 「크롤링으로도 안 되면 운영자가」 --
+    # 순서와 기록 형식은 api/customer_bom_gaps 머리말).
     rows = list(conn.execute(text(
         "SELECT pp.ordinal, pp.explanation_code, p.sale_price,"
-        " EXISTS (SELECT 1 FROM product_supplier_prices sp WHERE sp.product_code = p.product_code"
-        " AND sp.supply_state = '가능') AS has_supply"
+        " (EXISTS (SELECT 1 FROM product_supplier_prices sp WHERE sp.product_code = p.product_code"
+        " AND sp.supply_state = '가능') OR " + BOM_EVIDENCE_SQL + ") AS has_supply"
         " FROM pc_configuration_parts pp"
         " LEFT JOIN product_explanations e ON e.source_product_code = pp.explanation_code"
         " LEFT JOIN products p ON p.product_code = e.product_code"

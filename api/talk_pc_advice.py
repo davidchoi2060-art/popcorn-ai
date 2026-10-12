@@ -437,6 +437,135 @@ def align_market_price(answer: str, prices: list[int]) -> str:
     return " ".join(out).strip()
 
 
+# ── 설명의 사양 숫자를 아래 카드에 맞춘다 (2026-10-12 코덱스 24조합 검수 2번) ─────────────────────
+# 고사양150 「파워 650W급 이상 유지」 아래 카드는 600W 두 장, 고사양200 「RTX 5070급·750W·QHD」 아래 카드는 5060/5060 Ti·
+# 600/650W·FHD 기준, 영상 「750W급 권장」 아래 카드는 700W 였다. 설명 AI 는 카드를 보지 못하고 먼저 답하므로(사장님 「시간끌지
+# 말고」 -- 두 번째 AI 호출은 두지 않는다) 카드가 정해진 뒤 서버가 «카드보다 높은 사양을 기본처럼 말한 문장»을 걷고,
+# 실제 카드 사양 한 문장을 붙인다. 「더 여유를 원하면」처럼 선택으로 말한 윗사양은 남긴다 -- 다만 파워는 «최소 안전 기준»처럼
+# 읽혀 카드가 위험해 보이므로 카드 최대치보다 크면 선택 문장이어도 걷는다.
+_WATT = re.compile(r"(?<!\d)(\d{3,4})\s*W(?![a-z])", re.I)
+_SSD_CLAIM = re.compile(r"SSD\D{0,12}?(\d+(?:\.\d+)?)\s*(GB|TB)", re.I)
+_RAM_CLAIM = re.compile(r"(?:램|RAM|(?<!그래픽 )(?<!그래픽)메모리)\D{0,8}?(\d{1,3})\s*GB", re.I)
+_GPU_CLAIM = re.compile(r"(RTX|GTX|RX)\s?(\d{3,4})\s?(Ti|TI|SUPER|XT)?", re.I)
+_RES_HIGH = re.compile(r"QHD|1440\s*p|4K|2160\s*p|UHD", re.I)
+_OPTIONAL = re.compile(r"더\s*여유|여유를\s*원|여유롭게\s*(?:쓰|원)|원하면|원하시면|원한다면|원할\s*때|선택하면|선택해도|선택이|올리면|올려도|올리는|고려|"
+                       r"한다면|하신다면|싶다면|싶으면|싶을\s*때|경우|위주라면|필요할\s*때|필요하면|늘면|늘리면")
+# 설명이 예로 드는 옛 세대 모델 -- 판매 카드 판독표(tools/product_fit.GPU_TABLE)에 없는 것만. 같은 척도(RTX 5060 = 100) 근사.
+_GPU_EXTRA = {"GTX 1650": 25, "GTX 1660": 35, "RTX 2060": 50, "RTX 3060": 65, "RTX 3060 TI": 80, "RTX 3070": 90,
+              "RTX 4060": 85, "RTX 4060 TI": 100, "RTX 4070": 135, "RTX 4070 SUPER": 150, "RTX 4070 TI": 165,
+              "RTX 4080": 210, "RTX 4090": 280, "RX 6600": 60, "RX 7700": 115, "RX 7800": 145, "RX 9060": 100}
+
+
+def _gpu_idx(name: str) -> int | None:
+    from tools.product_fit import find_gpu          # 카드 수준 판정과 같은 판독표
+    key = re.sub(r"\s+", " ", name.upper()).strip()
+    if key in _GPU_EXTRA:
+        return _GPU_EXTRA[key]
+    g = find_gpu(name)
+    return g["idx"] if g else None
+
+
+_BARE_WATT = re.compile(r"(?<![\d.])(\d{3,4})(?![\d.])")
+
+
+def _psu_watt(psu) -> int | None:
+    """파워 이름의 정격 출력. 「COOLMAX ELITE II 600W」 뿐 아니라 「MWE GOLD 750 V3」처럼 W 없이 적은 이름도 읽는다."""
+    if not isinstance(psu, str):
+        return None
+    m = _WATT.search(psu)
+    if m:
+        return int(m.group(1))
+    bare = [int(x) for x in _BARE_WATT.findall(psu) if 300 <= int(x) <= 2000]
+    return bare[0] if bare else None
+
+
+def _num(spec, key):
+    v = spec.get(key) if isinstance(spec, dict) else None
+    return v if type(v) in (int, float) and v > 0 else None
+
+
+def _storage(gb) -> str:
+    return f"{gb // 1000}TB" if gb >= 1000 and gb % 1000 == 0 else f"{gb}GB"
+
+
+def _range(vals, fmt) -> str:
+    """16GB · 16~32GB · 500GB~1TB -- 단위가 같으면 한 번만 적는다."""
+    lo, hi = fmt(min(vals)), fmt(max(vals))
+    if lo == hi:
+        return lo
+    unit = re.search(r"[A-Za-z]+$", lo)
+    if unit and hi.endswith(unit.group(0)):
+        lo = lo[:unit.start()]
+    return f"{lo}~{hi}"
+
+
+def card_spec_sentence(items: list[dict]) -> str:
+    """아래 카드의 실제 그래픽·램·SSD·파워 한 문장. 사양을 못 읽으면 ""."""
+    specs = [it.get("spec") for it in items or [] if isinstance(it.get("spec"), dict)]
+    gpus = list(dict.fromkeys(s["gpu"] for s in specs if isinstance(s.get("gpu"), str) and s["gpu"].strip()))
+    rams = [int(v) for s in specs if (v := _num(s, "ram_gb"))]
+    ssds = [int(v) for s in specs if (v := _num(s, "ssd_gb"))]
+    watts = [w for s in specs if (w := _psu_watt(s.get("psu")))]
+    parts = []
+    if gpus:
+        parts.append("그래픽 " + "·".join(gpus))
+    if rams:
+        parts.append("램 " + _range(rams, lambda v: f"{v}GB"))
+    if ssds:
+        parts.append("SSD " + _range(ssds, _storage))
+    if watts:
+        parts.append("파워 " + _range(watts, lambda v: f"{v}W"))
+    return ("아래 카드의 실제 구성은 " + ", ".join(parts) + "예요.") if parts else ""
+
+
+def _over_cards(s: str, top: dict, fhd_game: bool) -> str | None:
+    """문장이 카드보다 높은 사양을 말하는가 -> 걷는 사유. 아니면 None."""
+    optional = bool(_OPTIONAL.search(s))
+    if top["watt"] and any(int(m.group(1)) > top["watt"] for m in _WATT.finditer(s)):
+        return "card power"
+    if optional:
+        return None
+    # 「RTX 5070급·RX 9070급」처럼 예시를 나란히 들면 가장 낮은 것이 문장의 기준이다.
+    idx = [i for m in _GPU_CLAIM.finditer(s)
+           if (i := _gpu_idx(" ".join(x for x in m.groups() if x))) is not None]
+    if idx and top["gpu"] is not None and min(idx) > top["gpu"]:
+        return "card gpu"
+    if top["ssd"] and any(float(m.group(1)) * (1000 if m.group(2).upper() == "TB" else 1) > top["ssd"]
+                          for m in _SSD_CLAIM.finditer(s)):
+        return "card ssd"
+    if top["ram"] and any(int(m.group(1)) > top["ram"] for m in _RAM_CLAIM.finditer(s)):
+        return "card ram"
+    if fhd_game and _RES_HIGH.search(s):
+        return "card resolution"
+    return None
+
+
+def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> tuple[str, list[dict]]:
+    """설명에서 아래 카드보다 높은 사양을 기본처럼 말한 문장을 걷고 카드 사양 한 문장을 붙인다 -> (설명, 걷은 문장).
+
+    fhd_game = 게임 카드가 FHD 기준이다(해상도 미지정·1080p). 그때 QHD·4K 를 기본처럼 말한 문장도 걷는다.
+    카드가 없거나 사양을 못 읽으면 그대로 둔다."""
+    specs = [it.get("spec") for it in items or [] if isinstance(it.get("spec"), dict)]
+    if not answer or not specs:
+        return answer, []
+    gidx = [i for s in specs if isinstance(s.get("gpu"), str) and (i := _gpu_idx(s["gpu"])) is not None]
+    top = {"watt": max((w for s in specs if (w := _psu_watt(s.get("psu")))), default=None),
+           "gpu": max(gidx) if gidx else None,
+           "ssd": max((v for s in specs if (v := _num(s, "ssd_gb"))), default=None),
+           "ram": max((v for s in specs if (v := _num(s, "ram_gb"))), default=None)}
+    kept, dropped = [], []
+    for s in TF.split_sentences(answer):
+        why = _over_cards(s, top, fhd_game)
+        if why:
+            dropped.append({"before": s, "reason": why})
+        else:
+            kept.append(s)
+    line = card_spec_sentence(items)
+    if line and line not in kept:
+        kept.append(line)
+    return " ".join(kept).strip(), dropped
+
+
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
            timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD, games: list[str] | None = None,
            shop_notes: list[str] | None = None):

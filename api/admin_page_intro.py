@@ -50,6 +50,7 @@ INTRO: dict[str, dict] = {
     },
     "/admin2/categories-v2": {"short": "판매 분류 나무 관리"},
     "/admin2/part-explanations": {"short": "부품 설명 검토"},
+    "/admin2/customer-bom-gaps": {"short": "고객 화면 빈칸 · 운영자 확인"},
     "/admin2/pc-workspace": {"short": "제품별 할 일과 AI 제안"},
     "/admin2/pc-configurations": {"short": "조립PC 목록과 부품"},
     "/admin2/configuration-consultation": {"short": "추천 결과 미리 시험"},
