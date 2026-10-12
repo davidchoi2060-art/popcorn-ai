@@ -194,6 +194,20 @@ def main():
               f"{photo.get('state')} {'url 있음' if photo.get('url') else 'url 없음'} | "
               f"{'있음' if conf else '없음'} | {with_url}/{len(parts)} |")
     print()
+    # 부품별 판매가와 「조립·기타」(PC 금액 - 부품 합) -- 2026-10-12 상세 화면 부품 금액 점검.
+    for c in found:
+        parts = ((c.get('public_configuration') or {}).get('parts')) or []
+        real = [p for p in parts if isinstance(p, dict) and not p.get('pseudo')]
+        if not real:
+            continue
+        lines = [f"{p.get('slot')} {str(p.get('name'))[:30]} x{p.get('quantity')} = {p.get('price')}" for p in real]
+        missing = [p for p in real if not isinstance(p.get('price'), int)]
+        total = sum(p['price'] * p['quantity'] for p in real if p not in missing)
+        other = (c.get('price') - total) if not missing and isinstance(c.get('price'), int) else None
+        print(f"- 부품 금액 {c.get('product_code')}: PC {c.get('price')} / 부품 합 {total} / 조립·기타 {other} / 값 없음 {len(missing)}")
+        for line in lines:
+            print(f"  - {line}")
+    print()
     return 0 if found else 1
 
 
