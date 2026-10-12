@@ -404,14 +404,6 @@ BACK_LINKS: dict[str, dict] = {
         "entries": (("결제·정산 기록", "/admin2/payment-records"),),
         "crumb_on_hub": False,
     },
-    # 고객 화면 부품 정보 확인(2026-10-12 사장님 「크롤링으로도 안 되면 운영자가」). 부품 관리 화면에 들어가는 링크를 둔다.
-    "/admin2/part-explanations": {
-        "label": "부품 관리로 돌아가기",
-        "group": "부품 관리",
-        "from": ("/admin2/customer-bom-gaps",),
-        "entries": (("고객 화면 부품 정보 확인", "/admin2/customer-bom-gaps"),),
-        "crumb_on_hub": False,
-    },
 }
 
 

@@ -151,12 +151,12 @@ def test_customer_offer_uses_same_evidence():
 
 def test_permissions_and_navigation():
     from api.auth import required_role
-    from api.admin_page_intro import back_for
     assert required_role("GET", "/api/admin/customer-bom-gaps") == "viewer"
     assert required_role("POST", "/api/admin/customer-bom-gaps/check") == "operator"
     assert required_role("POST", "/api/admin/customer-bom-gaps/parts/1/confirm") == "operator"
-    assert "/admin2/customer-bom-gaps" in (ROOT / "api" / "admin_nav.py").read_text(encoding="utf-8")
-    assert back_for("/admin2/customer-bom-gaps")["href"] == "/admin2/part-explanations"
+    # 메뉴(admin_nav)는 따로 승인받아 바꾼다(test_admin_commerce_orders_page 가 고정) -- 부품 설명 관리 화면의 링크로 들어간다.
+    hub = (ROOT / "templates" / "admin" / "part_explanations.html.j2").read_text(encoding="utf-8")
+    assert '<a href="/admin2/customer-bom-gaps">고객 화면 부품 정보 확인</a>' in hub
 
 
 def test_screen_copy():
