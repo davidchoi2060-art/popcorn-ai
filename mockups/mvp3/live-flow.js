@@ -198,7 +198,9 @@
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
         state.history=state.history.slice(-6);
-        if(keep)return true;
+        // 「차이만 설명해 주세요 · 추천은 필요 없어요」면 설명으로 끝낸다 -- 추천 카드를 부르지 않고 보던 것도 그대로 둔다
+        // (2026-10-12 카드 검수 X2: 설명 뒤에 카드 3장이 나왔다).
+        if(keep||response.explain_only===true)return true;
         // 조건이 바뀌었으면 새로고침 전 견적은 더 이상 지금 조건의 견적이 아니다.
         // 대화 화면(keepCurrent)은 고를 때 조건을 함께 보관하므로 조건이 바뀌어도 그 견적을 버리지 않는다.
         if(!keepCurrent&&JSON.stringify(response.state)!==JSON.stringify(previousTalk))state.restoredCurrent=null;

@@ -1642,6 +1642,8 @@ def parse_talk(body: ParseBody, request: Request):
         "exceptions": exceptions,
         # 참이면 화면이 「사람 상담 남기기」(구매 상담 신청, 주제 「기타」)를 띄운다.
         "handoff_offer": handoff_offer,
+        # 참이면 고객이 추천 없이 설명만 바랐다(「차이만 설명해 주세요」) -- 화면은 추천 카드를 부르지 않는다.
+        "explain_only": TR.explain_only(text),
         # "ai_unreadable" 이면 AI 응답을 못 읽은 턴이다 -- state 는 이전 그대로이고,
         # 화면은 추천을 다시 부르지 않는다.
         "fallback": "ai_unreadable" if unreadable else None,
