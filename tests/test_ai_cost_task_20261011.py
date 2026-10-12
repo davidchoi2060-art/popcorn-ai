@@ -75,7 +75,10 @@ class CostLogInsert(unittest.TestCase):
             undo()
 
     def test_call_one_passes_task_key(self):
-        src = inspect.getsource(llm._call_one)
+        # 비용 기록은 _call_one · _call_one_tools 가 함께 쓰는 _log_cost 한 곳에 있다(2026-10-12 도구 상담).
+        self.assertIn("_log_cost(spec, used_model, task_key", inspect.getsource(llm._call_one))
+        self.assertIn("_log_cost(spec, used_model, task_key", inspect.getsource(llm._call_one_tools))
+        src = inspect.getsource(llm._log_cost)
         self.assertIn('"tk": (task_key or None)', src)
         self.assertIn("_insert_cost_log(row)", src)
 

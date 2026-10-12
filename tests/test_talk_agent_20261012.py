@@ -1,0 +1,281 @@
+"""도구 상담 경로(/api/talk/chat) -- 2026-10-12 LLM 중심 상담 ② 단계. 개발 서버 전용 스위치.
+
+① llm.call_tools: 공급자와 무관한 대화 모양 -> 공급자별 번역, 캡·비용 기록·폴백은 call() 과 같은 길.
+② talk_tools: AI 가 고른 인자를 서버가 다시 검사하고, 상품은 이 턴에 보여 준 번호로만 가리킨다. 기록을 남기지 않는다.
+③ talk_agent: 턴 한도 · 같은 호출 재사용 · 카드는 사실 묶음에서만 · 묶음에 없는 금액과 약속 문장은 뺀다 · 실패는 실패로.
+AI 응답은 흉내 낸다(실제 공급자 호출 없음).
+"""
+import contextlib
+import json
+import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
+
+from fastapi import HTTPException
+
+from api import llm, talk_agent as AG, talk_tools as TT
+from api.talk_schema import Vocab
+
+
+class _Conn:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
+
+
+class _Engine:
+    def connect(self):
+        return _Conn()
+
+
+# ── ① llm.call_tools ──────────────────────────────────────────────────────
+CONVO = [
+    {"role": "user", "text": "게임용 PC 150만원"},
+    {"role": "assistant", "text": "찾아볼게요.", "tool_calls": [
+        {"id": "c1", "name": "find_pcs", "args": {"usages": ["게임"]}},
+        {"id": "c2", "name": "shop_policy", "args": {"topic": "os"}}]},
+    {"role": "tool", "id": "c1", "name": "find_pcs", "content": '{"status":"ok"}'},
+    {"role": "tool", "id": "c2", "name": "shop_policy", "content": '{"status":"ok"}'},
+]
+
+
+class Translate(unittest.TestCase):
+    def test_claude_groups_tool_results_in_one_user_message(self):
+        out = llm._claude_messages(CONVO)
+        self.assertEqual([m["role"] for m in out], ["user", "assistant", "user"])
+        self.assertEqual([b["type"] for b in out[1]["content"]], ["text", "tool_use", "tool_use"])
+        self.assertEqual([b["tool_use_id"] for b in out[2]["content"]], ["c1", "c2"])
+
+    def test_openai_function_call_items(self):
+        out = llm._openai_input(CONVO)
+        self.assertEqual(out[2]["type"], "function_call")
+        self.assertEqual(json.loads(out[2]["arguments"]), {"usages": ["게임"]})
+        self.assertEqual([o.get("type") for o in out[-2:]], ["function_call_output"] * 2)
+
+    def test_same_provider_raw_is_replayed(self):
+        convo = [CONVO[0], dict(CONVO[1], raw={"codex": [{"type": "reasoning", "id": "r1"}]})]
+        self.assertEqual(llm._openai_input(convo)[1], {"type": "reasoning", "id": "r1"})
+        # 다른 공급자로 넘어가면 원형이 아니라 번역본을 쓴다
+        self.assertEqual(llm._claude_messages(convo)[1]["content"][1]["type"], "tool_use")
+
+    def test_broken_arguments_are_marked(self):
+        self.assertIn("__invalid__", llm._parse_args("{not json"))
+        self.assertIn("__invalid__", llm._parse_args("[1,2]"))
+        self.assertEqual(llm._parse_args('{"a":1}'), {"a": 1})
+
+
+class CallTools(unittest.TestCase):
+    def _run(self, callers):
+        logged = []
+        with patch.object(llm, "_TOOL_CALLERS", callers), \
+                patch.object(llm, "_check_caps", lambda *a, **k: None), \
+                patch.object(llm, "engine", _Engine()), \
+                patch.object(llm, "_insert_cost_log", lambda row: logged.append(row) or 7), \
+                patch.dict("os.environ", {"ANTHROPIC_API_KEY": "x", "OPENAI_API_KEY": "x", llm.REROUTE_ENV: "off"}):
+            r = llm.call_tools(CONVO[:1], [], task_key="task.talk_agent", provider="claude",
+                               fallback_order=["codex"])
+        return r, logged
+
+    def test_cost_logged_with_task_key(self):
+        ok = lambda *a: ("답", [], [], 100, 20, 30, "end_turn")  # noqa: E731
+        r, logged = self._run({"claude": ok, "codex": ok})
+        self.assertEqual((r.provider, r.text, r.log_id, r.cached_in), ("claude", "답", 7, 30))
+        self.assertEqual(logged[0]["tk"], "task.talk_agent")
+
+    def test_transient_failure_falls_back_to_other_provider(self):
+        def down(*a):
+            raise llm.LLMProviderError("529", transient=True)
+        ok = lambda *a: ("", [{"id": "x", "name": "find_pcs", "args": {}}], [], 1, 1, None, "completed")  # noqa: E731
+        r, _ = self._run({"claude": down, "codex": ok})
+        self.assertEqual(r.provider, "codex")
+        self.assertEqual(r.tool_calls[0]["name"], "find_pcs")
+
+    def test_empty_answer_is_an_error_not_success(self):
+        empty = lambda *a: ("", [], [], 1, 1, None, "end_turn")  # noqa: E731
+        with self.assertRaises(llm.LLMError):
+            self._run({"claude": empty, "codex": empty})
+
+
+# ── ② talk_tools ──────────────────────────────────────────────────────────
+ITEM = {"product_code": 1001, "name": "게임 PC A", "price": 1_498_000, "spec": {"gpu": "RTX 5060", "ram_gb": 16},
+        "level": "상", "over_budget": False, "reasons": ["게임 상"], "mall_url": "https://x/1001"}
+
+
+def _reco(**over):
+    base = {"card_sets": [{"usage": "게임", "items": [ITEM]}], "needs": [], "assumed": [], "dropped": [],
+            "talk_notes": [], "budget_won": 1_500_000, "budget_bound": "이하", "game_grade": "B",
+            "game_resolution": "1080p", "platform": "인텔", "anchor_code": 1001}
+    base.update(over)
+    return base
+
+
+class Tools(unittest.TestCase):
+    def test_find_pcs_never_sends_grade_so_nothing_is_recorded(self):
+        from api import grid_public as GP
+        seen = {}
+        def fake(body):
+            seen["state"] = body.state
+            return _reco()
+        with patch.object(GP, "recommend", fake):
+            book = TT.FactBook()
+            r = TT.find_pcs({"usages": ["게임"], "games": ["발로란트"], "budget_won": 1_500_000,
+                             "grade": "A", "grade_src": "ai_estimate"}, book)
+        self.assertEqual(seen["state"]["game"], {"names": ["발로란트"], "resolution": None})
+        self.assertEqual(r["status"], "ok")
+        self.assertEqual(r["sets"][0]["items"][0]["ref"], "P1")
+        self.assertIn(1_498_000, book.prices)
+        self.assertEqual(book.condition["game_grade"], "B")
+
+    def test_find_pcs_reports_needs_and_empty_separately(self):
+        from api import grid_public as GP
+        with patch.object(GP, "recommend", lambda b: _reco(card_sets=[], needs=["game.grade"])):
+            self.assertEqual(TT.find_pcs({"usages": ["게임"]}, TT.FactBook())["status"], "needs")
+        with patch.object(GP, "recommend", lambda b: _reco(card_sets=[{"usage": "게임", "items": []}])):
+            self.assertEqual(TT.find_pcs({"usages": ["게임"]}, TT.FactBook())["status"], "empty")
+
+    def test_bad_arguments_are_refused(self):
+        b = TT.FactBook()
+        self.assertEqual(TT.find_pcs({"usages": "게임"}, b)["status"], "invalid")
+        self.assertEqual(TT.find_pcs({"usages": ["게임"], "budget_won": True}, b)["status"], "invalid")
+        self.assertEqual(TT.find_pcs({"usages": ["게임"], "nav": "cheaper"}, b)["status"], "invalid")
+
+    def test_products_only_by_refs_shown_this_turn(self):
+        b = TT.FactBook()
+        self.assertEqual(TT.pc_detail({"ref": "P1"}, b)["status"], "invalid")
+        self.assertEqual(TT.show_pcs({"refs": ["P9"]}, b)["status"], "invalid")
+        ref = b.add_item(dict(ITEM))
+        self.assertEqual(b.add_item(dict(ITEM)), ref)          # 같은 상품은 같은 번호
+        self.assertEqual(TT.show_pcs({"refs": [ref, ref]}, b), {"status": "ok", "shown": [ref]})
+        ref2 = b.add_item(dict(ITEM, product_code=1002))
+        self.assertEqual(TT.show_pcs({"refs": [ref2, ref]}, b)["shown"], [ref, ref2])   # 엔진 순서
+
+    def test_pc_detail_unknown_price_stays_null(self):
+        from api import customer_pc_offer as OFFER
+        b = TT.FactBook()
+        ref = b.add_item(dict(ITEM))
+        cfg = {"configuration_id": 9, "revision": 2, "parts": [{"name": "RTX 5060", "price": None},
+                                                             {"name": "DDR5 16GB", "price": 85_000}]}
+        with patch.object(OFFER, "public_item", lambda code: {"public_configuration": cfg}):
+            r = TT.pc_detail({"ref": ref}, b)
+        self.assertEqual([p["price_state"] for p in r["parts"]], ["확인 중", "확인됨"])
+        self.assertIn(85_000, b.prices)
+        with patch.object(OFFER, "public_item", lambda code: {"public_configuration": None}):
+            self.assertEqual(TT.pc_detail({"ref": ref}, b)["status"], "unknown")
+
+    def test_tool_exception_is_not_leaked(self):
+        b = TT.FactBook()
+        with patch.dict(TT.EXECUTORS, {"find_pcs": lambda a, bk: 1 / 0}):
+            r = TT.run("find_pcs", {"usages": ["게임"]}, b)
+        self.assertEqual(r["status"], "error")
+        self.assertNotIn("ZeroDivision", json.dumps(r, ensure_ascii=False))
+        self.assertEqual(TT.run("drop_table", {}, b)["status"], "invalid")
+        self.assertEqual(TT.run("find_pcs", {"__invalid__": "x"}, b)["status"], "invalid")
+
+    def test_encode_truncates_lists_not_json(self):
+        big = {"status": "ok", "sets": [{"x": "가" * 3000}] * 5}
+        out = json.loads(TT.encode(big))
+        self.assertTrue(out["truncated"])
+
+
+# ── ③ talk_agent ──────────────────────────────────────────────────────────
+VOCAB = Vocab(usages=[("게임", []), ("사무·인강", [])])
+
+
+def _turn(text="", calls=(), cost=0.001):
+    return llm.ToolTurn(provider="codex", model="gpt-5.6-luna", text=text, tool_calls=list(calls), raw={},
+                        tokens_in=100, tokens_out=20, cached_in=0, cost_usd=cost, elapsed_sec=0.1,
+                        log_id=1, cost_logged=True, stop="completed")
+
+
+class Agent(unittest.TestCase):
+    def _run(self, script, text="게임용 PC 150만원 이하로 추천해줘", history=(), reco=None):
+        from api import grid_public as GP
+        sent = []
+        def fake_call(msgs, tools, **kw):
+            sent.append(([dict(m) for m in msgs], [t["name"] for t in tools]))
+            step = script.pop(0)
+            if isinstance(step, Exception):
+                raise step
+            return step
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", fake_call), \
+                patch.object(GP, "recommend", lambda b: reco or _reco()):
+            out = AG.run_turn(text, [AG.Turn(**h) for h in history])
+        return out, sent
+
+    def test_recommend_flow_cards_come_from_server_facts(self):
+        out, sent = self._run([
+            _turn(calls=[{"id": "a", "name": "find_pcs", "args": {"usages": ["게임"], "budget_won": 1_500_000}}]),
+            _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+            _turn("150만원 이하로는 게임 PC A가 맞아요. 판매가는 1,498,000원이에요. 비슷한 PC가 120만원에도 있어요."),
+        ])
+        self.assertEqual(out["status"], "ok")
+        self.assertEqual([c["product_code"] for c in out["cards"]], [1001])
+        self.assertEqual(out["cards"][0]["price"], 1_498_000)          # 서버 값
+        self.assertIn("1,498,000원", out["reply"])
+        self.assertNotIn("120만원", out["reply"])                      # 묶음에 없는 금액 -> 문장째 뺀다
+        self.assertEqual(out["dropped_sentences"][0]["reason"], "price_not_in_snapshot")
+        self.assertEqual(out["meta"]["rounds"], 3)
+        self.assertEqual(out["snapshot"]["condition"]["budget_won"], 1_500_000)
+        tool_msg = sent[1][0][-1]
+        self.assertEqual(tool_msg["role"], "tool")
+        self.assertEqual(json.loads(tool_msg["content"])["sets"][0]["items"][0]["ref"], "P1")
+
+    def test_explanation_only_needs_no_tools_and_no_cards(self):
+        out, sent = self._run([_turn("램은 여러 작업을 동시에 할 때, SSD는 저장과 로딩 속도에 영향을 줘요.")],
+                              text="램이랑 SSD 차이가 뭐예요?")
+        self.assertEqual((out["status"], out["cards"], out["meta"]["tool_calls"]), ("ok", [], 0))
+
+    def test_repeated_same_call_is_not_rerun_and_last_round_has_no_tools(self):
+        call = {"id": "a", "name": "find_pcs", "args": {"usages": ["게임"]}}
+        out, sent = self._run([_turn(calls=[call]), _turn(calls=[dict(call, id="b")]),
+                               _turn(calls=[dict(call, id="c")]), _turn("찾은 PC를 보여 드릴게요.")])
+        self.assertEqual(out["meta"]["tool_calls"], 1)
+        self.assertEqual(sent[-1][1], [])                 # 마지막 왕복은 도구 없이
+        self.assertEqual(out["meta"]["rounds"], AG.MAX_ROUNDS)
+
+    def test_llm_failure_is_reported_as_failure(self):
+        out, _ = self._run([llm.LLMProviderError("down", transient=True)])
+        self.assertEqual((out["ok"], out["status"], out["cards"]), (False, "failed", []))
+        self.assertEqual(out["reply"], AG.TE.REPLY_AI_UNREADABLE)
+
+    def test_self_harm_is_answered_without_ai(self):
+        out, sent = self._run([], text="요즘 너무 힘들어서 죽고 싶어요")
+        self.assertEqual((out["status"], out["kind"], sent), ("fixed", "self_harm", []))
+
+    def test_personal_numbers_are_masked_before_ai(self):
+        out, sent = self._run([_turn("네, 용도를 알려 주세요.")],
+                              text="카드 1234-5678-1234-5678 로 사도 돼요? 연락은 010-1234-5678, a.b@ex.com",
+                              history=[{"role": "assistant", "text": "안녕하세요"},
+                                       {"role": "user", "text": "주민 900101-1234567"}])
+        joined = json.dumps(sent[0][0], ensure_ascii=False)
+        self.assertNotIn("1234-5678", joined)
+        self.assertNotIn("1234567", joined)
+        self.assertNotIn("010-1234", joined)
+        self.assertNotIn("a.b@ex.com", joined)
+        self.assertEqual(sent[0][0][0]["role"], "user")           # 앞쪽 상담원 말은 버린다
+        self.assertTrue(out["notes"])
+
+    def test_promise_sentences_are_dropped(self):
+        out, _ = self._run([_turn("윈도우는 저희가 깔아 드릴게요. 설치 여부는 상품 페이지에서 확인해 주세요.")],
+                           text="윈도우 깔려서 와요?")
+        self.assertNotIn("깔아 드릴게요", out["reply"])
+
+    def test_found_but_not_selected_shows_no_cards(self):
+        out, _ = self._run([
+            _turn(calls=[{"id": "a", "name": "find_pcs", "args": {"usages": ["게임"]}}]),
+            _turn("게임용이면 그래픽카드가 가장 중요해요."),
+        ])
+        self.assertEqual(out["cards"], [])
+
+    def test_switch_off_is_404(self):
+        with patch.dict("os.environ", {AG.FLAG_ENV: ""}):
+            with self.assertRaises(HTTPException) as e:
+                AG.chat(AG.ChatBody(text="안녕"), SimpleNamespace())
+        self.assertEqual(e.exception.status_code, 404)
+
+
+if __name__ == "__main__":
+    unittest.main()
