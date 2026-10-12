@@ -55,7 +55,7 @@ async function runJob(browser,job){
     const s=await snap();const i=s.map(x=>x.kind).lastIndexOf('user');const after=s.slice(i+1);
     const ai=after.filter(x=>x.kind==='ai').map(x=>x.text);const ci=after.findIndex(x=>x.kind==='cards'&&!x.past);
     const cards=ci>=0?await cardInfo():[];
-    const t={turn:n,sent:String(sent).slice(0,300),ms,ai,questions:ai.join(' ').split(/[?？]/).length-1,cards,cardsEmptyText:ci>=0&&!cards.length?after[ci].text:null,aiAbove:ci>=0?after.slice(0,ci).some(x=>x.kind==='ai'):null,aiBelow:ci>=0&&after.slice(ci+1).some(x=>x.kind==='ai'),aiBelowText:ci>=0?after.slice(ci+1).filter(x=>x.kind==='ai').map(x=>x.text.slice(0,200)):[],error:after.filter(x=>/is-error/.test(x.kind)).map(x=>x.text),userHtml:s[i]?.html};
+    const t={turn:n,sent:String(sent).slice(0,300),ms,ai,questions:ai.join(' ').split(/[?？]/).length-1,cards,cardsEmptyText:ci>=0&&!cards.length?after[ci].text:null,aiAbove:ci>=0?after.slice(0,ci).some(x=>x.kind==='ai'):null,aiBelow:ci>=0&&after.slice(ci+1).some(x=>x.kind==='ai'),aiBelowText:ci>=0?after.slice(ci+1).filter(x=>x.kind==='ai').map(x=>x.text.slice(0,200)):[],error:after.filter(x=>/is-error/.test(x.kind)).map(x=>x.text),userHtml:s[i]?.html,cardLists:after.filter(x=>x.kind==='cards'&&!x.past).length,side:await page.evaluate(()=>{const b=[...document.querySelectorAll('#tk-now-body button, #tk-now-body a')].map(e=>e.innerText.trim()).filter(Boolean);const c={};b.forEach(x=>c[x]=(c[x]||0)+1);return Object.entries(c).filter(([k,v])=>v>1).map(([k,v])=>k+' x'+v);}).catch(()=>[])};
     turns.push(t);return t;
   }
   async function talkSend(text){const t0=Date.now();await page.fill('#tk-input',text);await page.press('#tk-input','Enter');await talkIdle().catch(()=>{});return Date.now()-t0;}
@@ -63,7 +63,13 @@ async function runJob(browser,job){
     const bad=[];if(t.error.length)bad.push('오류 '+t.error.join(' / ').slice(0,150));
     const all=t.ai.join(' ');if(/정리하지 못했어요/.test(all))bad.push('「정리하지 못했어요」');
     if(/(배틀그라운드|배그|리그 오브 레전드|롤|발로란트)[^.]{0,30}확인된 자료가 없/.test(all))bad.push('유명 게임 「확인된 자료가 없어」');
-    if(t.questions>1)bad.push('되묻기 '+t.questions+'개');if(t.ms&&t.ms>60000)bad.push(Math.round(t.ms/1000)+'초');
+    if(t.questions>1)bad.push('되묻기 '+t.questions+'개');
+    // 사장님 테스트 2026-10-12: 「모니터가 4대」를 여러 대 구매로 읽었고, 카드·옆 칸 단추가 겹쳐 그려졌다.
+    if(!/(\d+|여러|두|세|네|다섯)\s*대\s*(를|정도)?\s*(구매|사|살|주문|견적)/.test(t.sent)&&/여러 대|대량|수량|\d+\s*대\s*(구매|주문|견적)|대 구매/.test(all))bad.push('숫자를 구매 대수로 읽음 「'+(all.match(/[^.]{0,40}(여러 대|대량|수량|대 구매|\d+\s*대\s*(구매|주문|견적))[^.]{0,30}/)||[''])[0]+'」');
+    if(t.cardLists>1)bad.push('카드 묶음이 '+t.cardLists+'번 그려짐');
+    const names=t.cards.map(x=>x.name+'|'+x.price);const dupN=names.filter((x,i)=>names.indexOf(x)!==i);if(dupN.length)bad.push('같은 카드 중복 '+dupN.length+'장');
+    if(t.side&&t.side.length)bad.push('옆 칸 단추 중복 '+t.side.join(', '));
+    if(t.ms&&t.ms>60000)bad.push(Math.round(t.ms/1000)+'초');
     row(label,!bad.length&&t.ai.length>0,'AI 답 '+t.ai.length+'개 · 되묻기 '+t.questions+'개 · 카드 '+t.cards.length+'장'+(t.ms?' · '+Math.round(t.ms/1000)+'초':'')+' · 첫 답 「'+(t.ai[0]||'').replace(/\s+/g,' ').slice(0,160)+'」'+(bad.length?' ‖ 문제: '+bad.join('; '):''),sh);
   }
   function judgeCards(t){
@@ -80,6 +86,10 @@ async function runJob(browser,job){
       if(sc.kind==='office'&&/고사양 게임|게임 QHD|게임 FHD/.test(why))iss.push('카드'+(i+1)+' 사무용인데 게임 이유');
       if(x.spec.join(' ').includes('정보 없음'))iss.push('카드'+(i+1)+' 「정보 없음」');
     });
+    if(sc.monitors&&c.length){
+      c.forEach((x,i)=>{const g=x.spec.find(s=>/그래픽|GPU|VGA/i.test(s))||'';if(/내장|UHD|Iris|Radeon Graphics|없음/i.test(g)||!g)iss.push('카드'+(i+1)+' 모니터 '+sc.monitors+'대인데 내장 그래픽 「'+(g||'줄 없음')+'」');});
+      if(!new RegExp('출력|단자|포트|모니터 ?'+sc.monitors+'|'+sc.monitors+' ?대').test(t.ai.join(' ')+' '+c.map(x=>x.fit||'').join(' ')))iss.push('모니터 '+sc.monitors+'대 출력 단자 설명 없음');
+    }
     if(need&&/사무/.test(firstGroup||''))iss.push('첫 묶음이 사무용 「'+firstGroup+'」');
     if(sc.budget&&c.length){const ins=c.filter(x=>x.group===firstGroup).map(x=>won(x.price)).filter(p=>p&&p<=sc.budget*10000);const first=won(c[0].price);if(ins.length&&first>sc.budget*10000)iss.push('예산 안 카드가 있는데 첫 카드가 예산 초과');}
     return iss;

@@ -8,7 +8,7 @@ permissions:
 jobs:
   dbg:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y fonts-noto-cjk >/dev/null 2>&1 || true
       - env:
           OUT: ${{ runner.temp }}/out
-        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node qa-journey/dbg.cjs
+        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" SCEN=E29,E29@m node qa-journey/run.cjs
       - name: 결과 올리기
         if: always()
         env:
