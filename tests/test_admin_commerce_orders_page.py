@@ -275,15 +275,18 @@ class CommerceOrdersPageTests(unittest.TestCase):
         tree = source_tree(NAV)
         fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'new_admin_nav')
         assignment = next(n for n in fn.body if isinstance(n, ast.Assign))
-        approved = next(n for n in assignment.value.elts if ast.literal_eval(n)[1] == '/admin2/commerce-orders')
-        assignment.value.elts.remove(approved)
+        # 나중에 승인되어 들어온 항목은 빼고 «원래 항목»의 동작이 그대로인지 본다:
+        # 주문 운영(2026-10-11) · 운영 현황(2026-10-12 사장님 확정, 신 관리자 첫 화면).
+        added = ('/admin2/commerce-orders', '/admin2/')
+        for approved in [n for n in assignment.value.elts if ast.literal_eval(n)[1] in added]:
+            assignment.value.elts.remove(approved)
         env = exec_selected(tree, NAV, {})
         old = env['new_admin_nav']; current = navigation()['new_admin_nav']
         # Execute the original function for every existing accepted alias, not a copied expected map.
         for _, _, _, paths in ast.literal_eval(assignment.value):
             for path in paths:
                 with self.subTest(path=path):
-                    self.assertEqual([i for i in current(path) if i['href'] != '/admin2/commerce-orders'], old(path))
+                    self.assertEqual([i for i in current(path) if i['href'] not in added], old(path))
         digest = hashlib.sha256(ast.dump(tree, include_attributes=False).encode()).hexdigest()
         self.assertEqual(digest, NAV_BASELINE_AST_SHA)
     def test_discovery_actual_function_finds_new_page_and_skips_main_private_helper(self):

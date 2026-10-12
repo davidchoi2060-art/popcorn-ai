@@ -54,6 +54,10 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     # 신 관리자 모드는 자기 제목·메뉴를 쓰므로 그리지 않는다.
     ctx.setdefault("page_intro", None if ctx['new_admin'] else intro_for(request.url.path))
     # 카드로 들어온 화면의 「돌아가기」 줄 — 두 모드 공통(2026-10-11 사장님 신고).
+    # 「운영 현황」 카드로 들어온 목록이면 그 화면으로 돌아가는 줄을 먼저 단다(2026-10-12).
+    # 카드 링크에만 붙는 `from=overview` 를 보고 정한다 — 임의 return URL 은 받지 않는다.
+    if request.query_params.get('from') == 'overview' and request.url.path.rstrip('/') != '/admin2':
+        ctx.setdefault("back_link", {"href": "/admin2/", "label": "운영 현황으로 돌아가기"})
     ctx.setdefault("back_link", back_for(request.url.path))
     ctx.setdefault("entry_links", entries_for(request.url.path))
     # 신 관리자 헤더 경로는 신 메뉴 묶음 이름으로 맞춘다 — 「사용·성능 자료 › 현재 화면」.
@@ -96,6 +100,15 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
 #   커밋»이어야 한다.** 이쪽만 옮기면 구화면 `/admin/login.html`이 계속 열려 있어
 #   **로그인 화면이 둘 공존**한다(어느 쪽이 정본인지 아무도 모르게 된다).
 _LOGIN_PAGE = "/admin2/login"
+
+
+def admin_mode(request: Request) -> str:
+    """이 요청이 신(new)·구(legacy) 관리자 중 어느 쪽인가 — `render()` 와 같은 규칙
+    (주소의 `admin=` 가 쿠키보다 앞선다). render() 본문은 고정 검사(tests/test_admin_commerce_orders_page)
+    가 그대로 떼어 실행하므로 이 함수를 부르지 않고 같은 세 줄을 갖는다."""
+    choice = request.query_params.get('admin')
+    mode = choice if choice in ('new', 'legacy') else request.cookies.get('admin_ui_mode', 'legacy')
+    return 'new' if mode == 'new' else 'legacy'
 
 
 def login_required_html() -> str:

@@ -81,7 +81,8 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .admin_ui_common import render, login_required_html
+from .admin_ui_common import admin_mode, render, login_required_html
+from . import admin_home_overview
 from .admin_nav import NAV
 from .admin_dashboard import (
     dashboard as _dashboard_data,
@@ -400,6 +401,12 @@ def home(request: Request) -> HTMLResponse:
     op = resolve_session(request.cookies.get(COOKIE, ""))
     if op is None:
         return HTMLResponse(login_required_html(), status_code=401)
+
+    # 신 관리자 첫 화면 = 「운영 현황」(2026-10-12 사장님 확정). 구 관리자는 아래 1b 그대로.
+    if admin_mode(request) == "new":
+        return render(request, "admin/ops_overview.html.j2", screen_id="ADM-DASH-020",
+                      domain="dashboard", crumb_group="신 관리자", crumb_now="운영 현황",
+                      admin_mode="new", ov=admin_home_overview.build())
 
     dash, err_dash = _safe("오늘의 흐름 · 최근 활동", _dashboard_data)
     quality, err_quality = _safe("견적 품질 · 재고 정합", _quote_quality_data)

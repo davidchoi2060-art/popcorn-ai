@@ -585,6 +585,8 @@ def workspace_nav():
 def new_admin_nav(current_path=''):
     """One shared work menu for NEW; existing page/API implementations are reused."""
     groups = [
+        # 2026-10-12 사장님 확정 — 「운영 현황」(코덱스 대시보드 기획안 v1)이 신 관리자 첫 화면이다.
+        ('운영 현황', '/admin2/', 'pie-chart', ('/admin2',)),
         ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),

@@ -34,7 +34,7 @@ class MobileShellTemplateTests(unittest.TestCase):
         for new in [False,True]:
             d=dom(render(new));self.assertEqual(len(d.byid('roleBox')),1);self.assertEqual(len(d.byid('fixtureHeaderAction')),1);hub=d.links('/mvp1/index.html')[0];self.assertEqual(hub['target'],'_blank');self.assertEqual(hub['rel'],'noopener');self.assertEqual(hub['data-keep'],'1');profile=d.links('/admin2/my-profile')[0];self.assertNotIn('target',profile);self.assertNotIn('data-keep',profile);self.assertEqual(profile['aria-label'],'내 정보');self.assertEqual(d.byid('lnb')[0]['data-keep'],'1')
     def test_new_links_match_actual_navigation_and_active_state(self):
-        d=dom(render());expected=navigation(True,'/admin2/commerce-orders');self.assertEqual(len(expected),9)
+        d=dom(render());expected=navigation(True,'/admin2/commerce-orders');self.assertEqual(len(expected),10)
         for item in expected:
             a=d.links(item['href'])[0];self.assertEqual(a['title'],item['label']);self.assertEqual(a.get('aria-current')=='page',item['active'])
     def test_actual_orders_template_preserves_body_and_shared_assets(self):
