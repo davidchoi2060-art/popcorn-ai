@@ -1,0 +1,64 @@
+# 고객단 카드별 클릭 검수 일회용 — 이 브랜치 전용, main 에 병합하지 않는다.
+# 개발 서버 공개 고객 화면만 브라우저로 누른다. 비밀값·DB 접속 없음.
+name: 고객단 카드 검수 (일회용)
+on:
+  push:
+    branches: [ci/qa-cards-20261012]
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: [new_pc, upgrade, parts, chat, talk, root]
+        vp: [PC, 모바일]
+        exclude:
+          - entry: root
+            vp: 모바일
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: qa-cards
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright 설치
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: 검수
+        env:
+          ENTRY: ${{ matrix.entry }}
+          VP: ${{ matrix.vp }}
+          OUT: ${{ runner.temp }}/out
+        run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node qa-cards/run.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: out-${{ matrix.entry }}-${{ matrix.vp == 'PC' && 'pc' || 'mobile' }}
+          path: ${{ runner.temp }}/out
+  collect:
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/all
+          merge-multiple: true
+      - name: 결과를 전용 브랜치에 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cd "$RUNNER_TEMP/all"
+          git init -q -b r .
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "qa cards run ${GITHUB_RUN_ID}"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/qa-cards-20261012-results
