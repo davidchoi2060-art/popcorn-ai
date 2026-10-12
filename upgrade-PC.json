@@ -1,0 +1,293 @@
+{
+  "entry": "upgrade",
+  "viewport": "PC",
+  "persona": "영상 편집자",
+  "at": "2026-10-12T04:22:13.877Z",
+  "rows": [
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "처음 화면 열기",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "upgrade-PC-01-gateway.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "카드 누르기 → 대화 화면",
+      "ok": true,
+      "symptom": "대화 화면으로 이동 · 입력창 초안 「지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.」 · 상단 「PC 상담」",
+      "shot": "upgrade-PC-02-card-click.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "첫 턴 답변 (턴 1)",
+      "ok": true,
+      "symptom": "AI 답 있음 · 되묻기 0개 · 카드 1장 · 10초",
+      "shot": "upgrade-PC-03-turn1.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "되묻기 한 턴에 하나 이하",
+      "ok": true,
+      "symptom": "모든 턴 물음표 1개 이하",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "추천 카드 나옴",
+      "ok": true,
+      "symptom": "1장 · 다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070] 3,230,400원",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "AI 설명이 카드 위",
+      "ok": false,
+      "symptom": "카드 아래에도 AI 말풍선 있음",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "카드에 용도 보임",
+      "ok": true,
+      "symptom": "[용도 머리 없음] 꼬리표 「예산을 넘는 최저가」 · 이유 「영상편집 쾌적 — 4K 편집·색보정·효과」",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "카드에 작업 수준 보임",
+      "ok": true,
+      "symptom": "꼬리표 「예산을 넘는 최저가」 · 사양 4줄",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "카드에 예산 차이 보임",
+      "ok": true,
+      "symptom": "예산보다 2,230,400원 높아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "이 구성 선택 → 지금 견적",
+      "ok": true,
+      "symptom": "지금 견적 ·  · 지금 선택한 구성 · ",
+      "shot": "upgrade-PC-04-chosen.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "부품 바꾸기 → 상세 화면",
+      "ok": false,
+      "symptom": "주소 /mvp3/index.html#results · 「대화로 돌아가기」 보임 · 왼쪽 「어떤 PC를 찾으세요?」 보임",
+      "shot": "upgrade-PC-05-detail.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "부품 변경 단추",
+      "ok": false,
+      "symptom": "바꿀 수 있는 줄 없음 · ",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "「대화로 돌아가기」",
+      "ok": true,
+      "symptom": "대화 화면 복귀 · 내 말 1개 남음 · 지금 견적 금액 3,230,400원 → null · 「바꾼 부품」 표시 없음",
+      "shot": "upgrade-PC-06-back-to-talk.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "견적 저장",
+      "ok": false,
+      "symptom": "저장 단추 없음 또는 눌리지 않음 (없음)",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "쇼핑몰 이동",
+      "ok": false,
+      "symptom": "「쇼핑몰에서 구매 이어가기」 단추 없음(저장 뒤에만 나옴)",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "PC",
+      "step": "문의 접수",
+      "ok": true,
+      "symptom": "사람에게 문의하기 구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요. 신청 번호 PI-1012 · 주문과 결제는 진행되지 않았어요.",
+      "shot": "upgrade-PC-07-inquiry.png"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "지금 쓰는 PC에서 불편한 점을 상담하고 싶어요. 프리미어로 4K 편집하는데 지금 PC가 너무 느려요. i5-9400F, GTX1660, 램 16GB예요. 100만원 안에서 업그레이드하고 싶어요.",
+      "ms": 9683,
+      "ai": [
+        "프리미어 4K 편집이 느린 원인은 i5-9400F의 처리 성능과 GTX1660의 그래픽 메모리, 램 16GB, 저장장치 속도와 여유 공간이 함께 영향을 주는 경우가 많아요. 먼저 작업 파일과 프로그램이 설치된 저장장치가 SSD인지, 여유 공간이 충분한지 확인하고 램 사용량과 그래픽 메모리 부족 여부를 살펴보는 것이 좋아요. 4K 편집과 색보정·효과 작업은 램 32GB 이상, SSD 960GB 이상, 그래픽 메모리 12GB 이상인 외장 그래픽 구성이 기준이며, 다중 트랙·8K·RAW까지 다루면 램 64GB 이상과 SSD 1900GB 이상, 그래픽 메모리 16GB 이상을 고려해요. 부품을 바꾸기 전에는 메인보드의 CPU·램 호환 범위와 슬롯, 파워서플라이 용량과 보조전원, 케이스 내부 공간, 저장장치 연결 규격을 확인해 현재 PC에 바로 장착 가능한지 판단해야 해요.\n\n영상편집용은 프리미어·다빈치 FHD 컷편집 (유튜브) 기준으로 봤어요. 4K 편집이나 색보정까지 하시면 사양이 달라져요. 말씀하신 그래픽카드 GTX 1660 · 메모리 16GB 조건으로 판매 중인 PC를 골라 볼게요. 맞추지 못하는 조건은 추천 카드와 함께 알려 드려요. 말씀하신 CPU i5-9400 · 4K 해상도 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.",
+        "「램 16GB 이상」 조건에 맞는 PC만 골랐어요.",
+        "「그래픽카드 GTX 1660급 이상」 조건은 지금 못 맞춥니다. GTX 1660이(가) 든 판매 PC가 없어 비교 기준을 정하지 못했어요.",
+        "100만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 2,230,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": 1,
+      "cardsEmpty": null,
+      "aiAboveCards": true,
+      "aiBelowCards": true,
+      "error": [],
+      "cardDetail": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+          "group": null,
+          "price": "3,230,400원",
+          "gap": "예산보다 2,230,400원 높아요",
+          "spec": [
+            "CPU 코어 울트라7 265",
+            "GPU RTX 5070 · 12GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ],
+          "reason": "영상편집 쾌적 — 4K 편집·색보정·효과",
+          "photo": true
+        }
+      ]
+    }
+  ],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:21:06.584Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:07.277Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:07.960Z",
+      "method": "GET",
+      "url": "/api/customer/products/127317/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:10.111Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:10.741Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.372Z",
+      "method": "GET",
+      "url": "/api/product-images/109547/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.392Z",
+      "method": "GET",
+      "url": "/api/product-images/124852/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.396Z",
+      "method": "GET",
+      "url": "/api/product-images/110964/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.537Z",
+      "method": "GET",
+      "url": "/api/product-images/128462/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.547Z",
+      "method": "GET",
+      "url": "/api/product-images/113685/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.809Z",
+      "method": "GET",
+      "url": "/api/customer/products/98149/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.846Z",
+      "method": "GET",
+      "url": "/api/product-images/129250/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.882Z",
+      "method": "GET",
+      "url": "/api/product-images/123395/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:21:11.952Z",
+      "method": "GET",
+      "url": "/api/product-images/121242/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:22:13.457Z",
+      "method": "GET",
+      "url": "/api/mvp3/purchase-inquiries/form",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:22:13.758Z",
+      "method": "POST",
+      "url": "/api/mvp3/purchase-inquiries",
+      "status": 200
+    }
+  ],
+  "extra": {
+    "flowLabel": "PC 상담 · 쓰던 PC 업그레이드",
+    "detailAskVisible": true,
+    "oldLink": "index.html#results",
+    "pageErrors": []
+  }
+}
