@@ -97,6 +97,9 @@ ACTION_LABELS = {
     # kind="ai_task" (admin_ai_tasks.py) · kind="ai_integration" (admin_ai_integration.py)
     "ai_task_create": "AI 작업 배정 생성", "ai_task_delete": "AI 작업 배정 삭제",
     "ai_integration_limit_update": "AI 연동 한도 수정",
+    "ai_integration_limit_clear": "AI 연동 한도 해제",
+    # mall_price.py — 쇼핑몰 가격 반영 배치(파일 · 자동 갱신 · 장바구니 · 결제 이동)와 그 되돌림
+    "mall_price_apply": "쇼핑몰 가격 반영", "mall_price_undo": "쇼핑몰 가격 반영 되돌림",
     # kind="ops_assistant_faq" (admin_ops_assistant.py) — edit는 DB에 아직 0건이지만
     # 코드에 있는 액션이라 같은 화면의 add·delete와 함께 미리 채운다(조기 발견 취지와
     # 정확히 같은 이유로, 발생 전에 옮겨 둔다).

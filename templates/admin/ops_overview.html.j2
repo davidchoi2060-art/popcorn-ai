@@ -42,6 +42,7 @@ a.ov-card:focus-visible,.ov a:focus-visible,.ov summary:focus-visible{outline:2p
 .ov summary{cursor:pointer;padding:12px 14px;font:600 13.5px/1.3 var(--font)}
 .ov details .ov-grid{padding:0 12px 12px}
 .ov-tbl{width:100%;border-collapse:collapse;background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:9px;overflow:hidden;font-size:13px}
+.ov-tbl td:first-child{white-space:nowrap}
 .ov-tbl th{background:var(--rv-panel);text-align:left;font-size:12px;font-weight:600;padding:10px 12px;white-space:nowrap}
 .ov-tbl td{padding:11px 12px;border-top:1px solid var(--rv-panel2);vertical-align:top}
 .ov-tbl td.num{font-family:var(--font-num,monospace);font-weight:600;white-space:nowrap}
@@ -140,7 +141,7 @@ a.ov-card:focus-visible,.ov a:focus-visible,.ov summary:focus-visible{outline:2p
       <thead><tr><th>시각</th><th>업무</th><th>대상</th><th>처리 내용</th><th>담당자</th></tr></thead>
       <tbody>
       {% for l in ov.logs %}
-        <tr><td class="num">{{ l.at }}</td><td data-l="업무">{{ l.kind }}</td><td data-l="대상">{{ l.target }}</td><td data-l="처리">{{ l.action }}</td><td data-l="담당자">{{ l.operator }}</td></tr>
+        <tr><td class="num">{{ l.at }}</td><td data-l="업무">{{ l.kind }}</td><td data-l="대상">{{ l.target }}</td><td data-l="처리" title="{{ l.code }}">{{ l.action }}</td><td data-l="담당자">{{ l.operator }}</td></tr>
       {% endfor %}
       </tbody>
     </table>
