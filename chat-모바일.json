@@ -1,0 +1,408 @@
+{
+  "entry": "chat",
+  "viewport": "모바일",
+  "persona": "영상 편집자",
+  "at": "2026-10-12T04:15:20.276Z",
+  "rows": [
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "처음 화면 열기",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "chat-모바일-01-gateway.png"
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "채팅창에 쓰고 보내기 → 대화 화면",
+      "ok": true,
+      "symptom": "대화 화면으로 이동, 글이 자동으로 보내지는지 확인",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "첫 턴 답변 (턴 1)",
+      "ok": true,
+      "symptom": "AI 답 있음 · 되묻기 0개 · 카드 1장",
+      "shot": "chat-모바일-02-turn1.png"
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "되묻기 한 턴에 하나 이하",
+      "ok": true,
+      "symptom": "모든 턴 물음표 1개 이하",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "채팅창 글 자동 전송",
+      "ok": true,
+      "symptom": "보낸 글이 첫 메시지로 나가고 답이 옴",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "추천 카드 나옴",
+      "ok": true,
+      "symptom": "1장 · 다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070] 3,230,400원",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "AI 설명이 카드 위",
+      "ok": false,
+      "symptom": "카드 아래에도 AI 말풍선 있음",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 용도 보임",
+      "ok": true,
+      "symptom": "[용도 머리 없음] 꼬리표 「예산을 넘는 최저가」 · 이유 「영상편집 쾌적 — 4K 편집·색보정·효과」",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 작업 수준 보임",
+      "ok": true,
+      "symptom": "꼬리표 「예산을 넘는 최저가」 · 사양 4줄",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 예산 차이 보임",
+      "ok": true,
+      "symptom": "예산보다 730,400원 높아요",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "이 구성 선택 → 지금 견적",
+      "ok": true,
+      "symptom": "지금 견적 ·  · 지금 선택한 구성 · ",
+      "shot": "chat-모바일-03-chosen.png"
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 → 상세 화면",
+      "ok": false,
+      "symptom": "주소 /mvp3/index.html#results · 「대화로 돌아가기」 보임 · 왼쪽 「어떤 PC를 찾으세요?」 보임",
+      "shot": "chat-모바일-04-detail.png"
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "부품 변경 단추",
+      "ok": false,
+      "symptom": "바꿀 수 있는 줄 없음 · ",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "「대화로 돌아가기」",
+      "ok": true,
+      "symptom": "대화 화면 복귀 · 내 말 1개 남음 · 지금 견적 금액 3,230,400원 → null · 「바꾼 부품」 표시 없음",
+      "shot": "chat-모바일-05-back-to-talk.png"
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "견적 저장",
+      "ok": false,
+      "symptom": "저장 단추 없음 또는 눌리지 않음 (없음)",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "쇼핑몰 이동",
+      "ok": false,
+      "symptom": "「쇼핑몰에서 구매 이어가기」 단추 없음(저장 뒤에만 나옴)",
+      "shot": ""
+    },
+    {
+      "entry": "처음 화면 채팅창",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "문의 접수",
+      "ok": true,
+      "symptom": "사람에게 문의하기 구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요. 신청 번호 PI-1008 · 주문과 결제는 진행되지 않았어요.",
+      "shot": "chat-모바일-06-inquiry.png"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "프리미어로 4K 유튜브 영상을 편집해요. 예산은 250만원이에요.",
+      "ms": null,
+      "ai": [
+        "말씀하신 4K 해상도 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.",
+        "250만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 730,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": 1,
+      "cardsEmpty": null,
+      "aiAboveCards": true,
+      "aiBelowCards": true,
+      "error": [],
+      "cardDetail": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "name": "다이아 [인텔 15세대 애로우레이크][265/32G/1TB/RTX5070]",
+          "group": null,
+          "price": "3,230,400원",
+          "gap": "예산보다 730,400원 높아요",
+          "spec": [
+            "CPU 코어 울트라7 265",
+            "GPU RTX 5070 · 12GB",
+            "RAM 32GB",
+            "저장장치 1TB SSD"
+          ],
+          "reason": "영상편집 쾌적 — 4K 편집·색보정·효과",
+          "photo": true
+        }
+      ]
+    }
+  ],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:14:10.990Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:12.364Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:13.675Z",
+      "method": "GET",
+      "url": "/api/customer/products/127317/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:21.972Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:27.677Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.405Z",
+      "method": "GET",
+      "url": "/api/product-images/110964/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.578Z",
+      "method": "GET",
+      "url": "/api/product-images/109547/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.610Z",
+      "method": "GET",
+      "url": "/api/product-images/124852/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.799Z",
+      "method": "GET",
+      "url": "/api/product-images/128462/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.898Z",
+      "method": "GET",
+      "url": "/api/product-images/113685/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:29.179Z",
+      "method": "GET",
+      "url": "/api/product-images/121242/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:29.276Z",
+      "method": "GET",
+      "url": "/api/product-images/129250/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:29.296Z",
+      "method": "GET",
+      "url": "/api/product-images/123395/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:29.932Z",
+      "method": "GET",
+      "url": "/api/product-images/122516/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:29.975Z",
+      "method": "GET",
+      "url": "/api/product-images/127555/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.009Z",
+      "method": "GET",
+      "url": "/api/product-images/126853/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.074Z",
+      "method": "GET",
+      "url": "/api/customer/products/98149/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.228Z",
+      "method": "GET",
+      "url": "/api/product-images/119256/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.369Z",
+      "method": "GET",
+      "url": "/api/product-images/124765/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.480Z",
+      "method": "GET",
+      "url": "/api/product-images/123110/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.511Z",
+      "method": "GET",
+      "url": "/api/product-images/121652/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.538Z",
+      "method": "GET",
+      "url": "/api/product-images/113689/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.039Z",
+      "method": "GET",
+      "url": "/api/product-images/123795/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.041Z",
+      "method": "GET",
+      "url": "/api/product-images/127334/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.060Z",
+      "method": "GET",
+      "url": "/api/customer/products/127309/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.239Z",
+      "method": "GET",
+      "url": "/api/product-images/121807/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.390Z",
+      "method": "GET",
+      "url": "/api/product-images/128449/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.464Z",
+      "method": "GET",
+      "url": "/api/product-images/128119/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.465Z",
+      "method": "GET",
+      "url": "/api/product-images/123917/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.498Z",
+      "method": "GET",
+      "url": "/api/product-images/123939/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:31.684Z",
+      "method": "GET",
+      "url": "/api/product-images/127295/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:32.034Z",
+      "method": "GET",
+      "url": "/api/customer/products/129832/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:15:19.852Z",
+      "method": "GET",
+      "url": "/api/mvp3/purchase-inquiries/form",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:15:20.155Z",
+      "method": "POST",
+      "url": "/api/mvp3/purchase-inquiries",
+      "status": 200
+    }
+  ],
+  "extra": {
+    "flowLabel": "PC 상담 · 새 PC 찾기",
+    "detailAskVisible": true,
+    "oldLink": "index.html#results",
+    "pageErrors": []
+  }
+}

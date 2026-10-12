@@ -1,0 +1,357 @@
+{
+  "entry": "parts",
+  "viewport": "모바일",
+  "persona": "사무용 사장님",
+  "at": "2026-10-12T04:14:58.096Z",
+  "rows": [
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "처음 화면 열기",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "parts-모바일-01-gateway.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "카드 누르기 → 대화 화면",
+      "ok": true,
+      "symptom": "대화 화면으로 이동 · 입력창 초안 「PC 부품이나 구성에서 궁금한 점이 있어요.」 · 상단 「PC 상담」",
+      "shot": "parts-모바일-02-card-click.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "첫 턴 답변 (턴 1)",
+      "ok": true,
+      "symptom": "AI 답 있음 · 되묻기 1개 · 카드 3장 · 17초",
+      "shot": "parts-모바일-03-turn1.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "되묻기 한 턴에 하나 이하",
+      "ok": true,
+      "symptom": "모든 턴 물음표 1개 이하",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "추천 카드 나옴",
+      "ok": true,
+      "symptom": "3장 · 오피스 초슬림/미니타워[12100/8G/256GB/UHD 730] 595,700원 / 실버 [12400/8G/256GB/UHD 730] 668,900원 / 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "AI 설명이 카드 위",
+      "ok": false,
+      "symptom": "카드 아래에도 AI 말풍선 있음",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "카드에 용도 보임",
+      "ok": true,
+      "symptom": "[용도 머리 없음] 꼬리표 「알뜰 구성」 · 이유 「사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)」 / [용도 머리 없음] 꼬리표 「추천 구성」 · 이유 「사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)」 / [용도 머리 없음] 꼬리표 「더 높은 사양」 · 이유 「사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터」",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "카드에 작업 수준 보임",
+      "ok": true,
+      "symptom": "꼬리표 「알뜰 구성」 · 사양 4줄 / 꼬리표 「추천 구성」 · 사양 4줄 / 꼬리표 「더 높은 사양」 · 사양 4줄",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "카드에 예산 차이 보임",
+      "ok": true,
+      "symptom": "예산보다 204,300원 낮아요 / 예산보다 131,100원 낮아요 / 예산보다 92,800원 높아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "이 구성 선택 → 지금 견적",
+      "ok": true,
+      "symptom": "지금 견적 ·  · 지금 선택한 구성 · ",
+      "shot": "parts-모바일-04-chosen.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 → 상세 화면",
+      "ok": true,
+      "symptom": "주소 /mvp3/index.html#detail · 「대화로 돌아가기」 보임 · 왼쪽 「어떤 PC를 찾으세요?」 보임",
+      "shot": "parts-모바일-05-detail.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "「변경」 → 바꿀 부품 목록 (메모리 바꾸기)",
+      "ok": true,
+      "symptom": "후보 12개 · 안내 「닫기」",
+      "shot": "parts-모바일-06-build-options.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 결과: 바뀐 줄",
+      "ok": true,
+      "symptom": "메모리 AGI DDR4-3200 CL22 UD138 서린 (8GB) 수량 1 바꾼 부품 · 원래 부품: 삼성전자 DDR4-3200 (8GB) PC4-25600 상세 펼치기 -21,200원 변경",
+      "shot": "parts-모바일-07-build-picked.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 결과: 새 총액",
+      "ok": true,
+      "symptom": "하단 금액 595,700원 → 574,500원 · 표 아래 「기본 구성 금액 595,700원 부품 변경 -21,200원 바꾼 구성 금액 574,500원」",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 결과: 예산 차이",
+      "ok": true,
+      "symptom": "예산보다 225,500원 낮아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 결과: 확인 상태",
+      "ok": true,
+      "symptom": "미확인 / 미확인 / 미확인",
+      "shot": ""
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "「대화로 돌아가기」",
+      "ok": true,
+      "symptom": "대화 화면 복귀 · 내 말 1개 남음 · 지금 견적 금액 595,700원 → 572,200원 · 「바꾼 부품」 표시 있음",
+      "shot": "parts-모바일-08-back-to-talk.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "견적 저장",
+      "ok": true,
+      "symptom": "견적을 저장했어요.",
+      "shot": "parts-모바일-09-saved.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "쇼핑몰 이동",
+      "ok": true,
+      "symptom": "링크 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=113835 → 새 창 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=113835 · 제목 「프리미엄팝콘피씨=조립1위」",
+      "shot": "parts-모바일-mall.png"
+    },
+    {
+      "entry": "카드3 부품·구성 알아보기",
+      "persona": "사무용 사장님",
+      "viewport": "모바일",
+      "step": "문의 접수",
+      "ok": true,
+      "symptom": "사람에게 문의하기 구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요. 신청 번호 PI-1004 · 주문과 결제는 진행되지 않았어요.",
+      "shot": "parts-모바일-10-inquiry.png"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "PC 부품이나 구성에서 궁금한 점이 있어요. 사무용은 CPU i3랑 i5 차이가 큰가요? 엑셀이랑 문서 작업용으로 한 대 80만원 이하요.",
+      "ms": 16782,
+      "ai": [
+        "문서·웹 중심이면 i3급도 충분하지만, 엑셀 파일이 크거나 여러 창을 동시에 쓰면 i5급이 체감상 더 쾌적해요. 그래픽카드는 별도 그래픽카드가 없어도 되므로 아끼고, 램과 SSD를 우선하는 것이 다중 작업과 저장공간에 유리해요. 시중에서는 보통 60~80만원이며, 아주 큰 엑셀이나 탭 수십 개를 장기간 사용할 예정이면 램 16GB 이상을 유지하는 것이 좋아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n사무용은 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 기준으로 봤어요. 큰 엑셀 파일이나 모니터 두 대를 쓰시면 한 단계 위 구성이 맞아요. 말씀하신 CPU i3 조건은 아직 추천에 반영하지 못해요. 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": 3,
+      "cardsEmpty": null,
+      "aiAboveCards": true,
+      "aiBelowCards": true,
+      "error": [],
+      "cardDetail": [
+        {
+          "pill": "알뜰 구성",
+          "name": "오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]",
+          "group": null,
+          "price": "595,700원",
+          "gap": "예산보다 204,300원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ],
+          "reason": "사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "photo": true
+        },
+        {
+          "pill": "추천 구성",
+          "name": "실버 [12400/8G/256GB/UHD 730]",
+          "group": null,
+          "price": "668,900원",
+          "gap": "예산보다 131,100원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 8GB",
+            "저장장치 256GB SSD"
+          ],
+          "reason": "사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "photo": true
+        },
+        {
+          "pill": "더 높은 사양",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": null,
+          "price": "892,800원",
+          "gap": "예산보다 92,800원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ],
+          "reason": "사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "photo": true
+        }
+      ]
+    }
+  ],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:14:15.091Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:22.395Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:30.576Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:32.854Z",
+      "method": "GET",
+      "url": "/api/customer/products/113835/representative-image",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:33.739Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/options",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:36.264Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/quote",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:45.605Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:46.738Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/quote",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:47.687Z",
+      "method": "GET",
+      "url": "/api/mvp3/saved-quotes?limit=1",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:48.596Z",
+      "method": "GET",
+      "url": "/api/customer/products/113835/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:48.741Z",
+      "method": "GET",
+      "url": "/api/customer/products/113330/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:48.752Z",
+      "method": "GET",
+      "url": "/api/customer/products/113836/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:50.592Z",
+      "method": "POST",
+      "url": "/api/mvp3/saved-quotes",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.248Z",
+      "method": "POST",
+      "url": "/api/mvp3/saved-quotes/f8e9d5f2-2b16-422f-bdd0-d8a1e7bbb21b/handoff",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:57.439Z",
+      "method": "GET",
+      "url": "/api/mvp3/purchase-inquiries/form",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:57.752Z",
+      "method": "POST",
+      "url": "/api/mvp3/purchase-inquiries",
+      "status": 200
+    }
+  ],
+  "extra": {
+    "flowLabel": "PC 상담 · 부품·구성 물어보기",
+    "detailAskVisible": true,
+    "detailText": "이전 화면\n추천 구성 상세\n판매 중 PC · 조회 시점 참고 금액\n예산 800,000원 이하\n×\n사무용\n×\n슬림한 본체로 정리하는 문서·인터넷 작업 공간\n\n오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]\n\nCore i3-12100의 내장 그래픽을 사용하는 구성입니다. 별도 그래픽카드 없이 8GB 메모리와 256GB SSD를 담아 문서 작성·자료 검색·온라인 강의 같은 사용을 고려했습니다. 슬림 케이스를 사용하므로 놓을 자리와 연결할 기기를 함께 살펴보세요.\n\n574,500원\n\n부품 1개를 바꾼 금액이에요 · 기본 구성 대비 -21,200원\n\n예산보다 225,500원 낮아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음\n부품 구성과 선택 이유\nCPU\n[병행] 인텔 코어i3-12세대 12100 (엘더레이크) 벌크\n수량 1\n\n프로그램의 명령과 연산을 처리하는 중심 부품입니다.\n\n상세 사양 펼치기\n미확인\n변경\n그래픽카드\n정보 없음\n수량 1\n\n정보 없음\n\n상세 사양 펼치기\n미확인\n변경\n메모리\nAGI DDR4-3200 CL22 UD138 서린 (8GB)\n수량 1\n\n바꾼 부품 · 원래 부품: 삼성전자 DDR4-3200 (8GB) PC4-25600\n\n상세 펼치기\n-21,200원\n변경\n저장장치\n삼성전자 PM9A1 M.2 NVMe 벌크 (256GB)\n수량 1\n\n운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.\n\n상세 사양 펼치기\n미확인\n변경\n메인보드\nGIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]\n수량 1\n\nCPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.\n\n상세 사양 펼치기\n미확인\n변경\nCOOLER\n앱코 자이로스 95XF V2 1700 ONLY FRGB\n수량 1\n\nCPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.\n\n상세 사양 펼치기\n미확인\n변경\nPOWER\nAONE TFX-500P KC\n수량 1\n\n컴퓨터의 각 부품에 필요한 전력을 공급합니다.\n\n상세 사양 펼치기\n미확인\n변경\n케이스\nDAVEN N1 MESH (블랙)\n수량 1\n\n부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.\n\n상세 사양 펼치기\n미확인\n변경\n기본 구성 금액\n595,700원\n부품 변경\n-21,200원\n바꾼 구성 금액\n574,500원\n이 상품을 추천한 이유\n\n상담 조건: 사무용 · 예산 800,000원 이하\n\n사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)\n다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.\n다음 수준을 고려한다면 메모리 용량을 늘려 보세요.\n부품 바꾸기\n\n부품 구성 표의 「변경」을 누르면 이 PC에 맞는 판매 부품을 보여 드려요. 호환 규칙을 통과한 부품만 나오고, 금액은 PC 판매가에 부품 가격 차이를 더해 다시 계산해요.\n\n바꾼 부품 1개 · 기본 구성 595,700원에서 -21,200원\n\n원래 구성으로\n구매 전 확인할 내용\n호환성\n실제 조립 검수 결과는 확인되지 않았어요.\n가격\n10월 11일 기준 쇼핑몰 가격 · 구매할 때 확정\n재고\n재고 확보 전 · 구매 전 확인\n운영체제\n포함 여부 재확인 필요\n키보드 · 마우스 · 모니터\n포함 여부 미확인\n보증\n기간 · 범위 재확인 필요",
+    "oldLink": "index.html#detail",
+    "pageErrors": []
+  }
+}

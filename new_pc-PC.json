@@ -1,0 +1,343 @@
+{
+  "entry": "new_pc",
+  "viewport": "PC",
+  "persona": "게임용 학생",
+  "at": "2026-10-12T04:14:56.312Z",
+  "rows": [
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "처음 화면 열기",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "new_pc-PC-01-gateway.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "카드 누르기 → 대화 화면",
+      "ok": true,
+      "symptom": "대화 화면으로 이동 · 입력창 초안 「새 PC를 찾고 있어요.」 · 상단 「PC 상담」",
+      "shot": "new_pc-PC-02-card-click.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "첫 턴 답변 (턴 1)",
+      "ok": true,
+      "symptom": "AI 답 있음 · 되묻기 0개 · 카드 2장 · 15초",
+      "shot": "new_pc-PC-03-turn1.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "되묻기 한 턴에 하나 이하",
+      "ok": true,
+      "symptom": "모든 턴 물음표 1개 이하",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "추천 카드 나옴",
+      "ok": true,
+      "symptom": "2장 · 골드 인텔 [12400F/16GB/500GB/RTX5060] 1,624,400원 / 골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI] 1,741,000원",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "AI 설명이 카드 위",
+      "ok": false,
+      "symptom": "카드 아래에도 AI 말풍선 있음",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "카드에 용도 보임",
+      "ok": true,
+      "symptom": "[용도 머리 없음] 꼬리표 「예산을 넘는 최저가」 · 이유 「게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상」 / [용도 머리 없음] 꼬리표 「더 높은 사양」 · 이유 「게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상」",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "카드에 작업 수준 보임",
+      "ok": true,
+      "symptom": "꼬리표 「예산을 넘는 최저가」 · 사양 4줄 / 꼬리표 「더 높은 사양」 · 사양 4줄",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "카드에 예산 차이 보임",
+      "ok": true,
+      "symptom": "예산보다 124,400원 높아요 / 예산보다 241,000원 높아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "이 구성 선택 → 지금 견적",
+      "ok": true,
+      "symptom": "지금 견적 ·  · 지금 선택한 구성 · ",
+      "shot": "new_pc-PC-04-chosen.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "부품 바꾸기 → 상세 화면",
+      "ok": true,
+      "symptom": "주소 /mvp3/index.html#detail · 「대화로 돌아가기」 보임 · 왼쪽 「어떤 PC를 찾으세요?」 보임",
+      "shot": "new_pc-PC-05-detail.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "「변경」 → 바꿀 부품 목록 (그래픽카드 바꾸기)",
+      "ok": true,
+      "symptom": "후보 12개 · 안내 「닫기」",
+      "shot": "new_pc-PC-06-build-options.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "부품 바꾸기 결과: 바뀐 줄",
+      "ok": true,
+      "symptom": "그래픽카드 GIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트 수량 1 바꾼 부품 · 원래 부품: PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스 상세 펼치기 -48,200원 변경",
+      "shot": "new_pc-PC-07-build-picked.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "부품 바꾸기 결과: 새 총액",
+      "ok": true,
+      "symptom": "하단 금액 1,624,400원 → 1,576,200원 · 표 아래 「기본 구성 금액 1,624,400원 부품 변경 -48,200원 바꾼 구성 금액 1,576,200원」",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "부품 바꾸기 결과: 예산 차이",
+      "ok": true,
+      "symptom": "예산보다 76,200원 높아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "부품 바꾸기 결과: 확인 상태",
+      "ok": true,
+      "symptom": "미확인 / 미확인 / 미확인",
+      "shot": ""
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "「대화로 돌아가기」",
+      "ok": true,
+      "symptom": "대화 화면 복귀 · 내 말 1개 남음 · 지금 견적 금액 1,624,400원 → 1,576,200원 · 「바꾼 부품」 표시 있음",
+      "shot": "new_pc-PC-08-back-to-talk.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "견적 저장",
+      "ok": true,
+      "symptom": "견적을 저장했어요.",
+      "shot": "new_pc-PC-09-saved.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "쇼핑몰 이동",
+      "ok": true,
+      "symptom": "링크 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149 → 새 창 https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=98149 · 제목 「프리미엄팝콘피씨=조립1위」",
+      "shot": "new_pc-PC-mall.png"
+    },
+    {
+      "entry": "카드1 새 PC 고르기",
+      "persona": "게임용 학생",
+      "viewport": "PC",
+      "step": "문의 접수",
+      "ok": true,
+      "symptom": "사람에게 문의하기 구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요. 신청 번호 PI-1003 · 주문과 결제는 진행되지 않았어요.",
+      "shot": "new_pc-PC-10-inquiry.png"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "새 PC를 찾고 있어요. 배그랑 롤 하는 대학생이에요. 예산은 150만원 정도요.",
+      "ms": 15348,
+      "ai": [
+        "배그와 롤을 FHD로 즐기는 용도라면, 롤은 비교적 가벼워 CPU와 램이 무난하면 충분하고 배그는 그래픽카드가 체감 성능을 더 크게 좌우해요. 중급형 CPU인 라이젠 5급·코어 i5급과 중급형 그래픽카드인 RTX 5060급을 중심으로 구성하면 적절해요. 램은 16GB, SSD는 게임 설치 여유를 고려해 1TB를 권하며, 파워는 650W급 정도가 무난해요. 케이스 디자인이나 과한 RGB, 최상위 CPU는 아껴도 되며 그 비용을 그래픽카드에 쓰는 편이 배그 프레임 향상에 유리해요. 시중에서는 보통 130만~150만원 구성이 많아요. 시중 가격은 일반 시세이고, 아래 카드는 지금 판매 중인 PC의 실제 가격이라 다를 수 있어요.\n\n게임은 FHD(1080p) 화면 기준으로 봤어요.",
+        "150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 124,400원 높아요.",
+        "더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요."
+      ],
+      "questions": 0,
+      "cards": 2,
+      "cardsEmpty": null,
+      "aiAboveCards": true,
+      "aiBelowCards": true,
+      "error": [],
+      "cardDetail": [
+        {
+          "pill": "예산을 넘는 최저가",
+          "name": "골드 인텔 [12400F/16GB/500GB/RTX5060]",
+          "group": null,
+          "price": "1,624,400원",
+          "gap": "예산보다 124,400원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 · 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ],
+          "reason": "게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상",
+          "photo": true
+        },
+        {
+          "pill": "더 높은 사양",
+          "name": "골드 [인텔 Hit] [12400F/16G/500GB/RTX5060TI]",
+          "group": null,
+          "price": "1,741,000원",
+          "gap": "예산보다 241,000원 높아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ],
+          "reason": "게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상",
+          "photo": true
+        }
+      ]
+    }
+  ],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:14:21.548Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:26.105Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:27.706Z",
+      "method": "GET",
+      "url": "/api/customer/products/121228/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:32.257Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:34.045Z",
+      "method": "GET",
+      "url": "/api/customer/products/98149/representative-image",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:36.188Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/options",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:37.833Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/quote",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:45.298Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:46.651Z",
+      "method": "POST",
+      "url": "/api/mvp3/build/quote",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:47.062Z",
+      "method": "GET",
+      "url": "/api/mvp3/saved-quotes?limit=1",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:48.332Z",
+      "method": "GET",
+      "url": "/api/customer/products/121228/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:48.680Z",
+      "method": "GET",
+      "url": "/api/customer/products/98149/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:50.251Z",
+      "method": "POST",
+      "url": "/api/mvp3/saved-quotes",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.491Z",
+      "method": "POST",
+      "url": "/api/mvp3/saved-quotes/16b3aa61-8733-42c5-9b93-fb7f2083dbe5/handoff",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:55.857Z",
+      "method": "GET",
+      "url": "/api/mvp3/purchase-inquiries/form",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:56.176Z",
+      "method": "POST",
+      "url": "/api/mvp3/purchase-inquiries",
+      "status": 200
+    }
+  ],
+  "extra": {
+    "flowLabel": "PC 상담 · 새 PC 찾기",
+    "detailAskVisible": true,
+    "detailText": "이전 화면\n추천 구성 상세\n판매 중 PC · 조회 시점 참고 금액\n배그\n×\n롤\n×\n예산 1,500,000원\n×\n고사양 게임 · 캐주얼 게임\n×\n할 일도 하고 게임도 즐기는 나만의 PC\n\n골드 인텔 [12400F/16GB/500GB/RTX5060]\n\n게임과 영상 편집을 모두 생각하신다면, 부품 구성이 즐기는 게임과 사용하시는 편집 프로그램에 맞는지 살펴보세요.\n\n1,576,200원\n\n부품 1개를 바꾼 금액이에요 · 기본 구성 대비 -48,200원\n\n예산보다 76,200원 높아요\n\nAI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음\n부품 구성과 선택 이유\n부품 · 등록 사양\t금액\t변경\n\nCPU\n[병행] 인텔 코어i5-12세대 12400F (엘더레이크)(벌크)\n수량 1\n\n프로그램의 명령과 연산을 처리하는 중심 부품입니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\n그래픽카드\nGIGABYTE 지포스 RTX 5050 GAMING OC D6 8GB 피씨디렉트\n수량 1\n\n바꾼 부품 · 원래 부품: PALIT 지포스 RTX 5060 DUAL OC D7 8GB 이엠텍/ 벌크 / 박스\n\n상세 펼치기\n-48,200원\n변경\n\n\n메모리\n삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]\n수량 1\n\n실행 중인 프로그램의 데이터를 임시로 보관합니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\n저장장치\nWestern Digital WD Blue SN5100 M.2 NVMe (500GB)\n수량 1\n\n운영체제·프로그램·파일을 저장하고 불러오는 장치입니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\n메인보드\nGIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]\n수량 1\n\nCPU·메모리·저장장치와 주변기기를 연결하는 기반입니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\nCOOLER\nABKO 자이로스 120X4 FRGB (블랙)\n수량 1\n\nCPU에서 발생한 열을 방열판과 팬 또는 냉각수로 내보냅니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\nPOWER\n마이크로닉스 COOLMAX ELITE II 600W\n수량 1\n\n컴퓨터의 각 부품에 필요한 전력을 공급합니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n\n케이스\n앱코 U30 마린 블랙 (미들타워)\n수량 1\n\n부품을 고정하고 냉각 공기가 흐를 공간을 제공합니다.\n\n상세 사양 펼치기\n미확인\n변경\n\n기본 구성 금액\t1,624,400원\n부품 변경\t-48,200원\n바꾼 구성 금액\t1,576,200원\n이 상품을 추천한 이유\n\n상담 조건: 고사양 게임 · 캐주얼 게임 · 예산 1,500,000원 · 배그 · 롤\n\n게임 FHD — 최신 대작 FHD 높음 옵션 60fps 이상\n다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.\n다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요.\n부품 바꾸기\n\n부품 구성 표의 「변경」을 누르면 이 PC에 맞는 판매 부품을 보여 드려요. 호환 규칙을 통과한 부품만 나오고, 금액은 PC 판매가에 부품 가격 차이를 더해 다시 계산해요.\n\n바꾼 부품 1개 · 기본 구성 1,624,400원에서 -48,200원\n\n원래 구성으로\n구매 전 확인할 내용\n호환성\n실제 조립 검수 결과는 확인되지 않았어요.\n가격\n10월 11일 기준 쇼핑몰 가격 · 구매할 때 확정\n재고\n재고 확보 전 · 구매 전 확인\n운영체제\n포함 여부 재확인 필요\n키보드 · 마우스 · 모니터\n포함 여부 미확인\n보증\n기간 · 범위 재확인 필요",
+    "oldLink": "index.html#detail",
+    "pageErrors": []
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "entry": "root",
+  "viewport": "PC",
+  "at": "2026-10-12T04:14:07.902Z",
+  "rows": [
+    {
+      "entry": "경로 없는 주소",
+      "persona": "-",
+      "viewport": "PC",
+      "step": "주소 / 열기",
+      "ok": true,
+      "symptom": "최종 주소 /mvp1/main-landing.html · 상태 200 · 보이는 제목 「모든 견적에는 이유가 있습니다.」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "root-PC-01-addr_.png"
+    },
+    {
+      "entry": "경로 없는 주소",
+      "persona": "-",
+      "viewport": "PC",
+      "step": "주소 /mvp3/ 열기",
+      "ok": true,
+      "symptom": "최종 주소 /mvp3/#start · 상태 200 · 보이는 제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "root-PC-02-addr_mvp3_.png"
+    },
+    {
+      "entry": "경로 없는 주소",
+      "persona": "-",
+      "viewport": "PC",
+      "step": "주소 /mvp3/index.html 열기",
+      "ok": true,
+      "symptom": "최종 주소 /mvp3/index.html#start · 상태 200 · 보이는 제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "root-PC-03-addr_mvp3_index_html.png"
+    },
+    {
+      "entry": "경로 없는 주소",
+      "persona": "-",
+      "viewport": "PC",
+      "step": "주소 /mvp3/index.html#welcome 열기",
+      "ok": false,
+      "symptom": "최종 주소 /mvp3/index.html#welcome · 상태 실패 · 보이는 제목 「어떤 PC를 찾으세요?」 · 「어떤 PC를 찾으세요?」 보임",
+      "shot": "root-PC-04-addr_mvp3_index_html_welcome.png"
+    },
+    {
+      "entry": "경로 없는 주소",
+      "persona": "-",
+      "viewport": "PC",
+      "step": "주소 /mvp3/talk.html 열기",
+      "ok": true,
+      "symptom": "최종 주소 /mvp3/talk.html · 상태 200 · 보이는 제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "root-PC-05-addr_mvp3_talk_html.png"
+    }
+  ],
+  "turns": [],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:13:55.311Z",
+      "method": "GET",
+      "url": "/api/showcase",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:13:55.901Z",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 503
+    }
+  ],
+  "extra": {
+    "pageErrors": [
+      "console: Failed to load resource: the server responded with a status of 503 (Service Unavailable)"
+    ]
+  }
+}

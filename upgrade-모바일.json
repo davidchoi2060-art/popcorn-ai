@@ -1,0 +1,490 @@
+{
+  "entry": "upgrade",
+  "viewport": "모바일",
+  "persona": "영상 편집자",
+  "at": "2026-10-12T04:15:47.428Z",
+  "rows": [
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "처음 화면 열기",
+      "ok": true,
+      "symptom": "제목 「어떤 PC가 필요하세요?」 · 「어떤 PC를 찾으세요?」 안 보임",
+      "shot": "upgrade-모바일-01-gateway.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드 누르기 → 대화 화면",
+      "ok": true,
+      "symptom": "대화 화면으로 이동 · 입력창 초안 「지금 쓰는 PC에서 불편한 점을 상담하고 싶어요.」 · 상단 「PC 상담」",
+      "shot": "upgrade-모바일-02-card-click.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "첫 턴 답변 (턴 1)",
+      "ok": true,
+      "symptom": "AI 답 있음 · 되묻기 0개 · 10초",
+      "shot": "upgrade-모바일-03-turn1.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "되묻기에 답 (턴 2: 「그래픽카드랑 램 위주로 바꾸고 싶어요.」)",
+      "ok": true,
+      "symptom": "되묻기 0개 · 카드 없음 · 9초",
+      "shot": "upgrade-모바일-04-turn2.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "되묻기에 답 (턴 3: 「새 PC로 사는 것도 괜찮아요. 250만원까지 추천해 주세요.」)",
+      "ok": true,
+      "symptom": "되묻기 0개 · 카드 없음 · 8초",
+      "shot": "upgrade-모바일-05-turn3.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "되묻기에 답 (턴 4: 「그냥 추천해 주세요.」)",
+      "ok": true,
+      "symptom": "되묻기 1개 · 카드 3장 · 9초",
+      "shot": "upgrade-모바일-06-turn4.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "되묻기 한 턴에 하나 이하",
+      "ok": true,
+      "symptom": "모든 턴 물음표 1개 이하",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "추천 카드 나옴",
+      "ok": true,
+      "symptom": "3장 · 실버 [12100/16G/256GB/UHD 730] 742,600원 / 오피스 초슬림/미니타워[12400/16G/500G/UHD 730] 892,800원 / 다이아 [인텔 15세대 애로우레이크][265/16G/1TB/RTX5060TI] 2,296,300원",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "AI 설명이 카드 위",
+      "ok": false,
+      "symptom": "카드 아래에도 AI 말풍선 있음",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 용도 보임",
+      "ok": true,
+      "symptom": "[용도 머리 없음] 꼬리표 「알뜰 구성」 · 이유 「사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)」 / [용도 머리 없음] 꼬리표 「추천 구성」 · 이유 「사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터」 / [용도 머리 없음] 꼬리표 「더 높은 사양」 · 이유 「사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터」",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 작업 수준 보임",
+      "ok": true,
+      "symptom": "꼬리표 「알뜰 구성」 · 사양 4줄 / 꼬리표 「추천 구성」 · 사양 4줄 / 꼬리표 「더 높은 사양」 · 사양 4줄",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "카드에 예산 차이 보임",
+      "ok": true,
+      "symptom": "예산보다 1,757,400원 낮아요 / 예산보다 1,607,200원 낮아요 / 예산보다 203,700원 낮아요",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "이 구성 선택 → 지금 견적",
+      "ok": true,
+      "symptom": "지금 견적 ·  · 지금 선택한 구성 · ",
+      "shot": "upgrade-모바일-07-chosen.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "부품 바꾸기 → 상세 화면",
+      "ok": false,
+      "symptom": "주소 /mvp3/index.html#results · 「대화로 돌아가기」 보임 · 왼쪽 「어떤 PC를 찾으세요?」 보임",
+      "shot": "upgrade-모바일-08-detail.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "부품 변경 단추",
+      "ok": false,
+      "symptom": "바꿀 수 있는 줄 없음 · ",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "「대화로 돌아가기」",
+      "ok": true,
+      "symptom": "대화 화면 복귀 · 내 말 4개 남음 · 지금 견적 금액 742,600원 → null · 「바꾼 부품」 표시 없음",
+      "shot": "upgrade-모바일-09-back-to-talk.png"
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "견적 저장",
+      "ok": false,
+      "symptom": "저장 단추 없음 또는 눌리지 않음 (없음)",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "쇼핑몰 이동",
+      "ok": false,
+      "symptom": "「쇼핑몰에서 구매 이어가기」 단추 없음(저장 뒤에만 나옴)",
+      "shot": ""
+    },
+    {
+      "entry": "카드2 쓰던 PC 업그레이드",
+      "persona": "영상 편집자",
+      "viewport": "모바일",
+      "step": "문의 접수",
+      "ok": true,
+      "symptom": "사람에게 문의하기 구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요. 신청 번호 PI-1010 · 주문과 결제는 진행되지 않았어요.",
+      "shot": "upgrade-모바일-10-inquiry.png"
+    }
+  ],
+  "turns": [
+    {
+      "turn": 1,
+      "sent": "지금 쓰는 PC에서 불편한 점을 상담하고 싶어요. 프리미어로 4K 편집하는데 지금 PC가 너무 느려요. i5-9400F, GTX1660, 램 16GB예요. 100만원 안에서 업그레이드하고 싶어요.",
+      "ms": 10341,
+      "ai": [
+        "방금 말씀을 제가 잘 정리하지 못했어요. 한 번만 다르게 말씀해 주시거나, 사람 상담을 원하시면 아래 「사람 상담 남기기」를 눌러 주세요."
+      ],
+      "questions": 0,
+      "cards": 0,
+      "cardsEmpty": null,
+      "aiAboveCards": null,
+      "aiBelowCards": false,
+      "error": [],
+      "cardDetail": []
+    },
+    {
+      "turn": 2,
+      "sent": "그래픽카드랑 램 위주로 바꾸고 싶어요.",
+      "ms": 8857,
+      "ai": [
+        "방금 말씀을 제가 잘 정리하지 못했어요. 한 번만 다르게 말씀해 주시거나, 사람 상담을 원하시면 아래 「사람 상담 남기기」를 눌러 주세요."
+      ],
+      "questions": 0,
+      "cards": 0,
+      "cardsEmpty": null,
+      "aiAboveCards": null,
+      "aiBelowCards": false,
+      "error": [],
+      "cardDetail": []
+    },
+    {
+      "turn": 3,
+      "sent": "새 PC로 사는 것도 괜찮아요. 250만원까지 추천해 주세요.",
+      "ms": 7851,
+      "ai": [
+        "방금 말씀을 제가 잘 정리하지 못했어요. 한 번만 다르게 말씀해 주시거나, 사람 상담을 원하시면 아래 「사람 상담 남기기」를 눌러 주세요."
+      ],
+      "questions": 0,
+      "cards": 0,
+      "cardsEmpty": null,
+      "aiAboveCards": null,
+      "aiBelowCards": false,
+      "error": [],
+      "cardDetail": []
+    },
+    {
+      "turn": 4,
+      "sent": "그냥 추천해 주세요.",
+      "ms": 9343,
+      "ai": [
+        "하실 일을 아직 몰라서 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개) 같은 일반 용도를 가정했어요. 하실 일을 알려 주시면 그에 맞춰 다시 볼 수 있어요.",
+        "「램 16GB 이상」 조건에 맞는 PC만 골랐어요.",
+        "「그래픽카드 GTX 1660급 이상」 조건은 지금 못 맞춥니다. GTX 1660이(가) 든 판매 PC가 없어 비교 기준을 정하지 못했어요.",
+        "더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요."
+      ],
+      "questions": 1,
+      "cards": 3,
+      "cardsEmpty": null,
+      "aiAboveCards": true,
+      "aiBelowCards": true,
+      "error": [],
+      "cardDetail": [
+        {
+          "pill": "알뜰 구성",
+          "name": "실버 [12100/16G/256GB/UHD 730]",
+          "group": null,
+          "price": "742,600원",
+          "gap": "예산보다 1,757,400원 낮아요",
+          "spec": [
+            "CPU i3-12100",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 256GB SSD"
+          ],
+          "reason": "사무용 기본 — 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "photo": true
+        },
+        {
+          "pill": "추천 구성",
+          "name": "오피스 초슬림/미니타워[12400/16G/500G/UHD 730]",
+          "group": null,
+          "price": "892,800원",
+          "gap": "예산보다 1,607,200원 낮아요",
+          "spec": [
+            "CPU i5-12400",
+            "GPU 인텔 UHD(내장)",
+            "RAM 16GB",
+            "저장장치 500GB SSD"
+          ],
+          "reason": "사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "photo": true
+        },
+        {
+          "pill": "더 높은 사양",
+          "name": "다이아 [인텔 15세대 애로우레이크][265/16G/1TB/RTX5060TI]",
+          "group": null,
+          "price": "2,296,300원",
+          "gap": "예산보다 203,700원 낮아요",
+          "spec": [
+            "CPU 코어 울트라7 265",
+            "GPU RTX 5060 Ti 8GB",
+            "RAM 16GB",
+            "저장장치 1TB SSD"
+          ],
+          "reason": "사무용 쾌적 — 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "photo": true
+        }
+      ]
+    }
+  ],
+  "apiLog": [
+    {
+      "at": "2026-10-12T04:14:11.874Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:20.821Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:28.742Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:34.004Z",
+      "method": "POST",
+      "url": "/api/talk/parse",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:38.176Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:40.370Z",
+      "method": "GET",
+      "url": "/api/customer/products/113836/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:46.775Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:50.561Z",
+      "method": "POST",
+      "url": "/api/grid/recommend",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.052Z",
+      "method": "GET",
+      "url": "/api/product-images/108887/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.054Z",
+      "method": "GET",
+      "url": "/api/product-images/110899/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.065Z",
+      "method": "GET",
+      "url": "/api/product-images/118490/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.153Z",
+      "method": "GET",
+      "url": "/api/product-images/112789/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.263Z",
+      "method": "GET",
+      "url": "/api/product-images/113685/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.535Z",
+      "method": "GET",
+      "url": "/api/customer/products/113835/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.887Z",
+      "method": "GET",
+      "url": "/api/product-images/105195/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.913Z",
+      "method": "GET",
+      "url": "/api/product-images/129552/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:51.964Z",
+      "method": "GET",
+      "url": "/api/product-images/110965/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.156Z",
+      "method": "GET",
+      "url": "/api/product-images/109547/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.247Z",
+      "method": "GET",
+      "url": "/api/product-images/128462/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.358Z",
+      "method": "GET",
+      "url": "/api/customer/products/113836/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.399Z",
+      "method": "GET",
+      "url": "/api/product-images/129551/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.494Z",
+      "method": "GET",
+      "url": "/api/product-images/127201/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.521Z",
+      "method": "GET",
+      "url": "/api/product-images/124631/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.588Z",
+      "method": "GET",
+      "url": "/api/product-images/113162/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.768Z",
+      "method": "GET",
+      "url": "/api/product-images/122516/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.975Z",
+      "method": "GET",
+      "url": "/api/product-images/121242/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.981Z",
+      "method": "GET",
+      "url": "/api/product-images/128779/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:52.991Z",
+      "method": "GET",
+      "url": "/api/product-images/128870/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:53.203Z",
+      "method": "GET",
+      "url": "/api/product-images/127203/detail",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:14:53.412Z",
+      "method": "GET",
+      "url": "/api/customer/products/127206/representative-image?size=card",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:15:46.899Z",
+      "method": "GET",
+      "url": "/api/mvp3/purchase-inquiries/form",
+      "status": 200
+    },
+    {
+      "at": "2026-10-12T04:15:47.281Z",
+      "method": "POST",
+      "url": "/api/mvp3/purchase-inquiries",
+      "status": 200
+    }
+  ],
+  "extra": {
+    "flowLabel": "PC 상담 · 쓰던 PC 업그레이드",
+    "detailAskVisible": true,
+    "oldLink": "index.html#results",
+    "pageErrors": []
+  }
+}
