@@ -1,0 +1,310 @@
+{
+  "base": "https://popcornai.co.kr",
+  "taken_at": "2026-10-12T09:09:27.282Z",
+  "results": [
+    {
+      "name": "배그롤150-대화",
+      "text": "배그와 롤 150만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "예산을 넘는 최저가",
+          "name": null,
+          "fit": "게임 FHD 최신 대작 FHD 높음 옵션 60fps 이상",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "더 높은 사양",
+          "name": null,
+          "fit": "게임 FHD 최신 대작 FHD 높음 옵션 60fps 이상",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: FHD 기준으로 배그와 롤을 함께 한다면 중급형 CPU인 라이젠 5급·코",
+        "AI: 150만원 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 12",
+        "AI: 더 높은 사양을 보거나 조건을 바꿀 수 있어요. 아래에서 골라 주세요.",
+        "카드"
+      ],
+      "buttons": [
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 98149,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 98149,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 121228,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 121228,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        }
+      ],
+      "qty_panel": "수량 − 1개 + 메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요. 2개까지 고를 수 있어요.",
+      "sets_panel": "같은 구성 대수 − 1대 + 금액은 한 대 기준이고, 저장과 쇼핑몰 연결에 대수를 함께 넘겨요."
+    },
+    {
+      "name": "롤150-대화",
+      "text": "롤 150만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "알뜰 구성",
+          "name": null,
+          "fit": "게임 캐주얼 롤·발로란트·피파·메이플 FHD",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "추천 구성",
+          "name": null,
+          "fit": "게임 캐주얼 롤·발로란트·피파·메이플 FHD",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "더 높은 사양",
+          "name": null,
+          "fit": "게임 캐주얼 롤·발로란트·피파·메이플 FHD",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: 리그 오브 레전드는 비교적 가벼운 게임이라 FHD 환경에서는 그래픽카드보",
+        "AI: 더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요.",
+        "카드"
+      ],
+      "buttons": [
+        "더 싼 PC",
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 93454,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 93454,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 121257,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 121257,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 90678,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 메모리 슬롯이나 메모리 용량 정보를 확인하지 못해 수량을 늘릴 수 없어요.",
+            "known": false
+          }
+        },
+        {
+          "code": 90678,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        }
+      ],
+      "qty_panel": "수량 − 1개 + 메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요. 2개까지 고를 수 있어요.",
+      "sets_panel": "같은 구성 대수 − 1대 + 금액은 한 대 기준이고, 저장과 쇼핑몰 연결에 대수를 함께 넘겨요."
+    },
+    {
+      "name": "사무용100-대화",
+      "text": "사무용 100만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "알뜰 구성",
+          "name": null,
+          "fit": "사무용 기본 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "추천 구성",
+          "name": null,
+          "fit": "사무용 쾌적 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "더 높은 사양",
+          "name": null,
+          "fit": "사무용 쾌적 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: 램은 기본 문서·웹·화상회의라면 8GB, 대용량 엑셀이나 창을 많이 띄우",
+        "AI: 더 싼 PC나 더 높은 사양도 보여 드릴까요? 아래에서 골라 주세요.",
+        "카드"
+      ],
+      "buttons": [
+        "더 싼 PC",
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 113835,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113835,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113836,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113836,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 120221,
+          "bom": false
+        }
+      ],
+      "qty_panel": "수량 − 1개 + 메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요. 2개까지 고를 수 있어요.",
+      "sets_panel": "같은 구성 대수 − 1대 + 금액은 한 대 기준이고, 저장과 쇼핑몰 연결에 대수를 함께 넘겨요."
+    }
+  ]
+}
