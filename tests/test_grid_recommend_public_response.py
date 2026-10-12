@@ -112,7 +112,7 @@ class RecommendPublicResponseTest(unittest.TestCase):
     def test_card_sets_and_items_keep_contract_fields(self):
         with self.assertLogs('grid_public', level='INFO'):
             d = call_recommend()
-        self.assertEqual([s['usage_grid'] for s in d['card_sets']], ['영상편집', '게임'])
+        self.assertEqual([s['usage_grid'] for s in d['card_sets']], ['게임', '영상편집'])  # 게임 묶음이 먼저(2026-10-12)
         for s in d['card_sets']:
             self.assertEqual(s['kind'], 'sold')
             self.assertLessEqual(SET_KEYS, set(s))
