@@ -3,15 +3,18 @@
 # 2026-10-11 사장님: 손님은 일반 AI 와 비교한다. 한 번이라도 바보 같은 답을 하면 다시 안 온다.
 # 그래서 「우리가 못함」이 하나라도 나오면 빨간불이다(도구·질문: tools/quality/).
 #
-# 언제 도나
-#   ① 배포가 끝난 뒤 — 그 배포 커밋이 상담 AI 파일을 건드렸으면 질문 20개(pr=true)로 비교하고
-#      「우리가 못함」이 있으면 빨간불. **PR 단계가 아니라 배포 뒤인 이유**: 비교 대상은 개발 서버에
-#      실제로 떠 있는 상담 AI 다. PR 코드를 띄우려면 DB·3사 AI 키가 있는 우리 서버에서 PR 코드를
+# 언제 도나 (2026-10-12 개정 — 사장님 「추천한대로 하자」: 배포마다 20개씩 쌓여 하룻밤 700문항쯤 돌았고
+#   Anthropic 잔액이 바닥났다. 그래서 배포마다는 아주 작게, 20개는 하루 한 번으로 줄였다)
+#   ① 배포가 끝난 뒤 — 그 배포 커밋이 상담 AI 파일을 건드렸으면 **3문항 점검(smoke)** 만 돈다.
+#      상담 API 가 죽었거나 답이 크게 망가졌으면 빨간불. **PR 단계가 아니라 배포 뒤인 이유**: 비교 대상은
+#      개발 서버에 실제로 떠 있는 상담 AI 다. PR 코드를 띄우려면 DB·3사 AI 키가 있는 우리 서버에서 PR 코드를
 #      돌려야 하는데, 이 저장소는 공개라 deploy.yml 머리말대로 그 길을 열지 않는다.
-#   ② 손으로 실행 — 전체 86개(3묶음 병렬) 또는 20개.
-#   ③ 비교 도구·질문을 고친 PR — 전체 86개를 돌려 결과만 남긴다(빨간불로 막지 않는다: 그 PR 의
-#      코드가 아니라 지금 배포된 상담 AI 를 재는 것이라서).
+#   ② 하루 한 번(03:00 KST) — 지난 24시간에 상담 AI 파일이 바뀌었으면 질문 20개(pr)로 비교, 못함이면 빨간불.
+#      바뀐 것이 없으면 건너뛴다.
+#   ③ 손으로 실행 — 전체 86개(3묶음 병렬) · 20개 · 3개. 전체 86개는 사람이 누를 때만 돈다.
+#   ④ 비교 도구·질문을 고친 PR — 3문항 점검만 돌려 도구가 도는지 본다(빨간불로 막지 않는다).
 #
+# 모델은 tools/quality/compare.py 의 QUALITY_MODEL(Sonnet 5.5) — 상담 서버의 Opus 를 따라가지 않는다.
 # 비밀값은 ANTHROPIC_API_KEY 하나(일반 AI·심판). self-hosted 러너를 쓰지 않는다.
 # 개발 서버에는 공개 상담 API(/api/talk/parse)만 부른다. 방문자 한도(분당 5 · 하루 40)를 지키려고
 # 13초 간격으로 부르고 전체 실행은 세 러너로 나눈다.
@@ -21,11 +24,13 @@ on:
   workflow_run:
     workflows: ['배포']
     types: [completed]
+  schedule:
+    - cron: '0 18 * * *'   # 매일 03:00 KST
   workflow_dispatch:
     inputs:
       subset:
-        description: '질문 묶음 — all(86개) 또는 pr(20개)'
-        default: all
+        description: '질문 묶음 — all(86개) · pr(20개) · smoke(3개)'
+        default: pr
       gate:
         description: '「우리가 못함」이 있으면 빨간불'
         type: boolean
@@ -59,18 +64,27 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
-          fetch-depth: 2
+          fetch-depth: 100
       - id: p
         shell: bash
         run: |
+          TALK='^(api/talk[^/]*\.py|api/llm\.py|api/game_copy\.py|api/wiki_fetch\.py|api/shop_notices[^/]*\.py|tools/quality/)'
           case "${{ github.event_name }}" in
             workflow_run)
               changed=$(git diff --name-only HEAD~1 HEAD || true)
               echo "바뀐 파일:"; echo "$changed"
-              if echo "$changed" | grep -Eq '^(api/talk[^/]*\.py|api/llm\.py|api/game_copy\.py|api/wiki_fetch\.py|api/shop_notices[^/]*\.py|tools/quality/)'; then
+              if echo "$changed" | grep -Eq "$TALK"; then
                 echo "run=true" >> "$GITHUB_OUTPUT"
               else
                 echo "run=false" >> "$GITHUB_OUTPUT"; echo "상담 AI 파일 변경 없음 — 건너뜀"
+              fi
+              echo "subset=smoke" >> "$GITHUB_OUTPUT"; echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; echo "gate=true" >> "$GITHUB_OUTPUT" ;;
+            schedule)
+              changed=$(git log --since='24 hours ago' --name-only --pretty=format: || true)
+              if echo "$changed" | grep -Eq "$TALK"; then
+                echo "run=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "run=false" >> "$GITHUB_OUTPUT"; echo "지난 24시간 상담 AI 파일 변경 없음 — 건너뜀"
               fi
               echo "subset=pr" >> "$GITHUB_OUTPUT"; echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; echo "gate=true" >> "$GITHUB_OUTPUT" ;;
             workflow_dispatch)
@@ -79,8 +93,8 @@ jobs:
               if [ "${{ inputs.subset }}" = "all" ]; then echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT"; else echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; fi
               echo "gate=${{ inputs.gate }}" >> "$GITHUB_OUTPUT" ;;
             pull_request)
-              echo "run=true" >> "$GITHUB_OUTPUT"; echo "subset=all" >> "$GITHUB_OUTPUT"
-              echo 'shards=["1/3","2/3","3/3"]' >> "$GITHUB_OUTPUT"; echo "gate=false" >> "$GITHUB_OUTPUT" ;;
+              echo "run=true" >> "$GITHUB_OUTPUT"; echo "subset=smoke" >> "$GITHUB_OUTPUT"
+              echo 'shards=["1/1"]' >> "$GITHUB_OUTPUT"; echo "gate=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
   compare:

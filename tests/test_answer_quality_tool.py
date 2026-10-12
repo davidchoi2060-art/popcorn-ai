@@ -27,9 +27,18 @@ def test_long_question_expands_to_requested_length():
     assert len(C.expand(q)) >= 20000
 
 
-def test_model_follows_repo_setting(monkeypatch):
+def test_model_is_cheap_comparison_model_not_server_model(monkeypatch):
+    # 2026-10-12: 상담 서버의 Opus 를 따라가다 잔액이 바닥났다 -- 비교용은 따로 둔다.
     monkeypatch.delenv("QUALITY_MODEL", raising=False)
-    assert C.repo_model().startswith("claude-")
+    assert C.repo_model() == "claude-sonnet-5-5"
+    monkeypatch.setenv("QUALITY_MODEL", "claude-opus-5-5")
+    assert C.repo_model() == "claude-opus-5-5"
+
+
+def test_smoke_subset_is_tiny():
+    qs = C.load_questions("smoke", None)
+    assert 1 <= len(qs) <= 3
+    assert {q["id"] for q in qs} == set(C.SMOKE_IDS)
 
 
 def _combine(tmp_path, verdicts, gate=True, reason="r"):
