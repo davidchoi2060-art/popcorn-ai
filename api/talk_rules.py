@@ -287,10 +287,21 @@ UNNAMED_GAME_REPLY = ("즐겨 하시는 게임을 알려 주시면 "
                       "용도와 예산에 맞춰 안내하겠습니다.")
 
 
-def unnamed_game(state) -> bool:
-    """게임 계열 용도인데 게임 이름이 하나도 없는가."""
+# 「스팀 인디(통칭)」처럼 이름 끝에 (통칭)이 붙은 것은 특정 게임이 아니라 장르 묶음이다 -- 등급 조사 대상에서
+# 원천 제외됐다(0091). 그래서 등급이 영영 없고, 이름 있는 게임의 「적합성 확인 전 보류」로 다루면 카드가 나오지 않는다
+# (코덱스 #194 검수 P2-1: 상담은 FHD 기준이라 답하는데 추천은 카드를 비웠다). 이름 없는 게임과 같이 해상도 기준으로 본다.
+_GENERIC_GAME = re.compile(r"\(통칭\)\s*$")
+
+
+def specific_game_names(state) -> list[str]:
+    """장르 통칭을 뺀 실제 게임 이름."""
     g = getattr(state, "game", None)
-    return g is None or not g.names
+    return [n for n in (getattr(g, "names", None) or []) if not _GENERIC_GAME.search(n or "")]
+
+
+def unnamed_game(state) -> bool:
+    """게임 계열 용도인데 (장르 통칭 말고) 게임 이름이 하나도 없는가."""
+    return not specific_game_names(state)
 
 
 def release_unnamed_game(missing: list[str], state, prev_state, is_game_usage,
@@ -414,12 +425,20 @@ _CURRENT_PC = re.compile(r"(지금|현재|기존|원래)\s*(제가\s*)?(쓰는|�
 _CLAUSE_END = re.compile(r"(인데|는데|이고|이라서|라서|이에요|예요|입니다|이거든요|[.,?!\n])")
 
 
+# 「지금 쓰는 컴퓨터에 RTX 4070을 달고 싶어요」는 가진 PC 설명이 아니라 새로 달 부품 요청이다 -- 그 마디는 남긴다
+# (코덱스 #188 검수 P2: 마디째 지워 그래픽카드 조건 안내가 빠졌다).
+_WANT_PART = re.compile(r"달(고|아|려|면)|바꾸(고|려)|바꿔|교체|장착|넣(고|으려|어)|업그레이드\s*(하고|하려|할|해)|추가")
+
+
 def drop_current_pc(text: str) -> str:
     """지금 가진 PC 를 설명하는 마디를 뺀 문장."""
     m = _CURRENT_PC.search(text or "")
     if not m:
         return text or ""
     end = _CLAUSE_END.search(text, m.end())
+    clause = text[m.start():end.end() if end else len(text)]
+    if _WANT_PART.search(clause):
+        return text
     return text[:m.start()] + (text[end.end():] if end else "")
 
 
@@ -433,6 +452,19 @@ _WEIGH = re.compile(r"아니면|(?<![a-z])vs(?![a-z])|또는|둘\s*중|(어느|�
 def weighs_options(text: str) -> bool:
     """부품 사양을 견주거나 충분한지 묻는 문장인가(조건이 아니라 질문이다)."""
     return bool(_WEIGH.search(text or ""))
+
+
+# 「램 64GB는 꼭 넣고 SSD는 1TB 아니면 2TB 중 뭐가 좋나요?」 -- 견주는 것은 SSD 마디뿐이다. 마디 단위로 보고
+# 견주는 마디만 뺀다(코덱스 #194 검수 P2-2: 문장 전체를 보아 정한 램 64GB 까지 빠졌다).
+_CLAUSE_SPLIT = re.compile(r"[,.;\n]|(?<=고)\s+|\s+그리고\s+")
+
+
+def drop_weighed(text: str) -> str:
+    """견주거나 충분한지 묻는 마디를 뺀 문장 -- 남은 마디의 부품 숫자만 조건이다."""
+    t = text or ""
+    if not weighs_options(t):
+        return t
+    return " ".join(c for c in _CLAUSE_SPLIT.split(t) if c and c.strip() and not weighs_options(c))
 
 
 PREF_LABEL = {"화이트": "흰색 케이스", "저소음": "조용한 PC(저소음)"}
@@ -449,12 +481,17 @@ def purchase_topics(text: str) -> list[str]:
     hit = [key for key, _label, pat, _ in PURCHASE_TOPICS if pat.search(t)]
     # 「배송 중에 취소」의 배송은 취소 시점이다 -- 배송 기간을 함께 묻지 않았으면 배송 안내는 빼고 취소 안내만 낸다
     # (「배그PC 추천하고 배송일과 환불도 알려줘」는 둘 다 낸다).
-    if "refund" in hit and "delivery" in hit and not _DELIVERY_ASKED.search(t):
-        hit.remove("delivery")
+    # 「배송 중에」처럼 배송이 취소·환불의 «시점»만 꾸미면 배송 안내를 빼고, 배송·설치를 따로 물었으면 둘 다 낸다
+    # (코덱스 #195 검수: 「배송 중에 취소는 언제까지」에 배송 안내가 붙었고, 「반품 조건 + 방문 설치도 해 주나요」에는
+    # 설치 안내가 빠졌다).
+    if "refund" in hit and "delivery" in hit:
+        rest = _DELIVERY_WHEN.sub(" ", t)
+        if not dict((k, p) for k, _l, p, _d in PURCHASE_TOPICS)["delivery"].search(rest):
+            hit.remove("delivery")
     return hit
 
 
-_DELIVERY_ASKED = re.compile(r"얼마나|언제|며칠|배송\s*일|걸려|걸리|도착|택배사")
+_DELIVERY_WHEN = re.compile(r"배송\s*(중|전|후|도중|완료|받기\s*전|오기\s*전)\s*(에|이|에는|이라도|이면|인데)?|(택배|배송)\s*비")
 
 
 # 추천이 거르는 조건의 이름표 머리(unsupported_conditions 가 만드는 문자열과 같은 틀).
@@ -482,8 +519,7 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     안내가 되풀이되면 AI 답이 영영 안 보인다).
     """
     t = drop_current_pc(text or "")
-    if weighs_options(t):
-        t = _RAM.sub(" ", _STORAGE.sub(" ", _GPU.sub(" ", _CPU.sub(" ", t))))
+    t = drop_weighed(t)
     out = []
     m = _GPU.search(t)
     if m:
