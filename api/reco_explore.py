@@ -72,13 +72,28 @@ HEAVY_WORK = (
     ("캐드·설계", "전문", re.compile(r"\bbim\b|대형\s*어셈블리|구조\s*해석", re.I)),
     ("음악 작업", "쾌적", re.compile(r"오케스트라|샘플\s*라이브러리", re.I)),
 )
-HEAVY_KEYS = frozenset((u, lv) for u, lv, _ in HEAVY_WORK)
+# 「성능 좋은 사무용 컴퓨터」처럼 작업 없이 성능만 높여 달라고 하면 그 용도의 «쾌적»(기준표 2단계)부터 고른다
+# (2026-10-12 사장님 시험 「지금 사무용으로 쓸만한 성능좋은 컴퓨터」: 1단계 사무용 기본 카드가 나왔다).
+# 게임은 해상도가 수준을 정하므로 넣지 않는다. 작업 낱말(HEAVY_WORK)이 같이 걸리면 그쪽이 이긴다.
+GOOD_LEVEL = "쾌적"
+GOOD_USAGES = ("사무용", "주식·트레이딩", "개발", "디자인·조판", "영상편집", "3D 렌더링", "캐드·설계",
+               "음악 작업", "방송·스트리밍", "로컬 AI")
+_GOOD = re.compile(r"성능\s*(?:이|은|도|만)?\s*(?:좋|뛰어|빵빵|우수|높|괜찮)|좋은\s*성능|고성능|"
+                   r"사양\s*(?:이|은|도)?\s*(?:좋|높|빵빵)|빵빵한|쌩쌩한|넉넉한\s*(?:사양|성능)")
+# 「성능 좋을 필요 없어요」·「고성능은 필요 없고」는 성능을 높여 달라는 말이 아니다.
+_GOOD_NEG = re.compile(r"^.{0,10}?(?:필요\s*(?:는|가)?\s*없|상관\s*없|안\s*(?:좋아도|필요)|필요\s*없|아니어도|않아도)")
+HEAVY_KEYS = frozenset([(u, lv) for u, lv, _ in HEAVY_WORK] + [(u, GOOD_LEVEL) for u in GOOD_USAGES])
+
+
+def wants_good(raw: str | None) -> bool:
+    s = (raw or "")[:MAX_TEXT]
+    return any(not _GOOD_NEG.search(s[m.end():]) for m in _GOOD.finditer(s))
 
 
 def heavy_levels(raw: str | None) -> dict:
     """고객 문장 -> {기준표 용도: 단계}. 한 용도에 둘이 걸리면 뒤(더 높은) 단계."""
     s = (raw or "")[:MAX_TEXT]
-    out: dict = {}
+    out: dict = {u: GOOD_LEVEL for u in GOOD_USAGES} if wants_good(s) else {}
     for usage, level, pat in HEAVY_WORK:
         if pat.search(s):
             out[usage] = level
