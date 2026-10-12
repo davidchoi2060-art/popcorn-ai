@@ -573,6 +573,13 @@ def main() -> None:
                     help=f"이 배율(기본: 환경변수 {MALL_SYNC_SWING_ENV} 또는"
                          f" {BIG_SWING_RATIO_DEFAULT}) 이상 뛰거나 그 역수 이하로"
                          " 떨어지면 그 상품만 보류한다")
+    ap.add_argument("--margin", type=float, default=None,
+                    help="이번 실행에만 쓸 마진(예: 0 = 카드수수료만). 주지 않으면"
+                         " pricing_settings 의 margin_rate 를 쓴다")
+    ap.add_argument("--from-cache", action="store_true",
+                    help="몰에 다시 요청하지 않고 직전 실행이 남긴 캐시 HTML 로 반영한다"
+                         "(쿠키 불필요). 미리보기(tools/mall_price_preview.py)와 같은"
+                         " 원문으로 반영할 때 쓴다")
     ap.add_argument("--selftest", action="store_true",
                     help="DB·네트워크 없이 순수 로직(안전장치 판정)만 검증하고 끝낸다")
     args = ap.parse_args()
@@ -612,8 +619,11 @@ def main() -> None:
         # 고친 tools/mall_supplier_fetch.fetch()의 refetch 결함 참조).
         print(f"2단계: 몰에서 공급처·가격을 읽습니다(요청 간격 {_msf.DELAY}초,"
              f" 세션 만료 시 즉시 중단)")
-        stats, samples = _msf.run(engine, codes, apply_=args.apply, refetch=True,
-                                  cache_only=False, reapply=True, file_map=None)
+        # --from-cache: 미리보기를 본 그 원문 그대로 반영한다(2026-10-12). 다시 요청하면
+        # 미리보기와 다른 값이 들어갈 수 있고, 그 사이 쿠키가 만료될 수도 있다.
+        stats, samples = _msf.run(engine, codes, apply_=args.apply,
+                                  refetch=not args.from_cache,
+                                  cache_only=args.from_cache, reapply=True, file_map=None)
         collected = stats["fetched"] + stats["cached"]
         print(f"2단계 완료: 응답 {collected}건 · 공급처 행 {stats['rows_total']}건 ·"
              f" product_supplier_prices {'반영' if args.apply else '반영 예정'}"
@@ -676,6 +686,11 @@ def main() -> None:
         # 동작까지 바뀐다) -- 사실만 남긴다.
         with engine.connect() as conn:
             fee, margin = _settings(conn)
+        if args.margin is not None:
+            # 2026-10-12 사장님 결정: 지금 판매가는 매입가에 카드수수료만 붙은 값이다.
+            # 설정 마진(12%)을 그대로 쓰면 반영되는 상품마다 판매가가 약 12% 뛴다.
+            print(f"3단계 마진: 설정값 {margin} 대신 이번 실행 값 {args.margin} 을 씁니다")
+            margin = args.margin
         if args.apply:
             with engine.begin() as conn:
                 applied, held, locked_skip, reprice_log_id = _reprice_from_mall(
