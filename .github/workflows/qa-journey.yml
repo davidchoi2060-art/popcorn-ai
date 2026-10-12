@@ -1,4 +1,4 @@
-# 고객 여정 끝까지 검수 일회용 — 이 브랜치 전용, main 에 병합하지 않는다.
+# 고객 여정 끝까지 검수 일회용 (테스트시나리오-v2.md) — 이 브랜치 전용, main 에 병합하지 않는다.
 # 개발 서버 공개 고객 화면만 브라우저로 누른다. 비밀값·DB 접속 없음.
 name: 고객 여정 끝까지 검수 (일회용)
 on:
@@ -9,20 +9,34 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
         include:
-          - {scen: 's01,s02,s03', mode: pc}
-          - {scen: 's04,s05,s06', mode: pc}
-          - {scen: 's07,s08,s09', mode: pc}
-          - {scen: 's10,s11,s12', mode: pc}
-          - {scen: 's13,s14,s15', mode: pc}
-          - {scen: 's16,s17,s18', mode: pc}
-          - {scen: 's19,s20,s21', mode: pc}
-          - {scen: 's01,s11,s15', mode: mobile}
+          - {scen: 'A1,A1@m,A2,A2@m'}
+          - {scen: 'A3,A3@m,A4,A4@m'}
+          - {scen: 'A5,A5@m,A6,A6@m'}
+          - {scen: 'B01,B02,B03,B04'}
+          - {scen: 'B04@m,B05,B06,B07'}
+          - {scen: 'B08,B09,B10,B11'}
+          - {scen: 'B12,B13,B14,B15'}
+          - {scen: 'B16,B17,B18,B19'}
+          - {scen: 'B20,B21,B22,B22@m'}
+          - {scen: 'B23,B24,B25,B26'}
+          - {scen: 'B27,B28,B29,B30'}
+          - {scen: 'B31,C1,C2,C3'}
+          - {scen: 'C4,C5,C6,E01'}
+          - {scen: 'E02,E03,E04,E05'}
+          - {scen: 'E06,E07a,E07b,E07c'}
+          - {scen: 'E08,E09,E10,E11'}
+          - {scen: 'E12,E13,E14,E15'}
+          - {scen: 'E16,E17,E18,E19'}
+          - {scen: 'E20,E21,E22a,E22b'}
+          - {scen: 'E22c,E23a,E23b,E23c'}
+          - {scen: 'E24a,E24b,E25,E26'}
+          - {scen: 'E27,E28,D1,D3'}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +52,6 @@ jobs:
       - name: 검수
         env:
           SCEN: ${{ matrix.scen }}
-          MODE: ${{ matrix.mode }}
           OUT: ${{ runner.temp }}/out
         run: NODE_PATH="$RUNNER_TEMP/pw/node_modules" node qa-journey/run.cjs
       - uses: actions/upload-artifact@v4
