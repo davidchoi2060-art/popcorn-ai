@@ -74,5 +74,5 @@ jobs:
             [ "$state" = clean ] || { echo "#$p 상태 $state — 병합 안 함"; continue; }
             gh api -X PUT "repos/$R/pulls/$p/merge" -f merge_method=squash -f sha="$SHA" --jq .sha
             echo "#$p 병합 완료"
-            gh workflow run deploy.yml --ref main -f regression=false
+            gh workflow run deploy.yml -R "$R" --ref main -f regression=false
           done
