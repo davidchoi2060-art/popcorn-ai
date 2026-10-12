@@ -157,7 +157,31 @@ def talk_cases(texts):
     return 1 if failed else 0
 
 
+def resume_case(text):
+    """「RESUME:<문장>」 -- 대화 화면이 받은 카드와, 옛 화면이 복원할 때 다시 묻는 두 방식의 카드를 비교한다
+    (2026-10-12 카드 검수: 부품 바꾸기를 누르면 고른 PC 를 못 찾음)."""
+    print('### 복원 재현: ' + text)
+    parsed, _, _ = post('/api/talk/parse', {'text': text})
+    state = parsed.get('state')
+    print(f"- missing: {parsed.get('missing')!r}")
+    a, _, _ = post('/api/grid/recommend', {'state': state, 'text': text[:300]})
+    wants = a.get('wants')
+    print(f"- 대화 화면(state+text): {[c.get('product_code') for c in cards(a)]} wants={wants!r}")
+    body = {'state': state}
+    if isinstance(wants, dict):
+        body['wants'] = wants
+    b, _, _ = post('/api/grid/recommend', body)
+    print(f"- 복원 1(state+wants): {[c.get('product_code') for c in cards(b)]}")
+    c_, _, _ = post('/api/grid/recommend', {'state': state})
+    print(f"- 복원 2(state 만): {[c.get('product_code') for c in cards(c_)]}")
+    print(f"- 응답 키: {sorted(a) if isinstance(a, dict) else a!r}")
+    print()
+    return 0
+
+
 def main():
+    if TEXT.startswith('RESUME:'):
+        return max(resume_case(t.strip()) for t in TEXT[len('RESUME:'):].split('##') if t.strip())
     texts = [t.strip() for t in TEXT.split('||')]
     if len(texts) > 1:
         return talk_cases(texts)
