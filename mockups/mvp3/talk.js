@@ -6,6 +6,7 @@ const M=window.MVP3LiveModel,A=window.MVP3Api,{customerPhoto}=window.MVP3LivePho
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미확인';
+const signedMoney=d=>d===0?'같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const MAX_TEXT=20000;
 const log=$('#tk-log'),panel=$('#tk-now-body'),input=$('#tk-input'),status=$('#tk-status');
@@ -57,8 +58,8 @@ function photo(product){
   if(p.state!=='available')return '';
   return '<figure class="tk-photo"><img src="'+esc(p.url+'?size=card')+'" alt="'+esc(product.name)+' · AI 조립 예시" loading="lazy" decoding="async"><figcaption>'+esc(p.notice)+'</figcaption></figure>';
 }
-function specList(spec){
-  const rows=M.cardSpecRows(spec);
+function specList(spec,build){
+  const rows=M.changedSpecRows(M.cardSpecRows(spec),build);
   return rows.length?'<dl class="tk-spec">'+rows.map(([k,v])=>'<div><dt>'+esc(k)+'</dt><dd>'+esc(v)+'</dd></div>').join('')+'</dl>':'';
 }
 function conditionsText(talk){const c=M.conditions(talk);return c.length?c.join(' · '):'';}
@@ -156,13 +157,13 @@ function renderPanel(){
   }else{
     const basis=conditionsText(state.selectionState),changed=JSON.stringify(state.selectionState)!==JSON.stringify(state.talk);
     const saved=state.saveState==='saved'&&state.savedQuote;
-    html+='<p class="tk-now-label">지금 선택한 구성</p><h3>'+esc(p.name)+'</h3>'+photo(p)+
+    html+='<p class="tk-now-label">지금 선택한 구성</p><h3>'+esc(p.name)+'</h3>'+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+photo(p)+
       (basis?'<p class="tk-cond">고를 때 조건 · '+esc(basis)+'</p>':'')+
       (changed&&now?'<p class="tk-cond is-new">지금 조건 · '+esc(now)+'</p>':'')+
       (changed&&state.phase==='recommend'?'<p class="tk-note" role="status">새 조건으로 다시 살펴보는 중이에요. 지금 견적은 그대로 남겨둘게요.</p>':'')+
       '<p class="tk-price"><strong>'+money(p.price)+'</strong> <span class="muted">'+esc(p.price_src||'가격 기준 미확인')+'</span></p>'+
       (budgetGap(p,state.talk)?'<p class="muted">'+esc(budgetGap(p,state.talk))+(changed?' (지금 조건 기준)':'')+'</p>':'')+
-      specList(p.spec)+
+      specList(p.spec,p.build)+
       (p.build?.changes?.length?'<p class="muted">바꾼 부품 '+p.build.changes.length+'개를 반영한 금액이에요.</p>':'')+
       '<p class="muted">재고·판매 조건은 저장하거나 구매할 때 다시 확인해요.</p>'+
       '<p class="tk-save-state">'+(saved?'견적을 저장했어요.':state.needsRefresh?'금액이 바뀌어 저장하지 못했어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':state.saveState==='uncertain'?'저장 결과를 확인하지 못했어요. 내 견적에서 확인해 주세요.':resumed?'새로고침 전 저장 여부는 내 견적에서 확인할 수 있어요.':'아직 저장하지 않았어요.')+'</p>'+
@@ -171,7 +172,10 @@ function renderPanel(){
         button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':''))+'</div>';
     if(saved){
       const h=state.handoff?.quote_id===state.savedQuote.id?state.handoff:null;
-      html+='<div class="tk-buy">'+(h?'<a class="primary tk-link" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰에서 구매 이어가기</a><p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p>'
+      html+='<div class="tk-buy">'+(h?'<a class="primary tk-link" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰에서 구매 이어가기</a>'+
+        // 쇼핑몰 상품 페이지는 기본 구성이다 -- 바꾼 부품은 연결 번호로만 전해진다(옛 화면 app.js 와 같은 안내).
+        (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+esc(h.changes)+'개(차액 '+esc(signedMoney(h.delta))+')는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
+        '<p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p>'
         :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+'<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요.</p>')+'</div>';
     }
   }
