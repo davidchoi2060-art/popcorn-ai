@@ -340,7 +340,9 @@ ONE_LINER_MAX = 40
 # 한 턴에 질문은 하나까지 -- AI 답이 이미 무엇을 묻고 있으면(「어떤 용도로 쓰실지 말씀해 주세요.」) 갈래 질문을
 # 붙이지 않는다. 「이런 가격 미쳤냐」·「ㅋㅋㅋㅋ 컴퓨터가 날아다녀?」에 질문 두 개가 잇달아 나갔다(2026-10-12 개발
 # 서버, 모델 luna · 사장님 원칙 「되묻기 최소」). 갈래 질문은 답에 질문이 하나도 없을 때만 붙는다.
-_ASKING = re.compile(r"\?|알려\s*주세요|말씀해\s*주세요|알려\s*주시면|말씀해\s*주시면")
+# 물음표는 문장 끝 물음표만 센다 -- 「물음표(?)는…」처럼 괄호·따옴표 안 물음표는 질문이 아니다(코덱스 #196 검수 P3).
+# 「말씀해 주실래요.」·「알려 주시겠어요.」처럼 물음표 없는 부탁도 질문이다(같은 검수 P2).
+_ASKING = re.compile(r"(?<![(「『'\"])\?(?![)」』'\"])|(알려|말씀해|말해)\s*주(세요|시면|실래요|시겠어요|시겠습니까|실\s*수\s*있)")
 
 
 def _asks_already(reply: str) -> bool:
@@ -1307,9 +1309,10 @@ def parse_talk(body: ParseBody, request: Request):
     # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
     # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
     # 본체 구성 설명(build)일 때만 -- 「게임용 PC 램 역할이 뭐예요?」 같은 부품 설명 뒤에 추천을 열지 않는다(2026-10-12 검수 9595 P2-2).
-    # 게임 이름이 있어도 등급이 아직 없는 이름(「스팀 인디(통칭)」)이면 같다 -- 설명이 이미 나갔는데 「주로 어떤 게임을
-    # 하실 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 카드 쪽(sold_reco)은 등급을 쓰지 않고 해상도로 거른다.
-    if (not released and missing == [TS.MISSING_GAME_GRADE]
+    # 장르 통칭 이름(「스팀 인디(통칭)」)만 있어도 같다(TR.unnamed_game) -- 설명이 이미 나갔는데 「주로 어떤 게임을 하실
+    # 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 실제 게임 이름이 있는데 등급이 없으면 추천(grid_public)이
+    # 「적합성 확인 전 보류」로 카드를 비우므로 여기서도 풀지 않는다(코덱스 #194 검수 P2-1 -- 답과 카드가 어긋났다).
+    if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
             and getattr(ans, "kind", "game") == "pc_advice" and getattr(ans, "topic", None) == PA.TOPIC_BUILD
             and (ans.answer or "").strip()):
         released = True
@@ -1456,8 +1459,12 @@ def parse_talk(body: ParseBody, request: Request):
             (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
             or (asked_before and "?" in reply)
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage,
-                                heavy=TD.X.heavy_levels(text))
+        # 카드는 화면이 들고 있는 조건(wants.heavy)을 계속 쓴다 -- 이번 문장에 작업 낱말이 없으면 앞서 말한 작업으로
+        # 기준 줄을 맞춘다(코덱스 #194 검수 P2-3: 「대용량 엑셀」 뒤 「조금 더 싸게」에 카드는 쾌적, 기준 줄은 기본이었다).
+        # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
+        heavy = TD.X.heavy_levels(text) or next(
+            (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy)
         if first:
             reply = (first + " " + " ".join(cond_notes)).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",

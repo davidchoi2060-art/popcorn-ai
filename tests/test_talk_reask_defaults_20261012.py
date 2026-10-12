@@ -19,7 +19,7 @@ from tests.test_talk_rules_20261010 import _Conn, vocab
 ADVICE = "FHD 기준으로 중급형, 라이젠 5급 CPU와 RTX 5060급 그래픽카드, 램 16GB 구성이 무난해요."
 
 
-def parse(text, ai_state, answer="", topic=None, reply="어떤 용도로 사용할 PC를 찾으세요?"):
+def parse(text, ai_state, answer="", topic=None, reply="어떤 용도로 사용할 PC를 찾으세요?", voc=None):
     obj = {"pc": True, "state": ai_state, "missing": [], "evidence": [], "reply": reply}
     result = SimpleNamespace(text=json.dumps(obj, ensure_ascii=False), provider="t", model="t",
                              tokens_in=1, elapsed_sec=0.1)
@@ -29,7 +29,7 @@ def parse(text, ai_state, answer="", topic=None, reply="어떤 용도로 사용�
         st.enter_context(patch.object(talk.engine, "connect", lambda: _Conn()))
         st.enter_context(patch.object(talk.engine, "begin", lambda: _Conn()))
         st.enter_context(patch.object(talk.access_gate, "check_rate", lambda *a, **k: None))
-        st.enter_context(patch.object(talk.TS, "load_vocab", lambda conn: vocab()))
+        st.enter_context(patch.object(talk.TS, "load_vocab", lambda conn: voc or vocab()))
         st.enter_context(patch.object(talk.TA, "run_parallel", lambda a, b: (result, ans)))
         st.enter_context(patch.object(talk.TA, "is_game_related", lambda *a: False))
         st.enter_context(patch.object(talk, "_record_hit", lambda *a, **k: None))
@@ -57,19 +57,26 @@ class WeighOptions(unittest.TestCase):
 
 
 class GradelessGameName(unittest.TestCase):
-    def test_explained_pc_with_gradeless_name_shows_cards(self):
-        r = parse("메이플스토리 같은 거 하는데 무난한 PC 추천해 주세요",
-                  {"usages": ["게임"], "game": {"names": ["메이플스토리"]}},
-                  answer=ADVICE, topic=PA.TOPIC_BUILD, reply="주로 어떤 게임을 하실 예정인가요?")
+    # 2026-10-12 코덱스 #194 검수 P2-1: 실제 게임 이름이 있는데 등급이 없으면 추천(grid_public)이 「적합성 확인 전 보류」로
+    # 카드를 비운다 -- 상담도 풀지 않는다. 풀어 주는 것은 장르 통칭(「스팀 인디(통칭)」) 이름뿐이다.
+    def test_explained_pc_with_generic_name_shows_cards(self):
+        v = vocab()
+        v.all_game_names.append("스팀 인디(통칭)")
+        r = parse("스팀 게임 이것저것 하는데 무난한 PC 추천해 주세요",
+                  {"usages": ["게임"], "game": {"names": ["스팀 인디(통칭)"]}},
+                  answer=ADVICE, topic=PA.TOPIC_BUILD, reply="주로 어떤 게임을 하실 예정인가요?", voc=v)
+        self.assertEqual(r["state"]["game"]["names"], ["스팀 인디(통칭)"])
         self.assertEqual(r["missing"], [])
         self.assertNotIn("어떤 게임", r["reply"])
         self.assertIn("FHD", r["reply"])
 
-    def test_without_explanation_still_waits_for_grade(self):
-        r = parse("메이플스토리 같은 거 하는데 무난한 PC 추천해 주세요",
-                  {"usages": ["게임"], "game": {"names": ["메이플스토리"]}},
-                  reply="주로 어떤 게임을 하실 예정인가요?")
-        self.assertEqual(r["missing"], ["game.grade"])
+    def test_specific_gradeless_name_still_waits_for_grade(self):
+        for answer in (ADVICE, ""):
+            r = parse("메이플스토리 같은 거 하는데 무난한 PC 추천해 주세요",
+                      {"usages": ["게임"], "game": {"names": ["메이플스토리"]}},
+                      answer=answer, topic=PA.TOPIC_BUILD if answer else None,
+                      reply="주로 어떤 게임을 하실 예정인가요?")
+            self.assertEqual(r["missing"], ["game.grade"], answer)
 
 
 class RepeatedPriceWord(unittest.TestCase):

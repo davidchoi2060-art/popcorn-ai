@@ -93,6 +93,7 @@ from sqlalchemy import text
 from . import game_copy as GC
 from .db import engine
 from . import sold_reco as SOLD
+from . import talk_rules as TR
 from . import reco_explore as EXPLORE
 from . import customer_pc_offer as _PC_OFFER
 
@@ -873,7 +874,8 @@ def recommend(body: RecommendBody):
             # needs 의 game.grade 는 어느 쪽이든 그대로.
             # 2026-10-11 상담 주고받기: 말한 조건 · 더 싸게/더 높게(api/reco_explore). state 는 바꾸지 않는다.
             state, explore = _explore_input(body, state, talk_notes)
-            named = bool(state.game and state.game.names)
+            # 장르 통칭(「스팀 인디(통칭)」)은 실제 게임 이름으로 세지 않는다 -- 상담(talk)과 같은 판정(TR.unnamed_game).
+            named = not TR.unnamed_game(state)
             sold_games = game_usages if (game_grade is not None or not named) else []
             others = [u for u in state.usages if not is_game_usage(u)]
             card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab, explore))

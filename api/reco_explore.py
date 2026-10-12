@@ -22,7 +22,7 @@ import re
 from sqlalchemy import text
 
 from .db import engine
-from .talk_rules import weighs_options
+from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_weighed
 
 log = logging.getLogger("reco_explore")
 
@@ -116,24 +116,27 @@ def extract(raw: str | None) -> dict:
                 out["cheapest"] = True
         elif _BETTER.search(s):
             out["nav"] = BETTER
-    # 「16기가면 충분해요 아니면 32기가?」는 견주는 질문이라 사양 숫자로 거르지 않는다(talk_rules.weighs_options).
-    weigh = weighs_options(s)
-    m = None if weigh else _RAM.search(s)
+    # 「16기가면 충분해요 아니면 32기가?」는 견주는 질문이라 사양 숫자로 거르지 않는다(talk_rules.drop_weighed).
+    # 견주는 마디만 빼고 읽는다 -- 「램 64GB는 꼭 넣고 SSD는 1TB 아니면 2TB」의 램 64GB 는 조건이다.
+    # 지금 가진 PC 설명(「지금 쓰는 컴퓨터가 i5-8400에 GTX 1060인데」)의 부품도 원하는 조건이 아니다 -- 상담 안내와 같은
+    # 판정(talk_rules.drop_current_pc)으로 뺀다. CPU 모델 번호(i5-8400)는 그래픽카드 번호로 읽지 않는다.
+    c = drop_weighed(drop_current_pc(s))
+    m = _RAM.search(c)
     if m and 4 <= int(m.group(2)) <= 256:
         out["min_ram_gb"] = int(m.group(2))
     elif _RAM_MORE.search(s):
         out.setdefault("more", []).append("ram")
-    m = None if weigh else _SSD.search(s)
+    m = _SSD.search(c)
     gb = _ssd_gb(m.group(2), m.group(3)) if m else None
-    if gb is None and not weigh:
-        t = _TB.search(s)
+    if gb is None:
+        t = _TB.search(c)
         gb = _ssd_gb(t.group(1), t.group(2)) if t else None
     if gb is not None:
         out["min_ssd_gb"] = gb
     elif _SSD_MORE.search(s):
         out.setdefault("more", []).append("ssd")
-    if _GPU_CONTEXT.search(s) and not weigh:
-        for g in _GPU.finditer(s):
+    if _GPU_CONTEXT.search(c):
+        for g in _GPU.finditer(_CPU_MODEL.sub(" ", c)):
             n = int(g.group(2))
             if n % 10 or not 1000 <= n <= 9999:
                 continue
