@@ -23,6 +23,7 @@ from fastapi import APIRouter
 from sqlalchemy import text
 
 from .db import engine
+from .product_name import pc_case_psu
 
 KST = timezone(timedelta(hours=9))
 
@@ -79,7 +80,7 @@ def load():
         rows = conn.execute(text(
             "SELECT f.product_code, f.crawl_name, f.crawl_price, f.mall_url, f.excluded, f.includes,"
             " f.spec, f.balance, f.dominated_by, f.evaluated_at,"
-            " p.sale_price, p.status, p.product_name,"
+            " p.sale_price, p.status, p.product_name, p.spec_source_text,"
             " (SELECT h.changed_at FROM product_price_history h WHERE h.product_code = f.product_code"
             "   AND h.field = 'sale' ORDER BY h.changed_at DESC LIMIT 1) AS sale_at,"
             " (SELECT h.reason FROM product_price_history h WHERE h.product_code = f.product_code"
@@ -99,6 +100,8 @@ def load():
             "price_src": price_basis(m["sale_at"], m["sale_reason"]) if live_price else "몰 수집가(2026-09-25)",
             "status": m["status"], "url": m["mall_url"], "includes": m["includes"],
             "spec": m["spec"], "balance": m["balance"], "dominated_by": m["dominated_by"],
+            # 고객 카드의 케이스·파워 줄(api/sold_reco._item) -- 몰이 공개한 구성 원문에서 읽는다.
+            "case_psu": pc_case_psu(m["spec_source_text"]),
             "band": band_of(price), "fit": {},
         }
     for r in fit_rows:

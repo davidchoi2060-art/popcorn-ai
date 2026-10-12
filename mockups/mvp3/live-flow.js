@@ -580,5 +580,22 @@
     }
     return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
   }
-  if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation,DRAFT_KEY,DRAFT_TTL_MS,createDraftHandoff};else root.MVP3LiveFlow={createFlow,GREETING,createDraftHandoff};
+  // 「쇼핑몰에서 구매 이어가기」 한 번으로 쇼핑몰까지 간다(2026-10-12 중헌 님 고객단 6번: 연결 번호가 생긴 뒤 같은 단추를
+  // 한 번 더 눌러야 쇼핑몰이 열렸다). 연결 번호는 그대로 만든다 -- 인계 기록(관리자 「인계 기록」·유입 성과)과 쇼핑몰 가격
+  // 재확인, 부품을 바꾼 견적의 차액 기록이 이 번호에 걸린다(api/mvp3_handoff). 고객에게는 화면에 남겨 두기만 한다.
+  // 새 창은 누른 순간에 열어 둔다 -- 서버 응답을 기다린 뒤 열면 브라우저가 팝업으로 막는다. 연결에 실패하면 그 창을 닫고,
+  // 창이 막혔으면(open 이 null) 화면에 남는 「쇼핑몰 상품 페이지 열기」 링크로 간다.
+  async function handoffAndOpen(flow,win){
+    let tab=null;
+    try{tab=win.open('','_blank');}catch{tab=null;}
+    try{if(tab)tab.document.title='팝콘PC 쇼핑몰로 연결하는 중';}catch{}
+    await flow.handoff();
+    const h=flow.state.handoff,q=flow.state.savedQuote;
+    const ok=!!(h&&q&&h.quote_id===q.id&&h.mall_url);
+    if(!tab)return ok;
+    if(!ok){try{tab.close();}catch{}return false;}
+    try{tab.opener=null;tab.location.href=h.mall_url;}catch{try{tab.close();}catch{}return false;}
+    return true;
+  }
+  if(typeof module!=='undefined')module.exports={createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation,DRAFT_KEY,DRAFT_TTL_MS,createDraftHandoff,handoffAndOpen};else root.MVP3LiveFlow={createFlow,GREETING,createDraftHandoff,handoffAndOpen};
 })(typeof window==='undefined'?globalThis:window);

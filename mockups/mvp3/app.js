@@ -163,7 +163,7 @@ function requirements(withAssumed=false){
     button(uiIcon(c.icon)+'<span>'+esc(c.label)+'</span><span class="chip-change" aria-hidden="true">×</span>','conditions','chip condition-chip','aria-label="'+esc(c.label)+' 조건 바꾸기"')).join('')+'</div>':'';
 }
 function errorPanel(){
-  if(!state.error)return '';
+  if(!state.error||handoffFailed())return '';
   const e=state.error,seconds=Math.max(0,Math.ceil((e.retryAt-Date.now())/1000));
   const uncertain=state.saveState==='uncertain';
   const retryLabel=state.retry?.kind==='recommend'?'최신 추천 다시 조회':['save','recover'].includes(state.retry?.kind)?'같은 보관 요청 확인':'다시 시도';
@@ -402,9 +402,15 @@ function priceCheckPanel(){
 // Mall handoff result (api/mvp3_handoff.py). Price differences are told, never hidden.
 function handoffPanel(h){
   const changed=h.status==='가격변동'&&Number.isInteger(h.price_mall),soldout=h.status==='품절',unknown=h.status==='확인못함';
-  const line=changed?'쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라 보관 견적을 쇼핑몰 가격으로 고쳤어요. 결제 금액은 쇼핑몰에서 최종 확인해 주세요.':
+  // 부품을 바꾼 견적이면 서버의 price_quoted 는 «기본 구성» 판매가다(api/mvp3_handoff). 견적 합계(기본 + 바꾼 부품 차액)와
+  // 다르므로 「쇼핑몰 가격도 ○○원으로 같아요」라고 하지 않고 기본 구성 기준이라고 밝힌다(2026-10-12 끝까지 검수 O3 --
+  // 견적 1,576,200원인데 「쇼핑몰 가격도 1,624,400원으로 같아요」).
+  const built=h.changes>0,total=(changed?h.price_mall:h.price_quoted)+h.delta;
+  const line=changed?(built?'쇼핑몰 기본 구성 가격이 '+money(h.price_mall)+'으로 바뀌었어요. 바꾼 부품 차액('+signedMoney(h.delta)+')을 더해 견적을 '+money(total)+'으로 고쳤어요. 결제 금액은 쇼핑몰에서 최종 확인해 주세요.':
+      '쇼핑몰 현재 가격은 '+money(h.price_mall)+'이에요. 보관한 금액('+money(h.price_quoted)+')과 달라 보관 견적을 쇼핑몰 가격으로 고쳤어요. 결제 금액은 쇼핑몰에서 최종 확인해 주세요.'):
     soldout?'쇼핑몰에서 지금 품절로 표시돼요. 구매 전에 쇼핑몰에서 재고를 확인해주세요.':
     unknown?'현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다.':
+    built?'쇼핑몰 상품 페이지는 기본 구성 기준으로 '+money(h.price_quoted)+'이에요. 바꾼 부품 차액('+signedMoney(h.delta)+')을 더한 이 견적은 '+money(total)+'이에요.':
     '쇼핑몰 가격도 '+money(h.price_quoted)+'으로 같아요.';
   return '<section class="live-explanation live-handoff" role="status"><h3>팝콘PC 쇼핑몰로 연결할 준비가 됐어요</h3><p>'+esc(line)+'</p>'+
     '<p><a class="primary" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a></p>'+
@@ -442,6 +448,14 @@ function inquiryValues(){
   for(const e of view.querySelectorAll('[data-inquiry]'))out[e.dataset.inquiry]=e.type==='checkbox'?e.checked:e.value;
   return out;
 }
+// 쇼핑몰 연결이 실패하면 단추 바로 아래에 말한다(2026-10-12 끝까지 검수 O4 -- 오류 칸이 화면 맨 위라 모바일에서 3,700px
+// 위에 있었다). 같은 단추를 다시 누르면 다시 시도한다. 화면 맨 위 오류 칸에는 따로 싣지 않는다(errorPanel).
+function handoffFailed(){return !!(state.error&&state.retry?.kind==='handoff'&&state.screen==='final');}
+function handoffError(){
+  if(!handoffFailed())return '';
+  const wait=Math.max(0,Math.ceil(((state.error.retryAt||0)-Date.now())/1000));
+  return '<p class="warn-text final-handoff-error" role="alert">쇼핑몰 연결을 준비하지 못했어요. '+esc(state.error.message)+' '+(wait?wait+'초 뒤에':'잠시 뒤')+' 다시 눌러 주세요.</p>';
+}
 function renderFinal(){
   const handoffDone=!!(state.handoff&&state.savedQuote&&state.handoff.quote_id===state.savedQuote.id);
   const label={idle:'아직 보관 전',saving:'보관 확인 중',saved:'서버에 보관됨',uncertain:'보관 결과 미확인',failed:'보관되지 않음'};
@@ -454,7 +468,7 @@ function renderFinal(){
     (saved&&state.savedQuote&&!handoffDone?button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'팝콘PC 쇼핑몰에서 구매하기','handoff','primary',state.phase?'disabled':''):'')+
     // 인계가 끝나도 단추 자리를 비우지 않는다(2026-10-12 사장님 「클릭했더니 없어져 버리고」) — 같은 자리에서 쇼핑몰을 연다.
     (handoffDone?'<a class="primary final-mall-link" href="'+esc(state.handoff.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a>':'')+
-    '</div><small>'+(saved?'결제와 배송은 팝콘PC 쇼핑몰에서 진행돼요. 이 화면에서는 결제하지 않아요.':'주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다. 견적을 보관하면 팝콘PC 쇼핑몰 구매로 이어갈 수 있어요.')+'</small></div></footer>'+
+    '</div>'+handoffError()+'<small>'+(saved?'결제와 배송은 팝콘PC 쇼핑몰에서 진행돼요. 이 화면에서는 결제하지 않아요.':'주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다. 견적을 보관하면 팝콘PC 쇼핑몰 구매로 이어갈 수 있어요.')+'</small></div></footer>'+
     // 쇼핑몰 연결과 구매 상담은 화면 폭 전체에 나란히 둔다(2026-10-12 사장님 「한쪽으로 쏠려 있고, 아래쪽에 있는지도 몰랐어」).
     '<div class="final-next">'+(handoffDone?handoffPanel(state.handoff):'')+
     (!state.inquiry.open&&!state.inquiry.done?'<section class="live-explanation live-inquiry live-inquiry-open"><h3>구매 상담 신청</h3><p class="muted">여러 대 구매 · 할인 · 세금계산서는 팝콘PC 담당자가 연락드려 안내해요.</p>'+button('구매 상담 신청하기','inquiry-open','outline',state.phase?'disabled':'')+'</section>':'')+
@@ -501,7 +515,13 @@ function render(){
   clearTimeout(retryTimer);if(state.error?.retryAt>Date.now())retryTimer=setTimeout(()=>render(),1000);
   settleArrival();
 }
-function focusParts(){const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});(s?.querySelector('button')||view.querySelector('[data-action=build-options]'))?.focus({preventScroll:true});}
+// 「부품 전체 구성 확인 및 변경」(대화 화면 · 2026-10-12 중헌 님 고객단 5번)과 아래 「부품 바꾸기」가 여기로 온다.
+// 구성표가 공개된 PC 는 부품 구성 표(줄마다 「변경」)로, 아니면 다른 판매 PC 로 옮기는 부품 바꾸기 칸으로 옮긴다.
+function focusParts(){
+  const pick=view.querySelector('[data-action=build-options]');
+  if(pick){view.querySelector('.final-parts')?.scrollIntoView({block:'start'});pick.focus({preventScroll:true});return;}
+  const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});s?.querySelector('button')?.focus({preventScroll:true});
+}
 // 넘어온 직후 견적을 다시 불러오는 일이 끝나면 한 번만 부품 바꾸기 칸으로 옮긴다(못 불러왔으면 옮기지 않고 끝낸다).
 function settleArrival(){if(!arrival?.focus||enteringRoute||state.phase)return;arrival.focus=false;if(state.screen==='detail'&&state.selected)focusParts();}
 function openSaved(){ui.surface='consultation';if(state.screen==='saved'&&state.phase==='list'){render();return;}void flow.list();}
@@ -557,7 +577,7 @@ document.addEventListener('click',e=>{
     case 'results':flow.navigate('results');break;
     case 'back':back();break;
     case 'save':void flow.save();break;
-    case 'handoff':void flow.handoff();break;
+    case 'handoff':void window.MVP3LiveFlow.handoffAndOpen(flow,window);break;
     case 'inquiry-open':void flow.openInquiry({human:b.dataset.human==='1'});break;
     case 'part-options':void flow.openParts(b.dataset.slot);break;
     case 'part-close':flow.closeParts();break;

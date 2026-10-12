@@ -22,7 +22,7 @@ const STARTERS=[
   {key:'parts',label:'부품·구성 물어보기',draft:'PC 부품이나 구성에서 궁금한 점이 있어요.'}];
 let entry=null;
 // 처음 화면의 세 갈래에서 들어오면(talk.html?start=키) 그 갈래 초안을 입력창에 넣어 둔다(보내지 않는다).
-// 하던 대화가 있으면 그 대화에 이어서 보낼 수 있게 둔다 -- 갈래를 바꿔도 같은 상담이다(보강6 의견 §1).
+// 처음 화면에서 갈래를 고르면 새 상담으로 시작한다(2026-10-12 중헌 님 -- 전에는 하던 대화에 이어 붙였다, 보강6 의견 §1).
 // 주소에서 지워 새로고침 때 다시 넣지 않게 한다.
 // 처음 화면 채팅창에 쓴 글이 있으면 꺼내 바로 보낸다(고객이 이미 「보내기」를 눌렀다). 갈래는 서버가 글
 // 내용으로 고른다. 오래된 글(10분 넘음)은 버린다 -- 다른 날 연 탭에서 갑자기 보내지 않게.
@@ -30,6 +30,12 @@ const FIRST_KEY='popcorn-mvp3-first-message-v1';
 function takeFirstMessage(){
   let raw=null;try{raw=sessionStorage.getItem(FIRST_KEY);sessionStorage.removeItem(FIRST_KEY);}catch{return '';}
   try{const m=JSON.parse(raw||'null');return m&&typeof m.text==='string'&&Date.now()-m.at<600000?m.text.trim().slice(0,MAX_TEXT):'';}catch{return '';}
+}
+// 처음 화면에서 새 상담을 시작하고 들어왔는가(채팅창에 쓴 글이 아직 남아 있거나 주소에 갈래 키가 있다). 읽기만 한다 --
+// 꺼내 쓰는 일은 startFromGateway 가 한다.
+function gatewayStarted(){
+  try{const m=JSON.parse(sessionStorage.getItem(FIRST_KEY)||'null');if(m&&typeof m.text==='string'&&m.text.trim()&&Date.now()-m.at<600000)return true;}catch{}
+  try{const key=new URLSearchParams(location.search).get('start');return STARTERS.some(x=>x.key===key);}catch{return false;}
 }
 async function startFromGateway(){
   const first=takeFirstMessage();
@@ -122,10 +128,12 @@ function fitLine(x){
   const i=r.indexOf(' — '),head=i>0?r.slice(0,i).trim():r,work=i>0?r.slice(i+3).trim():'';
   return '<p class="tk-fit"><strong>'+esc(head)+'</strong>'+(work?'<span>'+esc(work)+'</span>':'')+'</p>';
 }
+// 카드에는 상품명을 두지 않는다(2026-10-12 중헌 님 고객단 4번: 「오피스 초슬림/미니타워[12100/8G/256GB/UHD 730]」이
+// 아래 사양 줄과 겹쳤다). 이름은 사진 설명(alt)과 「지금 견적」·상세에 남는다. 사양 줄에 케이스·파워가 더해졌다.
 function card(x,p,latest){
   const chosen=state.selected?.product_code===x.product_code;
   const gap=budgetGap(x,p.talk);
-  return '<li class="tk-card'+(chosen?' is-chosen':'')+'"><span class="pill">'+esc(x.tag||x.level||'판매 중 PC')+'</span>'+fitLine(x)+'<h4>'+esc(x.name)+'</h4>'+photo(x)+
+  return '<li class="tk-card'+(chosen?' is-chosen':'')+'"><span class="pill">'+esc(x.tag||x.level||'판매 중 PC')+'</span>'+fitLine(x)+photo(x)+
     '<p class="tk-price"><strong>'+money(x.price)+'</strong> <span class="muted">'+esc(x.price_src||'가격 기준 미확인')+'</span></p>'+
     (gap?'<p class="'+(x.price>p.talk?.budget_won&&p.talk?.budget_bound!=='이상'?'warn-text':'muted')+'">'+esc(gap)+'</p>':'')+specList(x.spec)+
     (latest?'<div class="tk-card-actions">'+button('상세 보기','detail','outline','data-index="'+x.index+'"')+
@@ -207,7 +215,8 @@ function renderPanel(){
       (p.build?.changes?.length?'<p class="muted">바꾼 부품 '+p.build.changes.length+'개를 반영한 금액이에요.</p>':'')+
       '<p class="muted">재고·판매 조건은 저장하거나 구매할 때 다시 확인해요.</p>'+
       '<p class="tk-save-state">'+(saved?'견적을 저장했어요.':state.needsRefresh?'금액이 바뀌어 저장하지 못했어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':state.saveState==='uncertain'?'저장 결과를 확인하지 못했어요. 내 견적에서 확인해 주세요.':resumed?'새로고침 전 저장 여부는 내 견적에서 확인할 수 있어요.':'아직 저장하지 않았어요.')+'</p>'+
-      '<div class="tk-row">'+button('구성 자세히 보기','open-detail','outline',busy?'disabled':'')+button('부품 바꾸기','open-detail','outline',(busy?'disabled ':'')+'data-focus="parts"')+
+      // 「구성 자세히 보기」와 「부품 바꾸기」는 같은 상세 화면을 열어 하나로 합쳤다(2026-10-12 중헌 님 고객단 5번).
+      '<div class="tk-row">'+button('부품 전체 구성 확인 및 변경','open-detail','outline',(busy?'disabled ':'')+'data-focus="parts"')+
       (state.needsRefresh&&!saved?button(state.phase==='reprice'?'금액 확인 중…':'지금 금액 다시 확인','reprice','primary',busy?'disabled':''):
         button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':''))+'</div>';
     if(saved){
@@ -216,7 +225,10 @@ function renderPanel(){
         // 쇼핑몰 상품 페이지는 기본 구성이다 -- 바꾼 부품은 연결 번호로만 전해진다(옛 화면 app.js 와 같은 안내).
         (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+esc(h.changes)+'개(차액 '+esc(signedMoney(h.delta))+')는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
         '<p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p>'
-        :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+'<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요.</p>')+'</div>';
+        :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+
+          // 실패하면 단추 바로 아래에 말한다(2026-10-12 끝까지 검수 O4). 같은 단추를 다시 누르면 다시 시도한다.
+          (state.error&&state.retry?.kind==='handoff'?'<p class="warn-text" role="alert">쇼핑몰 연결을 준비하지 못했어요. '+esc(state.error.message)+' 잠시 뒤 다시 눌러 주세요.</p>':'')+
+          '<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요. 누르면 쇼핑몰 상품 페이지가 새 창으로 열려요.</p>')+'</div>';
     }
   }
   if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>'+
@@ -277,7 +289,7 @@ document.addEventListener('click',e=>{
     case 'open-detail':if(state.selected)goDetail(b.dataset.focus);break;
     case 'save':void flow.save();break;
     case 'reprice':void flow.reprice();break;
-    case 'handoff':void flow.handoff();break;
+    case 'handoff':void LF.handoffAndOpen(flow,window);break;
     case 'retry':void flow.retry();break;
     case 'explore':condOpen=false;void flow.explore(b.dataset.dir,b.dataset.label);break;
     case 'cond-open':condOpen=!condOpen;render();if(condOpen)log.querySelector('[data-cond=budget]')?.focus({preventScroll:true});break;
@@ -302,13 +314,19 @@ log.addEventListener('submit',e=>{
 });
 input.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void send();}});
 
-flow.reset({restore:true});
+// 처음 화면에서 새로 시작해 들어왔으면(채팅창에 쓴 글 · 세 갈래 단추) 이 탭에 남은 지난 대화·조건·지금 견적을 되살리지 않고
+// 비운 채 시작한다(2026-10-12 중헌 님 고객단 1·2번: 홈으로 돌아와 다른 상담을 골라도 지난 대화와 조건이 그대로 남았다).
+// 서버에 저장한 「내 견적」은 지우지 않는다 -- 비우는 것은 이 탭의 대화 보관뿐이다.
+// 지난 대화를 이어 가려면 처음 화면의 「작성하던 상담 이어가기」나 상단 「대화 화면」으로 들어온다(주소에 start 가 없다).
+const freshStart=gatewayStarted();
+flow.reset({restore:!freshStart});
 if(state.restoredCurrent&&state.talk){resumed=true;void flow.resume();}
 // 고른 구성 없이 카드만 보던 중 새로고침했으면 같은 조건으로 카드를 다시 받는다(값은 지금 기준 · AI 호출 없음).
 else if(state.restoredShown&&state.talk)void flow.refresh({notes:false});
 // 처음 화면과 오갈 때 보내지 않은 입력 문장을 넘긴다(코덱스 #148 검수 P2). 받은 문장은 입력 칸에 채우기만 한다.
+// 새로 시작한 상담에는 지난 화면에서 적다 만 문장을 넣지 않는다.
 const draftHandoff=LF.createDraftHandoff();
 window.addEventListener('pagehide',()=>{draftHandoff.put(input.value);});
-{const carried=draftHandoff.take();if(carried&&!input.value.trim()){input.value=carried;count();}}
+{const carried=draftHandoff.take();if(carried&&!freshStart&&!input.value.trim()){input.value=carried;count();}}
 void startFromGateway();
 })();

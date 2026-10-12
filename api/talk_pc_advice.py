@@ -398,6 +398,45 @@ def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool =
     return body, dropped
 
 
+def _man(won: int) -> int:
+    return max(1, round(won / 10_000))
+
+
+def card_range_sentence(prices: list[int]) -> str:
+    """아래 카드 가격 범위 한 문장(만원 단위 반올림)."""
+    lo, hi = _man(min(prices)), _man(max(prices))
+    if lo == hi:
+        return "지금 이 조건에 맞는 판매 중인 PC는 아래 카드처럼 %d만원 정도예요." % lo
+    return "지금 이 조건에 맞는 판매 중인 PC는 아래 카드처럼 %d만~%d만원이에요." % (lo, hi)
+
+
+def align_market_price(answer: str, prices: list[int]) -> str:
+    """설명의 「시중에서는 보통 ○○만원대」 문장을 아래 카드의 실제 가격 범위로 바꾼다.
+
+    2026-10-12 중헌 님 3번: 설명은 「시중에서는 보통 ○○~○○만원대예요」인데 바로 아래 카드 가격과 많이 달랐다.
+    덧붙인 한 줄(NOTE_MARKET 「다를 수 있어요」)로는 어긋남이 그대로 보였다. 카드가 있으면 그 카드 가격을
+    말하고 «다를 수 있다» 줄은 뺀다. 카드가 없으면(못 구했으면) 그대로 둔다 -- 시중 시세와 다를 수 있다는 줄이 남는다.
+    """
+    if not answer or not prices:
+        return answer
+    sents = TF.split_sentences(answer)
+    market = [s for s in sents if "시중" in s and (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s))
+              and s != NOTE_MARKET]
+    if not market:
+        return answer
+    line, out = card_range_sentence(prices), []
+    for s in sents:
+        if s == NOTE_MARKET:
+            continue
+        if s in market:
+            if line:
+                out.append(line)
+                line = ""
+            continue
+        out.append(s)
+    return " ".join(out).strip()
+
+
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
            timeout_sec: float = ADVICE_TIMEOUT_SEC, topic: str = TOPIC_BUILD, games: list[str] | None = None,
            shop_notes: list[str] | None = None):

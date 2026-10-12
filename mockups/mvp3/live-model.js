@@ -8,7 +8,7 @@
     if(typeof value==='string')return value;
     if(!object(value))return null;
     const out={};
-    for(const key of ['cpu','gpu'])if(typeof value[key]==='string')out[key]=value[key];
+    for(const key of ['cpu','gpu','case','psu'])if(typeof value[key]==='string')out[key]=value[key];
     for(const key of ['ram_gb','ssd_gb','vram_gb'])if(Number.isFinite(value[key])&&value[key]>=0)out[key]=value[key];
     return Object.keys(out).length?out:null;
   }
@@ -28,7 +28,9 @@
       ['CPU',cpu!==''?cpu:NONE],
       ['GPU',gpu&&vram&&!gpu.replace(/\s+/g,'').toUpperCase().includes(vram.toUpperCase())?gpu+' · '+vram:gpu||(vram?vram+' 그래픽카드':NONE)],
       ['RAM',ram!==''?ram+'GB':NONE],
-      ['저장장치',ssd!==''?storageLabel(ssd)+' SSD':NONE]
+      ['저장장치',ssd!==''?storageLabel(ssd)+' SSD':NONE],
+      // 케이스·파워(2026-10-12 중헌 님 고객단 4번) -- 서버가 몰 구성 원문에서 읽은 이름만. 못 읽었으면 줄을 두지 않는다.
+      ...[['케이스','case'],['파워','psu']].filter(([,key])=>val(key)!=='').map(([label,key])=>[label,String(val(key))])
     ];
   }
   // 2026-10-11: a card without an approved intro used to show the fit category name
@@ -47,7 +49,7 @@
   // 부품을 바꾼 구성(build.changes)은 사양 줄도 바꾼 부품으로 보인다. 바꾼 부품의 용량·코어 수는 서버가 주지 않으므로
   // 지어내지 않고 부품 이름을 그대로 쓴다(2026-10-12 카드 검수 X1: SSD 1TB 로 바꿔도 「저장장치 500GB SSD」로 남았다).
   // 바꾼 부품 칸 -> 바꿔 쓸 사양 줄 이름(카드·상세 두 표기) · 더는 맞지 않아 뺄 줄.
-  const CHANGE_ROWS={CPU:[['CPU'],[]],GPU:[['GPU'],['GPU 메모리']],RAM:[['RAM','메모리'],[]],SSD:[['저장장치'],[]],HDD:[['저장장치'],[]]};
+  const CHANGE_ROWS={CPU:[['CPU'],[]],GPU:[['GPU'],['GPU 메모리']],RAM:[['RAM','메모리'],[]],SSD:[['저장장치'],[]],HDD:[['저장장치'],[]],CASE:[['케이스'],[]],POWER:[['파워'],[]]};
   function changedSpecRows(rows,build){
     const changes=object(build)&&Array.isArray(build.changes)?build.changes:[];
     const names=new Map(),drop=new Set();
