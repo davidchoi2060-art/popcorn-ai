@@ -249,6 +249,11 @@
 (function(){
  var API='/api/admin/talk-patterns';
  var state={filter:'all',q:'',kind:'text',regress:false,rows:[],picked:null};
+ /* 「운영 현황」 카드처럼 주소에 status= 가 오면 그 칩으로 연다(칩에 있는 값만 받는다). */
+ (function(){var v=new URLSearchParams(location.search).get('status');
+  var b=v&&document.querySelector('#tp-filters [data-f="'+CSS.escape(v)+'"]');
+  if(!b)return;state.filter=v;
+  document.querySelectorAll('#tp-filters [data-f]').forEach(function(x){x.setAttribute('aria-pressed',String(x===b));});})();
  var $=function(id){return document.getElementById(id);};
  function esc(s){var d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML;}
  /* 답변 종류 코드 → 화면 이름 (2026-10-10) */

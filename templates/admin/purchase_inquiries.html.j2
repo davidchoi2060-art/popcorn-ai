@@ -189,6 +189,9 @@
     $('piDrawer').hidden=false;
   }
   $('piClose').addEventListener('click',function(){ $('piDrawer').hidden=true; st.picked=null; });
+  // 「운영 현황」 카드처럼 주소에 status= 가 오면 같은 조건으로 연다(목록에 있는 값만 받는다).
+  (function(){ var v=new URLSearchParams(location.search).get('status'); var sel=$('piStatus');
+    if (v && Array.prototype.some.call(sel.options,function(o){ return o.value===v; })) sel.value=v; })();
   ['piStatus','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
   $('piPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
   $('piNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
