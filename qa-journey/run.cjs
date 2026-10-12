@@ -86,6 +86,28 @@ async function runJob(browser,job){
   async function oldIdle(timeout=150000){await sleep(1500);await page.waitForFunction(()=>document.querySelector('#operation-status')?.hidden!==false,null,{timeout}).catch(()=>{});await sleep(800);}
   const oldMsgs=()=>page.$$eval('#messages .message',ms=>ms.map(m=>({who:m.classList.contains('user')?'user':'ai',text:m.innerText.trim().slice(0,2000)})));
   // ---------- 상세 ----------
+  async function priceCheck(where){
+    const d=await page.evaluate(()=>{
+      const rs=[...document.querySelectorAll('#view .final-table tbody tr')].filter(r=>!r.classList.contains('build-options-row')).map(r=>({part:r.querySelector('h4 span')?.innerText.trim()||'',name:r.querySelector('.part-name')?.innerText.trim()||'',desc:r.querySelector('.final-part-description p')?.innerText.trim()||'',price:r.querySelector('.final-part-price')?.innerText.trim()||r.querySelectorAll('td')[1]?.innerText.trim()||''}));
+      const foot=[...document.querySelectorAll('#view .final-table tfoot tr')].map(r=>r.innerText.replace(/\s+/g,' ').trim());
+      const v=document.querySelector('#view')?.innerText||'';
+      return {rows:rs,foot,budgetLine:(v.match(/예산(보다|과) [^\n]*/)||[''])[0],bar:document.querySelector('#actions:not([hidden]) strong')?.innerText||''};
+    });
+    const sumP=d.rows.reduce((a,r)=>a+(won(r.price)||0),0);
+    const totalRow=d.foot.find(f=>/바꾼 구성 금액/.test(f))||d.foot.find(f=>/참고 금액/.test(f))||'';const total=won(totalRow.replace(/.*?금액/,''));
+    const etcRow=d.foot.find(f=>/조립|기타/.test(f));const etc=etcRow?won(etcRow):0;const base=won((d.foot.find(f=>/기본 구성 금액/.test(f))||'').replace(/.*?금액/,''));
+    const P=[];
+    if(total&&sumP&&Math.abs(sumP+(etc||0)-total)>1000)P.push('P2 부품합 '+sumP.toLocaleString()+' + 기타 '+(etc||0).toLocaleString()+' ≠ 총액 '+total.toLocaleString());
+    if(total&&etc&&etc/total>0.1)P.push('P3 조립·기타 '+etc.toLocaleString()+'원 = 총액의 '+Math.round(etc/total*100)+'%');
+    d.rows.forEach(r=>{if(/포함/.test(r.price)&&/그래픽|CPU|메모리|저장/.test(r.part))P.push('P3 '+r.part+' 금액이 「'+r.price+'」');});
+    if(/금액 미확인|정보 없음/.test(d.rows.map(r=>r.price).join(' ')+d.foot.join(' '))||d.rows.some(r=>won(r.price)===0))P.push('P6 금액 빈칸·미확인');
+    const bl=d.budgetLine.match(/예산보다 ([\d,]+)원 (낮아요|높아요)/);
+    if(bl&&sc.budget&&total){const exp=sc.budget*10000-total;const got=(bl[2]==='낮아요'?1:-1)*won(bl[1]+'원');if(Math.abs(exp-got)>1000)P.push('P5 예산 문구 「'+d.budgetLine+'」 ≠ 계산 '+exp.toLocaleString());}
+    if(d.bar&&total&&won(d.bar)!==total)P.push('P1 하단 금액 '+d.bar+' ≠ 표 총액 '+total.toLocaleString());
+    extra.parts=(extra.parts||[]).concat(d.rows.map(r=>({where,part:r.part,name:r.name,price:won(r.price),priceText:r.price})));
+    extra.prices=(extra.prices||[]).concat({where,sumP,etc,total,base,foot:d.foot,budgetLine:d.budgetLine,issues:P});
+    return {...d,sumP,etc,total,P};
+  }
   async function analyzeDetail(label){
     await page.waitForSelector('.final-table, .public-bom-empty',{timeout:60000}).catch(()=>{});await sleep(1500);
     const d=await page.evaluate(()=>{
@@ -103,10 +125,11 @@ async function runJob(browser,job){
     const iss=[];const need=['game','heavy','edit'].includes(sc.kind);
     d.rows.forEach(r=>{if(/정보 없음/.test(r.name+r.desc))iss.push(r.part+' 「정보 없음」');if(!r.name)iss.push((r.part||'?')+' 이름 빈 줄');if(!won(r.price)&&!/포함/.test(r.price))iss.push(r.part+' 금액 「'+r.price+'」');});
     if(need&&d.rows.length&&!d.rows.some(r=>/그래픽/.test(r.part)&&r.name&&!/정보 없음|내장/.test(r.name)))iss.push('그래픽카드 줄 없음/정보 없음');
-    if(total&&etc&&etc/total>0.1)iss.push('조립·기타 '+etc.toLocaleString()+'원 = 합계의 '+Math.round(etc/total*100)+'%');
-    if(total&&sumP&&Math.abs(sumP+(etc||0)-total)>1000)iss.push('부품합 '+sumP.toLocaleString()+' + 기타 '+(etc||0).toLocaleString()+' ≠ 합계 '+total.toLocaleString());
+    if(total&&etc&&etc/total>0.1)iss.push('P3 조립·기타 '+etc.toLocaleString()+'원 = 합계의 '+Math.round(etc/total*100)+'%');
+    if(total&&sumP&&Math.abs(sumP+(etc||0)-total)>1000)iss.push('P2 부품합 '+sumP.toLocaleString()+' + 기타 '+(etc||0).toLocaleString()+' ≠ 합계 '+total.toLocaleString());
     if(d.ask)iss.push('옛 상담창 「어떤 PC를 찾으세요?」 보임');
     if(need&&d.reasons.join(' ').match(/사무|문서/)&&!d.reasons.join(' ').match(/게임|편집/))iss.push('추천 이유가 사무용');
+    const pc=await priceCheck(label);pc.P.filter(x=>!/^P2|^P3 조립/.test(x)).forEach(x=>iss.push(x));
     extra.detail=(extra.detail||[]).concat({label,...d,sumP,etc,total});
     const sh=await shots(label);
     const lay=extra.layout[extra.layout.length-1];if(lay?.main?.overflowX||lay?.alt390?.overflowX)iss.push('가로 넘침 '+(lay.main.overflowX?lay.main.scrollWidth:lay.alt390.scrollWidth)+'px');
@@ -116,6 +139,7 @@ async function runJob(browser,job){
   async function toFinalAndBuy(){
     const fin=page.locator('#actions [data-action="final"]');
     if(!(await fin.count())){row('S5 최종 견적 확인',false,'상세 아래 「이 견적 저장하기」 없음',await shots('저장없음'));return;}
+    const barBefore=won(await page.locator('#actions strong').innerText().catch(()=>''));
     if(sc.op==='buttonspam'){const n0=count(/saved-quotes/,'POST');for(let k=0;k<3;k++)await fin.click({force:true,noWaitAfter:true}).catch(()=>{});await sleep(4000);extra.spamFinal={savePosts:count(/saved-quotes/,'POST')-n0};}
     else await fin.click();
     await page.waitForFunction(()=>/#final/.test(location.hash),null,{timeout:30000}).catch(()=>{});await sleep(1500);
@@ -123,11 +147,12 @@ async function runJob(browser,job){
     if(await keep.count()){const n0=count(/saved-quotes/,'POST');if(sc.op==='buttonspam'){for(let k=0;k<3;k++)await keep.click({force:true,noWaitAfter:true}).catch(()=>{});}else await keep.click();await page.waitForFunction(()=>/보관됨|보관되지|미확인/.test(document.querySelector('.save-status')?.innerText||''),null,{timeout:60000}).catch(()=>{});if(sc.op==='buttonspam')extra.spamSave={savePosts:count(/saved-quotes/,'POST')-n0};}
     await sleep(1000);
     const st=await page.locator('.save-status').innerText().catch(()=>'');
+    const fp=await priceCheck('최종');
     const sh=await shots('최종견적');const lay=extra.layout[extra.layout.length-1].main;
     const ratio=lay&&lay.textRight?+(lay.textLeft/Math.max(1,lay.textRight)).toFixed(1):null;
     const buyCta=lay?.ctas.find(c=>/쇼핑몰/.test(c.text));
-    const iss=[];if(!/보관됨/.test(st))iss.push('상태 「'+st+'」');if(!mobile&&ratio&&ratio>4)iss.push('왼쪽 쏠림 '+ratio+':1');if(buyCta&&!buyCta.inFirstView)iss.push('구매 단추가 첫 화면 밖('+buyCta.top+'px)');
-    row('S5 최종 견적 확인',!iss.length,'상태 「'+st+'」 · 좌:우 글자 '+ratio+':1 · 구매 단추 '+(buyCta?buyCta.top+'px':'없음')+(iss.length?' ‖ 문제: '+iss.join('; '):''),sh);
+    const iss=[...fp.P];if(barBefore&&fp.total&&barBefore!==fp.total)iss.push('P1 상세 '+barBefore.toLocaleString()+'원 ≠ 최종 '+fp.total.toLocaleString()+'원');if(!/보관됨/.test(st))iss.push('상태 「'+st+'」');if(!mobile&&ratio&&ratio>4)iss.push('왼쪽 쏠림 '+ratio+':1');if(buyCta&&!buyCta.inFirstView)iss.push('구매 단추가 첫 화면 밖('+buyCta.top+'px)');
+    row('S5 최종 견적 확인',!iss.length,'총액 '+(fp.total||0).toLocaleString()+'원 · 부품합 '+fp.sumP.toLocaleString()+' · 조립·기타 '+(fp.etc||0).toLocaleString()+' · 상태 「'+st+'」 · 좌:우 글자 '+ratio+':1 · 구매 단추 '+(buyCta?buyCta.top+'px':'없음')+(iss.length?' ‖ 문제: '+iss.join('; '):''),sh);
     if(id==='A1'&&!mobile){const out=[];for(const w of [320,390,1280,1920,2560]){await page.setViewportSize({width:w,height:900});await sleep(700);const l=await layout(page);const f=tag+'-D2-'+w+'.png';await page.screenshot({path:path.join(OUT,f),fullPage:true});out.push(f);extra['D2_'+w]=l;}await page.setViewportSize({width:W,height:H});row('D2 화면 폭별 최종 견적',null,[320,390,1280,1920,2560].map(w=>w+'폭 좌:우 '+(extra['D2_'+w].textLeft/Math.max(1,extra['D2_'+w].textRight)).toFixed(1)+(extra['D2_'+w].overflowX?' 넘침':'')).join(' · '),out);}
     if(sc.op==='reload'){await page.reload({waitUntil:'networkidle'});await sleep(2000);const st2=await page.locator('.save-status').innerText().catch(()=>'');const h=page.url();row('E16 새로고침 · 최종 견적',/#final/.test(h)&&!!st2,'주소 '+h.replace(BASE,'')+' · 상태 「'+st2+'」',await shots('새로고침-최종'));}
     if(sc.op==='rotate'){await page.setViewportSize({width:844,height:390});await sleep(800);const l=await layout(page);const f=await shots('회전-최종',{alt:false});await page.setViewportSize({width:390,height:844});row('E19 회전 · 최종',!l.overflowX,'844×390 넘침 '+(l.overflowX?l.scrollWidth+'px':'없음'),f);}
@@ -140,6 +165,7 @@ async function runJob(browser,job){
     const panel=await page.evaluate(()=>{const p=document.querySelector('.live-handoff');if(!p)return null;const b=p.getBoundingClientRect();return {text:p.innerText.replace(/\s+/g,' ').slice(0,300),top:Math.round(b.top),inView:b.top<innerHeight&&b.bottom>0};});
     const iss2=[];if(!still&&!(panel&&panel.inView))iss2.push('누른 단추가 사라지고 결과가 화면 밖');if(!panel)iss2.push('결과 칸 안 나옴');
     if(sc.op==='buttonspam'){const k=count(/handoff/,'POST')-n0;extra.spamHandoff={posts:k};if(k>1)iss2.push('연결 요청 '+k+'번');}
+    if(panel){const m=panel.text.match(/쇼핑몰 (?:현재 )?가격(?:도|은) ([\d,]+)원/);if(m&&fp.total&&won(m[1]+'원')!==fp.total&&!/달라|고쳤어요/.test(panel.text))iss2.push('P1 쇼핑몰 '+m[1]+'원 ≠ 견적 '+fp.total.toLocaleString()+'원, 차이 안내 없음');}
     row('S6 쇼핑몰 구매 단추',!iss2.length,(still?'단추 남음':'단추 사라짐')+' · 결과 칸 '+(panel?(panel.inView?'화면 안':'화면 밖(아래 '+panel.top+'px)')+' 「'+panel.text.slice(0,140)+'」':'없음')+(iss2.length?' ‖ 문제: '+iss2.join('; '):''),await shots('쇼핑몰단추후',{alt:false}));
     const link=page.locator('.live-handoff a.primary');
     if(await link.count()){const href=await link.getAttribute('href');const [pop]=await Promise.all([ctx.waitForEvent('page',{timeout:20000}).catch(()=>null),link.click()]);let info='';const f=tag+'-99-쇼핑몰.png';if(pop){await pop.waitForLoadState('domcontentloaded',{timeout:30000}).catch(()=>{});await sleep(2000);info=pop.url()+' · 「'+(await pop.title().catch(()=>''))+'」';await pop.screenshot({path:path.join(OUT,f)}).catch(()=>{});await pop.close();}
