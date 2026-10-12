@@ -1247,9 +1247,17 @@ def parse_talk(body: ParseBody, request: Request):
                         max_output_tokens=LLM_MAX_OUTPUT_TOKENS,
                         timeout_sec=LLM_TIMEOUT_SEC)
 
+    # 판매 안내(운영체제·배송·결제·여러 대 등)는 문장만 보고 정해진다 -- 설명 AI([B])에 «가게 사실»로 먼저 넘긴다.
+    # AI 가 고객이 실제로 그 주제를 물었는지 대화로 판단해 자기 말로 전한다. 정규식이 잘못 걸려도(「모니터가 4대」)
+    # AI 답을 고정 문구로 바꿔치기하지 않는다(2026-10-12 사장님 「고객 소통채널은 LLM 이 되어야 함」).
+    # 다만 고객이 배송·결제·운영체제처럼 절차 낱말을 직접 쓴 문장은 관리자 안내 원문을 그대로 아래에 둔다(2026-10-11 E46
+    # 「설명은 위, 우리 가게 안내는 아래」) -- 넘기는 것은 «여러 대»·«모니터 포함»처럼 낱말만으로 잘못 걸리기 쉬운 주제다.
+    shop_notes = TR.topic_notices(text, written_notices, custom_notices)
+    b_notes = [] if PA._GENERAL.search(text) else shop_notes
+
     def _call_b():
         return TA.answer_path(engine.connect, text, vocab,
-                              prev_state=prev_state_obj, history=history)
+                              prev_state=prev_state_obj, history=history, shop_notes=b_notes)
 
     # 고객 응답에는 프로바이더·모델·비용·토큰·원문 오류를 싣지 않는다(PR #2 계약).
     # 사유는 서버 로그와 api_cost_logs 에만 남긴다.
@@ -1344,7 +1352,9 @@ def parse_talk(body: ParseBody, request: Request):
     custom_hits = TR.custom_topic_hits(text, custom_notices)
     if (TR.purchase_topics(text) or custom_hits) and pc is not True:
         pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
-    if pc is not True and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
+    if (pc is not True and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip()
+            and getattr(ans, "topic", None) != PA.TOPIC_FOLLOW):
+        # 이어 답하기(TOPIC_FOLLOW)는 규칙이 PC 질문으로 본 것이 아니라 «상담 중이라» 부른 것이다 -- 잡담 판정을 뒤집지 않는다.
         # 규칙(talk_pc_advice.topic_of)이 PC·부품 질문으로 보고 설명을 지었으면 PC 상담이다. AI 판정이
         # 「주제 밖」이라고 그 설명을 지우지 않는다(2026-10-11 개발 서버: 「발로란트 240프레임 그래픽카드 뭐 사야 돼?」·
         # 「RTX 5070 들어간 PC 얼마 정도 해요?」에 설명 없이 「다른 시스템에서 확인하세요」만 나갔다).
@@ -1375,12 +1385,16 @@ def parse_talk(body: ParseBody, request: Request):
         reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
     # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
     # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
-    topic_notes = TR.topic_notices(text, written_notices, custom_notices)
+    topic_notes = shop_notes
     cond_notes = TR.condition_notices(text, state, prev_state_obj)
-    notices = topic_notes + cond_notes
+    # 설명 AI 가 판매 안내를 받아 답을 냈으면 그 안내는 설명이 전한다 -- 아래 말풍선에 고정 문구로 다시 싣지 않는다.
+    # 설명이 나중에 화면에서 빠지면(예외·잡담 판정) 맨 끝에서 고정 안내를 되살린다(notes_deferred).
+    b_told = bool(b_notes) and getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+    notes_deferred = list(topic_notes) if b_told else []
+    notices = ([] if b_told else topic_notes) + cond_notes
     if stage == TS.STAGE_PC:
         reply = TR.drop_deferrals(reply)
-    if notices and stage == TS.STAGE_PC:
+    if (notices or b_told) and stage == TS.STAGE_PC:
         # 배송·환불·보증만 물었고 위 설명([B])이 이미 답했으면 「용도와 예산을 알려 주시면」을 붙이지 않는다
         # (2026-10-12 일반 AI 비교 R13·E44 -- 절차 질문 끝마다 PC 를 다시 물었다).
         answered = (topic_notes and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
@@ -1527,6 +1541,9 @@ def parse_talk(body: ParseBody, request: Request):
     if set(exceptions) & {"self_harm", "prompt_injection"}:
         answer = ""        # 안전 최소 보호 -- 이때는 서버 문장 한 줄만 낸다
     answer = TR.tidy_customer_text(answer, text)
+    if notes_deferred and not answer.strip():
+        # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
+        reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()
     # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).
     # 값 자체는 [A] 의 state 가 정본이다(격자 좌표 계약을 [B] 가 덮어쓰지 않는다).
     a_names = set(state.game.names) if state.game and state.game.names else set()
