@@ -6,7 +6,7 @@ const talk={usages:['게임'],budget_won:1500000,budget_bound:'이하'};
 const product={product_code:101,name:'검증용 PC',price:1430000,price_src:'등록 판매가',spec:{cpu:'CPU',gpu:'GPU',ram_gb:32,ssd_gb:1024},reasons:['조건에 맞는 등록 상품'],tag:'추천'};
 const reco={ok:true,card_sets:[{kind:'sold',usage:'게임',items:[product,{...product,product_code:102,name:'대안 PC'}]}],needs:[],assumed:[]};
 const parsed={ok:true,state:talk,chat_flow:{step:2},answer:'',reply:'찾아볼게요.',pc_related:true,missing:[]};
-const change={ordinal:1,slot:'RAM',label:'메모리',quantity:1,before:{product_code:501,name:'램 16GB',price:60000},after:{product_code:502,name:'램 32GB',price:110000},delta:50000};
+const change={ordinal:1,slot:'RAM',label:'메모리',quantity:1,base_quantity:1,before:{product_code:501,name:'램 16GB',price:60000},after:{product_code:502,name:'램 32GB',price:110000},delta:50000};
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k),map};}
 const tick=()=>new Promise(r=>setImmediate(r));
 function make(api,ss){const flow=createFlow({parse:async()=>parsed,recommend:async()=>reco,inquiryForm:async()=>({ok:true,topics:['기타','여러 대 구매'],consent_text:'동의'}),...api},{uuid:()=>ID,sessionStorage:ss});return flow;}

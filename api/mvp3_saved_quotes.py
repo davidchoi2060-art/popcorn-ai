@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, visitor
+from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_quantity, visitor
 from .sold_reco import public_spec
 from .db import engine
 from .talk_schema import load_vocab, validate_state
@@ -37,6 +37,8 @@ class SaveBody(BaseModel):
     state: dict
     # 부품 직접 바꾸기(api/mvp3_build). 있으면 서버가 금액·호환을 다시 계산해 그 값으로 보관한다.
     changes: list[mvp3_build.Change] = Field(default_factory=list, max_length=mvp3_build.MAX_CHANGES)
+    # 같은 구성을 몇 대 사나(2026-10-12 중헌 님 7번). 금액(price)은 한 대 값 그대로 두고 대수만 함께 보관한다.
+    sets: StrictInt = Field(default=1, ge=1, le=mvp3_quantity.MAX_SETS)
 
 
 def same_origin(request):
@@ -50,6 +52,11 @@ def fingerprint(body):
     dump = body.model_dump(mode='json')
     if not dump.get('changes'):
         dump.pop('changes', None)     # 부품을 바꾸지 않은 저장은 예전과 같은 지문이다
+    for c in dump.get('changes') or []:
+        if c.get('quantity') is None:
+            c.pop('quantity', None)   # 수량을 바꾸지 않은 줄도 예전과 같은 지문이다
+    if dump.get('sets') == 1:
+        dump.pop('sets', None)
     raw = json.dumps(dump, sort_keys=True, ensure_ascii=False, separators=(',', ':'))
     if len(raw.encode('utf-8')) > 16384:
         raise HTTPException(422, '상담 조건이 너무 큽니다.')
@@ -163,6 +170,8 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         if build:
             build['base_price'] = check['mall']
     product['price_check'] = check
+    if body.sets > 1:
+        product['sets'] = body.sets
     params = {'id': quote_id, 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
               'product': json.dumps(product, ensure_ascii=False),
               'state': json.dumps(state.model_dump(), ensure_ascii=False)}

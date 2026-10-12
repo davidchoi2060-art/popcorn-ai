@@ -244,7 +244,7 @@ function renderResults(){
 function productSummary(){
   const p=state.selected,description=p.public_configuration?.description,title=description?.title||p.name;
   const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
-  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+'<p class="'+(overBudget(p)?'warn-text':'green')+'">'+esc(budget(p))+'</p>'+'</div>'+productImage(p,true)+'</section>';
+  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+'<p class="'+(overBudget(p)?'warn-text':'green')+'">'+esc(budget(p))+'</p>'+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){
   const roles={
@@ -326,11 +326,32 @@ function buildPanel(){
   if(!d)return '';
   // 쿨러 미확인 경고는 서버 안내(note)가 한 문장으로 품는다 — 「모두 통과」와 경고를 따로 나란히 두지 않는다.
   const warned=(d.warnings||[]).length>0,untested=d.untested?'<p class="muted">사양 정보가 모자라 호환을 확인하지 못한 부품 '+d.untested+'개는 빼고 보여 드려요.</p>':'';
-  if(!d.options.length)return '<div class="part-options" role="status">'+head+'<p>지금 이 PC에 맞는 다른 판매 부품이 없어요.</p>'+untested+'</div>';
-  return '<div class="part-options">'+head+'<p class="'+(warned?'warn-text':'muted')+'">'+esc(d.note||(warned?d.warnings.join(' '):'호환 규칙을 통과한 판매 중 부품만 보여 드려요.'))+'</p>'+untested+'<ul class="part-option-list">'+
+  if(!d.options.length)return '<div class="part-options" role="status">'+head+quantityBlock(d)+'<p>지금 이 PC에 맞는 다른 판매 부품이 없어요.</p>'+untested+'</div>';
+  return '<div class="part-options">'+head+quantityBlock(d)+'<p class="'+(warned?'warn-text':'muted')+'">'+esc(d.note||(warned?d.warnings.join(' '):'호환 규칙을 통과한 판매 중 부품만 보여 드려요.'))+'</p>'+untested+'<ul class="part-option-list">'+
     d.options.map(o=>'<li class="part-option" data-build-option="'+o.product_code+'"><div class="part-option-copy"><strong>'+esc(o.name)+'</strong><span class="part-option-name">부품 판매가 '+money(o.price)+'</span></div>'+
       '<div class="part-option-price"><strong>'+money(o.total)+'</strong><span class="'+(o.price_diff>0?'warn-text':'green')+'">'+signedMoney(o.price_diff)+'</span>'+
       button('이걸로 바꾸기','build-pick','primary small','data-code="'+o.product_code+'"'+(state.phase?' disabled':''))+'</div></li>').join('')+'</ul></div>';
+}
+// 메모리·저장장치 수량(api/mvp3_quantity). 범위·근거는 서버가 준 것만 쓴다(2026-10-12 중헌 님 7번).
+// 메인보드 정보를 모르면(known=false) 늘리는 단추를 잠그고 그 이유를 그대로 보여 준다. 줄이는 것은 1개까지 된다.
+function stepper(action,attr,n,min,max,unit,label){
+  const dis=state.phase?' disabled':'';
+  return '<span class="qty-stepper" role="group" aria-label="'+esc(label)+'">'+
+    button('−',action,'outline small',attr+'="'+(n-1)+'" aria-label="'+esc(label)+' 줄이기"'+(n<=min?' disabled':dis))+
+    '<strong aria-live="polite">'+n+unit+'</strong>'+
+    button('+',action,'outline small',attr+'="'+(n+1)+'" aria-label="'+esc(label)+' 늘리기"'+(n>=max?' disabled':dis))+'</span>';
+}
+function quantityBlock(d){
+  const q=d?.quantity;if(!q)return '';
+  return '<div class="part-qty" data-part-qty><span>수량</span>'+stepper('build-qty','data-qty',q.current,q.min,q.max,'개',(d.label||'부품')+' 수량')+
+    '<p class="'+(q.known?'muted':'warn-text')+'">'+esc(q.basis)+(q.known?' '+q.max+'개까지 고를 수 있어요.':'')+'</p></div>';
+}
+// 같은 구성 여러 대(2026-10-12 중헌 님 7번). 금액은 한 대 값(서버)이고 합계는 그 값 × 대수다. 보관·쇼핑몰 연결은 서버가 다시 곱한다.
+function setsBlock(p){
+  const n=p.sets||1,edit=state.screen==='detail'&&!state.savedQuote;
+  if(!edit&&n===1)return '';
+  return '<div class="final-sets" data-sets><span>같은 구성 대수</span>'+(edit?stepper('sets','data-sets',n,1,10,'대','같은 구성 대수'):'<strong>'+n+'대</strong>')+
+    '<p class="muted">'+(n>1&&Number.isSafeInteger(p.price)?n+'대 합계 '+money(p.price*n)+' · 한 대 '+money(p.price)+'. ':'')+'금액은 한 대 기준이고, 저장과 쇼핑몰 연결에 대수를 함께 넘겨요.</p></div>';
 }
 // 부품 바꾸기(api/mvp3_part_options): 고른 판매 PC 에서 그 부품만 다른 판매 PC 를 고른다.
 // 금액·차액·함께 바뀌는 것은 서버가 준 값만 쓴다. 상품 상세에서만 바꾼다(최종 견적은 안내만).
@@ -352,6 +373,9 @@ function partOptionsPanel(){
       button('이걸로 바꾸기','part-swap','primary small','data-code="'+o.product_code+'"'+(state.phase?' disabled':''))+'</div></li>').join('')+'</ul></div>';
 }
 function partChange(finalOnly,configured){
+  return partChangeBody(finalOnly,configured).replace('</h3>','</h3>'+setsBlock(state.selected));
+}
+function partChangeBody(finalOnly,configured){
   if(configured){
     const p=state.selected,b=p.build;
     return '<section class="live-capabilities" id="part-change"><h3>부품 바꾸기</h3><p>'+(finalOnly?'부품은 「상품 상세 다시 보기」에서 바꿀 수 있어요.':'부품 구성 표의 「변경」을 누르면 이 PC에 맞는 판매 부품을 보여 드려요. 호환 규칙을 통과한 부품만 나오고, 금액은 PC 판매가에 부품 가격 차이를 더해 다시 계산해요.')+'</p>'+
@@ -414,6 +438,7 @@ function handoffPanel(h){
     '쇼핑몰 가격도 '+money(h.price_quoted)+'으로 같아요.';
   return '<section class="live-explanation live-handoff" role="status"><h3>팝콘PC 쇼핑몰로 연결할 준비가 됐어요</h3><p>'+esc(line)+'</p>'+
     '<p><a class="primary" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a></p>'+
+    (h.sets>1?'<p class="warn-text">같은 구성 '+h.sets+'대 견적이에요. 쇼핑몰에서 수량을 '+h.sets+'대로 골라 주세요. '+h.sets+'대 합계는 '+money(total*h.sets)+'이에요.</p>':'')+
     (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+h.changes+'개(차액 '+esc(signedMoney(h.delta))+')는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
     '<p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p></section>';
 }
@@ -520,7 +545,7 @@ function render(){
 function focusParts(){
   const pick=view.querySelector('[data-action=build-options]');
   if(pick){view.querySelector('.final-parts')?.scrollIntoView({block:'start'});pick.focus({preventScroll:true});return;}
-  const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});s?.querySelector('button')?.focus({preventScroll:true});
+  const s=view.querySelector('#part-change');s?.scrollIntoView({block:'start'});(s?.querySelector('[data-action=part-options]')||s?.querySelector('button:not([disabled])'))?.focus({preventScroll:true});
 }
 // 넘어온 직후 견적을 다시 불러오는 일이 끝나면 한 번만 부품 바꾸기 칸으로 옮긴다(못 불러왔으면 옮기지 않고 끝낸다).
 function settleArrival(){if(!arrival?.focus||enteringRoute||state.phase)return;arrival.focus=false;if(state.screen==='detail'&&state.selected)focusParts();}
@@ -586,6 +611,8 @@ document.addEventListener('click',e=>{
     case 'build-close':flow.closeBuild();break;
     case 'build-pick':void flow.pickBuild(Number(b.dataset.code));break;
     case 'build-reset':void flow.resetBuild();break;
+    case 'build-qty':void flow.setBuildQuantity(Number(b.dataset.qty));break;
+    case 'sets':flow.setSets(Number(b.dataset.sets));break;
     case 'part-focus':focusParts();break;
     case 'inquiry-close':flow.inquiryDraft(inquiryValues());flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
