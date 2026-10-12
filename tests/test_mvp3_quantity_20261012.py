@@ -69,6 +69,15 @@ class BoardFacts(unittest.TestCase):
         self.assertEqual(Q.ram_unit({'capacity_gb': 32}, '패키지 구성 : 2', ''), (2, 32))
         self.assertEqual(Q.ram_unit({}, '', 'DDR5 32GB (16Gx2)'), (2, 32))
 
+    def test_kit_name_beats_a_spec_column_of_one(self):
+        # 2026-10-12 배포 캡처: [8Gx2] 묶음이 사양 칸 1 때문에 2슬롯 보드에서 2개까지 열렸다.
+        self.assertEqual(Q.ram_unit({'module_count': 1, 'capacity_gb': 16}, '', '삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]'), (2, 16))
+        u = Q.usage([dict(ordinal=1, slot='MB', product_code=1, quantity=1),
+                     dict(ordinal=2, slot='RAM', product_code=2, quantity=1, name='삼성 메모리')],
+                    {1: dict(mem_slots=2, mem_max_gb=64), 2: dict(module_count=1, capacity_gb=16)}, {},
+                    {2: '삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]'})
+        self.assertEqual(Q.limit_for(u, 2, 1)['max'], 1)
+
     def test_storage_kind(self):
         self.assertEqual(Q.storage_kind({'form_factor': 'M.2 2280', 'interface': 'SATA'}, '', 'SSD'), 'm2')
         self.assertEqual(Q.storage_kind({'form_factor': '6.4cm(2.5형)'}, '', 'SSD'), 'sata')

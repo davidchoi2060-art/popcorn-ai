@@ -48,7 +48,8 @@ def board(spec, raw):
 def ram_unit(spec, raw, name):
     """상품 한 개의 (모듈 수, 용량 GB). 용량을 모르면 None."""
     bundle = ram_bundle(name or '')
-    modules = _pick(spec, raw, 'module_count') or (bundle['module_count'] if bundle else 1)
+    # 사양 칸의 1 과 상품명의 8Gx2 가 다르면 많은 쪽을 믿는다 -- 슬롯 수를 넘겨 팔지 않는 쪽이다.
+    modules = max(_pick(spec, raw, 'module_count') or 1, bundle['module_count'] if bundle else 1)
     cap = _pos((spec or {}).get('capacity_gb')) or (bundle['total_gb'] if bundle else None)
     return modules, cap
 
@@ -70,8 +71,8 @@ def storage_kind(spec, raw, slot):
     return None
 
 
-def usage(lines, specs, raws):
-    """구성 전체가 쓰는 자리. lines = [{ordinal, slot, product_code, quantity, name}]."""
+def usage(lines, specs, raws, names=None):
+    """구성 전체가 쓰는 자리. lines = [{ordinal, slot, product_code, quantity, name}]. names = 상품 원래 이름."""
     out = dict(board=None, ram=[], storage=[])
     for l in lines:
         code, slot = l.get('product_code'), l.get('slot')
@@ -81,7 +82,8 @@ def usage(lines, specs, raws):
         if slot == 'MB':
             out['board'] = board(spec, raw)
         elif slot == 'RAM':
-            modules, cap = ram_unit(spec, raw, l.get('name'))
+            units = [ram_unit(spec, raw, n) for n in ((names or {}).get(code), l.get('name'))]
+            modules, cap = max(u[0] for u in units), next((u[1] for u in units if u[1]), None)
             out['ram'].append(dict(ordinal=l['ordinal'], quantity=l['quantity'], modules=modules, cap=cap))
         elif slot in ('SSD', 'HDD'):
             out['storage'].append(dict(ordinal=l['ordinal'], quantity=l['quantity'],
