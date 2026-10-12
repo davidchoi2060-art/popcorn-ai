@@ -130,7 +130,10 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     build = bool((_REQUEST.search(s) and (uses or pc))
                  or (_NEED.search(s) and (uses or (pc and not part)))
                  # 「100만원 PC 환불 언제 들어와?」의 금액은 새 PC 예산이 아니라 주문 금액이다(코덱스 #177~#181 검수 P2-4).
-                 or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
+                 or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
+                 # 「사무용 80만원」 -- PC 낱말·요청 낱말 없이 용도와 예산만 말해도 새 PC 이야기다. 설명 없이
+                 # 「문서 작업 중심인가요?」 질문만 나갔다(2026-10-12 Claude 복귀 뒤 점검).
+                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
