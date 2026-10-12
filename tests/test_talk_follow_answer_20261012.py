@@ -24,15 +24,19 @@ HISTORY = [("user", "PC 부품이나 구성에서 궁금한 점이 있어요."),
 FOLLOW = "모니터 4대를 쓰시려면 출력 단자가 4개 이상인 외장 그래픽카드가 필요해요."
 
 
+# 캡처 문장 자체는 #227 이 모니터 여러 대를 구성 설명(build)으로 잡게 했다. 규칙에 아직 안 걸리는 이어 말로 고정한다.
+UNCAUGHT = "책상이 좁아서 작은 게 좋아요"
+
+
 class TopicInContext(unittest.TestCase):
-    def test_capture_sentence_is_not_caught_by_rules(self):
-        self.assertIsNone(PA.topic_of(CAPTURE, vocab()))      # 고치기 전 AI 를 안 부른 이유
+    def test_uncaught_sentence_is_not_caught_by_rules(self):
+        self.assertIsNone(PA.topic_of(UNCAUGHT, vocab()))     # 고치기 전이면 AI 를 안 불렀을 문장
 
     def test_in_consult_follow_up_calls_ai(self):
-        self.assertEqual(PA.topic_in_context(CAPTURE, vocab(), None, HISTORY), PA.TOPIC_FOLLOW)
+        self.assertEqual(PA.topic_in_context(UNCAUGHT, vocab(), None, HISTORY), PA.TOPIC_FOLLOW)
 
     def test_first_turn_with_pc_words_calls_ai(self):
-        self.assertEqual(PA.topic_in_context("모니터가 4대 있어요", vocab()), PA.TOPIC_FOLLOW)
+        self.assertEqual(PA.topic_in_context("본체가 작았으면 좋겠어요", vocab()), PA.TOPIC_FOLLOW)
 
     def test_rule_topic_still_wins(self):
         self.assertEqual(PA.topic_in_context("사무용 컴퓨터 추천해줘", vocab(), None, HISTORY), PA.TOPIC_BUILD)
