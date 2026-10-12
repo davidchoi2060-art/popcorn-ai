@@ -61,6 +61,7 @@ add('E24b',{kind:'game',budget:150,depth:'cards',longText:19000,text:'예산은 
 add('E25',{kind:'none',depth:'cards',op:'junk',follow:false,expectNoCards:true,text:''});
 add('E26',{kind:'game',budget:150,depth:'cards',follow:false,text:'<b>배그</b> 150만원 <script>alert(1)</script>'});
 add('E27',{kind:'none',depth:'cards',follow:false,text:'제 카드번호 1234-5678-9012-3456이에요, 전화 010-1234-5678'});
+add('E29',{kind:'office',depth:'detail',follow:false,monitors:4,text:'주로 업무, 학교, 회사일, 개인적인 용도로 두루두루 사용하는데, 모니터가 4대 임'});
 add('E28',{kind:'game',budget:150,depth:'cards',follow:false,text:'배그 150만원 PC 추천해줘',then:['배그 150만원 PC 추천해줘','배그 150만원 PC 추천해줘']});
 // D 화면 자체 (AI 없음, A1 결과 화면을 쓰는 D2는 A1 안에서)
 add('D1',{op:'addresses',depth:'none'});
