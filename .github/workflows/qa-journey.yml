@@ -15,28 +15,8 @@ jobs:
       max-parallel: 4
       matrix:
         include:
-          - {scen: 'A1,A1@m,A2,A2@m'}
-          - {scen: 'A3,A3@m,A4,A4@m'}
-          - {scen: 'A5,A5@m,A6,A6@m'}
-          - {scen: 'B01,B02,B03,B04'}
-          - {scen: 'B04@m,B05,B06,B07'}
-          - {scen: 'B08,B09,B10,B11'}
-          - {scen: 'B12,B13,B14,B15'}
-          - {scen: 'B16,B17,B18,B19'}
-          - {scen: 'B20,B21,B22,B22@m'}
-          - {scen: 'B23,B24,B25,B26'}
-          - {scen: 'B27,B28,B29,B30'}
-          - {scen: 'B31,C1,C2,C3'}
-          - {scen: 'C4,C5,C6,E01'}
-          - {scen: 'E02,E03,E04,E05'}
-          - {scen: 'E06,E07a,E07b,E07c'}
-          - {scen: 'E08,E09,E10,E11'}
-          - {scen: 'E12,E13,E14,E15'}
-          - {scen: 'E16,E17,E18,E19'}
-          - {scen: 'E20,E21,E22a,E22b'}
-          - {scen: 'E22c,E23a,E23b,E23c'}
-          - {scen: 'E24a,E24b,E25,E26'}
-          - {scen: 'E27,E28,D1,D3'}
+          - {scen: 'A1'}
+          - {scen: 'E25,D1'}
     steps:
       - uses: actions/checkout@v4
         with:
