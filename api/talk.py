@@ -1270,7 +1270,19 @@ def parse_talk(body: ParseBody, request: Request):
 
     unreadable = False
     try:
-        obj = _extract_json(result.text)
+        try:
+            obj = _extract_json(result.text)
+        except Exception as first:
+            # 형식이 깨진 응답은 가끔이다(2026-10-12 개발 서버: 같은 업그레이드 문장 3번 중 1번, 모델 luna).
+            # 고객에게 「다르게 말해 달라」고 하기 전에 한 번만 다시 묻는다. 다시 물어도 깨지거나 실패하면
+            # 아래 「못 읽었다」 길로 간다 -- 이 턴을 502 로 끊지 않는다.
+            log.warning("[talk] non-JSON response from %s/%s, retry once: %s",
+                        result.provider, result.model, first)
+            try:
+                result = _call_a()
+            except llm.LLMError as e:
+                raise ValueError(f"retry failed: {type(e).__name__}") from e
+            obj = _extract_json(result.text)
     except Exception as e:
         # 모델이 형식을 어긴 것도 실패다 -- 빈 조건으로 뭉개면 "못 읽었다"와
         # "AI가 깨졌다"를 화면이 구분하지 못한다.
