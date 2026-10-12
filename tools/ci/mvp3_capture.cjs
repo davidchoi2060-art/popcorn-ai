@@ -11,6 +11,9 @@
 //   OUT    캡처를 쓸 폴더
 //   PAGES  index(옛 상담 화면) · talk(대화 화면 talk.html)를 쉼표로. 기본 「talk」(옛 화면은 #202 뒤 상담창이 걷혀 입력칸을 못 찾는다 -- 필요하면 index 를 직접 준다).
 //          대화 화면은 「AI 설명 -> 안내 -> 카드 -> 다음 선택 단추」 순서를 함께 적는다(2026-10-12).
+//   QTY    1 이면 대화 화면 카드마다 메모리·저장장치 줄의 수량 한도(/api/mvp3/build/options quantity_limit)를
+//          화면이 쓰는 클라이언트로 읽어 적고, 첫 카드의 부품 구성 화면에서 메모리 수량 칸을 캡처한다(2026-10-12 7번).
+//          읽기만 한다 -- build/options 는 계산만 하고 저장하지 않는다.
 const {chromium}=require('playwright');
 const fs=require('fs'),path=require('path');
 
@@ -20,6 +23,7 @@ const CASES=(process.env.CASES||'').split('|').map(x=>x.trim()).filter(Boolean).
   const i=x.indexOf('=');return i>0?{name:x.slice(0,i).trim(),text:x.slice(i+1).trim()}:{name:x.replace(/[^\p{L}\p{N}_-]+/gu,''),text:x};
 });
 if(!CASES.length){console.error('CASES 가 비어 있습니다');process.exit(2);}
+const QTY=process.env.QTY==='1';
 const PAGES=(process.env.PAGES||'talk').split(',').map(x=>x.trim()).filter(x=>x==='index'||x==='talk');
 fs.mkdirSync(OUT,{recursive:true});
 
@@ -38,6 +42,9 @@ async function captureTalk(browser,c){
   const page=await ctx.newPage();
   page.on('pageerror',e=>r.errors.push('pageerror: '+e.message));
   page.on('console',m=>{if(m.type()==='error')r.errors.push('console: '+m.text());});
+  let reco=null;
+  page.on('response',async res=>{if(res.url().endsWith('/api/grid/recommend')&&res.ok()){
+    try{reco={state:JSON.parse(res.request().postData()||'{}').state,body:await res.json()};}catch{}}});
   try{
     await page.goto(BASE+'/mvp3/talk.html',{waitUntil:'networkidle',timeout:60000});
     await page.fill('#tk-input',c.text);
@@ -63,6 +70,7 @@ async function captureTalk(browser,c){
     const mobile=path.join(OUT,r.name+'-모바일.png');
     await page.screenshot({path:mobile,fullPage:true});r.shots.push(mobile);
     r.overflow_px=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);
+    if(QTY&&reco)await captureQuantity(page,r,reco);
   }catch(e){
     r.errors.push('capture: '+e.message.split('\n')[0]);
     const fail=path.join(OUT,r.name+'-실패.png');
@@ -71,6 +79,47 @@ async function captureTalk(browser,c){
   }
   await ctx.close();
   return r;
+}
+
+// 7번 수량: 카드마다 메모리·저장장치 줄의 한도를 읽고, 첫 카드의 부품 구성 화면에서 메모리 수량 칸을 찍는다.
+async function captureQuantity(page,r,reco){
+  r.quantity=await page.evaluate(async({state,body})=>{
+    const out=[];
+    const items=(body.card_sets||[]).filter(g=>g.kind==='sold').flatMap(g=>g.items||[]);
+    for(const it of items){
+      const parts=it.public_configuration?.parts||[];
+      if(!parts.length){out.push({code:it.product_code,bom:false});continue;}
+      for(const p of parts.filter(p=>!p.pseudo&&(p.slot==='RAM'||p.slot==='SSD'))){
+        try{const o=await window.MVP3Api.buildOptions(state,it.product_code,[],p.ordinal);
+          out.push({code:it.product_code,slot:p.slot,quantity:o.quantity,limit:o.quantity_limit});}
+        catch(e){out.push({code:it.product_code,slot:p.slot,error:String(e?.message||e).slice(0,80)});}
+      }
+    }
+    return out;
+  },reco);
+  await page.setViewportSize({width:1440,height:1000});
+  const choose=page.locator('.tk-cards:not(.is-past) [data-action=choose]').first();
+  if(!await choose.isVisible().catch(()=>false))return;
+  await choose.click();
+  await page.click('[data-action=open-detail]');
+  await page.waitForSelector('.public-bom, #part-change',{timeout:60000});
+  const rows=await page.$$eval('[data-action=build-options]',bs=>bs.map(b=>({ordinal:b.dataset.ordinal,label:b.getAttribute('aria-label')})));
+  const target=rows.find(x=>/메모리/.test(x.label||''))||rows.find(x=>/저장|SSD/.test(x.label||''));
+  if(target){
+    await page.click('[data-action=build-options][data-ordinal="'+target.ordinal+'"]');
+    await page.waitForSelector('.part-options [data-part-qty], .part-options .warn-text, .part-option-list',{timeout:60000}).catch(()=>{});
+    await page.waitForTimeout(500);
+  }
+  await page.evaluate(()=>(document.querySelector('[data-part-qty]')||document.querySelector('#part-change'))?.scrollIntoView({block:'center'}));
+  r.qty_panel=await page.$eval('[data-part-qty]',e=>e.innerText.replace(/\s+/g,' ').trim()).catch(()=>null);
+  r.sets_panel=await page.$eval('[data-sets]',e=>e.innerText.replace(/\s+/g,' ').trim()).catch(()=>null);
+  const pc=path.join(OUT,r.name+'-수량-PC.png');
+  await page.screenshot({path:pc});r.shots.push(pc);
+  await page.setViewportSize({width:390,height:900});
+  await page.waitForTimeout(300);
+  await page.evaluate(()=>(document.querySelector('[data-part-qty]')||document.querySelector('#part-change'))?.scrollIntoView({block:'center'}));
+  const mobile=path.join(OUT,r.name+'-수량-모바일.png');
+  await page.screenshot({path:mobile});r.shots.push(mobile);
 }
 
 async function capture(browser,c){
@@ -135,6 +184,9 @@ async function capture(browser,c){
     if(r.order)lines.push('- 대화 차례: '+r.order.join(' / '));
     if(r.buttons)lines.push('- 카드 아래 단추: '+(r.buttons.join(' · ')||'없음'));
     if(r.overflow_px)lines.push('- 가로 넘침 '+r.overflow_px+'px');
+    for(const q of r.quantity||[])lines.push('- 수량 '+q.code+' '+(q.bom===false?'구성표 미공개':q.slot+' '+(q.error||('지금 '+q.quantity+' · 최대 '+(q.limit?.max??'-')+' · '+(q.limit?.known?'확인':'모름')+' · '+(q.limit?.basis||'')))));
+    if(r.qty_panel)lines.push('- 수량 칸: '+r.qty_panel);
+    if(r.sets_panel)lines.push('- 대수 칸: '+r.sets_panel);
     for(const k of r.cards){
       const ok=k.part_photos.filter(p=>p.loaded).length;
       if(k.fit!==undefined){lines.push('- '+(k.tag||'')+' · '+(k.fit||'작업 수준 없음')+' · '+(k.name||'')+(k.broken_images?' · 깨진 이미지 '+k.broken_images:''));continue;}
