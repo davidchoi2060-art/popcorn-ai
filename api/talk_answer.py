@@ -619,6 +619,10 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                     and not PA.asks_for_pc(sentence, vocab)):
                 labels = None
             topic = PA.topic_in_context(sentence, vocab, prev_state, history) if labels is not None else None
+            if (topic == PA.TOPIC_BUILD and prev_state is not None and getattr(prev_state, "game", None)
+                    and prev_state.game.names):
+                # 앞서 말한 게임이 있으면 그 게임 기준으로 설명한다(「게임별로 필요한 성능」).
+                games = list(prev_state.game.names)
             if labels is None and shop_notes:
                 # 판매 안내 주제가 걸린 문장은 AI 가 그 안내를 읽고 답한다(고정 문구로 바꿔치기하지 않는다 -- talk.parse_talk).
                 labels, topic = [], PA.TOPIC_GENERAL
