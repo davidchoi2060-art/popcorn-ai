@@ -28,3 +28,6 @@ openai~=3.1
 Pillow>=11,<13
 # Bundled cross-platform renderer; no AI video API calls.
 imageio-ffmpeg==0.6.0
+# Customer social login (2026-10-13, api/customer_oidc.py): verify Google/Kakao
+# OIDC ID token signatures against the provider JWKS (RS256 needs the crypto extra).
+PyJWT[crypto]>=2.10,<3
