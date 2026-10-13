@@ -497,8 +497,25 @@ def card_range_sentence(prices: list[int]) -> str:
     return "지금 이 조건에 맞는 판매 중인 PC는 아래 카드처럼 %d만~%d만원이에요." % (lo, hi)
 
 
+_RES_LABEL = {"4K": "4K", "1440p": "QHD", "1080p": "FHD"}
+
+
+def condition_label(usages, resolution=None, is_game=None) -> str | None:
+    """카드가 맞춘 조건을 고객 말로 -- 「고사양 게임 4K」·「영상편집」. 못 만들면 None(→「이 조건」).
+    2026-10-14 개발 서버 E26: 설명이 10만원 저가 구성을 먼저 말한 뒤 「이 조건에 맞는 것은 481만원부터」가 붙어
+    「이 조건」이 10만원 구성인지 4K 인지 헷갈렸다."""
+    names = [u for u in (usages or []) if isinstance(u, str) and u.strip()]
+    if not names:
+        return None
+    label = "·".join(dict.fromkeys(names))
+    res = _RES_LABEL.get(resolution or "")
+    if res and (is_game is None or any(is_game(u) for u in names)):
+        label += " " + res
+    return label
+
+
 def align_market_price(answer: str, prices: list[int], budget_won: int | None = None,
-                       sentence: str = "") -> str:
+                       sentence: str = "", condition: str | None = None) -> str:
     """설명의 「시중에서는 보통 ○○만원대」 문장을 아래 카드의 실제 가격 범위로 바꾼다.
 
     2026-10-12 중헌 님 3번: 설명은 「시중에서는 보통 ○○~○○만원대예요」인데 바로 아래 카드 가격과 많이 달랐다.
@@ -522,7 +539,8 @@ def align_market_price(answer: str, prices: list[int], budget_won: int | None = 
         # 카드의 「예산보다 …원 높아요」가 이미 말한다(2026-10-14 개발 서버 E26: 같은 차이를 세 번 말했다).
         # 「아래 카드처럼 481만원부터라」는 시세 문장(「300만원대 이상」) 바로 뒤라 시세와 같은 말처럼 읽혀 「수치 모순」으로
         # 판정됐다 -- 시세가 아니라 «우리가 파는 것 중 이 조건에 맞는 것»의 시작 가격이라고 분명히 말한다.
-        line = "다만 지금 판매 중인 PC 중 이 조건에 맞는 것은 아래 카드처럼 %d만원부터예요." % _man(low)
+        line = "다만 지금 판매 중인 PC 중 %s에 맞는 것은 아래 카드처럼 %d만원부터예요." % (
+            (condition + " 조건") if condition else "이 조건", _man(low))
         last = market[-1] if market else None
         out = _map_sentences(answer, lambda s: None if s == NOTE_MARKET else (s + " " + line if s == last else s))
         return out if last else (out + " " + line).strip()

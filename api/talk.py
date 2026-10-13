@@ -1606,7 +1606,8 @@ def parse_talk(body: ParseBody, request: Request):
             items = sold_card_items(state.model_dump(), text)
             prices = [it["price"] for it in items if type(it.get("price")) is int and it["price"] > 0]
             budget = state.budget_won if state.budget_bound != "이상" else None
-            answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text)
+            cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
+            answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text, condition=cond)
             g = state.game
             fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
             answer, spec_dropped = PA.align_card_specs(answer, items, fhd_game=fhd_game)

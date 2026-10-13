@@ -91,3 +91,22 @@ class OverBudgetSaysGapOnce(unittest.TestCase):
         self.assertNotIn("예산보다", out)          # 차이는 카드 아래 안내·카드가 말한다
         self.assertIn("시중에서는 보통 300만원대 이상으로 예상해요. 다만 지금 판매 중인 PC 중 이 조건에 맞는 것은"
                       " 아래 카드처럼 481만원부터예요.", out)
+
+
+class OverBudgetNamesTheCondition(unittest.TestCase):
+    def test_e26_line_says_which_condition(self):
+        from api import talk_schema as TS
+        cond = PA.condition_label(["고사양 게임"], "4K", TS.is_game_usage)
+        self.assertEqual(cond, "고사양 게임 4K")
+        raw = "10만원이면 코어 i3급·내장 그래픽 구성이 현실적이에요. 시중에서는 보통 중고 기준 10만원이에요."
+        out = PA.align_market_price(raw, [4_809_800], budget_won=100_000, sentence="10만원으로 모든 게임4K 최고옵션",
+                                    condition=cond)
+        self.assertIn("다만 지금 판매 중인 PC 중 고사양 게임 4K 조건에 맞는 것은 아래 카드처럼 481만원부터예요.", out)
+
+    def test_label_rules(self):
+        from api import talk_schema as TS
+        self.assertEqual(PA.condition_label(["영상편집"], "4K", TS.is_game_usage), "영상편집")   # 해상도는 게임일 때만
+        self.assertEqual(PA.condition_label(["사무용", "사무용"]), "사무용")
+        self.assertIsNone(PA.condition_label([]))
+        out = PA.align_market_price("램은 16GB면 돼요.", [1_624_400], budget_won=1_500_000, sentence="150만원")
+        self.assertTrue(out.endswith("이 조건에 맞는 것은 아래 카드처럼 162만원부터예요."))   # 조건을 모르면 그대로
