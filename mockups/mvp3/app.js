@@ -581,7 +581,7 @@ function enterRoute(hash,initial=false){
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
     if(screen==='saved')openSaved();else flow.navigate(screen);
     // 새로고침 전에 보던 견적이 있으면 같은 조건으로 다시 물어 그 상품을 다시 연다(값은 지금 기준).
-    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk){restoring=true;void flow.resume().finally(()=>{restoring=false;});}
+    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk){restoring=true;void flow.resume({arrived:!!arrival}).finally(()=>{restoring=false;});}
     // 고른 견적 없이 조건만 넘어왔으면(대화 화면의 「기존 상담 화면」) 그 조건으로 추천을 다시 받아 추천 목록을 연다.
     else if(initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk){restoring=true;void flow.refresh().finally(()=>{restoring=false;});}
   }finally{enteringRoute=false;}

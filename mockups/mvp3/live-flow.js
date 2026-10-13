@@ -279,7 +279,9 @@
     // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 고를 때 조건으로 서버에 다시 묻고,
     // 같은 상품 번호가 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
     // 없거나 실패하면 지어내지 않고 그 사실을 말한다. 실패하면 상품 번호는 남겨 다시 시도할 수 있게 한다.
-    async function resume(){
+    // arrived = 대화 화면에서 「상세 보기」로 넘어왔다(새로고침이 아니다) -- 안내 문구만 다르다(2026-10-13 사장님:
+    // 넘어왔는데 「새로고침 전에 보던 …을 다시 불러왔어요」라고 했다).
+    async function resume({arrived=false}={}){
       const want=state.restoredCurrent;
       if(state.phase||!want||!state.talk)return;
       const basis=M.object(want.selection_state)?want.selection_state:state.talk,op=begin('recommend');
@@ -305,11 +307,11 @@
           // 다시 찾는다(코덱스 PR158 검수 v1 신규 후보).
           p={...p,swap_from:M.copy(want.swap_from)};
         }
-        if(!p){state.restoredCurrent=null;messageOnce('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
+        if(!p){state.restoredCurrent=null;messageOnce((arrived?'고르신 PC(상품번호 ':'새로고침 전에 보던 PC(상품번호 ')+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);
         if(!r||!current(op))return;
         state.selected=validSets(want.sets)?{...r.product,sets:want.sets}:r.product;state.selectionState=M.copy(basis);state.selectionWants=wantWants&&M.copy(wantWants);state.selectionQuery=wantQuery;state.selectedContext=null;state.screen='detail';
-        state.restoredCurrent=null;messageOnce('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
+        state.restoredCurrent=null;messageOnce((arrived?'고르신 '+p.name+' 구성의 상세예요.':'새로고침 전에 보던 '+p.name+'을 다시 불러왔어요.')+' 금액은 지금 다시 확인한 값이에요.'+r.note);
         if(latest)fail(latest,{kind:'recommend'});
       }catch(error){if(current(op))fail(error,{kind:'resume'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}

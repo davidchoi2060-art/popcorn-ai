@@ -201,7 +201,7 @@ function renderPanel(){
   let html='<h2>지금 견적</h2>';
   const now=conditionsText(state.talk);
   if(!p){
-    html+='<p class="muted">'+(state.restoredCurrent&&state.phase==='recommend'?'새로고침 전에 보던 구성을 다시 확인하고 있어요.':'구성을 선택하면 여기에 모아둘게요.')+'</p>'+(now?'<p class="tk-cond">지금 조건 · '+esc(now)+'</p>':'');
+    html+='<p class="muted">'+(state.restoredCurrent&&state.phase==='recommend'?'보던 구성을 지금 금액으로 다시 확인하고 있어요.':'구성을 선택하면 여기에 모아둘게요.')+'</p>'+(now?'<p class="tk-cond">지금 조건 · '+esc(now)+'</p>':'');
   }else{
     const basis=conditionsText(state.selectionState),changed=JSON.stringify(state.selectionState)!==JSON.stringify(state.talk);
     const saved=state.saveState==='saved'&&state.savedQuote;
