@@ -62,13 +62,13 @@ class BudgetBelowCards(unittest.TestCase):
         out = PA.align_market_price(body, [593_400, 626_100], budget_won=500_000,
                                     sentence="사무용 컴퓨터 50만원 정도로 맞출 수 있어요?")
         self.assertIn("50만원이면 사무용으로 충분히 맞출 수 있어요.", out)
-        self.assertIn("다만 지금 판매 중인 PC는 아래 카드처럼 59만원부터라 말씀하신 예산보다 9만원 높아요.", out)
+        self.assertIn("다만 지금 판매 중인 PC 중 이 조건에 맞는 것은 아래 카드처럼 59만원부터예요.", out)
 
     def test_market_sentence_kept_with_from_price_when_over_budget(self):
         raw = "시중에서는 보통 130만~150만원대면 RTX 5060급 구성이 가능해요. 램은 16GB면 돼요."
         out = PA.align_market_price(raw, [1_624_400, 1_741_000], budget_won=1_500_000, sentence="배그 150만원")
         self.assertIn("시중에서는 보통", out)
-        self.assertIn("162만원부터라 말씀하신 예산보다 12만원 높아요", out)
+        self.assertIn("이 조건에 맞는 것은 아래 카드처럼 162만원부터예요", out)
         self.assertNotIn(PA.NOTE_MARKET, out)
 
     def test_within_budget_still_replaced_by_card_range(self):
@@ -78,7 +78,7 @@ class BudgetBelowCards(unittest.TestCase):
 
     def test_no_market_sentence_gets_from_price_line(self):
         out = PA.align_market_price("램은 16GB면 돼요.", [1_624_400], budget_won=1_500_000, sentence="150만원")
-        self.assertTrue(out.endswith("162만원부터라 말씀하신 예산보다 12만원 높아요."))
+        self.assertTrue(out.endswith("이 조건에 맞는 것은 아래 카드처럼 162만원부터예요."))
 
 
 class ReplyPromises(unittest.TestCase):
