@@ -518,8 +518,11 @@ def align_market_price(answer: str, prices: list[int], budget_won: int | None = 
     market = [s for s in sents if is_market(s)]
     low = min(prices)
     if budget_won and low > budget_won:
-        line = ("다만 지금 판매 중인 PC는 아래 카드처럼 %d만원부터라 말씀하신 예산보다 %d만원 높아요."
-                % (_man(low), max(1, _man(low - budget_won))))
+        # 예산과의 차이는 말하지 않는다 -- 카드 아래 「○○ 안에는 맞는 PC가 없어요. 가장 가까운 PC는 예산보다 …원 높아요」와
+        # 카드의 「예산보다 …원 높아요」가 이미 말한다(2026-10-14 개발 서버 E26: 같은 차이를 세 번 말했다).
+        # 「아래 카드처럼 481만원부터라」는 시세 문장(「300만원대 이상」) 바로 뒤라 시세와 같은 말처럼 읽혀 「수치 모순」으로
+        # 판정됐다 -- 시세가 아니라 «우리가 파는 것 중 이 조건에 맞는 것»의 시작 가격이라고 분명히 말한다.
+        line = "다만 지금 판매 중인 PC 중 이 조건에 맞는 것은 아래 카드처럼 %d만원부터예요." % _man(low)
         last = market[-1] if market else None
         out = _map_sentences(answer, lambda s: None if s == NOTE_MARKET else (s + " " + line if s == last else s))
         return out if last else (out + " " + line).strip()

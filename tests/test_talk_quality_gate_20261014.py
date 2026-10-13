@@ -82,3 +82,12 @@ class MildInsult(unittest.TestCase):
         self.assertEqual(talk.follow_mild_insult("너 바보야?", done), done)
         self.assertEqual(talk.follow_mild_insult("너 바보야?", talk.follow_apology("죄송합니다.")),
                          talk.follow_apology("죄송합니다."))
+
+
+class OverBudgetSaysGapOnce(unittest.TestCase):
+    def test_e26_no_gap_in_explanation_and_not_read_as_market_price(self):
+        raw = "10만원으로는 구성할 수 없어요. 시중에서는 보통 300만원대 이상으로 예상해요."
+        out = PA.align_market_price(raw, [4_809_800], budget_won=100_000, sentence="10만원으로 모든 게임4K 최고옵션")
+        self.assertNotIn("예산보다", out)          # 차이는 카드 아래 안내·카드가 말한다
+        self.assertIn("시중에서는 보통 300만원대 이상으로 예상해요. 다만 지금 판매 중인 PC 중 이 조건에 맞는 것은"
+                      " 아래 카드처럼 481만원부터예요.", out)
