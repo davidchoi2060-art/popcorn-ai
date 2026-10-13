@@ -32,9 +32,9 @@ from . import talk_filter as TF
 log = logging.getLogger(__name__)
 
 # 480자로는 일반 AI 대비 「설명이 얕다」가 네 번 연속 나왔다(2026-10-12 비교 네 번째 86개 -- 추천 질문 31개 중 28개).
-ADVICE_MAX_LEN = 700
+ADVICE_MAX_LEN = 1000
 # 한국어는 글자당 토큰이 많다 -- 500 이면 설명이 「CPU는 높은 프」에서 끊겼다(2026-10-11 일반 AI 비교 R05·R23).
-ADVICE_MAX_TOKENS = 1300
+ADVICE_MAX_TOKENS = 1800
 ADVICE_TIMEOUT_SEC = 12      # [B] 경로 전체 상한(talk_answer.PATH_B_TIMEOUT_SEC = 13) 안
 TASK_KEY = "task.talk_answer"
 
@@ -96,7 +96,9 @@ def asks_for_pc(sentence: str, vocab) -> bool:
     2026-10-12 개발 서버 「유튜브 방송하면서 게임도 하려면 뭐가 필요해요?」에 인기 게임 목록이 나갔다."""
     from . import talk_schema as TS
     s = sentence or ""
-    return (bool(_NEED.search(s)) or bool(_SPEC.search(s))
+    # 예산 금액을 말했으면 PC 를 사려는 말이다 -- 「10만원으로 모든 게임 4K 최고옵션」이 게임 소개 경로로 가 설명이 비었다
+    # (2026-10-13 상담 답 품질 비교 E26).
+    return (bool(_NEED.search(s)) or bool(_SPEC.search(s)) or bool(_AMOUNT.search(s))
             or any(not TS.is_game_usage(lb) for lb in usage_hits(s, vocab)))
 
 
@@ -220,12 +222,18 @@ _TOPIC_TASK = {
                  " ○○만원대」처럼 일반 시세로 말한다. 무엇은 아껴도 되는지와 그 이유도 말한다."
                  " 고객이 해상도·주사율·프레임(FHD·QHD·4K·144Hz·240fps)이나 AI·영상·3D 작업을 말했으면 그 기준에 맞는"
                  " 숫자(그래픽카드 VRAM ○GB 이상, 램 ○GB, 파워 ○W급)를 한 문장 넣는다."
+                 " 고객이 4K·색보정·8K·대용량 같은 무거운 작업을 말하지 않았으면 기준표의 «추천 카드의 최소 기준» 단계를 기본으로"
+                 " 설명하고, 윗단계 사양은 「4K 편집까지 하시면」처럼 그 작업을 할 때로만 한 줄 덧붙인다(2026-10-13 R04: 고객은 그냥"
+                 " 「영상 편집용 200만원」인데 4K 기준 사양을 기본처럼 말해 아래 기준 줄·카드와 어긋났다)."
                  " 고객이 싸게(최저가·가성비)를 말했으면 어디를 아끼고 어디는 지킬지, 좋은 것을 말했으면 어디에 더"
                  " 쓰면 체감이 큰지 말한다. 작업이 커지면(예: 도커·가상 머신 여러 개) 무엇이 더 필요해지는지도 한 문장 말해도 된다."
                  " 용도를 말하지 않았으면 용도에 따라 무엇이 달라지는지 짧게 설명한다.",
     TOPIC_PART: "고객이 물은 부품의 역할과 차이, 고르는 기준을 네다섯 문장으로 쉽게 설명한다. 기준은 숫자로 말한다"
                 " (VRAM ○GB·램 ○GB·파워 ○W·코어 수처럼). 하나를 골라 달라고 하면 용도별로 「RTX 5060급」·「라이젠 5급」처럼"
                 " 급 예시를 들어 어느 쪽이 맞는지 말한다."
+                " 두 회사·두 제품을 견주면(「인텔이 좋아요 AMD가 좋아요?」·「16GB vs 32GB」) 첫 문장에 결론(어떤 경우 어느 쪽)을 말하고,"
+                " 각각의 강점을 「- 인텔: …」「- AMD: …」처럼 한 줄씩 나눠 쓴다(전력·발열, 게임, 작업, 내장 그래픽 유무, 업그레이드 같은"
+                " 일반적인 차이). 2026-10-13 상담 답 품질 비교 R20: 회사 비교 없이 등급 이야기만 해 질문에 답하지 않았다고 판정됐다."
                 " 새 PC를 사라고 권하지 않는다.",
     TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
                    " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
@@ -237,8 +245,11 @@ _TOPIC_TASK = {
                    " «일반적인» 기준으로 네다섯 문장 설명한다. 흔한 기간·조건은 숫자로 말한다(예: 조립 PC 출고는 보통 ○~○영업일,"
                    " 카드 결제 취소 환불은 보통 ○~○영업일, 단순 변심 청약철회는 전자상거래법상 받은 날부터 7일 이내,"
                    " 부품 보증은 제조사 기준 보통 ○~○년). 「보통」·「일반적으로」·「쇼핑몰마다 다르지만」처럼 말하고,"
-                   " 우리 가게가 해 준다·가능하다고 약속하지 않는다. 고객이 직접 확인할 곳(상품 페이지·주문 내역·카드사)을"
-                   " 한 문장 알려 준다. 카드번호·주민번호 같은 정보는 상담 창에 적지 않아도 된다는 점은 필요할 때만 말한다."
+                   " 우리 가게가 해 준다·가능하다고 약속하지 않는다. 경우가 나뉘면(예: 조립 PC·브랜드 완제품·부품만 구매, 카드·계좌이체)"
+                   " 경우마다 「- 」 목록 한 줄씩 쓴다. 숫자는 «업계에서 흔한 범위»로만 말하고 우리 가게 기준처럼 단정하지 않는다"
+                   " (2026-10-13 상담 답 품질 비교 R13: 「보통 2~5영업일」이 근거 없는 정책 단정으로 판정됐다)."
+                   " 우리 가게의 실제 기준·확인할 곳은 서버가 아래 안내 문장으로 붙이므로 「상품 페이지에서 확인해 주세요」를 되풀이하지 않는다"
+                   " (R12: 같은 말을 두 번 해 확인만 떠넘긴다고 판정됐다). 카드번호·주민번호 같은 정보는 상담 창에 적지 않아도 된다는 점은 필요할 때만 말한다."
                    " 다른 쇼핑몰·가격비교 사이트와 비교를 물으면 같은 부품 모델인지, 조립비·운영체제·배송·A/S 포함 여부를 맞춰"
                    " 비교하는 요령을 말한다. 업체를 믿을 수 있는지 물으면 사업자 정보·통신판매업 신고·안전결제·후기처럼 확인할"
                    " 방법을 말하고, 어느 업체도 좋다·나쁘다·사기다 단정하지 않는다.",
@@ -272,7 +283,8 @@ def build_prompt(sentence: str, basis: list[str], history: list | None = None,
         *(["[고객이 말한 게임] " + ", ".join(games) + " -- 게임 소개·역사·장르·인기 설명은 쓰지 않는다."
             " 이 게임들이 가벼운지 무거운지, 그래서 그래픽카드·CPU·램 중 무엇이 체감을 좌우하는지와 그에 맞는 등급을 말한다."]
           if games else []),
-        "[말투] 쉬운 한국어 존댓말(~요). 강조 기호(**)·목록 기호 없이 문장으로 쓴다. 감사 인사로 시작하지 않는다."
+        "[말투] 쉬운 한국어 존댓말(~요). 첫 문장에서 질문에 바로 답한다(「16GB면 대부분 충분해요」처럼). 용도·경우가 여럿이면"
+        " 줄마다 「- 」로 시작하는 짧은 목록을 써도 된다(목록 한 줄은 한 문장). 표·제목·강조 기호(**)·이모지는 쓰지 않는다. 감사 인사로 시작하지 않는다."
         " %d자 이내." % ADVICE_MAX_LEN,
         "",
         "[우리 추천 기준] 아래 추천 카드는 이 기준표를 따른다. 설명이 이 기준과 어긋나지 않게 한다"
@@ -347,6 +359,53 @@ def _models(sentence: str) -> list[str]:
     return out
 
 
+_BULLET = re.compile(r"^\s*(?:[-•*·]|\d{1,2}[.)])\s+")
+_MAN = re.compile(r"(\d{1,4})\s*만\s*원?")
+
+
+def _says_budget(s: str, sentence: str) -> bool:
+    """문장이 고객이 말한 예산 금액(○○만원)을 그대로 말하는가."""
+    said = {m.group(1) for m in _MAN.finditer(sentence or "")}
+    return bool(said) and any(m.group(1) in said for m in _MAN.finditer(s))
+
+
+def _join_lines(entries) -> str:
+    """[(줄 번호, 목록 머리, 문장)] -> 줄을 살린 글. 같은 줄 문장은 띄어 잇고, 빈 줄은 한 번만 둔다."""
+    lines, cur, idx = [], [], None
+    for i, head, s in entries:
+        if i != idx:
+            if cur:
+                lines.append("".join(cur))
+            cur, idx = [], i
+            if not s:
+                if lines and lines[-1] != "":
+                    lines.append("")
+                continue
+            cur.append(head + s)
+        elif s:
+            cur.append(" " + s)
+    if cur:
+        lines.append("".join(cur))
+    while lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines).strip()
+
+
+def _map_sentences(text: str, fn) -> str:
+    """글의 줄·목록 머리를 살린 채 문장마다 fn(문장) -> 남길 문장(바꾼 문장) 또는 None(걷음)을 적용한다."""
+    entries = []
+    for i, line in enumerate((text or "").split("\n")):
+        m = _BULLET.match(line)
+        head, body_text = ("- ", line[m.end():]) if m else ("", line)
+        if not line.strip():
+            entries.append((i, "", ""))
+        for x in TF.split_sentences(body_text):
+            y = fn(x)
+            if y:
+                entries.append((i, head, y))
+    return _join_lines(entries)
+
+
 def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool = False) -> tuple[str, list[dict]]:
     """AI 설명 -> (고객 문장, 걷은 문장[{before, reason}]). 가격·모델명·재고·질문 문장만 걷는다.
     일반 기준 설명(TOPIC_GENERAL)은 우리 가게가 해 주겠다는 약속 문장도 걷는다(talk_rules 약속 표시와 같은 틀)."""
@@ -359,11 +418,24 @@ def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool =
     stock = _STOCK_ONLY if general or mixed else TF._LEXICON_STOCK
     asked = {_norm(m) for m in _models(sentence)}
     kept, dropped = [], []
-    sents = TF.split_sentences((raw or "").replace("**", ""))
-    if sents and not _ENDED.search(sents[-1]):
-        # 토큰이 다해 끊긴 끝 문장(「CPU는 높은 프」)은 내지 않는다.
-        dropped.append({"before": sents.pop(), "reason": "cut"})
-    for s in sents:
+    # 줄 단위로 읽는다 -- 짧은 목록(「- 」)과 문단을 살린다(2026-10-13 상담 답 품질 비교 R05·R07·R20·E31: 일반 AI 는 용도별
+    # 목록으로 답하는데 우리 답은 한 덩어리 문장이라 「덜 구체적」으로 판정됐다). entry = (줄 번호, 목록 머리, 문장).
+    entries = []
+    for i, line in enumerate((raw or "").replace("**", "").replace("\r", "").split("\n")):
+        m = _BULLET.match(line)
+        head, body_text = ("- ", line[m.end():]) if m else ("", line)
+        entries.extend((i, head, x) for x in TF.split_sentences(body_text))
+        if not line.strip():
+            entries.append((i, "", ""))           # 빈 줄 = 문단 나눔
+    while entries and not entries[-1][2]:
+        entries.pop()
+    if entries and not entries[-1][1] and not _ENDED.search(entries[-1][2]):
+        # 토큰이 다해 끊긴 끝 문장(「CPU는 높은 프」)은 내지 않는다. 목록 줄은 마침표 없이 끝나도 된다.
+        dropped.append({"before": entries.pop()[2], "reason": "cut"})
+    for i, head, s in entries:
+        if not s:
+            kept.append((i, "", ""))
+            continue
         # 고객이 직접 말한 모델명만 든 문장은 남긴다(2026-10-11 「RTX 5060이랑 5060 Ti 차이가 뭐예요?」에 비교 문장이
         # 전부 걷혀 「판단할 수 없어요」만 남았다). 고객이 말하지 않은 모델명이 하나라도 있으면 걷는다.
         # 「RTX 5060급」「i5 정도」처럼 등급 예시로 든 모델명은 남긴다(2026-10-12 -- 설명이 등급을 구체적으로 말하게).
@@ -374,7 +446,9 @@ def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool =
                             and not _TIER_AFTER.match(s, m.end())
                             for m in _RE_MODEL.finditer(s))
         # 「시중」 가격 문장은 남기되 같은 문장에 가게 가격(「저희 가격은 140만원」)이 섞이면 걷는다(2026-10-12 검수 9595 P2-3).
-        market_price = (build and "시중" in s and not _STORE_PRICE.search(s)
+        # 고객이 말한 예산 금액으로 «그 돈이면 무엇이 되는지» 답하는 문장도 시세 판단이라 남긴다(2026-10-13 R03 「사무용 50만원
+        # 정도로 맞출 수 있어요?」에 「50만원이면 충분해요」가 걷혀 질문에 답하지 않은 꼴이 됐다).
+        market_price = (build and (("시중" in s) or _says_budget(s, sentence)) and not _STORE_PRICE.search(s)
                         and not any(p.search(s) for _label, p in PROMISE_PATTERNS))
         if (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s)) and not market_price:
             dropped.append({"before": s, "reason": "price"})
@@ -389,17 +463,19 @@ def clean(raw: str, topic: str | None = None, sentence: str = "", strict: bool =
         elif _QUESTION.search(s):
             dropped.append({"before": s, "reason": "question"})
         else:
-            kept.append(s.lstrip("-•* ").strip())
+            kept.append((i, head, s.lstrip("-•* ").strip()))
     # 길이는 문장 단위로 줄인다 -- 글자 수로 자르면 문장 중간에서 끊긴다(2026-10-11 R23 「기본형을 선택」).
-    body = ""
-    for k in (k for k in kept if k):
-        if body and len(body) + 1 + len(k) > ADVICE_MAX_LEN:
+    budget_left, fitted = ADVICE_MAX_LEN, []
+    for i, head, k in kept:
+        if k and fitted and len(head) + len(k) + 1 > budget_left:
             dropped.append({"before": k, "reason": "length"})
             continue
-        body = (body + " " + k).strip()
+        fitted.append((i, head, k))
+        budget_left -= len(head) + len(k) + 1
+    body = _join_lines(fitted)
     # 시중 시세 문장이 남았으면 아래 카드(우리 판매가)와 다를 수 있다고 한 줄 밝힌다 -- 설명은 50~70만원대인데
     # 카드는 89만원이라 어긋나 보였다(2026-10-12 일반 AI 비교 R02·R11).
-    if body and any("시중" in k for k in kept if k and k in body) and NOTE_MARKET not in body:
+    if body and "시중" in body and NOTE_MARKET not in body:
         body = (body + " " + NOTE_MARKET).strip()
     return body, dropped
 
@@ -416,31 +492,44 @@ def card_range_sentence(prices: list[int]) -> str:
     return "지금 이 조건에 맞는 판매 중인 PC는 아래 카드처럼 %d만~%d만원이에요." % (lo, hi)
 
 
-def align_market_price(answer: str, prices: list[int]) -> str:
+def align_market_price(answer: str, prices: list[int], budget_won: int | None = None,
+                       sentence: str = "") -> str:
     """설명의 「시중에서는 보통 ○○만원대」 문장을 아래 카드의 실제 가격 범위로 바꾼다.
 
     2026-10-12 중헌 님 3번: 설명은 「시중에서는 보통 ○○~○○만원대예요」인데 바로 아래 카드 가격과 많이 달랐다.
     덧붙인 한 줄(NOTE_MARKET 「다를 수 있어요」)로는 어긋남이 그대로 보였다. 카드가 있으면 그 카드 가격을
     말하고 «다를 수 있다» 줄은 뺀다. 카드가 없으면(못 구했으면) 그대로 둔다 -- 시중 시세와 다를 수 있다는 줄이 남는다.
+
+    단, 고객 예산이 카드 최저가보다 낮으면(budget_won) 시세 문장을 지우지 않는다 -- 「150만원이면 어떤 PC?」에 시세로는
+    무엇이 되는지가 곧 답이다(2026-10-13 상담 답 품질 비교 R01·R03·E11). 대신 우리 판매 PC 는 얼마부터인지 바로 붙인다.
     """
     if not answer or not prices:
         return answer
-    sents = TF.split_sentences(answer)
-    market = [s for s in sents if "시중" in s and (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s))
-              and s != NOTE_MARKET]
+
+    def is_market(s):
+        return bool(s != NOTE_MARKET and (TF._RE_PRICE.search(s) or _PRICE_WORDS.search(s))
+                    and ("시중" in s or _says_budget(s, sentence)))
+    sents = [x for line in answer.split("\n") for x in TF.split_sentences(line)]
+    market = [s for s in sents if is_market(s)]
+    low = min(prices)
+    if budget_won and low > budget_won:
+        line = ("다만 지금 판매 중인 PC는 아래 카드처럼 %d만원부터라 말씀하신 예산보다 %d만원 높아요."
+                % (_man(low), max(1, _man(low - budget_won))))
+        last = market[-1] if market else None
+        out = _map_sentences(answer, lambda s: None if s == NOTE_MARKET else (s + " " + line if s == last else s))
+        return out if last else (out + " " + line).strip()
     if not market:
         return answer
-    line, out = card_range_sentence(prices), []
-    for s in sents:
+    state = {"line": card_range_sentence(prices)}
+
+    def swap(s):
         if s == NOTE_MARKET:
-            continue
+            return None
         if s in market:
-            if line:
-                out.append(line)
-                line = ""
-            continue
-        out.append(s)
-    return " ".join(out).strip()
+            line, state["line"] = state["line"], ""
+            return line or None
+        return s
+    return _map_sentences(answer, swap)
 
 
 # ── 설명의 사양 숫자를 아래 카드에 맞춘다 (2026-10-12 코덱스 24조합 검수 2번) ─────────────────────
@@ -559,17 +648,19 @@ def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> 
            "gpu": max(gidx) if gidx else None,
            "ssd": max((v for s in specs if (v := _num(s, "ssd_gb"))), default=None),
            "ram": max((v for s in specs if (v := _num(s, "ram_gb"))), default=None)}
-    kept, dropped = [], []
-    for s in TF.split_sentences(answer):
+    dropped = []
+
+    def keep(s):
         why = _over_cards(s, top, fhd_game)
         if why:
             dropped.append({"before": s, "reason": why})
-        else:
-            kept.append(s)
+            return None
+        return s
+    out = _map_sentences(answer, keep)
     line = card_spec_sentence(items)
-    if line and line not in kept:
-        kept.append(line)
-    return " ".join(kept).strip(), dropped
+    if line and line not in out:
+        out = (out + "\n" + line).strip()
+    return out, dropped
 
 
 def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,

@@ -710,6 +710,18 @@ def condition_notices(text: str, state, prev_state=None) -> list[str]:
     return notes
 
 
+_BUDGET_PROMISE = re.compile(r"(예산|\d+\s*만\s*원)[^.!?。]{0,30}(맞춰|맞추어|준비|찾|구성해)[^.!?。]{0,12}(겠|게요|께요|드리도록)")
+
+
+def drop_budget_promise(reply: str) -> str:
+    """「150만원으로 맞춰 드리겠습니다」처럼 예산을 지키겠다는 AI 약속 문장을 걷는다 -- 예산 안 카드가 없을 수도 있다."""
+    sents = [x for x in re.split(r"(?<=[.!?。])\s+", reply or "") if x.strip()]
+    # 「예산을 알려 주시면 찾아 드릴게요」처럼 조건을 묻는 말(서버 안내 포함)은 약속이 아니다.
+    kept = [x for x in sents if not _BUDGET_PROMISE.search(x) or re.search(r"(알려|말씀해)\s*주시면", x)]
+    # 전부 그런 문장이면 그대로 둔다(빈 말풍선보다 낫다 -- drop_deferrals 와 같은 규칙).
+    return " ".join(kept).strip() if kept and len(kept) < len(sents) else (reply or "")
+
+
 def drop_deferrals(reply: str) -> str:
     """「다른 시스템에서 확인해 드립니다」「담당 팀이 안내해요」처럼 없는 곳으로 미루는 문장을 걷는다
     (2026-10-12 일반 AI 비교 R26). 전부 그런 문장이면 그대로 둔다(빈 말풍선보다 낫다)."""
