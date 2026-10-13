@@ -539,7 +539,9 @@ def align_market_price(answer: str, prices: list[int], budget_won: int | None = 
 # 실제 카드 사양 한 문장을 붙인다. 「더 여유를 원하면」처럼 선택으로 말한 윗사양은 남긴다 -- 다만 파워는 «최소 안전 기준»처럼
 # 읽혀 카드가 위험해 보이므로 카드 최대치보다 크면 선택 문장이어도 걷는다.
 _WATT = re.compile(r"(?<!\d)(\d{3,4})\s*W(?![a-z])", re.I)
-_SSD_CLAIM = re.compile(r"SSD\D{0,12}?(\d+(?:\.\d+)?)\s*(GB|TB)", re.I)
+# 「SSD는 게임 여러 개를 설치할 수 있도록 960GB급」처럼 숫자가 멀리 있어도 읽는다(2026-10-13 코덱스 사례 11 -- 12자 한도라
+# 이 문장을 못 읽어 카드보다 큰 권장이 그대로 남았다). 사이에 램·메모리가 끼면 그 숫자는 SSD 가 아니다.
+_SSD_CLAIM = re.compile(r"SSD(?:(?!램|RAM|메모리)\D){0,30}?(\d+(?:\.\d+)?)\s*(GB|TB)", re.I)
 _RAM_CLAIM = re.compile(r"(?:램|RAM|(?<!그래픽 )(?<!그래픽)메모리)\D{0,8}?(\d{1,3})\s*GB", re.I)
 _GPU_CLAIM = re.compile(r"(RTX|GTX|RX)\s?(\d{3,4})\s?(Ti|TI|SUPER|XT)?", re.I)
 _RES_HIGH = re.compile(r"QHD|1440\s*p|4K|2160\s*p|UHD", re.I)
@@ -635,6 +637,52 @@ def _over_cards(s: str, top: dict, fhd_game: bool) -> str | None:
     return None
 
 
+# 권하는 용량을 말한 문장인가(「SSD는 960GB급을 권장해요」·「램은 16GB 이상」). 카드 사양을 그냥 읽어 준 문장은 아니다.
+_RECOMMEND = re.compile(r"권장|권해|권하|이상|필요|추천|좋아요|좋습니다|알맞")
+_SAME_SIZE = 0.9      # 960GB 와 1TB 는 같은 급이다(reco_explore·sold_reco 와 같은 기준)
+
+
+def _recommended_size(answer: str, claim: re.Pattern, ssd: bool) -> int | None:
+    vals = []
+    for s in TF.split_sentences(answer):
+        if s.startswith("아래 카드의 실제 구성은") or _OPTIONAL.search(s) or not _RECOMMEND.search(s):
+            continue
+        for m in claim.finditer(s):
+            v = float(m.group(1)) * (1000 if ssd and m.group(2).upper() == "TB" else 1)
+            vals.append(int(v))
+    return min(vals) if vals else None
+
+
+def under_recommendation_note(answer: str, items: list[dict]) -> str:
+    """설명이 권한 램·SSD 용량보다 작은 카드가 있으면 그 카드를 짚는 한 문장. 없으면 "".
+
+    2026-10-13 코덱스 실화면 재검수(사례 11 배그+롤 200만): 「SSD는 960GB급을 권장해요」 아래 500GB·512GB 카드가
+    그대로 나왔다. 권장 문장은 기준표 숫자라 맞고, 카드는 예산 안 판매 PC 라 바꿀 수 없다 -- 그래서 어느 카드가 권장보다
+    작은지, 어떻게 메우는지를 말한다."""
+    cards = [it for it in items or [] if isinstance(it.get("spec"), dict)]
+    out = []
+    for key, claim, ssd, label in (("ssd_gb", _SSD_CLAIM, True, "SSD"), ("ram_gb", _RAM_CLAIM, False, "램")):
+        want = _recommended_size(answer, claim, ssd)
+        if not want:
+            continue
+        low = [it for it in cards if (v := _num(it["spec"], key)) and v < want * _SAME_SIZE]
+        if not low:
+            continue
+        fit = [it for it in cards if (v := _num(it["spec"], key)) and v >= want * _SAME_SIZE]
+        name = lambda it: it.get("tag") or it.get("name") or "카드"
+        fmt = _storage if ssd else (lambda v: f"{v}GB")
+        sizes = "·".join(dict.fromkeys(fmt(int(_num(it["spec"], key))) for it in low))
+        who = "아래 카드는 모두" if not fit else "·".join(dict.fromkeys(name(it) for it in low)) + " 카드는"
+        part = "저장장치" if ssd else "메모리"
+        # 구성표가 공개된 PC 만 상세에서 부품 「변경」이 된다(구성표 없는 PC 도 있다) -- 된다고 약속하지 않는다.
+        fix = f"상세 보기에서 {part}를 더 큰 용량으로 바꿀 수 있는지 확인해 보세요."
+        if fit:
+            fix += " " + "·".join(dict.fromkeys(name(it) for it in fit)) + " 카드는 권장 용량을 갖췄어요."
+        out.append(f"{who} {label}가 {sizes}로 권장({fmt(want)}급)보다 작아요. {fix}" if ssd else
+                   f"{who} {label}이 {sizes}로 권장({fmt(want)})보다 작아요. {fix}")
+    return " ".join(out)
+
+
 def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> tuple[str, list[dict]]:
     """설명에서 아래 카드보다 높은 사양을 기본처럼 말한 문장을 걷고 카드 사양 한 문장을 붙인다 -> (설명, 걷은 문장).
 
@@ -660,6 +708,11 @@ def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> 
     line = card_spec_sentence(items)
     if line and line not in out:
         out = (out + "\n" + line).strip()
+    # 권장 램·SSD 보다 작은 카드를 짚는다. 원래 설명에서 읽는다 -- 모든 카드보다 큰 권장이라 문장이 걷혔어도
+    # «아래 카드는 모두 권장보다 작다»는 사실은 고객에게 남긴다.
+    note = under_recommendation_note(answer, items)
+    if note and note not in out:
+        out = (out + " " + note).strip()
     return out, dropped
 
 
