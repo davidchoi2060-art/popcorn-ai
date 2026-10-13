@@ -4,8 +4,8 @@
 psycopg2 는 UUID 열을 uuid.UUID 로 주는데 해석기(_uuid)는 정규 문자열만 받는다 -- 여기서 str 로 바꾼다.
 그 밖의 값은 손대지 않는다(정수 epoch · EXTRACT 의 Decimal 그대로). 해석·검증은 해석기(SQLReadPort)가 한다.
 
-★ 이 모듈은 아직 어디에도 연결하지 않는다. api/customer_auth.RUNTIME_RESOLVER 는 그대로 503 이다 --
-  켜는 것은 P2(CUSTOMER_AUTH_ENABLED 스위치 + 공급자 검증기 + 발급 증거 대조)다.
+★ 연결은 customer_auth_runtime(P2b) -- CUSTOMER_AUTH_ENABLED=on + 공급자 키가 있을 때만
+  customer_auth_issuer.build_runtime_resolver() 가 이 실행기를 쓴다. 꺼져 있으면 해석기는 그대로 503 이다.
 """
 from itertools import count
 from threading import Lock

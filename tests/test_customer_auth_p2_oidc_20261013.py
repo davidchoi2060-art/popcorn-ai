@@ -327,4 +327,4 @@ def test_join_issues_session_and_attaches(client, keys, monkeypatch):
 def test_resolver_still_not_wired():
     from api import customer_auth
     assert "customer_auth_issuer" not in (R.__file__ and open(customer_auth.__file__, encoding="utf-8").read())
-    assert customer_auth.RuntimeIssuerReadiness().ready() is False             # 해석기 연결은 P2b
+    assert customer_auth.RuntimeIssuerReadiness().ready() is False             # 기본 해석기는 계속 닫힘(켜는 것은 customer_auth_runtime)
