@@ -335,6 +335,15 @@ def drop_pc_push(reply: str) -> str:
 # · E07 「뭔가 마음에 안 드셨나 봐요.」). PC 권유가 아닌 이어 말하기 한 문장을 붙인다.
 REPLY_SMALLTALK_FOLLOW = "궁금하거나 불편한 점이 있으면 편하게 더 말씀해 주세요. 이어서 같이 이야기해 볼게요."
 ONE_LINER_MAX = 40
+# 「너 바보야?」에 「기분 상하셨나 봐요. … 죄송합니다.」처럼 사과만 하고 끝나면 다음 말을 꺼내기 어렵다(2026-10-13 품질 비교
+# E06 「사과만 하고 다음 질문이 없다」). 사과·감정을 받은 답인데 묻는 말이 없으면 무엇이 불편했는지 묻는 한 문장을 붙인다.
+REPLY_APOLOGY_FOLLOW = "어떤 점이 불편하셨는지 알려 주시면 바로 고쳐서 다시 도와드릴게요."
+# 강한 욕(talk_exceptions._ABUSE)이 아닌 가벼운 핀잔·불만. AI 가 「편하게 말씀해 주세요.」 한 줄로 끝내도(2026-10-14 재측정
+# E06 「너무 짧고 도움 방향이 없다」) 사과와 «무엇이 불편했는지» 묻는 말을 서버가 붙인다.
+_MILD_INSULT = re.compile(r"바보|멍청|짜증|답답|구려|쓰레기|별로네|별로야|못\s*알아|이상해|미쳤")
+REPLY_MILD_INSULT = "제 답이 마음에 안 드셨다면 죄송해요. " + REPLY_APOLOGY_FOLLOW
+MILD_INSULT_SHORT = 80
+_APOLOGY = re.compile(r"죄송|미안|기분\s*(이\s*)?상하|불편하게|마음에\s*안\s*드")
 
 
 # 한 턴에 질문은 하나까지 -- AI 답이 이미 무엇을 묻고 있으면(「어떤 용도로 쓰실지 말씀해 주세요.」) 갈래 질문을
@@ -351,6 +360,25 @@ def _asks_already(reply: str) -> bool:
 
 def _count_sentences(text: str) -> int:
     return len([p for p in _SENTENCE.findall(text or "") if p.strip()])
+
+
+def follow_mild_insult(text: str, reply: str) -> str:
+    """가벼운 핀잔에 짧게만 답했으면 사과 + 무엇이 불편했는지 묻는 문장. 이미 그렇게 답했으면 그대로."""
+    r = (reply or "").strip()
+    if _MILD_INSULT.search(text or ""):
+        r = r.replace(REPLY_SMALLTALK_FOLLOW, "").strip()     # 일반 이어 말하기 대신 아래 사과·질문 한 번
+    if (not _MILD_INSULT.search(text or "") or len(r) >= MILD_INSULT_SHORT
+            or REPLY_APOLOGY_FOLLOW in r or "불편하셨" in r):
+        return r
+    return (r + " " + REPLY_MILD_INSULT).strip()
+
+
+def follow_apology(reply: str) -> str:
+    """사과·감정만 받고 묻는 말이 없는 답에 «무엇이 불편했는지» 묻는 한 문장. 아니면 그대로."""
+    r = (reply or "").strip()
+    if not r or not _APOLOGY.search(r) or _asks_already(r) or REPLY_APOLOGY_FOLLOW in r:
+        return r
+    return r + " " + REPLY_APOLOGY_FOLLOW
 
 
 def extend_one_liner(reply: str) -> str:
@@ -1443,6 +1471,9 @@ def parse_talk(body: ParseBody, request: Request):
             # 문장을 통째로 걷었을 때만 -- AI 가 처음부터 한 줄로 답한 것(「지금 날씨 정보는 확인할 수 없어요.」)이나
             # 문장 안의 낱말만 걷은 것(「게임을 하거나 영상 봐도」)은 그대로 둔다.
             reply = extend_one_liner(reply)
+        if not invite:
+            reply = follow_apology(reply)
+            reply = follow_mild_insult(text, reply)
         if invite:
             reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
             pc_offered = True

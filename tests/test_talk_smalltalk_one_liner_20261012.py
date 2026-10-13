@@ -47,7 +47,8 @@ class OneLinerIsExtended(unittest.TestCase):
 
     def test_insult_after_pc_push_dropped(self):
         r = parse("너 바보야?", "그런 말씀 마세요. 혹시 컴퓨터 맞추실 생각 있으세요?")
-        self.assertEqual(r["reply"], "그런 말씀 마세요. " + talk.REPLY_SMALLTALK_FOLLOW)
+        # 2026-10-14: 가벼운 핀잔이면 일반 이어 말하기 대신 사과 + 무엇이 불편했는지 묻는다(품질 비교 E06 재측정)
+        self.assertEqual(r["reply"], "그런 말씀 마세요. " + talk.REPLY_MILD_INSULT)
 
     def test_full_answer_untouched(self):
         a = "저녁이라면 국밥이나 카레가 무난해요. 든든하게 드시고 싶으면 국밥이 좋아요."
