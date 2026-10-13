@@ -50,6 +50,9 @@ _REQUEST = re.compile(r"추천|맞춰|맞추|견적|사려|살려|살까|사고\
 # 「~하려면」「~필요해요」는 용도·게임·PC 를 말했을 때만 새 PC 질문이다. 부품을 말했으면(「PC 램 몇 기가 필요해요?」)
 # 부품 설명으로 둔다 -- 새 PC 용도를 되묻지 않게.
 _NEED = re.compile(r"하려면|쓰려면|필요해|필요한가|필요할까|뭐가\s*필요")
+# 「게임별로 필요한 성능 알려줘」·「배그 권장 사양」처럼 성능·사양을 묻는 말은 PC 질문이다 -- 게임 소개 경로로 가면 그 경로가
+# 사양 수치를 말하지 못하게 막혀 「확인된 정보가 없어 안내하기 어렵습니다」만 나갔다(2026-10-13 사장님 캡처).
+_SPEC = re.compile(r"성능|사양|스펙|권장|최소\s*사양|요구\s*사양|프레임|fps", re.I)
 # 「화이트 감성으로 100만원 PC」처럼 예산 금액과 PC 를 함께 말했으면 새 PC 질문이다(2026-10-12 개발 서버 -- 설명 없이 되묻기만 했다).
 _AMOUNT = re.compile(r"\d+\s*만\s*원|\d+\s*만\s*(원\s*)?대|\d{2,3}\s*만(?!\s*(시간|명|개|건))")
 # 고객에게 보일 조건만 -- 램·SSD·그래픽 필요 여부. 지수·등급 같은 내부 기준은 빼고 옮긴다.
@@ -93,7 +96,8 @@ def asks_for_pc(sentence: str, vocab) -> bool:
     2026-10-12 개발 서버 「유튜브 방송하면서 게임도 하려면 뭐가 필요해요?」에 인기 게임 목록이 나갔다."""
     from . import talk_schema as TS
     s = sentence or ""
-    return bool(_NEED.search(s)) or any(not TS.is_game_usage(lb) for lb in usage_hits(s, vocab))
+    return (bool(_NEED.search(s)) or bool(_SPEC.search(s))
+            or any(not TS.is_game_usage(lb) for lb in usage_hits(s, vocab)))
 
 
 def usage_hits(sentence: str, vocab) -> list[str]:
@@ -109,7 +113,7 @@ def usage_hits(sentence: str, vocab) -> list[str]:
 # 게임 이름이 든 문장이 «PC 이야기»인가 -- PC·부품 낱말, 예산 숫자, 구성·사양·견적 낱말(「롤 같은 게임 추천해줘」는
 # 게임 이야기라 아니다). 2026-10-11 일반 AI 비교 R01·R23: 「120만원 롤·오버워치·로아 구성 짜줘」에 게임 소개와
 # 「PC 구성은 답변하지 않습니다」가 나갔다.
-_PC_INTENT = re.compile(r"\d+\s*만\s*원?|예산|구성|사양|견적|맞추|맞춰|짜\s*줘|짜\s*주|프레임|fps|옵션", re.I)
+_PC_INTENT = re.compile(r"\d+\s*만\s*원?|예산|구성|사양|성능|스펙|권장|견적|맞추|맞춰|짜\s*줘|짜\s*주|프레임|fps|옵션", re.I)
 
 
 def pc_intent(sentence: str) -> bool:
@@ -137,7 +141,9 @@ def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
                  or (pc and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
                  # 「사무용 80만원」 -- PC 낱말·요청 낱말 없이 용도와 예산만 말해도 새 PC 이야기다. 설명 없이
                  # 「문서 작업 중심인가요?」 질문만 나갔다(2026-10-12 Claude 복귀 뒤 점검).
-                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))) and not explain_part
+                 or (uses and not part and _AMOUNT.search(s) and not _GENERAL.search(s))
+                 # 「게임별로 필요한 성능 알려줘」 -- 용도(게임)의 성능·사양을 물으면 구성 설명이다(부품을 콕 집으면 부품 설명).
+                 or (uses and not part and _SPEC.search(s) and not _GENERAL.search(s))) and not explain_part
     if _GENERAL.search(s) and not build:
         return TOPIC_GENERAL
     if _UPGRADE.search(s) and (pc or part):
