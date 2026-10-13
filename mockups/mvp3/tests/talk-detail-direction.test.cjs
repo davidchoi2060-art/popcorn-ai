@@ -27,10 +27,22 @@ test('a card picked after 「더 높은 사양」 reopens in detail on the other
   assert.ok(validConversation(saved));
 
   // 상세 화면(index.html)이 같은 탭 보관에서 이어받는다.
-  const detailCalls=[],detail=make(ss,detailCalls);detail.reset({restore:true});await detail.resume();
+  const detailCalls=[],detail=make(ss,detailCalls);detail.reset({restore:true});await detail.resume({arrived:true});
   assert.equal(detail.state.screen,'detail');
   assert.equal(detail.state.selected.product_code,202);
   assert.ok(detailCalls.some(x=>x.nav==='better'&&x.anchor_code===101),'re-query carries the direction and anchor');
+  // 넘어온 것이지 새로고침이 아니다 -- 「새로고침 전에 보던」이라고 하지 않는다(2026-10-13 사장님).
+  const last=detail.state.messages.at(-1).text;
+  assert.match(last,/^고르신 PC 202 구성의 상세예요\. 금액은 지금 다시 확인한 값이에요\./);
+  assert.doesNotMatch(last,/새로고침/);
+});
+
+test('a real refresh still says it reopened the earlier build',async()=>{
+  const ss=storage(),calls=[];
+  const f=make(ss,calls);f.reset({restore:false});await f.submit('사무용 컴퓨터 찾아요');
+  f.select(f.state.groups.flatMap(g=>g.products).find(p=>p.product_code===101).index);
+  const again=make(ss,[]);again.reset({restore:true});await again.resume();
+  assert.match(again.state.messages.at(-1).text,/^새로고침 전에 보던 PC 101을 다시 불러왔어요\./);
 });
 
 test('a plain recommendation keeps no direction',async()=>{
