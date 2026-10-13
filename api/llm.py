@@ -262,11 +262,15 @@ class LLMProviderError(LLMError):
               모델명 오타) -- 설정 실수라 다른 프로바이더로 넘겨도 원인이 안 없어지고,
               오히려 실수를 조용히 감춘다(무엇이 왜 실패했는지 아무도 모르게 된다).
               사장님 지시("잘못된 키는 넘겨도 소용없다")를 그대로 코드화한 것.
+    out_of_credit: 이 계정의 잔액·한도가 바닥났다(Anthropic 「credit balance is too low」 ·
+      OpenAI `insufficient_quota`). 우리 쪽 설정 실수가 아니라 지갑 문제라, 다른 공급자로
+      넘기면 실제로 도움이 된다 -- `call()` 이 CREDIT_FALLBACK 으로 넘기고 관리자에게 알린다.
     """
 
-    def __init__(self, message: str, *, transient: bool = False):
+    def __init__(self, message: str, *, transient: bool = False, out_of_credit: bool = False):
         super().__init__(message)
         self.transient = transient
+        self.out_of_credit = out_of_credit
 
 
 # ============================================================================
@@ -510,6 +514,21 @@ def _call_gemini(model: str, prompt: str, system: str | None,
     return ProviderResponse(text_out, tokens_in, tokens_out, finish_reason)
 
 
+_CREDIT_MARKERS = ("credit balance", "insufficient_quota", "exceeded your current quota",
+                   "billing", "spend limit", "usage limit")
+
+
+def _is_credit_message(status: int | None, message: str | None, code: str | None = None) -> bool:
+    """잔액·결제 한도 때문에 막힌 오류인가 -- 2026-10-12 02:21 Anthropic 「Your credit balance is
+    too low」(400)가 이 판정이 없어 「설정 실수」로 분류됐고 상담이 전부 502 였다."""
+    if code == "insufficient_quota":
+        return True
+    if status not in (400, 402, 403, 429):
+        return False
+    m = (message or "").lower()
+    return any(k in m for k in _CREDIT_MARKERS)
+
+
 def _call_claude(model: str, prompt: str, system: str | None,
                   max_output_tokens: int, timeout_sec: int) -> tuple[str, int | None, int | None]:
     """Anthropic Messages API 호출 1회. 반환: (텍스트, 입력 토큰, 출력 토큰)."""
@@ -528,7 +547,8 @@ def _call_claude(model: str, prompt: str, system: str | None,
         # 5xx/429/529(overloaded) = 일시적 -- 폴백 대상.
         transient = e.status_code >= 500 or e.status_code == 429
         raise LLMProviderError(
-            f"Claude API error {e.status_code}: {e.message}", transient=transient) from e
+            f"Claude API error {e.status_code}: {e.message}", transient=transient,
+            out_of_credit=_is_credit_message(e.status_code, e.message)) from e
     except Exception as e:  # 연결/타임아웃 등 APIStatusError가 아닌 것들 -- 전부 일시적
         raise LLMProviderError(f"Claude call failed ({type(e).__name__}): {e}", transient=True) from e
 
@@ -557,7 +577,9 @@ def _call_openai(model: str, prompt: str, system: str | None,
     except openai.APIStatusError as e:
         transient = e.status_code >= 500 or e.status_code == 429
         raise LLMProviderError(
-            f"OpenAI API error {e.status_code}: {e.message}", transient=transient) from e
+            f"OpenAI API error {e.status_code}: {e.message}", transient=transient,
+            out_of_credit=_is_credit_message(e.status_code, e.message,
+                                             getattr(e, "code", None))) from e
     except Exception as e:
         raise LLMProviderError(f"OpenAI call failed ({type(e).__name__}): {e}", transient=True) from e
 
@@ -738,7 +760,7 @@ def _is_fallback_eligible(exc: Exception) -> bool:
     if isinstance(exc, LLMBlockedError):
         return exc.kind in ("cost", "rate_minute", "rate_day")
     if isinstance(exc, LLMProviderError):
-        return exc.transient
+        return exc.transient or getattr(exc, "out_of_credit", False)
     return False
 
 
@@ -941,6 +963,66 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
 # 「claude=codex:gpt-5.6-luna」였다(#191) -- 충전 뒤 비웠다. 다시 막히면 env 한 줄이나 이 기본값으로 켠다.
 # 대상 모델을 생략하거나 레지스트리에 없는 모델이면 대상 공급자의 default_model 을 쓴다.
 # 우회된 공급자는 폴백 순서에서도 뺀다(막힌 계정을 다시 부르지 않는다).
+# ── 잔액 바닥 자동 전환 (2026-10-12 사장님 「추천한대로 하자」) ──────────────────────
+# 위 REROUTE 는 사람이 배포해야 켜진다. 잔액 부족 오류가 오면 그 공급자를 CREDIT_HOLD_SEC 동안
+# 건너뛰고 CREDIT_FALLBACK 으로 넘긴다 -- 고객은 502 대신 다른 공급자의 답을 받는다.
+# 처음 막힌 순간 관리자에게 알린다(서버 로그 + 텔레그램, ALERT_EVERY_SEC 에 한 번).
+# 충전되면 CREDIT_HOLD_SEC 뒤 다시 원래 공급자를 시도한다(재시작 불필요).
+CREDIT_HOLD_SEC = 600
+ALERT_EVERY_SEC = 1800
+CREDIT_FALLBACK: dict[str, tuple[str, str | None]] = {
+    "claude": ("codex", "gpt-5.6-luna"),
+    "codex": ("claude", "claude-haiku-4-5-20251001"),
+    "gemini": ("codex", "gpt-5.6-luna"),
+}
+_credit_out_until: dict[str, float] = {}
+_last_alert: dict[str, float] = {}
+
+
+def _credit_out(provider: str) -> bool:
+    return _credit_out_until.get(provider, 0.0) > time.monotonic()
+
+
+def _mark_credit_out(provider: str, exc: Exception) -> None:
+    now = time.monotonic()
+    _credit_out_until[provider] = now + CREDIT_HOLD_SEC
+    log.error("[llm] %s out of credit - switching to %s for %ds: %s", provider,
+              CREDIT_FALLBACK.get(provider, ("none",))[0], CREDIT_HOLD_SEC, exc)
+    if now - _last_alert.get(provider, -ALERT_EVERY_SEC) < ALERT_EVERY_SEC:
+        return
+    _last_alert[provider] = now
+    vendor = PROVIDERS[provider].vendor if provider in PROVIDERS else provider
+    to = CREDIT_FALLBACK.get(provider)
+    to_txt = PROVIDERS[to[0]].vendor if to and to[0] in PROVIDERS else "없음"
+    _send_admin_alert(f"[팝콘 AI] {vendor} API 잔액이 부족해 상담 AI 를 {to_txt} 로 돌렸습니다. "
+                      f"콘솔에서 충전해 주세요. 충전되면 {CREDIT_HOLD_SEC // 60}분 안에 자동으로 돌아갑니다.")
+
+
+def _send_admin_alert(message: str) -> None:
+    """텔레그램으로 한 줄 알린다(서버 .env 의 TELEGRAM_BOT_TOKEN · TELEGRAM_CHAT_ID).
+    값이 없거나 보내기가 실패해도 상담은 계속된다 -- 서버 로그에 남긴다."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if not token or not chat:
+        log.warning("[llm] admin alert not sent - TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID not set")
+        return
+
+    def _send():
+        import json as _json
+        import urllib.request
+        try:
+            req = urllib.request.Request(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                data=_json.dumps({"chat_id": chat, "text": message}).encode("utf-8"),
+                headers={"Content-Type": "application/json"})
+            urllib.request.urlopen(req, timeout=5).read()
+        except Exception as e:  # noqa: BLE001
+            log.warning("[llm] admin alert failed: %s", type(e).__name__)
+
+    import threading
+    threading.Thread(target=_send, daemon=True).start()
+
+
 REROUTE_ENV = "POPCORN_LLM_REROUTE"
 REROUTE_DEFAULT = ""
 
@@ -1068,20 +1150,38 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
         log.info("[llm] %s: %s rerouted to %s/%s", REROUTE_ENV, blocked, resolved_provider,
                  resolved_model or "(default_model)")
 
+    if fallback_order != [] and _credit_out(resolved_provider):
+        alt = CREDIT_FALLBACK.get(resolved_provider)
+        if alt and alt[0] in PROVIDERS and not _credit_out(alt[0]):
+            log.info("[llm] %s is out of credit - using %s/%s", resolved_provider, alt[0], alt[1])
+            resolved_provider, resolved_model = alt
+
     order = ([resolved_provider] if fallback_order == []
               else [resolved_provider] + [p for p in (fallback_order or
                                           _resolve_fallback_order(resolved_provider, task_key))
                                   if p in PROVIDERS and p != resolved_provider and p not in reroutes])
 
+    models: dict[str, str | None] = {resolved_provider: resolved_model}
     attempts: list[tuple[str, Exception]] = []
-    for i, prov in enumerate(order):
+    i = 0
+    while i < len(order):
+        prov = order[i]
         try:
-            return _call_one(prompt, prov, task_key,
-                              resolved_model if prov == resolved_provider else None,
+            return _call_one(prompt, prov, task_key, models.get(prov),
                               system, customer_facing, max_output_tokens, timeout_sec,
                               caller_key=caller_key)
         except Exception as e:
             attempts.append((prov, e))
+            if getattr(e, "out_of_credit", False):
+                _mark_credit_out(prov, e)
+                alt = CREDIT_FALLBACK.get(prov)
+                # 잔액 부족이면 정해 둔 대체 공급자를 바로 다음에 시도한다(폴백 순서에 없어도).
+                if (fallback_order != [] and alt and alt[0] in PROVIDERS
+                        and alt[0] not in order[:i + 1] and not _credit_out(alt[0])):
+                    if alt[0] in order:
+                        order.remove(alt[0])
+                    order.insert(i + 1, alt[0])
+                    models[alt[0]] = alt[1]
             is_last = (i == len(order) - 1)
             if is_last or not _is_fallback_eligible(e):
                 if len(attempts) == 1:
@@ -1091,4 +1191,5 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
                     f"all {len(attempts)} provider(s) failed - {summary}", attempts) from e
             log.warning("[llm] %s failed (%s: %s) - falling back to %s",
                         prov, type(e).__name__, e, order[i + 1])
+            i += 1
     raise AssertionError("unreachable - order is never empty")
