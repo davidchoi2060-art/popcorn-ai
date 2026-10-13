@@ -17,23 +17,10 @@ import pytest
 
 PC_ONLY_ROOT = 'D:/WORK'
 
-_CATALOG_STALE = ('2026-10-07 커밋 c8487e0 이 apply_plan 에 _preflight_commerce_stock 을 넣었는데 '
-                  '이 테스트의 가짜 DB 는 그 조회를 모른다 - 테스트 갱신 또는 코드 확인이 필요하다')
 _CRLF_PIN = ('원본 파일 바이트 해시가 개발 PC 의 줄바꿈(CRLF/LF 혼재) 기준으로 고정돼 있다 - '
              '줄바꿈 정리(개선 순서 2번)에서 함께 다룬다')
 
 KNOWN_FAILURES = {
-    **{f'tests/test_catalog_ingest_write_lock_order.py::CatalogTests::{name}': _CATALOG_STALE for name in (
-        'test_batch500_and_original_order',
-        'test_duplicate_existing_sequential_stock_and_price_history',
-        'test_external_new_product_after_scope_check_before_before_read_not_adopted',
-        'test_locked_prices_no_history_and_empty_price_coalesce',
-        'test_new_duplicate_across_batch_boundary',
-        'test_other_integrity_propagates',
-        'test_raw_errors_capped200_actor_and_spec_sql_preserved',
-        'test_unrelated_refs_not_compared',
-        'test_whole_lock_before_job_and_actual_before_after_wait',
-    )},
     'tests/test_mall_supplier_write_lock_order.py::MallWriteGuardTests::'
     'test_unowned_top_level_ast_and_original_function_body_are_identical_except_guard': _CRLF_PIN,
     'tests/test_reprice_preview_expected.py::PreviewExpectedTests::'
