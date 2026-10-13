@@ -13,7 +13,7 @@
 ■ 읽기 쪽 포트 (기존 V2 연결 고리의 빈 두 자리 -- customer_auth_store.P1PrincipalBridgeV2 에 끼운다)
   PgIssuanceAuthority          발급 영수증 표를 proof_ref 로 «따로» 읽는다(P1 IndependentIssuanceAuthority)
   ConfiguredPrincipalRestorer  서버 설정의 공급자 등록과 대조해 VerifiedPrincipal 을 다시 만든다(I1 복원)
-  build_runtime_resolver()     위를 모두 이어 세션 해석기를 만든다 -- ★ 아직 customer_auth.RUNTIME_RESOLVER 에 넣지 않는다(P2b)
+  build_runtime_resolver()     위를 모두 이어 세션 해석기를 만든다 -- customer_auth_runtime 이 켜졌을 때만 끼운다(P2b)
 """
 from __future__ import annotations
 
@@ -290,7 +290,7 @@ class ConfiguredPrincipalRestorer:
 
 
 def build_runtime_resolver(engine):
-    """V2 연결 고리를 실제 포트로 잇는다. ★ P2b 전까지 customer_auth.RUNTIME_RESOLVER 에 넣지 않는다."""
+    """V2 연결 고리를 실제 포트로 잇는다. 끼우는 것은 customer_auth_runtime.install()(스위치가 켜졌을 때만)."""
     from . import customer_auth as C4
     from . import customer_auth_store as R1
     from .customer_auth_pg_read import PostgresReadExecutor

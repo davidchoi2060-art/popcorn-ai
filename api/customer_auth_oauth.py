@@ -9,7 +9,7 @@
   POST /api/auth/signout                   세션 철회 + 쿠키 삭제
 
 ★ CUSTOMER_AUTH_ENABLED=on 과 공급자 키가 없으면 전부 503 auth_unavailable(providers 만 enabled:false).
-  기존 /api/auth/login(이메일)·/logout·/me 는 customer_auth.py 그대로 -- 해석기 연결과 함께 P2b 에서 정리한다.
+  기존 /api/auth/login(이메일)·/logout 은 customer_auth.py 그대로(503). /me 는 켜지면 customer_auth_runtime 이 실제 해석기로 바꾼다.
 """
 from __future__ import annotations
 

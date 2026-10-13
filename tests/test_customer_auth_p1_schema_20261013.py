@@ -146,7 +146,7 @@ def test_observe_is_read_only_read_committed_closed_and_sequenced():
 
 def test_login_stays_closed_and_executor_not_wired():
     auth = (ROOT / "api" / "customer_auth.py").read_text(encoding="utf-8")
-    assert "customer_auth_pg_read" not in auth                         # P2 전까지 연결하지 않는다
+    assert "customer_auth_pg_read" not in auth                         # C4 는 DB 를 모른다(연결은 customer_auth_runtime)
     from api import customer_auth
     assert customer_auth.RUNTIME_RESOLVER is not None
     assert customer_auth.RuntimeIssuerReadiness().ready() is False
