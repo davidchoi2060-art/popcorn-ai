@@ -644,7 +644,10 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     # 「4K 모니터」는 모니터 상품 이야기다(모니터 크기 구간이 답한다) — PC 조건으로 세지 않는다.
     if _UHD.search(t) and "모니터" not in t and getattr(g, "resolution", None) != "4K":
         out.append(UHD_COND)
-    if _TOP.search(t):
+    # 게임 4K 는 카드가 이미 가장 높은 게임 단계다 -- 「최고옵션」을 «반영 못 한 조건»이라 하면 4K 카드와 앞뒤가 안 맞는다
+    # (2026-10-13 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 481만원 4K 카드 아래 「최고 사양 조건은 아직 추천에
+    # 반영하지 못해요」가 붙어 「모순」 판정).
+    if _TOP.search(t) and getattr(g, "resolution", None) != "4K":
         out.append("최고 사양")
     before = set(getattr(prev_state, "prefs", None) or [])
     for p in (getattr(state, "prefs", None) or []):

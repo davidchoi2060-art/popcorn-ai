@@ -234,6 +234,11 @@ _TOPIC_TASK = {
                 " 두 회사·두 제품을 견주면(「인텔이 좋아요 AMD가 좋아요?」·「16GB vs 32GB」) 첫 문장에 결론(어떤 경우 어느 쪽)을 말하고,"
                 " 각각의 강점을 「- 인텔: …」「- AMD: …」처럼 한 줄씩 나눠 쓴다(전력·발열, 게임, 작업, 내장 그래픽 유무, 업그레이드 같은"
                 " 일반적인 차이). 2026-10-13 상담 답 품질 비교 R20: 회사 비교 없이 등급 이야기만 해 질문에 답하지 않았다고 판정됐다."
+                " 견주는 답에는 이것도 넣는다: 같은 회사 안에서도 갈리는 점(예: 인텔·AMD 모두 F 붙은 모델은 내장 그래픽이 없다),"
+                " 용량을 견줄 때(16GB vs 32GB·1TB vs 2TB)만 지금 쓰는 PC에서 스스로 판단하는 방법 한 줄(예: 작업 관리자에서"
+                " 메모리 사용률이 자주 80%를 넘으면 32GB) -- 회사·브랜드 비교에는 넣지 않는다(R20 재측정: 「곁가지가 많다」),"
+                " 나중에 바꾸기 쉬운지 한 줄(예: 데스크톱 램은 나중에 늘리기 쉽다 · 메인보드 소켓이 오래 가는 쪽은 CPU만 바꾸기 쉽다)."
+                " 2026-10-14 같은 비교 R07·R20 재측정: 맞는 답인데 「판단 방법·업그레이드 관점이 없어 얕다」로 졌다."
                 " 새 PC를 사라고 권하지 않는다.",
     TOPIC_UPGRADE: "쓰던 PC의 불편에서 흔한 원인과 먼저 살펴볼 부품(예: 저장장치·메모리)을 서너 문장으로 설명한다."
                    " 지금 PC 사양을 모르면 무엇을 확인하면 되는지 문장으로 알려 준다(질문 형태로 쓰지 않는다)."
@@ -638,7 +643,7 @@ def _over_cards(s: str, top: dict, fhd_game: bool) -> str | None:
 
 
 # 권하는 용량을 말한 문장인가(「SSD는 960GB급을 권장해요」·「램은 16GB 이상」). 카드 사양을 그냥 읽어 준 문장은 아니다.
-_RECOMMEND = re.compile(r"권장|권해|권하|이상|필요|추천|좋아요|좋습니다|알맞")
+_RECOMMEND = re.compile(r"권장|권해|권하|이상|필요|추천|좋아요|좋습니다|알맞|적당|적합|충분")
 _SAME_SIZE = 0.9      # 960GB 와 1TB 는 같은 급이다(reco_explore·sold_reco 와 같은 기준)
 
 
@@ -653,8 +658,16 @@ def _recommended_size(answer: str, claim: re.Pattern, ssd: bool) -> int | None:
     return min(vals) if vals else None
 
 
-def under_recommendation_note(answer: str, items: list[dict]) -> str:
-    """설명이 권한 램·SSD 용량보다 작은 카드가 있으면 그 카드를 짚는 한 문장. 없으면 "".
+def _names(cards, low: bool) -> str:
+    """카드 묶음을 부르는 말 -- 「알뜰 구성·추천 구성」. 이름 없는 카드가 섞이면 「일부」/「다른」."""
+    names = [it.get("tag") or it.get("name") for it in cards]
+    if not all(names):
+        return "일부" if low else "다른"
+    return "·".join(dict.fromkeys(names))
+
+
+def under_recommendation_note(answer: str, items: list[dict], gpu_answer: str | None = None) -> str:
+    """설명이 권한 램·SSD 용량·그래픽카드 급보다 작은(낮은) 카드가 있으면 그 카드를 짚는 문장. 없으면 "".
 
     2026-10-13 코덱스 실화면 재검수(사례 11 배그+롤 200만): 「SSD는 960GB급을 권장해요」 아래 500GB·512GB 카드가
     그대로 나왔다. 권장 문장은 기준표 숫자라 맞고, 카드는 예산 안 판매 PC 라 바꿀 수 없다 -- 그래서 어느 카드가 권장보다
@@ -669,18 +682,48 @@ def under_recommendation_note(answer: str, items: list[dict]) -> str:
         if not low:
             continue
         fit = [it for it in cards if (v := _num(it["spec"], key)) and v >= want * _SAME_SIZE]
-        name = lambda it: it.get("tag") or it.get("name") or "카드"
         fmt = _storage if ssd else (lambda v: f"{v}GB")
         sizes = "·".join(dict.fromkeys(fmt(int(_num(it["spec"], key))) for it in low))
-        who = "아래 카드는 모두" if not fit else "·".join(dict.fromkeys(name(it) for it in low)) + " 카드는"
+        who = "아래 카드는 모두" if not fit else _names(low, True) + " 카드는"
         part = "저장장치" if ssd else "메모리"
         # 구성표가 공개된 PC 만 상세에서 부품 「변경」이 된다(구성표 없는 PC 도 있다) -- 된다고 약속하지 않는다.
         fix = f"상세 보기에서 {part}를 더 큰 용량으로 바꿀 수 있는지 확인해 보세요."
         if fit:
-            fix += " " + "·".join(dict.fromkeys(name(it) for it in fit)) + " 카드는 권장 용량을 갖췄어요."
+            fix += " " + _names(fit, False) + " 카드는 권장 용량을 갖췄어요."
         out.append(f"{who} {label}가 {sizes}로 권장({fmt(want)}급)보다 작아요. {fix}" if ssd else
                    f"{who} {label}이 {sizes}로 권장({fmt(want)})보다 작아요. {fix}")
+    # 그래픽카드는 «걷은 뒤» 설명에서 읽는다 -- 카드보다 높은 급을 말한 문장은 이미 걷혔다(#237). 걷힌 문장을
+    # 「설명한 RTX 5070급」이라고 다시 꺼내면 안 된다. 남은 설명이 카드 중 하나보다 높은 급을 권했을 때만 짚는다.
+    gpu = _recommended_gpu(answer if gpu_answer is None else gpu_answer)
+    if gpu:
+        want_name, want = gpu
+        rated = [(it, i) for it in cards if isinstance(it["spec"].get("gpu"), str)
+                 and (i := _gpu_idx(it["spec"]["gpu"])) is not None]
+        low = [it for it, i in rated if i < want]
+        if low:
+            fit = [it for it, i in rated if i >= want]
+            gpus = "·".join(dict.fromkeys(it["spec"]["gpu"] for it in low))
+            who = "아래 카드는 모두" if not fit else _names(low, True) + " 카드는"
+            line = f"{who} 그래픽카드가 {gpus}로 설명한 {want_name}급보다 낮아요."
+            if fit:
+                line += " " + _names(fit, False) + f" 카드는 {want_name}급 이상이에요."
+            out.append(line)
     return " ".join(out)
+
+
+def _recommended_gpu(answer: str) -> tuple[str, int] | None:
+    """설명이 기본으로 권한 그래픽카드 급(가장 낮은 것) -> (이름, 지수). 선택 문장(「원하면 한 단계 높은」)은 뺀다.
+    2026-10-13 품질 비교 R05 「발로란트 240프레임」: 「RTX 5060급이 적당해요」 아래 RTX 3050 카드가 같이 나왔다."""
+    best = None
+    for s in TF.split_sentences(answer):
+        if s.startswith("아래 카드의 실제 구성은") or _OPTIONAL.search(s) or not _RECOMMEND.search(s):
+            continue
+        for m in _GPU_CLAIM.finditer(s):
+            label = " ".join(x for x in m.groups() if x).upper()
+            i = _gpu_idx(label)
+            if i is not None and (best is None or i < best[1]):
+                best = (label, i)
+    return best
 
 
 def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> tuple[str, list[dict]]:
@@ -710,7 +753,7 @@ def align_card_specs(answer: str, items: list[dict], fhd_game: bool = False) -> 
         out = (out + "\n" + line).strip()
     # 권장 램·SSD 보다 작은 카드를 짚는다. 원래 설명에서 읽는다 -- 모든 카드보다 큰 권장이라 문장이 걷혔어도
     # «아래 카드는 모두 권장보다 작다»는 사실은 고객에게 남긴다.
-    note = under_recommendation_note(answer, items)
+    note = under_recommendation_note(answer, items, gpu_answer=out)
     if note and note not in out:
         out = (out + " " + note).strip()
     return out, dropped
