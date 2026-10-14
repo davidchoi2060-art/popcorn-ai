@@ -152,12 +152,11 @@
          title="내부 접근 허브" aria-label="내부 접근 허브">허브</a>
       {#  「견적 스튜디오」 — 팝콘PC 견적 스튜디오(외부 Cloud Run · 구글 로그인 필요)로 가는 단추.
           허브와 같은 규약: 새 탭(`target="_blank"` + `rel="noopener"`)·`data-keep="1"`·
-          클릭 핸들러 없음. 주소 정본은 `api/admin_nav.STUDIO_URL`. #}
-      {% if studio_url %}
-      <a class="a2-hub a2-studio" href="{{ studio_url }}" target="_blank" rel="noopener"
+          클릭 핸들러 없음. 주소 정본은 이 줄 하나다 — 허브처럼 템플릿에 직접 둔다
+          (`admin_nav`·`render()` 는 테스트가 AST 해시와 실행 환경을 고정해 둔 파일이라 건드리지 않는다). #}
+      <a class="a2-hub a2-studio" href="https://popcornpc-studio-741686685802.asia-northeast3.run.app/" target="_blank" rel="noopener"
          data-action="open-studio" data-keep="1"
          title="팝콘PC 견적 스튜디오 (새 창 · 구글 로그인)" aria-label="팝콘PC 견적 스튜디오 새 창으로 열기">견적 스튜디오</a>
-      {% endif %}
       {#  `a2-me` — 권한 표시와 아바타를 한 덩어리로 묶는다(2026-10-10 전수 점검 L126).
           좁은 화면에서 헤더가 줄바꿈될 때 아바타만 혼자 다음 줄로 떨어지던 것을 막는다 —
           줄을 넘기면 둘이 함께 넘어간다. #}

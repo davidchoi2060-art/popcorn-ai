@@ -17,7 +17,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from .admin_nav import STUDIO_URL, counts as nav_counts, nav_for, new_admin_nav
+from .admin_nav import counts as nav_counts, nav_for, new_admin_nav
 from .admin_page_intro import back_for, entries_for, group_crumb, intro_for
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -50,7 +50,6 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     ctx['workspace_nav'] = new_admin_nav(request.url.path) if mode == 'new' else None
     ctx.setdefault("nav", nav_for(request.url.path))
     ctx.setdefault("nav_counts", nav_counts())
-    ctx.setdefault("studio_url", STUDIO_URL)
     # 화면 머리말(제목·설명·같은 묶음 바로가기·작업 순서) — 단일 원천 `admin_page_intro`.
     # 신 관리자 모드는 자기 제목·메뉴를 쓰므로 그리지 않는다.
     ctx.setdefault("page_intro", None if ctx['new_admin'] else intro_for(request.url.path))

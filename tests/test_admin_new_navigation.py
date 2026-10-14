@@ -56,7 +56,7 @@ class StudioLinkTests(unittest.TestCase):
     """관리자 헤더의 「견적 스튜디오」 링크 — 두 모드 모두, 새 탭으로 연다(2026-10-14)."""
 
     def test_header_links_studio_in_both_modes(self):
-        from api.admin_nav import STUDIO_URL
+        STUDIO_URL = 'https://popcornpc-studio-741686685802.asia-northeast3.run.app/'
         for cookie in ('admin_ui_mode=legacy', 'admin_ui_mode=new'):
             html = render(request('/admin2/', cookie=cookie), 'admin/new_home.html.j2').body.decode()
             self.assertIn(f'class="a2-hub a2-studio" href="{STUDIO_URL}" target="_blank" rel="noopener"', html)
