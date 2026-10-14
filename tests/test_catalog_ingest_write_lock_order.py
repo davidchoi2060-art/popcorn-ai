@@ -50,6 +50,8 @@ class Database:
         self.products={101:{'stock':7, 'pp':100, 'sp2':200, 'locked':[]}}
         self.specs={101:{'socket':'AM5'}}; self.owners={}; self.calls=[]; self.writes=[]
         self.locks=(); self.required=None; self.after_lock=None; self.before_read=None; self.key_error=None; self.commits=0; self.rollbacks=0
+        # 0126 실판매 재고 보호(c8487e0 _preflight_commerce_stock): 실판매 표가 있고, 실판매에 편입된 상품은 기본 없음
+        self.commerce_present=True; self.protected=()
     def begin(self): return Transaction(self)
     def connect(self): return Transaction(self, read=True)
 
@@ -91,6 +93,10 @@ class Connection:
         if ' FROM product_specs WHERE' in q:
             columns=q.split(' FROM')[0].split(', ')[1:]
             return Result((pc,*(d.specs[pc].get(col) for col in columns)) for pc in p['c'] if pc in d.specs)
+        if q==ci._COMMERCE_CATALOG_SQL:
+            return Result([d.commerce_present])
+        if q==ci._COMMERCE_STOCK_CODES_SQL:
+            return Result(pc for pc in d.protected if pc in p['c'])
         if q.startswith('SELECT danawa_code'):
             return Result((dan,d.owners[dan]) for dan in p['d'] if dan in d.owners)
         if 'INSERT INTO csv_import_jobs' in q:
@@ -215,6 +221,22 @@ class CatalogTests(unittest.TestCase):
         self.apply(db,plan([product(101,1,900,999)],db))
         self.assertEqual(self.rows(db,'product_price_history'),[])
         self.assertEqual((db.products[101]['pp'],db.products[101]['sp2']),(100,200))
+    def test_commerce_sold_product_stock_change_rejected_before_any_write(self):
+        # 실판매에 편입된 상품(0126)의 재고는 CSV 로 못 바꾼다 -- 작업 기록·상품 쓰기 전에 전부 되돌린다.
+        db=Database(); db.protected=(101,)
+        with self.assertRaises(ci.CatalogConflict):
+            self.apply(db,plan([product(101,3)],db))
+        self.assertEqual((db.writes,db.products[101]['stock'],db.rollbacks),([],7,1))
+        db=Database(); db.protected=(101,)
+        self.apply(db,plan([product(101,7,900,999)],db))                   # 재고가 같으면 가격 갱신은 된다
+        self.assertEqual(db.products[101]['stock'],7)
+    def test_commerce_stock_guard_skipped_only_when_catalog_says_no_commerce_table(self):
+        db=Database(); db.protected=(101,); db.commerce_present=False      # 0126 전 설치본
+        self.apply(db,plan([product(101,3)],db))
+        self.assertEqual(db.products[101]['stock'],3)
+        db=Database(); db.commerce_present=None                            # 근거를 못 읽으면 닫는다
+        with self.assertRaises(ci.CatalogConflict):
+            self.apply(db,plan([product(101,3)],db))
     def test_build_plan_basis_only_used_targets_fields_owners(self):
         refs={'gpu_ref':{},'locked':{101:['specs.socket'],999:['x']},
               'existing':{101:{'socket':'AM5','tdp_watt':65},999:{'socket':'other'}},

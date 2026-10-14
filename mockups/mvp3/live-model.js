@@ -136,7 +136,8 @@
     return {product_code:value.product_code,name:value.name,price:Number.isInteger(value.price)&&value.price>=0?value.price:null,
       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
       mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:productRole(value),over_budget:value.over_budget===true,
-      public_configuration:publicConfiguration(value.public_configuration,value.product_code),build:build(value.build)};
+      public_configuration:publicConfiguration(value.public_configuration,value.product_code),build:build(value.build),
+      ...(Number.isSafeInteger(value.sets)&&value.sets>1&&value.sets<=10?{sets:value.sets}:{})};
   }
   // 부품 직접 바꾸기(api/mvp3_build): 같은 PC 의 구성표에서 바꾼 줄들. 금액·차액은 서버가 준 값만 쓴다.
   function buildPart(v){
@@ -148,7 +149,9 @@
     const out=list.map(c=>{
       const before=buildPart(c?.before),after=buildPart(c?.after);
       if(!object(c)||!Number.isSafeInteger(c.ordinal)||c.ordinal<0||!text(c.slot)||!Number.isSafeInteger(c.delta)||!before||!after)return null;
-      return {ordinal:c.ordinal,slot:c.slot,label:text(c.label)||c.slot,quantity:Number.isSafeInteger(c.quantity)&&c.quantity>0?c.quantity:1,before,after,delta:c.delta};
+      const quantity=Number.isSafeInteger(c.quantity)&&c.quantity>0?c.quantity:1;
+      // base_quantity: 구성표 원래 수량(api/mvp3_quantity). 예전 견적에는 없어 바꾼 수량과 같다고 본다.
+      return {ordinal:c.ordinal,slot:c.slot,label:text(c.label)||c.slot,quantity,base_quantity:Number.isSafeInteger(c.base_quantity)&&c.base_quantity>0?c.base_quantity:quantity,before,after,delta:c.delta};
     });
     return out.every(Boolean)?out:null;
   }
@@ -171,7 +174,11 @@
     const options=value.options.map(o=>object(o)&&Number.isSafeInteger(o.product_code)&&o.product_code>0&&text(o.name).trim()&&
       Number.isSafeInteger(o.price)&&Number.isSafeInteger(o.price_diff)&&Number.isSafeInteger(o.total)
       ?{product_code:o.product_code,name:o.name,price:o.price,price_diff:o.price_diff,total:o.total}:null).filter(Boolean);
-    return {ordinal,label:text(value.label),current:buildPart(value.current),total:value.total,options,
+    // 메모리·저장장치 수량 범위(api/mvp3_quantity.limit_for). 서버가 준 범위만 쓴다 -- 없으면 수량을 바꾸지 않는다.
+    const l=value.quantity_limit,q=value.quantity;
+    const quantity=object(l)&&Number.isSafeInteger(q)&&Number.isSafeInteger(l.max)&&l.max>=q&&q>=1
+      ?{current:q,min:1,max:l.max,basis:text(l.basis),known:l.known===true}:null;
+    return {ordinal,label:text(value.label),current:buildPart(value.current),total:value.total,options,quantity,
       checked:Number.isSafeInteger(value.checked)?value.checked:0,untested:Number.isSafeInteger(value.untested)?value.untested:0,note:text(value.note),
       warnings:buildWarnings(value.warnings)};
   }

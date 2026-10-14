@@ -25,7 +25,7 @@ from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import customer_pc_offer, grid_public
+from . import customer_pc_offer, grid_public, mvp3_quantity as QTY
 from .catalog_map import is_server_ram, is_sodimm
 from .build_check import DISPLAY_KEY, evaluate, load_rules, load_specs
 from .db import engine
@@ -58,6 +58,8 @@ class Change(BaseModel):
     model_config = ConfigDict(extra='forbid')
     ordinal: StrictInt = Field(ge=0)
     product_code: StrictInt = Field(gt=0)
+    # 메모리·저장장치 줄의 수량(api/mvp3_quantity). 없으면 구성표 수량 그대로다.
+    quantity: StrictInt | None = Field(default=None, ge=1, le=QTY.MAX_LINE_QTY)
 
 
 class BuildBody(BaseModel):
@@ -124,12 +126,16 @@ def apply_changes(bom, changes, parts):
             raise HTTPException(422, '같은 종류의 부품으로만 바꿀 수 있어요.')
         if not_desktop_ram(new):
             raise HTTPException(409, '노트북용·서버용 메모리는 이 PC에 꽂을 수 없어요. 다른 메모리를 골라 주세요.')
-        if ch.product_code == old['product_code']:
+        qty = old['quantity'] if ch.quantity is None else ch.quantity
+        if qty != old['quantity'] and old['slot'] not in QTY.QTY_SLOTS:
+            raise HTTPException(422, '메모리와 저장장치만 수량을 바꿀 수 있어요.')
+        if ch.product_code == old['product_code'] and qty == old['quantity']:
             continue
         out.append(dict(ordinal=ch.ordinal, slot=old['slot'], label=SLOT_LABELS.get(old['slot'], old['slot']),
-                        quantity=old['quantity'], before=_part(old), after=_part(new),
-                        delta=(new['sale_price'] - old['sale_price']) * old['quantity']))
-        lines[ch.ordinal].update(product_code=new['product_code'], sale_price=new['sale_price'], name=new['product_name'])
+                        quantity=qty, base_quantity=old['quantity'], before=_part(old), after=_part(new),
+                        delta=new['sale_price'] * qty - old['sale_price'] * old['quantity']))
+        lines[ch.ordinal].update(product_code=new['product_code'], sale_price=new['sale_price'], name=new['product_name'],
+                                 quantity=qty)
     return [lines[k] for k in sorted(lines)], out
 
 
@@ -227,9 +233,25 @@ def changed_lines(conn, bom, changes):
     return apply_changes(bom, changes, parts)
 
 
+def quantity_usage(conn, lines):
+    """메인보드·메모리·저장장치 줄이 쓰는 자리(api/mvp3_quantity.usage)."""
+    codes = sorted({l['product_code'] for l in lines if l['slot'] in ('MB', 'RAM', 'SSD', 'HDD') and l['product_code']})
+    rows = list(conn.execute(text(PARTS_SQL), dict(codes=codes)).mappings()) if codes else []
+    raws = {r['product_code']: r['spec_source_text'] for r in rows}
+    # 묶음(8Gx2)은 상품명이 말한다 -- 줄 이름이 비어 있거나 다르게 줄었어도 상품 원래 이름으로 본다.
+    names = {r['product_code']: r['product_name'] for r in rows}
+    return QTY.usage(lines, load_specs(conn, codes), raws, names)
+
+
 def quote(conn, base_price, bom, changes, rules=None):
     """바꾼 구성의 금액과 호환 판정. 바꾼 줄이 만든 호환 실패 · 판정 못 한 호환이 있으면 409."""
     lines, applied = changed_lines(conn, bom, changes)
+    raised = {x['ordinal']: x['quantity'] for x in applied if x['quantity'] > x['base_quantity']}
+    if raised:
+        # 늘린 수량은 바꾼 뒤 구성의 메인보드 기준으로 본다(메인보드를 함께 바꿨으면 새 보드다).
+        why = QTY.refusal(quantity_usage(conn, lines), raised)
+        if why:
+            raise HTTPException(409, why)
     rules = load_rules(conn) if rules is None else rules
     lines_c = compat_lines(lines)
     compat = evaluate(lines_c, load_specs(conn, [l['spec_key'] for l in lines_c]), rules)
@@ -237,6 +259,8 @@ def quote(conn, base_price, bom, changes, rules=None):
     # 후보 목록과 같은 기준(refusal)이다: 실패뿐 아니라 판정하지 못한 것도 받지 않는다.
     warned = []
     for x in applied:
+        if x['after']['product_code'] == x['before']['product_code']:
+            continue      # 수량만 바꾼 줄 -- 부품은 공개된 구성 그대로다(개수는 위 메인보드 기준이 본다)
         args = (compat['checks'], [x['ordinal']], {x['slot']}, rules, x['slot'] in ('CPU', 'GPU'))
         why = refusal(*args)
         if why and why[0] == 'fail':
@@ -283,8 +307,10 @@ def options_for(conn, lines, ordinal, rules):
             uniq.append(o)
     cheaper = [o for o in uniq if o['price_diff'] < 0][-CHEAPER:]
     pricier = [o for o in uniq if o['price_diff'] >= 0][:PRICIER]
+    qty = (QTY.limit_for(quantity_usage(conn, lines), ordinal, line['quantity'])
+           if line['slot'] in QTY.QTY_SLOTS else None)
     return dict(ordinal=ordinal, slot=line['slot'], label=SLOT_LABELS.get(line['slot'], line['slot']),
-                current=_part(line), quantity=line['quantity'], options=cheaper + pricier,
+                current=_part(line), quantity=line['quantity'], quantity_limit=qty, options=cheaper + pricier,
                 checked=len(rows), untested=untested, warnings=warned)
 
 

@@ -25,7 +25,7 @@ const options={ok:true,base_code:12,ordinal:1,slot:'RAM',label:'메모리',quant
   note:'호환 규칙을 모두 통과한 판매 중 부품만 보여 드려요.',
   options:[{product_code:503,name:'램 8GB',price:30000,price_diff:-60000,total:1240000},{product_code:502,name:'램 32GB',price:110000,price_diff:100000,total:1400000}]};
 
-function harness({quoteFail=false,total=1400000}={}){
+function harness({quoteFail=false,total=1400000,limit=null}={}){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
@@ -38,7 +38,9 @@ function harness({quoteFail=false,total=1400000}={}){
     const changes=body?.changes||[];
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:
       url==='/api/grid/recommend'?reco:
-      url==='/api/mvp3/build/options'?options:
+      url==='/api/mvp3/build/options'?(limit?{...options,quantity_limit:limit}:options):
+      url==='/api/mvp3/build/quote'&&changes[0]?.quantity?{ok:true,base_code:12,base_price:1300000,total:1300000+60000*(changes[0].quantity-2),compat:{ok:true},
+        changes:[{...change,quantity:changes[0].quantity,base_quantity:2,after:change.before,delta:60000*(changes[0].quantity-2)}]}:
       url==='/api/mvp3/build/quote'?{ok:true,base_code:12,base_price:1300000,total:changes.length?total:1300000,changes:changes.length?[change]:[],compat:{ok:true}}:
       url==='/api/mvp3/saved-quotes'&&init.method==='POST'?{ok:true,quote:{id:qid,product:{...pc,price:1400000,build:{base_price:1300000,changes:[change]}},state:talkState,saved_at:'2026-10-11T00:00:00Z'}}:
       url.endsWith('/handoff')?{ok:true,handoff_no:'HO-4001',quote_id:qid,product_code:12,name:'PC 12',price_quoted:1300000,price_mall:1300000,mall_status:'확인됨',
@@ -163,4 +165,49 @@ test('changed spec rows replace only the changed slots and drop the old GPU memo
   assert.deepEqual(M.changedSpecRows(M.specRows(spec),build),[['CPU','i5-12400F'],['GPU','RTX 5050 (바꾼 부품)'],['메모리','16GB'],['저장장치','PNY CS900 1TB (바꾼 부품)']]);
   assert.deepEqual(M.changedSpecRows(M.cardSpecRows(spec),null),M.cardSpecRows(spec));
   assert.equal(M.changedPartsNote(null),'');
+});
+
+// 2026-10-12 중헌 님 7번: 메모리·저장장치는 메인보드가 받는 만큼 수량을, 전체 구성은 여러 대로.
+test('memory quantity goes up to the board limit the server gives; the server recomputes the price',async()=>{
+  const h=harness({limit:{min:1,max:4,basis:'메인보드 메모리 슬롯 4개 · 최대 192GB 기준이에요.',known:true}});try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-part-qty]'));
+    assert.match(text(d.querySelector('[data-part-qty]')),/수량−2개\+메인보드 메모리 슬롯 4개 · 최대 192GB 기준이에요. 4개까지 고를 수 있어요./);
+    d.querySelector('[data-action=build-qty][data-qty="3"]').click();
+    await until(()=>h.flow.state.selected.price===1360000);
+    const q=h.calls.filter(c=>c.url==='/api/mvp3/build/quote').at(-1);
+    assert.deepEqual(q.body.changes,[{ordinal:1,product_code:501,quantity:3}]);
+    assert.match(text(d.querySelector('[data-part="bom-1"]')),/수량 3/);
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-build-option]'));
+    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    await until(()=>h.calls.filter(c=>c.url==='/api/mvp3/build/quote').length===2&&!h.flow.state.phase);await tick();
+    assert.deepEqual(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').at(-1).body.changes,[{ordinal:1,product_code:502,quantity:3}],'a picked part keeps the chosen quantity');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+test('an unknown board keeps the plus button locked and says why',async()=>{
+  const h=harness({limit:{min:1,max:2,basis:'메인보드 메모리 슬롯이나 메모리 용량 정보를 확인하지 못해 수량을 늘릴 수 없어요.',known:false}});try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-part-qty]'));
+    assert.ok(d.querySelector('[data-action=build-qty][data-qty="3"]').disabled);
+    assert.ok(!d.querySelector('[data-action=build-qty][data-qty="1"]').disabled);
+    assert.ok(d.querySelector('[data-part-qty] .warn-text'));
+  }finally{h.close();}
+});
+
+test('the whole build can be quoted for several units; the save sends the unit price and the count',async()=>{
+  const h=harness();try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-sets] [data-action=sets][data-sets="2"]').click();
+    await until(()=>d.querySelector('[data-sets-total]'));
+    assert.equal(text(d.querySelector('[data-sets-total]')),'같은 구성 2대 · 합계 2,600,000원');
+    d.querySelector('[data-sets] [data-action=sets][data-sets="3"]').click();
+    await until(()=>h.flow.state.selected.sets===3);
+    h.flow.save();
+    await until(()=>h.calls.some(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST'));
+    const save=h.calls.find(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST');
+    assert.equal(save.body.sets,3);assert.equal(save.body.expected_price,1300000);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
 });

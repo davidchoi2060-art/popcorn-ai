@@ -573,8 +573,26 @@ _DELIVERY_WHEN = re.compile(r"배송\s*(중|전|후|도중|완료|받기\s*전|�
 _APPLIED_HEADS = ("메모리 ", "저장공간 ", "흰색 케이스", "조용한 PC")
 
 
-def _applied_by_recommend(cond: str) -> bool:
+UHD_COND = "4K 해상도"
+
+
+def uhd_applied(state) -> bool:
+    """추천이 4K 를 실제로 거르는가 -- 비게임 용도 중 기준표에 4K 작업 단계가 있는 것이 있으면 참
+    (sold_reco._uhd_rank 와 같은 판정 · reco_explore.uhd_level)."""
+    usages = [u for u in (getattr(state, "usages", None) or []) if isinstance(u, str)]
+    if not usages:
+        return False
+    from .reco_explore import uhd_level            # reco_explore 가 이 모듈을 읽으므로 쓸 때만 읽는다
+    from .sold_reco import fit_usage
+    return any(uhd_level(fit_usage(u)) for u in usages)
+
+
+def _applied_by_recommend(cond: str, state=None) -> bool:
     if cond.startswith(_APPLIED_HEADS):
+        return True
+    # 「4K」는 영상편집처럼 4K 작업 단계가 있는 용도에서는 추천이 그 단계부터 고른다 -- 그때는 «반영 못 함»이라
+    # 말하지 않는다(2026-10-12 코덱스 24조합 검수 1번: 안내는 「4K 미반영」, 카드는 「4K 편집·색보정·효과」).
+    if cond == UHD_COND and state is not None and uhd_applied(state):
         return True
     return bool(re.match(r"그래픽카드 (RTX|GTX|RX) \d{4}", cond))
 
@@ -582,8 +600,8 @@ def _applied_by_recommend(cond: str) -> bool:
 def requested_conditions(text: str, state, prev_state=None) -> tuple[list[str], list[str]]:
     """고객이 말한 조건 -> (추천이 거르는 것, 추천이 쓰지 않는 것)."""
     conds = unsupported_conditions(text, state, prev_state, _all=True)
-    return ([c for c in conds if _applied_by_recommend(c)],
-            [c for c in conds if not _applied_by_recommend(c)])
+    return ([c for c in conds if _applied_by_recommend(c, state)],
+            [c for c in conds if not _applied_by_recommend(c, state)])
 
 
 # 「RAM 16GB랑 32GB 차이만 설명해 주세요. 아직 PC 추천은 필요 없어요.」는 설명을 바라는 말이다 -- 부품 숫자를 조건으로
@@ -625,8 +643,11 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
     g = getattr(state, "game", None)
     # 「4K 모니터」는 모니터 상품 이야기다(모니터 크기 구간이 답한다) — PC 조건으로 세지 않는다.
     if _UHD.search(t) and "모니터" not in t and getattr(g, "resolution", None) != "4K":
-        out.append("4K 해상도")
-    if _TOP.search(t):
+        out.append(UHD_COND)
+    # 게임 4K 는 카드가 이미 가장 높은 게임 단계다 -- 「최고옵션」을 «반영 못 한 조건»이라 하면 4K 카드와 앞뒤가 안 맞는다
+    # (2026-10-13 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 481만원 4K 카드 아래 「최고 사양 조건은 아직 추천에
+    # 반영하지 못해요」가 붙어 「모순」 판정).
+    if _TOP.search(t) and getattr(g, "resolution", None) != "4K":
         out.append("최고 사양")
     before = set(getattr(prev_state, "prefs", None) or [])
     for p in (getattr(state, "prefs", None) or []):
@@ -635,7 +656,7 @@ def unsupported_conditions(text: str, state, prev_state=None, _all: bool = False
         label = PREF_LABEL.get(p, p)
         if label not in out:
             out.append(label)
-    return out if _all else [c for c in out if not _applied_by_recommend(c)]
+    return out if _all else [c for c in out if not _applied_by_recommend(c, state)]
 
 
 # 관리자가 직접 더한 안내 주제(표 `shop_notice_topics`, 0150 · 개편 12번). 낱말은 정규식이 아니라
@@ -690,6 +711,18 @@ def condition_notices(text: str, state, prev_state=None) -> list[str]:
         notes.append("말씀하신 " + " · ".join(conds) + " 조건은 아직 추천에 반영하지 못해요."
                      " 추천 카드는 용도와 예산 기준이니, 카드의 사양에서 직접 확인해 주세요.")
     return notes
+
+
+_BUDGET_PROMISE = re.compile(r"(예산|\d+\s*만\s*원)[^.!?。]{0,30}(맞춰|맞추어|준비|찾|구성해)[^.!?。]{0,12}(겠|게요|께요|드리도록)")
+
+
+def drop_budget_promise(reply: str) -> str:
+    """「150만원으로 맞춰 드리겠습니다」처럼 예산을 지키겠다는 AI 약속 문장을 걷는다 -- 예산 안 카드가 없을 수도 있다."""
+    sents = [x for x in re.split(r"(?<=[.!?。])\s+", reply or "") if x.strip()]
+    # 「예산을 알려 주시면 찾아 드릴게요」처럼 조건을 묻는 말(서버 안내 포함)은 약속이 아니다.
+    kept = [x for x in sents if not _BUDGET_PROMISE.search(x) or re.search(r"(알려|말씀해)\s*주시면", x)]
+    # 전부 그런 문장이면 그대로 둔다(빈 말풍선보다 낫다 -- drop_deferrals 와 같은 규칙).
+    return " ".join(kept).strip() if kept and len(kept) < len(sents) else (reply or "")
 
 
 def drop_deferrals(reply: str) -> str:

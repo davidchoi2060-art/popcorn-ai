@@ -435,6 +435,42 @@ CREATE TABLE member_sessions (             -- 구조는 admin_sessions와 동일
 없으면 게스트 주문(email upsert 유지 — 그 이메일은 자기신고값이며, 같은 이메일로 로그인해야
 MY에서 보인다) ⑤ 탈퇴·정지 회원(`status != 'active'`)의 세션은 즉시 무효.
 
+### 3.11b [개정 2026-10-13] 고객 회원 · 소셜 로그인 저장 구조 (C2 · 마이그레이션 0156)
+
+근거: 2026-10-13 사장님 결정 (나) 「회원만 자체」 + 설계 `docs/design/customer-social-login-v1.md` 확정(「제안대로 진행해」).
+§3.11 을 아래처럼 **바꾼다**:
+
+| §3.11 에서 | 이제 |
+|---|---|
+| 첫 로그인이 곧 가입 | 첫 소셜 로그인 → **가입 동의**(이용약관·개인정보·만 14세) → 가입. 동의 전 신원은 `member_join_pending`(회원 아님, 10분) |
+| `joined_via` + `provider_uid` 로 공급자 식별 | **`member_verified_identities` (issuer_key, subject) 정확 일치**. 이메일은 조회 키가 아니고 자동 연결하지 않는다. `joined_via`·`provider_uid` 는 표시용(첫 가입 공급자)으로만 남는다 |
+| `member_sessions` (TIMESTAMP) | **`member_verified_sessions`** + 발급 영수증 `member_session_issuance_receipts`. 옛 `member_sessions` 는 쓰지 않는다(지우지도 않는다) |
+| 이메일 로그인 | 없음. 구글·카카오·네이버만 |
+
+```sql
+ALTER TABLE members ADD auth_subject UUID UNIQUE NULL, ADD auth_revision BIGINT NULL CHECK (>0),
+                    ADD withdrawn_at TIMESTAMP NULL;            -- 둘 다 있거나 둘 다 없거나(ck_members_auth_pair)
+member_verified_identities  (identity_id PK, member_id FK, issuer_key, issuer, subject, verification_method,
+                             registration_ref, verified_at_epoch, revoked_at_epoch,
+                             UNIQUE(issuer_key, subject), UNIQUE(identity_id, member_id))   -- 회원 1 : 공급자 N
+member_session_issuance_receipts (proof_ref PK, credential_hash UNIQUE, member_id, verified_identity_id,
+                             auth_context_id UNIQUE, issued_auth_revision, issued/expires_at_epoch, 출처 6열, authority_ref)
+member_verified_sessions    (credential_hash PK = sha256(쿠키 토큰), member_id, verified_identity_id, auth_context_id,
+                             issued_auth_revision, issued/expires/revoked_at_epoch, proof_ref, user_agent;
+                             8열 FK -> 영수증)                          -- 발급 뒤 불변, 철회는 revoked_at_epoch 만
+member_consents             (member_id, kind terms|privacy|age14|marketing, version, agreed/withdrawn_at_epoch)
+oauth_login_attempts        (attempt_id, provider, purpose login|link, state_hash, nonce_hash, pkce_verifier,
+                             return_path, created/used_at_epoch)          -- 10분 · 한 번용 · 공급자 토큰 저장 없음
+member_join_pending         (pending_id, token_hash, 신원 6열, display_nickname/email, return_path, created/used_at_epoch)
+mvp3_saved_recommendations.member_id, purchase_inquiries.member_id      -- 비회원 기록의 회원 귀속(설계 §6)
+```
+
+**계약**(§3.11 의 ①③⑤ 유지, ②④ 바뀜): ① 쿠키 `popcorn_member_session`(HttpOnly·SameSite=Lax·Secure, 64 hex, 서버엔 sha256 만)
+② 인증 표의 시각은 **epoch BIGINT** — 저장 읽기 계약(`api/customer_auth_sql_read.py`)이 정수 시각으로 대조한다
+③ 게스트는 그대로 열려 있다 ④ 주문·결제는 팝콘PC 쇼핑몰 몫 — 회원에 붙는 것은 보관 견적·구매 상담 신청·인계 기록
+⑤ `status != 'active'` 회원의 세션은 즉시 무효 ⑥ 정규화 금지 — issuer_key·subject 는 받은 그대로(대소문자·공백), 255자 넘으면 거절
+⑦ 기록이 있으면 0156 downgrade 는 거절한다.
+
 ### 3.12 [7차 개정] 카탈로그 적재(T0) — 데모/실데이터 구분 · 다중 소켓 · 사양 출처 (2026-07-26, 슬라이스 39)
 
 실파일 실측(마스터 24,303행 · 사양 EAV 339,650행 · 키 724종)에서 나온 개정이다.

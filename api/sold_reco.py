@@ -137,9 +137,44 @@ def public_spec(spec):
             or (k in PUBLIC_SPEC_NUM and type(v) in (int, float) and v >= 0)}
 
 
+_CPU_TAIL = re.compile(r"(\d{3,5})([A-Z]*)$")
+# 평가 스냅샷(tools/product_fit 판독표)은 내장 그래픽 이름을 «Radeon Graphics» 한 줄로 읽어 8000G 시리즈 APU 도
+# 「AMD Radeon(내장 2CU)」로 적었다(2CU 는 라이젠 7000 일반형 내장 그래픽이다). APU 는 CPU 모델이 내장 그래픽을 정한다.
+_APU_IGPU = (("8700G", "Radeon 780M(내장)"), ("8600G", "Radeon 760M(내장)"), ("8500G", "Radeon 740M(내장)"))
+_GENERIC_RADEON = "AMD Radeon(내장 2CU)"
+
+
+def cpu_label(cpu, name):
+    """카드 CPU 이름 -- 판독표 표시명은 F·KF 를 한 이름으로 묶는다(「i5-12400」이 12400F 도 뜻한다). 상품명에 붙은
+    접미를 되살린다(2026-10-12 코덱스 24조합 검수 5번: 카드 12400 · 상세 12400F). 상품명에 없으면 그대로."""
+    if not isinstance(cpu, str) or not isinstance(name, str):
+        return cpu
+    m = _CPU_TAIL.search(cpu.strip())
+    if not m:
+        return cpu
+    digits, tail = m.groups()
+    hit = re.search(r"(?<![0-9A-Za-z])" + digits + r"([A-Z]{1,3})(?![0-9A-Za-z])", name)
+    if not hit or hit.group(1) == tail or not hit.group(1).startswith(tail):
+        return cpu
+    return cpu.strip()[:m.start()] + digits + hit.group(1)
+
+
+def gpu_label(gpu, cpu):
+    """카드 GPU 이름 -- 8000G APU 의 내장 그래픽을 CPU 모델로 바로 적는다(2026-10-12 코덱스 24조합 검수 4번)."""
+    if gpu == _GENERIC_RADEON and isinstance(cpu, str):
+        return next((label for model, label in _APU_IGPU if model in cpu), gpu)
+    return gpu
+
+
 def card_spec(p):
     """카드 사양 = 공개 사양 + 케이스·파워 이름(몰 구성 원문, 2026-10-12 중헌 님 고객단 4번). 못 읽은 줄은 넣지 않는다."""
     spec = public_spec(p.get("spec"))
+    if isinstance(spec, dict):
+        spec = dict(spec)
+        if "gpu" in spec:
+            spec["gpu"] = gpu_label(spec["gpu"], spec.get("cpu"))
+        if "cpu" in spec:
+            spec["cpu"] = cpu_label(spec["cpu"], p.get("name"))
     extra = {k: v for k, v in (p.get("case_psu") or {}).items() if k in PUBLIC_SPEC_PART and isinstance(v, str) and v}
     if not extra:
         return spec
@@ -435,6 +470,11 @@ MAX_SWAP_OPTIONS = 8
 def _swap_val(p, key):
     sp = p.get("spec") if isinstance(p.get("spec"), dict) else {}
     v = sp.get(key)
+    # 카드와 같은 이름으로 비교·표시한다(12400F 와 12400 은 다른 CPU 다 -- 내장 그래픽 유무가 다르다).
+    if key == "cpu":
+        v = cpu_label(v, p.get("name"))
+    elif key == "gpu":
+        v = gpu_label(v, sp.get("cpu"))
     if isinstance(v, str):
         v = v.strip()
         return v or None

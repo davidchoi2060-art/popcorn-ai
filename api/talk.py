@@ -335,6 +335,15 @@ def drop_pc_push(reply: str) -> str:
 # · E07 「뭔가 마음에 안 드셨나 봐요.」). PC 권유가 아닌 이어 말하기 한 문장을 붙인다.
 REPLY_SMALLTALK_FOLLOW = "궁금하거나 불편한 점이 있으면 편하게 더 말씀해 주세요. 이어서 같이 이야기해 볼게요."
 ONE_LINER_MAX = 40
+# 「너 바보야?」에 「기분 상하셨나 봐요. … 죄송합니다.」처럼 사과만 하고 끝나면 다음 말을 꺼내기 어렵다(2026-10-13 품질 비교
+# E06 「사과만 하고 다음 질문이 없다」). 사과·감정을 받은 답인데 묻는 말이 없으면 무엇이 불편했는지 묻는 한 문장을 붙인다.
+REPLY_APOLOGY_FOLLOW = "어떤 점이 불편하셨는지 알려 주시면 바로 고쳐서 다시 도와드릴게요."
+# 강한 욕(talk_exceptions._ABUSE)이 아닌 가벼운 핀잔·불만. AI 가 「편하게 말씀해 주세요.」 한 줄로 끝내도(2026-10-14 재측정
+# E06 「너무 짧고 도움 방향이 없다」) 사과와 «무엇이 불편했는지» 묻는 말을 서버가 붙인다.
+_MILD_INSULT = re.compile(r"바보|멍청|짜증|답답|구려|쓰레기|별로네|별로야|못\s*알아|이상해|미쳤")
+REPLY_MILD_INSULT = "제 답이 마음에 안 드셨다면 죄송해요. " + REPLY_APOLOGY_FOLLOW
+MILD_INSULT_SHORT = 80
+_APOLOGY = re.compile(r"죄송|미안|기분\s*(이\s*)?상하|불편하게|마음에\s*안\s*드")
 
 
 # 한 턴에 질문은 하나까지 -- AI 답이 이미 무엇을 묻고 있으면(「어떤 용도로 쓰실지 말씀해 주세요.」) 갈래 질문을
@@ -351,6 +360,25 @@ def _asks_already(reply: str) -> bool:
 
 def _count_sentences(text: str) -> int:
     return len([p for p in _SENTENCE.findall(text or "") if p.strip()])
+
+
+def follow_mild_insult(text: str, reply: str) -> str:
+    """가벼운 핀잔에 짧게만 답했으면 사과 + 무엇이 불편했는지 묻는 문장. 이미 그렇게 답했으면 그대로."""
+    r = (reply or "").strip()
+    if _MILD_INSULT.search(text or ""):
+        r = r.replace(REPLY_SMALLTALK_FOLLOW, "").strip()     # 일반 이어 말하기 대신 아래 사과·질문 한 번
+    if (not _MILD_INSULT.search(text or "") or len(r) >= MILD_INSULT_SHORT
+            or REPLY_APOLOGY_FOLLOW in r or "불편하셨" in r):
+        return r
+    return (r + " " + REPLY_MILD_INSULT).strip()
+
+
+def follow_apology(reply: str) -> str:
+    """사과·감정만 받고 묻는 말이 없는 답에 «무엇이 불편했는지» 묻는 한 문장. 아니면 그대로."""
+    r = (reply or "").strip()
+    if not r or not _APOLOGY.search(r) or _asks_already(r) or REPLY_APOLOGY_FOLLOW in r:
+        return r
+    return r + " " + REPLY_APOLOGY_FOLLOW
 
 
 def extend_one_liner(reply: str) -> str:
@@ -536,6 +564,9 @@ class ParseBody(BaseModel):
 
 # 일반 기준 설명을 지우지 않는 예외 -- 주문·환불 상태를 묻는 턴도 일반적인 환불 기간은 말해 줄 수 있다.
 GENERAL_OK_EXCEPTIONS = frozenset({"order_status", "competitor"})
+# 긴 글·예산과 사양이 맞지 않는 말에도 설명은 남긴다 -- 「10만원으로 모든 게임 4K 최고옵션」에 「불가능에 가깝다」는 설명 없이
+# 482만원 카드만 나갔고, 2만 자 글 끝 「예산은 150만원」에도 설명이 비었다(2026-10-13 상담 답 품질 비교 E26·E16).
+ADVICE_OK_EXCEPTIONS = frozenset({"contradiction", "too_long"})
 
 # 시작 단추 키. 정본은 api/talk_entry.KEYS, 화면은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야
 # 센다(테스트가 대조한다).
@@ -1401,6 +1432,12 @@ def parse_talk(body: ParseBody, request: Request):
                     and bool((getattr(ans, "answer", "") or "").strip()))
         reply = TR.honest_reply(notices, bool(state.usages), [] if answered else missing,
                                 has_budget=bool(state.budget_won))
+    if (stage == TS.STAGE_PC and not notices and getattr(ans, "kind", "game") == "pc_advice"
+            and getattr(ans, "topic", None) == PA.TOPIC_GENERAL and (ans.answer or "").strip()):
+        # 구매 절차·다른 쇼핑몰 비교 설명이 위에 나가면 AI 의 짧은 확인·되묻기는 같은 말 되풀이다(2026-10-13 상담 답 품질 비교
+        # E31 「다나와가 더 싸요?」: 설명 뒤 「다른 사이트 가격은 확인하기 어렵네요. 어떤 구성을 비교하세요?」가 또 붙었다).
+        # 예외 안내(다른 곳 가격 확인 불가 등)는 아래 TX.respond 가 그대로 붙인다.
+        reply = ""
     if laptop and stage == TS.STAGE_PC:
         reply = TR.with_laptop_notice(reply)
     band_note = TR.budget_band_note(text)
@@ -1434,6 +1471,9 @@ def parse_talk(body: ParseBody, request: Request):
             # 문장을 통째로 걷었을 때만 -- AI 가 처음부터 한 줄로 답한 것(「지금 날씨 정보는 확인할 수 없어요.」)이나
             # 문장 안의 낱말만 걷은 것(「게임을 하거나 영상 봐도」)은 그대로 둔다.
             reply = extend_one_liner(reply)
+        if not invite:
+            reply = follow_apology(reply)
+            reply = follow_mild_insult(text, reply)
         if invite:
             reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
             pc_offered = True
@@ -1484,17 +1524,31 @@ def parse_talk(body: ParseBody, request: Request):
             # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
             (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
             or (asked_before and "?" in reply)
+            # 설명([B])을 못 받은 턴에 카드는 나가는데 AI 가 「해상도나 작업 규모가 어느 정도인가요?」만 되물었다(2026-10-13 상담 답
+            # 품질 비교 R04 「영상 편집용 PC 200만원으로 추천해주세요」). 카드가 나가는 턴은 되묻기 대신 기준 줄로 마무리한다.
+            or "?" in reply
             or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
         # 카드는 화면이 들고 있는 조건(wants.heavy)을 계속 쓴다 -- 이번 문장에 작업 낱말이 없으면 앞서 말한 작업으로
         # 기준 줄을 맞춘다(코덱스 #194 검수 P2-3: 「대용량 엑셀」 뒤 「조금 더 싸게」에 카드는 쾌적, 기준 줄은 기본이었다).
         # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
         heavy = TD.X.heavy_levels(text) or next(
             (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy)
+        # 4K 도 같다 -- 화면은 앞서 한 번 말한 4K 를 wants.uhd 로 계속 들고 있다(reco_explore.merge).
+        uhd = bool(TD.X._UHD.search(text or "")) or any(r == "user" and TD.X._UHD.search(t or "") for r, t in history)
+        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy, uhd=uhd)
         if first:
             reply = (first + " " + " ".join(cond_notes)).strip()
+        elif getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
+            # 설명이 위에 나가고 덧붙일 기준 줄이 없으면 AI 확인 문장을 내지 않는다 -- 「본체 60만원 이하 예산으로
+            # 구성을 준비해드리겠습니다」 바로 아래에 59만원 넘는 카드가 나왔다(2026-10-12 코덱스 24조합 검수 3번).
+            # 예산 안 카드가 있는지는 카드 묶음의 안내(grid_public)가 말한다.
+            reply = " ".join(cond_notes).strip()
         log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
                  pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
+    if stage == TS.STAGE_PC:
+        # 「150만원으로 맞춰 드리겠습니다」 -- 예산 안 카드가 없을 수도 있는데 AI 가 먼저 약속한다. 예외 응대(긴 글·모순)
+        # 턴에도 남았다(2026-10-13 상담 답 품질 비교 E16). 예산 안 여부는 카드 안내가 말한다.
+        reply = TR.drop_budget_promise(reply)
     reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
                                       top_spec_re=TR._TOP, uhd_re=TR._UHD,
                                       read_len=MAX_TEXT_LEN, masked=masked,
@@ -1529,7 +1583,7 @@ def parse_talk(body: ParseBody, request: Request):
     # 확인할 곳이다(2026-10-11 일반 AI 비교 「확인 가능한 일반 정보도 회피」 · 사장님 「답 먼저」).
     # 예외 응대·노트북 턴은 그 문장이 먼저라 설명을 비운다. 주문·환불 상태 질문에도 일반 기준 설명은 남긴다.
     general = advice and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
-    bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset())
+    bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset()) - ADVICE_OK_EXCEPTIONS
     if advice and (bad_exceptions or (laptop and getattr(ans, "topic", None) != PA.TOPIC_LAPTOP)
                    or (not general and not (pc is True and stage == TS.STAGE_PC))):
         answer = ""
@@ -1543,12 +1597,30 @@ def parse_talk(body: ParseBody, request: Request):
     answer = TR.tidy_customer_text(answer, text)
     # 설명의 「시중에서는 보통 ○○만원대」를 아래 카드 가격 범위로 맞춘다(2026-10-12 중헌 님 3번 -- 설명과 카드 가격이
     # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
-    if answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing and "시중" in answer:
+    # 파워·그래픽카드·SSD·해상도도 같다 -- 카드보다 높은 사양을 기본처럼 말한 문장은 걷고 실제 카드 사양 한 문장을 붙인다
+    # (2026-10-12 코덱스 24조합 검수 2번: 「650W급 이상」 아래 600W 카드 · 「RTX 5070급·750W·QHD」 아래 5060·600W·FHD 카드).
+    if (answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing
+            and not TR.explain_only(text)):
         try:
-            from .grid_public import sold_card_prices    # 추천 쪽 모듈 -- 이 턴에만 읽는다
-            answer = PA.align_market_price(answer, sold_card_prices(state.model_dump(), text))
-        except Exception as e:  # noqa: BLE001 - 가격 맞추기는 곁가지다. 실패해도 설명은 나간다
-            log.warning("[talk] market price align skipped: %s", type(e).__name__)
+            from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 이 턴에만 읽는다
+            items = sold_card_items(state.model_dump(), text)
+            prices = [it["price"] for it in items if type(it.get("price")) is int and it["price"] > 0]
+            budget = state.budget_won if state.budget_bound != "이상" else None
+            cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
+            answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text, condition=cond)
+            g = state.game
+            fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
+            answer, spec_dropped = PA.align_card_specs(answer, items, fhd_game=fhd_game)
+            if spec_dropped and isinstance(ans.filter_report, dict):
+                ans.filter_report.setdefault("dropped", []).extend(spec_dropped)
+        except Exception as e:  # noqa: BLE001 - 카드 맞추기는 곁가지다. 실패해도 설명은 나간다
+            log.warning("[talk] card align skipped: %s", type(e).__name__)
+    if advice and answer.strip() and "contradiction" in exceptions:
+        # 설명이 이미 «그 예산으로는 그 사양이 어렵다»를 말했다 -- 같은 뜻의 고정 안내를 또 붙이면 길고 어색하다
+        # (2026-10-13 상담 답 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 「불가능해요」 설명 뒤 모순 안내가 붙어
+        # 「모순되고 부자연스럽다」로 판정됐다). 예산 안 카드 여부는 카드 안내가 말한다.
+        for note in (TX.NOTE_CONTRADICTION, TX.NOTE_LOW_BUDGET):
+            reply = reply.replace(note, "").strip()
     if notes_deferred and not answer.strip():
         # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
         reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()

@@ -794,6 +794,13 @@ def sold_card_prices(state_raw: dict, text_raw: str | None = None) -> list[int]:
     """상담 설명의 가격대를 카드에 맞추는 용도(api/talk_pc_advice.align_market_price): 이 조건으로 지금
     추천 카드에 나올 판매 PC 가격들. 추천(`recommend`)과 같은 나눔·같은 고객 문장 해석을 쓰고, 사진·추정 기록
     같은 곁가지는 하지 않는다(읽기만). 못 구하면 []."""
+    return [it["price"] for it in sold_card_items(state_raw, text_raw)
+            if type(it.get("price")) is int and it["price"] > 0]
+
+
+def sold_card_items(state_raw: dict, text_raw: str | None = None) -> list[dict]:
+    """sold_card_prices 와 같은 카드 -- 가격뿐 아니라 사양(spec)·수준(level)·용도(usage_grid)까지.
+    상담 설명의 파워·그래픽카드·SSD 를 카드에 맞추는 데 쓴다(api/talk_pc_advice.align_card_specs)."""
     notes: list[str] = []
     with engine.connect() as conn:
         vocab = load_vocab(conn)
@@ -805,8 +812,8 @@ def sold_card_prices(state_raw: dict, text_raw: str | None = None) -> list[int]:
     sold_games = game_usages if (game_grade is not None or TR.unnamed_game(state)) else []
     others = [u for u in state.usages if not is_game_usage(u)]
     sets = SOLD.card_sets(state, sold_games, others, notes, vocab, explore)
-    return [it["price"] for cs in sets if cs.get("kind") == "sold" for it in cs.get("items") or []
-            if type(it.get("price")) is int and it["price"] > 0]
+    return [dict(it, usage_grid=cs.get("usage_grid")) for cs in sets if cs.get("kind") == "sold"
+            for it in cs.get("items") or []]
 
 
 def sold_part_options(state_raw: dict, code: int, slot: str) -> dict | None:

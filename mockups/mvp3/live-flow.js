@@ -4,11 +4,15 @@
   const JOURNAL_KEY='popcorn-mvp3-pending-save-v1';
   // 상담 한 번에 보낼 수 있는 글자 수. 서버는 긴 글을 막지 않고 앞 800자와 끝 200자를 읽은 뒤 그 사실을 알린다(api/talk.py _read_long).
   const MAX_TEXT=20000;
+  // 같은 구성을 몇 대까지 한 번에 견적하나(api/mvp3_quantity.MAX_SETS 와 같은 값).
+  const MAX_SETS=10;
   function validPending(record){
     const p=record?.payload;
     return M.object(record)&&record.version===1&&/^[a-f0-9]{64}$/.test(record.binding)&&M.object(p)
-      &&['expected_price,product_code,request_id,state','changes,expected_price,product_code,request_id,state'].includes(Object.keys(p).sort().join(','))
-      &&(p.changes===undefined||Array.isArray(p.changes)&&p.changes.length>0&&p.changes.length<=8&&p.changes.every(c=>M.object(c)&&Object.keys(c).sort().join(',')==='ordinal,product_code'&&Number.isSafeInteger(c.ordinal)&&c.ordinal>=0&&Number.isSafeInteger(c.product_code)&&c.product_code>0))
+      &&['expected_price,product_code,request_id,state','changes,expected_price,product_code,request_id,state','expected_price,product_code,request_id,sets,state','changes,expected_price,product_code,request_id,sets,state'].includes(Object.keys(p).sort().join(','))
+      &&(p.sets===undefined||Number.isSafeInteger(p.sets)&&p.sets>1&&p.sets<=MAX_SETS)
+      &&(p.changes===undefined||Array.isArray(p.changes)&&p.changes.length>0&&p.changes.length<=8&&p.changes.every(c=>M.object(c)&&['ordinal,product_code','ordinal,product_code,quantity'].includes(Object.keys(c).sort().join(','))&&Number.isSafeInteger(c.ordinal)&&c.ordinal>=0&&Number.isSafeInteger(c.product_code)&&c.product_code>0
+        &&(c.quantity===undefined||Number.isSafeInteger(c.quantity)&&c.quantity>=1&&c.quantity<=8)))
       &&M.uuid(p.request_id)&&Number.isInteger(p.product_code)&&p.product_code>0&&Number.isInteger(p.expected_price)&&p.expected_price>=0
       &&M.object(p.state)&&new TextEncoder().encode(JSON.stringify(p)).length<=16384;
   }
@@ -65,9 +69,11 @@
       // 되살린 견적을 아직 다시 불러오기 전이면(selected 없음) 그 상품 번호를 지우지 않고 그대로 둔다.
       // 고를 때 조건(selection_state)도 함께 둔다 -- 그 뒤 조건을 바꿨으면 지금 조건의 추천에는 그 상품이 없을 수 있다.
       // 부품 바꾸기로 옮긴 PC 는 추천 목록에 없을 수 있어 어느 PC 의 어느 부품에서 옮겼는지(swap_from)도 둔다.
-      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel),selection_state:M.object(state.selectionState)?M.copy(state.selectionState):null,...(M.object(state.selectionWants)?{selection_wants:M.copy(state.selectionWants)}:{}),...(validSwapFrom(sel.swap_from)?{swap_from:M.copy(sel.swap_from)}:{})}
+      current:sel&&Number.isInteger(sel.product_code)?{product_code:sel.product_code,changes:changesOf(sel),selection_state:M.object(state.selectionState)?M.copy(state.selectionState):null,...(M.object(state.selectionWants)?{selection_wants:M.copy(state.selectionWants)}:{}),...(validQuery(state.selectionQuery)?{selection_query:M.copy(state.selectionQuery)}:{}),...(validSwapFrom(sel.swap_from)?{swap_from:M.copy(sel.swap_from)}:{}),...(validSets(sel.sets)?{sets:sel.sets}:{})}
         :state.restoredCurrent?M.copy(state.restoredCurrent):null};
   }
+  function validSets(n){return Number.isSafeInteger(n)&&n>1&&n<=MAX_SETS;}
+  function validQuery(q){return M.object(q)&&['cheaper','better'].includes(q.nav)&&Number.isSafeInteger(q.anchor_code)&&q.anchor_code>0?{nav:q.nav,anchor_code:q.anchor_code}:null;}
   function validSwapFrom(x){return M.object(x)&&Number.isSafeInteger(x.product_code)&&x.product_code>0&&['cpu','gpu','ram','ssd'].includes(x.slot);}
   function validConversation(r,now=Date.now()){
     return M.object(r)&&r.version===1&&Number.isFinite(r.saved_at)&&now-r.saved_at>=0&&now-r.saved_at<=CONVERSATION_TTL_MS
@@ -77,7 +83,8 @@
       &&(r.current===null||M.object(r.current)&&Number.isInteger(r.current.product_code)&&r.current.product_code>0&&Array.isArray(r.current.changes)
         &&(r.current.selection_state===undefined||r.current.selection_state===null||M.object(r.current.selection_state))
         &&(r.current.selection_wants===undefined||r.current.selection_wants===null||M.object(r.current.selection_wants))
-        &&(r.current.swap_from===undefined||validSwapFrom(r.current.swap_from)));
+        &&(r.current.selection_query===undefined||validQuery(r.current.selection_query)!==null)
+        &&(r.current.swap_from===undefined||validSwapFrom(r.current.swap_from))&&(r.current.sets===undefined||validSets(r.current.sets)));
   }
   function createConversationStore(options){
     let storage=options.sessionStorage,resolved=Object.prototype.hasOwnProperty.call(options,'sessionStorage');
@@ -107,7 +114,9 @@
   // 부품 직접 바꾸기 칸(api/mvp3_build). 열린 구성표 줄(ordinal)과 서버가 준 선택지만 든다.
   // 바꾼 결과는 선택한 상품의 build(기준 판매가 · 바꾼 줄)와 price(서버가 다시 계산한 합계)에 둔다.
   function emptyBuild(){return {ordinal:null,data:null,error:''};}
-  function changesOf(p){return (p?.build?.changes||[]).map(c=>({ordinal:c.ordinal,product_code:c.after.product_code}));}
+  // 수량을 바꾼 줄(메모리·저장장치)은 그 수량도 함께 보낸다. 수량이 구성표 그대로면 예전과 같은 모양이다.
+  function changesOf(p){return (p?.build?.changes||[]).map(c=>({ordinal:c.ordinal,product_code:c.after.product_code,
+    ...(Number.isSafeInteger(c.base_quantity)&&c.quantity!==c.base_quantity?{quantity:c.quantity}:{})}));}
   // 첫 인사는 PC 상담으로 바로 들어간다(2026-10-11 사장님: 게임 탐색은 화면이 먼저 권하지 않는다).
   const GREETING='안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요.';
   function createFlow(api,options={}){
@@ -116,7 +125,7 @@
     // 고객이 다른 구성을 고를 때만 바뀐다(코덱스 1816 보강3 §5). 1차 화면은 지금처럼 새 조건에서 비운다.
     const keepCurrent=options.keepCurrent===true;let proposalSeq=0;
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
-      selected:null,selectionState:null,selectionWants:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
+      selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
       wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null,restoredShown:false,proposals:[]};
     let generation=0,controller=null,pendingProduct=null;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
@@ -137,7 +146,7 @@
     }
     function reset({restore=false}={}){
       cancel();Object.assign(state,{restoredCurrent:null,restoredShown:false,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
-        selected:null,selectionState:null,selectionWants:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
+        selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
         wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
@@ -155,8 +164,12 @@
     }
     async function recommendFor(op,extra={},{notes=true}={}){
       state.phase='recommend';emit();
+      const sentAnchor=state.anchorCode;
       const response=await api.recommend(state.talk,{signal:op.signal},{wants:state.wants,anchor_code:state.anchorCode,...extra});
       if(!current(op))return;
+      // 「더 싸게·더 높은 사양」으로 받은 카드는 같은 방향·기준 카드로 물어야 다시 나온다 -- 고를 때 함께 기억한다
+      // (2026-10-13 사장님: 대화 화면 「더 높은 사양」 카드의 상세 보기가 상세 대신 다른 추천 목록으로 갔다).
+      state.lastQuery=validQuery({nav:extra.nav,anchor_code:sentAnchor});
       if(extra.text!==undefined)state.pendingText='';
       const parsed=M.recommendations(response);
       state.recommendation=parsed;state.groups=parsed.groups;state.assumed=parsed.assumed;state.missing=parsed.needs;
@@ -171,7 +184,7 @@
       // (2026-10-12 사장님 결정 · 카드 검수 C1 「예산 안내가 카드 아래 말풍선으로 붙음」).
       state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
       state.history=state.history.slice(-6);
-      if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
+      if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.selectionQuery=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
       state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
@@ -211,7 +224,7 @@
         state.missing=Array.isArray(response.missing)?response.missing:[];state.assumed=Array.isArray(response.assumed)?response.assumed:[];
         if(state.recommendation)prior={screen:state.screen,recommendation:state.recommendation,groups:state.groups,selected:state.selected,selectionState:state.selectionState,
           savedQuote:state.savedQuote,saveState:state.saveState,needsRefresh:state.needsRefresh,wants:state.wants,choices:state.choices,anchorCode:state.anchorCode};
-        if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
+        if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.selectionQuery=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
         state.groups=[];state.recommendation=null;
         // Sentences said while the server was still asking (e.g. 「램 64GB」 before the usage)
         // ride along until a recommendation actually reads them.
@@ -237,11 +250,12 @@
     // 고른 상품을 고를 때 조건(basis)으로 서버에 다시 묻는다. 지금 조건이 고를 때와 같으면 방금 받은 추천에서
     // 찾고(fresh 가 아닐 때), 아니면 고를 때 조건으로 한 번 더 묻는다 -- 조건을 바꾼 뒤에도 지금 견적이
     // 사라지지 않게(코덱스 PR142·143 검수 1). 없으면 null, 이 요청이 밀려났으면 undefined.
-    async function findProduct(op,code,basis,{fresh=false,wants=null}={}){
+    async function findProduct(op,code,basis,{fresh=false,wants=null,query=null}={}){
       const pick=groups=>groups.flatMap(g=>g.products).find(x=>x.product_code===code)||null;
       let p=!fresh&&JSON.stringify(basis)===JSON.stringify(state.talk)?pick(state.groups):null;
       // 고를 때 추천 조건(wants)도 함께 보낸다 -- 빼면 서버가 다른 PC 를 추천해 고른 PC 를 못 찾는다.
-      if(!p){const r=M.recommendations(await api.recommend(M.copy(basis),{signal:op.signal},M.object(wants)?{wants:M.copy(wants)}:{}));if(!current(op))return undefined;p=pick(r.groups);}
+      const q=validQuery(query);
+      if(!p){const r=M.recommendations(await api.recommend(M.copy(basis),{signal:op.signal},{...(M.object(wants)?{wants:M.copy(wants)}:{}),...(q||{})}));if(!current(op))return undefined;p=pick(r.groups);}
       return p&&M.copy(p);
     }
     // 바꿨던 부품을 서버 계산으로 다시 적용한다. 못 하면 기본 구성으로 두고 그 사실을 note 로 돌려준다.
@@ -265,7 +279,9 @@
     // 새로고침 전에 보던 견적을 다시 연다. 가격·구성은 보관하지 않았으므로 고를 때 조건으로 서버에 다시 묻고,
     // 같은 상품 번호가 있으면 그것을 고른 뒤 바꿨던 부품을 서버 계산으로 다시 적용한다.
     // 없거나 실패하면 지어내지 않고 그 사실을 말한다. 실패하면 상품 번호는 남겨 다시 시도할 수 있게 한다.
-    async function resume(){
+    // arrived = 대화 화면에서 「상세 보기」로 넘어왔다(새로고침이 아니다) -- 안내 문구만 다르다(2026-10-13 사장님:
+    // 넘어왔는데 「새로고침 전에 보던 …을 다시 불러왔어요」라고 했다).
+    async function resume({arrived=false}={}){
       const want=state.restoredCurrent;
       if(state.phase||!want||!state.talk)return;
       const basis=M.object(want.selection_state)?want.selection_state:state.talk,op=begin('recommend');
@@ -276,7 +292,8 @@
         try{await recommendFor(op,{},{notes:false});}catch(error){if(!current(op))return;if(error?.name==='AbortError')throw error;latest=error;}
         if(!current(op))return;
         const wantWants=M.object(want.selection_wants)?want.selection_wants:null;
-        let p=await findProduct(op,want.product_code,basis,{fresh:!!latest,wants:wantWants});
+        const wantQuery=validQuery(want.selection_query);
+        let p=await findProduct(op,want.product_code,basis,{fresh:!!latest,wants:wantWants,query:wantQuery});
         if(p===undefined||!current(op))return;
         // 부품 바꾸기로 옮긴 PC 는 추천 목록에 없을 수 있다. 옮기기 전 PC 의 같은 부품 선택지에서 서버에 다시 찾는다.
         if(!p&&validSwapFrom(want.swap_from)){
@@ -290,11 +307,11 @@
           // 다시 찾는다(코덱스 PR158 검수 v1 신규 후보).
           p={...p,swap_from:M.copy(want.swap_from)};
         }
-        if(!p){state.restoredCurrent=null;messageOnce('새로고침 전에 보던 PC(상품번호 '+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
+        if(!p){state.restoredCurrent=null;messageOnce((arrived?'고르신 PC(상품번호 ':'새로고침 전에 보던 PC(상품번호 ')+want.product_code+')는 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 아래 추천에서 다시 골라 주세요.');return;}
         const r=await reapply(op,p,basis,want.changes);
         if(!r||!current(op))return;
-        state.selected=r.product;state.selectionState=M.copy(basis);state.selectionWants=wantWants&&M.copy(wantWants);state.selectedContext=null;state.screen='detail';
-        state.restoredCurrent=null;messageOnce('새로고침 전에 보던 '+p.name+'을 다시 불러왔어요. 금액은 지금 다시 확인한 값이에요.'+r.note);
+        state.selected=validSets(want.sets)?{...r.product,sets:want.sets}:r.product;state.selectionState=M.copy(basis);state.selectionWants=wantWants&&M.copy(wantWants);state.selectionQuery=wantQuery;state.selectedContext=null;state.screen='detail';
+        state.restoredCurrent=null;messageOnce((arrived?'고르신 '+p.name+' 구성의 상세예요.':'새로고침 전에 보던 '+p.name+'을 다시 불러왔어요.')+' 금액은 지금 다시 확인한 값이에요.'+r.note);
         if(latest)fail(latest,{kind:'recommend'});
       }catch(error){if(current(op))fail(error,{kind:'resume'});}
       finally{if(current(op)){state.phase=null;controller=null;emit();}}
@@ -306,7 +323,7 @@
       if(state.phase||!p||!M.object(basis)||!state.needsRefresh)return;
       const before=p.price,op=begin('reprice');
       try{
-        const found=await findProduct(op,p.product_code,basis,{fresh:true,wants:state.selectionWants});
+        const found=await findProduct(op,p.product_code,basis,{fresh:true,wants:state.selectionWants,query:state.selectionQuery});
         if(found===undefined||!current(op))return;
         if(!found){message('「'+p.name+'」은 지금 판매 중인 추천에서 찾지 못했어요. 판매가 끝났거나 조건에 맞는 상품이 바뀌었을 수 있어요. 다른 구성을 골라 주세요.');return;}
         const r=await reapply(op,found,basis,changesOf(p),{strict:true});
@@ -331,7 +348,7 @@
     function select(index){
       if(state.phase)return;
       const p=state.groups.flatMap(g=>g.products).find(p=>p.index===index);if(!p)return;
-      cancel();state.restoredCurrent=null;state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.selectionWants=M.object(state.wants)?M.copy(state.wants):null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
+      cancel();state.restoredCurrent=null;state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(p);state.selectionState=M.copy(state.talk);state.selectionWants=M.object(state.wants)?M.copy(state.wants):null;state.selectionQuery=state.lastQuery&&M.copy(state.lastQuery);state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='detail';emit();
     }
     function navigate(screen){
       if(['detail','final'].includes(screen)&&!state.selected)return;
@@ -342,10 +359,12 @@
       if(state.phase||state.pendingSave||state.pendingProblem||!state.selected||!state.selectionState||state.needsRefresh||state.savedQuote||!Number.isInteger(state.selected.price))return;
       const selected=M.copy(state.selected),selectionState=M.copy(state.selectionState);
       const changes=changesOf(selected);
-      const logical=JSON.stringify([selected.product_code,selected.price,selectionState,changes]);
+      const sets=Number.isSafeInteger(selected.sets)&&selected.sets>1?selected.sets:1;
+      const logical=JSON.stringify([selected.product_code,selected.price,selectionState,changes].concat(sets>1?[sets]:[]));
       if(!saveIds.has(logical))saveIds.set(logical,uuid());
       const payload={request_id:saveIds.get(logical),product_code:selected.product_code,expected_price:selected.price,state:selectionState};
       if(changes.length)payload.changes=changes;
+      if(sets>1)payload.sets=sets;
       const op=begin('save');state.saveState='saving';emit();
       try{
         const binding=await api.prepareSave();if(!current(op))return;
@@ -413,7 +432,8 @@
         state.handoff={quote_id:q.id,handoff_no:M.text(r.handoff_no),mall_url:url,status:M.text(r.mall_status),
           price_quoted:r.price_quoted,price_mall:Number.isInteger(r.price_mall)?r.price_mall:null,
           changes:Array.isArray(r.changes)?r.changes.filter(c=>M.object(c)&&Number.isSafeInteger(c.delta)).length:0,
-          delta:Array.isArray(r.changes)?r.changes.reduce((n,c)=>n+(Number.isSafeInteger(c?.delta)?c.delta:0),0):0};
+          delta:Array.isArray(r.changes)?r.changes.reduce((n,c)=>n+(Number.isSafeInteger(c?.delta)?c.delta:0),0):0,
+          sets:Number.isSafeInteger(r.sets)&&r.sets>1&&r.sets<=MAX_SETS?r.sets:1};
         // 서버가 보관 견적도 쇼핑몰 가격으로 고쳤다(api/mvp3_handoff). 화면의 보관 가격도 같은 값으로 맞춘다.
         // 부품을 바꾼 견적이면 쇼핑몰 가격은 기준 PC 값이라 바꾼 부품 차액을 더한다.
         if(state.handoff.status==='가격변동'&&state.handoff.price_mall!==null){
@@ -529,11 +549,30 @@
       if(state.phase||!data||!state.selected)return;
       const o=data.options.find(x=>x.product_code===code);if(!o)return;
       const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
-      const original=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal)?.before.product_code;
-      if(code!==original)changes.push({ordinal:data.ordinal,product_code:code});
+      const was=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal),original=was?.before.product_code;
+      // 수량을 바꿔 둔 줄은 제품을 바꿔도 그 수량을 지킨다.
+      const quantity=was&&was.quantity!==was.base_quantity?{quantity:was.quantity}:{};
+      if(code!==original||quantity.quantity)changes.push({ordinal:data.ordinal,product_code:code,...quantity});
       const won=n=>n.toLocaleString('ko-KR')+'원';
       return applyBuild(changes,q=>(data.label||'부품')+' 부품을 「'+o.name+'」 제품으로 바꿨어요. 호환 규칙을 다시 확인했고, 금액은 '+won(q.total)+'이에요(기본 구성 '+won(q.base_price)+
         (q.total===q.base_price?'과 같아요).':(q.total>q.base_price?' + ':' - ')+won(Math.abs(q.total-q.base_price))+').'));
+    }
+    // 메모리·저장장치 수량(api/mvp3_quantity). 범위는 서버가 준 것만 쓰고, 금액·메인보드 조건은 서버가 다시 확인한다.
+    function setBuildQuantity(n){
+      const data=state.build.data,q=data?.quantity;
+      if(state.phase||!q||!state.selected||!data.current||!Number.isSafeInteger(n)||n<q.min||n>q.max||n===q.current)return;
+      const was=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal);
+      const base=was?was.base_quantity:q.current,original=was?was.before.product_code:data.current.product_code;
+      const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
+      if(data.current.product_code!==original||n!==base)changes.push({ordinal:data.ordinal,product_code:data.current.product_code,...(n!==base?{quantity:n}:{})});
+      return applyBuild(changes,r=>(data.label||'부품')+' 수량을 '+n+'개로 바꿨어요. 금액은 '+r.total.toLocaleString('ko-KR')+'원이에요(한 대 기준).');
+    }
+    // 같은 구성 여러 대. 금액(price)은 한 대 값 그대로, 대수만 상품에 둔다 -- 보관·쇼핑몰 연결에서 서버가 다시 곱한다.
+    function setSets(n){
+      const p=state.selected;
+      if(state.phase||!p||state.screen!=='detail'||!Number.isSafeInteger(n)||n<1||n>MAX_SETS||n===(p.sets||1))return;
+      const next={...p};if(n>1)next.sets=n;else delete next.sets;
+      state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;emit();
     }
     function resetBuild(){
       if(state.phase||!state.selected?.build)return;
@@ -578,7 +617,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild};
+    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild,setBuildQuantity,setSets};
   }
   // 「쇼핑몰에서 구매 이어가기」 한 번으로 쇼핑몰까지 간다(2026-10-12 중헌 님 고객단 6번: 연결 번호가 생긴 뒤 같은 단추를
   // 한 번 더 눌러야 쇼핑몰이 열렸다). 연결 번호는 그대로 만든다 -- 인계 기록(관리자 「인계 기록」·유입 성과)과 쇼핑몰 가격
