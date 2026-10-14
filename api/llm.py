@@ -186,12 +186,13 @@
   않으면 개발 중 반복 호출로 실제 과금 한도를 캡이 모르는 채 넘길 수 있다). 이번
   슬라이스는 이 판단만 남기고 마이그레이션 파일은 만들지 않았다(사장님 지시).
 """
+import json
 import logging
 import os
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
-from typing import Callable
+from typing import Any, Callable
 
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import ProgrammingError
@@ -689,6 +690,9 @@ TASK_DEFAULTS: dict[str, tuple[str, str]] = {
     #   gpt-5.6-terra 3.10s / 175자 — "높은 점유율" 로 수치를 뭉갰다
     # luna 는 속도·품질·비용(입력 $0.2/출력 $1.2 = haiku 의 1/5·1/4) 셋 다 앞선다.
     "task.talk_answer": ("codex", "gpt-5.6-luna"),
+    # 도구 상담(2026-10-12 · api/talk_agent, 개발 서버 전용 스위치). 모델은 아직 사장님 결정 전이라
+    # 지금 고객 답(task.talk_answer)과 같은 값으로 둔다 -- 비교 실측 뒤 ai_task_assignments 에서 바꾼다.
+    "task.talk_agent": ("codex", "gpt-5.6-luna"),
 }
 for _tk, (_pk, _md) in TASK_DEFAULTS.items():
     assert _pk in PROVIDERS, f"TASK_DEFAULTS[{_tk}]: unknown provider {_pk!r}"
@@ -866,6 +870,24 @@ def _insert_cost_log(row: dict) -> int:
             " VALUES (:p, :m, :ti, :to, :c) RETURNING log_id"), row).scalar_one()
 
 
+def _log_cost(spec: ProviderSpec, used_model: str, task_key: str | None,
+              tokens_in: int | None, tokens_out: int | None) -> tuple[float | None, int | None, bool]:
+    """비용 계산 + api_cost_logs 한 행 -> (cost_usd, log_id, cost_logged). _call_one · _call_one_tools 가 같이 쓴다."""
+    cost_usd = _cost_usd(spec, used_model, tokens_in, tokens_out)
+    row = {"p": spec.key, "m": used_model, "ti": tokens_in, "to": tokens_out,
+           "c": cost_usd, "tk": (task_key or None) and task_key[:48]}
+    try:
+        return cost_usd, _insert_cost_log(row), True
+    except Exception:
+        # 이미 호출은 성공해 비용이 발생했다 -- 기록 실패를 이유로 응답을 버리지
+        # 않는다(위 모듈 docstring #실패를 삼키지 않는다 참고). 대신 크게 남긴다.
+        log.exception(
+            "[llm] failed to write api_cost_logs (response is still returned,"
+            " cost_logged=False) provider=%s model=%s tokens_in=%s tokens_out=%s cost_usd=%s",
+            spec.key, used_model, tokens_in, tokens_out, cost_usd)
+        return cost_usd, None, False
+
+
 def _call_one(prompt: str, provider: str, task_key: str | None, model: str | None,
               system: str | None, customer_facing: bool, max_output_tokens: int,
               timeout_sec: int, caller_key: int | None = None) -> LLMResult:
@@ -905,22 +927,7 @@ def _call_one(prompt: str, provider: str, task_key: str | None, model: str | Non
     finish_reason = response.finish_reason if isinstance(response, ProviderResponse) else None
     elapsed = time.monotonic() - t0
 
-    cost_usd = _cost_usd(spec, used_model, tokens_in, tokens_out)
-
-    log_id = None
-    cost_logged = False
-    row = {"p": spec.key, "m": used_model, "ti": tokens_in, "to": tokens_out,
-           "c": cost_usd, "tk": (task_key or None) and task_key[:48]}
-    try:
-        log_id = _insert_cost_log(row)
-        cost_logged = True
-    except Exception:
-        # 이미 호출은 성공해 비용이 발생했다 -- 기록 실패를 이유로 응답을 버리지
-        # 않는다(위 모듈 docstring #실패를 삼키지 않는다 참고). 대신 크게 남긴다.
-        log.exception(
-            "[llm] failed to write api_cost_logs (response is still returned,"
-            " cost_logged=False) provider=%s model=%s tokens_in=%s tokens_out=%s cost_usd=%s",
-            spec.key, used_model, tokens_in, tokens_out, cost_usd)
+    cost_usd, log_id, cost_logged = _log_cost(spec, used_model, task_key, tokens_in, tokens_out)
 
     return LLMResult(
         provider=spec.key, model=used_model, text=text_out,
@@ -1032,6 +1039,15 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
     if not prompt or not prompt.strip():
         raise ValueError("prompt is empty")
 
+    order, resolved_provider, resolved_model = _route(provider, task_key, model, fallback_order)
+    return _try_in_order(order, lambda prov: _call_one(
+        prompt, prov, task_key, resolved_model if prov == resolved_provider else None,
+        system, customer_facing, max_output_tokens, timeout_sec, caller_key=caller_key))
+
+
+def _route(provider: str | None, task_key: str | None, model: str | None,
+           fallback_order: list[str] | None) -> tuple[list[str], str, str | None]:
+    """provider·model·task_key·우회·폴백을 풀어 (시도 순서, 주 공급자, 주 모델) 을 낸다. call()·call_tools() 공통."""
     # ── ① task_key -> provider/model 자동 해석 (2026-08-16 세 번째 지시) ─────────
     # provider=·model=을 이미 둘 다 명시했으면 task_key를 몰라도 되므로 DB를 안 읽는다
     # (기존처럼 명시 호출만 하는 호출부는 이 층이 생겨도 DB 왕복이 늘지 않는다).
@@ -1072,14 +1088,15 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
               else [resolved_provider] + [p for p in (fallback_order or
                                           _resolve_fallback_order(resolved_provider, task_key))
                                   if p in PROVIDERS and p != resolved_provider and p not in reroutes])
+    return order, resolved_provider, resolved_model
 
+
+def _try_in_order(order: list[str], attempt: Callable[[str], Any]) -> Any:
+    """순서대로 한 공급자씩 시도한다. 폴백 판정·예외 묶기는 call() 이 하던 그대로다."""
     attempts: list[tuple[str, Exception]] = []
     for i, prov in enumerate(order):
         try:
-            return _call_one(prompt, prov, task_key,
-                              resolved_model if prov == resolved_provider else None,
-                              system, customer_facing, max_output_tokens, timeout_sec,
-                              caller_key=caller_key)
+            return attempt(prov)
         except Exception as e:
             attempts.append((prov, e))
             is_last = (i == len(order) - 1)
@@ -1092,3 +1109,194 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
             log.warning("[llm] %s failed (%s: %s) - falling back to %s",
                         prov, type(e).__name__, e, order[i + 1])
     raise AssertionError("unreachable - order is never empty")
+
+
+# ============================================================================
+# 도구 호출 (2026-10-12 · LLM 중심 상담 ② 단계 · api/talk_agent 전용)
+# ============================================================================
+# 한 번의 call_tools() = 모델 요청 1회. 도구를 실행하고 다시 부르는 반복은 호출부(talk_agent)가 한다 --
+# 턴 전체 한도(왕복 수·도구 수·마감 시각)는 그쪽이 쥔다(코덱스 검토 v1 §3 「도구 루프 전체 예산은 별도」).
+# 캡 확인·비용 기록·우회·폴백은 call() 과 같은 길(_route · _try_in_order · _check_caps · _log_cost)을 탄다.
+#
+# 대화는 공급자와 무관한 한 모양으로 들고 다닌다 -- 폴백으로 공급자가 바뀌어도 이어 부를 수 있게.
+#   {"role": "user", "text": str}
+#   {"role": "assistant", "text": str, "tool_calls": [{"id", "name", "args": dict}], "raw": {provider: [...]}}
+#   {"role": "tool", "id": str, "name": str, "content": str}
+# raw 는 같은 공급자로 다시 부를 때만 원형 그대로 되돌려 보낸다(추론 항목 등 공급자 고유 정보를 잃지 않게).
+# 도구 정의: {"name", "description", "parameters": JSON schema} -- strict 는 쓰지 않는다.
+# 형식 보장은 서버가 인자를 다시 검사하는 것으로 대신한다(공식 strict 도 업무 의미 검증은 대신하지 못한다).
+@dataclass
+class ToolTurn:
+    provider: str
+    model: str
+    text: str
+    tool_calls: list[dict]
+    raw: dict
+    tokens_in: int | None
+    tokens_out: int | None
+    cached_in: int | None      # 캐시로 읽은 입력 토큰(공급자가 알려 줄 때만). 비용 계산에는 아직 안 쓴다 -- 실측용
+    cost_usd: float | None
+    elapsed_sec: float
+    log_id: int | None
+    cost_logged: bool
+    stop: str | None
+
+
+def _claude_messages(messages: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for m in messages:
+        role = m["role"]
+        if role == "user":
+            out.append({"role": "user", "content": m["text"]})
+        elif role == "assistant":
+            raw = (m.get("raw") or {}).get("claude")
+            if raw is not None:
+                out.append({"role": "assistant", "content": raw})
+                continue
+            blocks = [{"type": "text", "text": m["text"]}] if m.get("text") else []
+            blocks += [{"type": "tool_use", "id": c["id"], "name": c["name"], "input": c["args"]}
+                       for c in m.get("tool_calls") or []]
+            out.append({"role": "assistant", "content": blocks or m.get("text", "")})
+        elif role == "tool":
+            block = {"type": "tool_result", "tool_use_id": m["id"], "content": m["content"]}
+            if out and out[-1]["role"] == "user" and isinstance(out[-1]["content"], list):
+                out[-1]["content"].append(block)
+            else:
+                out.append({"role": "user", "content": [block]})
+    return out
+
+
+def _openai_input(messages: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for m in messages:
+        role = m["role"]
+        if role == "user":
+            out.append({"role": "user", "content": m["text"]})
+        elif role == "assistant":
+            raw = (m.get("raw") or {}).get("codex")
+            if raw is not None:
+                out.extend(raw)
+                continue
+            if m.get("text"):
+                out.append({"role": "assistant", "content": m["text"]})
+            out += [{"type": "function_call", "call_id": c["id"], "name": c["name"],
+                     "arguments": json.dumps(c["args"], ensure_ascii=False)}
+                    for c in m.get("tool_calls") or []]
+        elif role == "tool":
+            out.append({"type": "function_call_output", "call_id": m["id"], "output": m["content"]})
+    return out
+
+
+def _parse_args(raw) -> dict:
+    """공급자가 준 도구 인자 -> dict. JSON 이 깨졌으면 {"__invalid__": 원문} -- 서버 검사가 거절한다."""
+    if isinstance(raw, dict):
+        return raw
+    try:
+        v = json.loads(raw or "{}")
+    except (TypeError, ValueError):
+        return {"__invalid__": str(raw)[:200]}
+    return v if isinstance(v, dict) else {"__invalid__": str(raw)[:200]}
+
+
+def _tools_claude(model, messages, tools, system, max_output_tokens, timeout_sec):
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", "").strip(),
+                                 timeout=float(timeout_sec), max_retries=0)
+    kwargs = {"model": model, "max_tokens": max_output_tokens, "messages": _claude_messages(messages),
+              "tools": [{"name": t["name"], "description": t["description"], "input_schema": t["parameters"]}
+                        for t in tools]}
+    if system:
+        # 시스템 지시와 도구 정의는 매 왕복 같다 -- 캐시 지점을 둔다(실제 적중은 응답 usage 로 잰다).
+        kwargs["system"] = [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+    try:
+        resp = client.messages.create(**kwargs)
+    except anthropic.APIStatusError as e:
+        transient = e.status_code >= 500 or e.status_code == 429
+        raise LLMProviderError(f"Claude API error {e.status_code}: {e.message}", transient=transient) from e
+    except Exception as e:
+        raise LLMProviderError(f"Claude call failed ({type(e).__name__}): {e}", transient=True) from e
+    text_out = "".join(b.text for b in resp.content if getattr(b, "type", None) == "text")
+    calls = [{"id": b.id, "name": b.name, "args": _parse_args(b.input)}
+             for b in resp.content if getattr(b, "type", None) == "tool_use"]
+    raw = [b.model_dump(exclude_none=True) for b in resp.content]
+    u = resp.usage
+    tokens_in = None
+    cached = None
+    if u is not None:
+        cached = getattr(u, "cache_read_input_tokens", None)
+        tokens_in = (u.input_tokens or 0) + (getattr(u, "cache_creation_input_tokens", None) or 0) + (cached or 0)
+    return text_out, calls, raw, tokens_in, (u.output_tokens if u else None), cached, resp.stop_reason
+
+
+def _tools_openai(model, messages, tools, system, max_output_tokens, timeout_sec):
+    import openai
+
+    client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY", "").strip(),
+                           timeout=float(timeout_sec), max_retries=0)
+    kwargs = {"model": model, "input": _openai_input(messages), "max_output_tokens": max_output_tokens,
+              "tools": [{"type": "function", "name": t["name"], "description": t["description"],
+                         "parameters": t["parameters"], "strict": False} for t in tools]}
+    if system:
+        kwargs["instructions"] = system
+    try:
+        resp = client.responses.create(**kwargs)
+    except openai.APIStatusError as e:
+        transient = e.status_code >= 500 or e.status_code == 429
+        raise LLMProviderError(f"OpenAI API error {e.status_code}: {e.message}", transient=transient) from e
+    except Exception as e:
+        raise LLMProviderError(f"OpenAI call failed ({type(e).__name__}): {e}", transient=True) from e
+    calls = [{"id": it.call_id, "name": it.name, "args": _parse_args(it.arguments)}
+             for it in resp.output or [] if getattr(it, "type", None) == "function_call"]
+    raw = [it.model_dump(exclude_none=True) for it in resp.output or []]
+    u = resp.usage
+    cached = getattr(getattr(u, "input_tokens_details", None), "cached_tokens", None) if u else None
+    return (resp.output_text or ""), calls, raw, (u.input_tokens if u else None), \
+        (u.output_tokens if u else None), cached, resp.status
+
+
+_TOOL_CALLERS = {"claude": _tools_claude, "codex": _tools_openai}
+
+
+def _call_one_tools(messages, tools, provider, task_key, model, system, customer_facing,
+                    max_output_tokens, timeout_sec) -> ToolTurn:
+    spec = PROVIDERS.get(provider)
+    if spec is None:
+        raise ValueError(f"unknown provider: {provider} (registered: {', '.join(PROVIDERS)})")
+    caller = _TOOL_CALLERS.get(provider)
+    if caller is None:
+        # 도구 호출을 아직 붙이지 않은 공급자(gemini) -- 설정 실수와 같은 결이라 폴백 대상이 아니다.
+        raise LLMProviderError(f"{spec.vendor} tool calling is not wired", transient=False)
+    if not os.environ.get(spec.env_key, "").strip():
+        raise LLMNotConfiguredError(f"{spec.env_key} is not set - add a value in .env before calling {spec.vendor}")
+    used_model = model or spec.default_model
+    with engine.connect() as conn:
+        _check_caps(conn, spec.key, task_key, customer_facing, len(PROVIDERS) > 1)
+    t0 = time.monotonic()
+    text_out, calls, raw, tokens_in, tokens_out, cached, stop = caller(
+        used_model, messages, tools, system, max_output_tokens, timeout_sec)
+    elapsed = time.monotonic() - t0
+    cost_usd, log_id, logged = _log_cost(spec, used_model, task_key, tokens_in, tokens_out)
+    if not text_out and not calls:
+        raise LLMProviderError(f"{spec.vendor} returned neither text nor tool call (stop={stop})", transient=True)
+    return ToolTurn(provider=spec.key, model=used_model, text=text_out, tool_calls=calls,
+                    raw={spec.key: raw}, tokens_in=tokens_in, tokens_out=tokens_out, cached_in=cached,
+                    cost_usd=cost_usd, elapsed_sec=round(elapsed, 3), log_id=log_id,
+                    cost_logged=logged, stop=stop)
+
+
+def call_tools(messages: list[dict], tools: list[dict], *, task_key: str, system: str | None = None,
+               provider: str | None = None, model: str | None = None, customer_facing: bool = True,
+               max_output_tokens: int = 900, timeout_sec: int = 15,
+               fallback_order: list[str] | None = None) -> ToolTurn:
+    """도구를 줄 수 있는 모델 요청 1회. 반환한 tool_calls 를 실행하고 다시 부르는 것은 호출부 몫이다.
+
+    폴백으로 다른 공급자가 받아도 대화는 같은 모양에서 번역되므로 이어진다(raw 는 그 공급자 것만 쓴다).
+    """
+    if not messages:
+        raise ValueError("messages is empty")
+    order, resolved_provider, resolved_model = _route(provider, task_key, model, fallback_order)
+    order = [p for p in order if p in _TOOL_CALLERS] or order[:1]
+    return _try_in_order(order, lambda prov: _call_one_tools(
+        messages, tools, prov, task_key, resolved_model if prov == resolved_provider else None,
+        system, customer_facing, max_output_tokens, timeout_sec))

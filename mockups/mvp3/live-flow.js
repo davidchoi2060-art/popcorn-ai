@@ -235,6 +235,10 @@
         // ride along until a recommendation actually reads them.
         state.pendingText=(state.pendingText?state.pendingText+' / '+text:text).slice(-300);
         if(state.missing.length||response.pc_related===false||response.silent||response.fallback){state.screen='welcome';}
+        // LLM 상담(response.agent, api/talk_agent.as_parse · 2026-10-14 중헌 님): AI 가 엔진에 넘긴 조건 그대로 카드를
+        // 다시 묻는다 -- wants·문장은 보내지 않았고, 「더 싸게/더 좋게」면 같은 방향이다(A-02 같은 엔진·같은 순서).
+        // 엔진 안내 문장은 AI 설명과 겹치므로 붙이지 않는다.
+        else if(response.agent===true){state.pendingText='';await recommendFor(op,{wants:null,...(['cheaper','better'].includes(response.nav)?{nav:response.nav}:{})},{notes:false});}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
         if(current(op)){
