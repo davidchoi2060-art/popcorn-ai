@@ -238,6 +238,10 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
     return {"ok": status != "failed", "status": status, "reply": clean, "notes": notes,
             "cards": _cards(book) if status != "failed" else [],
             "snapshot": {"id": book.snapshot_id, "as_of": book.as_of, "condition": book.condition},
+            # 고객 화면은 카드를 이 조건으로 /api/grid/recommend 에 다시 물어 그린다(같은 엔진·같은 순서, A-02).
+            # 카드를 고르지 않은 턴(설명만)은 null -- 화면은 보던 견적을 그대로 둔다.
+            "state": book.state if status != "failed" and book.shown else None,
+            "nav": book.nav if status != "failed" and book.shown else None,
             "anchor_code": book.anchor_code, "dropped_sentences": dropped, "meta": meta}
 
 
@@ -257,8 +261,36 @@ def _account(meta: dict, turn: "llm.ToolTurn") -> None:
 
 def _fixed(reply: str, kind: str, t0: float) -> dict:
     return {"ok": True, "status": "fixed", "kind": kind, "reply": reply, "notes": [], "cards": [],
-            "snapshot": None, "anchor_code": None, "dropped_sentences": [],
+            "snapshot": None, "anchor_code": None, "dropped_sentences": [], "state": None, "nav": None,
             "meta": {"rounds": 0, "tool_calls": 0, "elapsed_sec": round(time.monotonic() - t0, 3)}}
+
+
+CHAT_MAX = 2000   # ChatBody.text 한도와 같다 -- 더 긴 글은 지금 경로(/parse)가 앞·끝만 읽고 밝힌다
+
+
+def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict | None) -> dict | None:
+    """/api/talk/parse 가 스위치가 켜져 있을 때 부른다(2026-10-14 중헌 님 「고객 상담을 LLM 중심으로 해」).
+
+    고객 화면은 바뀌지 않은 채 같은 경로를 부르고, 응답 모양도 /parse 계약을 따른다 -- `agent: true` 로
+    구분한다. 카드는 화면이 `state` 로 /api/grid/recommend 에 다시 물어 그린다(같은 엔진·같은 순서, A-02).
+    AI 가 카드를 고르지 않은 턴은 `explain_only` -- 화면이 보던 견적을 그대로 둔다.
+    AI 가 실패하면 None -- 이 턴은 지금 경로가 받는다(손님에게 실패를 보이지 않는다).
+    방문자 한도 확인은 /parse 가 먼저 한다.
+    """
+    turns = [Turn(role=getattr(t, "role", ""), text=(getattr(t, "text", "") or "")[:4000]) for t in history or []]
+    r = run_turn(text, turns)
+    if not r.get("ok") or r.get("status") == "failed":
+        return None
+    cards = r.get("cards") or []
+    state = r.get("state") if cards and isinstance(r.get("state"), dict) else None
+    reply = "\n\n".join([*(r.get("notes") or []), r.get("reply") or ""]).strip()
+    return {"ok": True, "agent": True, "state": state if state is not None else (prev_state or {}),
+            "missing": [], "assumed": [], "dropped": [], "pc_related": True, "silent": False,
+            "fallback": None, "handoff_offer": r.get("kind") == "self_harm",
+            "explain_only": state is None, "answer": "", "reply": reply, "nav": r.get("nav"),
+            "chat_flow": chat_flow, "exceptions": [r["kind"]] if r.get("kind") else [],
+            "agent_meta": {"status": r.get("status"), "snapshot": r.get("snapshot"),
+                           "cards": [c.get("product_code") for c in cards]}}
 
 
 @router.post("/chat")

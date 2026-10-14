@@ -1226,6 +1226,17 @@ def parse_talk(body: ParseBody, request: Request):
     # 카드번호·주민번호 모양의 숫자는 AI 에 보내기 전·기록에 남기기 전에 가린다(1815 36~40번).
     text, masked = TX.mask_personal(text)
 
+    # 2026-10-14 중헌 님 「고객 상담을 LLM 중심으로 해」 -- 스위치(POPCORN_TALK_AGENT=1)가 켜져 있으면
+    # 이 문장은 도구 상담(api/talk_agent)이 받는다. 응답은 이 경로의 계약 모양 그대로(`agent: true`)이고,
+    # AI 가 실패하면 None 이 와서 아래 지금 경로가 그대로 받는다. 꺼져 있으면 이 블록은 아무 일도 안 한다.
+    from . import talk_agent as AGENT   # 순환 import 를 피해 여기서 부른다
+    if AGENT.enabled() and not truncated and len(text) <= AGENT.CHAT_MAX:
+        with engine.connect() as conn:
+            access_gate.check_rate(conn, request, what="talk.parse")
+        agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow)
+        if agent_res is not None:
+            return agent_res
+
     # 입력 검사 뒤 · LLM 호출 앞.
     # 격자 어휘도 같은 연결에서 읽는다 -- 매 요청 DB 에서(정본은 DB, 캐시 없음).
     with engine.connect() as conn:

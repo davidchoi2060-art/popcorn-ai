@@ -50,6 +50,8 @@ class FactBook:
     snapshot_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     as_of: str = field(default_factory=_now)
     condition: dict | None = None            # 마지막 find_pcs 가 실제로 쓴 정규화 조건
+    state: dict | None = None                # 마지막 find_pcs 가 엔진에 넘긴 조건 원문 -- 화면이 같은 엔진으로 카드를 다시 받는다
+    nav: str | None = None                   # 마지막 find_pcs 의 「더 싸게/더 좋게」
     anchor_code: int | None = None
     items: dict[str, dict] = field(default_factory=dict)    # ref -> 서버가 낸 상품 값
     prices: set[int] = field(default_factory=set)           # 이 턴에 말해도 되는 금액(원)
@@ -166,6 +168,7 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                       "games": games, "game_grade": res.get("game_grade"),
                       "resolution": res.get("game_resolution"), "platform": res.get("platform")}
     book.anchor_code = res.get("anchor_code") or book.anchor_code
+    book.state, book.nav = raw, nav
     sets = []
     for cs in res.get("card_sets") or []:
         items = (cs.get("items") or [])[:MAX_ITEMS_PER_SET]

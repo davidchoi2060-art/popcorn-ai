@@ -277,5 +277,56 @@ class Agent(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 404)
 
 
+# ── ④ /api/talk/parse 가 스위치 켜짐에서 도구 상담으로 넘긴다 (2026-10-14 「고객 상담을 LLM 중심으로 해」) ──
+class AsParse(unittest.TestCase):
+    _run = Agent._run
+    FLOW = [
+        _turn(calls=[{"id": "a", "name": "find_pcs", "args": {"usages": ["게임"], "budget_won": 1_500_000}}]),
+        _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+        _turn("150만원 이하로는 게임 PC A가 맞아요. 판매가는 1,498,000원이에요."),
+    ]
+
+    def test_cards_turn_hands_engine_state_to_the_screen(self):
+        out, _ = self._run(list(self.FLOW))
+        self.assertEqual(out["state"]["usages"], ["게임"])               # 화면이 같은 조건으로 /grid/recommend 를 다시 묻는다
+        self.assertEqual(out["state"]["budget_won"], 1_500_000)
+        self.assertIsNone(out["nav"])
+
+    def _as_parse(self, script, prev=None):
+        from api import grid_public as GP
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0) if not isinstance(script[0], Exception) else (_ for _ in ()).throw(script.pop(0))), \
+                patch.object(GP, "recommend", lambda b: _reco()):
+            return AG.as_parse("게임용 PC 150만원", [SimpleNamespace(role="user", text="안녕")], prev, {"smalltalk_turns": 0})
+
+    def test_parse_shape_with_cards(self):
+        r = self._as_parse(list(self.FLOW))
+        self.assertTrue(r["ok"] and r["agent"])
+        self.assertFalse(r["explain_only"])
+        self.assertEqual((r["missing"], r["pc_related"], r["answer"]), ([], True, ""))
+        self.assertIn("1,498,000원", r["reply"])
+        self.assertEqual(r["agent_meta"]["cards"], [1001])
+        self.assertEqual(r["chat_flow"], {"smalltalk_turns": 0})
+
+    def test_explanation_keeps_previous_state(self):
+        prev = {"usages": ["사무·인강"], "budget_won": 800_000}
+        r = self._as_parse([_turn("램은 동시 작업, SSD는 저장 속도에 영향을 줘요.")], prev)
+        self.assertTrue(r["explain_only"])
+        self.assertEqual(r["state"], prev)                               # 화면이 보던 견적을 그대로 둔다
+
+    def test_failure_returns_none_so_parse_path_answers(self):
+        self.assertIsNone(self._as_parse([llm.LLMProviderError("down", transient=True)]))
+
+    def test_parse_route_delegates_only_when_switch_is_on(self):
+        import inspect
+        from api import talk
+        src = inspect.getsource(talk.parse_talk)
+        gate = src.index("AGENT.enabled()")
+        self.assertLess(gate, src.index("TS.load_vocab"))                # 지금 경로의 AI 호출보다 앞
+        self.assertIn("if agent_res is not None:", src)                  # 실패면 지금 경로가 받는다
+        with patch.dict("os.environ", {AG.FLAG_ENV: ""}):
+            self.assertFalse(AG.enabled())
+
+
 if __name__ == "__main__":
     unittest.main()
