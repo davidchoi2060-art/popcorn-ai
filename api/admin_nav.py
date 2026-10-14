@@ -569,6 +569,12 @@ def nav_for_screens(current_path: str = "") -> list:
     return out
 
 
+# 「팝콘PC 견적 스튜디오」 — 별도 Cloud Run 서비스(구글 IAP 로그인 뒤). 2026-10-14 사장님 선택
+# (접목 검토 v1 의 1번 「관리자 화면에 링크」). 직원 도구라 새 창 링크만 단다 — iframe 은
+# 구글 로그인 화면이 막고, 고객 화면에는 두지 않는다(고객은 로그인할 수 없다).
+STUDIO_URL = "https://popcornpc-studio-741686685802.asia-northeast3.run.app/"
+
+
 def workspace_nav():
     """Focused work navigation; legacy screens remain available in the full admin."""
     return [dict(label=label, href=href, icon=icon) for label, href, icon in [
