@@ -104,6 +104,8 @@ def mask(text: str) -> tuple[str, bool]:
 _SENT = re.compile(r"(?<=[.!?。])\s+|\n+")
 _WON = re.compile(r"(\d[\d,]*)\s*(만\s*)?원")
 _TAG = re.compile(r"<[^>]{1,200}>")
+# 화면은 설명을 글자 그대로 보여 준다 -- 마크다운 강조·제목 기호가 별표·샵으로 남는다.
+_MD = re.compile(r"\*\*|__|^#{1,6}\s+", re.M)
 
 
 def _amounts(sentence: str) -> list[tuple[int, bool]]:
@@ -125,7 +127,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
       원 단위로 쓴 금액은 정확히 같아야 하고, 「만원」으로 쓴 금액은 묶음 금액을 만원 단위로 반올림한 값까지 받는다
       (1,498,000원 -> 「150만원」은 통과, 「140만원」은 뺀다).
     · 약속: PROMISE_PATTERNS 에 걸리면 뺀다.
-    · HTML 태그는 지운다(화면이 원문을 렌더하지 않게).
+    · HTML 태그와 마크다운 강조(**, __, # 제목)는 지운다(화면이 원문을 렌더하지 않게).
     다 빠지면 빈 글을 돌려준다 -- 호출부가 정해진 안내로 바꾼다.
     """
     allowed = set(book.prices)
@@ -133,7 +135,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
         allowed.add(budget_won)
     allowed_man = allowed | {(p + 5_000) // 10_000 * 10_000 for p in allowed}
     kept, dropped = [], []
-    for s in [x.strip() for x in _SENT.split(_TAG.sub("", reply or "")) if x and x.strip()]:
+    for s in [x.strip() for x in _SENT.split(_MD.sub("", _TAG.sub("", reply or ""))) if x and x.strip()]:
         bad = [a for a, man in _amounts(s) if a not in (allowed_man if man else allowed)]
         if bad:
             dropped.append({"sentence": s, "reason": "price_not_in_snapshot"})
@@ -143,6 +145,28 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
             continue
         kept.append(s)
     return " ".join(kept).strip(), dropped
+
+
+_OVER_WORDS = ("넘", "초과", "벗어")
+
+
+def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
+    """보여 준 카드가 예산을 넘는데 설명이 그 말을 안 하면, 서버가 사실 문장을 붙인다.
+
+    금액은 카드 판매가 - 예산(둘 다 이 턴 묶음 값)이라 지어낸 수가 아니다.
+    설명이 이미 넘는다고 말했으면(_OVER_WORDS) 붙이지 않는다.
+    """
+    if not budget_won:
+        return None
+    over = [c for c in cards if c.get("over_budget") and isinstance(c.get("price"), int) and c["price"] > budget_won]
+    if not over or any(w in (reply or "") for w in _OVER_WORDS):
+        return None
+    gap = min(c["price"] for c in over) - budget_won
+    if len(over) == len(cards):
+        head = "보여 드린 PC는 모두" if len(cards) > 1 else "보여 드린 PC는"
+        return f"{head} 예산 {budget_won:,}원보다 높습니다(가장 적게 넘는 것이 {gap:,}원 초과)." if len(cards) > 1 \
+            else f"{head} 예산 {budget_won:,}원보다 {gap:,}원 높습니다."
+    return f"보여 드린 {len(cards)}대 중 {len(over)}대는 예산 {budget_won:,}원을 넘습니다(가장 적게 넘는 것이 {gap:,}원 초과)."
 
 
 def _cards(book: TT.FactBook) -> list[dict]:
@@ -232,6 +256,10 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
     if not clean:
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
+    if status != "failed" and book.shown:
+        note = budget_note(_cards(book), budget, clean)
+        if note:
+            clean = f"{clean} {note}".strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls
