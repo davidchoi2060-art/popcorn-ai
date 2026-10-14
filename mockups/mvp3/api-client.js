@@ -44,7 +44,7 @@
     }
     const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&(['/api/talk/parse','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote'].includes(path)||HANDOFF_RE.test(path)))
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/talk/answer','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote'].includes(path)||HANDOFF_RE.test(path)))
         ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'));
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
       if(!fetchImpl)throw new ApiError('서버 연결을 사용할 수 없어요.',0,'network');
@@ -88,6 +88,7 @@
       return request('POST','/api/mvp3/saved-quotes',payload,options);
     }
     return {request,parse:(payload,options)=>request('POST','/api/talk/parse',payload,options),
+      answer:(payload,options)=>request('POST','/api/talk/answer',payload,options),
       // extra: this turn's text, the wants the server returned last time, a quick-choice
       // direction and the card it is measured from. Nothing else is forwarded.
       recommend:(state,options,extra={})=>{const body={state};
