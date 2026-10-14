@@ -179,7 +179,40 @@ def resume_case(text):
     return 0
 
 
+def defer_cases(texts):
+    """「카드 먼저」 시간 -- 화면처럼 parse(defer_answer) 뒤에 카드와 설명을 함께 부르고 각각 끝난 시각을 잰다."""
+    import threading
+    print('### 개발 서버 카드 먼저 시간 점검')
+    print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
+    print('| 문장 | 첫 응답 | 카드까지 | 설명까지 | 대기표 | 설명 글자 |')
+    print('|---|---|---|---|---|---|')
+    for t in texts:
+        t0 = time.time()
+        parsed, s1, _ = post('/api/talk/parse', {'text': t, 'defer_answer': True})
+        t_first = time.time() - t0
+        token = parsed.get('answer_pending') if isinstance(parsed, dict) else None
+        box = {}
+
+        def ans():
+            if token:
+                a, s3, _ = post('/api/talk/answer', {'token': token})
+                box['answer'] = (a or {}).get('answer') or ''
+                box['code'] = s3
+            box['t'] = time.time() - t0
+        th = threading.Thread(target=ans)
+        th.start()
+        post('/api/grid/recommend', {'state': parsed.get('state'), 'text': t})
+        t_cards = time.time() - t0
+        th.join()
+        print(f"| {t} | {t_first:.1f}s (HTTP {s1}) | {t_cards:.1f}s | {box['t']:.1f}s"
+              f" {('HTTP ' + str(box.get('code'))) if token else '(설명 함께 옴)'} | {'있음' if token else '없음'}"
+              f" | {len(box.get('answer') or parsed.get('answer') or '')} |")
+    return 0
+
+
 def main():
+    if TEXT.startswith('DEFER:'):
+        return defer_cases([t.strip() for t in TEXT[len('DEFER:'):].split('||') if t.strip()])
     if TEXT.startswith('RESUME:'):
         return max(resume_case(t.strip()) for t in TEXT[len('RESUME:'):].split('##') if t.strip())
     texts = [t.strip() for t in TEXT.split('||')]
