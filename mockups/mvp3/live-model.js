@@ -99,7 +99,9 @@
       ordinals.add(p.ordinal);
       parts.push({ordinal:p.ordinal,slot:p.slot,quantity:p.quantity,pseudo:p.pseudo,name:p.name,description:p.description,
         specs:p.specs.map(x=>({label:x.label,value:x.value})),photo:partPhoto(p),
-        price:!p.pseudo&&positive(p.price)?p.price:null});
+        price:!p.pseudo&&positive(p.price)?p.price:null,
+        // 조립 전용 부품(단품판매불가) — 개별 판매가가 원래 없는 줄. true 일 때만 싣는다(2026-10-14).
+        assembly_only:!p.pseudo&&!positive(p.price)&&p.assembly_only===true});
     }
     const price=value.price,stock=value.stock,c=value.compatibility,photo=value.photo,conditions={};
     if(!object(price)||!['confirmed','snapshot','estimated','needs_reconfirmation','unknown'].includes(price.state)||

@@ -63,6 +63,19 @@ test('pseudo and multiple SSD rows use ordinal keys and quantities without guess
   assert.doesNotMatch(html,/class="final-part-price">미확인/);assert.match(html,/900,000원/);assert.match(html,/가격 확인 중인 부품이 있어 계산하지 않았어요/);
   assert.doesNotMatch(html,/100원|fake\.png|<img[^>]+(?:merchant|photo)/);assert.match(html,/disabled aria-describedby="bom-unavailable-/);
 });
+test('assembly-only parts say so instead of 가격 확인 중 and survive the public projection (2026-10-14 owner)',()=>{
+  const f=fixture();f.parts[0].price=159500;f.parts[1].assembly_only=true;
+  const out=M.publicConfiguration(f,99413);assert.equal(out.parts[1].assembly_only,true);assert.equal(out.parts[0].assembly_only,false);
+  const html=render(f),body=html.slice(0,html.indexOf('<tfoot>'));
+  assert.match(body,/class="final-part-price">조립 전용 부품<small class="muted foot-note">따로 팔지 않아요 · PC 금액에 포함/);
+  assert.doesNotMatch(body,/class="final-part-price">가격 확인 중/);
+  assert.match(html,/조립 전용 부품이 있어 계산하지 않았어요<small class="muted foot-note">조립 전용: 메인보드 · PC 금액에는/);
+  assert.doesNotMatch(html,/가격 확인 중인 부품이 있어/);
+  // 가격이 붙은 줄의 assembly_only 는 무시한다 — 값이 있으면 값을 보인다.
+  const g=fixture();g.parts[0].price=159500;g.parts[0].assembly_only=true;assert.equal(M.publicConfiguration(g,99413).parts[0].assembly_only,false);
+  // 확인 중 줄과 조립 전용 줄이 섞이면 둘 다 이름을 댄다.
+  const h=fixture();h.parts[1].assembly_only=true;assert.match(render(h),/가격 확인 중: CPU · 조립 전용: 메인보드/);
+});
 test('missing spec values and parts without specs read 정보 없음 (2026-10-10 owner decision)',()=>{
   const f=fixture();f.parts[0].specs=[{label:'소켓',value:'LGA1851'},{label:'기본 전력',value:'  '}];f.parts[1].specs=[];
   const html=render(f);assert.match(html,/<dt>소켓<\/dt><dd>LGA1851<\/dd>/);assert.match(html,/<dt>기본 전력<\/dt><dd>정보 없음<\/dd>/);

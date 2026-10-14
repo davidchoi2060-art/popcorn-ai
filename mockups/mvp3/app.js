@@ -303,6 +303,7 @@ function pseudoPart(part){
 function partLinePrice(part){
   if(pseudoPart(part).price)return pseudoPart(part).price;
   if(part.pseudo)return '조립·기타에 포함';
+  if(!Number.isSafeInteger(part.price)&&part.assembly_only)return '조립 전용 부품<small class="muted foot-note">따로 팔지 않아요 · PC 금액에 포함</small>';
   if(!Number.isSafeInteger(part.price))return '가격 확인 중';
   return money(part.price*part.quantity)+(part.quantity>1?'<small class="muted foot-note">'+money(part.price)+' × '+part.quantity+'개</small>':'');
 }
@@ -314,8 +315,12 @@ const SLOT_NAME={CPU:'CPU',GPU:'그래픽카드',RAM:'메모리',SSD:'저장장�
 function otherRow(configuration,total){
   const parts=configuration.parts.filter(x=>!x.pseudo),missing=parts.filter(x=>!Number.isSafeInteger(x.price));
   if(!Number.isSafeInteger(total)||missing.length){
-    const names=[...new Set(missing.map(x=>SLOT_NAME[x.slot]||x.slot))].join('·');
-    return footRow('조립·기타','가격 확인 중인 부품이 있어 계산하지 않았어요'+(names?'<small class="muted foot-note">가격 확인 중: '+esc(names)+' · PC 금액에는 이 부품들이 포함돼 있어요</small>':''),'other-row');
+    // 조립 전용 부품은 «확인 중»이 아니라 개별 판매가가 원래 없는 줄이다 -- 두 사유를 나눠 말한다(2026-10-14 사장님).
+    const label=xs=>[...new Set(xs.map(x=>SLOT_NAME[x.slot]||x.slot))].join('·');
+    const checking=label(missing.filter(x=>!x.assembly_only)),assembly=label(missing.filter(x=>x.assembly_only));
+    const notes=(checking?'가격 확인 중: '+esc(checking):'')+(checking&&assembly?' · ':'')+(assembly?'조립 전용: '+esc(assembly):'');
+    const head=checking?'가격 확인 중인 부품이 있어 계산하지 않았어요':'조립 전용 부품이 있어 계산하지 않았어요';
+    return footRow('조립·기타',head+(notes?'<small class="muted foot-note">'+notes+' · PC 금액에는 이 부품들이 포함돼 있어요</small>':''),'other-row');
   }
   const other=total-parts.reduce((sum,x)=>sum+x.price*x.quantity,0);
   return footRow('조립·기타',(other<0?signedMoney(other):money(other))+'<small class="muted foot-note">PC 금액과 부품 판매가 합의 차이</small>','other-row');

@@ -22,6 +22,7 @@
 ■ 공개 아님은 전부 같은 404 — 미승인·철회·근거 변경·판매중 아님·증빙 확인 불가를 구분해
   알려 주지 않는다. PC 가격·재고는 이 경로가 넘기지 않아 `unknown` 이다(가격은 추천 응답 값).
   parts[].price 는 부품 판매가(`products.sale_price`, 부품 바꾸기와 같은 원천)이고 없으면 null 이다.
+  parts[].assembly_only 는 조립 전용 부품(판매 상품 행 없음 · 단품판매불가)이라 price 가 원래 없는 줄이다.
 """
 import hashlib
 import io
@@ -148,6 +149,7 @@ def _public_offer(conn, product_code):
     # 순서와 기록 형식은 api/customer_bom_gaps 머리말).
     rows = list(conn.execute(text(
         "SELECT pp.ordinal, pp.explanation_code, p.sale_price,"
+        " (e.product_code IS NULL AND e.content->>'availability_scope' = 'assembly_only') AS assembly_only,"
         " (EXISTS (SELECT 1 FROM product_supplier_prices sp WHERE sp.product_code = p.product_code"
         " AND sp.supply_state = '가능') OR " + BOM_EVIDENCE_SQL + ") AS has_supply"
         " FROM pc_configuration_parts pp"
@@ -156,6 +158,9 @@ def _public_offer(conn, product_code):
         " WHERE pp.configuration_id=:id AND NOT pp.pseudo"), {"id": identity}).mappings())
     codes = {r["ordinal"]: r["explanation_code"] for r in rows}
     prices = {r["ordinal"]: r.get("sale_price") if r.get("has_supply") is True else None for r in rows}
+    # 조립 전용 부품(팝콘PC 「단품판매불가」 · 판매 상품 행이 없다)은 개별 판매가가 원래 없다 -- 「가격 확인 중」이 아니라
+    # 그 사실을 말한다(2026-10-14 사장님). 가격은 지어내지 않고 null 그대로다.
+    assembly = {r["ordinal"] for r in rows if r.get("assembly_only") is True}
     for part in offer["parts"]:
         code = None if part["pseudo"] else codes.get(part["ordinal"])
         part["photo"] = ({"state": "approved", "url": f"/api/product-images/{code}/detail"}
@@ -163,6 +168,7 @@ def _public_offer(conn, product_code):
         price = None if part["pseudo"] else prices.get(part["ordinal"])
         # 상세 화면의 부품별 금액(2026-10-12 사장님 「추천한대로」: 부품 판매가 + 「조립·기타」 한 줄)
         part["price"] = price if type(price) is int and price > 0 else None
+        part["assembly_only"] = part["ordinal"] in assembly and not part["pseudo"]
     job = conn.execute(text(
         "SELECT job_id, visual_basis, asset FROM pc_media_jobs"
         " WHERE configuration_id=:id AND selected AND status='ready'"), {"id": identity}).mappings().first()
