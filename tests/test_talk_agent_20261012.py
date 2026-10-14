@@ -330,3 +330,49 @@ class AsParse(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ── ⑤ 예산 초과를 설명이 숨기지 않는다 · 마크다운 기호를 남기지 않는다 (2026-10-14 3턴 결함 점검) ──
+class BudgetNote(unittest.TestCase):
+    def test_over_budget_card_gets_fact_sentence(self):
+        n = AG.budget_note([{"price": 1_624_400, "over_budget": True}], 1_500_000, "이 PC가 좋아요.")
+        self.assertEqual(n, "보여 드린 PC는 예산 1,500,000원보다 124,400원 높습니다.")
+
+    def test_no_note_when_reply_already_says_so(self):
+        self.assertIsNone(AG.budget_note([{"price": 1_624_400, "over_budget": True}], 1_500_000,
+                                         "예산을 124,400원 넘어요."))
+
+    def test_no_note_within_budget_or_unknown_budget(self):
+        self.assertIsNone(AG.budget_note([{"price": 1_400_000, "over_budget": False}], 1_500_000, "좋아요."))
+        self.assertIsNone(AG.budget_note([{"price": 1_624_400, "over_budget": True}], None, "좋아요."))
+
+    def test_mixed_cards_counts_over(self):
+        n = AG.budget_note([{"price": 1_400_000, "over_budget": False},
+                            {"price": 1_700_000, "over_budget": True}], 1_500_000, "둘 다 괜찮아요.")
+        self.assertIn("2대 중 1대", n)
+        self.assertIn("200,000원 초과", n)
+
+    def test_note_passes_verify(self):
+        book = TT.FactBook()
+        book.prices = {1_624_400}
+        n = AG.budget_note([{"price": 1_624_400, "over_budget": True}], 1_500_000, "")
+        clean, dropped = AG.verify(n, book, 1_500_000)
+        # 차액(124,400)은 묶음 값이 아니지만 서버가 verify 뒤에 붙이므로 상관없다 -- 붙이는 위치를 지킨다.
+        self.assertTrue(dropped)
+        import inspect
+        src = inspect.getsource(AG.run_turn)
+        self.assertLess(src.index("verify(reply"), src.index("budget_note("))
+
+    def test_markdown_is_stripped(self):
+        clean, _ = AG.verify("**추천**은 __이것__입니다.\n## 요약\n좋아요.", TT.FactBook())
+        self.assertEqual(clean, "추천은 이것입니다. 요약 좋아요.")
+
+    def test_run_turn_appends_note_for_over_budget_card(self):
+        over = dict(ITEM, price=1_624_400, over_budget=True)
+        reco = _reco(card_sets=[{"usage": "게임", "items": [over]}])
+        out, _ = Agent._run(self, [
+            _turn(calls=[{"id": "a", "name": "find_pcs", "args": {"usages": ["게임"], "budget_won": 1_500_000}}]),
+            _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+            _turn("**게임 PC A**를 추천해요."),
+        ], reco=reco)
+        self.assertEqual(out["reply"], "게임 PC A를 추천해요. 보여 드린 PC는 예산 1,500,000원보다 124,400원 높습니다.")
