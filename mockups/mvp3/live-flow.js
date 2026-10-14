@@ -65,7 +65,7 @@
     return {version:1,saved_at:now,talk:M.object(state.talk)?M.copy(state.talk):null,...(M.object(state.wants)?{wants:M.copy(state.wants)}:{}),...(state.recommendation||state.restoredShown?{shown:true}:{}),
       chat_flow:M.object(state.chatFlow)?M.copy(state.chatFlow):null,
       history:(state.history||[]).slice(-6).filter(h=>h&&['user','assistant'].includes(h.role)).map(h=>({role:h.role,text:text(h.text)})),
-      messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)).map(m=>({who:m.who,text:text(m.text)})),
+      messages:(state.messages||[]).slice(-CONVERSATION_MAX_MESSAGES).filter(m=>m&&['user','ai'].includes(m.who)&&!m.pending).map(m=>({who:m.who,text:text(m.text)})),
       // 되살린 견적을 아직 다시 불러오기 전이면(selected 없음) 그 상품 번호를 지우지 않고 그대로 둔다.
       // 고를 때 조건(selection_state)도 함께 둔다 -- 그 뒤 조건을 바꿨으면 지금 조건의 추천에는 그 상품이 없을 수 있다.
       // 부품 바꾸기로 옮긴 PC 는 추천 목록에 없을 수 있어 어느 PC 의 어느 부품에서 옮겼는지(swap_from)도 둔다.
@@ -119,11 +119,13 @@
     ...(Number.isSafeInteger(c.base_quantity)&&c.quantity!==c.base_quantity?{quantity:c.quantity}:{})}));}
   // 첫 인사는 PC 상담으로 바로 들어간다(2026-10-11 사장님: 게임 탐색은 화면이 먼저 권하지 않는다).
   const GREETING='안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요.';
+  const ANSWER_WRITING='설명을 쓰고 있어요. 아래 추천부터 먼저 보여 드릴게요.';
+  const ANSWER_MISSING='설명을 불러오지 못했어요. 아래 추천을 먼저 확인해 주세요.';
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     // keepCurrent: 2차 대화 화면(talk.html). 고객이 고른 구성(지금 견적)은 새 조건·새 추천이 와도 지우지 않고,
     // 고객이 다른 구성을 고를 때만 바뀐다(코덱스 1816 보강3 §5). 1차 화면은 지금처럼 새 조건에서 비운다.
-    const keepCurrent=options.keepCurrent===true;let proposalSeq=0;
+    const keepCurrent=options.keepCurrent===true;let proposalSeq=0,answerSeq=0;
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
@@ -197,7 +199,8 @@
       let prior=null;
       try{
         // entry: 대화 화면 시작 단추로 시작한 문장이면 그 단추 키(서버가 로그로만 센다).
-        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous};if(entry)payload.entry=entry;
+        // defer_answer: 「카드 먼저」(2026-10-14) -- 서버가 설명을 기다리지 않고 답한다. 설명은 fillAnswer 가 따로 받아 채운다.
+        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous,defer_answer:true};if(entry)payload.entry=entry;
         const response=await api.parse(payload,{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
@@ -206,7 +209,9 @@
         state.talk=M.copy(response.state);state.chatFlow=M.object(response.chat_flow)?M.copy(response.chat_flow):null;
         state.history.push({role:'user',text:text.slice(0,1000)});
         const answer=M.text(response.answer),reply=M.text(response.reply);
-        if(!response.silent){
+        const pendingAnswer=typeof response.answer_pending==='string'?response.answer_pending:'';
+        if(pendingAnswer)fillAnswer(pendingAnswer,response);
+        else if(!response.silent){
           // 답을 먼저 충분히 하고, PC 이야기는 같은 말풍선 끝에 짧게 붙인다(코덱스 1816 보강2).
           message([answer.trim(),reply.trim()].filter(Boolean).join('\n\n'),'ai');
           if(answer.trim())state.history.push({role:'assistant',text:answer.slice(0,300)});
@@ -239,6 +244,35 @@
         }
       }finally{if(current(op)){state.phase=null;controller=null;emit();}}
       return true;
+    }
+    // 「카드 먼저」(2026-10-14 사장님 「그렇게 해」): 설명 AI 가 7~9초 걸려, 서버는 질문 읽기가 끝나면 먼저 답하고
+    // (answer_pending 표) 설명은 따로 쓴다. 말풍선에는 «설명을 쓰는 중» 한 줄을 두고 카드를 먼저 부른다. 설명이 오면
+    // 같은 말풍선을 설명 + 서버 마무리 문장으로 바꾼다 -- 말풍선 순서(설명 위, 카드 아래)는 그대로다.
+    // 설명을 못 받으면(서버가 표를 모름·시간 초과·연결 실패) 첫 응답의 문장으로 둔다. 문장도 없으면 그 사실을 한 줄로 밝힌다.
+    function fillAnswer(token,first){
+      const seq=++answerSeq,msg={text:ANSWER_WRITING,who:'ai',pending:true};state.messages.push(msg);
+      const shown=r=>[M.text(r.answer).trim(),M.text(r.reply).trim()].filter(Boolean).join('\n\n');
+      const settle=(text,final)=>{
+        if(!state.messages.includes(msg))return;     // 새 상담으로 지웠다
+        msg.text=text||ANSWER_MISSING;delete msg.pending;
+        if(!final||seq!==answerSeq)return;          // 그새 다음 문장을 보냈으면 대화 기록·조건은 그 문장이 정한다
+        const a=M.text(final.answer),r=M.text(final.reply);
+        if(a.trim())state.history.push({role:'assistant',text:a.slice(0,300)});
+        if(r.trim())state.history.push({role:'assistant',text:r.slice(0,300)});
+        state.history=state.history.slice(-6);
+        if(M.object(final.chat_flow))state.chatFlow=M.copy(final.chat_flow);
+        if(final.handoff_offer===true)state.handoffOffer=true;
+        // 설명까지 보고 조건이 달라졌으면(드물다) 카드를 그 조건으로 다시 받는다.
+        const missing=Array.isArray(final.missing)?final.missing:[];
+        if(M.object(final.state)&&!state.phase&&(JSON.stringify(final.state)!==JSON.stringify(state.talk)||JSON.stringify(missing)!==JSON.stringify(state.missing))){
+          state.talk=M.copy(final.state);state.missing=missing;
+          if(!missing.length&&final.pc_related!==false&&final.explain_only!==true)refresh({notes:false});
+        }
+      };
+      api.answer({token}).then(final=>{
+        if(!M.object(final)||final.ok!==true)throw new Error('answer');
+        settle(shown(final),final);
+      },()=>settle(shown({reply:first.reply}),null)).finally(emit);
     }
     // notes=false: 되살린 대화에 카드만 다시 붙인다(같은 안내·다음 질문은 이미 대화에 있다).
     async function refresh({notes=true}={}){
