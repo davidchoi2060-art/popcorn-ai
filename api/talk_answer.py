@@ -584,7 +584,8 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                 history: list | None = None,
                 shop_notes: list[str] | None = None,
                 allow_web: bool = True,
-                timeout_sec: float = PATH_B_TIMEOUT_SEC) -> AnswerResult:
+                timeout_sec: float = PATH_B_TIMEOUT_SEC,
+                on_route=None) -> AnswerResult:
     """★ [B] 경로 — 근거 수집 -> 자유 답변 -> **필터** -> 유도.
 
     `conn_factory` 는 `engine.connect` 같은 «연결을 여는 것»을 받는다. [A] 와 병렬로
@@ -592,6 +593,9 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
 
     실패해도 **예외를 올리지 않는다** — `error` 에 사유를 담아 돌려준다. 답변 경로가
     죽어도 좌표 추출([A])은 살아야 하고, 상담이 끊기면 안 된다.
+
+    `on_route(res)` 는 설명 AI 를 부르기 직전에 한 번 불린다(갈래 kind·topic·narrowing 이 정해진 뒤) --
+    「카드 먼저」(talk._parse_deferred)가 설명을 기다리지 않고 첫 응답을 조립하는 데 쓴다.
     """
     t0 = time.time()
     res = AnswerResult()
@@ -636,6 +640,8 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
                 labels = PA.usage_hits(sentence, vocab) or prev or ([game_label] if game_label else [])
                 games = game_names or None
         if labels is not None:
+            res.kind, res.topic = "pc_advice", topic
+            _routed(on_route, res)
             return PA.advise(conn_factory, sentence, labels, res, history=history,
                              timeout_sec=timeout_sec, topic=topic, games=games, shop_notes=shop_notes)
         if not is_game_related(sentence, vocab):
@@ -672,6 +678,7 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
             return res
 
         prompt = build_answer_prompt(sentence, ev, res.narrowing, history)
+        _routed(on_route, res)
         out = llm.call(prompt, task_key=ANSWER_TASK_KEY, customer_facing=True,
                        max_output_tokens=ANSWER_MAX_TOKENS,
                        timeout_sec=int(min(ANSWER_TIMEOUT_SEC, timeout_sec)))
@@ -709,6 +716,14 @@ def answer_path(conn_factory, sentence: str, vocab: "TS.Vocab", *,
         res.fallback = bool(res.answer)
     res.elapsed_sec = round(time.time() - t0, 3)
     return res
+
+
+def _routed(on_route, res) -> None:
+    if on_route is not None:
+        try:
+            on_route(res)
+        except Exception as e:                               # noqa: BLE001 - 알림 실패가 설명을 막지 않는다
+            log.warning("[talk-answer] route hook failed: %s", type(e).__name__)
 
 
 def run_parallel(fn_a, fn_b, timeout_sec: float = PATH_B_TIMEOUT_SEC):

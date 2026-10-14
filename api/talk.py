@@ -140,7 +140,11 @@
 import json
 import logging
 import re
+import secrets
 import statistics
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
@@ -560,6 +564,9 @@ class ParseBody(BaseModel):
     # 대화 화면 시작 단추(코덱스 1816 보강6 의견 v1 -- 입구는 하나, 안에 시작 단추 셋). 어느 단추 초안으로
     # 시작했는지만 서버 로그에 센다 -- 문장은 찍지 않는다. `ENTRY_KEYS` 밖의 값은 「-」로 찍는다.
     entry: str | None = None
+    # 「카드 먼저」(2026-10-14 사장님 「그렇게 해」): 참이면 질문 읽기([A])가 끝나는 즉시 답한다. 설명([B])은
+    # 서버에서 계속 쓰이고, 응답의 `answer_pending` 표로 `POST /api/talk/answer` 에서 받는다. 없으면 옛 동작 그대로.
+    defer_answer: bool = False
 
 
 # 일반 기준 설명을 지우지 않는 예외 -- 주문·환불 상태를 묻는 턴도 일반적인 환불 기간은 말해 줄 수 있다.
@@ -1164,6 +1171,125 @@ def _quick_response(body: ParseBody, reply: str, exceptions: list) -> dict:
     }
 
 
+# ── 「카드 먼저」 -- 설명([B])을 기다리지 않고 첫 응답을 낸다 (2026-10-14) ────────────────────────
+# 설명 AI 가 7~9초, 질문 읽기 AI 가 3초 안팎이다(2026-10-14 개발 서버 실측). 화면은 두 결과를 다 받은 뒤에야 카드를
+# 불러 카드까지 9~11초였다. 사장님 승인(「그렇게 해」): 질문 읽기가 끝나면 카드를 먼저 내고 설명은 늦게 채운다.
+#   첫 응답   [A] 결과 + «[B] 가 어느 갈래로 답할지»로 조립한다(설명 글은 아직 없다). 기록은 남기지 않는다.
+#   최종 응답 [B] 가 끝나면 같은 조립을 다시 하고 기록을 남긴다. 화면은 `POST /answer` 로 받는다.
+# 대기 중 결과는 이 프로세스 메모리에만 있다 -- 서버는 uvicorn 한 프로세스다(deploy/popcorn-api.service). 표가
+# 사라졌거나 오래돼 못 찾으면 404 이고, 화면은 첫 응답 그대로 둔다(설명만 빠진다 -- 상담은 이어진다).
+_DEFER_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="talk-defer")
+_PENDING: dict[str, dict] = {}
+_PENDING_LOCK = threading.Lock()
+PENDING_TTL_SEC = 120          # 받아 가지 않은 최종 응답을 지우는 시간
+ROUTE_WAIT_SEC = 1.0           # [A] 가 끝난 뒤 [B] 의 갈래 판정을 기다리는 최대 시간(판정은 규칙·DB 읽기라 보통 즉시)
+DEFER_PENDING_MARK = "\u2026"  # 첫 조립에서 «설명이 나올 예정»을 나타내는 자리표(고객에게 나가지 않는다)
+
+
+def _route_hook(box: dict):
+    """[B] 가 갈래를 정하면(설명 AI 를 부르기 직전) 그 결과 객체를 box 에 담는다."""
+    def hook(res):
+        box["res"] = res
+        ev = box.get("event")
+        if ev is not None:
+            ev.set()
+    box["event"] = threading.Event()
+    return hook
+
+
+def _purge_pending(now: float) -> None:
+    with _PENDING_LOCK:
+        for k in [k for k, v in _PENDING.items() if now - v["at"] > PENDING_TTL_SEC]:
+            _PENDING.pop(k, None)
+
+
+def _predicted_answer(routed: dict):
+    """첫 조립에 쓸 [B] 결과 -- 갈래(kind·topic·narrowing)만 진짜이고, 설명 글은 자리표다."""
+    res = routed.get("res")
+    if res is None:
+        return TA.AnswerResult()
+    return TA.AnswerResult(answer=DEFER_PENDING_MARK, narrowing=res.narrowing, game_names=list(res.game_names),
+                           kind=res.kind, topic=res.topic)
+
+
+def _parse_deferred(call_a, call_b, finish, routed: dict) -> dict:
+    t0 = time.time()
+    _purge_pending(t0)
+    fa = _DEFER_POOL.submit(call_a)
+    fb = _DEFER_POOL.submit(call_b)
+    try:
+        result = fa.result()
+    except llm.LLMBlockedError as e:
+        log.warning("[talk] parse blocked: kind=%s provider=%s err=%s", e.kind, e.provider, e)
+        raise HTTPException(502, PARSE_FAILED_LIMIT)
+    except llm.LLMAllProvidersFailedError as e:
+        log.warning("[talk] parse failed: all providers: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
+    except llm.LLMNotConfiguredError as e:
+        log.warning("[talk] parse not configured: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
+    except llm.LLMProviderError as e:
+        log.warning("[talk] parse provider error: %s", e)
+        raise HTTPException(502, PARSE_FAILED)
+    if not fb.done():
+        routed["event"].wait(ROUTE_WAIT_SEC)
+    if fb.done():
+        # 설명이 이미 끝났다(설명할 것이 없는 문장 등) -- 기다릴 것이 없으니 옛 모양 그대로 한 번에 낸다.
+        return finish(result, _answer_or_error(fb, 0, t0))
+    first = finish(result, _predicted_answer(routed), final=False)
+    token = secrets.token_urlsafe(18)
+    slot = {"at": t0, "done": threading.Event(), "resp": None}
+    with _PENDING_LOCK:
+        _PENDING[token] = slot
+
+    def complete():
+        try:
+            slot["resp"] = finish(result, _answer_or_error(fb, TA.PATH_B_TIMEOUT_SEC, t0))
+        except Exception as e:                                # noqa: BLE001 - 첫 응답은 이미 나갔다
+            log.warning("[talk] deferred finish failed: %s", type(e).__name__)
+        finally:
+            slot["done"].set()
+
+    _DEFER_POOL.submit(complete)
+    first["answer"] = ""
+    first["answer_pending"] = token
+    log.info("[talk] deferred: first reply after %.2fs", time.time() - t0)
+    return first
+
+
+def _answer_or_error(fb, timeout_sec: float, t0: float):
+    try:
+        return fb.result(timeout=timeout_sec or None)
+    except Exception as e:                                    # noqa: BLE001
+        log.warning("[talk-answer] path B timed out or failed: %s", type(e).__name__)
+        return TA.AnswerResult(error="path B unavailable: %s" % type(e).__name__,
+                               elapsed_sec=round(time.time() - t0, 3))
+
+
+class AnswerBody(BaseModel):
+    token: str
+
+
+@router.post("/answer")
+def answer_talk(body: AnswerBody):
+    """「카드 먼저」의 두 번째 응답 -- `/parse`(defer_answer) 가 준 `answer_pending` 표로 설명이 붙은 최종 응답을 받는다.
+
+    200 = `/parse` 200 과 같은 모양(설명·말풍선 문장·조건이 모두 최종 값). 404 = 표를 모른다(지났거나 다른 서버).
+    504 = 설명이 시간 안에 끝나지 않았다. 화면은 404·504 에서 첫 응답을 그대로 둔다.
+    """
+    with _PENDING_LOCK:
+        slot = _PENDING.get(body.token or "")
+    if slot is None:
+        raise HTTPException(404, "answer not found")
+    if not slot["done"].wait(TA.PATH_B_TIMEOUT_SEC + 5):
+        raise HTTPException(504, "answer not ready")
+    with _PENDING_LOCK:
+        _PENDING.pop(body.token, None)
+    if slot["resp"] is None:
+        raise HTTPException(404, "answer not found")
+    return slot["resp"]
+
+
 @router.post("/parse")
 def parse_talk(body: ParseBody, request: Request):
     """고객 문장 -> (PC 상담인가) + 격자 좌표(state). 부품·가격·후보 수는 말하지 않는다(A-01·A-02).
@@ -1256,15 +1382,15 @@ def parse_talk(body: ParseBody, request: Request):
         # 로그에 남긴다(문장·값은 찍지 않는다 -- 키 수만).
         log.warning("[talk] prev state rejected (keys=%d) - treated as none", len(body.state))
     # 상담 갈래 -- 단추 > 지난 턴 > 이번 문장 규칙 순(talk_entry 머리말). AI 판정 뒤에 한 번 더 본다.
-    flow_entry, entry_asked = TE.from_flow(body.chat_flow)
+    flow_entry, entry_asked0 = TE.from_flow(body.chat_flow)
     if body.entry in ENTRY_KEYS:
-        entry, entry_src = body.entry, "button"
+        entry0, entry_src0 = body.entry, "button"
     elif flow_entry:
-        entry, entry_src = flow_entry, "kept"
+        entry0, entry_src0 = flow_entry, "kept"
     else:
-        entry = TE.classify(text)
-        entry_src = "rule" if entry else "-"
-    prompt = _build_prompt(text, vocab, body.state if prev_ok else None, history, entry)
+        entry0 = TE.classify(text)
+        entry_src0 = "rule" if entry0 else "-"
+    prompt = _build_prompt(text, vocab, body.state if prev_ok else None, history, entry0)
     # 문장 자체는 로그에 남기지 않는다(원문 비적재 규약) -- 길이만 남긴다.
     # games/usages/tiers 는 프롬프트에 실린 격자 어휘 수 -- 표가 늘면 프롬프트도 길어지므로
     # (비용) 여기서 세어 둔다. 어휘 자체는 찍지 않는다(로그는 ASCII 기호만).
@@ -1297,12 +1423,474 @@ def parse_talk(body: ParseBody, request: Request):
     shop_notes = TR.topic_notices(text, written_notices, custom_notices)
     b_notes = [] if PA._GENERAL.search(text) else shop_notes
 
+    # 「카드 먼저」(defer_answer) 때 [B] 가 어느 갈래로 답할지(설명 종류) 정해지면 여기에 담긴다 -- 첫 응답이 그 갈래로 조립된다.
+    routed: dict = {}
+    on_route = _route_hook(routed)
+
     def _call_b():
         return TA.answer_path(engine.connect, text, vocab,
-                              prev_state=prev_state_obj, history=history, shop_notes=b_notes)
+                              prev_state=prev_state_obj, history=history, shop_notes=b_notes,
+                              on_route=on_route)
 
     # 고객 응답에는 프로바이더·모델·비용·토큰·원문 오류를 싣지 않는다(PR #2 계약).
     # 사유는 서버 로그와 api_cost_logs 에만 남긴다.
+    def _finish(result, ans, *, final: bool = True) -> dict:
+        """[A] 결과와 [B] 결과로 응답을 조립한다. final=False 는 «카드 먼저» 첫 응답이다(아래 `_parse_deferred`) --
+        설명([B])이 아직 쓰이는 중이라 기록을 남기지 않고 카드 가격 맞추기(DB 읽기)도 하지 않는다."""
+        entry, entry_src, entry_asked = entry0, entry_src0, entry_asked0
+        unreadable = False
+        try:
+            try:
+                obj = _extract_json(result.text)
+            except Exception as first:
+                # 형식이 깨진 응답은 가끔이다(2026-10-12 개발 서버: 같은 업그레이드 문장 3번 중 1번, 모델 luna).
+                # 고객에게 「다르게 말해 달라」고 하기 전에 한 번만 다시 묻는다. 다시 물어도 깨지거나 실패하면
+                # 아래 「못 읽었다」 길로 간다 -- 이 턴을 502 로 끊지 않는다.
+                log.warning("[talk] non-JSON response from %s/%s, retry once: %s",
+                            result.provider, result.model, first)
+                try:
+                    result = _call_a()
+                except llm.LLMError as e:
+                    raise ValueError(f"retry failed: {type(e).__name__}") from e
+                obj = _extract_json(result.text)
+        except Exception as e:
+            # 모델이 형식을 어긴 것도 실패다 -- 빈 조건으로 뭉개면 "못 읽었다"와
+            # "AI가 깨졌다"를 화면이 구분하지 못한다.
+            # 2026-10-11: 그래도 502 로 상담을 끊지 않는다(사장님 「무조건 차단하면 안 된다」).
+            # 이전 state 를 그대로 두고(조건을 지어내지 않는다) 다시 말해 달라고 하며 사람 상담
+            # 길을 연다. 화면이 구분할 수 있게 응답에 `fallback:"ai_unreadable"` 를 싣는다.
+            log.warning("[talk] non-JSON response from %s/%s: %s",
+                        result.provider, result.model, e)
+            unreadable = True
+            obj = {"pc": None,
+                   "state": body.state if prev_ok else {},
+                   "reply": ""}
+
+        # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
+        # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
+        raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab,
+                                             prev_budget=prev_state_obj.budget_won if prev_state_obj else None,
+                                             prev_usages=list(prev_state_obj.usages) if prev_state_obj else None,
+                                             admin_fixes=admin_fixes)
+        state, dropped = TS.validate_state(raw_state, vocab)
+        dropped.extend(fixes)
+        # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
+        # "game.resolution" 처럼 계약 밖 좌표를 적어도 카드가 막히지 않게).
+        missing = TS.missing_for(state, vocab)
+        # 게임 이름 없는 게임 질문 -- 예산이 있거나 이미 한 번 물었으면 FHD 기준으로 카드로 넘긴다
+        # (2026-10-10 점검 9·27번. 추천 단계는 #53 에서 같은 기준으로 이미 고쳤다).
+        released = TR.release_unnamed_game(missing, state, prev_state_obj, TS.is_game_usage,
+                                           TS.MISSING_GAME_GRADE)
+        # 「게임용 가장 싸게」처럼 가격 방향을 말했으면 게임 이름 없이도 FHD 기준으로 바로 카드를 낸다
+        # (api/talk_defaults -- 예산 대신 가격 방향이 기본값을 정한다).
+        pref = TD.price_pref(text)
+        if (not released and pref and missing == [TS.MISSING_GAME_GRADE]
+                and TR.unnamed_game(state)):
+            released = True
+        # 게임 이름 없이 PC 를 물었는데 설명([B])을 먼저 했으면 「어떤 게임?」을 되묻지 않고 FHD 기준 카드를 아래에 낸다
+        # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
+        # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
+        # 본체 구성 설명(build)일 때만 -- 「게임용 PC 램 역할이 뭐예요?」 같은 부품 설명 뒤에 추천을 열지 않는다(2026-10-12 검수 9595 P2-2).
+        # 장르 통칭 이름(「스팀 인디(통칭)」)만 있어도 같다(TR.unnamed_game) -- 설명이 이미 나갔는데 「주로 어떤 게임을 하실
+        # 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 실제 게임 이름이 있는데 등급이 없으면 추천(grid_public)이
+        # 「적합성 확인 전 보류」로 카드를 비우므로 여기서도 풀지 않는다(코덱스 #194 검수 P2-1 -- 답과 카드가 어긋났다).
+        if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
+                and getattr(ans, "kind", "game") == "pc_advice" and getattr(ans, "topic", None) == PA.TOPIC_BUILD
+                and (ans.answer or "").strip()):
+            released = True
+        if released:
+            missing = []
+        # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
+        # 2026-09-16). missing 이 있으면 카드가 안 나가는데 「1080p 가정」 배지가 붙는 것은
+        # 앞서 가는 말이다 -- 되묻는 턴에는 가정도 없다.
+        assumed: list = []
+        if not missing and any(TS.is_game_usage(u) for u in state.usages) and (
+                state.game is None or state.game.resolution is None):
+            assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
+        pc = _pc_verdict(obj)
+        laptop = TR.mentions_laptop(text)
+        if laptop and pc is not True:
+            pc = True        # 노트북 문의는 PC 상담이다 -- 잡담으로 세지 않는다
+        custom_hits = TR.custom_topic_hits(text, custom_notices)
+        if (TR.purchase_topics(text) or custom_hits) and pc is not True:
+            pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
+        if (pc is not True and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip()
+                and getattr(ans, "topic", None) != PA.TOPIC_FOLLOW):
+            # 이어 답하기(TOPIC_FOLLOW)는 규칙이 PC 질문으로 본 것이 아니라 «상담 중이라» 부른 것이다 -- 잡담 판정을 뒤집지 않는다.
+            # 규칙(talk_pc_advice.topic_of)이 PC·부품 질문으로 보고 설명을 지었으면 PC 상담이다. AI 판정이
+            # 「주제 밖」이라고 그 설명을 지우지 않는다(2026-10-11 개발 서버: 「발로란트 240프레임 그래픽카드 뭐 사야 돼?」·
+            # 「RTX 5070 들어간 PC 얼마 정도 해요?」에 설명 없이 「다른 시스템에서 확인하세요」만 나갔다).
+            pc = True
+        # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
+        #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
+        #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
+        #   순서까지 말한 고객이 대화 도중에 차단된다.
+        #   **경계 3/4/5 는 그대로 두고 «세는 대상»만 바꾼다.** 판정은 [B] 가 이미 쓰는
+        #   어휘 매칭을 그대로 재사용한다 -- 새 판정기를 만들지 않는다.
+        game_related = TA.is_game_related(text, vocab)
+        prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
+        turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
+        # PC 제안은 상담에 한 번, 거절하면 하지 않는다. 고객이 먼저 PC 를 물으면 거절을 푼다.
+        pc_offered, pc_declined = TS.flow_flags(body.chat_flow)
+        # 흐름 상태가 없거나 비어 온 경우(옛 화면·보관 견적을 연 직후)에도, 최근 대화에 서버 권유 줄이 이미
+        # 있으면 권한 것으로 친다 -- 같은 상담에서 두 번 권하지 않는다(코덱스 #145 검수 3).
+        if any(r == "assistant" and (REPLY_GAME_PICK in t or TX.NOTE_SMALLTALK_LONG in t) for r, t in history):
+            pc_offered = True
+        if TS.declines_pc(text):
+            pc_declined = True
+        elif pc is True:
+            pc_declined = False
+        may_offer = not pc_offered and not pc_declined
+        reply = _reply_text(obj, pc, bool(state.usages), stage)
+        ai_reply = reply      # 서버가 바꾸기 전 모델의 말 — 관리자 AI 답 점검이 본다
+        if released and stage == TS.STAGE_PC:
+            reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
+        # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
+        # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
+        topic_notes = shop_notes
+        cond_notes = TR.condition_notices(text, state, prev_state_obj)
+        # 설명 AI 가 판매 안내를 받아 답을 냈으면 그 안내는 설명이 전한다 -- 아래 말풍선에 고정 문구로 다시 싣지 않는다.
+        # 설명이 나중에 화면에서 빠지면(예외·잡담 판정) 맨 끝에서 고정 안내를 되살린다(notes_deferred).
+        b_told = bool(b_notes) and getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+        notes_deferred = list(topic_notes) if b_told else []
+        notices = ([] if b_told else topic_notes) + cond_notes
+        if stage == TS.STAGE_PC:
+            reply = TR.drop_deferrals(reply)
+        if (notices or b_told) and stage == TS.STAGE_PC:
+            # 배송·환불·보증만 물었고 위 설명([B])이 이미 답했으면 「용도와 예산을 알려 주시면」을 붙이지 않는다
+            # (2026-10-12 일반 AI 비교 R13·E44 -- 절차 질문 끝마다 PC 를 다시 물었다).
+            answered = (topic_notes and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
+                        and bool((getattr(ans, "answer", "") or "").strip()))
+            reply = TR.honest_reply(notices, bool(state.usages), [] if answered else missing,
+                                    has_budget=bool(state.budget_won))
+        if (stage == TS.STAGE_PC and not notices and getattr(ans, "kind", "game") == "pc_advice"
+                and getattr(ans, "topic", None) == PA.TOPIC_GENERAL and (ans.answer or "").strip()):
+            # 구매 절차·다른 쇼핑몰 비교 설명이 위에 나가면 AI 의 짧은 확인·되묻기는 같은 말 되풀이다(2026-10-13 상담 답 품질 비교
+            # E31 「다나와가 더 싸요?」: 설명 뒤 「다른 사이트 가격은 확인하기 어렵네요. 어떤 구성을 비교하세요?」가 또 붙었다).
+            # 예외 안내(다른 곳 가격 확인 불가 등)는 아래 TX.respond 가 그대로 붙인다.
+            reply = ""
+        if laptop and stage == TS.STAGE_PC:
+            reply = TR.with_laptop_notice(reply)
+        band_note = TR.budget_band_note(text)
+        if band_note and stage == TS.STAGE_PC and band_note not in reply:
+            reply = (reply.rstrip() + " " + band_note).strip()
+        # 2026-10-11 개발 서버: 모델 문장에 힌디어 낱말(「उपलब्ध한」)이 섞여 깨진 글자로 보였고,
+        # 「150만원」을 「150만원대」로 받아 말했다. 화면에 내기 전에 걷는다(원문은 ai_reply 로 남는다).
+        reply = TR.tidy_customer_text(reply, text)
+        # 2026-10-11 「요즘 많이 하는 게임 뭐 있어?」: 게임 목록을 답한 턴에 AI 의 되묻기
+        # (「특정 장르 있으세요?」)가 따로 놀았다. 목록을 준 뒤에는 서버 한 줄로 추천에 잇는다.
+        if ((ans.answer or "").strip() and len(ans.game_names) >= 2
+                and ans.narrowing == TS.NARROWING_WIDE and not released
+                and pc is not True and stage in (TS.STAGE_PC, TS.STAGE_OPEN)):
+            # 같은 상담에서 이미 한 번 권했거나 고객이 거절했으면 되풀이하지 않는다(답만 보인다).
+            # 흐름 상태가 없던 옛 화면을 위해 최근 이력의 같은 문장도 함께 본다.
+            said = any(r == "assistant" and REPLY_GAME_PICK in t for r, t in history)
+            reply = REPLY_GAME_PICK if may_offer and not said else ""
+            pc_offered = pc_offered or bool(reply)
+        elif pc is False:
+            # 지시해도 AI 가 잡담 끝에 「혹시 컴퓨터 맞추면서 …?」를 붙였다(2026-10-11 개발 서버, #140 배포 뒤).
+            # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 잡담이 세 번 이어진 뒤 상담에
+            # «한 번만» 서버 줄을 붙인다. 거절했으면 붙이지 않는다.
+            before = reply
+            reply = drop_pc_push(reply)
+            # 고객이 이번에도, 최근에도 게임을 말하지 않았으면 AI 가 먼저 건 게임 권유도 걷는다.
+            said_game = game_related or any(r == "user" and TA.is_game_related(t, vocab) for r, t in history)
+            if not said_game:
+                reply = drop_game_nudge(reply)
+            invite = may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply
+            if not invite and _count_sentences(reply) < _count_sentences(before):
+                # 문장을 통째로 걷었을 때만 -- AI 가 처음부터 한 줄로 답한 것(「지금 날씨 정보는 확인할 수 없어요.」)이나
+                # 문장 안의 낱말만 걷은 것(「게임을 하거나 영상 봐도」)은 그대로 둔다.
+                reply = extend_one_liner(reply)
+            if not invite:
+                reply = follow_apology(reply)
+                reply = follow_mild_insult(text, reply)
+            if invite:
+                reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
+                pc_offered = True
+            reply = reply or REPLY_SMALLTALK_EMPTY
+        # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
+        # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
+        # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.
+        exceptions = TX.classify(text, state=state, pc=pc, stage=stage, truncated=truncated,
+                                 top_spec_re=TR._TOP, uhd_re=TR._UHD, masked=masked,
+                                 history=history)
+        if unreadable:
+            exceptions.append("ai_unreadable")
+            reply = TX.REPLY_AI_UNREADABLE
+        # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
+        asked_before = TS.flow_asked(body.chat_flow)
+        # 램·SSD 같은 구성 조건 안내(cond_notes)는 설명과 함께 둔다 -- 판매 주제 안내만 설명을 대신한다.
+        # 한 문장 안 되풀이(「싸게 싸게 싸게 싸게」)는 응대 문장을 바꾸지 않는 예외라 평범한 PC 문장으로 본다 -- 막으면 용도만
+        # 되묻고 카드가 없었다(2026-10-12 개발 서버, 모델 luna). 같은 문장을 거듭 보낸 반복(turns)은 기존대로 사람 상담 길이다.
+        soft_exc = {"repeat"} if TX.repeated(text, history) == "words" else set()
+        plain_pc = (not (set(exceptions) - soft_exc) and pc is True and stage == TS.STAGE_PC
+                    and not topic_notes and not laptop)
+        # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
+        # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
+        explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+                     and getattr(ans, "topic", None) in ("part", "upgrade"))
+        # 모델명을 말한 질문(「RTX 5070 들어간 PC」)은 일반 용도를 가정하면 카드가 어긋나므로 기존대로 용도를 묻는다.
+        build_explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
+                           and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not PA.TF._RE_PART.search(text)
+                           # 아무 조건도 없는 「PC 추천해줘」는 용도를 한 번 묻는다(코덱스 PR157 검수) -- 예산·선호를 말했을 때만.
+                           and bool(state.budget_won or getattr(state, "prefs", None) or cond_notes))
+        if plain_pc and explained and missing == [TS.MISSING_USAGES]:
+            reply = " ".join(cond_notes)
+        # 가격 방향(「싸게」·「좋은 걸로」)을 말했으면 그것도 조건이다 -- 용도를 되묻지 않고 일반 용도로 카드를 낸다.
+        elif plain_pc and (asked_before or build_explained or pref) and missing == [TS.MISSING_USAGES]:
+            # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
+            # 구성 설명을 먼저 한 턴도 같다(2026-10-12 일반 AI 비교 R10·R11: 「조용한 PC」·「화이트 100만원대」에 설명 뒤
+            # 용도만 되묻고 카드가 없었다 -- 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
+            label = TD.default_usage_label(vocab)
+            if label:
+                state = state.model_copy(update={"usages": [label]})
+                missing = TS.missing_for(state, vocab)
+                fit = TD._fit_usage(label)
+                price_line = TD.PREF_LINE.get(pref, "") if pref and state.budget_won is None else ""
+                reply = " ".join(x for x in (TD.no_usage_reply(TD.basis_work(fit) if fit else None), price_line,
+                                             " ".join(cond_notes)) if x).strip()
+                log.info("[talk] answer-first: no usage after ask - assumed general use")
+        elif plain_pc and not missing and (
+                # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
+                (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
+                or (asked_before and "?" in reply)
+                # 설명([B])을 못 받은 턴에 카드는 나가는데 AI 가 「해상도나 작업 규모가 어느 정도인가요?」만 되물었다(2026-10-13 상담 답
+                # 품질 비교 R04 「영상 편집용 PC 200만원으로 추천해주세요」). 카드가 나가는 턴은 되묻기 대신 기준 줄로 마무리한다.
+                or "?" in reply
+                or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
+            # 카드는 화면이 들고 있는 조건(wants.heavy)을 계속 쓴다 -- 이번 문장에 작업 낱말이 없으면 앞서 말한 작업으로
+            # 기준 줄을 맞춘다(코덱스 #194 검수 P2-3: 「대용량 엑셀」 뒤 「조금 더 싸게」에 카드는 쾌적, 기준 줄은 기본이었다).
+            # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
+            heavy = TD.X.heavy_levels(text) or next(
+                (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
+            # 4K 도 같다 -- 화면은 앞서 한 번 말한 4K 를 wants.uhd 로 계속 들고 있다(reco_explore.merge).
+            uhd = bool(TD.X._UHD.search(text or "")) or any(r == "user" and TD.X._UHD.search(t or "") for r, t in history)
+            first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy, uhd=uhd)
+            if first:
+                reply = (first + " " + " ".join(cond_notes)).strip()
+            elif getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
+                # 설명이 위에 나가고 덧붙일 기준 줄이 없으면 AI 확인 문장을 내지 않는다 -- 「본체 60만원 이하 예산으로
+                # 구성을 준비해드리겠습니다」 바로 아래에 59만원 넘는 카드가 나왔다(2026-10-12 코덱스 24조합 검수 3번).
+                # 예산 안 카드가 있는지는 카드 묶음의 안내(grid_public)가 말한다.
+                reply = " ".join(cond_notes).strip()
+            log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
+                     pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
+        if stage == TS.STAGE_PC:
+            # 「150만원으로 맞춰 드리겠습니다」 -- 예산 안 카드가 없을 수도 있는데 AI 가 먼저 약속한다. 예외 응대(긴 글·모순)
+            # 턴에도 남았다(2026-10-13 상담 답 품질 비교 E16). 예산 안 여부는 카드 안내가 말한다.
+            reply = TR.drop_budget_promise(reply)
+        reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
+                                          top_spec_re=TR._TOP, uhd_re=TR._UHD,
+                                          read_len=MAX_TEXT_LEN, masked=masked,
+                                          history=history)
+        if pc is None and not state.usages:
+            # 판정을 못 얻었고 읽은 조건도 없다 -- 「모르는 경우」다. 사람 상담 길을 함께 연다.
+            handoff_offer = True
+        # 상담 갈래 ④⑤(talk_entry 머리말): 규칙으로 못 정했어도 AI 가 용도·예산을 읽었으면 새 PC 찾기다.
+        # 그래도 모르는 PC 이야기면 상담에 한 번만 갈래를 되묻는다(사장님 2026-10-11 「위 채팅 내용을 보고
+        # 적당한 화면으로」). 문장은 찍지 않고 갈래 키와 출처만 로그에 남긴다.
+        if not entry and pc is True and (state.usages or state.budget_won):
+            entry, entry_src = "new_pc", "state"
+        # 부품·쓰던 PC 설명을 먼저 했으면 그 설명이 갈래다 -- 설명 뒤에 갈래를 다시 되묻지 않는다(코덱스 PR157 검수 v1 P2-2).
+        if not entry and explained:
+            entry, entry_src = ("parts" if getattr(ans, "topic", None) == "part" else "upgrade"), "answer"
+        # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
+        if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
+                and not exceptions and not notices and not laptop and not handoff_offer
+                and TE.ASK not in reply and not _asks_already(reply)):
+            reply = (reply.rstrip() + " " + TE.ASK).strip()
+            entry_asked, entry_src = True, "ask"
+        log.info("[talk] entry: key=%s src=%s", entry or "-", entry_src)
+        evidence = _evidence_lines(obj)
+
+        # ── [B] 결과 조립 ────────────────────────────────────────────────────────
+        # ★ 수-3: `stage=silent` 여도 **answer 는 낸다**. 침묵은 「PC 견적 창구에서 무관한
+        #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
+        #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
+        answer = ans.answer or ""
+        advice = getattr(ans, "kind", "game") == "pc_advice"
+        # 설명은 판매 안내(윈도우·배송·환불 등)와 함께 둔다 -- 위는 일반 기준·구성 설명, 아래 안내는 우리 가게에서
+        # 확인할 곳이다(2026-10-11 일반 AI 비교 「확인 가능한 일반 정보도 회피」 · 사장님 「답 먼저」).
+        # 예외 응대·노트북 턴은 그 문장이 먼저라 설명을 비운다. 주문·환불 상태 질문에도 일반 기준 설명은 남긴다.
+        general = advice and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
+        bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset()) - ADVICE_OK_EXCEPTIONS
+        if advice and (bad_exceptions or (laptop and getattr(ans, "topic", None) != PA.TOPIC_LAPTOP)
+                       or (not general and not (pc is True and stage == TS.STAGE_PC))):
+            answer = ""
+        if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
+            # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
+            answer = ""
+        if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
+            answer = answer.replace(TA.NUDGE_NARROW, "").strip()
+        if set(exceptions) & {"self_harm", "prompt_injection"}:
+            answer = ""        # 안전 최소 보호 -- 이때는 서버 문장 한 줄만 낸다
+        answer = TR.tidy_customer_text(answer, text)
+        # 설명의 「시중에서는 보통 ○○만원대」를 아래 카드 가격 범위로 맞춘다(2026-10-12 중헌 님 3번 -- 설명과 카드 가격이
+        # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
+        # 파워·그래픽카드·SSD·해상도도 같다 -- 카드보다 높은 사양을 기본처럼 말한 문장은 걷고 실제 카드 사양 한 문장을 붙인다
+        # (2026-10-12 코덱스 24조합 검수 2번: 「650W급 이상」 아래 600W 카드 · 「RTX 5070급·750W·QHD」 아래 5060·600W·FHD 카드).
+        if (final and answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing
+                and not TR.explain_only(text)):
+            try:
+                from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 이 턴에만 읽는다
+                items = sold_card_items(state.model_dump(), text)
+                prices = [it["price"] for it in items if type(it.get("price")) is int and it["price"] > 0]
+                budget = state.budget_won if state.budget_bound != "이상" else None
+                cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
+                answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text, condition=cond)
+                g = state.game
+                fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
+                answer, spec_dropped = PA.align_card_specs(answer, items, fhd_game=fhd_game)
+                if spec_dropped and isinstance(ans.filter_report, dict):
+                    ans.filter_report.setdefault("dropped", []).extend(spec_dropped)
+            except Exception as e:  # noqa: BLE001 - 카드 맞추기는 곁가지다. 실패해도 설명은 나간다
+                log.warning("[talk] card align skipped: %s", type(e).__name__)
+        if advice and answer.strip() and "contradiction" in exceptions:
+            # 설명이 이미 «그 예산으로는 그 사양이 어렵다»를 말했다 -- 같은 뜻의 고정 안내를 또 붙이면 길고 어색하다
+            # (2026-10-13 상담 답 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 「불가능해요」 설명 뒤 모순 안내가 붙어
+            # 「모순되고 부자연스럽다」로 판정됐다). 예산 안 카드 여부는 카드 안내가 말한다.
+            for note in (TX.NOTE_CONTRADICTION, TX.NOTE_LOW_BUDGET):
+                reply = reply.replace(note, "").strip()
+        if notes_deferred and not answer.strip():
+            # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
+            reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()
+        # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).
+        # 값 자체는 [A] 의 state 가 정본이다(격자 좌표 계약을 [B] 가 덮어쓰지 않는다).
+        a_names = set(state.game.names) if state.game and state.game.names else set()
+        if ans.game_names and a_names and not (a_names & set(ans.game_names)):
+            log.info("[talk] path A/B game name mismatch: a=%d b=%d",
+                     len(a_names), len(ans.game_names))
+        if ans.error:
+            log.warning("[talk] answer path unavailable: %s", ans.error)
+
+        log.info("[talk] parse done: provider=%s pc=%s usages=%d game=%s missing=%d dropped=%d"
+                 " reply_chars=%d stage=%s turns=%d tokens_in=%s elapsed=%.2fs",
+                 result.provider, "none" if pc is None else ("yes" if pc else "no"),
+                 len(state.usages),
+                 "none" if state.game is None else f"{state.game.grade}/{state.game.grade_src}",
+                 len(missing), len(dropped), len(reply), stage, turns,
+                 result.tokens_in, result.elapsed_sec)
+        if pc is None:
+            # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
+            # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
+            log.warning("[talk] no pc verdict in response from %s/%s - treated as unknown",
+                        result.provider, result.model)
+
+        # note -- 상단 진행 바(shared/ui-progress.js okText)가 읽는 서버 내부 사유. **고객
+        # 말풍선에는 싣지 않는다**(설계서 §7 -- 결함 ④: 되묻기는 AI 의 reply 만 한다).
+        # A-105(2026-08-23): `intent_key` 가 있으면 화면이 이미 정본 답을 골랐으므로 문구를 비운다.
+        if body.intent_key:
+            note = None
+        elif unreadable:
+            note = "AI 응답을 읽지 못해 다시 말해 달라고 안내했습니다."
+        elif stage == TS.STAGE_SILENT:
+            note = "잡담이 %d회째라 PC 상담 안내를 덧붙였습니다." % turns
+        elif stage == TS.STAGE_GUIDE:
+            note = "잡담이 %d회째라 역할을 안내했습니다." % turns
+        elif pc is False:
+            note = "PC 상담 문장이 아니라고 판정했습니다(잡담 %d/%d회)." % (
+                turns, TS.SMALLTALK_ALLOW_MAX)
+        elif missing:
+            note = "카드를 내기엔 좌표가 아직 모자랍니다: " + ", ".join(missing)
+        else:
+            note = None
+
+        # 질문을 원장에 남긴다(A-95). 실패해도 상담을 끊지 않는다 -- `_record_hit` 주석.
+        # matched_terms 에는 채워진 좌표 이름을 남긴다(옛 경로의 라벨 목록과 같은 자리).
+        filled = [k for k, v in state.model_dump().items() if v not in (None, [], {})]
+        # 2026-10-11: 조건을 못 읽은 결제·배송·A/S 문의가 관리자 화면에서 빈 줄로 보였다 -- 원문
+        # 대신 주제와 반영 못 한 조건을 꼬리표로 남긴다(관리자 「고객 문의 · 보관 견적」이 읽는다).
+        filled += [TR.TOPIC_TAG + k for k in TR.purchase_topics(text)]
+        # 관리자 주제는 이름으로 남긴다 — 나중에 주제를 «미사용»으로 내려도 기록은 읽힌다
+        filled += [TR.TOPIC_TAG + c["label"] for c in custom_hits]
+        filled += [TR.UNAPPLIED_TAG + c for c in TR.unsupported_conditions(text, state, prev_state_obj)]
+        # 관리자가 예외 입력을 모아 볼 수 있게(관리자 「고객 문의 · 보관 견적」의 「예외 입력만」).
+        filled += TX.tags(exceptions)
+        # «카드 먼저» 첫 응답(final=False)은 남기지 않는다 -- 설명이 끝난 뒤 최종 조립이 한 번만 남긴다.
+        if final:
+            with engine.begin() as conn:
+                hit_id = _record_hit(conn, request=request, text_raw=text, matched=filled,
+                                     unmatched_n=len(dropped), intent_key=body.intent_key,
+                                     answer_kind="constraint_parse", llm_called=True)
+                _record_reply(conn, hit_id, text_raw=text, ai_reply=ai_reply, shown_reply=reply,
+                              answer=answer, answer_error=bool(ans.error),
+                              extra_flags=_answer_flags(ans))
+            # 이 문의에서 부른 AI 비용 기록에 문의 번호를 잇는다(0141 · F18). 실패해도 상담은 그대로 나간다.
+            _link_cost_logs(hit_id, [getattr(result, "log_id", None), getattr(ans, "log_id", None)])
+
+        if ans.error:
+            log.warning("[talk] answer path B failed: %s", ans.error)
+        parsed = TS.ParseResult(state=state, missing=missing, dropped=dropped, evidence=evidence,
+                                reply=reply, assumed=assumed, pc_related=pc)
+        return {
+            "ok": True,
+            **parsed.model_dump(),
+            # 하위호환 -- mvp1(s1-session.html `srvParse`)이 아직 옛 모양을 읽는다. mvp2 는 `state`.
+            "constraints": _legacy_constraints(state),
+            "note": note,
+            # 대화 흐름 카운터(2026-09-17) -- 화면이 그대로 들고 있다가 다음 요청에 되돌려
+            # 보낸다(state 왕복과 같은 방식). **TalkState 안이 아니라 형제 필드**다 --
+            # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
+            # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
+            "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
+                                     pc_declined=pc_declined, entry=entry,
+                                     entry_asked=entry_asked,
+                                     asked=bool(missing) and pc is True and stage == TS.STAGE_PC
+                                     and bool(reply.strip())).model_dump(),
+            "stage": stage,
+            # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
+            # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,
+            # `answer` 는 [B] 가 내는 자유 답변 600자다 -- 서로 **독립된 상한**이라
+            # `_reply_text` 의 200자 컷을 `answer` 가 타지 않는다(분리안의 부수 이득).
+            # `answer` 가 빈 문자열이면 [B] 가 답할 근거를 못 찾았거나 경로가 막힌 것이다 --
+            # 화면은 그때 `reply` 만 띄운다.
+            "answer": answer,
+            # 근거 구분 표시는 2026-10-08 대표 지시로 고객 노출에서 뺐다. 키는 계약 호환을 위해
+            # 남기되 항상 빈 목록이다 -- 예전 화면(mvp2·mvp3)이 받아도 아무것도 그리지 않는다.
+            # 수집한 근거(`ans.sources`)는 서버 안에만 있다.
+            "sources": [],
+            # wide | narrow | ready -- 순수함수 `talk_schema.narrowing_level` 이 정한다.
+            # 화면이 다시 계산하지 않게 서버가 붙인다(경계를 두 벌로 두지 않는다).
+            "narrowing": ans.narrowing,
+            # [B] 가 실제로 DB 에서 읽어 근거로 쓴 게임들. `state.game.names`([A] 가 고객
+            # 문장에서 뽑은 것)와 **다른 축**이다 -- 저쪽은 «고객이 말한 이름», 이쪽은
+            # «우리 표에서 찾아 근거로 쓴 이름»이다. 비어 있으면 DB 를 못 봤다는 뜻이다.
+            "answer_game_names": ans.game_names,
+            # 웹검색 안내도 2026-10-08 대표 지시로 뺐다. 대체 문구를 두지 않는다 -- 항상 null.
+            "answer_notice": None,
+            # ★ 필터가 무엇을 손댔는가 -- 조용히 지우지 않는다(`dropped[]` 규약과 같은 원칙).
+            # {kept, replaced[{before, after, kinds, source}], dropped[], gate_hit}
+            "answer_filter": ans.filter_report,
+            "answer_elapsed_sec": ans.elapsed_sec,
+            # 사유 원문(프로바이더 이름 포함 가능)은 로그에만. 고객에게는 실패 여부만 준다.
+            "answer_error": ANSWER_UNAVAILABLE if ans.error else None,
+            # 침묵 턴 표시 -- 2026-10-11 침묵을 걷어 **항상 false** 다(`_reply_text` 참고).
+            # 키는 계약 호환으로 남긴다(예전 화면이 받아도 말풍선을 숨기지 않는다).
+            "silent": False,
+            # 예외 입력 종류(talk_exceptions.KINDS 의 키). 화면은 그리지 않는다 -- 기록·점검용.
+            "exceptions": exceptions,
+            # 참이면 화면이 「사람 상담 남기기」(구매 상담 신청, 주제 「기타」)를 띄운다.
+            "handoff_offer": handoff_offer,
+            # 참이면 고객이 추천 없이 설명만 바랐다(「차이만 설명해 주세요」) -- 화면은 추천 카드를 부르지 않는다.
+            "explain_only": TR.explain_only(text),
+            # "ai_unreadable" 이면 AI 응답을 못 읽은 턴이다 -- state 는 이전 그대로이고,
+            # 화면은 추천을 다시 부르지 않는다.
+            "fallback": "ai_unreadable" if unreadable else None,
+            # 고객 글이 길어 앞·끝부분만 읽었는가(읽은 글자 수는 MAX_TEXT_LEN).
+            "truncated": truncated,
+            # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 0 이면 이력 없이 판정한 응답이다.
+            "history_used": len(history),
+            "elapsed_sec": result.elapsed_sec,
+            # 프로바이더·모델·비용·토큰은 고객 응답에 싣지 않는다(2026-10-08 PR #2 계약).
+            # 운영자는 api_cost_logs(관리자 AI 사용 비용 화면)와 서버 로그에서 본다.
+            # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
+            # 여전히 「이 응답이 상담 원장(consult_sessions)을 만들지 않았다」이다.
+            "stored": False,
+        }
+
+    if body.defer_answer:
+        return _parse_deferred(_call_a, _call_b, _finish, routed)
     try:
         result, ans = TA.run_parallel(_call_a, _call_b)
     except llm.LLMBlockedError as e:
@@ -1318,454 +1906,7 @@ def parse_talk(body: ParseBody, request: Request):
         log.warning("[talk] parse provider error: %s", e)
         raise HTTPException(502, PARSE_FAILED)
 
-    unreadable = False
-    try:
-        try:
-            obj = _extract_json(result.text)
-        except Exception as first:
-            # 형식이 깨진 응답은 가끔이다(2026-10-12 개발 서버: 같은 업그레이드 문장 3번 중 1번, 모델 luna).
-            # 고객에게 「다르게 말해 달라」고 하기 전에 한 번만 다시 묻는다. 다시 물어도 깨지거나 실패하면
-            # 아래 「못 읽었다」 길로 간다 -- 이 턴을 502 로 끊지 않는다.
-            log.warning("[talk] non-JSON response from %s/%s, retry once: %s",
-                        result.provider, result.model, first)
-            try:
-                result = _call_a()
-            except llm.LLMError as e:
-                raise ValueError(f"retry failed: {type(e).__name__}") from e
-            obj = _extract_json(result.text)
-    except Exception as e:
-        # 모델이 형식을 어긴 것도 실패다 -- 빈 조건으로 뭉개면 "못 읽었다"와
-        # "AI가 깨졌다"를 화면이 구분하지 못한다.
-        # 2026-10-11: 그래도 502 로 상담을 끊지 않는다(사장님 「무조건 차단하면 안 된다」).
-        # 이전 state 를 그대로 두고(조건을 지어내지 않는다) 다시 말해 달라고 하며 사람 상담
-        # 길을 연다. 화면이 구분할 수 있게 응답에 `fallback:"ai_unreadable"` 를 싣는다.
-        log.warning("[talk] non-JSON response from %s/%s: %s",
-                    result.provider, result.model, e)
-        unreadable = True
-        obj = {"pc": None,
-               "state": body.state if prev_ok else {},
-               "reply": ""}
-
-    # §5 검증 -- 어휘 밖 값은 null 로 접고 dropped 에 사유. 등급은 확정 목록이 이긴다.
-    # 2026-10-10: 문장 원문으로 예산·게임명을 먼저 바로잡는다(AI 가 반복한 실수 -- talk_rules 머리말).
-    raw_state, fixes = _apply_text_rules(text, obj.get("state") or {}, vocab,
-                                         prev_budget=prev_state_obj.budget_won if prev_state_obj else None,
-                                         prev_usages=list(prev_state_obj.usages) if prev_state_obj else None,
-                                         admin_fixes=admin_fixes)
-    state, dropped = TS.validate_state(raw_state, vocab)
-    dropped.extend(fixes)
-    # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
-    # "game.resolution" 처럼 계약 밖 좌표를 적어도 카드가 막히지 않게).
-    missing = TS.missing_for(state, vocab)
-    # 게임 이름 없는 게임 질문 -- 예산이 있거나 이미 한 번 물었으면 FHD 기준으로 카드로 넘긴다
-    # (2026-10-10 점검 9·27번. 추천 단계는 #53 에서 같은 기준으로 이미 고쳤다).
-    released = TR.release_unnamed_game(missing, state, prev_state_obj, TS.is_game_usage,
-                                       TS.MISSING_GAME_GRADE)
-    # 「게임용 가장 싸게」처럼 가격 방향을 말했으면 게임 이름 없이도 FHD 기준으로 바로 카드를 낸다
-    # (api/talk_defaults -- 예산 대신 가격 방향이 기본값을 정한다).
-    pref = TD.price_pref(text)
-    if (not released and pref and missing == [TS.MISSING_GAME_GRADE]
-            and TR.unnamed_game(state)):
-        released = True
-    # 게임 이름 없이 PC 를 물었는데 설명([B])을 먼저 했으면 「어떤 게임?」을 되묻지 않고 FHD 기준 카드를 아래에 낸다
-    # (2026-10-11 개발 서버 「게임용 컴퓨터 추천해줘」·「스팀 게임 무난한 PC」 -- 설명 뒤에 되묻기만 하고 카드가 없었다.
-    # 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
-    # 본체 구성 설명(build)일 때만 -- 「게임용 PC 램 역할이 뭐예요?」 같은 부품 설명 뒤에 추천을 열지 않는다(2026-10-12 검수 9595 P2-2).
-    # 장르 통칭 이름(「스팀 인디(통칭)」)만 있어도 같다(TR.unnamed_game) -- 설명이 이미 나갔는데 「주로 어떤 게임을 하실
-    # 예정인가요?」만 되물었다(2026-10-12 개발 서버, 모델 luna). 실제 게임 이름이 있는데 등급이 없으면 추천(grid_public)이
-    # 「적합성 확인 전 보류」로 카드를 비우므로 여기서도 풀지 않는다(코덱스 #194 검수 P2-1 -- 답과 카드가 어긋났다).
-    if (not released and missing == [TS.MISSING_GAME_GRADE] and TR.unnamed_game(state)
-            and getattr(ans, "kind", "game") == "pc_advice" and getattr(ans, "topic", None) == PA.TOPIC_BUILD
-            and (ans.answer or "").strip()):
-        released = True
-    if released:
-        missing = []
-    # assumed 는 **카드를 낼 수 있는 턴(missing 이 비었을 때)에만** 낸다(확인자 T-2,
-    # 2026-09-16). missing 이 있으면 카드가 안 나가는데 「1080p 가정」 배지가 붙는 것은
-    # 앞서 가는 말이다 -- 되묻는 턴에는 가정도 없다.
-    assumed: list = []
-    if not missing and any(TS.is_game_usage(u) for u in state.usages) and (
-            state.game is None or state.game.resolution is None):
-        assumed.append(f"game.resolution={TS.DEFAULT_RESOLUTION}")
-    pc = _pc_verdict(obj)
-    laptop = TR.mentions_laptop(text)
-    if laptop and pc is not True:
-        pc = True        # 노트북 문의는 PC 상담이다 -- 잡담으로 세지 않는다
-    custom_hits = TR.custom_topic_hits(text, custom_notices)
-    if (TR.purchase_topics(text) or custom_hits) and pc is not True:
-        pc = True        # 결제·배송·A/S 문의도 구매 상담이다 -- 잡담으로 세지 않는다
-    if (pc is not True and getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip()
-            and getattr(ans, "topic", None) != PA.TOPIC_FOLLOW):
-        # 이어 답하기(TOPIC_FOLLOW)는 규칙이 PC 질문으로 본 것이 아니라 «상담 중이라» 부른 것이다 -- 잡담 판정을 뒤집지 않는다.
-        # 규칙(talk_pc_advice.topic_of)이 PC·부품 질문으로 보고 설명을 지었으면 PC 상담이다. AI 판정이
-        # 「주제 밖」이라고 그 설명을 지우지 않는다(2026-10-11 개발 서버: 「발로란트 240프레임 그래픽카드 뭐 사야 돼?」·
-        # 「RTX 5070 들어간 PC 얼마 정도 해요?」에 설명 없이 「다른 시스템에서 확인하세요」만 나갔다).
-        pc = True
-    # ★ 게임 문장은 잡담으로 세지 않는다(2026-09-21 · talk_design_v2 §6-3 수-1).
-    #   사장님이 보신 증상의 절반이 여기였다: 「슈팅게임」이 pc=false 로 떨어져 카운터가
-    #   올랐고, 그 속도면 **5턴째에 침묵 처분**이다 -- 게임을 고른 뒤 PC 를 사겠다고
-    #   순서까지 말한 고객이 대화 도중에 차단된다.
-    #   **경계 3/4/5 는 그대로 두고 «세는 대상»만 바꾼다.** 판정은 [B] 가 이미 쓰는
-    #   어휘 매칭을 그대로 재사용한다 -- 새 판정기를 만들지 않는다.
-    game_related = TA.is_game_related(text, vocab)
-    prev_turns = (body.chat_flow or {}).get("smalltalk_turns")
-    turns, stage = TS.advance_smalltalk(prev_turns, pc, game_related)
-    # PC 제안은 상담에 한 번, 거절하면 하지 않는다. 고객이 먼저 PC 를 물으면 거절을 푼다.
-    pc_offered, pc_declined = TS.flow_flags(body.chat_flow)
-    # 흐름 상태가 없거나 비어 온 경우(옛 화면·보관 견적을 연 직후)에도, 최근 대화에 서버 권유 줄이 이미
-    # 있으면 권한 것으로 친다 -- 같은 상담에서 두 번 권하지 않는다(코덱스 #145 검수 3).
-    if any(r == "assistant" and (REPLY_GAME_PICK in t or TX.NOTE_SMALLTALK_LONG in t) for r, t in history):
-        pc_offered = True
-    if TS.declines_pc(text):
-        pc_declined = True
-    elif pc is True:
-        pc_declined = False
-    may_offer = not pc_offered and not pc_declined
-    reply = _reply_text(obj, pc, bool(state.usages), stage)
-    ai_reply = reply      # 서버가 바꾸기 전 모델의 말 — 관리자 AI 답 점검이 본다
-    if released and stage == TS.STAGE_PC:
-        reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
-    # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
-    # 있으면 AI 의 약속 대신 안내 문장으로 답한다(talk_rules ⑤ · 관리자 판매 안내 자료).
-    topic_notes = shop_notes
-    cond_notes = TR.condition_notices(text, state, prev_state_obj)
-    # 설명 AI 가 판매 안내를 받아 답을 냈으면 그 안내는 설명이 전한다 -- 아래 말풍선에 고정 문구로 다시 싣지 않는다.
-    # 설명이 나중에 화면에서 빠지면(예외·잡담 판정) 맨 끝에서 고정 안내를 되살린다(notes_deferred).
-    b_told = bool(b_notes) and getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
-    notes_deferred = list(topic_notes) if b_told else []
-    notices = ([] if b_told else topic_notes) + cond_notes
-    if stage == TS.STAGE_PC:
-        reply = TR.drop_deferrals(reply)
-    if (notices or b_told) and stage == TS.STAGE_PC:
-        # 배송·환불·보증만 물었고 위 설명([B])이 이미 답했으면 「용도와 예산을 알려 주시면」을 붙이지 않는다
-        # (2026-10-12 일반 AI 비교 R13·E44 -- 절차 질문 끝마다 PC 를 다시 물었다).
-        answered = (topic_notes and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
-                    and bool((getattr(ans, "answer", "") or "").strip()))
-        reply = TR.honest_reply(notices, bool(state.usages), [] if answered else missing,
-                                has_budget=bool(state.budget_won))
-    if (stage == TS.STAGE_PC and not notices and getattr(ans, "kind", "game") == "pc_advice"
-            and getattr(ans, "topic", None) == PA.TOPIC_GENERAL and (ans.answer or "").strip()):
-        # 구매 절차·다른 쇼핑몰 비교 설명이 위에 나가면 AI 의 짧은 확인·되묻기는 같은 말 되풀이다(2026-10-13 상담 답 품질 비교
-        # E31 「다나와가 더 싸요?」: 설명 뒤 「다른 사이트 가격은 확인하기 어렵네요. 어떤 구성을 비교하세요?」가 또 붙었다).
-        # 예외 안내(다른 곳 가격 확인 불가 등)는 아래 TX.respond 가 그대로 붙인다.
-        reply = ""
-    if laptop and stage == TS.STAGE_PC:
-        reply = TR.with_laptop_notice(reply)
-    band_note = TR.budget_band_note(text)
-    if band_note and stage == TS.STAGE_PC and band_note not in reply:
-        reply = (reply.rstrip() + " " + band_note).strip()
-    # 2026-10-11 개발 서버: 모델 문장에 힌디어 낱말(「उपलब्ध한」)이 섞여 깨진 글자로 보였고,
-    # 「150만원」을 「150만원대」로 받아 말했다. 화면에 내기 전에 걷는다(원문은 ai_reply 로 남는다).
-    reply = TR.tidy_customer_text(reply, text)
-    # 2026-10-11 「요즘 많이 하는 게임 뭐 있어?」: 게임 목록을 답한 턴에 AI 의 되묻기
-    # (「특정 장르 있으세요?」)가 따로 놀았다. 목록을 준 뒤에는 서버 한 줄로 추천에 잇는다.
-    if ((ans.answer or "").strip() and len(ans.game_names) >= 2
-            and ans.narrowing == TS.NARROWING_WIDE and not released
-            and pc is not True and stage in (TS.STAGE_PC, TS.STAGE_OPEN)):
-        # 같은 상담에서 이미 한 번 권했거나 고객이 거절했으면 되풀이하지 않는다(답만 보인다).
-        # 흐름 상태가 없던 옛 화면을 위해 최근 이력의 같은 문장도 함께 본다.
-        said = any(r == "assistant" and REPLY_GAME_PICK in t for r, t in history)
-        reply = REPLY_GAME_PICK if may_offer and not said else ""
-        pc_offered = pc_offered or bool(reply)
-    elif pc is False:
-        # 지시해도 AI 가 잡담 끝에 「혹시 컴퓨터 맞추면서 …?」를 붙였다(2026-10-11 개발 서버, #140 배포 뒤).
-        # 권유는 서버만 한다 -- AI 가 붙인 PC 권유 문장은 걷고, 잡담이 세 번 이어진 뒤 상담에
-        # «한 번만» 서버 줄을 붙인다. 거절했으면 붙이지 않는다.
-        before = reply
-        reply = drop_pc_push(reply)
-        # 고객이 이번에도, 최근에도 게임을 말하지 않았으면 AI 가 먼저 건 게임 권유도 걷는다.
-        said_game = game_related or any(r == "user" and TA.is_game_related(t, vocab) for r, t in history)
-        if not said_game:
-            reply = drop_game_nudge(reply)
-        invite = may_offer and turns >= SMALLTALK_INVITE_AT and TX.NOTE_SMALLTALK_LONG not in reply
-        if not invite and _count_sentences(reply) < _count_sentences(before):
-            # 문장을 통째로 걷었을 때만 -- AI 가 처음부터 한 줄로 답한 것(「지금 날씨 정보는 확인할 수 없어요.」)이나
-            # 문장 안의 낱말만 걷은 것(「게임을 하거나 영상 봐도」)은 그대로 둔다.
-            reply = extend_one_liner(reply)
-        if not invite:
-            reply = follow_apology(reply)
-            reply = follow_mild_insult(text, reply)
-        if invite:
-            reply = (reply.rstrip() + " " + TX.NOTE_SMALLTALK_LONG).strip()
-            pc_offered = True
-        reply = reply or REPLY_SMALLTALK_EMPTY
-    # 2026-10-11 예외 입력 대응(talk_exceptions 머리말) -- 거르지 않고 받아서 이끈다.
-    # 자해 신호·역할 바꾸기 시도만 문장을 바꾸고, 나머지는 AI 문장에 한 줄을 붙이거나
-    # AI 가 PC 이야기로 못 받았을 때만 안내로 바꾼다. 모르면 사람 상담 길을 연다.
-    exceptions = TX.classify(text, state=state, pc=pc, stage=stage, truncated=truncated,
-                             top_spec_re=TR._TOP, uhd_re=TR._UHD, masked=masked,
-                             history=history)
-    if unreadable:
-        exceptions.append("ai_unreadable")
-        reply = TX.REPLY_AI_UNREADABLE
-    # 2026-10-11 「답 먼저, 되묻기는 끝에 한 번」(api/talk_defaults). 예외·안내·노트북 턴은 건드리지 않는다.
-    asked_before = TS.flow_asked(body.chat_flow)
-    # 램·SSD 같은 구성 조건 안내(cond_notes)는 설명과 함께 둔다 -- 판매 주제 안내만 설명을 대신한다.
-    # 한 문장 안 되풀이(「싸게 싸게 싸게 싸게」)는 응대 문장을 바꾸지 않는 예외라 평범한 PC 문장으로 본다 -- 막으면 용도만
-    # 되묻고 카드가 없었다(2026-10-12 개발 서버, 모델 luna). 같은 문장을 거듭 보낸 반복(turns)은 기존대로 사람 상담 길이다.
-    soft_exc = {"repeat"} if TX.repeated(text, history) == "words" else set()
-    plain_pc = (not (set(exceptions) - soft_exc) and pc is True and stage == TS.STAGE_PC
-                and not topic_notes and not laptop)
-    # 부품 질문·쓰던 PC 고민에 설명을 먼저 했으면 새 PC 용도를 묻지 않는다(코덱스 담당의견-최소차이-v1 §3:
-    # 단순 설명 질문에 구매 절차를 강제로 시작하지 않는다). 카드는 용도를 들은 뒤에 나온다.
-    explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
-                 and getattr(ans, "topic", None) in ("part", "upgrade"))
-    # 모델명을 말한 질문(「RTX 5070 들어간 PC」)은 일반 용도를 가정하면 카드가 어긋나므로 기존대로 용도를 묻는다.
-    build_explained = (getattr(ans, "kind", "game") == "pc_advice" and bool((ans.answer or "").strip())
-                       and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not PA.TF._RE_PART.search(text)
-                       # 아무 조건도 없는 「PC 추천해줘」는 용도를 한 번 묻는다(코덱스 PR157 검수) -- 예산·선호를 말했을 때만.
-                       and bool(state.budget_won or getattr(state, "prefs", None) or cond_notes))
-    if plain_pc and explained and missing == [TS.MISSING_USAGES]:
-        reply = " ".join(cond_notes)
-    # 가격 방향(「싸게」·「좋은 걸로」)을 말했으면 그것도 조건이다 -- 용도를 되묻지 않고 일반 용도로 카드를 낸다.
-    elif plain_pc and (asked_before or build_explained or pref) and missing == [TS.MISSING_USAGES]:
-        # 앞 턴에 용도를 물었는데 이번에도 못 들었다 -- 또 묻지 않고 일반 용도를 가정해 카드를 낸다.
-        # 구성 설명을 먼저 한 턴도 같다(2026-10-12 일반 AI 비교 R10·R11: 「조용한 PC」·「화이트 100만원대」에 설명 뒤
-        # 용도만 되묻고 카드가 없었다 -- 사장님 「계속 되물어보면 짜증 · 우리 제품도 같이 보여줘야」).
-        label = TD.default_usage_label(vocab)
-        if label:
-            state = state.model_copy(update={"usages": [label]})
-            missing = TS.missing_for(state, vocab)
-            fit = TD._fit_usage(label)
-            price_line = TD.PREF_LINE.get(pref, "") if pref and state.budget_won is None else ""
-            reply = " ".join(x for x in (TD.no_usage_reply(TD.basis_work(fit) if fit else None), price_line,
-                                         " ".join(cond_notes)) if x).strip()
-            log.info("[talk] answer-first: no usage after ask - assumed general use")
-    elif plain_pc and not missing and (
-            # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
-            (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
-            or (asked_before and "?" in reply)
-            # 설명([B])을 못 받은 턴에 카드는 나가는데 AI 가 「해상도나 작업 규모가 어느 정도인가요?」만 되물었다(2026-10-13 상담 답
-            # 품질 비교 R04 「영상 편집용 PC 200만원으로 추천해주세요」). 카드가 나가는 턴은 되묻기 대신 기준 줄로 마무리한다.
-            or "?" in reply
-            or (state.budget_won is None and (pref or TD.asks_budget(reply)))):
-        # 카드는 화면이 들고 있는 조건(wants.heavy)을 계속 쓴다 -- 이번 문장에 작업 낱말이 없으면 앞서 말한 작업으로
-        # 기준 줄을 맞춘다(코덱스 #194 검수 P2-3: 「대용량 엑셀」 뒤 「조금 더 싸게」에 카드는 쾌적, 기준 줄은 기본이었다).
-        # 화면의 합치기(reco_explore.merge)와 같이 작업 낱말이 있는 가장 최근 문장이 이긴다.
-        heavy = TD.X.heavy_levels(text) or next(
-            (h for r, t in reversed(history) if r == "user" for h in [TD.X.heavy_levels(t)] if h), {})
-        # 4K 도 같다 -- 화면은 앞서 한 번 말한 4K 를 wants.uhd 로 계속 들고 있다(reco_explore.merge).
-        uhd = bool(TD.X._UHD.search(text or "")) or any(r == "user" and TD.X._UHD.search(t or "") for r, t in history)
-        first = TD.answer_first(state, pref, is_game_usage=TS.is_game_usage, heavy=heavy, uhd=uhd)
-        if first:
-            reply = (first + " " + " ".join(cond_notes)).strip()
-        elif getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip():
-            # 설명이 위에 나가고 덧붙일 기준 줄이 없으면 AI 확인 문장을 내지 않는다 -- 「본체 60만원 이하 예산으로
-            # 구성을 준비해드리겠습니다」 바로 아래에 59만원 넘는 카드가 나왔다(2026-10-12 코덱스 24조합 검수 3번).
-            # 예산 안 카드가 있는지는 카드 묶음의 안내(grid_public)가 말한다.
-            reply = " ".join(cond_notes).strip()
-        log.info("[talk] answer-first: pref=%s released=%s asked_before=%s",
-                 pref or "none", "yes" if released else "no", "yes" if asked_before else "no")
-    if stage == TS.STAGE_PC:
-        # 「150만원으로 맞춰 드리겠습니다」 -- 예산 안 카드가 없을 수도 있는데 AI 가 먼저 약속한다. 예외 응대(긴 글·모순)
-        # 턴에도 남았다(2026-10-13 상담 답 품질 비교 E16). 예산 안 여부는 카드 안내가 말한다.
-        reply = TR.drop_budget_promise(reply)
-    reply, handoff_offer = TX.respond(reply, exceptions, pc=pc, text=text, state=state,
-                                      top_spec_re=TR._TOP, uhd_re=TR._UHD,
-                                      read_len=MAX_TEXT_LEN, masked=masked,
-                                      history=history)
-    if pc is None and not state.usages:
-        # 판정을 못 얻었고 읽은 조건도 없다 -- 「모르는 경우」다. 사람 상담 길을 함께 연다.
-        handoff_offer = True
-    # 상담 갈래 ④⑤(talk_entry 머리말): 규칙으로 못 정했어도 AI 가 용도·예산을 읽었으면 새 PC 찾기다.
-    # 그래도 모르는 PC 이야기면 상담에 한 번만 갈래를 되묻는다(사장님 2026-10-11 「위 채팅 내용을 보고
-    # 적당한 화면으로」). 문장은 찍지 않고 갈래 키와 출처만 로그에 남긴다.
-    if not entry and pc is True and (state.usages or state.budget_won):
-        entry, entry_src = "new_pc", "state"
-    # 부품·쓰던 PC 설명을 먼저 했으면 그 설명이 갈래다 -- 설명 뒤에 갈래를 다시 되묻지 않는다(코덱스 PR157 검수 v1 P2-2).
-    if not entry and explained:
-        entry, entry_src = ("parts" if getattr(ans, "topic", None) == "part" else "upgrade"), "answer"
-    # 안내 문장(주문 상태·노트북·결제 등)이나 예외 응대를 낸 턴에는 묻지 않는다 -- 그 답이 먼저다.
-    if (not entry and pc is True and not entry_asked and stage == TS.STAGE_PC
-            and not exceptions and not notices and not laptop and not handoff_offer
-            and TE.ASK not in reply and not _asks_already(reply)):
-        reply = (reply.rstrip() + " " + TE.ASK).strip()
-        entry_asked, entry_src = True, "ask"
-    log.info("[talk] entry: key=%s src=%s", entry or "-", entry_src)
-    evidence = _evidence_lines(obj)
-
-    # ── [B] 결과 조립 ────────────────────────────────────────────────────────
-    # ★ 수-3: `stage=silent` 여도 **answer 는 낸다**. 침묵은 「PC 견적 창구에서 무관한
-    #   잡담을 끊는다」는 규약이지 「게임 질문에 답하지 않는다」가 아니다. 다만 그때
-    #   **유도는 하지 않는다**(안내를 두 번 하는 셈이 된다).
-    answer = ans.answer or ""
-    advice = getattr(ans, "kind", "game") == "pc_advice"
-    # 설명은 판매 안내(윈도우·배송·환불 등)와 함께 둔다 -- 위는 일반 기준·구성 설명, 아래 안내는 우리 가게에서
-    # 확인할 곳이다(2026-10-11 일반 AI 비교 「확인 가능한 일반 정보도 회피」 · 사장님 「답 먼저」).
-    # 예외 응대·노트북 턴은 그 문장이 먼저라 설명을 비운다. 주문·환불 상태 질문에도 일반 기준 설명은 남긴다.
-    general = advice and getattr(ans, "topic", None) == PA.TOPIC_GENERAL
-    bad_exceptions = set(exceptions) - (GENERAL_OK_EXCEPTIONS if general else frozenset()) - ADVICE_OK_EXCEPTIONS
-    if advice and (bad_exceptions or (laptop and getattr(ans, "topic", None) != PA.TOPIC_LAPTOP)
-                   or (not general and not (pc is True and stage == TS.STAGE_PC))):
-        answer = ""
-    if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
-        # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
-        answer = ""
-    if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
-        answer = answer.replace(TA.NUDGE_NARROW, "").strip()
-    if set(exceptions) & {"self_harm", "prompt_injection"}:
-        answer = ""        # 안전 최소 보호 -- 이때는 서버 문장 한 줄만 낸다
-    answer = TR.tidy_customer_text(answer, text)
-    # 설명의 「시중에서는 보통 ○○만원대」를 아래 카드 가격 범위로 맞춘다(2026-10-12 중헌 님 3번 -- 설명과 카드 가격이
-    # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
-    # 파워·그래픽카드·SSD·해상도도 같다 -- 카드보다 높은 사양을 기본처럼 말한 문장은 걷고 실제 카드 사양 한 문장을 붙인다
-    # (2026-10-12 코덱스 24조합 검수 2번: 「650W급 이상」 아래 600W 카드 · 「RTX 5070급·750W·QHD」 아래 5060·600W·FHD 카드).
-    if (answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing
-            and not TR.explain_only(text)):
-        try:
-            from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 이 턴에만 읽는다
-            items = sold_card_items(state.model_dump(), text)
-            prices = [it["price"] for it in items if type(it.get("price")) is int and it["price"] > 0]
-            budget = state.budget_won if state.budget_bound != "이상" else None
-            cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
-            answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text, condition=cond)
-            g = state.game
-            fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
-            answer, spec_dropped = PA.align_card_specs(answer, items, fhd_game=fhd_game)
-            if spec_dropped and isinstance(ans.filter_report, dict):
-                ans.filter_report.setdefault("dropped", []).extend(spec_dropped)
-        except Exception as e:  # noqa: BLE001 - 카드 맞추기는 곁가지다. 실패해도 설명은 나간다
-            log.warning("[talk] card align skipped: %s", type(e).__name__)
-    if advice and answer.strip() and "contradiction" in exceptions:
-        # 설명이 이미 «그 예산으로는 그 사양이 어렵다»를 말했다 -- 같은 뜻의 고정 안내를 또 붙이면 길고 어색하다
-        # (2026-10-13 상담 답 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 「불가능해요」 설명 뒤 모순 안내가 붙어
-        # 「모순되고 부자연스럽다」로 판정됐다). 예산 안 카드 여부는 카드 안내가 말한다.
-        for note in (TX.NOTE_CONTRADICTION, TX.NOTE_LOW_BUDGET):
-            reply = reply.replace(note, "").strip()
-    if notes_deferred and not answer.strip():
-        # 판매 안내를 맡긴 설명이 화면에서 빠졌다 -- 안내가 사라지지 않게 고정 문구를 앞에 되살린다.
-        reply = (" ".join(n for n in notes_deferred if n not in reply) + " " + reply).strip()
-    # [A] 와 [B] 의 게임명 교차 검증 -- 둘이 다르면 로그로 남긴다(삼키지 않는다).
-    # 값 자체는 [A] 의 state 가 정본이다(격자 좌표 계약을 [B] 가 덮어쓰지 않는다).
-    a_names = set(state.game.names) if state.game and state.game.names else set()
-    if ans.game_names and a_names and not (a_names & set(ans.game_names)):
-        log.info("[talk] path A/B game name mismatch: a=%d b=%d",
-                 len(a_names), len(ans.game_names))
-    if ans.error:
-        log.warning("[talk] answer path unavailable: %s", ans.error)
-
-    log.info("[talk] parse done: provider=%s pc=%s usages=%d game=%s missing=%d dropped=%d"
-             " reply_chars=%d stage=%s turns=%d tokens_in=%s elapsed=%.2fs",
-             result.provider, "none" if pc is None else ("yes" if pc else "no"),
-             len(state.usages),
-             "none" if state.game is None else f"{state.game.grade}/{state.game.grade_src}",
-             len(missing), len(dropped), len(reply), stage, turns,
-             result.tokens_in, result.elapsed_sec)
-    if pc is None:
-        # 삼키지 않는다 -- 판정을 못 얻은 것도 사실이므로 로그에 남긴다. 화면은 이때
-        # 반송하지 않고 「조건이 없다」쪽으로만 안내한다(정상 문의를 끊지 않는다).
-        log.warning("[talk] no pc verdict in response from %s/%s - treated as unknown",
-                    result.provider, result.model)
-
-    # note -- 상단 진행 바(shared/ui-progress.js okText)가 읽는 서버 내부 사유. **고객
-    # 말풍선에는 싣지 않는다**(설계서 §7 -- 결함 ④: 되묻기는 AI 의 reply 만 한다).
-    # A-105(2026-08-23): `intent_key` 가 있으면 화면이 이미 정본 답을 골랐으므로 문구를 비운다.
-    if body.intent_key:
-        note = None
-    elif unreadable:
-        note = "AI 응답을 읽지 못해 다시 말해 달라고 안내했습니다."
-    elif stage == TS.STAGE_SILENT:
-        note = "잡담이 %d회째라 PC 상담 안내를 덧붙였습니다." % turns
-    elif stage == TS.STAGE_GUIDE:
-        note = "잡담이 %d회째라 역할을 안내했습니다." % turns
-    elif pc is False:
-        note = "PC 상담 문장이 아니라고 판정했습니다(잡담 %d/%d회)." % (
-            turns, TS.SMALLTALK_ALLOW_MAX)
-    elif missing:
-        note = "카드를 내기엔 좌표가 아직 모자랍니다: " + ", ".join(missing)
-    else:
-        note = None
-
-    # 질문을 원장에 남긴다(A-95). 실패해도 상담을 끊지 않는다 -- `_record_hit` 주석.
-    # matched_terms 에는 채워진 좌표 이름을 남긴다(옛 경로의 라벨 목록과 같은 자리).
-    filled = [k for k, v in state.model_dump().items() if v not in (None, [], {})]
-    # 2026-10-11: 조건을 못 읽은 결제·배송·A/S 문의가 관리자 화면에서 빈 줄로 보였다 -- 원문
-    # 대신 주제와 반영 못 한 조건을 꼬리표로 남긴다(관리자 「고객 문의 · 보관 견적」이 읽는다).
-    filled += [TR.TOPIC_TAG + k for k in TR.purchase_topics(text)]
-    # 관리자 주제는 이름으로 남긴다 — 나중에 주제를 «미사용»으로 내려도 기록은 읽힌다
-    filled += [TR.TOPIC_TAG + c["label"] for c in custom_hits]
-    filled += [TR.UNAPPLIED_TAG + c for c in TR.unsupported_conditions(text, state, prev_state_obj)]
-    # 관리자가 예외 입력을 모아 볼 수 있게(관리자 「고객 문의 · 보관 견적」의 「예외 입력만」).
-    filled += TX.tags(exceptions)
-    with engine.begin() as conn:
-        hit_id = _record_hit(conn, request=request, text_raw=text, matched=filled,
-                             unmatched_n=len(dropped), intent_key=body.intent_key,
-                             answer_kind="constraint_parse", llm_called=True)
-        _record_reply(conn, hit_id, text_raw=text, ai_reply=ai_reply, shown_reply=reply,
-                      answer=answer, answer_error=bool(ans.error),
-                      extra_flags=_answer_flags(ans))
-    # 이 문의에서 부른 AI 비용 기록에 문의 번호를 잇는다(0141 · F18). 실패해도 상담은 그대로 나간다.
-    _link_cost_logs(hit_id, [getattr(result, "log_id", None), getattr(ans, "log_id", None)])
-
-    if ans.error:
-        log.warning("[talk] answer path B failed: %s", ans.error)
-    parsed = TS.ParseResult(state=state, missing=missing, dropped=dropped, evidence=evidence,
-                            reply=reply, assumed=assumed, pc_related=pc)
-    return {
-        "ok": True,
-        **parsed.model_dump(),
-        # 하위호환 -- mvp1(s1-session.html `srvParse`)이 아직 옛 모양을 읽는다. mvp2 는 `state`.
-        "constraints": _legacy_constraints(state),
-        "note": note,
-        # 대화 흐름 카운터(2026-09-17) -- 화면이 그대로 들고 있다가 다음 요청에 되돌려
-        # 보낸다(state 왕복과 같은 방식). **TalkState 안이 아니라 형제 필드**다 --
-        # 근거는 talk_schema §1-b. `stage` 는 화면이 다시 계산하지 않게 서버가 붙인다
-        # (경계를 두 벌로 두지 않는다 -- 화면이 5를 다르게 세면 표시가 갈린다).
-        "chat_flow": TS.ChatFlow(smalltalk_turns=turns, pc_offered=pc_offered,
-                                 pc_declined=pc_declined, entry=entry,
-                                 entry_asked=entry_asked,
-                                 asked=bool(missing) and pc is True and stage == TS.STAGE_PC
-                                 and bool(reply.strip())).model_dump(),
-        "stage": stage,
-        # ── 답변 경로 [B] 의 형제 필드 (2026-09-21 · talk_design_v2 §6-2) ──────
-        # **`reply` 를 손대지 않는다.** `reply` 는 [A] 가 내는 되묻기/확인 200자이고,
-        # `answer` 는 [B] 가 내는 자유 답변 600자다 -- 서로 **독립된 상한**이라
-        # `_reply_text` 의 200자 컷을 `answer` 가 타지 않는다(분리안의 부수 이득).
-        # `answer` 가 빈 문자열이면 [B] 가 답할 근거를 못 찾았거나 경로가 막힌 것이다 --
-        # 화면은 그때 `reply` 만 띄운다.
-        "answer": answer,
-        # 근거 구분 표시는 2026-10-08 대표 지시로 고객 노출에서 뺐다. 키는 계약 호환을 위해
-        # 남기되 항상 빈 목록이다 -- 예전 화면(mvp2·mvp3)이 받아도 아무것도 그리지 않는다.
-        # 수집한 근거(`ans.sources`)는 서버 안에만 있다.
-        "sources": [],
-        # wide | narrow | ready -- 순수함수 `talk_schema.narrowing_level` 이 정한다.
-        # 화면이 다시 계산하지 않게 서버가 붙인다(경계를 두 벌로 두지 않는다).
-        "narrowing": ans.narrowing,
-        # [B] 가 실제로 DB 에서 읽어 근거로 쓴 게임들. `state.game.names`([A] 가 고객
-        # 문장에서 뽑은 것)와 **다른 축**이다 -- 저쪽은 «고객이 말한 이름», 이쪽은
-        # «우리 표에서 찾아 근거로 쓴 이름»이다. 비어 있으면 DB 를 못 봤다는 뜻이다.
-        "answer_game_names": ans.game_names,
-        # 웹검색 안내도 2026-10-08 대표 지시로 뺐다. 대체 문구를 두지 않는다 -- 항상 null.
-        "answer_notice": None,
-        # ★ 필터가 무엇을 손댔는가 -- 조용히 지우지 않는다(`dropped[]` 규약과 같은 원칙).
-        # {kept, replaced[{before, after, kinds, source}], dropped[], gate_hit}
-        "answer_filter": ans.filter_report,
-        "answer_elapsed_sec": ans.elapsed_sec,
-        # 사유 원문(프로바이더 이름 포함 가능)은 로그에만. 고객에게는 실패 여부만 준다.
-        "answer_error": ANSWER_UNAVAILABLE if ans.error else None,
-        # 침묵 턴 표시 -- 2026-10-11 침묵을 걷어 **항상 false** 다(`_reply_text` 참고).
-        # 키는 계약 호환으로 남긴다(예전 화면이 받아도 말풍선을 숨기지 않는다).
-        "silent": False,
-        # 예외 입력 종류(talk_exceptions.KINDS 의 키). 화면은 그리지 않는다 -- 기록·점검용.
-        "exceptions": exceptions,
-        # 참이면 화면이 「사람 상담 남기기」(구매 상담 신청, 주제 「기타」)를 띄운다.
-        "handoff_offer": handoff_offer,
-        # 참이면 고객이 추천 없이 설명만 바랐다(「차이만 설명해 주세요」) -- 화면은 추천 카드를 부르지 않는다.
-        "explain_only": TR.explain_only(text),
-        # "ai_unreadable" 이면 AI 응답을 못 읽은 턴이다 -- state 는 이전 그대로이고,
-        # 화면은 추천을 다시 부르지 않는다.
-        "fallback": "ai_unreadable" if unreadable else None,
-        # 고객 글이 길어 앞·끝부분만 읽었는가(읽은 글자 수는 MAX_TEXT_LEN).
-        "truncated": truncated,
-        # 프롬프트에 실제로 실린 이력 턴 수(잘라낸 뒤). 0 이면 이력 없이 판정한 응답이다.
-        "history_used": len(history),
-        "elapsed_sec": result.elapsed_sec,
-        # 프로바이더·모델·비용·토큰은 고객 응답에 싣지 않는다(2026-10-08 PR #2 계약).
-        # 운영자는 api_cost_logs(관리자 AI 사용 비용 화면)와 서버 로그에서 본다.
-        # A-95 로 «표에는» 남긴다(talk_intent_hits · 마스킹 후). 이 필드가 뜻하는 것은
-        # 여전히 「이 응답이 상담 원장(consult_sessions)을 만들지 않았다」이다.
-        "stored": False,
-    }
+    return _finish(result, ans)
 
 
 # ── 모니터 크기 구간 ────────────────────────────────────────────────────────────
