@@ -375,4 +375,32 @@ class BudgetNote(unittest.TestCase):
             _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
             _turn("**게임 PC A**를 추천해요."),
         ], reco=reco)
-        self.assertEqual(out["reply"], "게임 PC A를 추천해요. 보여 드린 PC는 예산 1,500,000원보다 124,400원 높습니다.")
+        # 보여 준 카드가 모두 예산을 넘으면 끝에 붙이는 대신 맨 앞에서 먼저 말한다(K1 솔직히 알림).
+        self.assertEqual(out["reply"], "예산 1,500,000원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는"
+                                       " 1,624,400원이에요. 게임 PC A를 추천해요.")
+
+
+# ── ⑥ 카드가 모두 예산을 넘으면 설명 맨 앞에서 먼저 말한다 (2026-10-14 사장님 K1 「솔직히 알림」) ──
+class BudgetLead(unittest.TestCase):
+    OVER = {"price": 1_624_400, "over_budget": True}
+
+    def test_all_over_leads_with_none_in_budget(self):
+        n = AG.budget_lead([self.OVER], 600_000, "추천 제품은 골드 인텔입니다. 1080p 기준이에요.")
+        self.assertEqual(n, "예산 600,000원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는 1,624,400원이에요.")
+
+    def test_no_lead_when_first_sentence_already_says_so(self):
+        for first in ("80만 원 이하인 팝콘PC는 현재 맞는 상품이 없어요.", "예산을 넘는 PC만 있어요."):
+            self.assertIsNone(AG.budget_lead([self.OVER], 800_000, first + " 가장 가까운 것은 1,624,400원이에요."))
+
+    def test_no_lead_when_some_card_fits_or_budget_unknown(self):
+        self.assertIsNone(AG.budget_lead([{"price": 700_000, "over_budget": False}, self.OVER], 800_000, "좋아요."))
+        self.assertIsNone(AG.budget_lead([self.OVER], None, "좋아요."))
+        self.assertIsNone(AG.budget_lead([], 800_000, "좋아요."))
+
+    def test_lead_amounts_pass_verify(self):
+        book = TT.FactBook()
+        book.prices = {1_624_400}
+        n = AG.budget_lead([self.OVER], 600_000, "")
+        clean, dropped = AG.verify(n, book, 600_000)
+        self.assertEqual(dropped, [])
+        self.assertEqual(clean, n)

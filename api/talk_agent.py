@@ -169,6 +169,28 @@ def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | 
     return f"보여 드린 {len(cards)}대 중 {len(over)}대는 예산 {budget_won:,}원을 넘습니다(가장 적게 넘는 것이 {gap:,}원 초과)."
 
 
+_NONE_WORDS = ("없", "넘", "초과", "벗어")
+
+
+def budget_lead(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
+    """보여 준 카드가 «모두» 예산을 넘으면, 설명 맨 앞에서 예산 안에는 판매 중인 PC가 없다고 먼저 말한다.
+
+    2026-10-14 사장님 결정(고객단 끝까지 검수 K1 「솔직히 알림」): 게임 60~100만원에 1,624,400원 카드 한 장만 나오는데
+    설명이 「추천 제품은 …」으로 시작하고 초과 사실은 맨 끝에만 있었다(B01·B03). 설명 첫 문장이 이미 없다·넘는다고
+    말했으면 붙이지 않는다. 금액은 예산과 카드 판매가(둘 다 이 턴 묶음 값)뿐이다.
+    """
+    if not budget_won or not cards:
+        return None
+    priced = [c for c in cards if isinstance(c.get("price"), int)]
+    if not priced or len(priced) != len(cards) or not all(c.get("over_budget") and c["price"] > budget_won for c in priced):
+        return None
+    first = next((x.strip() for x in _SENT.split(reply or "") if x and x.strip()), "")
+    if any(w in first for w in _NONE_WORDS):
+        return None
+    low = min(c["price"] for c in priced)
+    return f"예산 {budget_won:,}원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는 {low:,}원이에요."
+
+
 def _cards(book: TT.FactBook) -> list[dict]:
     refs = book.shown or []
     out = []
@@ -257,8 +279,12 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
     if status != "failed" and book.shown:
-        note = budget_note(_cards(book), budget, clean)
-        if note:
+        cards = _cards(book)
+        lead = budget_lead(cards, budget, clean)
+        note = None if lead else budget_note(cards, budget, clean)
+        if lead:
+            clean = f"{lead} {clean}".strip()
+        elif note:
             clean = f"{clean} {note}".strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
