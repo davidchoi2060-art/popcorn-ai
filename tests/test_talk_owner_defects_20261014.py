@@ -84,8 +84,9 @@ class Psu(unittest.TestCase):
 
     def test_line(self):
         self.assertEqual(PA.psu_line("RTX 5070", 500, 650),
-                         "RTX 5070 권장 파워는 650W라 500W 파워는 부족해요. 650W 이상 정격 파워를 쓰셔야 안정적으로 쓸 수 있어요.")
-        self.assertIn("권장 기준을 넘어요", PA.psu_line("RTX 5070", 750, 650))
+                         "RTX 5070 권장 파워는 650W라 500W 파워는 부족해요. 여유를 두려면 750W 이상 정격 파워를 쓰시는 게 좋아요.")
+        self.assertIn("여유가 적어요", PA.psu_line("RTX 5070", 700, 650))
+        self.assertIn("여유 있게", PA.psu_line("RTX 5070", 750, 650))
         self.assertIsNone(PA.psu_line("RTX 9999", 500, None))
 
     def test_advise_puts_verdict_first_and_drops_hedge(self):

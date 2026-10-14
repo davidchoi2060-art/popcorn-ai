@@ -650,13 +650,20 @@ def psu_question(sentence: str) -> tuple[str, int] | None:
     return "%s %s%s" % (g.group(1).upper(), g.group(2), suffix), int(w.group(1))
 
 
+PSU_MARGIN_W = 100      # 권장 파워 + 여유 -- 견적 스튜디오 기준(right-size-check: 하한 = 권장 + 100W, 2026-10-14 사장님 공유 문서 ④)
+
+
 def psu_line(chip: str, watt: int, recommended: int | None) -> str | None:
     if not recommended:
         return None
+    safe = recommended + PSU_MARGIN_W
     if watt < recommended:
-        return ("%s 권장 파워는 %dW라 %dW 파워는 부족해요. %dW 이상 정격 파워를 쓰셔야 안정적으로 쓸 수 있어요."
-                % (chip, recommended, watt, recommended))
-    return "%s 권장 파워는 %dW라 %dW 파워면 권장 기준을 넘어요." % (chip, recommended, watt)
+        return ("%s 권장 파워는 %dW라 %dW 파워는 부족해요. 여유를 두려면 %dW 이상 정격 파워를 쓰시는 게 좋아요."
+                % (chip, recommended, watt, safe))
+    if watt < safe:
+        return ("%s 권장 파워는 %dW라 %dW 파워면 권장 기준은 넘지만 여유가 적어요. %dW 이상이면 넉넉해요."
+                % (chip, recommended, watt, safe))
+    return "%s 권장 파워는 %dW라 %dW 파워면 여유 있게 쓸 수 있어요." % (chip, recommended, watt)
 
 
 def psu_note(conn, sentence: str) -> tuple[str, int] | None:
