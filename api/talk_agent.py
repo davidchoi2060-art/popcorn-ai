@@ -32,6 +32,7 @@ from pydantic import BaseModel, Field
 
 from . import access_gate, llm
 from . import talk_exceptions as TE
+from . import talk_pc_advice as PA
 from . import talk_rules as TR
 from . import talk_tools as TT
 from .db import engine
@@ -169,6 +170,31 @@ def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | 
     return f"보여 드린 {len(cards)}대 중 {len(over)}대는 예산 {budget_won:,}원을 넘습니다(가장 적게 넘는 것이 {gap:,}원 초과)."
 
 
+def pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | None) -> str:
+    """옛 상담 경로와 같은 PC 설명 검사를 도구 상담에도 건다(talk_pc_advice, 2026-10-14 사장님 결함 2·3·권고 7).
+
+    · 고객이 말하지 않은 프레임 수치 문장은 뺀다 -- 부품 이름만으로 프레임을 확정하지 않는다.
+    · 「RTX 5070에 500W 파워면 돼요?」는 상품 자료의 권장 파워(gpu_power_reference)로 판정 한 줄을 맨 앞에 두고,
+      그 와트를 다룬 AI 문장(「단정하기 어려워요」)은 뺀다. 칩을 표에서 못 찾으면 AI 말을 그대로 둔다.
+    · 보여 준 카드가 모두 예산을 넘으면 「네, 그 예산이면 돼요」 같은 판정 문장을 뺀다(초과 금액은 budget_note 가 말한다).
+    """
+    out, _n = PA.drop_fps_claims(reply, sentence)
+    psu = None
+    if PA.psu_question(sentence):           # 파워 질문일 때만 DB 를 읽는다
+        try:
+            with engine.connect() as conn:
+                psu = PA.psu_note(conn, sentence)
+        except Exception as e:  # noqa: BLE001 - 대조 실패가 설명을 막지 않는다
+            log.warning("[talk_agent] psu check skipped: %s", type(e).__name__)
+    if psu:
+        line, watt = psu
+        out = (line + " " + PA.drop_watt_sentences(out, watt)).strip()
+    prices = [c["price"] for c in cards if isinstance(c.get("price"), int) and c["price"] > 0]
+    if budget_won and prices and min(prices) > budget_won:
+        out, _n = PA.drop_budget_yes(out, sentence)
+    return out.strip()
+
+
 def _cards(book: TT.FactBook) -> list[dict]:
     refs = book.shown or []
     out = []
@@ -253,6 +279,7 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
 
     budget = (book.condition or {}).get("budget_won")
     clean, dropped = verify(reply, book, budget)
+    clean = pc_checks(clean, text_masked, _cards(book) if book.shown else [], budget)
     if not clean:
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE

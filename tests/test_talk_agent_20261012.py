@@ -376,3 +376,67 @@ class BudgetNote(unittest.TestCase):
             _turn("**게임 PC A**를 추천해요."),
         ], reco=reco)
         self.assertEqual(out["reply"], "게임 PC A를 추천해요. 보여 드린 PC는 예산 1,500,000원보다 124,400원 높습니다.")
+
+
+# ── ⑥ 옛 경로의 PC 설명 검사를 도구 상담에도 건다 (2026-10-14 사장님 결함 2·3 · 권고 7, 「이어서 연결」) ──
+class _PsuConn(_Conn):
+    def __init__(self, watt):
+        self.watt = watt
+
+    def execute(self, *a, **k):
+        return SimpleNamespace(first=lambda: (self.watt,) if self.watt else None)
+
+
+class _PsuEngine:
+    def __init__(self, watt):
+        self.watt = watt
+
+    def connect(self):
+        return _PsuConn(self.watt)
+
+
+class PcChecks(unittest.TestCase):
+    def test_unasked_fps_numbers_are_dropped(self):
+        out = AG.pc_checks("RTX 5060이면 충분해요. FHD에서 100fps 이상 나와요.", "게임용 150만원", [], None)
+        self.assertEqual(out, "RTX 5060이면 충분해요.")
+
+    def test_fps_the_customer_said_stays(self):
+        out = AG.pc_checks("144fps 목표면 RTX 5070급을 보세요.", "144fps 나오는 PC", [], None)
+        self.assertIn("144fps", out)
+
+    def test_psu_question_gets_reference_line_and_hedge_is_dropped(self):
+        with patch.object(AG, "engine", _PsuEngine(650)):
+            out = AG.pc_checks("500W로는 충분하다고 단정하기 어려워요. 정격 파워를 고르세요.",
+                               "RTX 5070에 500W 파워면 돼요?", [], None)
+        self.assertTrue(out.startswith("RTX 5070 권장 파워는 650W라 500W 파워는 부족해요."))
+        self.assertNotIn("단정하기 어려워요", out)
+        self.assertIn("정격 파워를 고르세요.", out)
+
+    def test_unknown_chip_leaves_reply_alone(self):
+        with patch.object(AG, "engine", _PsuEngine(None)):
+            out = AG.pc_checks("500W면 애매해요.", "RTX 9999에 500W 파워면 돼요?", [], None)
+        self.assertEqual(out, "500W면 애매해요.")
+
+    def test_no_db_read_without_psu_question(self):
+        class Boom:
+            def connect(self):
+                raise AssertionError("DB 를 읽으면 안 된다")
+        with patch.object(AG, "engine", Boom()):
+            self.assertEqual(AG.pc_checks("램은 16GB면 돼요.", "램 얼마나 필요해요?", [], None), "램은 16GB면 돼요.")
+
+    def test_budget_yes_dropped_when_all_cards_over(self):
+        cards = [{"price": 1_624_400, "over_budget": True}]
+        out = AG.pc_checks("네, 150만원이면 충분히 가능해요. 게임 PC A를 보세요.", "150만원으로 게임 PC 돼요?", cards, 1_500_000)
+        self.assertNotIn("충분히 가능해요", out)
+        self.assertIn("게임 PC A를 보세요.", out)
+
+    def test_budget_yes_kept_when_a_card_fits(self):
+        cards = [{"price": 1_400_000, "over_budget": False}, {"price": 1_624_400, "over_budget": True}]
+        out = AG.pc_checks("네, 150만원이면 충분히 가능해요.", "150만원으로 게임 PC 돼요?", cards, 1_500_000)
+        self.assertIn("충분히 가능해요", out)
+
+    def test_run_turn_applies_checks_after_verify(self):
+        import inspect
+        src = inspect.getsource(AG.run_turn)
+        self.assertLess(src.index("verify(reply"), src.index("pc_checks("))
+        self.assertLess(src.index("pc_checks("), src.index("budget_note("))
