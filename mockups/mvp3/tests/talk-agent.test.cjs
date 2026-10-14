@@ -45,6 +45,7 @@ test('agent turn re-asks the engine with the AI condition, without wants, text o
     const recs=h.calls.filter(c=>c.url==='/api/grid/recommend');
     assert.equal(recs.length,1);
     assert.deepEqual(recs[0].body,{state:talk});
+    assert.equal(h.calls.filter(c=>c.url==='/api/talk/answer').length,0);   // AI 답이 최종 -- 「카드 먼저」 설명 받기를 부르지 않는다
     const texts=h.flow.state.messages.map(m=>m.text);
     assert.ok(texts.includes('CODE/MOCK 게임 PC A가 맞아요.'));
     assert.ok(!texts.includes('엔진 안내 문장'));
