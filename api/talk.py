@@ -1432,6 +1432,20 @@ def parse_talk(body: ParseBody, request: Request):
                               prev_state=prev_state_obj, history=history, shop_notes=b_notes,
                               on_route=on_route)
 
+    # 판매 카드 읽기는 한 턴에 한 번만 -- 예산 대조와 설명 맞추기가 같은 카드를 본다.
+    card_cache: dict = {}
+
+    def _card_items(state, text_):
+        key = (json.dumps(state.model_dump(), sort_keys=True, ensure_ascii=False, default=str), text_)
+        if key not in card_cache:
+            from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 카드가 나가는 턴에만 읽는다
+            card_cache[key] = sold_card_items(state.model_dump(), text_)
+        return card_cache[key]
+
+    def _card_low(state, text_):
+        prices = [it["price"] for it in _card_items(state, text_) if type(it.get("price")) is int and it["price"] > 0]
+        return min(prices) if prices else None
+
     # 고객 응답에는 프로바이더·모델·비용·토큰·원문 오류를 싣지 않는다(PR #2 계약).
     # 사유는 서버 로그와 api_cost_logs 에만 남긴다.
     def _finish(result, ans, *, final: bool = True) -> dict:
@@ -1543,6 +1557,14 @@ def parse_talk(body: ParseBody, request: Request):
         may_offer = not pc_offered and not pc_declined
         reply = _reply_text(obj, pc, bool(state.usages), stage)
         ai_reply = reply      # 서버가 바꾸기 전 모델의 말 — 관리자 AI 답 점검이 본다
+        if stage == TS.STAGE_PC:
+            # 질문 읽기 AI 는 카드를 보지 못한다 -- 「네, 그 예산 안에서 수월해요」 같은 예산 판정과 고객이 말하지 않은
+            # 프레임 수치를 걷는다(2026-10-14 사장님 결함 2·3). 예산 안에 맞는 카드가 있는지는 카드 안내가 말한다.
+            if state.budget_won:
+                reply, _n = PA.drop_budget_yes(reply, text)
+            reply, _n = PA.drop_fps_claims(reply, text)
+            if getattr(ans, "psu_watt", None):
+                reply = PA.drop_watt_sentences(reply, ans.psu_watt)    # 파워 판정은 설명 맨 앞 한 줄이 한다(권고 7)
         if released and stage == TS.STAGE_PC:
             reply = TR.UNNAMED_GAME_REPLY      # 모델의 「어떤 게임 하세요?」를 되풀이하지 않는다
         # 2026-10-11 품질관리: 운영체제·배송·결제·여러 대 같은 주제나 추천이 못 쓰는 조건이
@@ -1721,6 +1743,11 @@ def parse_talk(body: ParseBody, request: Request):
         if released and ans.narrowing == TS.NARROWING_WIDE and not advice:
             # 카드를 내는 턴이다 -- 게임 목록을 늘어놓고 「어떤 게임?」을 또 묻는 답은 내지 않는다.
             answer = ""
+        if not advice and answer and not missing and pc is not False and stage == TS.STAGE_PC and state.budget_won:
+            # 예산까지 말한 견적 상담 턴에 게임 백과사전 소개(제작사·출시일)를 카드 위에 내지 않는다 -- 그 소개는 «PC 구성은
+            # 다루지 않는다»는 지시로 쓰여 「구성 상담은 여기서 다루지 않겠습니다」가 바로 아래 「구성을 찾아 드리겠습니다」와
+            # 부딪쳤다(2026-10-14 사장님 결함 1). 갈래는 talk_pc_advice.topic_of 가 고쳤고, 이것은 다른 문장의 안전망이다.
+            answer = ""
         if stage == TS.STAGE_SILENT and ans.narrowing == TS.NARROWING_NARROW:
             answer = answer.replace(TA.NUDGE_NARROW, "").strip()
         if set(exceptions) & {"self_harm", "prompt_injection"}:
@@ -1730,14 +1757,24 @@ def parse_talk(body: ParseBody, request: Request):
         # 많이 달랐다). 카드가 나오는 턴(missing 없음)에만, 추천과 같은 조건으로 판매 카드 가격을 읽는다. 못 읽으면 그대로.
         # 파워·그래픽카드·SSD·해상도도 같다 -- 카드보다 높은 사양을 기본처럼 말한 문장은 걷고 실제 카드 사양 한 문장을 붙인다
         # (2026-10-12 코덱스 24조합 검수 2번: 「650W급 이상」 아래 600W 카드 · 「RTX 5070급·750W·QHD」 아래 5060·600W·FHD 카드).
+        budget = state.budget_won if state.budget_bound != "이상" else None
+        cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
+        if final and answer and advice and budget and not missing and not TR.explain_only(text):
+            # 설명 AI 도 카드를 보지 못한다 -- 카드 최저가가 예산을 넘는데 「네, 그 예산이면 수월해요」라 했으면 그 문장을
+            # 걷고 사실 한 줄로 바꾼다(2026-10-14 사장님 결함 2). 카드 최저가는 아래 맞추기와 같은 판매 카드에서 읽는다.
+            try:
+                low = _card_low(state, text)
+                if low and low > budget:
+                    kept, n = PA.drop_budget_yes(answer, text)
+                    if n:
+                        answer = (PA.budget_no_line(budget, low, cond) + " " + kept).strip()
+            except Exception as e:  # noqa: BLE001 - 대조 실패가 설명을 막지 않는다
+                log.warning("[talk] budget check skipped: %s", type(e).__name__)
         if (final and answer and advice and getattr(ans, "topic", None) == PA.TOPIC_BUILD and not missing
                 and not TR.explain_only(text)):
             try:
-                from .grid_public import sold_card_items    # 추천 쪽 모듈 -- 이 턴에만 읽는다
-                items = sold_card_items(state.model_dump(), text)
+                items = _card_items(state, text)
                 prices = [it["price"] for it in items if type(it.get("price")) is int and it["price"] > 0]
-                budget = state.budget_won if state.budget_bound != "이상" else None
-                cond = PA.condition_label(state.usages, getattr(state.game, "resolution", None), TS.is_game_usage)
                 answer = PA.align_market_price(answer, prices, budget_won=budget, sentence=text, condition=cond)
                 g = state.game
                 fhd_game = any(TS.is_game_usage(u) for u in state.usages) and (g is None or g.resolution in (None, "1080p"))
@@ -1746,6 +1783,8 @@ def parse_talk(body: ParseBody, request: Request):
                     ans.filter_report.setdefault("dropped", []).extend(spec_dropped)
             except Exception as e:  # noqa: BLE001 - 카드 맞추기는 곁가지다. 실패해도 설명은 나간다
                 log.warning("[talk] card align skipped: %s", type(e).__name__)
+        if stage == TS.STAGE_PC:
+            answer, _n = PA.drop_fps_claims(answer, text)     # 부품 이름만으로 프레임을 확정하지 않는다(결함 3)
         if advice and answer.strip() and "contradiction" in exceptions:
             # 설명이 이미 «그 예산으로는 그 사양이 어렵다»를 말했다 -- 같은 뜻의 고정 안내를 또 붙이면 길고 어색하다
             # (2026-10-13 상담 답 품질 비교 E26 「10만원으로 모든 게임 4K 최고옵션」: 「불가능해요」 설명 뒤 모순 안내가 붙어
