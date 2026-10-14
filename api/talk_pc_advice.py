@@ -129,10 +129,24 @@ _EXPLAIN = re.compile(r"차이|역할|왜|무슨\s*(뜻|의미|역할)|뭐예요
 _BUY = re.compile(r"추천|사려|살려|살까|사고\s*싶|구매|구입|견적|맞춰|맞추|짜\s*줘|짜\s*주|\d+\s*만\s*원?|예산", re.I)
 
 
+# 「QHD 모니터, 본체 예산 150만 원」의 모니터는 사려는 부품이 아니라 쓰는 환경(해상도)이다. 이걸 부품 질문으로 보면
+# build 가 못 되고 게임 소개 갈래로 빠져 「구성 상담은 다루지 않겠습니다」가 카드 위에 나갔다(2026-10-14 사장님 결함 1).
+# 해상도·주사율·인치가 붙은 모니터, 「모니터 있어요」만 걷는다 -- 「모니터 추천해줘」는 그대로 부품 질문이다.
+_SETUP_MONITOR = re.compile(r"(?:fhd|qhd|uhd|wqhd|4k|1080\s*p?|1440\s*p?|2160\s*p?|\d{2,3}\s*hz|\d{2}\s*인치)\s*모니터"
+                            r"|모니터\s*(?:는|은|도)?\s*(?:있|보유|가지고)", re.I)
+
+
+def _part_hit(s: str) -> bool:
+    """부품 낱말이 있는가 -- 본체 예산과 함께 말한 «쓰는 모니터»(해상도 표시)는 부품으로 세지 않는다."""
+    if _AMOUNT.search(s) or _PC_WORD.search(s):
+        s = _SETUP_MONITOR.sub(" ", s)
+    return bool(_PART.search(s))
+
+
 def topic_of(sentence: str, vocab, game: bool = False) -> str | None:
     """설명을 먼저 해 줄 문장인가 -> build | part | upgrade | general | None. game=True 면 게임 이름을 용도로 친다."""
     s = sentence or ""
-    part, pc = bool(_PART.search(s)), bool(_PC_WORD.search(s))
+    part, pc = _part_hit(s), bool(_PC_WORD.search(s))
     if _LAPTOP_COMPARE.search(s) and not part:        # 「노트북 램 차이」는 부품 이야기다
         return TOPIC_LAPTOP
     explain_part = part and bool(_EXPLAIN.search(s)) and not _BUY.search(s)
@@ -558,6 +572,118 @@ def align_market_price(answer: str, prices: list[int], budget_won: int | None = 
     return _map_sentences(answer, swap)
 
 
+# ── 말과 카드가 반대로 가지 않게 (2026-10-14 사장님 결함 2·3, 권고 7) ─────────────────────────────
+# 「FHD로 낮추면 150만 원 안에 되나요?」에 「네, 그 예산 안에서 구성하기 훨씬 수월해요」라 답했는데 바로 아래 카드는
+# 「150만 원 안에는 맞는 PC가 없어요」·최저 1,624,400원이었다. 문장을 쓰는 AI 는 카드를 보지 못한다. 그래서
+#   · 질문 읽기 AI([A])의 확인 문장은 예산 안에 된다고 «판정»하지 못하게 늘 걷는다(카드 안내가 판정을 말한다).
+#   · 설명 AI([B])의 «된다» 문장은 카드 최저가가 예산을 넘을 때만 걷고, 그 자리에 사실 한 줄을 둔다.
+_BUDGET_REF = re.compile(r"예산|\d+\s*만\s*원?|그\s*(?:금액|가격|돈|정도)|안에서|안으로|안쪽|이내|선에서")
+_BUDGET_YES = re.compile(r"^\s*(?:네|예|그럼요|물론)(?:[,.!\s]|$)|수월|충분|가능|넉넉|여유|무리\s*없|문제\s*없|맞출\s*수\s*있|"
+                         r"맞춰\s*(?:져|집|볼\s*수)|됩니다|돼요|되요|될\s*거|괜찮")
+_BUDGET_NO = re.compile(r"어렵|어려|힘들|빠듯|부족|넘어|넘는|넘을|초과|않|없어|없습|없는|안\s*돼|안\s*되|불가|모자")
+_ASKS_BUDGET = re.compile(r"(?:되|돼|가능|될까|맞출|맞춰|충분|괜찮)[^.!?]{0,8}(?:나요|까요|요\?|\?|ㅂ니까|습니까)")
+
+
+def _says_budget_yes(s: str) -> bool:
+    if not _BUDGET_YES.search(s):
+        return False
+    neg = re.sub(r"무리\s*없|문제\s*없", "", s)
+    return not _BUDGET_NO.search(neg)
+
+
+def drop_budget_yes(text_: str, sentence: str = "", bare_ok: bool = False) -> tuple[str, int]:
+    """예산 안에 된다는 판정 문장을 걷는다 -> (남은 글, 걷은 수).
+
+    예산·금액을 말하며 된다고 한 문장, 그리고 고객이 «예산 안에 되나요?»를 물었을 때의 맨 「네,」 대답을 걷는다.
+    bare_ok=True 면 맨 대답(「네, 가능해요.」)은 남긴다 -- 고객이 예산을 묻지 않았을 때다."""
+    asked = bool(_BUDGET_REF.search(sentence or "")) and bool(_ASKS_BUDGET.search(sentence or ""))
+    count = {"n": 0}
+
+    def keep(s):
+        if _says_budget_yes(s) and (_BUDGET_REF.search(s) or (asked and not bare_ok and _BARE_YES.match(s))
+                                    or (asked and re.match(r"^\s*(?:네|예)(?:[,.!\s]|$)", s))):
+            count["n"] += 1
+            return None
+        return s
+    out = _map_sentences(text_ or "", keep)
+    return out, count["n"]
+
+
+def budget_no_line(budget_won: int, low: int, condition: str | None = None) -> str:
+    """카드 최저가가 예산을 넘을 때 «된다» 대신 둘 사실 한 줄. 차이 금액은 카드 안내가 말하므로 되풀이하지 않는다."""
+    return "아쉽지만 지금 판매 중인 PC로는 %s%d만원 안에 맞는 구성이 없어요." % (
+        (condition + " 기준으로도 ") if condition else "", _man(budget_won))
+
+
+# 「FHD 높음 옵션으로 60fps 이상 목표라면…」 -- 상품 안내 FAQ 는 「부품 이름만으로 프레임을 확정하지 않습니다」다.
+# 고객이 직접 말한 프레임 숫자(「240프레임 원해요」)를 되받는 문장은 남기고, 고객이 말하지 않은 프레임 숫자는 걷는다.
+_FPS_NUM = re.compile(r"(\d{2,3})\s*(?:fps|프레임|프레임대)|(?:fps|프레임)\s*(?:이\s*|가\s*)?(\d{2,3})", re.I)
+
+
+def drop_fps_claims(text_: str, sentence: str = "") -> tuple[str, int]:
+    """고객이 말하지 않은 프레임 수치 문장을 걷는다 -> (남은 글, 걷은 수)."""
+    said = {a or b for a, b in _FPS_NUM.findall(sentence or "")}
+    count = {"n": 0}
+
+    def keep(s):
+        nums = {a or b for a, b in _FPS_NUM.findall(s)}
+        if nums and not nums <= said:
+            count["n"] += 1
+            return None
+        return s
+    return _map_sentences(text_ or "", keep), count["n"]
+
+
+# 「RTX 5070에 500W 파워면 돼요?」에 「충분하다고 단정하기 어렵다」만 나갔다. 우리 상품 자료의 그래픽카드 권장 파워
+# (gpu_power_reference -- 상품 사양 required_power_watt 의 원천)가 650W 이므로 부족하다고 분명히 말한다(권고 7).
+_PSU_GPU = re.compile(r"(?<![a-z])(RTX|GTX|RX)\s?(\d{4})\s?(Ti|SUPER|XTX|XT)?(?![a-z0-9])", re.I)
+_PSU_WATT = re.compile(r"(?<!\d)(\d{3,4})\s*(?:W|와트)(?![a-z])", re.I)
+
+
+def psu_question(sentence: str) -> tuple[str, int] | None:
+    """문장이 «그래픽카드 + 파워 용량»을 묻는가 -> (칩셋 키 「RTX 5070」, 와트). 아니면 None."""
+    s = sentence or ""
+    g, w = _PSU_GPU.search(s), _PSU_WATT.search(s)
+    if not g or not w or not re.search(r"파워|전원|psu|w\b|와트", s, re.I):
+        return None
+    suffix = " " + g.group(3).upper() if g.group(3) else ""      # catalog_map.gpu_chipset_key 와 같은 키 모양
+    return "%s %s%s" % (g.group(1).upper(), g.group(2), suffix), int(w.group(1))
+
+
+PSU_MARGIN_W = 100      # 권장 파워 + 여유 -- 견적 스튜디오 기준(right-size-check: 하한 = 권장 + 100W, 2026-10-14 사장님 공유 문서 ④)
+
+
+def psu_line(chip: str, watt: int, recommended: int | None) -> str | None:
+    if not recommended:
+        return None
+    safe = recommended + PSU_MARGIN_W
+    if watt < recommended:
+        return ("%s 권장 파워는 %dW라 %dW 파워는 부족해요. 여유를 두려면 %dW 이상 정격 파워를 쓰시는 게 좋아요."
+                % (chip, recommended, watt, safe))
+    if watt < safe:
+        return ("%s 권장 파워는 %dW라 %dW 파워면 권장 기준은 넘지만 여유가 적어요. %dW 이상이면 넉넉해요."
+                % (chip, recommended, watt, safe))
+    return "%s 권장 파워는 %dW라 %dW 파워면 여유 있게 쓸 수 있어요." % (chip, recommended, watt)
+
+
+def psu_note(conn, sentence: str) -> tuple[str, int] | None:
+    """그래픽카드 권장 파워 대조 한 줄 -> (문장, 고객이 말한 와트). 칩을 표에서 못 찾으면 None(지어내지 않는다)."""
+    q = psu_question(sentence)
+    if q is None:
+        return None
+    chip, watt = q
+    row = conn.execute(text("SELECT recommended_watt FROM gpu_power_reference WHERE upper(chipset_key) = :k"),
+                       {"k": chip.upper()}).first()
+    line = psu_line(chip, watt, int(row[0]) if row and row[0] else None)
+    return (line, watt) if line else None
+
+
+def drop_watt_sentences(text_: str, watt: int) -> str:
+    """고객이 말한 파워 용량을 다룬 문장(「500W면 충분하다고 단정하기 어려워요」)을 걷는다 -- 대조 한 줄이 대신 말한다."""
+    pat = re.compile(r"(?<!\d)%d\s*(?:W|와트)" % watt, re.I)
+    return _map_sentences(text_ or "", lambda s: None if pat.search(s) else s)
+
+
 # ── 설명의 사양 숫자를 아래 카드에 맞춘다 (2026-10-12 코덱스 24조합 검수 2번) ─────────────────────
 # 고사양150 「파워 650W급 이상 유지」 아래 카드는 600W 두 장, 고사양200 「RTX 5070급·750W·QHD」 아래 카드는 5060/5060 Ti·
 # 600/650W·FHD 기준, 영상 「750W급 권장」 아래 카드는 700W 였다. 설명 AI 는 카드를 보지 못하고 먼저 답하므로(사장님 「시간끌지
@@ -788,12 +914,17 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
     res.kind = "pc_advice"
     res.topic = topic
     try:
+        psu = None
         try:
             with conn_factory() as conn:
                 basis = basis_lines(conn, labels)
+                psu = psu_note(conn, sentence)
         except Exception as e:  # noqa: BLE001 - 기준표를 못 읽어도 일반 설명은 낸다
             log.warning("[talk-advice] fit levels unavailable: %s", type(e).__name__)
             basis = []
+        if psu:
+            # 설명 AI 가 실패해도 대조 한 줄은 나간다 -- 아래 except 갈래도 이 답을 지우지 않는다.
+            res.answer, res.psu_watt = psu[0], psu[1]
         out = llm.call(build_prompt(sentence, basis, history, topic, games, shop_notes), task_key=TASK_KEY,
                        customer_facing=True, max_output_tokens=ADVICE_MAX_TOKENS,
                        timeout_sec=int(min(ADVICE_TIMEOUT_SEC, timeout_sec)))
@@ -801,6 +932,9 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         res.cost_usd, res.tokens_in, res.tokens_out = out.cost_usd, out.tokens_in, out.tokens_out
         res.log_id = out.log_id
         body, dropped = clean(out.text, topic, sentence, strict=bool(shop_notes))
+        if psu:
+            # 「충분하다고 단정하기 어려워요」 같은 같은 용량 문장은 걷고, 우리 자료로 낸 판정을 맨 앞에 둔다(권고 7).
+            body = (psu[0] + "\n" + drop_watt_sentences(body, psu[1])).strip()
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}

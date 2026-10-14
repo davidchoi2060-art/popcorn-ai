@@ -525,6 +525,8 @@ class AnswerResult:
     kind: str = "game"
     # pc_advice 일 때 build(구성 추천) | part(부품 질문) | upgrade(쓰던 PC 고민)
     topic: str | None = None
+    # 고객이 «그래픽카드 + 파워 용량»을 물어 우리 권장 파워 표로 판정했으면 그 와트(talk_pc_advice.psu_note). 없으면 None.
+    psu_watt: int | None = None
 
 
 FALLBACK_MAX_GAMES = 3
