@@ -5,13 +5,21 @@
 /* 전수 점검 L66 — 사진이 없는 부품은 깨진 그림 대신 회색 빈 칸으로 그린다(아래 스크립트가 바꿔 끼운다) */
 .pm img.pm-noimg{background:var(--rv-panel2);border-radius:4px;object-fit:contain}
 /* 조립 부품 판매 준비(부품 상품화 1단계) */
-.pc-cat{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:9px;padding:12px;margin-bottom:14px}
+/* 코덱스 배치 A안(2026-10-15) — 위에는 전체 요약(상태 칩)만, 부품 목록·상세가 먼저, 전체 표는 작업 영역 아래 기본 접힘 */
+.pc-sum{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:9px;padding:10px 12px;margin-bottom:14px;flex-shrink:0}
+.pc-sum-top{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center}
+.pc-sum-title{display:flex;gap:8px;align-items:baseline}
+.pc-sum-title strong{font-size:11pt}
+.pc-sum-title small,.pc-sum-note{color:var(--rv-muted);font-size:9pt}
+.pc-sum #pc-cat-chips{display:flex;gap:6px;flex-wrap:wrap}
+.pc-sum #pc-cat-chips button[aria-pressed="true"]{border-color:var(--rv-green);font-weight:700}
+.pc-sum label{display:flex;gap:4px;align-items:center;color:var(--rv-muted)}
+.pc-sum-links{margin-left:auto;display:flex;gap:12px}
+.pc-sum-note{margin:6px 0 0}
+.pc-cat{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:9px;padding:12px;margin-top:14px}
 .pc-cat>summary{cursor:pointer;font-weight:700;font-size:11pt}
 .pc-cat>summary small{font-weight:400;color:var(--rv-muted);margin-left:8px}
-.pc-cat-bar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:10px 0 6px}
-.pc-cat-bar button[aria-pressed="true"]{border-color:var(--rv-green);font-weight:700}
-.pc-cat-bar label{margin-left:auto;display:flex;gap:4px;align-items:center;color:var(--rv-muted)}
-.pc-cat-msg{color:var(--rv-muted);margin:0 0 8px;font-size:9pt}
+.pc-cat-msg{color:var(--rv-muted);margin:10px 0 8px;font-size:9pt}
 .pc-cat-scroll{overflow-x:auto;max-height:340px;overflow-y:auto}
 .pc-cat table{width:100%;border-collapse:collapse;font-size:9.5pt}
 .pc-cat th,.pc-cat td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--rv-dim4);vertical-align:top}
@@ -27,11 +35,14 @@
 .pc-cat-foot{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
 /* 기능테스트 ISSUE-01 — 판매 준비를 펼치면 .pm-grid(flex:1·min-height:0)가 남은 높이 0으로 줄어
    목록·상세가 사라졌다(1920x855). 목록·상세에 최소 높이(접힘 상태 1920x855 의 기존 높이와 같은 360px)를 주고, 넘치는 높이는 .pm 이 스크롤한다.
-   판매 준비 패널은 자기 높이를 유지한다(자체 표는 .pc-cat-scroll 이 스크롤). */
+   판매 준비 표(작업 영역 아래)는 자기 높이를 유지한다(자체 표는 .pc-cat-scroll 이 스크롤). */
 .pc-cat{flex-shrink:0}
 @media(min-width:851px){.pm-grid{min-height:360px}}
 @media(max-width:850px){
-  .pc-cat-bar label{margin-left:0;flex:1 1 100%}
+  .pc-sum-links{margin-left:0;flex:1 1 100%}
+  /* 390px — 상태 칩은 한 줄 가로 스크롤로 두어 부품 목록 첫 행이 덜 밀리게 한다(코덱스 A안 모바일 순서) */
+  .pc-sum #pc-cat-chips{flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}
+  .pc-sum #pc-cat-chips button{flex-shrink:0;white-space:nowrap}
   .pc-cat thead{display:none}
   .pc-cat tr{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px solid var(--rv-dim4)}
   .pc-cat td{border:0;padding:0}
@@ -49,20 +60,21 @@
 <main class="pm">
 <header class="pm-heading"><div><h1>부품 설명 관리</h1><p>사양과 고객 설명, 보완할 정보를 한곳에서 확인합니다.</p></div><div class="pm-actions"><button class="primary" id="pm-ai-top">AI 보완 제안</button><a href="/admin2/catalog-import">자료 가져오기</a><a href="/admin2/customer-bom-gaps">고객 화면 부품 정보 확인</a></div></header>
 <section class="pm-filters" aria-label="부품 검색 조건"><input id="pm-q" maxlength="100" aria-label="부품 검색" placeholder="제품명 · 상품 코드 · 주요 사양 검색"><select id="pm-sale" aria-label="판매 상태"><option value="">판매 상태 전체</option><option>판매중</option><option>품절</option><option>단종</option></select><select id="pm-review" aria-label="보완 상태"><option value="">보완 상태 전체</option><option value="needs">보완 필요</option><option value="pending">검토 대기</option><option value="approved">승인 기록</option><option value="retired">보관</option></select><select id="pm-limit" aria-label="표시 수"><option value="10">10개</option><option value="20" selected>20개</option><option value="30">30개</option></select><label class="pm-owned"><input type="checkbox" id="pm-owned">DB 보유 부품만</label><nav class="pm-slots" aria-label="부품 종류"><button data-slot="">전체</button>{% for value,label in part_slots %}<button data-slot="{{value}}">{{label}}</button>{% endfor %}</nav></section>
-<details class="pc-cat" id="pc-cat" open><summary>조립 부품 판매 준비<small>조립PC 부품을 하나씩 판매 상품으로 팔 수 있는지 확인합니다.</small></summary>
-<div class="pc-cat-bar"><span id="pc-cat-chips" role="group" aria-label="판매 준비 상태"></span><label><input type="checkbox" id="pc-cat-used" checked>조립PC에 쓰는 부품만</label></div>
+<section class="pc-sum" aria-label="조립 부품 판매 준비 요약"><div class="pc-sum-top"><div class="pc-sum-title"><strong>조립 부품 판매 준비</strong><small>전체 조회 기준</small></div><span id="pc-cat-chips" role="group" aria-label="판매 준비 상태"></span><label><input type="checkbox" id="pc-cat-used" checked>조립PC에 쓰는 부품만</label><div class="pc-sum-links"><a href="#pc-cat" id="pc-cat-show">표 보기 ↓</a><a href="/admin2/sale-readiness">판매 준비 현황 ↗</a></div></div><p class="pc-sum-note">추천 근거와 주문·결제 가능 여부는 별개</p></section>
+<p class="pm-message" id="pm-message" role="status" aria-live="polite"></p>
+<div class="pm-grid"><section class="pm-list-card"><header><h2>부품 목록</h2><span id="pm-count">불러오는 중</span></header><div class="pm-list-scroll"><table class="pm-table"><thead><tr><th><input type="checkbox" id="pm-select-page" aria-label="현재 페이지 전체 선택"></th><th>부품 · 제품명</th><th>주요 사양</th><th>판매가</th><th>설명 검토</th></tr></thead><tbody id="pm-rows"></tbody></table></div><footer class="pm-pagination"><button id="pm-batch">선택 항목 보완 제안</button><div><button id="pm-prev">이전</button><span id="pm-page"></span><button id="pm-next">다음</button></div><small>표시 수와 검색 조건 유지</small></footer></section><aside class="pm-detail-card" aria-label="부품 상세"><header><h2 id="pm-detail-title" tabindex="-1">부품 상세</h2><button id="pm-back" class="pm-back">목록으로</button></header><div id="pm-detail" class="pm-detail-body"><p class="pm-empty">목록에서 부품 선택</p></div></aside></div>
+<details class="pc-cat" id="pc-cat"><summary>조립 부품 판매 준비 표<small>부품 목록과 별도 조회 · 전체 조회 기준</small></summary>
 <p class="pc-cat-msg" id="pc-cat-msg" role="status" aria-live="polite"></p>
-<div class="pc-cat-scroll"><table><thead><tr><th>부품</th><th>판매 준비</th><th class="num">판매가</th><th class="num">재고</th><th class="num">사용 PC</th></tr></thead><tbody id="pc-cat-rows"></tbody></table></div>
+<div class="pc-cat-scroll" tabindex="0" aria-label="판매 준비 표"><table><thead><tr><th>부품</th><th>판매 준비</th><th class="num">판매가</th><th class="num">재고</th><th class="num">사용 PC</th></tr></thead><tbody id="pc-cat-rows"></tbody></table></div>
 <footer class="pc-cat-foot"><button id="pc-cat-prev">이전</button><span id="pc-cat-page"></span><button id="pc-cat-next">다음</button></footer>
 <details class="pc-cat-nobom" id="pc-cat-nobom"><summary>구성표 없는 판매중 완제품 PC <b id="pc-cat-nobom-count">-</b></summary>
 <p class="pc-cat-msg" id="pc-cat-nobom-msg"></p><ul id="pc-cat-nobom-list"></ul><button id="pc-cat-nobom-more" hidden>더 보기</button></details>
+<p class="pc-sum-note">추천 근거와 주문·결제 가능 여부는 별개</p>
 </details>
-<p class="pm-message" id="pm-message" role="status" aria-live="polite"></p>
-<div class="pm-grid"><section class="pm-list-card"><header><h2>부품 목록</h2><span id="pm-count">불러오는 중</span></header><div class="pm-list-scroll"><table class="pm-table"><thead><tr><th><input type="checkbox" id="pm-select-page" aria-label="현재 페이지 전체 선택"></th><th>부품 · 제품명</th><th>주요 사양</th><th>판매가</th><th>설명 검토</th></tr></thead><tbody id="pm-rows"></tbody></table></div><footer class="pm-pagination"><button id="pm-batch">선택 항목 보완 제안</button><div><button id="pm-prev">이전</button><span id="pm-page"></span><button id="pm-next">다음</button></div><small>표시 수와 검색 조건 유지</small></footer></section><aside class="pm-detail-card" aria-label="부품 상세"><header><h2 id="pm-detail-title" tabindex="-1">부품 상세</h2><button id="pm-back" class="pm-back">목록으로</button></header><div id="pm-detail" class="pm-detail-body"><p class="pm-empty">목록에서 부품 선택</p></div></aside></div>
 </main>
 {% endblock %}
 {% block foot_extra %}<script src="/shared/parts-management.js?v=20261002-1"></script>
-<script src="/shared/part-catalog.js?v=20261011-attach"></script>
+<script src="/shared/part-catalog.js?v=20261015-layout"></script>
 <script>
 // 전수 점검 L66 — 썸네일이 없으면(404) 깨진 그림 아이콘이 보였다. 이 화면 안의 그림만 회색 빈 칸으로 바꾼다.
 (function(){

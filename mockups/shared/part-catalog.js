@@ -2,7 +2,8 @@
 // 판정은 서버(api/part_catalog.py)가 한다. 이 화면은 받은 판정을 그대로 그리고 수를 세지 않는다.
 (()=>{'use strict';
 const box=document.getElementById('pc-cat');if(!box)return;
-const $=s=>box.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// 코덱스 배치 A안 — 상태 칩은 위 요약(.pc-sum), 표는 작업 영역 아래 접힘(#pc-cat)으로 갈라져 있어 문서 기준으로 찾는다(id 는 화면에 하나뿐).
+const $=s=>document.querySelector(s),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number.isFinite(x)&&x>0?x.toLocaleString('ko-KR')+'원':'-';
 const ORDER=['no_product','not_on_sale','no_price','missing_specs','no_rules','ready'];
 let state='',used=true,offset=0,limit=20,seq=0;
@@ -29,7 +30,9 @@ async function load(){
   $('#pc-cat-page').textContent=`${page} / ${pages} · ${data.total}개`;
   $('#pc-cat-prev').disabled=offset===0;$('#pc-cat-next').disabled=offset+limit>=data.total;
 }
-$('#pc-cat-chips').addEventListener('click',e=>{const b=e.target.closest('button[data-state]');if(!b)return;state=b.dataset.state;offset=0;load();});
+const showTable=()=>{box.open=true;box.scrollIntoView({block:'start'});};
+$('#pc-cat-chips').addEventListener('click',e=>{const b=e.target.closest('button[data-state]');if(!b)return;state=b.dataset.state;offset=0;load();showTable();});
+$('#pc-cat-show').addEventListener('click',e=>{e.preventDefault();showTable();});
 $('#pc-cat-used').addEventListener('change',e=>{used=e.target.checked;offset=0;load();});
 $('#pc-cat-prev').addEventListener('click',()=>{offset=Math.max(0,offset-limit);load();});
 $('#pc-cat-next').addEventListener('click',()=>{offset+=limit;load();});
