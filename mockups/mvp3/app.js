@@ -215,7 +215,7 @@ function productCard(product,action='detail',id=product.index,comparison=null){
 // 용도 적합도는 서버 판정(fit · 정보 없음)을 그대로 적는다 — 정보가 없어도 숨기지 않는다(2026-10-10 결정).
 function customCards(group){
   if(!group.custom?.length)return '';
-  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립PC</h4><div class="quote-cards">'+group.custom.map(c=>
+  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립완제PC</h4><div class="quote-cards">'+group.custom.map(c=>
     '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 나온 PC</span><h3>'+esc(c.title)+'</h3>'+
     '<strong class="price">'+money(c.price)+'</strong><p class="muted">'+esc(c.price_note)+'</p>'+
     '<p class="custom-pc-fit">용도 적합도: '+esc(c.fit==='fit'?c.level_text:'정보 없음')+'</p>'+
@@ -426,7 +426,7 @@ function productDetails(finalOnly=false){
   const cardRows=M.cardSpecRows(p.spec),cardGrid=cardRows.length?'<dl class="live-spec-grid" data-card-spec>'+cardRows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'';
   return '<section class="final-parts"><h3>부품 구성과 선택 이유</h3><p class="public-bom-empty" role="status">부품 구성 정보는 아직 연결되지 않았어요. 이 상품은 부품별 구성표와 부품 가격이 등록되지 않아'+(cardGrid?', 추천 카드와 같은 등록 사양을 먼저 보여 드려요.':' 등록된 완제품 사양을 먼저 확인해주세요.')+'</p>'+cardGrid+'<div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
     '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
-    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
+    '<div><h4><span>조립완제PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
     '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+(finalOnly?'':information);
 }
 function finalConditions(){
