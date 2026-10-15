@@ -628,3 +628,28 @@ class CodexUnusualFindings(unittest.TestCase):
         clean, _ = AG.verify("두 가지를 골랐습니다.\n- P1: 595700원\n- P2: 892800원\n문서 위주면 P1이 맞아요. P9는 없어요.", book)
         self.assertEqual(clean, "두 가지를 골랐습니다.\n- 「사무용 기본」: 595,700원\n- 「사무용 쾌적」: 892,800원\n"
                                 "문서 위주면 「사무용 기본」이 맞아요. P9는 없어요.")
+
+
+# ── ⑬ 코덱스 고객10 오픈테스트 상담 답 결함 (C04·C06·C08·C10, 2026-10-15) ──
+class CodexOpenTestAnswers(unittest.TestCase):
+    def test_c10_unit_price_and_quantity_total_survive(self):
+        book = TT.FactBook()
+        book.add_item({"product_code": 1, "name": "사무용 기본", "price": 595_700})
+        said = ("회사 사무용 PC 12대 … 총 960만원까지예요. 수량이 15대로 늘었지만 총예산은 960만원 그대로입니다. "
+                "한 대 가격과 15대 총액을 나눠 보여주세요.")
+        reply = ("한 대 가격은 595,700원이고, 15대면 PC 합계가 8,935,500원이에요. 총예산 960만원을 15대로 나누면 "
+                 "한 대 640,000원이고, PC 합계만 보면 664,500원이 남아요. 부가세·윈도우·배송·설치를 넣은 최종 총액은 확인하지 못했어요.")
+        clean, dropped = AG.verify(reply, book, 640_000, said)
+        self.assertEqual(dropped, [])
+        self.assertIn("8,935,500원", clean)
+
+    def test_quantity_amounts_need_customer_count(self):
+        self.assertEqual(AG.quantity_amounts({595_700}, {9_600_000}, "예산 960만원"), set())
+        self.assertNotIn(595_700 * 30, AG.quantity_amounts({595_700}, set(), "저는 30대 후반이에요"))
+        clean, dropped = AG.verify("12대면 7,000,000원이에요.", TT.FactBook(), None, "12대 필요해요")
+        self.assertEqual(dropped[0]["reason"], "price_not_in_snapshot")
+
+    def test_prompt_covers_open_test_findings(self):
+        for phrase in ("「한 대 가격 × 대수」", "윈도우 포함 230만원", "budget_won", "첫 답의 첫 문장",
+                       "꼭 지켜야 한다고 한 조건", "FPS·방송 품질", "하나씩 빠짐없이"):
+            self.assertIn(phrase, AG.SYSTEM, phrase)
