@@ -102,7 +102,7 @@ class Result:
 class Connection:
     def __init__(self, copy, part, actor_id=2**40):
         self.calls=[]; self.events=[]; self.active=True; self.nested=False; self.isolation='REPEATABLE READ'; self.transaction=object()
-        self.error_tag=None; self.error=RuntimeError('fake SQL failure'); self.after_product_lock=None
+        self.part_events={}; self.error_tag=None; self.error=RuntimeError('fake SQL failure'); self.after_product_lock=None
         self.actor=dict(operator_id=actor_id,role='operator',status='활성')
         self.config=dict(configuration_id='P10',revision=1,bom_fingerprint='a'*64,
                          content_hash='b'*64,copy_hash='c'*64,status='approved',observed_date=date(2020,1,1),
@@ -133,6 +133,9 @@ class Connection:
     def get_transaction(self): return self.transaction
     def execute(self, statement, params=None):
         q=str(statement); p=params or {}; self.calls.append((q,deepcopy(p)))
+        if q.startswith('SELECT source_product_code,jsonb_exists(snapshot'):
+            return Result([dict(source_product_code=c,has=True,price=e['snapshot']['sale_price'])
+                           for c,e in sorted(self.part_events.items()) if c in p['codes']])
         tag=re.search(r'/\*pc_publication:([^*]+)\*/',q)
         if tag:
             tag=tag[1]
@@ -355,6 +358,30 @@ class PublicationTests(unittest.TestCase):
         for change in mutations:
             self.setUp(); self.approve(); change()
             with self.subTest(change=change): self.assertFalse(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+
+    def pin_parts(self):
+        self.conn.part_events={c:dict(snapshot=dict(sale_price=self.conn.rows[c]['sale_price'])) for c in (11,12)}
+
+    def test_part_price_change_keeps_publication_when_part_approval_pins_price(self):
+        self.pin_parts(); self.approve()
+        self.assertTrue(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+        self.conn.rows[11]['sale_price']=200
+        r=self.core.read_current(self.conn,'P10',source_reader=self.reader)
+        self.assertTrue(r['allowed']); self.assertEqual(r['source_state'],'current')
+        self.assertTrue(self.review.load_review(self.conn,'P10')[3]['eligible'])
+        self.conn.offers[0]['price_snapshot']=2000      # the PC's own price still invalidates
+        self.assertFalse(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+
+    def test_part_price_change_without_approve_event_falls_back_to_live_price(self):
+        self.approve(); self.conn.rows[11]['sale_price']=200
+        self.assertFalse(self.core.read_current(self.conn,'P10',source_reader=self.reader)['allowed'])
+
+    def test_unchanged_fixture_component_and_photo_basis_equal_origin_main(self):
+        cfg,part,row=self.conn.config,self.conn.parts[0],self.conn.rows[11]
+        self.assertEqual(self.core.component_basis(cfg,part,row),'a921aebe4b073fa84fb4736d605bdf5d6d9dd93c45aa23a92be7041ac6cc65a7')
+        self.assertEqual(self.core.photo_basis(cfg,part,row),'9ffff94d3edd558174100fe09b7c8f37b86d9535482f81a85d1ecf282f510581')
+        self.pin_parts()
+        self.assertEqual(self.conn.part_events[11]['snapshot']['sale_price'],row['sale_price'])
 
     def test_stored_hashes_are_not_enough_for_same_revision_copy_change(self):
         self.approve(); old=(self.conn.config['content_hash'],self.conn.config['copy_hash'])

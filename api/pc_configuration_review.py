@@ -145,6 +145,8 @@ def load_review(c, identity, lock=False):
     rows = {r['source_product_code']:dict(r) for r in c.execute(text('''SELECT e.*,p.product_name,p.spec_source_text,
         p.status AS sale_status,p.sale_price FROM product_explanations e LEFT JOIN products p USING(product_code)
         WHERE e.source_product_code=ANY(:codes) ORDER BY e.source_product_code'''+(' FOR SHARE OF e' if lock else '')),dict(codes=codes)).mappings()}
+    from .part_explanation_approval import pin_rows
+    pin_rows(c,rows)
     product_codes = [r['product_code'] for r in rows.values() if r['product_code'] is not None]
     if lock and product_codes:
         c.execute(text('SELECT product_code FROM products WHERE product_code=ANY(:codes) ORDER BY product_code FOR SHARE'),dict(codes=product_codes)).all()
@@ -152,6 +154,7 @@ def load_review(c, identity, lock=False):
         rows = {r['source_product_code']:dict(r) for r in c.execute(text('''SELECT e.*,p.product_name,p.spec_source_text,
             p.status AS sale_status,p.sale_price FROM product_explanations e LEFT JOIN products p USING(product_code)
             WHERE e.source_product_code=ANY(:codes) ORDER BY e.source_product_code'''),dict(codes=codes)).mappings()}
+        pin_rows(c,rows)
     by_product = {r['product_code']:dict(r) for r in c.execute(text('SELECT * FROM product_specs WHERE product_code=ANY(:codes) ORDER BY product_code'+(' FOR SHARE' if lock else '')),dict(codes=product_codes)).mappings()}
     specs = specs_for_review(rows, by_product)
     rules = [dict(r) for r in c.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id'+(' FOR SHARE' if lock else ''))).mappings()]

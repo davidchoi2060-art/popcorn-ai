@@ -34,6 +34,50 @@ class ReviewTests(unittest.TestCase):
         self.config['content']['_review']=dict(state='approved',basis=self.assess()['basis'],findings={})
         self.config['status']='approved'
 
+    def test_unchanged_fixture_basis_equals_origin_main(self):
+        self.assertEqual(self.assess()['basis'],'34b492e1ff5806f4938590ede567a2fc15931ef06707e0ce67025b994bac1f2c')
+
+    def load(self,pins=None):
+        test=self
+        class Result:
+            def __init__(s,rows=()):s.rows=list(rows)
+            def mappings(s):return s
+            def first(s):return s.rows[0] if s.rows else None
+            def all(s):return s.rows
+            def __iter__(s):return iter(s.rows)
+        class Conn:
+            def execute(s,statement,params=None):
+                q=str(statement)
+                if q.startswith('SELECT source_product_code,jsonb_exists(snapshot'):
+                    return Result([dict(source_product_code=c,has=True,price=v) for c,v in sorted((pins or {}).items())])
+                if q.startswith('SELECT * FROM pc_configurations'):return Result([copy.deepcopy(test.config)])
+                if q.startswith('SELECT * FROM pc_configuration_parts'):return Result(copy.deepcopy(test.parts))
+                if q.startswith('SELECT * FROM pc_configuration_offers'):return Result(copy.deepcopy(test.offers))
+                if 'SELECT e.*,p.product_name' in q:return Result(copy.deepcopy([test.rows[c] for c in sorted(test.rows)]))
+                if q.startswith('SELECT * FROM product_specs'):return Result(copy.deepcopy(list(test.specs.values())))
+                if q.startswith('SELECT * FROM compat_rules'):return Result(copy.deepcopy(test.rules))
+                return Result()
+        for i,s in self.specs.items():s.setdefault('product_code',i)
+        return review.load_review(Conn(),'T1')[3]
+
+    def test_part_price_change_keeps_review_when_approval_pinned_price(self):
+        pins={1:100,2:100}
+        self.config['content']['_review']=dict(state='approved',basis=self.load(pins)['basis'],findings={})
+        self.config['status']='approved'
+        self.assertTrue(self.load(pins)['eligible'])
+        self.rows[1]['sale_price']=999
+        self.assertTrue(self.load(pins)['eligible'])
+        self.assertEqual(self.load(pins)['basis'],self.config['content']['_review']['basis'])
+        self.offers[0]['price_snapshot']=200000          # the PC's own price still invalidates
+        self.assertFalse(self.load(pins)['eligible'])
+
+    def test_part_price_change_without_pin_falls_back_to_live_price(self):
+        self.config['content']['_review']=dict(state='approved',basis=self.load()['basis'],findings={})
+        self.config['status']='approved'
+        self.assertTrue(self.load()['eligible'])
+        self.rows[1]['sale_price']=999
+        self.assertFalse(self.load()['eligible'])
+
     def test_list_bulk_sources_and_order_do_not_invalidate_detail_approval(self):
         self.approve_fixture()
         self.parts.reverse()

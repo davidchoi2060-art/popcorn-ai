@@ -47,6 +47,8 @@ class Connection(pub_fixture.Connection):
             self.calls.append((q,deepcopy(p)));return Scalar(self.settings_isolation)
         if q.startswith(('/*part_approval:','/*part_photo:')):
             self.calls.append((q,deepcopy(p)));return self.native.execute(statement,params)
+        if q.startswith('SELECT source_product_code,jsonb_exists(snapshot'):
+            self.calls.append((q,deepcopy(p)));return self.native.execute(statement,params)
         if '/*pc_publication:sources*/' in q or 'SELECT e.*,p.product_name,p.spec_source_text' in q:
             self.calls.append((q,deepcopy(p)))
             return pub_fixture.Result([self.native.row(c) for c in sorted(set(p['codes'])) if self.native.row(c) is not None])
@@ -125,6 +127,14 @@ class ReaderTests(unittest.TestCase):
             self.assertEqual(desc.operator_id,2**40);self.assertIs(desc.approved_at.tzinfo,timezone.utc)
             self.assertTrue(desc.reference.startswith('part-explanation-approval:'))
             self.assertTrue(image.reference.startswith('part-photo-approval:'));self.assertEqual(image.detail_bytes,photo_fixture.PNG)
+
+    def test_part_price_change_after_approval_keeps_native_proofs_and_publication(self):
+        before=self.read()
+        self.conn.native.products[101]['sale_price']+=50
+        after=self.read()
+        self.assertEqual([p.basis for p in before.parts],[p.basis for p in after.parts])
+        self.assertEqual([p.basis for p in before.photos],[p.basis for p in after.photos])
+        self.assertTrue(self.publication_approve()['current']['allowed'])
 
     def test_actual_publication_core_accepts_producer_without_changing_private_false(self):
         before=deepcopy((self.conn.config,self.conn.parts,self.conn.native.explanations,self.conn.native.products))
