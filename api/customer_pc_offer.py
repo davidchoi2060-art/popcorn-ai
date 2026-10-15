@@ -44,6 +44,7 @@ from .db import engine
 from .customer_bom_gaps import EVIDENCE_SQL as BOM_EVIDENCE_SQL
 from .customer_sold_offer_read import read_customer_sold_offer
 from .pc_publication_source_reader import make_source_reader
+from .part_spec_notes import derived_specs
 from .product_images import MEDIA_BUCKET, read_image
 from . import pc_media
 
@@ -151,16 +152,24 @@ def _public_offer(conn, product_code):
         "SELECT pp.ordinal, pp.explanation_code, p.sale_price,"
         " (e.product_code IS NULL AND e.content->>'availability_scope' = 'assembly_only') AS assembly_only,"
         " (EXISTS (SELECT 1 FROM product_supplier_prices sp WHERE sp.product_code = p.product_code"
-        " AND sp.supply_state = '가능') OR " + BOM_EVIDENCE_SQL + ") AS has_supply"
+        " AND sp.supply_state = '가능') OR " + BOM_EVIDENCE_SQL + ") AS has_supply,"
+        # 읽을 때 덧붙이는 영상 출력·파워 판정 기준(api/part_spec_notes) -- 승인본 원문과 서버 값만 쓴다.
+        " pp.slot, e.content, COALESCE(e.source_snapshot->>'spec', p.spec_source_text) AS source_spec,"
+        " s.gpu_power_draw_watt,"
+        " (SELECT r.ref_offset FROM compat_rules r WHERE r.active AND r.rule_key = 'power'"
+        " AND r.ref_field = 'gpu_power_draw_watt' LIMIT 1) AS power_offset"
         " FROM pc_configuration_parts pp"
         " LEFT JOIN product_explanations e ON e.source_product_code = pp.explanation_code"
         " LEFT JOIN products p ON p.product_code = e.product_code"
+        " LEFT JOIN product_specs s ON s.product_code = p.product_code"
         " WHERE pp.configuration_id=:id AND NOT pp.pseudo"), {"id": identity}).mappings())
     codes = {r["ordinal"]: r["explanation_code"] for r in rows}
     prices = {r["ordinal"]: r.get("sale_price") if r.get("has_supply") is True else None for r in rows}
     # 조립 전용 부품(팝콘PC 「단품판매불가」 · 판매 상품 행이 없다)은 개별 판매가가 원래 없다 -- 「가격 확인 중」이 아니라
     # 그 사실을 말한다(2026-10-14 사장님). 가격은 지어내지 않고 null 그대로다.
     assembly = {r["ordinal"] for r in rows if r.get("assembly_only") is True}
+    offset = next((r.get("power_offset") for r in rows if r.get("power_offset") is not None), None)
+    extra = derived_specs({r["ordinal"]: r for r in rows}, offset)
     for part in offer["parts"]:
         code = None if part["pseudo"] else codes.get(part["ordinal"])
         part["photo"] = ({"state": "approved", "url": f"/api/product-images/{code}/detail"}
@@ -169,6 +178,8 @@ def _public_offer(conn, product_code):
         # 상세 화면의 부품별 금액(2026-10-12 사장님 「추천한대로」: 부품 판매가 + 「조립·기타」 한 줄)
         part["price"] = price if type(price) is int and price > 0 else None
         part["assembly_only"] = part["ordinal"] in assembly and not part["pseudo"]
+        if not part["pseudo"] and extra.get(part["ordinal"]):
+            part["specs"] = list(part.get("specs") or []) + extra[part["ordinal"]]
     job = conn.execute(text(
         "SELECT job_id, visual_basis, asset FROM pc_media_jobs"
         " WHERE configuration_id=:id AND selected AND status='ready'"), {"id": identity}).mappings().first()

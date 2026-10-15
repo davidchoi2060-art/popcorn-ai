@@ -45,6 +45,7 @@ class Conn:
         self.job, self.sql, self.options, self.began, self.rolled_back = job, [], {}, False, False
         self.part_price = 250000
         self.has_supply = True
+        self.extra = {}
 
     def execution_options(self, **kw):
         self.options.update(kw); return self
@@ -58,7 +59,7 @@ class Conn:
         q = str(statement); self.sql.append(q)
         if "FROM pc_configuration_parts" in q:
             return Rows([{"ordinal": 0, "explanation_code": 4321, "sale_price": self.part_price,
-                          "has_supply": self.has_supply}])
+                          "has_supply": self.has_supply, **self.extra}])
         if "FROM pc_media_jobs" in q:
             return Rows([deepcopy(self.job)] if self.job else [])
         return Rows([])
@@ -133,6 +134,14 @@ class CustomerPcOfferTest(unittest.TestCase):
         for bad in (None, 0, -5):
             self.conn.part_price = bad
             self.assertIsNone(self.get("/99413").json()["public_configuration"]["parts"][0]["price"])
+
+    def test_board_video_output_is_derived_at_read_time(self):
+        # 오픈테스트 C01-F01: 승인본 해시를 건드리지 않고 승인 당시 원문에서 영상 출력을 덧붙인다.
+        self.conn.extra = {"slot": "MB", "content": {"slot": "MB", "facts": []}, "source_spec": "ATX / HDMI / DP / "}
+        parts = self.get("/99413").json()["public_configuration"]["parts"]
+        self.assertEqual(parts[0]["specs"], [{"label": "영상 출력", "value": "HDMI · DP (CPU 내장그래픽 필요 · 판매처 표기)"}])
+        self.assertEqual(parts[1]["specs"], [])
+        self.assertTrue(any("e.source_snapshot->>'spec'" in q and "rule_key = 'power'" in q for q in self.conn.sql))
 
     def test_part_price_without_available_supplier_is_withheld(self):
         # 2026-10-12 사장님 「처음부터 가격 이상한 내용이 오류로 나오고」: 공급처 근거가 없으면 판매가를 내지 않는다.
