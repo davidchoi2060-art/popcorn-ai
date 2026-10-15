@@ -6,7 +6,6 @@ const M=window.MVP3LiveModel,A=window.MVP3Api,{customerPhoto}=window.MVP3LivePho
 const $=s=>document.querySelector(s);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미확인';
-const signedMoney=d=>d===0?'같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const MAX_TEXT=20000;
 const log=$('#tk-log'),panel=$('#tk-now-body'),input=$('#tk-input'),status=$('#tk-status');
@@ -225,7 +224,7 @@ function renderPanel(){
       const h=state.handoff?.quote_id===state.savedQuote.id?state.handoff:null;
       html+='<div class="tk-buy">'+(h?'<a class="primary tk-link" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰에서 구매 이어가기</a>'+
         // 쇼핑몰 상품 페이지는 기본 구성이다 -- 바꾼 부품은 연결 번호로만 전해진다(옛 화면 app.js 와 같은 안내).
-        (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+esc(h.changes)+'개(차액 '+esc(signedMoney(h.delta))+')는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
+        (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+esc(h.changes)+'개는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
         (h.sets>1?'<p class="warn-text">쇼핑몰에서 수량을 '+h.sets+'대로 골라 주세요.</p>':'')+
         '<p class="muted">연결 번호 '+esc(h.handoff_no)+' · 결제·배송·보증은 쇼핑몰에서 안내해요.</p>'
         :button(state.phase==='handoff'?'쇼핑몰 가격 확인 중…':'쇼핑몰에서 구매 이어가기','handoff','outline',busy?'disabled':'')+

@@ -32,7 +32,7 @@ function card(x){
   const benefits=x.benefits.length?`<h3>이런 점이 좋아요</h3><ul>${x.benefits.map(b=>`<li><strong>${esc(b.title)}</strong> ${esc(b.text)}</li>`).join('')}</ul>`:'';
   const checks=x.checks.length?`<h3>구매 전에 확인해 주세요</h3><ul>${x.checks.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:'';
   return `<article class="new-pc" data-pc="${esc(id)}"><div class="new-pc-head"><div><h2>${esc(x.title)}</h2></div>
-    <div class="new-pc-price"><strong>${money(x.price)}</strong><small>${esc(x.price_note)}</small></div></div>
+    <div class="new-pc-price"><strong>${money(x.price)}</strong><small>한 대 기준 · 실제 구매 금액과 포함 품목은 구매 전에 확인해 주세요.</small></div></div>
     <p>${esc(x.intro)}</p>${x.scene?`<p class="muted">${esc(x.scene)}</p>`:''}
     <table class="new-pc-parts"><caption class="sr-only">부품 구성</caption><tbody>${parts}</tbody></table>${benefits}${checks}
     <p class="muted">쇼핑몰 상품 페이지가 아직 없는 PC예요. 구매 상담을 신청하시면 담당자가 연락드려 주문을 도와드려요. 가격은 연락드릴 때 다시 확인해 드려요.</p>

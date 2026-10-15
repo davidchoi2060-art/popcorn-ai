@@ -730,3 +730,14 @@ body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price{fl
 body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price .foot-note{display:block;margin-top:2px}
 body.live-mode.original-flow .dt-detail .public-bom-disclosure>summary>span{border-left:0}
 @media(max-width:760px){body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price{align-items:flex-start;text-align:left;padding:6px 0}}
+
+/* 가격 표시: 몰 방식(2026-10-15 코덱스 디자인 v1 -- 2026-10-15-부품가격-몰방식-v1). 부품 줄은 금액 없이 「기본 구성」 또는 변경 차액만 보인다. */
+.mp-base-label{color:var(--muted);font-size:12px;font-weight:600}
+.mp-diff{font-weight:700;font-variant-numeric:tabular-nums}.mp-diff.is-plus{color:var(--amber)}.mp-diff.is-minus,.mp-diff.is-zero{color:var(--green)}.mp-diff.is-missing{color:var(--muted);font-weight:600}
+.mp-diff-tag{display:block;margin-top:2px;font-size:12px;font-weight:600;color:var(--muted)}
+.mp-assembly{display:inline-block;margin-left:6px;padding:1px 7px;border:1px solid var(--line);border-radius:999px;font-size:11px;font-weight:600;color:var(--muted);vertical-align:middle}
+.mp-changed-badge{display:inline-block;padding:1px 7px;border-radius:999px;background:var(--tint);color:var(--green);font-size:11px;font-weight:700}
+.mp-hold{display:inline-block;padding:4px 9px;border:1px dashed var(--line);border-radius:6px;font-size:12px;color:var(--muted)}
+.mp-candidate-head{margin:2px 0 6px;font-size:12px}
+.mp-info-line{margin:8px 2px 0;font-size:12px;color:var(--muted);line-height:1.5}
+.final-table tfoot .mp-total-row th,.final-table tfoot .mp-total-row td{font-weight:700}

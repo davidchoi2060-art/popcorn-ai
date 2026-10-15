@@ -79,14 +79,20 @@ test('options come from the server; picking one recomputes on the server and cha
     assert.equal(text(d.querySelector('.build-options-row h4')),'메모리 바꾸기 · 지금 램 16GB');
     assert.ok(text(d.querySelector('.build-options-row')).includes('확인하지 못한 부품 1개'));
     const rows=[...d.querySelectorAll('[data-build-option]')];
-    assert.ok(text(rows[1]).includes('1,400,000원')&&text(rows[1]).includes('+100,000원'));
+    assert.ok(text(d.querySelector('.build-options-row')).includes('확인한 차액이 없는 후보는 선택할 수 없어요'));
+    assert.ok(text(rows[1]).includes('+100,000원')&&text(rows[1]).includes('추가'));
+    assert.ok(!text(rows[1]).includes('1,400,000원')&&!text(rows[1]).includes('110,000원')&&!text(rows[0]).includes('1,240,000원'),'후보 옆에 단품·PC 금액이 없다');
+    assert.ok(text(rows[0]).includes('\u221260,000원')&&text(rows[0]).includes('감소'));
     rows[1].querySelector('[data-action=build-pick]').click();
     await until(()=>h.flow.state.selected.price===1400000);
     assert.deepEqual(h.calls.find(c=>c.url==='/api/mvp3/build/quote').body,{state:talkState,product_code:12,changes:[{ordinal:1,product_code:502}]});
     assert.equal(h.flow.state.selected.product_code,12);
     const row=d.querySelector('[data-part="bom-1"]');
-    assert.ok(text(row).includes('램 32GB')&&text(row).includes('원래 부품: 램 16GB')&&text(row).includes('+100,000원'));
-    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('기본구성금액1,300,000원'));
+    assert.ok(text(row).includes('램 32GB')&&text(row).includes('기본 구성: 램 16GB')&&text(row).includes('변경함')&&text(row).includes('+100,000원'));
+    assert.ok(!text(row).includes('110,000원')&&!text(row).includes('60,000원'),'바꾼 줄에도 부품 판매가가 없다');
+    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('기본구성PC총액1,300,000원'));
+    assert.ok(text(d.querySelector('.live-summary')).includes('기본 구성 1,300,000원 \u2192 바꾼 구성 1,400,000원'));assert.ok(text(d.querySelector('.public-bom tfoot')).includes('변경 후 총액을 한 대 기준으로 표시해요'));
+    assert.doesNotMatch(text(d.querySelector('.public-bom')),/조립·기타|부품 합계|부품 변경/);
     assert.ok(text(d.querySelector('#actions')).includes('1,400,000원'));
     assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리 부품을 「램 32GB」 제품으로 바꿨어요.'));
     assert.deepEqual(h.errors,[]);
@@ -104,7 +110,7 @@ test('save sends the changed rows and the server total; handoff says the mall pa
     assert.equal(save.expected_price,1400000);assert.deepEqual(save.changes,[{ordinal:1,product_code:502}]);
     assert.equal(h.flow.state.savedQuote.product.build.changes.length,1);
     await h.flow.handoff();await until(()=>d.querySelector('.live-handoff'));
-    assert.ok(text(d.querySelector('.live-handoff')).includes('쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 1개(차액 +100,000원)는 연결 번호 HO-4001로 기록해 두었어요.'));
+    assert.ok(text(d.querySelector('.live-handoff')).includes('쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 1개는 연결 번호 HO-4001로 기록해 두었어요.'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -126,7 +132,7 @@ test('a refused combination keeps the old price and says why; reset goes back to
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>g.flow.state.selected.price===1300000);
     assert.equal(g.flow.state.selected.build,null);
-    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('상품참고금액1,300,000원'));
+    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('기본구성PC총액1,300,000원'));
   }finally{g.close();}
 });
 
@@ -139,7 +145,7 @@ test('the summary keeps the budget line after a change and judges it on the new 
     d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
     await until(()=>h.flow.state.selected.price===1580300);
     const box=text(d.querySelector('.final-summary-price'));
-    assert.ok(box.includes('부품 1개를 바꾼 금액이에요 · 기본 구성 대비 +280,300원'),box);
+    assert.ok(box.includes('바꾼 부품 1개 · 기본 구성 1,300,000원 \u2192 바꾼 구성 1,580,300원')&&!box.includes('280,300'),box);
     assert.equal(text(line()),'예산보다 80,300원 높아요');assert.ok(line().classList.contains('warn-text'));
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>h.flow.state.selected.price===1300000);

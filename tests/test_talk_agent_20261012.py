@@ -151,7 +151,7 @@ class Tools(unittest.TestCase):
         ref2 = b.add_item(dict(ITEM, product_code=1002))
         self.assertEqual(TT.show_pcs({"refs": [ref2, ref]}, b)["shown"], [ref, ref2])   # 엔진 순서
 
-    def test_pc_detail_unknown_price_stays_null(self):
+    def test_pc_detail_gives_no_part_prices(self):
         from api import customer_pc_offer as OFFER
         b = TT.FactBook()
         ref = b.add_item(dict(ITEM))
@@ -159,8 +159,8 @@ class Tools(unittest.TestCase):
                                                              {"name": "DDR5 16GB", "price": 85_000}]}
         with patch.object(OFFER, "public_item", lambda code: {"public_configuration": cfg}):
             r = TT.pc_detail({"ref": ref}, b)
-        self.assertEqual([p["price_state"] for p in r["parts"]], ["확인 중", "확인됨"])
-        self.assertIn(85_000, b.prices)
+        self.assertTrue(all("price" not in p and "price_state" not in p for p in r["parts"]))
+        self.assertNotIn(85_000, b.prices)
         with patch.object(OFFER, "public_item", lambda code: {"public_configuration": None}):
             self.assertEqual(TT.pc_detail({"ref": ref}, b)["status"], "unknown")
 
