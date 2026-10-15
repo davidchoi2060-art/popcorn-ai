@@ -562,14 +562,14 @@
     function swapPart(code){
       const data=state.parts.data;
       if(state.phase||!data||!state.selected)return;
-      const o=data.options.find(x=>x.product_code===code);if(!o)return;
+      const o=data.options.find(x=>x.product_code===code);if(!o||!Number.isSafeInteger(o.swap.price_diff))return;
       const before=state.selected;
       state.selectedContext=state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(before.index)&&g.products.some(x=>x.index===before.index&&x.product_code===before.product_code))||null;
       const next=M.copy(o);delete next.swap;next.swap_from={product_code:before.product_code,slot:data.slot};state.build=emptyBuild();
       state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;
       state.inquiry=emptyInquiry();state.parts=emptyParts();state.error=null;state.retry=null;
-      const d=o.swap.price_diff,diff=d===0?'지금과 같은 금액':(d>0?'+':'-')+Math.abs(d).toLocaleString('ko-KR')+'원';
-      message(data.label+'를 '+o.swap.value+'로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겨서 금액은 '+o.price.toLocaleString('ko-KR')+'원('+diff+')이에요.'+
+      const d=o.swap.price_diff,diff=!Number.isSafeInteger(d)?'차액 확인 필요':d===0?'추가 금액 없음':(d>0?'+':'\u2212')+Math.abs(d).toLocaleString('ko-KR')+'원';
+      message(data.label+'를 '+o.swap.value+'로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겼어요. 기본 부품 대비 차액은 '+diff+'이고, PC 총액은 '+o.price.toLocaleString('ko-KR')+'원이에요.'+
         o.swap.also.map(x=>' '+x.label+'도 '+x.from+'에서 '+x.to+'로 함께 바뀌어요.').join('')+' 파워·케이스 같은 나머지 부품은 부품 구성에서 확인해 주세요.');
       emit();
     }
@@ -602,15 +602,14 @@
     function pickBuild(code){
       const data=state.build.data;
       if(state.phase||!data||!state.selected)return;
-      const o=data.options.find(x=>x.product_code===code);if(!o)return;
+      const o=data.options.find(x=>x.product_code===code);if(!o||!Number.isSafeInteger(o.price_diff))return;
       const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
       const was=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal),original=was?.before.product_code;
       // 수량을 바꿔 둔 줄은 제품을 바꿔도 그 수량을 지킨다.
       const quantity=was&&was.quantity!==was.base_quantity?{quantity:was.quantity}:{};
       if(code!==original||quantity.quantity)changes.push({ordinal:data.ordinal,product_code:code,...quantity});
       const won=n=>n.toLocaleString('ko-KR')+'원';
-      return applyBuild(changes,q=>(data.label||'부품')+' 부품을 「'+o.name+'」 제품으로 바꿨어요. 호환 규칙을 다시 확인했고, 금액은 '+won(q.total)+'이에요(기본 구성 '+won(q.base_price)+
-        (q.total===q.base_price?'과 같아요).':(q.total>q.base_price?' + ':' - ')+won(Math.abs(q.total-q.base_price))+').'));
+      return applyBuild(changes,q=>(data.label||'부품')+' 부품을 「'+o.name+'」 제품으로 바꿨어요. 호환 규칙을 다시 확인했어요. 기본 구성 '+won(q.base_price)+' \u2192 바꾼 구성 '+won(q.total)+'이에요.');
     }
     // 메모리·저장장치 수량(api/mvp3_quantity). 범위는 서버가 준 것만 쓰고, 금액·메인보드 조건은 서버가 다시 확인한다.
     function setBuildQuantity(n){
@@ -631,7 +630,7 @@
     }
     function resetBuild(){
       if(state.phase||!state.selected?.build)return;
-      return applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 금액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
+      return applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 PC 총액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
     }
     async function list(){
       const op=begin('list');state.screen='saved';emit();

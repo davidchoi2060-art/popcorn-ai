@@ -218,9 +218,9 @@
   function buildOptions(value,baseCode,ordinal){
     if(!object(value)||value.ok!==true||value.base_code!==baseCode||value.ordinal!==ordinal||!Number.isSafeInteger(value.total)||!Array.isArray(value.options))
       throw new Error('바꿀 부품 선택지를 확인할 수 없어요.');
-    const options=value.options.map(o=>object(o)&&Number.isSafeInteger(o.product_code)&&o.product_code>0&&text(o.name).trim()&&
-      Number.isSafeInteger(o.price)&&Number.isSafeInteger(o.price_diff)&&Number.isSafeInteger(o.total)
-      ?{product_code:o.product_code,name:o.name,price:o.price,price_diff:o.price_diff,total:o.total}:null).filter(Boolean);
+    const options=value.options.map(o=>object(o)&&Number.isSafeInteger(o.product_code)&&o.product_code>0&&text(o.name).trim()
+      // 차액이 없는 후보도 버리지 않는다 -- 「차액 확인 필요」로 보이고 선택할 수 없다(null 을 0 으로 바꾸지 않는다).
+      ?{product_code:o.product_code,name:o.name,price_diff:Number.isSafeInteger(o.price_diff)?o.price_diff:null}:null).filter(Boolean);
     // 메모리·저장장치 수량 범위(api/mvp3_quantity.limit_for). 서버가 준 범위만 쓴다 -- 없으면 수량을 바꾸지 않는다.
     const l=value.quantity_limit,q=value.quantity;
     const quantity=object(l)&&Number.isSafeInteger(q)&&Number.isSafeInteger(l.max)&&l.max>=q&&q>=1
@@ -291,9 +291,9 @@
       throw new Error('부품 선택지를 확인할 수 없어요.');
     const options=value.options.map(raw=>{
       const p=product(raw),s=raw?.swap;
-      if(!p||p.price===null||p.product_code===baseCode||!object(s)||s.slot!==slot||!text(s.value).trim()||!Number.isSafeInteger(s.price_diff)||!Array.isArray(s.also))return null;
+      if(!p||p.price===null||p.product_code===baseCode||!object(s)||s.slot!==slot||!text(s.value).trim()||!Array.isArray(s.also))return null;
       const also=s.also.filter(x=>object(x)&&['label','from','to'].every(k=>typeof x[k]==='string')).map(x=>({label:x.label,from:x.from,to:x.to}));
-      return {...p,swap:{value:s.value,price_diff:s.price_diff,also}};
+      return {...p,swap:{value:s.value,price_diff:Number.isSafeInteger(s.price_diff)?s.price_diff:null,also}};
     }).filter(Boolean);
     return {slot,label:text(value.label)||slot,current:text(value.current),options};
   }

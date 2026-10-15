@@ -132,7 +132,7 @@ test('a changed-part quote says the mall page is the base build and gives the qu
     await until(()=>h.flow.state.handoff&&h.flow.state.phase===null);
     const t=h.doc.querySelector('.live-handoff').textContent;
     assert.doesNotMatch(t,/쇼핑몰 가격도/);
-    assert.match(t,/기본 구성 기준으로 1,624,400원/);assert.match(t,/-48,200원/);assert.match(t,/이 견적은 1,576,200원/);
+    assert.match(t,/기본 구성 1,624,400원 \u2192 바꾼 구성 1,576,200원/);assert.doesNotMatch(t,/48,200원|차액/);assert.match(t,/주문·결제는 아직 진행되지 않았어요/);
   }finally{h.close();}
 });
 

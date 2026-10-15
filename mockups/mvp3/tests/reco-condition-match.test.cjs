@@ -25,18 +25,18 @@ function details(product,usages=['게임']){
 }
 const SPEC={cpu:'라이젠5 8600G',gpu:'Radeon 760M(내장)',ram_gb:16,ssd_gb:500,case:'[DARKFLASH] DMO11 블랙',psu:'[마이크로닉스] COOLMAX VISION II 500W'};
 
-test('6번: 수량 2 줄은 줄 합계와 「단가 × 수량」을 함께 적는다',()=>{
+test('6번: 수량 2 줄도 부품 금액 없이 수량만 적는다',()=>{
   const c=configuration([part(0,'CPU',186400),part(2,'RAM',159500,2)]);
   const html=details({product_code:98149,name:'[14400F/32G/1TB/RTX5060Ti]',price:1871100,spec:{cpu:'i5-14400F'},reasons:['게임 FHD'],public_configuration:c});
-  assert.match(html,/class="final-part-price">319,000원<small class="muted foot-note">159,500원 × 2개<\/small>/);
-  assert.match(html,/class="final-part-price">186,400원<\/span>/);   // 수량 1 은 그대로
+  // 2026-10-15: 줄 금액·단가 × 수량을 쓰지 않는다. 수량만 남는다.
+  assert.doesNotMatch(html,/319,000|159,500|186,400|× 2개/);assert.match(html,/수량 2/);
 });
 
-test('6번: 가격 확인 중 부품이 있으면 어느 부품인지와 PC 금액에 포함이라는 것을 말한다',()=>{
+test('6번: 부품 가격이 없어도 「가격 확인 중」·조립·기타 문장이 없다',()=>{
   const c=configuration([part(0,'CPU',159500),part(1,'GPU',null),part(2,'RAM',null),part(3,'POWER',42600)]);
   const html=details({product_code:98149,name:'[12400F/16GB/500GB/RTX5060]',price:1624400,spec:{cpu:'i5-12400F'},reasons:['게임 FHD'],public_configuration:c});
-  assert.match(html,/가격 확인 중인 부품이 있어 계산하지 않았어요<small class="muted foot-note">가격 확인 중: 그래픽카드·메모리 · PC 금액에는 이 부품들이 포함돼 있어요<\/small>/);
-  assert.doesNotMatch(html,/<th scope="row">조립·기타<\/th><td class="final-part-price">[0-9,]+원/);   // 차액을 조립비처럼 내지 않는다
+  assert.doesNotMatch(html,/가격 확인 중|조립·기타|계산하지 않았어요/);
+  assert.match(html,/<th scope="row">기본 구성 PC 총액<\/th><td class="final-part-price">1,624,400원/);
 });
 
 test('4번: 부품 구성표가 없는 상품도 상세에 카드와 같은 사양(케이스·파워 포함)을 보인다',()=>{

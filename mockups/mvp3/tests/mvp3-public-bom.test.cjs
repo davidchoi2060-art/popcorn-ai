@@ -58,23 +58,18 @@ test('pseudo and multiple SSD rows use ordinal keys and quantities without guess
   const f=fixture();f.parts.push(...[2,3].map(ordinal=>({...clone(f.parts[0]),ordinal,slot:'SSD',quantity:ordinal,name:'SSD'})));
   const html=render(f);assert.equal((html.match(/<tr data-part="bom-/g)||[]).length,5);
   assert.match(html,/data-detail="bom-2"/);assert.match(html,/data-detail="bom-3"/);assert.match(html,/수량 3/);assert.match(html,/서비스/);
-  // 2026-10-12: 고정 「미확인」 대신 부품 판매가. 값이 없는 줄은 「가격 확인 중」, 서비스 줄은 「조립·기타에 포함」.
-  assert.equal((html.slice(0,html.indexOf('<tfoot>')).match(/class="final-part-price">가격 확인 중/g)||[]).length,4);assert.equal((html.match(/class="final-part-price">조립·기타에 포함/g)||[]).length,1);
-  assert.doesNotMatch(html,/class="final-part-price">미확인/);assert.match(html,/900,000원/);assert.match(html,/가격 확인 중인 부품이 있어 계산하지 않았어요/);
+  // 2026-10-15: 부품 줄에는 금액이 없다 -- 모든 줄이 「기본 구성」이고 「가격 확인 중」·「조립·기타」는 어디에도 없다.
+  assert.equal((html.slice(0,html.indexOf('<tfoot>')).match(/class="final-part-price"><span class="mp-base-label">기본 구성<\/span>/g)||[]).length,5);
+  assert.doesNotMatch(html,/가격 확인 중|조립·기타|미확인/);assert.match(html,/900,000원/);
   assert.doesNotMatch(html,/100원|fake\.png|<img[^>]+(?:merchant|photo)/);assert.match(html,/disabled aria-describedby="bom-unavailable-/);
 });
-test('assembly-only parts say so instead of 가격 확인 중 and survive the public projection (2026-10-14 owner)',()=>{
+test('assembly-only parts keep a 조립 전용 tag and survive the public projection; no price sentence (2026-10-15)',()=>{
   const f=fixture();f.parts[0].price=159500;f.parts[1].assembly_only=true;
   const out=M.publicConfiguration(f,99413);assert.equal(out.parts[1].assembly_only,true);assert.equal(out.parts[0].assembly_only,false);
   const html=render(f),body=html.slice(0,html.indexOf('<tfoot>'));
-  assert.match(body,/class="final-part-price">조립 전용 부품<small class="muted foot-note">따로 팔지 않아요 · PC 금액에 포함/);
-  assert.doesNotMatch(body,/class="final-part-price">가격 확인 중/);
-  assert.match(html,/조립 전용 부품이 있어 계산하지 않았어요<small class="muted foot-note">조립 전용: 메인보드 · PC 금액에는/);
-  assert.doesNotMatch(html,/가격 확인 중인 부품이 있어/);
-  // 가격이 붙은 줄의 assembly_only 는 무시한다 — 값이 있으면 값을 보인다.
+  assert.equal((body.match(/<span class="mp-assembly">조립 전용<\/span>/g)||[]).length,1);
+  assert.doesNotMatch(html,/159,500|따로 팔지 않아요|가격 확인 중|조립·기타|계산하지 않았어요/);
   const g=fixture();g.parts[0].price=159500;g.parts[0].assembly_only=true;assert.equal(M.publicConfiguration(g,99413).parts[0].assembly_only,false);
-  // 확인 중 줄과 조립 전용 줄이 섞이면 둘 다 이름을 댄다.
-  const h=fixture();h.parts[1].assembly_only=true;assert.match(render(h),/가격 확인 중: CPU · 조립 전용: 메인보드/);
 });
 test('missing spec values and parts without specs read 정보 없음 (2026-10-10 owner decision)',()=>{
   const f=fixture();f.parts[0].specs=[{label:'소켓',value:'LGA1851'},{label:'기본 전력',value:'  '}];f.parts[1].specs=[];
@@ -121,7 +116,7 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
         const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);
         assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,3);
         const row=doc.querySelector('tr[data-part="bom-0"]');assert.ok(row.querySelector('h4').textContent.includes(slot));
-        assert.equal(row.querySelector('.final-part-price').textContent,'가격 확인 중');
+        assert.equal(row.querySelector('.final-part-price').textContent,'기본 구성');
         const details=row.querySelector('details');details.open=true;h.flow.emit();
         assert.equal(doc.querySelector('details[data-detail="bom-0"]').open,true);
         assert.match(doc.querySelector('.public-bom-role').textContent,slot==='CPU'?/프로그램의 명령/:/등록된 사양과 설명/);
@@ -134,29 +129,27 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
   });
 }
 module.exports={fixture,render};
-test('part sale prices show per line and the gap to the PC price is one 조립·기타 row (2026-10-12 owner decision)',()=>{
+test('no part sale price, parts subtotal or 조립·기타 row is shown even when the server sends part prices (2026-10-15 owner decision)',()=>{
   const f=fixture();f.parts[0].price=300000;f.parts[1].price=200000;f.parts.push({...clone(f.parts[0]),ordinal:2,slot:'SSD',quantity:2,name:'SSD',price:50000});
   const out=M.publicConfiguration(f,99413);assert.deepEqual(out.parts.map(x=>x.price),[300000,200000,50000,null]);
-  const html=render(f);assert.match(html,/class="final-part-price">300,000원/);assert.match(html,/class="final-part-price">100,000원/);
-  assert.match(html,/class="final-part-price">조립·기타에 포함/);
-  // 900,000 - (300,000 + 200,000 + 50,000 x 2) = 300,000
-  assert.match(html,/<th scope="row">조립·기타<\/th><td class="final-part-price">300,000원<small /);assert.doesNotMatch(html,/미확인/);
+  const html=render(f);
+  assert.doesNotMatch(html,/300,000원|200,000원|50,000원|100,000원|조립·기타|부품 합계|× 2개|가격 확인 중/);
+  assert.match(html,/기본 구성 \/ 변경 차액/);assert.match(html,/<th scope="row">기본 구성 PC 총액<\/th><td class="final-part-price">900,000원/);
 });
-test('parts summing above the PC price show a signed 조립·기타; pseudo or bad prices are never shown',()=>{
+test('bad part prices are still dropped by the projection',()=>{
   const f=fixture();f.parts[0].price=600000;f.parts[1].price=400000;f.parts[2].price=5000;
   const out=M.publicConfiguration(f,99413);assert.equal(out.parts[2].price,null);
-  assert.match(render(f),/<th scope="row">조립·기타<\/th><td class="final-part-price">-100,000원<small /);
   for(const bad of [0,-1,1.5,'300000',Number.MAX_SAFE_INTEGER+1]){const g=fixture();g.parts[0].price=bad;assert.equal(M.publicConfiguration(g,99413).parts[0].price,null);}
 });
 test('a pseudo GPU line says there is no separate graphics card instead of 정보 없음 (2026-10-12 owner screenshot)',()=>{
   const f=fixture();f.parts.push({ordinal:3,slot:'GPU',quantity:1,pseudo:true,name:null,description:null,specs:[]});
   const html=render(f);
   assert.match(html,/<span class="part-name">별도 그래픽카드 없음<\/span>/);assert.match(html,/CPU 내장 그래픽으로 화면을 출력하는 구성이에요/);
-  assert.match(html,/class="final-part-price">별도 부품 없음/);assert.equal((html.match(/class="final-part-price">조립·기타에 포함/g)||[]).length,1);
+  assert.match(html,/class="final-part-price">별도 부품 없음/);assert.doesNotMatch(html,/조립·기타/);
 });
 test('footer amounts sit in the price column, not centered across price and change columns',()=>{
   const html=render(fixture());
-  assert.match(html,/<th scope="row">상품 참고 금액<\/th><td class="final-part-price">900,000원<\/td><td aria-hidden="true"><\/td>/);
+  assert.match(html,/<th scope="row">기본 구성 PC 총액<\/th><td class="final-part-price">900,000원<small /);
   assert.doesNotMatch(html.slice(html.indexOf('<tfoot>')),/colspan="2"/);
 });
 test('POWER and COOLER rows get Korean labels and roles, not raw slot codes (open test C06)',()=>{

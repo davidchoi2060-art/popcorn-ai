@@ -71,14 +71,15 @@ test('ram options come from the server and swapping changes product, price and w
     assert.equal(text(d.querySelector('.part-options-head h4')),'메모리 바꾸기 · 지금 16GB');
     const rows=[...d.querySelectorAll('.part-option')];
     assert.deepEqual(rows.map(r=>text(r.querySelector('strong'))),['32GB','64GB']);
-    assert.ok(text(rows[0]).includes('1,350,000원')&&text(rows[0]).includes('+50,000원'));
+    assert.ok(text(rows[0]).includes('+50,000원')&&text(rows[0]).includes('추가'));
+    assert.ok(!text(rows[0]).includes('1,350,000원')&&!text(rows[1]).includes('1,500,000원'),'후보 옆에 PC 금액·단품 금액을 쓰지 않는다');
     assert.ok(text(rows[1]).includes('저장장치도 함께 바뀌어요: 500GB에서 2TB로'));
     rows[0].querySelector('[data-action=part-swap]').click();
     await until(()=>h.flow.state.selected.product_code===22);
     assert.equal(h.flow.state.selected.price,1350000);
     assert.equal(d.querySelector('.part-option'),null);
     assert.ok(text(d.querySelector('#actions')).includes('1,350,000원'));
-    assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리를 32GB로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겨서 금액은 1,350,000원(+50,000원)이에요.'));
+    assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리를 32GB로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겼어요. 기본 부품 대비 차액은 +50,000원이고, PC 총액은 1,350,000원이에요.'));
     d.querySelector('#actions [data-action=final]').click();
     await until(()=>h.flow.state.screen==='final'&&d.querySelector('[data-action=save]'));
     d.querySelector('[data-action=save]').click();
@@ -105,10 +106,31 @@ test('no option and server refusal are said plainly, nothing is swapped',async()
   }
 });
 
+test('zero diff says 추가 금액 없음, a negative diff says 감소, a missing diff is shown but cannot be picked (2026-10-15)',async()=>{
+  const zero=pc(24,1300000,{tag:'고른 구성',role:'chosen',swap:{slot:'ram',value:'16GB 다른 제품',price_diff:0,also:[]}});
+  const minus=pc(25,1270000,{tag:'고른 구성',role:'chosen',swap:{slot:'ram',value:'8GB',price_diff:-30000,also:[]}});
+  const none=pc(26,1300000,{tag:'고른 구성',role:'chosen',swap:{slot:'ram',value:'미확인 메모리',price_diff:null,also:[]}});
+  const h=harness({options:[zero,minus,none]});try{await toDetail(h);const d=h.d;
+    d.querySelector('#part-change [data-slot=ram]').click();
+    await until(()=>d.querySelector('.part-option'));
+    const row=code=>d.querySelector('[data-part-option="'+code+'"]');
+    assert.ok(text(row(24)).includes('추가 금액 없음')&&!text(row(24)).includes('0원')&&!text(row(24)).includes('같은 금액'));
+    assert.ok(text(row(25)).includes('\u221230,000원')&&text(row(25)).includes('감소')&&!text(row(25)).includes('1,270,000원'));
+    assert.ok(text(row(26)).includes('차액 확인 필요'));
+    assert.equal(row(26).querySelector('[data-action=part-swap]'),null,'차액 없는 후보는 선택 단추가 없다');
+    assert.ok(row(24).querySelector('[data-action=part-swap]')&&row(25).querySelector('[data-action=part-swap]'));
+    assert.ok(text(d.querySelector('.part-options')).includes('단품 금액 표시 없음'));
+    assert.doesNotMatch(text(d.body),/조립·기타|가격 확인 중/);
+    h.flow.swapPart(26);await tick();assert.equal(h.flow.state.selected.product_code,12,'흐름도 차액 없는 후보를 거부한다');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
 test('an option with a broken price is dropped, not shown with an invented amount',async()=>{
   const h=harness({options:[{...swapped,price:null},{...bigger,swap:{...bigger.swap,price_diff:'200000'}},swapped]});try{await toDetail(h);const d=h.d;
     d.querySelector('#part-change [data-slot=ram]').click();
     await until(()=>d.querySelector('.part-option'));
-    assert.deepEqual([...d.querySelectorAll('.part-option')].map(r=>Number(r.dataset.partOption)),[22]);
+    // 상품 금액이 깨진 후보는 버리고, 차액만 깨진 후보는 「차액 확인 필요」로 남기되 고를 수 없다.
+    assert.deepEqual([...d.querySelectorAll('.part-option')].map(r=>Number(r.dataset.partOption)),[23,22]);
+    assert.ok(text(d.querySelector('[data-part-option="23"]')).includes('차액 확인 필요'));assert.equal(d.querySelector('[data-part-option="23"] [data-action=part-swap]'),null);
   }finally{h.close();}
 });
