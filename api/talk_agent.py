@@ -70,7 +70,7 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 2~5문장. 결론부터. 질문은 한 번에 하나만.
 - PC 여러 대를 견주면 한 줄에 하나씩 「- 」로 시작해 줄을 바꿔 쓴다. 별표(**) 같은 마크다운 강조는 쓰지 않는다.
 - 손님에게 보낼 답만 한국어로 쓴다. 생각 과정·메모·영어 정리는 쓰지 않는다.
-- 가격은 도구가 준 숫자 그대로만 쓴다. price 가 null 이면 「가격 확인 중」이라고 한다.
+- 가격은 도구가 준 숫자 그대로만 쓰고, 세 자리마다 쉼표를 넣는다(3,220,500원). price 가 null 이면 「가격 확인 중」이라고 한다.
 - 「모니터 4대」는 PC를 4대 산다는 뜻이 아니라 모니터 4대를 연결한다는 뜻이다. 우리 자료에는 그래픽카드 출력 단자 수가 없으니, 동시 출력이 가능하다고 단정하지 말고 단자 확인이 필요하다고 말한다.
 - 「해 드릴게요」「확인했습니다」 같은 약속은 하지 않는다. 주문·결제·환불 처리는 이 상담에서 하지 않는다.
 - 다른 쇼핑몰 가격은 확인할 수 없다.
@@ -162,6 +162,15 @@ def is_scratch(sentence: str) -> bool:
     return lower >= 2
 
 
+_BARE_WON = re.compile(r"(?<![\d,.])(\d{4,})(?=\s*원)")
+
+
+def _won_commas(text_: str) -> str:
+    """「3220500원」 -> 「3,220,500원」. 모델이 도구 숫자를 쉼표 없이 옮겨 써도 화면은 세 자리마다 쉼표로 보인다
+    (2026-10-15 사장님 「금액은 중간에 , 표시가 들어가야 해」). 「150만원」·「2026년」은 건드리지 않는다."""
+    return _BARE_WON.sub(lambda m: f"{int(m.group(1)):,}", text_ or "")
+
+
 def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tuple[str, list[dict]]:
     """설명을 문장 단위로 사실 묶음과 대조한다 -> (남긴 글, 뺀 문장[{sentence, reason}]).
 
@@ -200,7 +209,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
             lines.append(mark + " ".join(kept))
         elif not raw_line.strip() and lines and lines[-1]:
             lines.append("")              # 빈 줄(문단 구분)은 한 번만
-    return "\n".join(lines).strip(), dropped
+    return _won_commas("\n".join(lines).strip()), dropped
 
 
 _OVER_WORDS = ("넘", "초과", "벗어")
