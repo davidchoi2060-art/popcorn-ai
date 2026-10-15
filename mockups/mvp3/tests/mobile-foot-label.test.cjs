@@ -1,4 +1,4 @@
-// 모바일 상세 하단 합계 줄: 라벨(「조립·기타」)이 긴 금액 문장에 밀려 한 글자씩 끊기지 않는다(2026-10-12 실서버 390px 캡처).
+// 모바일 상세 하단 합계 줄: 라벨(「완제품 가격 차이」 · 옛 「조립·기타」)이 긴 금액 문장에 밀려 한 글자씩 끊기지 않는다(2026-10-12 실서버 390px 캡처).
 const assert=require('assert');const fs=require('fs');const path=require('path');
 const css=fs.readFileSync(path.join(__dirname,'..','styles.css'),'utf8');
 const mobile=css.slice(css.indexOf('.final-table tfoot{display:block'));

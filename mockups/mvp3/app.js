@@ -298,7 +298,7 @@ function publicBomDetails(configuration,p,information,finalOnly){
       (part.photo?.state==='approved'?'<figure class="public-bom-photo" data-product-photo><img data-product-image src="'+esc(part.photo.url)+'" alt="'+esc(part.name||label)+' 부품 사진" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>부품 사진을 불러오지 못했습니다</p></figure>':'<div class="public-bom-photo">정보 없음</div>')+'<div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
       '<p class="public-bom-unavailable" id="'+id+'">'+(swap?(finalOnly?'부품 질문은 아직 지원하지 않아요. 부품은 「상품 상세 다시 보기」에서 바꿀 수 있어요.':'부품 질문은 아직 지원하지 않아요. 이 부품은 오른쪽 「변경」으로 바꿀 수 있어요.'):'부품 질문은 아직 지원하지 않아요. 이 줄은 바꿀 수 없어요.')+'</p></div></div></details></td></tr>'+(open?buildRow():'');
   }).join('');
-  const b=p.build,foot=otherRow(configuration,b?b.base_price:p.price)+(b?footRow('기본 구성 금액',money(b.base_price))+footRow('부품 변경',signedMoney(p.price-b.base_price))+footRow('바꾼 구성 금액',money(p.price))
+  const b=p.build,foot=otherRow(configuration,b?b.base_price:p.price,!!b)+(b?footRow('기본 구성 금액',money(b.base_price))+footRow('부품 변경',signedMoney(p.price-b.base_price))+footRow('바꾼 구성 금액',money(p.price))
     :footRow('상품 참고 금액',money(p.price)));
   return '<section class="final-parts public-bom"><h3>부품 구성과 선택 이유</h3><div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
     '<thead><tr><th scope="col">부품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody>'+rows+'</tbody><tfoot>'+foot+'</tfoot></table></div></section>'+
@@ -310,10 +310,12 @@ function changeButton(part,label,finalOnly,open,id){
   if(part.pseudo||finalOnly)return button('변경','unavailable','outline small','disabled aria-describedby="'+id+'"');
   return button('변경','build-options','outline small'+(open?' is-active':''),'data-ordinal="'+part.ordinal+'" aria-expanded="'+open+'" aria-label="'+esc(label)+' 바꾸기"'+(state.phase?' disabled':''));
 }
+// 차액 줄 이름 -- 정본은 이 한 줄(2026-10-15 사장님 확정, 옛 이름 「조립·기타」).
+const OTHER_LABEL='완제품 가격 차이';
 // 부품 줄 금액 = 부품 판매가 × 수량(서버 parts[].price). 값이 없으면 지어내지 않는다.
-// 서비스 줄(pseudo)은 따로 값이 없어 아래 「조립·기타」에 들어간다.
+// 서비스 줄(pseudo)은 따로 값이 없어 아래 차액 줄(OTHER_LABEL)에 들어간다.
 // 그래픽카드 자리의 서비스 줄 = 판매 구성에 별도 그래픽카드가 없다는 뜻(CPU 내장 그래픽으로 출력 — api/build_check.py
-// 「CPU 내장 그래픽 사용」과 같은 판정). 이름 없는 줄을 「정보 없음 · 조립·기타에 포함」으로 쓰면 값이 빠진 것처럼 읽힌다.
+// 「CPU 내장 그래픽 사용」과 같은 판정). 이름 없는 줄을 「정보 없음 · …에 포함」으로 쓰면 값이 빠진 것처럼 읽힌다.
 function pseudoPart(part){
   if(part.pseudo&&part.slot==='GPU')return {name:'별도 그래픽카드 없음',description:'CPU 내장 그래픽으로 화면을 출력하는 구성이에요.',price:'별도 부품 없음'};
   return {};
@@ -322,17 +324,23 @@ function pseudoPart(part){
 // 메모리 수량 2 줄의 319,000원이 단가인지 줄 합계인지 알 수 없었다).
 function partLinePrice(part){
   if(pseudoPart(part).price)return pseudoPart(part).price;
-  if(part.pseudo)return '조립·기타에 포함';
+  if(part.pseudo)return OTHER_LABEL+'에 포함';
   if(!Number.isSafeInteger(part.price)&&part.assembly_only)return '조립 전용 부품<small class="muted foot-note">따로 팔지 않아요 · PC 금액에 포함</small>';
   if(!Number.isSafeInteger(part.price))return '가격 확인 중';
   return money(part.price*part.quantity)+(part.quantity>1?'<small class="muted foot-note">'+money(part.price)+' × '+part.quantity+'개</small>':'');
 }
 const SLOT_NAME={CPU:'CPU',GPU:'그래픽카드',RAM:'메모리',SSD:'저장장치',HDD:'저장장치',MB:'메인보드',PSU:'파워',POWER:'파워',COOLER:'쿨러',CASE:'케이스'};
-// 「조립·기타」 = PC 금액 − 부품 판매가 합(2026-10-12 사장님 「추천한대로」). 바꾼 구성은 기본 구성 금액에서
+// 차액 줄(옛 이름 「조립·기타」) = PC 금액 − 부품 판매가 합(2026-10-12 사장님 「추천한대로」). 바꾼 구성은 기본 구성 금액에서
 // 원래 부품 합을 빼므로 차이가 그대로다. 값이 빠진 부품이 있으면 차이를 계산하지 않고 그렇다고 말한다 -- 어느 부품이
 // 빠졌는지와, PC 금액에는 그 부품이 들어 있다는 것도 함께 말한다(코덱스 24조합 검수 6번: 「총액 − 보이는 부품 합」이
 // 조립비처럼 크게 읽혔다).
-function otherRow(configuration,total){
+// 2026-10-15 코덱스 추천안 + 사장님 확정: 줄 이름 「조립·기타」 -> 「완제품 가격 차이」(조립 공임으로 읽혔다).
+// 이름은 OTHER_LABEL 한 곳에만 둔다(부품 줄의 「…에 포함」도 이 값을 쓴다). 조립비로 읽히지 않게 상시 설명을 붙이고, 차액을 조립비·마진·부가세로
+// 나누지 않는다(나눈 내역이 없다). 계산되면 「부품 판매가 합계」를 차액 앞에 먼저 보여 비교 기준을 드러낸다.
+const OTHER_HELP='PC 판매가에서 부품별 판매가 합계를 뺀 금액이에요. 완제품과 부품은 별도로 책정된 판매가를 사용해 차이가 날 수 있어요. 이 금액을 조립비·마진·부가세로 나눈 내역은 아직 확인되지 않았어요.';
+const OTHER_HELP_UNKNOWN='가격이 확인되지 않은 부품을 0원으로 보지 않아요. 해당 부품 가격이 확인되면 부품 합계와 차액을 보여 드려요. PC 판매가에 어떤 부품이 포함되는지는 구성표를 함께 확인해 주세요.';
+function otherHelp(text){return '<details class="other-help"><summary>이 차액은 무엇인가요?</summary><p>'+text+'</p></details>';}
+function otherRow(configuration,total,base){
   const parts=configuration.parts.filter(x=>!x.pseudo),missing=parts.filter(x=>!Number.isSafeInteger(x.price));
   if(!Number.isSafeInteger(total)||missing.length){
     // 조립 전용 부품은 «확인 중»이 아니라 개별 판매가가 원래 없는 줄이다 -- 두 사유를 나눠 말한다(2026-10-14 사장님).
@@ -340,10 +348,14 @@ function otherRow(configuration,total){
     const checking=label(missing.filter(x=>!x.assembly_only)),assembly=label(missing.filter(x=>x.assembly_only));
     const notes=(checking?'가격 확인 중: '+esc(checking):'')+(checking&&assembly?' · ':'')+(assembly?'조립 전용: '+esc(assembly):'');
     const head=checking?'가격 확인 중인 부품이 있어 계산하지 않았어요':'조립 전용 부품이 있어 계산하지 않았어요';
-    return footRow('조립·기타',head+(notes?'<small class="muted foot-note">'+notes+' · PC 금액에는 이 부품들이 포함돼 있어요</small>':''),'other-row');
+    return footRow(OTHER_LABEL,head+(notes?'<small class="muted foot-note">'+notes+' · PC 금액에는 이 부품들이 포함돼 있어요</small>':'')+otherHelp(OTHER_HELP_UNKNOWN),'other-row');
   }
-  const other=total-parts.reduce((sum,x)=>sum+x.price*x.quantity,0);
-  return footRow('조립·기타',(other<0?signedMoney(other):money(other))+'<small class="muted foot-note">PC 금액과 부품 판매가 합의 차이</small>','other-row');
+  const sum=parts.reduce((s,x)=>s+x.price*x.quantity,0),other=total-sum;
+  const note=other>0?'부품 합계보다 높은 금액이에요. 조립비를 따로 계산한 값은 아니에요.'
+    :other<0?'완제품 가격이 부품 합계보다 낮아요. 조립비나 할인을 따로 계산한 내역은 아니에요.':'완제품 가격과 부품 합계가 같아요.';
+  // 바꾼 구성이면 차액은 기본 구성 기준이다(기본 구성 금액 − 원래 부품 합) -- 합계 줄 이름도 그렇게 밝힌다.
+  return footRow(base?'기본 구성 부품 판매가 합계':'부품 판매가 합계',money(sum),'parts-sum-row')+
+    footRow(OTHER_LABEL,(other?signedMoney(other):money(other))+'<small class="muted foot-note">'+note+'</small>'+otherHelp(OTHER_HELP),'other-row');
 }
 // 합계 줄은 금액을 부품 줄과 같은 「금액」 열에 둔다(두 열을 합쳐 가운데 두면 금액 열과 어긋난다).
 function footRow(label,value,cls){

@@ -159,6 +159,11 @@ body[data-screen="final"] .chat-intro p{color:#536c94}
 .final-table tfoot .foot-note{display:block;font-size:12px;font-weight:400;margin-top:2px}
 /* 부품 줄 금액 아래 「159,500원 × 2개」도 줄을 나눈다 -- 합계 319,000원과 붙어 읽혔다(2026-10-13 코덱스 실화면 재검수 6번) */
 .final-table .final-part-price .foot-note{display:block;font-size:12px;font-weight:400;margin-top:2px;line-height:1.2}
+/* 「조립·기타」 차액 줄(2026-10-15): 상시 설명과 「이 차액은 무엇인가요?」 펼침이 금액 열을 넓히지 않게 단어 단위로 줄바꿈한다 */
+.final-table tfoot .other-row .final-part-price{white-space:normal;word-break:keep-all;overflow-wrap:anywhere}
+.final-table .other-help{margin-top:4px;font-size:12px;font-weight:400;text-align:left}
+.final-table .other-help summary{cursor:pointer;color:var(--green,#2f7a5b);font-weight:600;text-decoration:underline}
+.final-table .other-help p{margin:4px 0 0;line-height:1.4;color:#526d99}
 .final-part-expanded{background:#f0f6f4;border-radius:5px;padding:10px;margin-top:7px;margin-bottom:5px;line-height:1.5}
 .final-part-expanded dl{margin:0}.final-part-expanded dl>div{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;border-bottom:1px solid #dce8e2;padding:4px 0;font-size:14px}
 .final-part-expanded p{margin:8px 0}.final-part-expanded .text-button{font-size:14px}

@@ -36,7 +36,9 @@ test('6번: 가격 확인 중 부품이 있으면 어느 부품인지와 PC 금�
   const c=configuration([part(0,'CPU',159500),part(1,'GPU',null),part(2,'RAM',null),part(3,'POWER',42600)]);
   const html=details({product_code:98149,name:'[12400F/16GB/500GB/RTX5060]',price:1624400,spec:{cpu:'i5-12400F'},reasons:['게임 FHD'],public_configuration:c});
   assert.match(html,/가격 확인 중인 부품이 있어 계산하지 않았어요<small class="muted foot-note">가격 확인 중: 그래픽카드·메모리 · PC 금액에는 이 부품들이 포함돼 있어요<\/small>/);
-  assert.doesNotMatch(html,/<th scope="row">조립·기타<\/th><td class="final-part-price">[0-9,]+원/);   // 차액을 조립비처럼 내지 않는다
+  assert.doesNotMatch(html,/<th scope="row">완제품 가격 차이<\/th><td class="final-part-price">[0-9,]+원/);   // 차액을 조립비처럼 내지 않는다
+  assert.match(html,/<details class="other-help"><summary>이 차액은 무엇인가요\?<\/summary><p>가격이 확인되지 않은 부품을 0원으로 보지 않아요\./);
+  assert.doesNotMatch(html,/부품 판매가 합계<\/th>/);   // 계산 안 함이면 합계도 지어내지 않는다
 });
 
 test('4번: 부품 구성표가 없는 상품도 상세에 카드와 같은 사양(케이스·파워 포함)을 보인다',()=>{
