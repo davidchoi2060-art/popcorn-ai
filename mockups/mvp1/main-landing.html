@@ -3,7 +3,7 @@
 <head><meta name="robots" content="noindex,nofollow">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>팝콘PC AI — 실시간 재고 기반 AI 견적</title>
+<title>팝콘PC AI — 용도와 예산으로 시작하는 AI 견적</title>
 <style>
   * { box-sizing: border-box; }
   html { scroll-behavior:smooth; }
@@ -103,6 +103,11 @@
        192px라 263~339px 폭에서 성립 불가. 2열로 접는다(브랜드 블록은
        상위 flex-wrap이 이미 처리하고 있어 그대로 둔다). */
     .mm-footer-links{grid-template-columns:repeat(2,1fr)!important;gap:20px 16px!important}
+    /* 2026-10-15 개정: 링크 묶음이 3열로 돌아왔다(준비 중 항목은 줄바꿈 허용).
+       위 2열 규칙은 아래 줄이 덮는다 — 이력으로 남긴다. 좌우 56px 패딩은 20px로. */
+    .mm-footer{padding:48px 20px 40px!important;gap:32px!important}
+    .mm-footer-links{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:16px!important;width:100%}
+    .mm-soon{font-size:13px!important}
   }
 </style>
   <link rel="stylesheet" href="../shared/fonts/fonts.css">
@@ -145,9 +150,9 @@
         <p style="margin:0; font-size:20px; font-weight:600; color:rgba(255,255,255,.62); line-height:1.5;">&ldquo;같은 부품인데 왜 판매처마다 가격이 다르지?&rdquo;</p>
       </div>
       <h1 style="margin:0; font-family:var(--font); font-weight:800; font-size:56px; line-height:1.14; letter-spacing:-0.03em; color:#fff;">모든 견적에는 <span style="color:#8FC0E8;">이유가 있습니다.</span></h1>
-      <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">말씀하신 그대로 이해하고, 엔진이 검증한 구성으로 답합니다. 조립 불가능한 조합은 후보에서 제외됩니다.</p>
+      <p style="margin:26px 0 0; font-size:19px; line-height:1.7; color:rgba(255,255,255,.78); max-width:640px;">용도와 예산을 알려주세요. 상담에서 판매 PC와 선택 이유를 안내합니다. 실제 조립 가능 여부와 구매 조건은 주문 전에 확인해 주세요.</p>
       <div class="mm-hero-badges" style="display:flex; gap:22px; margin:30px 0 34px; align-items:center;">
-        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f); box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>실시간 재고 검증</div>
+        <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:var(--success-teal, #10a37f); box-shadow:0 0 0 4px rgba(16,163,127,.2);"></span>재고는 구매 전 확인</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#D97757; box-shadow:0 0 0 4px rgba(217,119,87,.2);"></span>호환성 <span data-bind="showcase_rules">—</span>종</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#4285F4; box-shadow:0 0 0 4px rgba(66,133,244,.2);"></span>근거 리포트</div>
         <div style="display:flex; align-items:center; gap:8px; color:rgba(255,255,255,.9); font-size:14px; font-weight:600;"><span style="width:9px; height:9px; border-radius:50%; background:#E8B563; box-shadow:0 0 0 4px rgba(232,181,99,.2);"></span>본체부터 모니터·주변기기까지</div>
@@ -172,8 +177,8 @@
         <div style="display:flex; gap:44px; flex-wrap:wrap;">
           <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">verified</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">25년 업력</span></div>
           <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">workspace_premium</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">정품 100%</span></div>
-        <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">support_agent</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">제조사 보증 1년</span></div>
-          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">bolt</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">당일에서 최대 3일 이내 조립 출고</span></div>
+        <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">support_agent</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">보증 기간·범위는 상품별 확인</span></div>
+          <div style="display:flex; align-items:center; gap:11px;"><span class="msym" style="font-size:26px; color:#65A1D4; font-variation-settings:'FILL' 1;">bolt</span><span style="font-family:var(--font); font-weight:700; font-size:16px; color:#1A202C;">출고 일정은 주문 전 확인</span></div>
         </div>
         <p style="margin:0; font-size:14px; color:#64748B; font-style:italic;">서울 용산에서 25년, 직접 조립·검수해 온 팀입니다</p>
       </section>
@@ -202,8 +207,8 @@
               <span style="font-family:var(--font-num); font-size:10px; font-weight:700; letter-spacing:.1em; color:#64748B; background:rgba(100,116,139,.1); padding:4px 9px; border-radius:6px;">ENGINE</span>
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:var(--success-teal, #10a37f); color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">inventory_2</span></div>
-            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">실시간 재고 검증</div>
-            <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">지금 살 수 있는 부품만 후보로. 품절·단종은 즉시 제외합니다.</p>
+            <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">조회 시점의 상품 정보</div>
+            <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">상품의 사양과 참고 금액을 안내합니다. 재고는 구매 전 쇼핑몰에서 확인해 주세요.</p>
           </div>
           <!-- 03 엔진 -->
           <div style="background:#fff; border-radius:22px; padding:26px 22px; border:1px solid rgba(148,163,184,.24); border-top:3px solid #4285F4; box-shadow:0 20px 40px -30px rgba(66,133,244,.5);">
@@ -233,7 +238,7 @@
             </div>
             <div style="width:44px; height:44px; border-radius:13px; background:#111827; color:#fff; display:flex; align-items:center; justify-content:center; margin-bottom:16px;"><span class="msym" style="font-size:23px;">task_alt</span></div>
             <div style="font-family:var(--font); font-weight:800; font-size:16px; color:#111827; margin-bottom:8px;">견적 확정</div>
-            <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">검증된 구성과 근거 리포트를 확정, 그대로 주문까지.</p>
+            <p style="margin:0; font-size:13px; line-height:1.55; color:#475569;">추천 이유와 구성을 확인하고, 구매는 팝콘PC 쇼핑몰에서 진행해 주세요.</p>
           </div>
         </div>
 
@@ -337,27 +342,81 @@
         <div>
           <div style="display:flex; gap:10px; margin-bottom:22px;"><span style="width:11px; height:11px; border-radius:50%; background:var(--success-teal, #10a37f);"></span><span style="width:11px; height:11px; border-radius:50%; background:#D97757;"></span><span style="width:11px; height:11px; border-radius:50%; background:#4285F4;"></span></div>
           <h2 style="margin:0; font-family:var(--font); font-weight:900; font-size:46px; line-height:1.1; letter-spacing:-0.03em; color:#fff;">이유 있는 견적,<br>지금 받아보세요.</h2>
-          <p style="margin:20px 0 0; font-size:18px; color:rgba(255,255,255,.72); max-width:480px; line-height:1.6;">질문 하나면 됩니다. 지금 재고에서 조건을 통과한 구성으로 답합니다.</p>
+          <p style="margin:20px 0 0; font-size:18px; color:rgba(255,255,255,.72); max-width:480px; line-height:1.6;">용도와 예산으로 상담을 시작하세요. 구매 전 가격·재고·보증 조건은 쇼핑몰에서 확인해 주세요.</p>
         </div>
         <button style="background:#65A1D4; color:#fff; border:none; padding:22px 40px; border-radius:18px; font-family:var(--font); font-weight:800; font-size:20px; cursor:pointer; white-space:nowrap; box-shadow:0 22px 44px rgba(101,161,212,.45); display:flex; align-items:center; gap:12px;" data-cta="start">무료로 견적 받기 <span class="msym" style="font-size:24px;">arrow_forward</span></button>
       </div>
     </section>
 
     <!-- FOOTER -->
-    <footer style="max-width:1240px; margin:0 auto; padding:80px 56px 64px; display:flex; justify-content:space-between; gap:60px; flex-wrap:wrap;">
+    <footer class="mm-footer" style="max-width:1240px; margin:0 auto; padding:80px 56px 64px; display:flex; justify-content:space-between; gap:60px; flex-wrap:wrap;">
       <div style="max-width:340px;">
         <div style="font-family:var(--font); font-weight:900; font-size:24px; color:#111827; letter-spacing:-0.02em;">팝콘PC <span style="color:#65A1D4;">AI</span></div>
-        <p style="margin:18px 0 24px; font-size:14px; line-height:1.8; color:#64748B;">© 2026 팝콘PC AI. 실시간 재고로 견적하는 용산 팝콘PC. 모든 견적에는 이유가 있습니다.</p>
+        <p style="margin:18px 0 24px; font-size:14px; line-height:1.8; color:#64748B;">© 2026 팝콘PC AI. 용도와 예산으로 시작하는 PC 상담. 구매·결제는 팝콘PC 쇼핑몰에서 진행돼요.</p>
         <div style="display:flex; gap:12px;"><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">share</span></div><div style="width:40px; height:40px; border-radius:50%; background:rgba(15,23,42,.05); display:flex; align-items:center; justify-content:center; color:#475569;"><span class="msym" style="font-size:20px;">alternate_email</span></div></div>
       </div>
       <div class="mm-footer-links" style="display:grid; grid-template-columns:repeat(3,auto); gap:64px;">
-        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">제품</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">견적 내기</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">부품 DB</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">벤치마크</a></div>
-        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">정책</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">이용약관</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">개인정보 처리방침</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">환불 규정</a></div>
-        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">고객 지원</span><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">자주 묻는 질문</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">1:1 문의</a><a href="#" style="font-size:14px; color:#64748B; text-decoration:none;">커뮤니티</a></div>
+        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">제품</span>
+          <a href="/mvp3/" style="font-size:14px; color:#64748B; text-decoration:none;">견적 내기</a>
+          <button type="button" class="mm-soon" data-soon="부품 DB">부품 DB <span class="mm-soon-tag">준비 중</span></button>
+          <button type="button" class="mm-soon" data-soon="벤치마크">벤치마크 <span class="mm-soon-tag">준비 중</span></button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">정책</span>
+          <button type="button" class="mm-soon" data-soon="이용약관">이용약관 <span class="mm-soon-tag">준비 중</span></button>
+          <button type="button" class="mm-soon" data-soon="개인정보 처리방침">개인정보 처리방침 <span class="mm-soon-tag">준비 중</span></button>
+          <button type="button" class="mm-soon" data-soon="환불 규정">환불 규정 <span class="mm-soon-tag">준비 중</span></button>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:14px;"><span style="font-size:12px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:#111827;">고객 지원</span>
+          <button type="button" class="mm-soon" data-soon="자주 묻는 질문">자주 묻는 질문 <span class="mm-soon-tag">준비 중</span></button>
+          <button type="button" class="mm-soon" data-soon="1:1 문의">1:1 문의 <span class="mm-soon-tag">준비 중</span></button>
+          <button type="button" class="mm-soon" data-soon="커뮤니티">커뮤니티 <span class="mm-soon-tag">준비 중</span></button>
+        </div>
       </div>
     </footer>
   </main>
 </div>
+
+<!-- FOOTER 준비 중 안내 (2026-10-15). 아직 페이지가 없는 하단 항목은 href="#" 대신
+     버튼으로 두고, 누르면 이 대화상자 하나가 항목 이름으로 안내한다. 항목을 다시
+     넣거나 새로 넣을 때는 푸터에 .mm-soon 버튼 한 줄만 추가한다(빼는 것도 그 한 줄).
+     정책 초안은 승인 전이라 연결하지 않는다.
+     안내 문구에 개통 시점·날짜를 적지 않는다. 색·라운딩·그림자는 이 파일의 공지
+     팝업(#mm-notice)과 같은 값을 재사용했다. -->
+<style>
+.mm-soon{word-break:keep-all;display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 8px;padding:0;border:0;background:none;font-family:var(--font);font-size:14px;line-height:1.5;color:#64748B;text-align:left;cursor:pointer}
+.mm-soon:hover{text-decoration:underline;text-underline-offset:4px}
+.mm-soon:focus-visible{outline:3px solid #65A1D4;outline-offset:3px;border-radius:4px}
+.mm-soon-tag{font-size:11px;line-height:1.4;color:#64748B;border:1px solid rgba(148,163,184,.24);border-radius:5px;padding:1px 5px;white-space:nowrap}
+#mm-soon-dialog{border:1px solid rgba(148,163,184,.24);border-radius:26px;padding:30px 24px 22px;width:420px;max-width:calc(100vw - 40px);background:#fff;color:#111827;box-shadow:0 30px 60px -30px rgba(15,23,42,.7)}
+#mm-soon-dialog::backdrop{background:rgba(11,18,32,.6)}
+</style>
+<dialog id="mm-soon-dialog" aria-labelledby="mm-soon-title">
+  <h2 id="mm-soon-title" style="margin:0 0 10px;font-family:var(--font);font-weight:800;font-size:19px;color:#111827;letter-spacing:-0.02em;">준비 중</h2>
+  <p id="mm-soon-msg" style="margin:0;font-size:14.5px;line-height:1.65;color:#475569;">이 메뉴는 준비 중이에요. 이용할 수 있게 되면 안내할게요.</p>
+  <form method="dialog" style="margin:22px 0 0;padding-top:16px;border-top:1px solid rgba(148,163,184,.24);">
+    <button type="submit" style="width:100%;background:#65A1D4;color:#fff;border:none;padding:13px 20px;border-radius:14px;font-family:var(--font);font-weight:800;font-size:15px;cursor:pointer;">확인</button>
+  </form>
+</dialog>
+<script>
+/* 항목별 문구가 따로 필요하면 MSG 에 한 줄 추가한다. 없으면 기본 문구. */
+(function(){
+ var dlg=document.getElementById('mm-soon-dialog');
+ if(!dlg||typeof dlg.showModal!=='function')return;
+ var MSG={
+  '환불 규정':'환불 규정 연결을 준비하고 있어요. 구매 전에 팝콘PC 쇼핑몰의 환불 조건을 확인해 주세요.',
+  '1:1 문의':'1:1 문의 안내를 준비하고 있어요. 지금은 이 화면에서 문의를 접수하지 않아요.'
+ };
+ var DEF='이 메뉴는 준비 중이에요. 이용할 수 있게 되면 안내할게요.';
+ document.querySelectorAll('.mm-soon[data-soon]').forEach(function(b){
+  b.addEventListener('click',function(){
+   var name=b.getAttribute('data-soon');
+   document.getElementById('mm-soon-title').textContent=name+' 안내';
+   document.getElementById('mm-soon-msg').textContent=MSG[name]||DEF;
+   dlg.showModal();
+  });
+ });
+})();
+</script>
 
 <!-- NOTICE POPUP (2026-08-21 제작 — 사장님 지시: "랜딩 페이지 메인에 공지사항
      팝업창으로 현재 오픈 베타 점검중이라고 띄우는 페이지 [ ]오늘 하루 보지 않기
