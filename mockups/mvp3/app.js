@@ -417,19 +417,22 @@ function partChangeBody(finalOnly,configured){
   return '<section class="live-capabilities" id="part-change"><h3>부품 바꾸기</h3><p>바꾸고 싶은 부품을 고르세요. 그 부품만 다른 판매 중인 PC를 찾아 드려요. 게임 FPS 비교 자료는 아직 제공되지 않아요.</p><div>'+
     SWAP_BUTTONS.map(([slot,label,icon])=>button(uiIcon(icon)+label+' 바꾸기','part-options','outline small'+(state.parts?.slot===slot?' is-active':''),'data-slot="'+slot+'" aria-expanded="'+(state.parts?.slot===slot)+'"'+(state.phase?' disabled':''))).join('')+'</div>'+partOptionsPanel()+'</section>';
 }
-function productDetails(finalOnly=false){
-  const p=state.selected;
+// 추천 이유·게임 안내. 상세(추천 구성 상세)에서는 오른쪽 열로, 최종 견적에서는 접힌 칸 안으로 간다.
+function detailReason(p){
   // Read only the selected recommendation group; saved/recovery records have no game-context contract.
   const context=state.savedQuote||state.pendingSave?null:(state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(p.index)&&g.products.some(item=>item.index===p.index&&item.product_code===p.product_code)));
   const ctx=context?.game_context,url=M.safeUrl(ctx?.source.url);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
-  const rows=M.changedSpecRows(M.specRows(p.spec),p.build),spec=rows.length?'<dl class="live-spec-grid">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-full-spec">'+esc(M.specText(p.spec)||'등록된 상세 사양을 확인하지 못했어요.')+'</p>';
-  const information=
-    '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+
+  return '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+
     '<p class="muted">상담 조건: '+M.conditions(state.selectionState||state.talk).map(esc).join(' · ')+'</p>'+
     (p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
-    (ctx?'<section class="live-explanation"><h3>게임 안내 · '+esc(ctx.game_name)+'</h3><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</section>':'')+
-    partChange(finalOnly,!!M.publicConfiguration(p.public_configuration,p.product_code));
+    (ctx?'<section class="live-explanation"><h3>게임 안내 · '+esc(ctx.game_name)+'</h3><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</section>':'');
+}
+// split: 추천 구성 상세의 두 열 배치(2026-10-15 코덱스 디자인 v1). 왼쪽 열에는 구성만 두고, 추천 이유·부품 바꾸기는 renderDetail 이 따로 놓는다.
+function productDetails(finalOnly=false,split=false){
+  const p=state.selected;
+  const rows=M.changedSpecRows(M.specRows(p.spec),p.build),spec=rows.length?'<dl class="live-spec-grid">'+rows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'<p class="live-full-spec">'+esc(M.specText(p.spec)||'등록된 상세 사양을 확인하지 못했어요.')+'</p>';
+  const information=split?'':detailReason(p)+partChange(finalOnly,!!M.publicConfiguration(p.public_configuration,p.product_code));
   const configuration=M.publicConfiguration(p.public_configuration,p.product_code);
   if(configuration)return publicBomDetails(configuration,p,information,finalOnly);
   // 부품별 구성표가 없는 상품도 카드에 보인 사양(CPU·GPU·램·저장장치·케이스·파워)은 상세에서 바로 보이게 한다 -- 완제품 한 줄만
@@ -447,9 +450,15 @@ function finalConditions(){
     row('package','재고','재고 확보 전 · 구매 전 확인')+'</dl><dl>'+row('squares-four','운영체제','포함 여부 재확인 필요')+
     row('monitor','키보드 · 마우스 · 모니터','포함 여부 미확인')+row('shield','보증','기간 · 범위 재확인 필요')+'</dl></div></section>';
 }
+// 추천 구성 상세(2026-10-15 코덱스 디자인 v1 -- D:\\WORK\\코덱스-디자인\\2026-10-15-추천구성상세-v1). 왼쪽 = 상품·구성·부품 바꾸기,
+// 오른쪽 = 추천 이유·같은 구성 대수·구매 전 안내, 그 아래 구매 전 확인 6칸. 담는 정보와 동작은 그대로이고 배치만 바뀐다.
 function renderDetail(){
-  view.innerHTML=heading('추천 구성 상세')+errorPanel()+productSummary()+productDetails()+finalConditions();
-  const p=state.selected;
+  const p=state.selected,configured=!!M.publicConfiguration(p.public_configuration,p.product_code);
+  view.innerHTML='<div class="dt-detail">'+heading('추천 구성 상세',true,'구성을 살펴보고, 나에게 맞게 조정해 보세요.')+errorPanel()+
+    '<div class="dt-layout"><div class="dt-main-col">'+productSummary()+productDetails(false,true)+partChangeBody(false,configured)+'</div>'+
+    '<aside class="dt-aside" aria-label="추천 이유와 대수">'+detailReason(p)+setsBlock(p)+
+    '<div class="dt-alt-note"><strong>구매 전에 확인해 주세요</strong>표시 금액은 조회 시점의 참고 금액이에요. 실제 구매 금액과 포함 품목은 구매 전에 확인해 주세요.</div></aside></div>'+
+    finalConditions()+'</div>';
   actions.innerHTML='<div><span>조회 시점 참고 금액</span><strong>'+money(p.price)+'</strong></div><div class="footer-buttons">'+button('부품 바꾸기','part-focus','outline')+button('이 견적 저장하기','final','primary')+'</div>';actions.hidden=false;
 }
 // 보관하는 순간의 쇼핑몰 현재가 확인(api/mall_price_live). 같으면 말하지 않고, 바뀌었거나 못 읽었으면 서버 문장을 그대로 보인다.
