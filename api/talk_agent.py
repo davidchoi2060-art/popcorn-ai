@@ -121,6 +121,28 @@ def _amounts(sentence: str) -> list[tuple[int, bool]]:
     return out
 
 
+_HANGUL = re.compile(r"[가-힣]")
+_FOREIGN = re.compile(r"[\u0400-\u04ff\u27c0-\u27ef]")      # 키릴 문자 · ⟂ 같은 수학 기호 -- 한국어 답에 나올 일이 없다
+_LOWER_WORD = re.compile(r"(?<![A-Za-z0-9-])[a-z]{2,}(?![A-Za-z0-9-])")
+
+
+def is_scratch(sentence: str) -> bool:
+    """모델이 속으로 정리한 메모 문장인가(「budget question Korean.」「Need ask one question, maybe …」).
+
+    부품 이름(RTX 5060 · i5-12400F · SSD · 144fps)은 대문자·숫자가 붙어 소문자 낱말로 세지 않는다. 키릴 문자가 섞이거나,
+    한글 문장에 소문자 영어 낱말이 둘 이상이거나, 한글 없는 문장에 소문자 영어 낱말이 하나라도 있으면 메모로 본다.
+    """
+    s = sentence.strip()
+    if not s:
+        return False
+    if _FOREIGN.search(s):
+        return True
+    lower = len(_LOWER_WORD.findall(s))
+    if not _HANGUL.search(s):
+        return lower >= 1          # 「RTX 5060 Ti」 같은 목록 줄은 남기고 「2-5 sentences.」는 뺀다
+    return lower >= 2
+
+
 def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tuple[str, list[dict]]:
     """설명을 문장 단위로 사실 묶음과 대조한다 -> (남긴 글, 뺀 문장[{sentence, reason}]).
 
@@ -128,6 +150,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
       원 단위로 쓴 금액은 정확히 같아야 하고, 「만원」으로 쓴 금액은 묶음 금액을 만원 단위로 반올림한 값까지 받는다
       (1,498,000원 -> 「150만원」은 통과, 「140만원」은 뺀다).
     · 약속: PROMISE_PATTERNS 에 걸리면 뺀다.
+    · 메모: 모델의 속말(is_scratch)이 나오면 그 문장부터 끝까지 뺀다.
     · HTML 태그와 마크다운 강조(**, __, # 제목)는 지운다(화면이 원문을 렌더하지 않게).
     다 빠지면 빈 글을 돌려준다 -- 호출부가 정해진 안내로 바꾼다.
     """
@@ -136,7 +159,13 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
         allowed.add(budget_won)
     allowed_man = allowed | {(p + 5_000) // 10_000 * 10_000 for p in allowed}
     kept, dropped = [], []
+    scratch = False
     for s in [x.strip() for x in _SENT.split(_MD.sub("", _TAG.sub("", reply or ""))) if x and x.strip()]:
+        # 메모가 한 번 나오면 그 뒤는 전부 메모다(답을 다 쓴 뒤 속말이 이어졌다) -- 섞인 한국어 조각까지 함께 뺀다.
+        scratch = scratch or is_scratch(s)
+        if scratch:
+            dropped.append({"sentence": s, "reason": "scratch"})
+            continue
         bad = [a for a, man in _amounts(s) if a not in (allowed_man if man else allowed)]
         if bad:
             dropped.append({"sentence": s, "reason": "price_not_in_snapshot"})

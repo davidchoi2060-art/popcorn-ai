@@ -469,3 +469,53 @@ class BudgetLead(unittest.TestCase):
         clean, dropped = AG.verify(n, book, 600_000)
         self.assertEqual(dropped, [])
         self.assertEqual(clean, n)
+
+
+# ── ⑧ 모델의 속말 메모를 고객 답에 내지 않는다 (2026-10-15 사장님 영상편집 상담 「бюджет? budget question Korean…」) ──
+LEAK = ("영상 편집용으로는 아래 3가지가 적합합니다. P1 골드 인텔: 1,624,400원 — i5-12400F, RAM 16GB, RTX 5060. "
+        "FHD 위주면 P1을 우선 추천합니다. бюджет? budget question Korean. Need ask one question, maybe "
+        "\"주로 FHD인가 4K인가요?\" Since already results. 2-5 sentences. \"주로 FHD와 4K 중 어느 해상도...\" Good. "
+        "⟂ no need mention show. maybe \"화면에...\" Fine.")
+
+
+class Scratch(unittest.TestCase):
+    def test_leaked_notes_and_everything_after_are_dropped(self):
+        book = TT.FactBook()
+        book.prices = {1_624_400}
+        clean, dropped = AG.verify(LEAK, book)
+        self.assertEqual(clean, "영상 편집용으로는 아래 3가지가 적합합니다. P1 골드 인텔: 1,624,400원 — i5-12400F, RAM 16GB, "
+                                "RTX 5060. FHD 위주면 P1을 우선 추천합니다.")
+        self.assertTrue(all(d["reason"] == "scratch" for d in dropped))
+        self.assertNotIn("주로 FHD인가", clean)
+
+    def test_part_names_and_fps_are_not_scratch(self):
+        for s in ("RTX 5060 Ti", "i5-12400F, RAM 16GB, SSD 1TB.", "144fps 목표면 RTX 5070급을 보세요.",
+                  "윈도우 11 home 버전은 따로 사셔야 해요.", "Intel Core i7-14700K"):
+            self.assertFalse(AG.is_scratch(s), s)
+
+    def test_scratch_shapes(self):
+        for s in ("бюджет?", "budget question Korean.", "2-5 sentences.", "⟂ no need mention show.",
+                  "Need ask one question, maybe \"주로 FHD인가요?\""):
+            self.assertTrue(AG.is_scratch(s), s)
+
+
+class OpenAIAnswerText(unittest.TestCase):
+    def _resp(self, *items):
+        return SimpleNamespace(output=list(items), output_text="".join(
+            c.text for it in items if it.type == "message" for c in it.content))
+
+    def _msg(self, text, phase=None):
+        return SimpleNamespace(type="message", phase=phase, content=[SimpleNamespace(type="output_text", text=text)])
+
+    def test_commentary_message_is_not_customer_text(self):
+        r = self._resp(self._msg("budget question Korean. Need ask one question.", "commentary"),
+                       self._msg("영상 편집용으로는 P1을 추천해요.", "final_answer"))
+        self.assertEqual(llm._openai_answer_text(r), "영상 편집용으로는 P1을 추천해요.")
+
+    def test_unlabelled_message_is_kept(self):
+        self.assertEqual(llm._openai_answer_text(self._resp(self._msg("네, 찾아볼게요."))), "네, 찾아볼게요.")
+
+    def test_commentary_only_is_empty(self):
+        r = self._resp(self._msg("thinking about tools", "commentary"),
+                       SimpleNamespace(type="function_call", content=None))
+        self.assertEqual(llm._openai_answer_text(r), "")
