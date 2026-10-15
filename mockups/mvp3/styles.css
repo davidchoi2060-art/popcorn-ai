@@ -628,3 +628,98 @@ body[data-from-talk="1"] .workspace>.chat{display:none}
   .ai-prep-halo, .ai-prep-image, .ai-prep-orbit, .ai-prep-spark, .ai-prep-dot { animation: none; }
   .ai-prep-dot { opacity: .45; }
 }
+
+/* 추천 구성 상세(2026-10-15 코덱스 디자인 v1 이식 -- D:\WORK\코덱스-디자인\2026-10-15-추천구성상세-v1 detail.css 의 .dt-* 값을 기존 마크업에 옮겼다).
+   왼쪽 = 상품·구성·부품 바꾸기, 오른쪽 = 추천 이유·대수·구매 전 안내(app.js renderDetail). 정보·동작은 그대로이고 모양만 바뀐다.
+   최종 견적(#final)은 같은 부품 표를 쓰지만 body.live-mode.original-flow .dt-detail 밖이라 이 규칙을 받지 않는다. */
+.dt-detail{max-width:1184px;margin:0 auto;padding-bottom:24px}
+body.live-mode.original-flow .dt-detail>.back{font-size:14px;min-height:32px}
+body.live-mode.original-flow .dt-detail .title-row{align-items:flex-end;margin:6px 0 0}
+body.live-mode.original-flow .dt-detail .title-row h2{font-size:34px;line-height:1.25;letter-spacing:-1px;font-weight:780}
+body.live-mode.original-flow .dt-detail .results-subtitle{font-size:14px;color:var(--muted);margin-top:10px}
+body.live-mode.original-flow .dt-detail .data-note{font-size:13px;color:var(--green);max-width:none;white-space:nowrap;padding-bottom:3px}
+body.live-mode.original-flow .dt-detail .requirements{margin:20px 0 26px}
+body.live-mode.original-flow .dt-detail .requirements .chip{background:var(--tint);color:var(--green);border-radius:6px;font-size:13px;padding:6px 12px}
+.dt-layout{display:grid;grid-template-columns:minmax(0,1fr) 302px;gap:38px;align-items:start}
+.dt-main-col{min-width:0}
+/* 상품 요약: 위 굵은 선 + 상품명·용도 | 사진, 그 아래 금액 칸 */
+body.live-mode.original-flow .dt-detail .final-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:15px;border:0;border-top:2px solid var(--green);border-radius:0;padding:24px 0 0;margin:0;align-items:start}
+body.live-mode.original-flow .dt-detail .final-summary h3{font-size:23px;line-height:1.45;letter-spacing:-.6px;font-weight:750;color:var(--ink);overflow-wrap:anywhere}
+body.live-mode.original-flow .dt-detail .final-summary .live-summary-copy p{font-size:14px;color:var(--muted);line-height:1.65;margin-top:8px}
+body.live-mode.original-flow .dt-detail .final-summary .live-summary-copy .live-product-name{color:var(--ink);font-weight:600}
+body.live-mode.original-flow .dt-detail .final-summary>.live-product-photo{grid-column:2;grid-row:1;width:150px;margin:0}
+body.live-mode.original-flow .dt-detail .final-summary>.live-product-photo.is-unavailable{width:100px;min-height:100px;border:0!important;border-radius:9px;background:var(--tint);display:grid;place-items:center}
+body.live-mode.original-flow .dt-detail .final-summary>.live-product-photo.is-unavailable p{font-size:12px;color:var(--muted)}
+body.live-mode.original-flow .dt-detail .final-summary-price{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;align-items:center;background:var(--tint);border:0;border-radius:0;padding:16px 18px;margin-top:8px}
+body.live-mode.original-flow .dt-detail .final-summary-price>strong{grid-column:2;grid-row:1/span 6;font-size:26px;letter-spacing:-.8px;color:var(--ink)}
+body.live-mode.original-flow .dt-detail .final-summary-price p{grid-column:1;font-size:13px;line-height:1.55;margin:2px 0}
+body.live-mode.original-flow .dt-detail .final-summary-price .green{color:var(--green)}
+/* 구성 표: 둘레 상자 대신 위아래 선, 파란 글자를 토큰 색으로 */
+body.live-mode.original-flow .dt-detail .final-parts{margin-top:30px}
+body.live-mode.original-flow .dt-detail .final-parts>h3{font-size:20px;letter-spacing:-.4px;font-weight:750;color:var(--ink);padding-bottom:12px;border-bottom:2px solid var(--green);margin:0}
+body.live-mode.original-flow .dt-detail .public-bom-empty{background:none;border:0;padding:0;margin:14px 0 4px;font-size:13px;color:var(--muted)}
+body.live-mode.original-flow .dt-detail .live-spec-grid[data-card-spec]{grid-template-columns:1fr 1fr;gap:0 28px;margin:8px 0 18px}
+body.live-mode.original-flow .dt-detail .live-spec-grid[data-card-spec]>div{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;border-top:1px solid var(--line);border-bottom:0;padding:12px 0;font-size:13px}
+body.live-mode.original-flow .dt-detail .live-spec-grid[data-card-spec] dt{color:var(--muted)}
+body.live-mode.original-flow .dt-detail .live-spec-grid[data-card-spec] dd{font-weight:550}
+body.live-mode.original-flow .dt-detail .final-table-wrap{border:0;border-radius:0}
+body.live-mode.original-flow .dt-detail .final-table :is(th,td){border-left:0!important;border-right:0!important}
+body.live-mode.original-flow .dt-detail .final-table .final-part-price .foot-note{display:block}
+body.live-mode.original-flow .dt-detail .final-table thead th{background:none;color:var(--muted);font-size:12px;font-weight:500;padding:11px 0}
+body.live-mode.original-flow .dt-detail .final-table thead th:first-child{padding-left:0}
+body.live-mode.original-flow .dt-detail .final-table .final-part-description{padding:12px 0;gap:12px}
+body.live-mode.original-flow .dt-detail .final-part-description .part-symbol{width:22px;height:22px;margin-top:3px;filter:none}
+body.live-mode.original-flow .dt-detail .final-part-description h4{color:var(--ink);font-size:15px;line-height:1.5}
+body.live-mode.original-flow .dt-detail .final-part-description h4>span:first-child{color:var(--muted);font-size:12px;font-weight:500;flex-basis:100%}
+body.live-mode.original-flow .dt-detail .final-part-description .part-name{border-left:0;padding-left:0}
+body.live-mode.original-flow .dt-detail .final-part-description p,body.live-mode.original-flow .dt-detail .final-part-description summary{color:var(--muted);font-size:13px;line-height:1.5}
+body.live-mode.original-flow .dt-detail .final-part-description summary{color:var(--green);font-weight:600;margin-top:6px}
+body.live-mode.original-flow .dt-detail .final-table .final-part-price{font-size:14px}
+body.live-mode.original-flow .dt-detail .final-part-change button{border-radius:6px;min-height:36px;padding:6px 14px}
+body.live-mode.original-flow .dt-detail .final-table tfoot th,body.live-mode.original-flow .dt-detail .final-table tfoot td{background:var(--tint);padding:13px 18px;font-size:15px}
+body.live-mode.original-flow .dt-detail .final-table tfoot th{padding-left:18px}
+body.live-mode.original-flow .dt-detail .final-part-expanded{background:var(--tint);border-radius:6px}
+/* 부품 바꾸기 */
+body.live-mode.original-flow .dt-detail .live-capabilities{background:none;border:1px solid var(--green);border-radius:7px;padding:16px 18px;margin:22px 0 0}
+body.live-mode.original-flow .dt-detail .live-capabilities>h3{font-size:16px;font-weight:700}
+body.live-mode.original-flow .dt-detail .live-capabilities>p{font-size:13px}
+body.live-mode.original-flow .dt-detail .live-capabilities>div{margin-top:12px}
+body.live-mode.original-flow .dt-detail .live-capabilities>div>button{min-height:44px;border-radius:7px}
+/* 오른쪽 열 */
+.dt-aside{padding-top:3px;min-width:0}
+.dt-aside .live-explanation{margin:0;border-top:2px solid var(--ink);padding-top:19px}
+.dt-aside .live-explanation+.live-explanation{border-top:1px solid var(--line);margin-top:24px}
+.dt-aside .live-explanation h3{font-size:18px;letter-spacing:-.35px;line-height:1.45}
+.dt-aside .live-explanation>p.muted{font-size:12px;line-height:1.7;margin-top:13px}
+.dt-aside .live-explanation ul{list-style:none;padding:0;margin:14px 0 0}
+.dt-aside .live-explanation li{border-top:1px solid var(--line);padding:15px 0 0;margin:15px 0 0;font-size:15px;line-height:1.7;font-weight:550}
+.dt-aside .live-explanation li::before{content:'↳';color:var(--green);margin-right:8px}
+.dt-aside .final-sets{border-top:1px solid var(--line);margin:26px 0 0;padding-top:23px;justify-content:space-between}
+.dt-aside .final-sets>span{font-size:15px;font-weight:650}
+.dt-aside .final-sets .qty-stepper button{min-width:44px;min-height:44px;padding:0;border-radius:6px}
+.dt-aside .final-sets p{font-size:12px;color:var(--muted)}
+.dt-alt-note{padding:18px 0;border-top:1px solid var(--line);margin-top:24px;font-size:13px;color:var(--muted);line-height:1.7}
+.dt-alt-note strong{font-size:14px;color:var(--ink);display:block;margin-bottom:4px}
+/* 구매 전 확인 6칸: 두 묶음(dl)을 풀어 세 칸씩 두 줄로 */
+body.live-mode.original-flow .dt-detail .final-conditions{margin-top:44px;border-top:1px solid var(--line);padding-top:25px}
+body.live-mode.original-flow .dt-detail .final-conditions>h3{font-size:20px;letter-spacing:-.4px;font-weight:750;color:var(--ink)}
+body.live-mode.original-flow .dt-detail .final-conditions-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:0 30px;border:0;border-radius:0;padding:0;margin-top:8px}
+body.live-mode.original-flow .dt-detail .final-conditions-grid dl{display:contents}
+body.live-mode.original-flow .dt-detail .final-conditions-grid dl>div,body.live-mode.original-flow .dt-detail .final-conditions-grid dl>div:last-child{display:grid;grid-template-columns:19px minmax(0,1fr);column-gap:10px;align-items:start;padding:17px 0;border-bottom:1px solid var(--line);min-height:0}
+body.live-mode.original-flow .dt-detail .final-conditions-grid .ui-icon{grid-row:1/span 2;width:19px;height:19px;margin-top:3px}
+body.live-mode.original-flow .dt-detail .final-conditions-grid dt{font-size:13px;font-weight:700}
+body.live-mode.original-flow .dt-detail .final-conditions-grid dd{grid-column:2;font-size:12px;line-height:1.65;color:var(--muted);border-left:0;padding-left:0;margin-top:4px}
+body[data-screen="detail"] .actionbar strong{letter-spacing:-.9px}
+body[data-screen="detail"] .actionbar .footer-buttons button{border-radius:7px;min-height:47px}
+@media(max-width:1100px){.dt-layout{grid-template-columns:1fr;gap:28px}body.live-mode.original-flow .dt-detail .final-conditions-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){
+  body.live-mode.original-flow .dt-detail .title-row{align-items:flex-start}body.live-mode.original-flow .dt-detail .title-row h2{font-size:28px}body.live-mode.original-flow .dt-detail .data-note{white-space:normal}
+  body.live-mode.original-flow .dt-detail .final-summary h3{font-size:20px}body.live-mode.original-flow .dt-detail .final-summary>.live-product-photo{width:100px}
+  body.live-mode.original-flow .dt-detail .final-summary-price>strong{font-size:22px}
+  body.live-mode.original-flow .dt-detail .live-spec-grid[data-card-spec]{grid-template-columns:1fr}
+  body.live-mode.original-flow .dt-detail .final-table tbody tr{border:0;border-bottom:1px solid var(--line);border-radius:0;padding:12px 0;margin:0}
+  body.live-mode.original-flow .dt-detail .final-table tfoot{border-radius:0}
+  body.live-mode.original-flow .dt-detail .final-table tfoot :is(th,td){background:none;padding:0}
+  body.live-mode.original-flow .dt-detail .live-capabilities>div>button{flex:1 1 calc(50% - 10px)}
+  body.live-mode.original-flow .dt-detail .final-conditions-grid{gap:0 18px}
+}
