@@ -891,3 +891,14 @@ details[open]>summary .dv2-more .ui-icon{transform:rotate(180deg)}
   .dv2-side.is-panel .dv2-panel-head{position:sticky;top:-20px;background:#fff;z-index:1;padding:4px 0}
   .dv2-side.is-panel .dv2-actions{position:sticky;bottom:calc(-28px - env(safe-area-inset-bottom));background:#fff;padding:10px 0 calc(8px + env(safe-area-inset-bottom));margin-bottom:-8px;border-top:1px solid var(--line);z-index:1}
 }
+
+/* 쇼핑몰 PC 부품 변경 안내창(2026-10-16 사장님): 부품 선택 패널 대신 팝콘PC 로 옮길지 묻는다 */
+.mall-dlg{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(24,53,46,.45)}
+.mall-dlg-card{width:min(440px,100%);max-height:calc(100dvh - 32px);overflow:auto;background:#fff;border-radius:14px;padding:24px 22px 20px;box-shadow:0 18px 50px rgba(0,0,0,.25)}
+.mall-dlg-card h3{font-size:19px}
+.mall-dlg-card h3:focus{outline:none}
+.mall-dlg-ask{font-weight:650;margin-top:12px}
+.mall-dlg-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.mall-dlg-actions a,.mall-dlg-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border-radius:9px;text-decoration:none;font-size:15px}
+@media (max-width:480px){.mall-dlg{align-items:flex-end;padding:0}.mall-dlg-card{width:100%;border-radius:16px 16px 0 0}.mall-dlg-actions{flex-direction:column-reverse}.mall-dlg-actions a,.mall-dlg-actions button{width:100%}}
+.dv2-mallhint{margin:0 0 8px}

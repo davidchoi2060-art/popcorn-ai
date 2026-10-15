@@ -119,7 +119,7 @@ test('zero diff says 추가 금액 없음, a negative diff says 감소, a missin
     assert.ok(text(row(26)).includes('차액 확인 필요'));
     assert.equal(row(26).querySelector('[data-action=part-swap]'),null,'차액 없는 후보는 선택 단추가 없다');
     assert.ok(row(24).querySelector('[data-action=part-swap]')&&row(25).querySelector('[data-action=part-swap]'));
-    assert.ok(text(d.querySelector('.part-options')).includes('단품 금액 표시 없음'));
+    assert.ok(text(d.querySelector('.part-options')).includes('기본 부품 대비 차액'));
     assert.doesNotMatch(text(d.body),/조립·기타|가격 확인 중/);
     h.flow.swapPart(26);await tick();assert.equal(h.flow.state.selected.product_code,12,'흐름도 차액 없는 후보를 거부한다');
     assert.deepEqual(h.errors,[]);
