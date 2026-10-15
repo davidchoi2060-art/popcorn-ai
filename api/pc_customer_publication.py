@@ -239,6 +239,8 @@ def _evidence(conn, config, parts, offers, review, source_reader):
         p.spec_source_text,p.status AS sale_status,p.sale_price FROM product_explanations e
         LEFT JOIN products p USING(product_code) WHERE e.source_product_code=ANY(:codes)
         ORDER BY e.source_product_code''', codes=[p['explanation_code'] for p in real]).mappings()}
+    from .part_explanation_approval import pin_rows
+    pin_rows(conn, rows)
     for p in real:
         row = rows.get(p['explanation_code'])
         # Assembly-only parts are sold only inside the PC: no retail product/sale status.
