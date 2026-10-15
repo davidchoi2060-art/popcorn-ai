@@ -32,8 +32,10 @@
     `api/admin_ui_price_import.py` 모듈 docstring §판단한 것(⚠ 그 문서의 "간극" 서술은
     2026-08-15 서버 수정으로 낡았다 — 그 파일은 담당 밖이라 고치지 못했다. 아래가
     지금 동작이다):
-      · diff 표 7열은 `chg`(가격이 바뀐 행, 매칭·미매칭 함께 — `k='code'` 신규
-        모델도 포함, 아래 참조)만 담는다. `nw`는 매칭이 «안 된» 것(`k='sim'`·
+      · diff 표 7열은 `chg`(가격이 바뀐 행) 중 «매칭된» 행만 담는다(`k='code'` 신규
+        모델도 포함, 아래 참조). 미매칭 chg 행은 아래 「신규 모델」 구획에만 둔다 —
+        「반영 대상」 제목 아래 선택할 수 없는 행이 섞여 혼동되던 것(2026-10-15
+        관리자 기능테스트 ISSUE-04, 매칭0·미매칭94). `nw`는 매칭이 «안 된» 것(`k='sim'`·
         `k='none'`)만 남는다 — 비교할 이전 매입가 자체가 없어 별도 목록에 둔다.
       · "가격 변동 · 매칭 안 됨" 카드 = (chg 미매칭 행) + (nw 전체, 이제 k≠code뿐).
         ⚠ 1차 구현의 `_file_diff()`는 `nw`를 매칭 종류(k)와 무관하게 전부
@@ -725,13 +727,18 @@
     html += '<div class="pi-cards">' + cardsHtml(f) + '</div>';
 
     // ③ diff 표
-    var matchedCount = f.chg.filter(function (c) { return c.product_code != null; }).length;
+    var matchedChg = f.chg.filter(function (c) { return c.product_code != null; });
+    var matchedCount = matchedChg.length;
+    var unmatchedChgCount = f.chg.length - matchedCount;
     var allChecked = matchedCount > 0 && selectedCountFor(f) === matchedCount;
     html += '<section class="pi-section">'
       + '<div class="pi-section-hd"><h3>가격 변동 · 매칭됨 — 반영 대상</h3>'
-      + '<span class="pi-section-sub">체크 후 아래 「선택 반영」 — <b>매칭 안 된 행은 선택할 수 없습니다</b>(신규 등록 필요)</span></div>';
+      + '<span class="pi-section-sub">체크 후 아래 「선택 반영」 — 매칭 안 된 행은 아래 「신규 모델」 구획에 따로 표시합니다(여기서 반영 불가)</span></div>';
     if (!f.chg.length) {
       html += '<div class="pi-empty-mini">가격이 바뀐 행이 없습니다.</div>';
+    } else if (!matchedCount) {
+      html += '<div class="pi-empty-mini">반영 대상이 없습니다 — 가격이 바뀐 ' + fmt(unmatchedChgCount)
+        + '건이 모두 매칭 안 됨이며, 아래 「신규 모델」에서 확인합니다.</div>';
     } else {
       // 원안 실측 트랙 7개(24px 1fr 190px 100px 100px 62px 118px) — colgroup은 그
       // 비율의 힌트일 뿐(치수 대조 대상 아닌 화면, 상단 docstring 참조), table-layout
@@ -745,7 +752,7 @@
         + (allChecked ? ' checked' : '') + '></th>'
         + '<th>단가표 모델명</th><th>매칭된 상품</th><th class="num">이전 매입가</th>'
         + '<th class="num">새 매입가</th><th class="num">변동</th><th>매칭 · 상태</th></tr></thead><tbody>'
-        + f.chg.map(chgRowHtml).join('') + '</tbody></table></div>';
+        + matchedChg.map(chgRowHtml).join('') + '</tbody></table></div>';
     }
     var n = selectedCount();
     var reason = !canWrite() ? '운영자 이상만 반영할 수 있습니다'
