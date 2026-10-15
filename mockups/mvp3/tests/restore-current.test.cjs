@@ -75,7 +75,18 @@ test('the inquiry follows the button it was opened with',async()=>{
 test('the retry button keeps the general inquiry wording',()=>{
   const app=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
   assert.match(app,/button\('다시 불러오기','inquiry-open','outline',human\?'data-human="1"':''\)/);
-  assert.match(app,/state\.restoredCurrent&&state\.talk\)\{restoring=true;void flow\.resume\(\{arrived:!!arrival\}\)/);
+  assert.match(app,/willResume=initial&&screen!=='saved'&&state\.restoredCurrent&&state\.talk/);
+  assert.match(app,/if\(willResume\)\{void flow\.resume\(\{arrived:!!arrival\}\)/);
+});
+
+// 「AI 답변 준비중」(2026-10-15 중헌 님): 다시 불러오는 동안 첫 화면 「나에게 맞는 PC」 대신 준비중 화면을 그린다.
+// restoring 은 navigate 가 첫 화면을 그리기 «전에» 켜져야 한다 -- 뒤에 켜면 한 번 첫 화면이 그려진다.
+test('while a quote is being reloaded the welcome screen is replaced by the AI preparing screen',()=>{
+  const app=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
+  assert.match(app,/if\(state\.screen==='welcome'&&restoring&&!state\.error\)\{renderPreparing\(\);\}/);
+  const on=app.indexOf('if(willResume||willRefresh)restoring=true;'),nav=app.indexOf('flow.navigate(screen);',on);
+  assert.ok(on>0&&nav>on,'restoring is set before the first navigate render');
+  assert.match(app,/AI 답변 준비중/);assert.doesNotMatch(app.slice(app.indexOf('function renderPreparing'),app.indexOf('function render(){')),/%/);
 });
 
 // 코덱스 PR142·143 검수 보완(2026-10-11): 대화 화면(keepCurrent)에서 조건을 바꾼 뒤에도 지금 견적을 지킨다.
