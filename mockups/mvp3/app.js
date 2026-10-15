@@ -93,19 +93,20 @@ function renderSurface(){
   if(consultation&&(draft.start_mode==='use_first'||draft.usage_choice||draft.budget_won))view.insertAdjacentHTML('afterbegin','<section class="draft-context"><strong>상담 초안</strong><p>'+draftSummary()+'</p><p>선택한 조건을 입력창에서 확인하고 수정해 주세요.</p>'+button('선택 조건으로 초안 바꾸기','gateway-rebuild','',''+(state.phase?'disabled':''))+'</section>');
 }
 function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('#notice').hidden=true,7000);}
-function budget(product,talk=state.selectionState||state.talk){
+// 여러 대(wants.units)면 한 대 예산으로 견준다(M.budgetGapText · 코덱스 C10-F01). 조건과 같은 때의 wants 를 쓴다.
+function wantsFor(talk){return talk&&talk===state.selectionState?state.selectionWants:state.wants;}
+function budget(product,talk=state.selectionState||state.talk,wants=wantsFor(talk)){
   const won=talk?.budget_won;
   if(!Number.isInteger(product.price)||!Number.isInteger(won))return '예산 조건 미확인';
   if(talk.budget_bound==='이상')return '입력하신 최소 예산 '+money(won);
-  const delta=won-product.price;
-  return delta>0?'예산보다 '+money(delta)+' 낮아요':delta<0?'예산보다 '+money(-delta)+' 높아요':'예산과 같아요';
+  return M.budgetGapText(product.price,talk,wants,money);
 }
 // 예산 초과 색은 문구(budget)와 같은 금액·같은 기준으로 정한다. 부품을 바꾸면 서버의 over_budget 은
 // 기본 구성 금액 기준이라 낡으므로, 바꾼 구성은 새 금액으로 다시 센다(하한 「이상」은 초과가 없다).
-function overBudget(product,talk=state.selectionState||state.talk){
-  if(!product.build)return product.over_budget===true;
-  const won=talk?.budget_won;
-  return Number.isInteger(product.price)&&Number.isInteger(won)&&talk.budget_bound!=='이상'&&product.price>won;
+function overBudget(product,talk=state.selectionState||state.talk,wants=wantsFor(talk)){
+  const multi=(M.budgetBasis(talk,wants)?.units??1)!==1;
+  if(!product.build&&!multi)return product.over_budget===true;
+  return M.overUnitBudget(product.price,talk,wants);
 }
 // 상세의 예산 문장은 위 조건 칩(지금 조건 = state.talk)과 같은 기준이어야 한다. 고른 뒤 상담에서 예산을 바꾸면
 // selectionState(고를 때 조건)와 칩이 갈라져, 칩은 80만원인데 초과액은 150만원 기준 124,400원으로 남았다
@@ -113,9 +114,11 @@ function overBudget(product,talk=state.selectionState||state.talk){
 function budgetLines(p){
   const basis=state.selectionState,now=state.talk,line=(cls,text)=>'<p class="'+cls+'">'+esc(text)+'</p>';
   const same=!basis||!now||basis.budget_won===now.budget_won&&basis.budget_bound===now.budget_bound;
-  if(same)return line(overBudget(p)?'warn-text':'green',budget(p));
+  // 여러 대인데 대수를 몰라 견주지 않은 줄은 통과(초록)로 칠하지 않는다.
+  const cls=(t=state.selectionState||state.talk)=>overBudget(p,t)?'warn-text':M.budgetBasis(t,wantsFor(t))?.units===0?'muted':'green';
+  if(same)return line(cls(),budget(p));
   const label=t=>Number.isInteger(t?.budget_won)?' 예산 '+money(t.budget_won)+' 기준 · ':' ';
-  return line(overBudget(p,now)?'warn-text':'green','지금'+label(now)+budget(p,now))+
+  return line(cls(now),'지금'+label(now)+budget(p,now))+
     line('muted','고를 때'+label(basis)+budget(p,basis));
 }
 function syncChat(){
@@ -223,7 +226,7 @@ function productCard(product,action='detail',id=product.index,comparison=null){
     '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+cardPartPhotos(product)+
     (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+
     // Full reasons stay on the detail screen; the card keeps only the over-budget verdict.
-    (product.over_budget?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
+    (overBudget(product,state.talk)?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
     button(strong?'추천 견적 자세히 보기'+uiIcon('arrow-right'):'구성 자세히 보기',action,(strong?'primary':'outline')+' card-detail','data-id="'+esc(id)+'"')+'</section>';
 }
 // 새로 나온 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 나온 PC」 화면으로 보낸다.
@@ -240,7 +243,7 @@ function customCards(group){
 function renderResults(){
   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
-  const products=groups.flatMap(g=>g.products),withinBudget=Number.isInteger(state.talk?.budget_won)&&state.talk.budget_bound!=='이상'&&products.every(p=>!p.over_budget);
+  const products=groups.flatMap(g=>g.products),withinBudget=Number.isInteger(state.talk?.budget_won)&&state.talk.budget_bound!=='이상'&&(M.budgetBasis(state.talk,state.wants)?.units??1)===1&&products.every(p=>!p.over_budget);
   const subtitle=groups.length===1&&products.length===2?(withinBudget?'예산 안에서 비교할 수 있는 두 가지 구성입니다.':'비교할 수 있는 두 가지 구성입니다.'):
     groups.length===1&&products.length===3?'싼 구성부터 더 높은 사양까지 세 가지를 비교해 보세요.':'';
   // A usage heading is needed only to tell several usage groups apart.
@@ -266,7 +269,7 @@ function summaryDescription(p){
 }
 function productSummary(){
   const p=state.selected,description=summaryDescription(p),title=description?.title||p.name;
-  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
+  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':M.changedIntro(description?.intro,p.build)||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
   return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+budgetLines(p)+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){

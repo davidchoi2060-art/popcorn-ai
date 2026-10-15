@@ -91,6 +91,14 @@ def usage(lines, specs, raws, names=None):
     return out
 
 
+def ram_total_gb(u):
+    """구성 전체 시스템 메모리 GB = 메모리 줄마다 수량 × 상품 용량의 합. 메모리 줄이 없거나 하나라도 용량을 모르면 None."""
+    ram = u['ram']
+    if not ram or any(r['cap'] is None for r in ram):
+        return None
+    return sum(r['quantity'] * r['cap'] for r in ram)
+
+
 def _room(limit, used, per):
     return None if limit is None or per is None else (limit - used) // per
 

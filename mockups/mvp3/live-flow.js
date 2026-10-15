@@ -198,7 +198,7 @@
       // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
       // 안내(예산·못 맞춘 조건·되묻기) 다음에 남긴다: AI 설명 -> 예산 안내 -> 카드 -> 다음 선택 단추 순서
       // (2026-10-12 사장님 결정 · 카드 검수 C1 「예산 안내가 카드 아래 말풍선으로 붙음」).
-      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
+      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk),wants:M.object(parsed.wants)?M.copy(parsed.wants):null}].slice(-10);
       state.history=state.history.slice(-6);
       if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.selectionQuery=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
       state.screen='results';

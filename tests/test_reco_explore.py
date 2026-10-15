@@ -103,6 +103,25 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual(X.clean_wants(None), {})
 
 
+class UnitsTest(unittest.TestCase):
+    # 2026-10-15 코덱스 C10-F01 -- 대수(wants.units): N 이면 화면이 한 대 예산으로 견주고, 0 이면 견주지 않는다.
+    def test_units(self):
+        self.assertEqual(X.extract('회사 사무용 PC 12대를 같은 사양으로 구매하려고 합니다')['units'], 12)
+        self.assertEqual(X.extract('수량이 15대로 늘었지만 총예산은 960만원 그대로입니다')['units'], 15)
+        self.assertEqual(X.extract('여러 대 살 거예요')['units'], 0)
+        self.assertEqual(X.extract('그냥 1대만 살게요')['units'], 1)
+        self.assertNotIn('units', X.extract('모니터가 4대 임'))
+        self.assertNotIn('units', X.extract('30대 후반 직장인이에요'))
+        self.assertNotIn('units', X.extract('게임용 PC 150만원'))
+
+    def test_clean_wants_keeps_units(self):
+        self.assertEqual(X.clean_wants({'units': 12})['units'], 12)
+        self.assertEqual(X.clean_wants({'units': 0})['units'], 0)
+        for bad in (-1, 501, '12', True, 1.5):
+            self.assertNotIn('units', X.clean_wants({'units': bad}))
+        self.assertEqual(X.merge({'units': 12}, X.extract('15대로 늘었어요'))['units'], 15)
+
+
 class SpectrumTest(unittest.TestCase):
     def test_budget_shows_value_recommended_and_higher(self):
         cs = sets(TalkState(**GAME, budget_won=2300000, budget_bound='이하'))[0]
@@ -284,6 +303,13 @@ class RecommendEndpointTest(unittest.TestCase):
     def test_multi_pc_is_honest(self):
         d = self.call(TalkState(**GAME), text='직원용 PC 5대 사려고요')
         self.assertEqual(d['talk_notes'][0], X.NOTE_MULTI)
+
+    def test_multi_pc_units_ride_in_wants(self):
+        # 2026-10-15 코덱스 C10-F01: 화면이 한 대 예산(총예산 ÷ 대수)으로 견주도록 대수를 wants 에 싣는다.
+        d = self.call(TalkState(**GAME), text='사무용 PC 12대를 같은 사양으로, 총 960만원까지')
+        self.assertEqual(d['wants'].get('units'), 12)
+        d = self.call(TalkState(**GAME), text='더 싼 PC 볼래요', wants={'units': 12})
+        self.assertEqual(d['wants'].get('units'), 12, '다음 말에도 대수가 이어진다')
 
     def test_internal_scores_stay_out(self):
         import json

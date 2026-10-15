@@ -106,6 +106,19 @@ class LineQuantity(unittest.TestCase):
             q = run([ch(3, 602, 2)])
         self.assertEqual(q['changes'][0]['delta'], 120000 * 2 - 60000 * 2)
 
+    def test_memory_change_carries_the_system_memory_total(self):
+        # 2026-10-15 코덱스 C04-F04: 16GB × 2 로 바꿔도 소개 글이 16GB 였다. 바꾼 뒤 합계(수량 × 용량)를 줄에 싣는다.
+        self.assertEqual(run([ch(3, 601, 4)])['changes'][0]['system_ram_gb'], 64)
+        self.assertEqual(run([ch(3, 601, 1)])['changes'][0]['system_ram_gb'], 16)
+        with patch.object(b, 'refusal', return_value=None):
+            self.assertEqual(run([ch(3, 602, 2)])['changes'][0]['system_ram_gb'], 64)
+        # 용량을 모르면 지어내지 않는다.
+        self.assertIsNone(run([ch(3, 601, 1)], specs={**SPECS, 601: dict(part_type='RAM')},
+                              parts={**PARTS, 601: dict(PARTS[601], spec_source_text='', product_name='DDR5 램')})
+                          ['changes'][0]['system_ram_gb'])
+        # 메모리가 아닌 줄에는 싣지 않는다.
+        self.assertNotIn('system_ram_gb', run([ch(4, 701, 2)])['changes'][0])
+
     def test_lowering_is_always_allowed(self):
         q = run([ch(3, 601, 1)])
         self.assertEqual(q['total'], 1500000 - 60000)

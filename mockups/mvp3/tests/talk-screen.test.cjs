@@ -376,3 +376,34 @@ test('card shows the work level big at the top, and no product name over the pho
     assert.equal(card.querySelectorAll('.tk-reason').length,0,'not repeated as a small line');
   }finally{h.close();}
 });
+
+// 2026-10-15 코덱스 오픈테스트 C10-F01: 12대 총 960만원에서 892,800원 카드가 「예산보다 8,707,200원 낮아요」였다.
+// 서버가 읽은 대수(wants.units)가 있으면 한 대 예산(총예산 ÷ 대수)으로 견주고, 대수를 모르면 견주지 않는다.
+test('bulk purchase: cards compare one unit to the per-unit budget, never to the total',async()=>{
+  const t960={usages:['사무용'],budget_won:9600000,budget_bound:'이하'};
+  let units=12;
+  const h=harness((url)=>{
+    if(url==='/api/talk/parse')return {data:{ok:true,state:t960,missing:[],reply:'찾아볼게요.',pc_related:true}};
+    if(url==='/api/grid/recommend')return {data:{...reco([pc(301,'CODE/MOCK 사무 A',595700),pc(302,'CODE/MOCK 사무 B',892800)]),wants:{units}}};
+    return {data:{ok:true,quotes:[],has_more:false}};
+  });
+  const gaps=()=>[...h.doc.querySelectorAll('.tk-cards:not(.is-past) .tk-card')].map(c=>[...c.querySelectorAll('p')].find(p=>/예산/.test(p.textContent)));
+  try{
+    await h.say('사무용 PC 12대, 총 960만원');
+    await until(()=>h.doc.querySelectorAll('.tk-cards:not(.is-past) .tk-card').length===2);
+    let [a,b]=gaps();
+    assert.equal(a.textContent,'12대 기준 한 대 예산 800,000원보다 204,300원 낮아요');
+    assert.equal(b.textContent,'12대 기준 한 대 예산 800,000원보다 92,800원 높아요');
+    assert.equal(b.className,'warn-text');
+    assert.doesNotMatch(h.text('.tk-cards'),/8,707,200/);
+    units=15;await h.say('15대로 늘었어요');
+    await until(()=>/15대 기준/.test(h.text('.tk-cards:not(.is-past)')));
+    [a,b]=gaps();
+    assert.equal(a.textContent,'15대 기준 한 대 예산 640,000원보다 44,300원 낮아요');
+    assert.equal(b.textContent,'15대 기준 한 대 예산 640,000원보다 252,800원 높아요');
+    units=0;await h.say('여러 대 살 거예요');
+    await until(()=>/견주지 않았어요/.test(h.text('.tk-cards:not(.is-past)')));
+    assert.doesNotMatch(h.text('.tk-cards:not(.is-past)'),/예산보다/);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});

@@ -52,12 +52,12 @@ async function startFromGateway(){
   input.value=t.draft;entry=t.key;count();input.focus();
 }
 
-function budgetGap(product,talk){
+// 여러 대(wants.units -- 서버가 고객 문장에서 읽은 대수)면 한 대 예산으로 견준다(M.budgetGapText · 코덱스 C10-F01).
+function budgetGap(product,talk,wants){
   const won=talk?.budget_won;
   if(!Number.isInteger(product?.price)||!Number.isInteger(won))return '';
   if(talk.budget_bound==='이상')return '최소 예산 '+money(won)+' 조건';
-  const d=won-product.price;
-  return d>0?'예산보다 '+money(d)+' 낮아요':d<0?'예산보다 '+money(-d)+' 높아요':'예산과 같아요';
+  return M.budgetGapText(product.price,talk,wants,money);
 }
 function photo(product){
   const p=customerPhoto(product.photo,product.product_code);
@@ -132,10 +132,10 @@ function fitLine(x){
 // 아래 사양 줄과 겹쳤다). 이름은 사진 설명(alt)과 「지금 견적」·상세에 남는다. 사양 줄에 케이스·파워가 더해졌다.
 function card(x,p,latest){
   const chosen=state.selected?.product_code===x.product_code;
-  const gap=budgetGap(x,p.talk);
+  const gap=budgetGap(x,p.talk,p.wants);
   return '<li class="tk-card'+(chosen?' is-chosen':'')+'"><span class="pill">'+esc(x.tag||x.level||'판매 중 PC')+'</span>'+fitLine(x)+photo(x)+
     '<p class="tk-price"><strong>'+money(x.price)+'</strong> <span class="muted">'+esc(x.price_src||'가격 기준 미확인')+'</span></p>'+
-    (gap?'<p class="'+(x.price>p.talk?.budget_won&&p.talk?.budget_bound!=='이상'?'warn-text':'muted')+'">'+esc(gap)+'</p>':'')+specList(x.spec)+
+    (gap?'<p class="'+(M.overUnitBudget(x.price,p.talk,p.wants)?'warn-text':'muted')+'">'+esc(gap)+'</p>':'')+specList(x.spec)+
     (latest?'<div class="tk-card-actions">'+button('상세 보기','detail','outline','data-index="'+x.index+'"')+
       (chosen?'<span class="tk-chosen">지금 견적으로 고른 구성</span>':button('이 구성 선택','choose','primary','data-index="'+x.index+'"'))+'</div>':'')+'</li>';
 }
@@ -212,7 +212,7 @@ function renderPanel(){
       '<p class="tk-price"><strong>'+money(p.price)+'</strong> <span class="muted">'+esc(p.price_src||'가격 기준 미확인')+'</span></p>'+
       // 같은 구성 여러 대(상세 화면에서 고른 대수). 금액은 한 대 값이고 합계는 그 값 × 대수다(2026-10-12 중헌 님 7번).
       (p.sets>1&&Number.isInteger(p.price)?'<p class="tk-sets"><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+
-      (budgetGap(p,state.talk)?'<p class="muted">'+esc(budgetGap(p,state.talk))+(changed?' (지금 조건 기준)':'')+'</p>':'')+
+      (budgetGap(p,state.talk,state.wants)?'<p class="muted">'+esc(budgetGap(p,state.talk,state.wants))+(changed?' (지금 조건 기준)':'')+'</p>':'')+
       specList(p.spec,p.build)+
       (p.build?.changes?.length?'<p class="muted">바꾼 부품 '+p.build.changes.length+'개를 반영한 금액이에요.</p>':'')+
       '<p class="muted">재고·판매 조건은 저장하거나 구매할 때 다시 확인해요.</p>'+
