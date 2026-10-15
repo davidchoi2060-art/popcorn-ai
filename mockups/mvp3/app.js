@@ -545,6 +545,28 @@ function renderSaved(){
   actions.hidden=true;
 }
 function renderWelcome(){view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header><section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
+// 「AI 답변 준비중」(2026-10-15 중헌 님 「로딩되는 순간 메인화면이 보이니까.. 헷갈려」). 대화 화면에서 상세로 넘어오거나
+// 새로고침해 보던 견적을 다시 불러오는 동안(restoring) 상세가 아직 없으면 첫 화면 대신 이것을 그린다.
+// 진행률은 모르므로 숫자를 말하지 않는다. 10초가 넘으면 문장만 바꾼다.
+const PREP_LONG_MS=10000;let prepStarted=0,prepTimer;
+function renderPreparing(){
+  if(!prepStarted){prepStarted=Date.now();clearTimeout(prepTimer);prepTimer=setTimeout(()=>{if(restoring)render();},PREP_LONG_MS);}
+  const long=Date.now()-prepStarted>=PREP_LONG_MS;
+  const msg=long?'조금 더 걸리고 있어요.<span class="ai-prep-pause">잠시만 기다려 주세요.</span>':'고르신 PC의 구성과 금액을<span class="ai-prep-pause">지금 기준으로 다시 확인하고 있어요.</span>';
+  // 머리띠 높이는 화면 폭마다 다르다(PC 82~84px · 좁으면 줄바꿈). 덮개 윗변을 실측값에 맞춘다.
+  const bar=document.querySelector('.topbar');document.documentElement.style.setProperty('--ai-prep-top',(bar?Math.max(0,Math.round(bar.getBoundingClientRect().bottom)):82)+'px');
+  // 다시 그려질 때마다 움직임이 처음부터 시작되지 않게, 이미 떠 있으면 문구만 바꾼다(10초가 지나면 한 번).
+  const shown=view.querySelector('.ai-prep-message');
+  if(shown){if(shown.dataset.long!==String(long)){shown.innerHTML=msg;shown.dataset.long=String(long);}actions.hidden=true;return;}
+  const spark='<svg class="ai-prep-spark ai-prep-spark--KIND" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  view.innerHTML='<section class="ai-prep-root ai-prep-overlay" role="status" aria-live="polite" aria-atomic="true" aria-labelledby="ai-prep-title"><div class="ai-prep-content">'+
+    '<div class="ai-prep-scene" aria-hidden="true"><div class="ai-prep-halo"></div><div class="ai-prep-orbit"><span class="ai-prep-orbit-dot"></span><span class="ai-prep-orbit-dot ai-prep-orbit-dot--small"></span></div>'+
+    '<img class="ai-prep-image" src="assets/welcome-pc.png" alt="" width="350" height="350">'+spark.replace('KIND','one')+spark.replace('KIND','two')+'</div>'+
+    '<h2 class="ai-prep-title" id="ai-prep-title" tabindex="-1">AI 답변 준비중</h2>'+
+    '<p class="ai-prep-description"><span class="ai-prep-message" data-long="'+long+'">'+msg+'</span></p>'+
+    '<div class="ai-prep-indicator" aria-hidden="true"><span class="ai-prep-dot"></span><span class="ai-prep-dot"></span><span class="ai-prep-dot"></span></div></div></section>';
+  actions.hidden=true;
+}
 function render(){
   const changed=lastScreen!==state.screen,openDetails=[...view.querySelectorAll('details[open]')].map(e=>e.dataset.detail),scroll=view.scrollTop,focused=document.activeElement?.dataset.action;
   const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
@@ -553,7 +575,8 @@ function render(){
   // 예외 입력·상담 실패 뒤에는 사람 상담 길을 연다(서버 handoff_offer). 신청 칸은 구매 상담 신청과 같다.
   const handoffBlock=()=>(state.handoffOffer||state.inquiry.open||state.inquiry.done)?
     (!state.inquiry.open&&!state.inquiry.done?'<p class="live-inquiry-open">'+button('사람 상담 남기기','inquiry-open','outline',(state.phase?'disabled ':'')+'data-human="1"')+'</p>':'')+inquiryPanel():'';
-  if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());view.insertAdjacentHTML('beforeend',handoffBlock());}
+  if(state.screen==='welcome'&&restoring&&!state.error){renderPreparing();}
+  else if(state.screen==='welcome'){renderWelcome();if(state.error)view.insertAdjacentHTML('afterbegin',errorPanel());view.insertAdjacentHTML('beforeend',handoffBlock());}
   // 견적을 보던 중에 받은 예외 입력도 같은 길을 연다(보던 견적은 그대로 둔다).
   else if(state.screen==='results'){renderResults();if(state.handoffOffer)view.insertAdjacentHTML('beforeend',handoffBlock());}
   // 상세를 보던 중에도 같은 길을 연다(코덱스 PR136 검수 「상세 화면의 상담 버튼」).
@@ -572,6 +595,7 @@ function render(){
     target?.focus({preventScroll:true});
   }
   lastScreen=state.screen;
+  if(!(restoring&&state.screen==='welcome')){prepStarted=0;clearTimeout(prepTimer);}
   clearTimeout(retryTimer);if(state.error?.retryAt>Date.now())retryTimer=setTimeout(()=>render(),1000);
   settleArrival();
 }
@@ -595,11 +619,14 @@ function enterRoute(hash,initial=false){
     ui.surface='consultation';let screen=hash.slice(1);const asked=screen;
     if(!screenNames.includes(screen)||(['detail','final'].includes(screen)&&!state.selected)||(screen==='results'&&!state.recommendation))screen='welcome';
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
+    const willResume=initial&&screen!=='saved'&&state.restoredCurrent&&state.talk,willRefresh=!willResume&&initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk;
+    // 다시 불러올 것이 있으면 navigate 가 그리는 첫 화면부터 「AI 답변 준비중」이 되게 먼저 표시한다.
+    if(willResume||willRefresh)restoring=true;
     if(screen==='saved')openSaved();else flow.navigate(screen);
     // 새로고침 전에 보던 견적이 있으면 같은 조건으로 다시 물어 그 상품을 다시 연다(값은 지금 기준).
-    if(initial&&screen!=='saved'&&state.restoredCurrent&&state.talk){restoring=true;void flow.resume({arrived:!!arrival}).finally(()=>{restoring=false;});}
+    if(willResume){void flow.resume({arrived:!!arrival}).finally(()=>{restoring=false;render();});}
     // 고른 견적 없이 조건만 넘어왔으면(대화 화면의 「기존 상담 화면」) 그 조건으로 추천을 다시 받아 추천 목록을 연다.
-    else if(initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk){restoring=true;void flow.refresh().finally(()=>{restoring=false;});}
+    else if(willRefresh){void flow.refresh().finally(()=>{restoring=false;render();});}
   }finally{enteringRoute=false;}
 }
 function back(){flow.navigate({results:'welcome',detail:'results',final:'detail',saved:state.selected?'final':state.groups.length?'results':'welcome'}[state.screen]||'welcome');}
