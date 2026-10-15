@@ -376,8 +376,9 @@ class BudgetNote(unittest.TestCase):
             _turn("**게임 PC A**를 추천해요."),
         ], reco=reco)
         # 보여 준 카드가 모두 예산을 넘으면 끝에 붙이는 대신 맨 앞에서 먼저 말한다(K1 솔직히 알림).
-        self.assertEqual(out["reply"], "예산 1,500,000원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는"
-                                       " 1,624,400원이에요.\n\n게임 PC A를 추천해요.")
+        # 말하는 범위는 보여 드린 PC까지다(코덱스 P2 F2 -- 전체 상품 부재·최저가를 단정하지 않는다).
+        self.assertEqual(out["reply"], "보여 드린 PC는 1,624,400원으로 예산 1,500,000원보다 124,400원 높아요."
+                                       "\n\n게임 PC A를 추천해요.")
 
 
 # ── ⑥ 옛 경로의 PC 설명 검사를 도구 상담에도 건다 (2026-10-14 사장님 결함 2·3 · 권고 7, 「이어서 연결」) ──
@@ -449,9 +450,11 @@ class PcChecks(unittest.TestCase):
 class BudgetLead(unittest.TestCase):
     OVER = {"price": 1_624_400, "over_budget": True}
 
-    def test_all_over_leads_with_none_in_budget(self):
+    def test_all_over_leads_with_shown_scope(self):
         n = AG.budget_lead([self.OVER], 600_000, "추천 제품은 골드 인텔입니다. 1080p 기준이에요.")
-        self.assertEqual(n, "예산 600,000원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는 1,624,400원이에요.")
+        self.assertEqual(n, "보여 드린 PC는 1,624,400원으로 예산 600,000원보다 1,024,400원 높아요.")
+        n = AG.budget_lead([self.OVER, {"price": 1_800_000, "over_budget": True}], 1_500_000, "좋아요.")
+        self.assertEqual(n, "보여 드린 PC 2대는 모두 예산 1,500,000원보다 비싸요. 이 중 가장 낮은 가격은 1,624,400원으로 예산보다 124,400원 높아요.")
 
     def test_no_lead_when_first_sentence_already_says_so(self):
         for first in ("80만 원 이하인 팝콘PC는 현재 맞는 상품이 없어요.", "예산을 넘는 PC만 있어요."):
@@ -462,13 +465,11 @@ class BudgetLead(unittest.TestCase):
         self.assertIsNone(AG.budget_lead([self.OVER], None, "좋아요."))
         self.assertIsNone(AG.budget_lead([], 800_000, "좋아요."))
 
-    def test_lead_amounts_pass_verify(self):
-        book = TT.FactBook()
-        book.prices = {1_624_400}
-        n = AG.budget_lead([self.OVER], 600_000, "")
-        clean, dropped = AG.verify(n, book, 600_000)
-        self.assertEqual(dropped, [])
-        self.assertEqual(clean, n)
+    def test_lead_is_added_after_verify(self):
+        # 차액은 묶음 값이 아니라 서버가 예산·카드 가격으로 계산한 값이다 -- verify 뒤에 붙이는 위치를 지킨다.
+        import inspect
+        src = inspect.getsource(AG.run_turn)
+        self.assertLess(src.index("verify(reply"), src.index("budget_lead("))
 
 
 # ── ⑧ 모델의 속말 메모를 고객 답에 내지 않는다 (2026-10-15 사장님 영상편집 상담 「бюджет? budget question Korean…」) ──
@@ -701,3 +702,119 @@ class CodexRetestFixes(unittest.TestCase):
     def test_prompt_tells_how_to_refer_back(self):
         for phrase in ("보여 드린 PC:", "같은 이름의 PC", "없었다고 말하고"):
             self.assertIn(phrase, AG.SYSTEM, phrase)
+
+
+# ── ⑮ 코덱스 PR258·260·259 P2 4건 (F1 예산 안내 누락 · F2 표시 범위 · F3 부정형 긍정 · F4 와트 역할, 2026-10-15) ──
+# 최종 run_turn 출력(verify -> pc_checks -> 빈 답 안내 -> budget_lead/note)으로 본다. 상품·권장 파워는 고정 자료다.
+OVER = dict(ITEM, price=1_624_400, over_budget=True)
+FIT = dict(ITEM, product_code=1002, name="예산 안 PC", price=1_400_000, over_budget=False)
+LEAD_ONE = "보여 드린 PC는 1,624,400원으로 예산 1,500,000원보다 124,400원 높아요."
+
+
+class CodexP2Budget(unittest.TestCase):
+    def _case(self, user, ai, items, refs=None, psu=None, bound="이하"):
+        calls = [
+            _turn(calls=[{"id": "a", "name": "find_pcs", "args": {"usages": ["게임"], "budget_won": 1_500_000, "budget_bound": bound}}]),
+            _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": refs or [f"P{i + 1}" for i in range(len(items))]}}]),
+            _turn(ai),
+        ]
+        orig = AG.PA.psu_note
+        fake = (lambda c, s: orig(_PsuConn(psu), s)) if psu else (lambda c, s: None)
+        with patch.object(AG.PA, "psu_note", fake):
+            out, _ = Agent._run(self, calls, text=user,
+                                reco=_reco(card_sets=[{"usage": "게임", "items": items}], budget_bound=bound))
+        return out
+
+    def test_f1_psu_line_does_not_hide_budget_lead(self):           # R01
+        out = self._case("RTX 5070에 700W 파워, 게임 PC 150만원 이하로 추천해줘", "게임 PC A를 보세요.", [OVER], psu=650)
+        self.assertEqual(out["reply"], LEAD_ONE + "\n\nRTX 5070 권장 파워는 650W라 700W 파워면 권장 기준은 넘지만 여유가 적어요."
+                                       " 750W 이상이면 넉넉해요.\n\n게임 PC A를 보세요.")
+
+    def test_f1_unrelated_neom_does_not_hide_budget_lead(self):     # R03
+        out = self._case("게임용 150만원 이하로 추천해줘", "성능이 넘치는 PC예요.", [OVER])
+        self.assertEqual(out["reply"], LEAD_ONE + "\n\n성능이 넘치는 PC예요.")
+
+    def test_f1_mixed_cards_with_psu_keep_partial_note(self):        # R14
+        out = self._case("RTX 5070에 700W 파워, 게임 PC 150만원 이하로 추천해줘", "두 PC를 보세요.", [FIT, OVER], psu=650)
+        self.assertIn("보여 드린 2대 중 1대는 예산 1,500,000원을 넘습니다(가장 적게 넘는 것이 124,400원 초과).", out["reply"])
+        self.assertIn("권장 기준은 넘지만 여유가 적어요", out["reply"])
+        self.assertNotIn("없어요", out["reply"])
+
+    def test_f1_no_double_notice_when_ai_says_over_first(self):     # R08 대조
+        out = self._case("RTX 5070에 500W 파워, 게임 PC 150만원 이하로 추천해줘",
+                         "예산 150만원을 넘는 PC만 있어요. 게임 PC A를 보세요.", [OVER], psu=650)
+        self.assertNotIn("보여 드린 PC는", out["reply"])
+        self.assertEqual(out["reply"].count("넘는 PC만"), 1)
+
+    def test_f2_subset_never_claims_global_absence(self):            # R04 + 선택 대조
+        for refs, has_lead, has_note in ((["P2"], True, False), (["P1"], False, False), (["P1", "P2"], False, True)):
+            out = self._case("게임용 150만원 이하로 추천해줘", "게임 PC A를 보세요.", [FIT, OVER], refs=refs)
+            self.assertNotIn("판매 중인 PC가 없", out["reply"], refs)
+            self.assertNotIn("가장 싼 PC", out["reply"], refs)
+            self.assertEqual(out["reply"].startswith(LEAD_ONE), has_lead, refs)
+            self.assertEqual("2대 중 1대" in out["reply"], has_note, refs)
+            self.assertEqual([c["ref"] for c in out["cards"]], refs)       # 고른 번호·순서는 그대로
+
+    def test_f2_unpriced_card_makes_no_lead(self):
+        out = self._case("게임용 150만원 이하로 추천해줘", "게임 PC A를 보세요.", [OVER, dict(OVER, product_code=1003, price=None)])
+        self.assertFalse(out["reply"].startswith("보여 드린 PC"))
+        self.assertNotIn("판매 중인 PC가 없", out["reply"])
+
+    def test_f3_negative_form_yes_is_removed_and_lead_answers(self):  # R02
+        out = self._case("150만원으로 게임 PC 가능해요?", "150만원이면 부족함 없이 충분해요.", [OVER])
+        self.assertEqual(out["reply"], LEAD_ONE)
+        self.assertEqual(out["status"], "ok")
+
+    def test_f3_static_sentences(self):
+        cards = [{"price": 1_624_400, "over_budget": True}]
+        ask = "150만원으로 게임 PC 가능해요?"
+        for s, kept in (("150만원 안에 맞추는 건 어렵지 않아요.", False), ("150만원으로는 맞추기 어려워요.", True),
+                        ("150만원이면 충분하지 않아요.", True), ("램은 부족함 없이 사용할 수 있어요.", True)):
+            self.assertEqual(AG.pc_checks(s, ask, cards, 1_500_000) == s, kept, s)
+
+    def test_f3_within_budget_control_keeps_yes(self):
+        cards = [{"price": 1_400_000, "over_budget": False}]
+        self.assertEqual(AG.pc_checks("150만원이면 부족함 없이 충분해요.", "150만원으로 게임 PC 가능해요?", cards, 1_500_000),
+                         "150만원이면 부족함 없이 충분해요.")
+
+    def test_f3_lower_bound_makes_no_over_notice(self):              # R13 대조 -- 새 초과 안내가 생기지 않는다
+        out = self._case("게임용 본체 150만원 이상으로 찾아주세요", "게임 PC A를 보세요.",
+                         [dict(OVER, over_budget=False)], bound="이상")
+        self.assertEqual(out["reply"], "게임 PC A를 보세요.")
+
+    def test_says_budget_over(self):
+        for s in ("예산 150만원을 넘는 PC만 있어요.", "80만 원 이하인 팝콘PC는 현재 맞는 상품이 없어요.", "150만원으로는 맞추기 어려워요."):
+            self.assertTrue(AG.says_budget_over(s), s)
+        for s in ("700W 파워면 권장 기준은 넘지만 여유가 적어요.", "성능이 넘치는 PC예요.", "150만원이면 부족함 없이 충분해요.",
+                  "RAM은 부족함 없어요."):
+            self.assertFalse(AG.says_budget_over(s), s)
+
+
+class CodexP2Watt(unittest.TestCase):
+    def test_f4_gpu_draw_is_not_psu(self):                           # R10 -- 도구 경로 최종 답
+        script = [_turn("750W 파워면 괜찮아요. 소비전력 250W는 그래픽카드 기준이에요.")]
+        with patch.object(AG, "engine", _PsuEngine(650)), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
+            out = AG.run_turn("RTX 5070 소비전력은 250W인데 750W 파워면 괜찮나요?", [])
+        self.assertEqual(out["reply"], "RTX 5070 권장 파워는 650W라 750W 파워면 여유 있게 쓸 수 있어요.\n\n"
+                                       "소비전력 250W는 그래픽카드 기준이에요.")
+        self.assertNotIn("250W 파워", out["reply"])
+
+    def test_f4_roles(self):
+        P = AG.PA
+        self.assertEqual(P.psu_question("RTX 5070 권장 파워가 650W라는데 500W 파워로 괜찮나요?"), ("RTX 5070", 500))
+        self.assertEqual(P.psu_question("750W 파워로 RTX 5070을 쓰려는데 GPU 소비전력이 250W라네요."), ("RTX 5070", 750))
+        self.assertIsNone(P.psu_question("RTX 5070에 500W 또는 750W 파워 중 뭘 고르면 되나요?"))
+        self.assertEqual(P.psu_watts("RTX 5070에 500W 또는 750W 파워 중 뭘 고르면 되나요?"), [500, 750])
+        self.assertEqual(P.psu_question("RTX 5070에 500W 파워면 돼요?"), ("RTX 5070", 500))
+        self.assertEqual(P.psu_question("RTX 5070 500W 돼요?"), ("RTX 5070", 500))
+        self.assertIsNone(P.psu_question("RTX 5070 소비전력 250W예요?"))
+
+    def test_f4_single_watt_judgements_unchanged(self):
+        for w, word in ((500, "부족해요"), (700, "여유가 적어요"), (750, "여유 있게")):
+            self.assertIn(word, AG.PA.psu_line("RTX 5070", w, 650))
+
+    def test_f4_old_path_uses_customer_psu(self):
+        line, watt = AG.PA.psu_note(_PsuConn(650), "RTX 5070 소비전력은 250W인데 750W 파워면 괜찮나요?")
+        self.assertEqual(watt, 750)
+        self.assertEqual(AG.PA.drop_watt_sentences("소비전력 250W는 GPU 기준이에요. 750W면 돼요.", watt), "소비전력 250W는 GPU 기준이에요.")
