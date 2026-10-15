@@ -5,4 +5,5 @@ const h=markup(p,{review:true});
 assert(h.includes('&lt;script&gt;'));assert(!h.includes('<script>'));assert(!h.includes('src="javascript:'));assert(!h.includes('href="javascript:'));
 assert(!h.includes('30,000원'));assert(!h.includes('pc-part-price'));assert(!h.includes('가격 확인'));assert(h.includes('<details'));assert(h.includes('검토 초안'));
 assert(!markup(p).includes('검토 초안'));
+const a=markup(p,{price:true});assert(a.includes('pc-part-price')&&a.includes('30,000원'));assert(markup({...p,price:null},{price:true}).includes('가격 확인 필요'));assert(!markup(p).includes('pc-part-price'));
 console.log('part explanation UI escaping and disclosure checks passed');

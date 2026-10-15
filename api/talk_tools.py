@@ -208,12 +208,9 @@ def pc_detail(args: dict, book: FactBook) -> dict:
         return _res("unknown", ref=args["ref"], reason="공개된 부품 구성이 없어 부품 단위로는 말할 수 없다")
     parts = []
     for p in cfg.get("parts") or []:
-        price = p.get("price") if type(p.get("price")) is int else None
-        if price is not None:
-            book.prices.add(price)
+        # 부품 판매가는 모델에 주지 않고 허용 금액에도 넣지 않는다(2026-10-15 사장님: PC 금액만).
         parts.append({"name": p.get("name"), "role": p.get("description"),
-                      "specs": [f"{s.get('label')}: {s.get('value')}" for s in (p.get("specs") or [])][:4],
-                      "price": price, "price_state": "확인됨" if price is not None else "확인 중"})
+                      "specs": [f"{s.get('label')}: {s.get('value')}" for s in (p.get("specs") or [])][:4]})
     return _res("ok", ref=args["ref"], snapshot_id=book.snapshot_id, as_of=book.as_of,
                 configuration_id=cfg.get("configuration_id"), revision=cfg.get("revision"),
                 pc_price=it.get("price"), parts=parts)
