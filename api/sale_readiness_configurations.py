@@ -142,8 +142,13 @@ def _project(row, *, review=None, terms=None):
 
 
 def list_configurations(conn):
-    """One canonical bulk read; never obtains each item's detail separately."""
-    return [_project(row) for row in catalog_rows(conn)]
+    """One canonical bulk read; never obtains each item's detail separately.
+
+    Each row carries the same structured review the detail read uses, so the
+    summary, list and selected detail derive one final state (no list-only rule).
+    """
+    return [_project(row, review=row.get('current_review'))
+            for row in catalog_rows(conn, with_review=True)]
 
 
 def detail_configuration(conn, identity):

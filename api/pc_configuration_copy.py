@@ -156,8 +156,12 @@ def read_sold_offer_configuration(conn, product_code):
                 customer_publishable=False, price_is_snapshot=True, detail=detail)
 
 
-def catalog_rows(conn):
-    """Bulk read once; evaluate the same source-review rule used by detail reads."""
+def catalog_rows(conn, with_review=False):
+    """Bulk read once; evaluate the same source-review rule used by detail reads.
+
+    with_review=True also returns each row's structured current_review, so a list
+    projection can use the exact blocker/eligibility data its detail read uses.
+    """
     rows=conn.execute(text('SELECT * FROM pc_configurations ORDER BY configuration_id')).mappings().all()
     parts=conn.execute(text('SELECT * FROM pc_configuration_parts ORDER BY configuration_id,ordinal')).mappings().all()
     explanations={r['source_product_code']:r for r in conn.execute(text('''
@@ -173,7 +177,11 @@ def catalog_rows(conn):
     from .pc_review_specs import specs_for_review
     from .pc_configuration_review import assess
     by_product={s['product_code']:dict(s) for s in conn.execute(text('SELECT * FROM product_specs WHERE product_code IN (SELECT product_code FROM product_explanations WHERE product_code IS NOT NULL)')).mappings()}
-    specs=specs_for_review(explanations,by_product)
+    # Review like load_review(): approved-price pinning applies to the review basis only;
+    # market alerts below still compare live prices (as read_configuration does).
+    from .part_explanation_approval import pin_rows
+    review_rows=pin_rows(conn,{k:dict(v) for k,v in explanations.items()})
+    specs=specs_for_review(review_rows,by_product)
     rules=[dict(x) for x in conn.execute(text('SELECT * FROM compat_rules WHERE active ORDER BY rule_id')).mappings()]
     market=load_market(conn)
     from .pc_media import visual_snapshot
@@ -184,7 +192,7 @@ def catalog_rows(conn):
         affected=[p['source_code'] for p in bom if part_needs_review(p,explanations.get(p['explanation_code']))]
         case=next((p for p in bom if p['slot']=='CASE' and not p['pseudo']),None)
         offer_list=offers.get(r['configuration_id'],[])
-        current_review=assess(r,bom,offer_list,explanations,specs,rules)
+        current_review=assess(r,bom,offer_list,review_rows,specs,rules)
         image=media.get(r['configuration_id'])
         image_current=bool(image and image['visual_basis']==digest(visual_snapshot([p for p in bom if not p['pseudo']],explanations,current_review['cooling_plan'])))
         market_alerts=changes_for(r,bom,offer_list,explanations,*market)
@@ -208,6 +216,7 @@ def catalog_rows(conn):
             recommendation_state=current_review['recommendation_state'],assembly_check_count=len(current_review['assembly_checks']),
             needs_review=bool(market_alerts) or bool(affected) or not description_ready or bool(content.get('_admin_bom_edit',{}).get('review_required')) or (bool(workflow) and not workflow['eligible']),affected_parts=affected,
             customer_publishable=False,price_is_snapshot=True))
+        if with_review: result[-1]['current_review']=current_review
     return result
 
 

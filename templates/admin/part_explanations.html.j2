@@ -25,6 +25,11 @@
 .pc-cat-nobom summary{cursor:pointer;font-weight:700}
 .pc-cat-nobom ul{margin:6px 0;padding-left:18px;font-size:9.5pt;line-height:1.7}
 .pc-cat-foot{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px}
+/* 기능테스트 ISSUE-01 — 판매 준비를 펼치면 .pm-grid(flex:1·min-height:0)가 남은 높이 0으로 줄어
+   목록·상세가 사라졌다(1920x855). 목록·상세에 최소 높이(접힘 상태 1920x855 의 기존 높이와 같은 360px)를 주고, 넘치는 높이는 .pm 이 스크롤한다.
+   판매 준비 패널은 자기 높이를 유지한다(자체 표는 .pc-cat-scroll 이 스크롤). */
+.pc-cat{flex-shrink:0}
+@media(min-width:851px){.pm-grid{min-height:360px}}
 @media(max-width:850px){
   .pc-cat-bar label{margin-left:0;flex:1 1 100%}
   .pc-cat thead{display:none}
