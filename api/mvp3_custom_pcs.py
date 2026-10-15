@@ -21,4 +21,4 @@ def custom_pcs(response: Response):
     with engine.connect() as conn:
         items = custom_pc.customer_list(conn)
     return {'ok': True, 'items': items, 'purchase': 'inquiry',
-            'note': '팝콘PC가 부품을 골라 새로 만든 조립PC예요. 쇼핑몰 상품 페이지가 아직 없어 구매 상담 신청으로 주문을 도와드려요.'}
+            'note': '팝콘PC가 부품을 골라 새로 만든 조립완제PC예요. 쇼핑몰 상품 페이지가 아직 없어 구매 상담 신청으로 주문을 도와드려요.'}
