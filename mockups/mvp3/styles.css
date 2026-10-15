@@ -741,3 +741,153 @@ body.live-mode.original-flow .dt-detail .public-bom-disclosure>summary>span{bord
 .mp-candidate-head{margin:2px 0 6px;font-size:12px}
 .mp-info-line{margin:8px 2px 0;font-size:12px;color:var(--muted);line-height:1.5}
 .final-table tfoot .mp-total-row th,.final-table tfoot .mp-total-row td{font-weight:700}
+
+/* ===== 고객 상세 v2 (2026-10-16 코덱스 통합안 v2 · 사장님 승인) =====
+   구성표가 공개된 PC 의 상세. 왼쪽 「선택한 부품」 표 + 오른쪽 요약(sticky), 「변경」은 오른쪽 패널(모바일은 전체 너비 덮개).
+   기존 .dt-detail / .final-* 규칙과 섞이지 않게 .dv2 아래에서만 정한다. 색은 위 :root 변수만 쓴다. */
+.dv2{max-width:1240px;margin:0 auto;padding-bottom:28px}
+.dv2 .back{font-size:14px;min-height:32px}
+.dv2 .ui-icon{filter:none;opacity:1;width:20px;height:20px}
+.dv2 .ui-icon.part-symbol{display:block;width:30px;height:30px;margin:0;opacity:.85}
+.dv2-head{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 24px;align-items:start;margin:4px 0 24px}
+.dv2-head-copy h2{font-size:34px;line-height:1.25;letter-spacing:-1px;font-weight:780}
+.dv2-name{font-size:20px;font-weight:700;line-height:1.4;margin:14px 0 4px;overflow-wrap:anywhere}
+.dv2-head-copy .muted{margin:0}
+.dv2-photo{grid-column:2;grid-row:1;width:150px;text-align:right}
+.dv2-photo .live-product-photo{margin:0 0 4px;border:0}
+.dv2-photo .live-product-photo img{height:110px}
+.dv2-photo small{font-size:12px}
+.dv2-mchanges{display:none}
+.dv2-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0 32px;align-items:start}
+.dv2-main{container:dv2main/inline-size;min-width:0}
+.dv2-parts>h3{font-size:22px;font-weight:750;letter-spacing:-.4px;padding-bottom:12px;border-bottom:2px solid var(--green);margin:0}
+.dv2-parts .final-table-wrap{border:0;border-radius:0;overflow:visible}
+.dv2-table,.dv2-table thead,.dv2-table tbody,.dv2-table tr,.dv2-table td{display:block;width:100%;padding:0;border:0}
+.dv2-table{border-collapse:collapse}
+.dv2-table thead tr,.dv2-row>td>details>summary{display:grid;grid-template-columns:128px minmax(0,1fr) 150px 108px 84px;gap:8px 12px;align-items:center}
+.dv2-table thead tr{background:var(--tint);padding:9px 6px;font-size:13px;color:var(--muted)}
+.dv2-table thead th{padding:0;border:0;font-weight:500;text-align:left;background:none}
+.dv2-table thead th:nth-child(2){grid-column:2/5}
+.dv2-table thead th:nth-child(3){grid-column:5;text-align:center}
+.dv2-row{border-bottom:1px solid var(--line)}
+.dv2-row.is-editing{background:var(--tint)}
+.dv2-row>td>details>summary{list-style:none;cursor:pointer;padding:13px 6px;min-height:64px}
+.dv2-row>td>details>summary::-webkit-details-marker{display:none}
+.dv2-cat{display:flex;align-items:center;gap:12px;margin:0;font-size:15px;font-weight:500;color:var(--muted)}
+.dv2-model{min-width:0;overflow-wrap:anywhere;line-height:1.45}
+.dv2-model .part-name{font-size:16px;font-weight:700;color:var(--ink)}
+.dv2-model .public-bom-quantity{font-size:13px;color:var(--muted);margin-left:6px}
+.dv2-chg{font-size:14px;line-height:1.7}
+.dv2-more{display:inline-flex;align-items:center;gap:4px;font-size:14px;color:var(--muted);white-space:nowrap}
+.dv2-more .ui-icon{width:16px;height:16px;opacity:.6;transition:transform .15s}
+details[open]>summary .dv2-more .ui-icon{transform:rotate(180deg)}
+.dv2-act{text-align:center}
+.dv2-act button{min-width:72px;min-height:40px;padding:6px 14px;font-weight:650;border:1px solid var(--green);background:#fff}
+.dv2-act button.is-active{background:var(--green);color:#fff}
+.dv2-na{display:block;color:var(--muted);font-size:14px;line-height:1.3}.dv2-na small{display:block;font-size:12px}
+.dv2-link{padding:2px 0;min-height:0;border-radius:0;font-size:14px;color:var(--green);text-decoration:underline;text-underline-offset:3px}
+.dv2-row .mp-changed-badge{padding:2px 9px;font-size:12px;background:color-mix(in srgb,var(--amber) 12%,#fff);color:var(--amber);border:1px solid color-mix(in srgb,var(--amber) 35%,#fff)}
+.dv2 .mp-diff{font-weight:700;font-variant-numeric:tabular-nums}
+.dv2 .mp-diff.is-plus{color:var(--amber)}.dv2 .mp-diff.is-minus{color:var(--green)}.dv2 .mp-diff.is-zero{color:var(--muted);font-weight:600}.dv2 .mp-diff.is-missing{color:var(--amber);font-weight:600}
+.dv2-row .public-bom-expanded{margin:0 6px 14px;padding:12px 16px;display:grid;gap:12px;background:#f0f6f4;border-radius:6px}
+.dv2-row .public-bom-photo{max-width:220px}
+.dv2-side{position:sticky;top:0;border-left:1px solid var(--line);padding:0 0 0 28px;min-width:0}
+.dv2-sum-head{display:flex;justify-content:space-between;align-items:baseline}.dv2-sum-head h3{font-size:19px}
+.dv2-total-num{display:block;font-size:38px;font-weight:800;letter-spacing:-1px;line-height:1.2;font-variant-numeric:tabular-nums}
+.dv2-summary{padding-bottom:16px;border-bottom:2px solid var(--green)}
+.dv2-summary .dv2-total-num{margin-top:12px}
+.dv2-fold{border-top:1px solid var(--line);padding:14px 0}
+.dv2-fold>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:4px 8px}
+.dv2-fold>summary::-webkit-details-marker{display:none}
+.dv2-fold-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:700}
+.dv2-fold>summary>.ui-icon{width:16px;height:16px;opacity:.6;transition:transform .15s}
+.dv2-fold[open]>summary>.ui-icon{transform:rotate(180deg)}
+.dv2-peek{grid-column:1/-1;font-size:14px;color:var(--muted);line-height:1.6;padding-left:30px}
+.dv2-changes{border-top:0}
+.dv2-change-list{list-style:none;margin:10px 0 6px;padding:0;display:grid;gap:6px}
+.dv2-change-list li{display:flex;justify-content:space-between;gap:12px}
+.dv2-sums{margin:0;padding:12px 0;border-top:1px solid var(--line);display:grid;gap:6px}
+.dv2-sums div{display:flex;justify-content:space-between;gap:12px;font-size:15px}.dv2-sums dt{color:var(--muted)}.dv2-sums dd{margin:0;font-weight:650;font-variant-numeric:tabular-nums}
+.dv2-notes p{font-size:14px;margin:4px 0}
+.dv2-sets{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 0;border-top:1px solid var(--line)}
+.dv2-sets strong{font-size:18px}
+.dv2-sets .qty-stepper strong{font-size:17px}
+.dv2-sets-total{margin:0 0 10px;font-size:14px}
+.dv2-save{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:16px;font-size:18px;border-radius:8px}
+.dv2-save .ui-icon{filter:brightness(0) invert(1)}
+.dv2-pricenote{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:12px 0 18px}
+.dv2-cond{margin:12px 0 0;display:grid;gap:8px}.dv2-cond div{display:grid;grid-template-columns:20px 120px minmax(0,1fr);gap:8px;font-size:14px;align-items:start}.dv2-cond dt{font-weight:650}.dv2-cond dd{margin:0;color:var(--muted)}
+.dv2-bar{display:none}
+/* 선택 패널(오른쪽) */
+.dv2-side.is-panel{padding-bottom:8px}
+.dv2-panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dv2-panel-head h3{font-size:26px;font-weight:780;letter-spacing:-.5px}
+.dv2-panel-head h3:focus{outline:none}.dv2-panel-head h3:focus-visible{outline:3px solid #51a590;outline-offset:3px}
+.dv2-x{font-size:30px;line-height:1;width:44px;height:44px;padding:0;color:var(--ink)}
+.dv2-lead{font-size:18px;font-weight:650;margin:18px 0 2px}
+.dv2-cands{list-style:none;margin:14px 0 6px;padding:0;display:grid;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.dv2-cand+.dv2-cand{border-top:1px solid var(--line)}
+.dv2-cand label{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:6px 12px;align-items:start;padding:14px;cursor:pointer;min-height:56px}
+.dv2-cand input{width:22px;height:22px;margin:2px 0 0;accent-color:var(--green)}
+.dv2-cand.is-picked{background:var(--tint)}
+.dv2-cand.is-disabled label{cursor:not-allowed;opacity:.75}
+.dv2-cand-copy{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}.dv2-cand-model{font-size:14px;color:var(--muted)}
+.dv2-cand-diff{display:grid;justify-items:end;gap:6px;text-align:right;font-size:15px}
+.dv2-current-tag{display:inline-block;padding:2px 10px;border:1px solid var(--green);border-radius:999px;font-size:12px;font-weight:650;color:var(--green);background:#fff}
+.dv2-base-link{display:inline-flex;align-items:center;gap:8px;margin:12px 0 4px;font-size:15px;font-weight:650;text-decoration:none}
+.dv2-panel .part-qty{margin:10px 0;font-size:14px}
+.dv2-total-box{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-bottom:0;padding:14px;margin-top:14px}
+.dv2-total-box small{display:block}.dv2-total-box .dv2-total-num{font-size:30px}
+.dv2-panel .dv2-sums{border:1px solid var(--line);padding:12px 14px;margin:0}
+.dv2-assembly{font-size:13.5px;margin:12px 0 0}
+.dv2-actions{display:grid;gap:6px;margin-top:14px}
+.dv2-apply{width:100%;padding:15px;font-size:17px;border-radius:8px}
+.dv2-cancel{width:100%;font-weight:650;padding:10px}
+.dv2-foot{font-size:13.5px;margin:8px 0 0}
+/* 좁은 표(컨테이너 기준): 모델명이 줄바꿈되도록 한 줄을 세로로 쌓는다 */
+@container dv2main (max-width:759px){
+  .dv2-table thead{display:none}
+  .dv2-row>td>details>summary{grid-template-columns:96px minmax(0,1fr) auto;grid-template-areas:"cat model act" "cat chg act" "cat more act";align-items:start;padding:14px 4px}
+  .dv2-cat{grid-area:cat}.dv2-model{grid-area:model}.dv2-chg{grid-area:chg}.dv2-more{grid-area:more}.dv2-act{grid-area:act;align-self:center}
+  .dv2-chg:empty{display:none}
+  .dv2-cat span{font-size:14px}
+}
+@media(min-width:769px){.actionbar.dv2-bar{display:none}}
+@keyframes dv2-in{from{transform:translateX(100%)}to{transform:none}}
+@media(max-width:768px){
+  .dv2{padding-bottom:132px}
+  .dv2-head{grid-template-columns:minmax(0,1fr);margin-bottom:18px}
+  .dv2-head-copy h2{font-size:28px}.dv2-name{font-size:19px;margin-top:10px}
+  .dv2-photo{display:none}
+  .dv2-mchanges{display:block;grid-column:1;margin-top:8px;font-size:14px}
+  .dv2-mchanges summary{list-style:none;cursor:pointer;display:grid;gap:2px}.dv2-mchanges summary::-webkit-details-marker{display:none}
+  .dv2-mchanges summary>span{display:flex;align-items:center;gap:6px;font-size:16px;font-weight:700}
+  .dv2-mchanges .ui-icon{width:16px;height:16px;opacity:.6}
+  .dv2-mchanges .dv2-change-list{margin:8px 0 0}
+  .dv2-layout{display:block}
+  .dv2-desk{display:none!important}
+  .dv2-side{position:static;border:0;padding:0;margin-top:8px}
+  .dv2-act button{min-height:44px;min-width:76px}
+  .dv2-link{min-height:32px;display:inline-flex;align-items:center}
+  .dv2-sets{padding:14px 0;border-top:1px solid var(--line);margin-top:4px}
+  .dv2-pricenote{display:none}
+  .dv2-side.is-panel{position:fixed;inset:0;z-index:100;margin:0;background:#fff;overflow:auto;overscroll-behavior:contain;padding:20px 20px calc(28px + env(safe-area-inset-bottom));animation:dv2-in .2s ease-out}
+  .dv2-panel-head h3{font-size:28px}
+  .dv2.has-panel .dv2-pricenote{display:none}
+  .actionbar.dv2-bar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 20px #00000010}
+  .dv2-bar-label strong{display:block;font-size:15px}.dv2-bar-label small{display:block}
+  .dv2-bar-price{font-size:24px;font-weight:800;letter-spacing:-.5px;white-space:nowrap}
+  .dv2-bar .dv2-save{width:auto;flex:1;min-width:128px;max-width:190px;padding:13px 10px;font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){.dv2-side.is-panel{animation:none}}
+/* v2 보정: 기존 .final-table 의 카드형 행 규칙(테두리·둥근 모서리·여백)이 모바일에서 되살아나지 않게 한다 */
+.dv2 .dv2-table tr.dv2-row,.dv2 .dv2-table tr.dv2-row>td{border:0;border-radius:0;box-shadow:none;margin:0;padding:0;background:none}
+.dv2 .dv2-table tr.dv2-row{border-bottom:1px solid var(--line)}
+.dv2 .dv2-table tr.dv2-row.is-editing{background:var(--tint)}
+.dv2 .dv2-row>td>details>summary{padding:12px 6px;row-gap:2px}
+.dv2 .dv2-row>td>details>summary>span,.dv2 .dv2-row>td>details>summary>h4{border:0;padding-left:0}
+@container dv2main (max-width:759px){.dv2 .dv2-row>td>details>summary{padding:12px 4px}}
+@media(max-width:768px){
+  .dv2-side.is-panel .dv2-panel-head{position:sticky;top:-20px;background:#fff;z-index:1;padding:4px 0}
+  .dv2-side.is-panel .dv2-actions{position:sticky;bottom:calc(-28px - env(safe-area-inset-bottom));background:#fff;padding:10px 0 calc(8px + env(safe-area-inset-bottom));margin-bottom:-8px;border-top:1px solid var(--line);z-index:1}
+}

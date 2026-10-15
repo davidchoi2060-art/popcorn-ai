@@ -273,17 +273,7 @@ function productSummary(){
   return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted" data-pc-total-move>바꾼 부품 '+p.build.changes.length+'개 · '+totalMove(p)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+budgetLines(p)+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){
-  const roles={
-    CPU:['CPU','cpu','프로그램의 명령을 계산하고 처리하는 부품이에요.'],
-    GPU:['그래픽카드','graphics-card','게임 화면과 그림을 출력하는 부품이에요.'],
-    RAM:['메모리','memory','실행 중인 프로그램의 정보를 잠시 담아두는 부품이에요.'],
-    SSD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
-    HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
-    MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
-    PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
-    POWER:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
-    COOLER:['쿨러','gear','CPU에서 나는 열을 식히는 부품이에요.'],
-    CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
+  const roles=BOM_ROLES;
   const rows=configuration.parts.map(part=>{
     const [label,icon,role]=(Object.hasOwn(roles,part.slot)?roles[part.slot]:null)||[part.pseudo?'서비스':part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];
     const id='bom-unavailable-'+part.ordinal,swap=!part.pseudo,change=p.build?.changes.find(c=>c.ordinal===part.ordinal);
@@ -293,7 +283,7 @@ function publicBomDetails(configuration,p,information,finalOnly){
     const specs=part.specs.length?'<dl class="live-spec-grid">'+part.specs.map(x=>'<div><dt>'+esc(x.label)+'</dt><dd>'+esc(x.value.trim()||'정보 없음')+'</dd></div>').join('')+'</dl>':'<p>정보 없음</p>';
     return '<tr data-part="bom-'+part.ordinal+'"><td colspan="3"><details class="public-bom-disclosure" data-detail="bom-'+part.ordinal+'"><summary>'+
       '<div class="final-part-description">'+uiIcon(icon,'part-symbol')+'<div><h4><span>'+esc(label)+'</span><span class="part-name">'+esc(shown.name||part.name||'정보 없음')+'</span><span class="public-bom-quantity">수량 '+part.quantity+'</span>'+(part.assembly_only?'<span class="mp-assembly">조립 전용</span>':'')+'</h4><p>'+esc(shown.description||part.description||'정보 없음')+'</p>'+
-      '<span class="public-bom-toggle"><span class="when-closed">상세 사양 펼치기</span><span class="when-open">상세 사양 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
+      '<span class="public-bom-toggle"><span class="when-closed">상세 정보 펼치기</span><span class="when-open">상세 정보 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
       '<span class="final-part-price">'+partLinePrice(part)+'</span><span class="final-part-change">'+changeButton(part,label,finalOnly,open,id)+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
       (part.photo?.state==='approved'?'<figure class="public-bom-photo" data-product-photo><img data-product-image src="'+esc(part.photo.url)+'" alt="'+esc(part.name||label)+' 부품 사진" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>부품 사진을 불러오지 못했습니다</p></figure>':'<div class="public-bom-photo">정보 없음</div>')+'<div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
       '<p class="public-bom-unavailable" id="'+id+'">'+(swap?(finalOnly?'부품 질문은 아직 지원하지 않아요. 부품은 「상품 상세 다시 보기」에서 바꿀 수 있어요.':'부품 질문은 아직 지원하지 않아요. 이 부품은 오른쪽 「변경」으로 바꿀 수 있어요.'):'부품 질문은 아직 지원하지 않아요. 이 줄은 바꿀 수 없어요.')+'</p></div></div></details></td></tr>'+(open?buildRow():'');
@@ -304,6 +294,18 @@ function publicBomDetails(configuration,p,information,finalOnly){
     '<thead><tr><th scope="col">부품 · 등록 사양</th><th scope="col">기본 구성 / 변경 차액</th><th scope="col">변경</th></tr></thead><tbody>'+rows+'</tbody><tfoot>'+foot+'</tfoot></table></div><p class="mp-info-line">표시 금액은 PC 한 대의 구성 금액이에요. 실제 구매 금액과 포함 품목은 구매 전에 확인해 주세요.</p></section>'+
     (finalOnly?'<details class="public-bom-information" data-detail="spec"><summary>추천 근거·변경 안내 펼치기</summary><div class="final-part-expanded">'+information+'</div></details>':information);
 }
+// 부품 종류별 이름 · 아이콘 · 역할 문장(상세 v2 와 최종 견적이 함께 쓴다).
+const BOM_ROLES={
+    CPU:['CPU','cpu','프로그램의 명령을 계산하고 처리하는 부품이에요.'],
+    GPU:['그래픽카드','graphics-card','게임 화면과 그림을 출력하는 부품이에요.'],
+    RAM:['메모리','memory','실행 중인 프로그램의 정보를 잠시 담아두는 부품이에요.'],
+    SSD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
+    HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
+    MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
+    PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    POWER:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    COOLER:['쿨러','gear','CPU에서 나는 열을 식히는 부품이에요.'],
+    CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
 // 부품 직접 바꾸기(api/mvp3_build): 공개된 구성표의 줄마다 「변경」. 호환 규칙을 통과한 판매 부품만,
 // 금액은 서버가 다시 계산한 값만 쓴다(화면이 더하지 않는다). 가상 줄(조립비 등)은 바꾸지 않는다.
 function changeButton(part,label,finalOnly,open,id){
@@ -337,7 +339,7 @@ function buildChangedRow(part,label,icon,c,finalOnly,open){
   const id='bom-unavailable-'+part.ordinal;
   return '<tr data-part="bom-'+part.ordinal+'" class="build-changed"><td colspan="3"><details class="public-bom-disclosure" data-detail="bom-'+part.ordinal+'"><summary>'+
     '<div class="final-part-description">'+uiIcon(icon,'part-symbol')+'<div><h4><span>'+esc(label)+'</span><span class="part-name">'+esc(c.after.name)+'</span><span class="public-bom-quantity">수량 '+c.quantity+'</span></h4>'+
-    '<p class="build-changed-note"><span class="mp-changed-badge">변경함</span> 기본 구성: '+esc(c.before.name)+'</p>'+
+    '<p class="build-changed-note"><span class="mp-changed-badge">변경됨</span> 기본 구성: '+esc(c.before.name)+'</p>'+
     '<span class="public-bom-toggle"><span class="when-closed">상세 펼치기</span><span class="when-open">상세 접기</span>'+uiIcon('caret-down')+'</span></div></div>'+
     '<span class="final-part-price">'+diffHtml(c.delta)+'</span><span class="final-part-change">'+changeButton(part,label,finalOnly,open,id)+'</span></summary><div class="final-part-expanded public-bom-expanded">'+
     '<p id="'+id+'">바꾼 부품의 설명과 사진은 아직 준비되지 않았어요. 「변경」에서 다른 부품을 고르거나 「원래 구성으로」로 되돌릴 수 있어요.</p></div></details></td></tr>'+(open?buildRow():'');
@@ -421,13 +423,13 @@ function partChangeBody(finalOnly,configured){
     SWAP_BUTTONS.map(([slot,label,icon])=>button(uiIcon(icon)+label+' 바꾸기','part-options','outline small'+(state.parts?.slot===slot?' is-active':''),'data-slot="'+slot+'" aria-expanded="'+(state.parts?.slot===slot)+'"'+(state.phase?' disabled':''))).join('')+'</div>'+partOptionsPanel()+'</section>';
 }
 // 추천 이유·게임 안내. 상세(추천 구성 상세)에서는 오른쪽 열로, 최종 견적에서는 접힌 칸 안으로 간다.
-function detailReason(p){
+function detailReason(p,bare=false){
   // Read only the selected recommendation group; saved/recovery records have no game-context contract.
   const context=state.savedQuote||state.pendingSave?null:(state.selectedContext||(state.groups||[]).find(g=>Number.isInteger(p.index)&&g.products.some(item=>item.index===p.index&&item.product_code===p.product_code)));
   const ctx=context?.game_context,url=M.safeUrl(ctx?.source.url);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
-  return '<section class="live-explanation"><h3>이 상품을 추천한 이유</h3>'+
-    '<p class="muted">상담 조건: '+M.conditions(state.selectionState||state.talk).map(esc).join(' · ')+'</p>'+
+  return '<section class="live-explanation">'+(bare?'':'<h3>이 상품을 추천한 이유</h3>'+
+    '<p class="muted">상담 조건: '+M.conditions(state.selectionState||state.talk).map(esc).join(' · ')+'</p>')+
     (p.reasons.length?'<ul>'+p.reasons.map(r=>'<li>'+esc(r)+'</li>').join(''):'<p>추천 이유가 제공되지 않았어요.</p>')+'</section>'+
     (ctx?'<section class="live-explanation"><h3>게임 안내 · '+esc(ctx.game_name)+'</h3><ul>'+gameLabels.filter(([key])=>ctx[key]).map(([key,label])=>'<li><strong>'+label+': </strong>'+esc(ctx[key])+'</li>').join('')+'</ul>'+(url?'<p class="muted"><a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">자세히 보기</a></p>':'')+'</section>':'');
 }
@@ -446,17 +448,169 @@ function productDetails(finalOnly=false,split=false){
     '<div><h4><span>조립완제PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
     '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+(finalOnly?'':information);
 }
+function condRows(){
+  return [['gear','호환성','실제 조립 검수 결과는 확인되지 않았어요.'],['tag','가격',state.savedQuote?'보관 시점 참고 금액 \u00b7 확정가 아님':state.selected.price_src||'가격 기준 미확인'],
+    ['package','재고','재고 확보 전 \u00b7 구매 전 확인'],['squares-four','운영체제','포함 여부 재확인 필요'],
+    ['monitor','키보드 \u00b7 마우스 \u00b7 모니터','포함 여부 미확인'],['shield','보증','기간 \u00b7 범위 재확인 필요']];
+}
 function finalConditions(){
-  const row=(name,label,text)=>'<div>'+uiIcon(name)+'<dt>'+label+'</dt><dd>'+esc(text)+'</dd></div>';
+  const row=([name,label,text])=>'<div>'+uiIcon(name)+'<dt>'+label+'</dt><dd>'+esc(text)+'</dd></div>',r=condRows();
   return '<section class="final-conditions"><h3>구매 전 확인할 내용</h3><div class="final-conditions-grid"><dl>'+
-    row('gear','호환성','실제 조립 검수 결과는 확인되지 않았어요.')+row('tag','가격',state.savedQuote?'보관 시점 참고 금액 · 확정가 아님':state.selected.price_src||'가격 기준 미확인')+
-    row('package','재고','재고 확보 전 · 구매 전 확인')+'</dl><dl>'+row('squares-four','운영체제','포함 여부 재확인 필요')+
-    row('monitor','키보드 · 마우스 · 모니터','포함 여부 미확인')+row('shield','보증','기간 · 범위 재확인 필요')+'</dl></div></section>';
+    r.slice(0,3).map(row).join('')+'</dl><dl>'+r.slice(3).map(row).join('')+'</dl></div></section>';
+}
+// ===== 고객 상세 v2 (2026-10-16 코덱스 통합안 v2 -- 선택한 부품 표 + 오른쪽 요약, 「변경」은 옆 패널) =====
+// 금액은 서버 값만 쓴다: 총액 = p.price, 기본 구성 = build.base_price, 줄·후보 차액 = 서버가 준 delta / price_diff.
+// 단품 가격·부품 합계·조립 기타 줄은 두지 않는다(2026-10-15 사장님 결정). 고르는 중인 후보(dv2.temp)는 임시 선택이라
+// 적용(build-apply -> flow.pickBuild)이 성공하기 전에는 본문·변경 개수·총액을 바꾸지 않는다.
+const mob768=matchMedia('(max-width:768px)');
+const dv2={hist:false,skipPop:false,temp:null,applied:null,panelFor:null,open:{},focusHandled:false};
+const DV2_LABEL={CPU:'CPU',GPU:'그래픽',RAM:'메모리',SSD:'SSD',HDD:'HDD',MB:'메인보드',PSU:'파워',POWER:'파워',COOLER:'쿨러',CASE:'케이스'};
+function dv2OpenAttr(key,def){return (Object.hasOwn(dv2.open,key)?dv2.open[key]:def)?' open':'';}
+function dv2Label(part){return (Object.hasOwn(DV2_LABEL,part.slot)?DV2_LABEL[part.slot]:null)||(Object.hasOwn(BOM_ROLES,part.slot)?BOM_ROLES[part.slot][0]:part.pseudo?'서비스':part.slot);}
+// 바꾼 구성이 기본 구성보다 얼마나 다른가 = 서버 총액 − 서버 기본 구성(둘 다 서버 값일 때만).
+function dv2Move(p){const b=p.build;return b&&Number.isSafeInteger(b.base_price)&&Number.isSafeInteger(p.price)?p.price-b.base_price:null;}
+function dv2MoveText(d){
+  if(!Number.isSafeInteger(d))return '확인 필요';
+  return d===0?'기본 구성과 같아요':'기본 구성보다 '+Math.abs(d).toLocaleString('ko-KR')+'원 '+(d>0?'추가':'감소');
+}
+function dv2Diff(d){return '<span class="mp-diff'+(hasDiff(d)?(d>0?' is-plus':d<0?' is-minus':' is-zero'):' is-missing')+'">'+diffText(d)+'</span>';}
+function dv2ChangeList(p){
+  const b=p.build;if(!b)return '';
+  const ram=M.systemRamGb(b);
+  return '<ul class="dv2-change-list">'+b.changes.map(c=>'<li><span>'+esc(c.label)+' 변경</span>'+dv2Diff(c.delta)+'</li>').join('')+'</ul>'+(ram?'<p class="muted" data-changed-parts>바꾼 구성의 시스템 메모리는 총 '+ram+'GB예요.</p>':'');
+}
+function dv2Row(part,p){
+  const [,icon,role]=(Object.hasOwn(BOM_ROLES,part.slot)?BOM_ROLES[part.slot]:null)||[part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];
+  const label=dv2Label(part),id='bom-unavailable-'+part.ordinal,shown=pseudoPart(part);
+  const change=p.build?.changes.find(c=>c.ordinal===part.ordinal),editing=state.build?.ordinal===part.ordinal;
+  const name=change?change.after.name:(shown.name||part.name||'정보 없음'),qty=change?change.quantity:part.quantity;
+  const integrated=part.pseudo&&part.slot==='GPU';
+  const action=part.pseudo?'<span class="dv2-na">–<small>'+(integrated?'(내장 그래픽)':'(변경 불가)')+'</small></span>'
+    :button('변경','build-options','outline small'+(editing?' is-active':''),'data-ordinal="'+part.ordinal+'" aria-expanded="'+editing+'" aria-label="'+esc(label)+' 변경"'+(state.phase?' disabled':''));
+  const chg=change?'<span class="mp-changed-badge">변경됨</span> '+dv2Diff(change.delta)+'<br>'+button('원래 부품으로','build-undo','dv2-link','data-ordinal="'+part.ordinal+'" aria-label="'+esc(label)+' 원래 부품으로"'+(state.phase?' disabled':'')):'';
+  const specs=part.specs.length?'<dl class="live-spec-grid">'+part.specs.map(x=>'<div><dt>'+esc(x.label)+'</dt><dd>'+esc(x.value.trim()||'정보 없음')+'</dd></div>').join('')+'</dl>':'<p>정보 없음</p>';
+  const photo=!change&&part.photo?.state==='approved'?'<figure class="public-bom-photo" data-product-photo><img data-product-image src="'+esc(part.photo.url)+'" alt="'+esc(part.name||label)+' 부품 사진" loading="lazy" decoding="async"><p class="live-product-image-status" data-product-image-status hidden>부품 사진을 불러오지 못했습니다</p></figure>':'<div class="public-bom-photo">정보 없음</div>';
+  const body=change?'<div class="public-bom-specs"><p>기본 구성: '+esc(change.before.name)+'</p></div><div class="public-bom-role"><p id="'+id+'">바꾼 부품의 설명과 사진은 아직 준비되지 않았어요. 「변경」에서 다른 부품을 고르거나 「원래 부품으로」로 되돌릴 수 있어요.</p></div>'
+    :'<div class="public-bom-specs">'+specs+'</div><div class="public-bom-role"><h5>이 부품의 역할</h5><p>'+esc(role)+'</p><p>'+esc(shown.description||part.description||'정보 없음')+'</p>'+button(uiIcon('chat-circle')+'이 부품 질문하기','unavailable','outline small','disabled aria-describedby="'+id+'"')+
+      '<p class="public-bom-unavailable" id="'+id+'">'+(part.pseudo?'부품 질문은 아직 지원하지 않아요. 이 줄은 바꿀 수 없어요.':'부품 질문은 아직 지원하지 않아요. 이 부품은 「변경」으로 바꿀 수 있어요.')+'</p></div>';
+  return '<tr data-part="bom-'+part.ordinal+'" class="dv2-row'+(change?' build-changed':'')+(editing?' is-editing':'')+'"><td colspan="3"><details class="dv2-details" data-detail="bom-'+part.ordinal+'"><summary>'+
+    '<h4 class="dv2-cat">'+uiIcon(icon,'part-symbol')+'<span>'+esc(label)+'</span></h4>'+
+    '<span class="dv2-model"><span class="part-name">'+esc(name)+'</span>'+(qty>1?' <span class="public-bom-quantity">수량 '+qty+'</span>':'')+(part.assembly_only?'<span class="mp-assembly">조립 전용</span>':'')+'</span>'+
+    '<span class="dv2-chg">'+chg+'</span>'+
+    '<span class="dv2-more">상세 정보'+uiIcon('caret-down')+'</span><span class="dv2-act">'+action+'</span></summary><div class="final-part-expanded public-bom-expanded">'+photo+body+'</div></details></td></tr>';
+}
+// 후보 목록: 기본 부품 · (바꾼 줄이면) 지금 적용된 부품 · 서버 후보. 차액은 모두 «기본 부품 대비».
+// 서버 후보의 price_diff 는 지금 적용된 부품 대비이므로, 이 줄이 바뀐 상태면 같은 줄의 서버 변경 차액(delta)을 더해 기본 부품 대비로 옮긴다
+// (둘 다 서버 값일 때만 -- 하나라도 없으면 null = 「차액 확인 필요」로 두고 0 으로 바꾸지 않는다).
+function dv2Candidates(p,q){
+  const d=q.data,c=p.build?.changes.find(x=>x.ordinal===q.ordinal);
+  const baseCode=c?c.before.product_code:d.current?.product_code,baseName=c?c.before.name:d.current?.name;
+  const applied=c?c.after.product_code:d.current?.product_code;
+  const rows=[];
+  if(Number.isSafeInteger(baseCode))rows.push({code:baseCode,base:true,name:baseName,diff:0});
+  if(c)rows.push({code:applied,name:c.after.name,diff:Number.isSafeInteger(c.delta)?c.delta:null});
+  for(const o of d.options){
+    if(o.product_code===baseCode||o.product_code===applied)continue;
+    const diff=!hasDiff(o.price_diff)?null:c?(Number.isSafeInteger(c.delta)?o.price_diff+c.delta:null):o.price_diff;
+    rows.push({code:o.product_code,name:o.name,diff});
+  }
+  return {rows,applied,baseCode,changed:!!c};
+}
+function dv2Totals(p){
+  const b=p.build,move=dv2Move(p);
+  return '<div class="dv2-total-box"><div><strong>현재 적용된 구성</strong><small>1대 기준</small></div><strong class="dv2-total-num" data-dv2-total>'+money(p.price)+'</strong></div>'+
+    '<dl class="dv2-sums"><div><dt>기본 구성</dt><dd>'+(b?money(b.base_price):money(p.price))+'</dd></div><div><dt>부품 변경 합계</dt><dd>'+(b?dv2Diff(move):'변경 없음')+'</dd></div></dl>';
+}
+function dv2Panel(p,labelOf){
+  const q=state.build,d=q.data,label=labelOf(q.ordinal)||d?.label||'부품',busy=state.phase==='build';
+  const modal=mob768.matches;
+  const head='<div class="dv2-panel-head"><h3 id="dv2-panel-title" tabindex="-1">'+esc(label)+' 변경</h3>'+button('<span aria-hidden="true">×</span>','build-close','dv2-x','aria-label="'+esc(label)+' 변경 닫기"')+'</div>';
+  const shell=inner=>'<div class="dv2-panel" role="dialog" aria-labelledby="dv2-panel-title"'+(modal?' aria-modal="true"':'')+'>'+head+inner+'</div>';
+  if(!d){
+    if(q.error)return shell('<p class="warn-text" role="alert">'+esc(q.error)+'</p><div class="dv2-actions">'+button('다시 찾기','build-options','outline','data-ordinal="'+q.ordinal+'" data-retry="1"')+button('취소','build-close','dv2-link')+'</div>');
+    return shell('<p class="muted" role="status">이 PC에 맞는 판매 부품을 찾는 중이에요.</p><div class="dv2-actions">'+button('취소','build-close','dv2-link')+'</div>');
+  }
+  const {rows,applied,baseCode,changed}=dv2Candidates(p,q);
+  dv2.applied=applied;
+  if(dv2.temp==null||!rows.some(r=>r.code===dv2.temp))dv2.temp=applied;
+  const warned=(d.warnings||[]).length>0;
+  const list=rows.map(r=>{
+    const known=hasDiff(r.diff)&&Number.isSafeInteger(r.code),picked=r.code===dv2.temp;
+    return '<li class="dv2-cand'+(picked?' is-picked':'')+(known?'':' is-disabled')+'" data-build-option="'+r.code+'"><label><input type="radio" name="dv2-pick" data-dv2-radio value="'+r.code+'"'+(picked?' checked':'')+(known&&!state.phase?'':' disabled')+'>'+
+      '<span class="dv2-cand-copy"><strong>'+(r.base?'기본 '+esc(label):esc(r.name))+'</strong>'+(r.base?'<span class="dv2-cand-model">'+esc(r.name)+'</span>':'')+(known?'':'<span class="dv2-cand-model">선택 불가</span>')+'</span>'+
+      '<span class="dv2-cand-diff">'+dv2Diff(r.diff)+(r.code===applied?'<span class="dv2-current-tag">현재 선택</span>':'')+'</span></label></li>';
+  }).join('');
+  const untested=d.untested?'<p class="muted">사양 정보가 모자라 확인하지 못한 부품 '+d.untested+'개는 빼고 보여 드려요.</p>':'';
+  const none=!d.options.length?'<p class="muted" role="status">지금 이 PC에 맞는 다른 판매 부품이 없어요.</p>':'';
+  return shell('<p class="dv2-lead">사용할 부품을 골라 주세요.</p><p class="muted">기본 구성과 비교한 금액이에요.</p>'+
+    (q.error?'<p class="warn-text" role="alert">'+esc(q.error)+'</p>':'')+(warned?'<p class="warn-text">'+esc(d.note||d.warnings.join(' '))+'</p>':'')+
+    '<ul class="dv2-cands" role="radiogroup" aria-labelledby="dv2-panel-title">'+list+'</ul>'+none+untested+
+    (changed?button('<span aria-hidden="true">↺</span> 원래 부품으로','build-pick-base','dv2-link dv2-base-link','data-code="'+baseCode+'"'+(state.phase?' disabled':'')):'')+quantityBlock(d)+
+    dv2Totals(p)+'<p class="dv2-assembly muted">변경한 구성의 실제 조립 검수는 확인이 필요해요.</p>'+
+    '<div class="dv2-actions">'+button(busy?'적용하는 중이에요':'선택한 부품 적용','build-apply','primary dv2-apply','data-dv2-apply'+(state.phase||dv2.temp===applied?' disabled':''))+button('취소','build-close','dv2-cancel')+'</div>'+
+    '<p class="dv2-foot muted">적용 전에는 구성이 바뀌지 않아요.</p>');
+}
+function dv2SelectTemp(code){
+  dv2.temp=code;
+  for(const li of view.querySelectorAll('.dv2-cand')){const on=Number(li.dataset.buildOption)===code;li.classList.toggle('is-picked',on);const r=li.querySelector('input');if(r)r.checked=on;}
+  const apply=view.querySelector('[data-dv2-apply]');if(apply)apply.disabled=!!state.phase||code===dv2.applied;
+}
+function dv2Inert(on){
+  for(const el of [document.querySelector('.topbar'),document.querySelector('.chat'),actions,view.querySelector('.dv2-head'),view.querySelector('.dv2-main')])if(el)el.inert=on;
+}
+function dv2Side(p,configuration){
+  const b=p.build,move=dv2Move(p),n=p.sets||1,edit=!state.savedQuote;
+  const sets=(edit||n>1)?'<div class="dv2-sets" data-sets><strong>PC 대수</strong>'+(edit?stepper('sets','data-sets',n,1,10,'대','PC 대수'):'<span>'+n+'대</span>')+'</div>'+
+    (n>1&&Number.isSafeInteger(p.price)?'<p class="dv2-sets-total" data-sets-total><strong>같은 구성 '+n+'대 · 합계 '+money(p.price*n)+'</strong></p>':''):'';
+  const cond=state.selectionState||state.talk,conds=M.conditions(cond);
+  const reasonPeek=conds.length?'상담 조건: '+conds.map(esc).join(' · '):'추천 이유를 확인해 보세요.';
+  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':M.changedIntro(summaryDescription(p)?.intro,b)||'';
+  const bought=condRows().map(([icon,l,t])=>'<div>'+uiIcon(icon)+'<dt>'+l+'</dt><dd>'+esc(t)+'</dd></div>').join('');
+  const hasBudget=Number.isInteger(cond?.budget_won);
+  return '<aside class="dv2-side" data-keep="1" aria-label="선택한 구성 요약"><section class="dv2-summary dv2-desk"><div class="dv2-sum-head"><h3>선택한 구성</h3><small>1대 기준</small></div><strong class="dv2-total-num" data-dv2-total>'+money(p.price)+'</strong></section>'+
+    (b?'<details class="dv2-fold dv2-desk dv2-changes" data-detail="dv2-changes"'+dv2OpenAttr('dv2-changes',true)+'><summary><span class="dv2-fold-title" data-pc-total-move>변경 내역 '+b.changes.length+'개</span>'+uiIcon('caret-down')+'</summary><div>'+dv2ChangeList(p)+button('전체 원래 구성으로','build-reset','dv2-link',state.phase?'disabled':'')+'</div></details>':'')+
+    '<dl class="dv2-sums dv2-desk"><div><dt>기본 구성 금액</dt><dd>'+(b?money(b.base_price):money(p.price))+'</dd></div><div><dt>부품 변경 금액</dt><dd>'+(b?dv2Diff(move):'변경 없음')+'</dd></div></dl>'+
+    '<div class="dv2-notes">'+(b?(b.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(hasBudget?budgetLines(p):'')+'</div>'+
+    sets+button(uiIcon('file-text')+'견적 저장','final','primary dv2-save dv2-desk')+
+    '<p class="dv2-pricenote muted">'+uiIcon('info')+'현재 조회 금액이며 구매 시 최종 금액을 확인해 주세요.</p>'+
+    '<details class="dv2-fold" data-detail="dv2-reason"'+dv2OpenAttr('dv2-reason',!mob768.matches)+'><summary><span class="dv2-fold-title">'+uiIcon('file-text')+'추천 이유</span>'+uiIcon('caret-down')+'<span class="dv2-peek">'+reasonPeek+'</span></summary><div>'+(intro?'<p>'+esc(intro)+'</p>':'')+detailReason(p,true)+'</div></details>'+
+    '<details class="dv2-fold" data-detail="dv2-buy"'+dv2OpenAttr('dv2-buy',!mob768.matches)+'><summary><span class="dv2-fold-title">'+uiIcon('warning-circle')+'구매 전 확인사항</span>'+uiIcon('caret-down')+
+      '<span class="dv2-peek">재고, 보증, 운영체제 포함 여부를 확인해 주세요.<br>'+(b?'변경한 구성의 ':'')+'실제 조립 검수는 확인이 필요해요.</span></summary><dl class="dv2-cond">'+bought+'</dl></details></aside>';
+}
+function renderDetailV2(p,configuration){
+  const cur=state.build.ordinal,opened=cur!==null&&cur!==dv2.panelFor,closed=cur===null&&dv2.panelFor!==null,prev=dv2.panelFor;
+  if(opened||closed)dv2.temp=null;
+  dv2.panelFor=cur;
+  const labels=new Map(configuration.parts.map(x=>[x.ordinal,dv2Label(x)]));
+  const b=p.build,move=dv2Move(p),cond=M.conditions(state.selectionState||state.talk);
+  const head='<div class="dv2-head"><div class="dv2-head-copy"><h2 tabindex="-1">PC 구성 확인</h2><p class="dv2-name">'+esc(p.name)+'</p>'+
+    (state.savedQuote?'<p class="muted">금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.</p>':cond.length?'<p class="muted">상담 조건: '+cond.map(esc).join(' · ')+'</p>':'')+'</div>'+
+    (productImage(p,true).includes('is-unavailable')?'':'<div class="dv2-photo">'+productImage(p,true)+'<small>외관 예시</small></div>')+
+    (b?'<details class="dv2-mchanges" data-detail="dv2-mchanges"'+dv2OpenAttr('dv2-mchanges',false)+'><summary><span>변경 내역 '+b.changes.length+'개'+uiIcon('caret-down')+'</span><small>'+esc(dv2MoveText(move))+'</small></summary>'+dv2ChangeList(p)+'</details>':'')+'</div>';
+  const side=cur!==null?'<aside class="dv2-side is-panel" data-keep="1">'+dv2Panel(p,o=>labels.get(o))+'</aside>':dv2Side(p,configuration);
+  view.innerHTML='<div class="dv2'+(cur!==null?' has-panel':'')+'">'+button(uiIcon('arrow-left')+'이전 화면','back','back live-back')+errorPanel()+head+
+    '<div class="dv2-layout"><div class="dv2-main"><section class="final-parts public-bom dv2-parts"><h3>선택한 부품</h3><div class="final-table-wrap"><table class="final-table dv2-table"><thead><tr><th scope="col">분류</th><th scope="col">현재 선택된 모델</th><th scope="col">변경</th></tr></thead><tbody>'+
+    configuration.parts.map(x=>dv2Row(x,p)).join('')+'</tbody></table></div></section></div>'+side+'</div></div>';
+  actions.classList.add('dv2-bar');
+  actions.innerHTML='<div class="dv2-bar-label"><strong>선택한 구성</strong><small>1대 기준</small></div><strong class="dv2-bar-price">'+money(p.price)+'</strong>'+button(uiIcon('file-text')+'견적 저장','final','primary dv2-save');actions.hidden=false;
+  dv2Inert(mob768.matches&&cur!==null);
+  if(opened&&mob768.matches&&!dv2.hist){try{history.pushState(history.state,'',location.href);dv2.hist=true;}catch{}}
+  if(closed&&dv2.hist){dv2.hist=false;dv2.skipPop=true;try{history.back();}catch{dv2.skipPop=false;}}
+  // 후보를 불러오거나 적용에 실패해 패널이 다시 그려져도 초점이 몸통으로 빠지지 않게 제목으로 되돌린다(눌러 둔 단추는 render 가 따로 되살린다).
+  const lost=!document.activeElement||document.activeElement===document.body;
+  if(opened||(cur!==null&&lost)){dv2.focusHandled=true;view.querySelector('#dv2-panel-title')?.focus({preventScroll:true});}
+  else if(closed){
+    dv2.focusHandled=true;
+    if(lastScreen==='detail'){const t=[...view.querySelectorAll('[data-action=build-options]')].find(e=>Number(e.dataset.ordinal)===prev);t?.focus({preventScroll:true});}
+  }
 }
 // 추천 구성 상세(2026-10-15 코덱스 디자인 v1 -- D:\\WORK\\코덱스-디자인\\2026-10-15-추천구성상세-v1). 왼쪽 = 상품·구성·부품 바꾸기,
 // 오른쪽 = 추천 이유·같은 구성 대수·구매 전 안내, 그 아래 구매 전 확인 6칸. 담는 정보와 동작은 그대로이고 배치만 바뀐다.
 function renderDetail(){
-  const p=state.selected,configured=!!M.publicConfiguration(p.public_configuration,p.product_code);
+  const p=state.selected,configuration=M.publicConfiguration(p.public_configuration,p.product_code),configured=!!configuration;
+  // 부품별 구성표가 공개된 PC 는 v2 상세(선택한 부품 표 + 오른쪽 요약/변경 패널). 구성표가 없는 상품은 아래 기존 배치(다른 판매 PC 로 옮기는 부품 바꾸기)를 쓴다.
+  if(configuration){renderDetailV2(p,configuration);return;}
+  actions.classList.remove('dv2-bar');
   view.innerHTML='<div class="dt-detail">'+heading('추천 구성 상세',true,'구성을 살펴보고, 나에게 맞게 조정해 보세요.')+errorPanel()+
     '<div class="dt-layout"><div class="dt-main-col">'+productSummary()+productDetails(false,true)+partChangeBody(false,configured)+'</div>'+
     '<aside class="dt-aside" aria-label="추천 이유와 대수">'+detailReason(p)+setsBlock(p)+
@@ -580,7 +734,8 @@ function renderPreparing(){
   actions.hidden=true;
 }
 function render(){
-  const changed=lastScreen!==state.screen,openDetails=[...view.querySelectorAll('details[open]')].map(e=>e.dataset.detail),scroll=view.scrollTop,focused=document.activeElement?.dataset.action;
+  const changed=lastScreen!==state.screen,openDetails=[...view.querySelectorAll('details[open]')].map(e=>e.dataset.detail),scroll=view.scrollTop,focused=document.activeElement?.dataset.action,focusedOrd=document.activeElement?.dataset.ordinal;
+  dv2.focusHandled=false;actions.classList.remove('dv2-bar');if(state.screen!=='detail'){dv2.panelFor=null;dv2.temp=null;dv2Inert(false);}
   const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
   document.body.dataset.screen=state.screen;document.body.classList.add('live-mode');document.body.classList.toggle('original-flow',['welcome','results','detail','final'].includes(state.screen));
   view.dataset.screen=state.screen;
@@ -598,7 +753,7 @@ function render(){
   const recovery=recoveryBanner();if(recovery)view.insertAdjacentHTML('afterbegin',recovery);
   renderMessages();syncChat();renderSurface();
   if(ui.surface==='consultation'){
-    if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled)?.focus({preventScroll:true});}
+    if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused&&!dv2.focusHandled)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled&&(focusedOrd===undefined||e.dataset.ordinal===focusedOrd))?.focus({preventScroll:true});}
     else{view.scrollTop=0;view.querySelector('h2')?.focus({preventScroll:true});if(mobile.matches)window.scrollTo(0,0);}
     if(!enteringRoute&&lastScreen!==state.screen&&location.hash!=='#'+state.screen)history[restoring?'replaceState':'pushState']({screen:state.screen},'','#'+state.screen);
   }else{
@@ -685,6 +840,9 @@ document.addEventListener('click',e=>{
     case 'build-close':flow.closeBuild();break;
     case 'build-pick':void flow.pickBuild(Number(b.dataset.code));break;
     case 'build-reset':void flow.resetBuild();break;
+    case 'build-undo':void flow.undoBuild(Number(b.dataset.ordinal));break;
+    case 'build-pick-base':dv2SelectTemp(Number(b.dataset.code));break;
+    case 'build-apply':if(dv2.temp!==null&&dv2.temp!==dv2.applied)void flow.pickBuild(dv2.temp);break;
     case 'build-qty':void flow.setBuildQuantity(Number(b.dataset.qty));break;
     case 'sets':flow.setSets(Number(b.dataset.sets));break;
     case 'part-focus':focusParts();break;
@@ -701,6 +859,10 @@ function refreshDraftExplicitly(){setDraft(generatedDraft());$('#request').focus
 document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captureDraft();const n=Number(e.target.value);draft.budget_won=[100,150,200,250].includes(n)?n*10000:null;draft.budget_bound=draft.budget_won===null?null:'이하';if(!draft.draft_edited)refreshDraft();render();$('#gateway-budget')?.focus({preventScroll:true});}});
 // 신청 칸은 다시 그려져도 적던 값이 남게 입력마다 상태에 옮긴다(다시 그리지는 않는다).
 view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
+// 상세 v2: 라디오로 고르는 것은 임시 선택이다(화면을 다시 그리지 않고 적용 단추 상태만 바꾼다). 접힌 칸의 열림 상태는 다시 그려도 지킨다.
+view.addEventListener('change',e=>{if(e.target.matches?.('[data-dv2-radio]'))dv2SelectTemp(Number(e.target.value));});
+view.addEventListener('toggle',e=>{const k=e.target?.dataset?.detail;if(k&&k.startsWith('dv2-'))dv2.open[k]=e.target.open;},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.defaultPrevented&&state.screen==='detail'&&state.build?.ordinal!==null){e.preventDefault();flow.closeBuild();}});
 view.addEventListener('change',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 $('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
 document.addEventListener('input',e=>{if(e.target.id==='gateway-text')gatewayText=e.target.value;});
@@ -727,6 +889,9 @@ for(const type of ['load','error'])document.addEventListener(type,e=>{
   photo.dataset.imageState=failed?'temporarily_unavailable':'loaded';photo.querySelector('[data-product-image-status]').hidden=!failed;
 },true);
 window.addEventListener('popstate',e=>{
+  // 모바일 선택창: 뒤로가기는 화면을 옮기지 않고 패널만 닫는다(적용된 구성 · 대수 · 스크롤은 그대로).
+  if(dv2.skipPop){dv2.skipPop=false;return;}
+  if(dv2.hist){dv2.hist=false;if(state.screen==='detail'&&state.build?.ordinal!==null)flow.closeBuild();return;}
   captureDraft();const entry=e.state;
   if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){
     enteringRoute=true;try{ui.surface=entry.surface;render();history.replaceState(uiEntry(),'',uiHash());focusSurface();}finally{enteringRoute=false;}
