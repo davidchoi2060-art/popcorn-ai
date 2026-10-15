@@ -11,7 +11,7 @@ const GATEWAY_PATHS=[
 // 처음 화면 채팅창에 쓴 글(사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」). 글은 주소에
 // 싣지 않고(접속 기록에 남는다) 이 탭 보관함에 잠깐 두고 대화 화면으로 간다. 대화 화면이 꺼내 바로 보내고,
 // 서버가 글 내용으로 세 갈래 중 하나를 고른다(api/talk_entry). 키는 talk.js FIRST_KEY 와 같다.
-const FIRST_KEY='popcorn-mvp3-first-message-v1';let gatewayText='';
+const FIRST_KEY='popcorn-mvp3-first-message-v1';let gatewayText='',lastGatewayHtml='';
 const M=window.MVP3LiveModel,A=window.MVP3Api;
 const {customerPhoto}=window.MVP3LivePhoto;
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
@@ -67,19 +67,23 @@ function focusSurface(){
   else{gateway.querySelector('h1')?.focus({preventScroll:true});window.scrollTo(0,0);}
 }
 function renderGateway(){
-  const icon=name=>uiIcon(name),arrow=icon('arrow-right');
-  if(ui.surface==='gateway'&&GATEWAY_PATHS)gateway.innerHTML='<section class="gateway-screen is-v3"><div class="gateway-intro"><h1 tabindex="-1">어떤 PC가 필요하세요?</h1><p>PC로 할 일이나 궁금한 점을 편하게 말씀해 주세요.</p></div>'+
+  const icon=name=>uiIcon(name),arrow=icon('arrow-right');let html;
+  if(ui.surface==='gateway'&&GATEWAY_PATHS)html='<section class="gateway-screen is-v3"><div class="gateway-intro"><h1 tabindex="-1">어떤 PC가 필요하세요?</h1><p>PC로 할 일이나 궁금한 점을 편하게 말씀해 주세요.</p></div>'+
     '<form id="gateway-chat" class="gateway-chat"><label class="sr-only" for="gateway-text">PC로 할 일이나 궁금한 점</label><textarea id="gateway-text" rows="3" maxlength="2000" placeholder="PC로 할 일이나 궁금한 점을 적어주세요.">'+esc(gatewayText)+'</textarea><button type="submit" class="gateway-button">보내기 '+uiIcon('paper-plane-tilt-fill')+'</button></form><p id="gateway-chat-status" class="gateway-chat-status" role="status" aria-live="polite" hidden></p>'+
     '<div class="gateway-choices is-three">'+
     GATEWAY_PATHS.map(([images,title,text,go,key])=>button('<span class="entry-icons">'+images.map(image=>uiIcon(image,'entry-icon')).join('')+'</span><span class="entry-copy"><h2>'+title+'</h2><p>'+text+'</p></span><span class="entry-action"><span class="entry-action-label">'+go+'</span> '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
     '</div><div class="gateway-more">'+button(uiIcon('chat-circle','talk-icon')+'<span class="talk-copy"><strong>아직 정하지 못했나요? 편하게 상담하기 '+arrow+'</strong><small class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</small></span>',DIRECT_ACTION,'gateway-talk-link')+
     '<div class="gateway-more-links">'+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
     (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></div></section>';
-  else if(ui.surface==='gateway')gateway.innerHTML='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
+  else if(ui.surface==='gateway')html='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
     [['game-controller','용도부터 시작하기','게임, 작업, 일상 중 필요한 용도부터 골라요.','예산은 아직 몰라도 괜찮아요.','gateway-use'],['chat-circle','바로 상담하기','원하는 사양이나 조건을 자유롭게 이야기해 주세요.','생각해 둔 조건부터 말해 주세요.',DIRECT_ACTION]].map(([image,title,text,small,action])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><small>'+small+'</small><span class="entry-action">'+title+' '+arrow+'</span>',action,'entry-card')).join('')+'</div><p class="change-note">선택한 방식은 언제든 바꿀 수 있어요.</p>'+(draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</section>';
-  else gateway.innerHTML=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+
+  else html=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+
     [['game','game-controller','즐겨 하는 게임에 쓸 PC예요.'],['edit','video-camera','영상 편집과 작업에 쓸 PC예요.'],['office','monitor','문서 작업과 일상 업무에 써요.'],['unknown','question','어떤 용도가 좋을지 함께 정해요.']].map(([value,image,text])=>button(icon(image)+'<strong>'+usageLabels[value]+'</strong><span>'+text+'</span>','gateway-usage','','data-usage="'+value+'" aria-pressed="'+(draft.usage_choice===value)+'"')).join('')+'</div></fieldset><div class="budget-controls"><label for="gateway-budget">예산은 어느 정도인가요?</label><select id="gateway-budget"><option value="">예산 미정도 괜찮아요</option>'+[100,150,200,250].map(n=>'<option value="'+n+'" '+(draft.budget_won===n*10000?'selected':'')+'>'+n+'만원 이하</option>').join('')+'</select></div><p class="condition-summary" aria-live="polite">'+draftSummary()+'</p>'+button('이 조건으로 상담 시작 '+arrow,'gateway-begin','gateway-button')+'</div><figure class="purpose-image"><img src="assets/gateway-pc-example.png" alt="PC 본체 예시 이미지"><figcaption>예시 이미지 · 실제 추천 상품과 다를 수 있어요.</figcaption></figure></section>';
-  gateway.insertAdjacentHTML('beforeend','<footer class="gateway-footer"><span class="gateway-brand"><img src="assets/popcorn-mark.png" alt=""><strong>팝콘AI</strong></span><small>나에게 맞는 PC를 함께 찾아요.</small></footer>');
+  html+='<footer class="gateway-footer"><span class="gateway-brand"><img src="assets/popcorn-mark.png" alt=""><strong>팝콘AI</strong></span><small>나에게 맞는 PC를 함께 찾아요.</small></footer>';
+  // 같은 화면이면 다시 그리지 않는다. 다른 일(진행 중인 추천·재시도 초읽기)로 render() 가 돌 때마다 시작 카드를 새로 만들면
+  // 누르는 사이(mousedown -> mouseup)에 단추가 바뀌어 클릭이 사라진다 -- 기존 상담이 있는 #start 에서 「새 PC 고르기」를
+  // 눌러도 이동하지 않던 일(2026-10-15 오픈테스트 C06-F05).
+  if(html!==lastGatewayHtml||!gateway.firstChild){gateway.innerHTML=html;lastGatewayHtml=html;}
 }
 function renderSurface(){
   const consultation=ui.surface==='consultation';document.body.dataset.surface=ui.surface;workspace.hidden=!consultation;gateway.hidden=consultation;toolbar.hidden=!consultation||state.screen==='results';
@@ -89,19 +93,20 @@ function renderSurface(){
   if(consultation&&(draft.start_mode==='use_first'||draft.usage_choice||draft.budget_won))view.insertAdjacentHTML('afterbegin','<section class="draft-context"><strong>상담 초안</strong><p>'+draftSummary()+'</p><p>선택한 조건을 입력창에서 확인하고 수정해 주세요.</p>'+button('선택 조건으로 초안 바꾸기','gateway-rebuild','',''+(state.phase?'disabled':''))+'</section>');
 }
 function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('#notice').hidden=true,7000);}
-function budget(product,talk=state.selectionState||state.talk){
+// 여러 대(wants.units)면 한 대 예산으로 견준다(M.budgetGapText · 코덱스 C10-F01). 조건과 같은 때의 wants 를 쓴다.
+function wantsFor(talk){return talk&&talk===state.selectionState?state.selectionWants:state.wants;}
+function budget(product,talk=state.selectionState||state.talk,wants=wantsFor(talk)){
   const won=talk?.budget_won;
   if(!Number.isInteger(product.price)||!Number.isInteger(won))return '예산 조건 미확인';
   if(talk.budget_bound==='이상')return '입력하신 최소 예산 '+money(won);
-  const delta=won-product.price;
-  return delta>0?'예산보다 '+money(delta)+' 낮아요':delta<0?'예산보다 '+money(-delta)+' 높아요':'예산과 같아요';
+  return M.budgetGapText(product.price,talk,wants,money);
 }
 // 예산 초과 색은 문구(budget)와 같은 금액·같은 기준으로 정한다. 부품을 바꾸면 서버의 over_budget 은
 // 기본 구성 금액 기준이라 낡으므로, 바꾼 구성은 새 금액으로 다시 센다(하한 「이상」은 초과가 없다).
-function overBudget(product,talk=state.selectionState||state.talk){
-  if(!product.build)return product.over_budget===true;
-  const won=talk?.budget_won;
-  return Number.isInteger(product.price)&&Number.isInteger(won)&&talk.budget_bound!=='이상'&&product.price>won;
+function overBudget(product,talk=state.selectionState||state.talk,wants=wantsFor(talk)){
+  const multi=(M.budgetBasis(talk,wants)?.units??1)!==1;
+  if(!product.build&&!multi)return product.over_budget===true;
+  return M.overUnitBudget(product.price,talk,wants);
 }
 // 상세의 예산 문장은 위 조건 칩(지금 조건 = state.talk)과 같은 기준이어야 한다. 고른 뒤 상담에서 예산을 바꾸면
 // selectionState(고를 때 조건)와 칩이 갈라져, 칩은 80만원인데 초과액은 150만원 기준 124,400원으로 남았다
@@ -109,9 +114,11 @@ function overBudget(product,talk=state.selectionState||state.talk){
 function budgetLines(p){
   const basis=state.selectionState,now=state.talk,line=(cls,text)=>'<p class="'+cls+'">'+esc(text)+'</p>';
   const same=!basis||!now||basis.budget_won===now.budget_won&&basis.budget_bound===now.budget_bound;
-  if(same)return line(overBudget(p)?'warn-text':'green',budget(p));
+  // 여러 대인데 대수를 몰라 견주지 않은 줄은 통과(초록)로 칠하지 않는다.
+  const cls=(t=state.selectionState||state.talk)=>overBudget(p,t)?'warn-text':M.budgetBasis(t,wantsFor(t))?.units===0?'muted':'green';
+  if(same)return line(cls(),budget(p));
   const label=t=>Number.isInteger(t?.budget_won)?' 예산 '+money(t.budget_won)+' 기준 · ':' ';
-  return line(overBudget(p,now)?'warn-text':'green','지금'+label(now)+budget(p,now))+
+  return line(cls(now),'지금'+label(now)+budget(p,now))+
     line('muted','고를 때'+label(basis)+budget(p,basis));
 }
 function syncChat(){
@@ -219,7 +226,7 @@ function productCard(product,action='detail',id=product.index,comparison=null){
     '<strong class="price">'+money(product.price)+'</strong><p class="muted">'+esc(product.price_src||'가격 기준 미확인')+'</p>'+spec+cardPartPhotos(product)+
     (difference?'<p class="live-price-difference">'+esc(difference)+'</p>':'')+
     // Full reasons stay on the detail screen; the card keeps only the over-budget verdict.
-    (product.over_budget?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
+    (overBudget(product,state.talk)?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
     button(strong?'추천 견적 자세히 보기'+uiIcon('arrow-right'):'구성 자세히 보기',action,(strong?'primary':'outline')+' card-detail','data-id="'+esc(id)+'"')+'</section>';
 }
 // 새로 나온 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 나온 PC」 화면으로 보낸다.
@@ -236,7 +243,7 @@ function customCards(group){
 function renderResults(){
   const groups=state.groups,hasProducts=groups.some(g=>g.products.length);
   const gameLabels=[['spec_summary','게임 사양 안내'],['why_this_pc','PC 선택 안내'],['upgrade_hint','업그레이드 안내'],['caution','확인할 내용']];
-  const products=groups.flatMap(g=>g.products),withinBudget=Number.isInteger(state.talk?.budget_won)&&state.talk.budget_bound!=='이상'&&products.every(p=>!p.over_budget);
+  const products=groups.flatMap(g=>g.products),withinBudget=Number.isInteger(state.talk?.budget_won)&&state.talk.budget_bound!=='이상'&&(M.budgetBasis(state.talk,state.wants)?.units??1)===1&&products.every(p=>!p.over_budget);
   const subtitle=groups.length===1&&products.length===2?(withinBudget?'예산 안에서 비교할 수 있는 두 가지 구성입니다.':'비교할 수 있는 두 가지 구성입니다.'):
     groups.length===1&&products.length===3?'싼 구성부터 더 높은 사양까지 세 가지를 비교해 보세요.':'';
   // A usage heading is needed only to tell several usage groups apart.
@@ -262,7 +269,7 @@ function summaryDescription(p){
 }
 function productSummary(){
   const p=state.selected,description=summaryDescription(p),title=description?.title||p.name;
-  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
+  const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':M.changedIntro(description?.intro,p.build)||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
   return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+budgetLines(p)+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){
@@ -274,6 +281,8 @@ function publicBomDetails(configuration,p,information,finalOnly){
     HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
     MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
     PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    POWER:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    COOLER:['쿨러','gear','CPU에서 나는 열을 식히는 부품이에요.'],
     CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
   const rows=configuration.parts.map(part=>{
     const [label,icon,role]=(Object.hasOwn(roles,part.slot)?roles[part.slot]:null)||[part.pseudo?'서비스':part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];

@@ -159,3 +159,10 @@ test('footer amounts sit in the price column, not centered across price and chan
   assert.match(html,/<th scope="row">상품 참고 금액<\/th><td class="final-part-price">900,000원<\/td><td aria-hidden="true"><\/td>/);
   assert.doesNotMatch(html.slice(html.indexOf('<tfoot>')),/colspan="2"/);
 });
+test('POWER and COOLER rows get Korean labels and roles, not raw slot codes (open test C06)',()=>{
+  const f=fixture();f.parts.push({...clone(f.parts[0]),ordinal:5,slot:'POWER',name:'파워'},{...clone(f.parts[0]),ordinal:6,slot:'COOLER',name:'쿨러'});
+  const html=render(f);
+  assert.doesNotMatch(html,/<span>(POWER|COOLER)<\/span>/);
+  assert.match(html,/<span>파워<\/span>/);assert.match(html,/<span>쿨러<\/span>/);
+  assert.match(html,/CPU에서 나는 열을 식히는 부품이에요/);
+});

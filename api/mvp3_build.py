@@ -264,11 +264,20 @@ def quote(conn, base_price, bom, changes, rules=None):
     """바꾼 구성의 금액과 호환 판정. 바꾼 줄이 만든 호환 실패 · 판정 못 한 호환이 있으면 409."""
     lines, applied = changed_lines(conn, bom, changes)
     raised = {x['ordinal']: x['quantity'] for x in applied if x['quantity'] > x['base_quantity']}
+    usage = quantity_usage(conn, lines) if raised or any(x['slot'] == 'RAM' for x in applied) else None
     if raised:
         # 늘린 수량은 바꾼 뒤 구성의 메인보드 기준으로 본다(메인보드를 함께 바꿨으면 새 보드다).
-        why = QTY.refusal(quantity_usage(conn, lines), raised)
+        why = QTY.refusal(usage, raised)
         if why:
             raise HTTPException(409, why)
+    # 메모리 줄을 바꾸면(부품·수량) 바꾼 뒤 구성의 시스템 메모리 합계를 그 줄에 싣는다 -- 상품 소개 글의
+    # 「시스템 메모리는 16GB」는 기본 구성 기준이라, 16GB × 2 로 바꾼 뒤에도 16GB 로 남았다(2026-10-15 코덱스 C04-F04).
+    # 줄 수량 × 상품 용량의 합이다. 한 줄이라도 용량을 모르면 None(지어내지 않는다).
+    if usage is not None:
+        total_gb = QTY.ram_total_gb(usage)
+        for x in applied:
+            if x['slot'] == 'RAM':
+                x['system_ram_gb'] = total_gb
     rules = load_rules(conn) if rules is None else rules
     lines_c = compat_lines(lines)
     compat = evaluate(lines_c, load_specs(conn, [l['spec_key'] for l in lines_c]), rules)

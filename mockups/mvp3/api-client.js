@@ -14,7 +14,7 @@
     if(status===409)return '상품 가격이나 추천 조건이 달라졌어요. 최신 추천을 다시 확인해주세요.';
     if(status===401||status===403)return '이 브라우저의 보관 기록에 접근할 수 없어요. 보관 키와 브라우저 설정을 확인해주세요.';
     if(status===404)return '요청한 자료를 찾지 못했어요. 연결 상태를 확인한 뒤 다시 시도해주세요.';
-    if(status===502||status===503)return '상담 또는 서버 연결을 확인할 수 없어요. 잠시 후 다시 시도해주세요.';
+    if(status===502||status===503||status===504)return '상담 또는 서버 연결을 확인할 수 없어요. 잠시 후 다시 시도해주세요.';
     return '요청을 처리하지 못했어요. 입력과 연결 상태를 확인해주세요.';
   }
   function createClient(options={}){
@@ -56,11 +56,19 @@
         const headers=body?{'Content-Type':'application/json'}:{};
         if(path.startsWith('/api/mvp3/saved-quotes'))headers['X-Access-Key']=guestKey(options.existingKeyOnly===true);
         const response=await fetchImpl(path,{method,headers,credentials:'same-origin',cache:'no-store',signal:controller.signal,...(body?{body:JSON.stringify(body)}:{})});
-        let data;try{data=await response.json();}catch{throw new ApiError('서버 응답을 확인할 수 없어요. 다시 시도해주세요.',response.status||502,'invalid_response');}
+        const retryOf=value=>{const rawRetry=response.headers?.get('Retry-After');return Number(rawRetry)||Math.max(0,(Date.parse(rawRetry)-Date.now())/1000)||Number(value?.retry_after_sec)||0;};
+        let data;try{data=await response.json();}catch(error){
+          // 본문을 읽다가 취소·시간 초과로 끊겼으면 아래 catch 가 그 사실대로 말한다(「응답 형식」 탓으로 돌리지 않는다).
+          if(controller.signal.aborted)throw error;
+          // JSON 이 아닌 5xx 는 서버 앞단(nginx)이 낸 오류 화면이다 -- API 가 재시작하는 몇 초 동안 502 HTML 이 온다
+          // (2026-10-15 오픈테스트 C04: main 반영·배포 재시작 25초 뒤 첫 답변의 추천이 「서버 응답을 확인할 수 없어요」로 실패).
+          // 응답 형식 문제가 아니라 일시적 연결 실패로 구분해 흐름이 다시 묻게 한다(live-flow TRANSIENT).
+          if(!response.ok&&response.status>=500)throw new ApiError(errorMessage(response.status,null,path),response.status,'gateway_error',Math.ceil(retryOf(null)));
+          throw new ApiError('서버 응답을 확인할 수 없어요. 다시 시도해주세요.',response.status||502,'invalid_response');
+        }
         if(!response.ok){
           const value=typeof data?.detail==='object'&&data.detail?data.detail:data;
-          const rawRetry=response.headers?.get('Retry-After');
-          const retry=Number(rawRetry)||Math.max(0,(Date.parse(rawRetry)-Date.now())/1000)||Number(value?.retry_after_sec)||0;
+          const retry=retryOf(value);
           throw new ApiError(errorMessage(response.status,data,path),response.status,typeof value?.error==='string'?value.error:'http_error',Math.ceil(retry));
         }
         return data;
