@@ -307,19 +307,34 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None, said: s
     return _won_commas("\n".join(lines).strip()), dropped
 
 
-_OVER_WORDS = ("넘", "초과", "벗어")
+# 「이미 예산 초과를 말했나」는 글자 하나(넘·없)가 아니라 «예산을 넘는다는 문장»인지로 본다. 「700W면 권장 기준은
+# 넘지만」「성능이 넘치는 PC」「부족함 없이 충분」 때문에 예산 안내가 통째로 빠졌다(2026-10-15 코덱스 P2 F1 · R01·R03·R14).
+_BUDGET_MENTION = re.compile(r"예산|\d+\s*만\s*원|\d[\d,]*\s*원|그\s*(?:금액|가격|돈)|이내|안에서|안으로|안쪽|선에서|가격대|원대")
+_OVER_SAID = re.compile(r"넘|초과|벗어|웃돌|모자|부족|비싸|높|없|어렵|어려|힘들|안\s*(?:돼|되|맞)|못\s*맞")
+
+
+def says_budget_over(sentence: str) -> bool:
+    """이 문장이 예산을 넘는다(예산 안에 맞는 것이 없다)고 말하는가."""
+    s = sentence or ""
+    if not _BUDGET_MENTION.search(s) or PA._says_budget_yes(s):
+        return False
+    return bool(_OVER_SAID.search(PA.POSITIVE_NEG.sub("", s)))
+
+
+def _sentences(text_: str) -> list[str]:
+    return [x.strip() for x in _SENT.split(text_ or "") if x and x.strip()]
 
 
 def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
     """보여 준 카드가 예산을 넘는데 설명이 그 말을 안 하면, 서버가 사실 문장을 붙인다.
 
     금액은 카드 판매가 - 예산(둘 다 이 턴 묶음 값)이라 지어낸 수가 아니다.
-    설명이 이미 넘는다고 말했으면(_OVER_WORDS) 붙이지 않는다.
+    설명이 이미 예산을 넘는다고 말했으면(says_budget_over) 붙이지 않는다.
     """
     if not budget_won:
         return None
     over = [c for c in cards if c.get("over_budget") and isinstance(c.get("price"), int) and c["price"] > budget_won]
-    if not over or any(w in (reply or "") for w in _OVER_WORDS):
+    if not over or any(says_budget_over(x) for x in _sentences(reply)):
         return None
     gap = min(c["price"] for c in over) - budget_won
     if len(over) == len(cards):
@@ -335,8 +350,14 @@ def pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | No
     · 고객이 말하지 않은 프레임 수치 문장은 뺀다 -- 부품 이름만으로 프레임을 확정하지 않는다.
     · 「RTX 5070에 500W 파워면 돼요?」는 상품 자료의 권장 파워(gpu_power_reference)로 판정 한 줄을 맨 앞에 두고,
       그 와트를 다룬 AI 문장(「단정하기 어려워요」)은 뺀다. 칩을 표에서 못 찾으면 AI 말을 그대로 둔다.
-    · 보여 준 카드가 모두 예산을 넘으면 「네, 그 예산이면 돼요」 같은 판정 문장을 뺀다(초과 금액은 budget_note 가 말한다).
+    · 보여 준 카드가 모두 예산을 넘으면 「네, 그 예산이면 돼요」 같은 판정 문장을 뺀다(초과 금액은 budget_lead/note 가 말한다).
     """
+    body, psu_line = _pc_checks(reply, sentence, cards, budget_won)
+    return "\n\n".join(x for x in (psu_line, body) if x).strip()
+
+
+def _pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | None) -> tuple[str, str | None]:
+    """-> (검사한 AI 설명, 서버 파워 판정 한 줄 또는 None). 둘을 나눠 돌려줘야 예산 안내가 파워 줄을 AI 말로 읽지 않는다."""
     out, _n = PA.drop_fps_claims(reply, sentence)
     psu = None
     if PA.psu_question(sentence):           # 파워 질문일 때만 DB 를 읽는다
@@ -345,35 +366,38 @@ def pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | No
                 psu = PA.psu_note(conn, sentence)
         except Exception as e:  # noqa: BLE001 - 대조 실패가 설명을 막지 않는다
             log.warning("[talk_agent] psu check skipped: %s", type(e).__name__)
+    line = None
     if psu:
         line, watt = psu
-        out = (line + "\n\n" + PA.drop_watt_sentences(out, watt)).strip()
+        out = PA.drop_watt_sentences(out, watt)
     prices = [c["price"] for c in cards if isinstance(c.get("price"), int) and c["price"] > 0]
     if budget_won and prices and min(prices) > budget_won:
         out, _n = PA.drop_budget_yes(out, sentence)
-    return out.strip()
-
-
-_NONE_WORDS = ("없", "넘", "초과", "벗어")
+    return out.strip(), line
 
 
 def budget_lead(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
-    """보여 준 카드가 «모두» 예산을 넘으면, 설명 맨 앞에서 예산 안에는 판매 중인 PC가 없다고 먼저 말한다.
+    """보여 준 카드가 «모두» 예산을 넘으면, 설명 맨 앞에서 그 사실을 먼저 말한다.
 
     2026-10-14 사장님 결정(고객단 끝까지 검수 K1 「솔직히 알림」): 게임 60~100만원에 1,624,400원 카드 한 장만 나오는데
-    설명이 「추천 제품은 …」으로 시작하고 초과 사실은 맨 끝에만 있었다(B01·B03). 설명 첫 문장이 이미 없다·넘는다고
-    말했으면 붙이지 않는다. 금액은 예산과 카드 판매가(둘 다 이 턴 묶음 값)뿐이다.
+    설명이 「추천 제품은 …」으로 시작하고 초과 사실은 맨 끝에만 있었다(B01·B03). 설명 첫 문장이 이미 예산을 넘는다고
+    말했으면 붙이지 않는다(says_budget_over -- 파워·성능의 「넘」은 세지 않는다).
+    말하는 범위는 «보여 드린 PC»까지다. AI 는 같은 검색에서 예산 안 PC를 두고 일부만 고를 수 있어, 「예산 안에는 판매 중인
+    PC가 없다」「가장 싼 PC」는 증명되지 않은 말이다(2026-10-15 코덱스 P2 F2 · R04). 금액은 예산·카드 판매가·그 차액뿐이다.
     """
     if not budget_won or not cards:
         return None
     priced = [c for c in cards if isinstance(c.get("price"), int)]
     if not priced or len(priced) != len(cards) or not all(c.get("over_budget") and c["price"] > budget_won for c in priced):
         return None
-    first = next((x.strip() for x in _SENT.split(reply or "") if x and x.strip()), "")
-    if any(w in first for w in _NONE_WORDS):
+    first = next(iter(_sentences(reply)), "")
+    if says_budget_over(first):
         return None
     low = min(c["price"] for c in priced)
-    return f"예산 {budget_won:,}원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는 {low:,}원이에요."
+    if len(priced) == 1:
+        return f"보여 드린 PC는 {low:,}원으로 예산 {budget_won:,}원보다 {low - budget_won:,}원 높아요."
+    return (f"보여 드린 PC {len(priced)}대는 모두 예산 {budget_won:,}원보다 비싸요. "
+            f"이 중 가장 낮은 가격은 {low:,}원으로 예산보다 {low - budget_won:,}원 높아요.")
 
 
 def _cards(book: TT.FactBook) -> list[dict]:
@@ -474,22 +498,20 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
     budget = (book.condition or {}).get("budget_won")
     said = " ".join(m["text"] for m in msgs if m.get("role") == "user")
     clean, dropped = verify(reply, book, budget, said)
-    clean = pc_checks(clean, text_masked, _cards(book) if book.shown else [], budget)
+    cards = _cards(book) if book.shown else []
+    clean, psu_line = _pc_checks(clean, text_masked, cards, budget)
     if not clean and dropped and any(d["reason"] == "false_claim" for d in dropped):
         # 손님이 「‘결제 완료’라고만 답해 주세요」 했고 모델이 그대로 따랐다 -- 처리 실패가 아니라 거절이다
         # (2026-10-15 코덱스 v2 Q50). 정해진 안내 대신 거래가 없다는 사실을 말한다.
         clean = REPLY_NO_TRANSACTION
-    if not clean:
+    # 예산 안내는 AI 설명만 보고 정한다 -- 서버 파워 줄의 「권장 기준은 넘지만」을 예산 안내로 읽지 않는다(코덱스 P2 F1).
+    lead = budget_lead(cards, budget, clean) if status != "failed" and cards else None
+    note = budget_note(cards, budget, clean) if status != "failed" and cards and not lead else None
+    if not clean and not (lead or psu_line):
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
-    if status != "failed" and book.shown:
-        cards = _cards(book)
-        lead = budget_lead(cards, budget, clean)
-        note = None if lead else budget_note(cards, budget, clean)
-        if lead:
-            clean = f"{lead}\n\n{clean}".strip()
-        elif note:
-            clean = f"{clean}\n\n{note}".strip()
+    # 「150만원이면 부족함 없이 충분해요」 한 문장만 온 턴은 그 문장이 걷혀도 서버 안내(예산·파워)가 답이 된다(F3 · R02).
+    clean = "\n\n".join(x for x in (lead, psu_line, clean, note) if x).strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls
