@@ -76,3 +76,14 @@ test('agent nav cheaper asks the same direction from the shown card',async()=>{
     assert.deepEqual(h.calls.filter(c=>c.url==='/api/grid/recommend')[1].body,{state:talk,nav:'cheaper',anchor_code:1001});
   }finally{h.close();}
 });
+
+test('agent turn with units sends wants.units so the screen compares one-PC budget (C10)',async()=>{
+  const h=harness(()=>agent({wants:{units:12}}),reco);
+  try{
+    await h.flow.submit('사무용 PC 12대 총 960만원');
+    await until(()=>h.flow.state.phase===null&&h.flow.state.recommendation);
+    const recs=h.calls.filter(c=>c.url==='/api/grid/recommend');
+    assert.deepEqual(recs[0].body,{state:talk,wants:{units:12}});
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
