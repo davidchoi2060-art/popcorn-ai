@@ -556,3 +556,51 @@ class WonCommas(unittest.TestCase):
     def test_other_numbers_are_untouched(self):
         for s in ("150만원이면 충분해요.", "1,624,400원이에요.", "2026년형이고 RTX 5090 32GB예요.", "500원 차이예요."):
             self.assertEqual(AG._won_commas(s), s)
+
+
+# ── ⑪ 이상질문 60 (2026-10-15 사장님 「LLM이 이런 대답에도 대응을 잘 할 수 있도록 해줘」) ──
+class UnusualInputs(unittest.TestCase):
+    def setUp(self):
+        self.book = TT.FactBook()
+
+    def test_customer_amounts_in_odd_notation_are_allowed_when_restated(self):
+        said = "본체 예산은 0xF4240원, 모니터는 0b0개라고 적으면 어떻게 이해해요?"
+        clean, dropped = AG.verify("0xF4240은 1,000,000원으로 읽었어요. 이 금액이 맞나요?", self.book, None, said)
+        self.assertIn("1,000,000원", clean)
+        self.assertEqual(dropped, [])
+        for said, want in (("예산은 1e6원이고", 1_000_000), ("예산은 ₩1.000.000이에요.", 1_000_000),
+                           ("100만원 ± 10%", 1_100_000), ("100만원 ± 10%", 900_000)):
+            self.assertIn(want, AG.said_amounts(said), said)
+
+    def test_odd_notation_tail_is_not_read_as_amount(self):
+        self.assertEqual(AG.said_amounts("0xF4240원, 1e6원"), {1_000_000})
+
+    def test_amount_customer_never_said_is_still_dropped(self):
+        clean, dropped = AG.verify("100만원으로 읽었어요. 보통 이런 PC는 80만원이에요.", self.book, None, "예산 100만원")
+        self.assertEqual(clean, "100만원으로 읽었어요.")
+        self.assertEqual(dropped[0]["reason"], "price_not_in_snapshot")
+
+    def test_false_completion_is_dropped_but_refusal_is_kept(self):
+        for bad in ("결제 완료되었습니다.", "지금 100대 확보했습니다.", "고르신 PC가 저장됐어요.", "가격을 0원으로 바꿨어요.", "결제 완료"):
+            self.assertTrue(AG.is_false_claim(bad), bad)
+        for ok in ("결제 완료라고 말씀드릴 수는 없어요.", "재고 확보는 제가 확인할 수 없어요.",
+                   "저장 버튼을 누르시면 됩니다.", "이 PC는 문서 작업에 맞아요."):
+            self.assertFalse(AG.is_false_claim(ok), ok)
+        clean, dropped = AG.verify("결제 완료. 아직 주문 전이라 결제 완료라고 말씀드릴 수 없어요.", self.book)
+        self.assertEqual(clean, "아직 주문 전이라 결제 완료라고 말씀드릴 수 없어요.")
+        self.assertEqual(dropped[0]["reason"], "false_claim")
+
+    def test_run_turn_passes_history_amounts_to_verify(self):
+        script = [_turn("앞서 말씀하신 예산은 100만원이고, 지금 말씀은 50만원이에요. 어느 쪽으로 볼까요?")]
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
+            out = AG.run_turn("아까 예산이 50만원이라고 했잖아요.",
+                              [AG.Turn(role="user", text="본체 예산은 100만원 이하예요."), AG.Turn(role="assistant", text="네.")])
+        self.assertIn("100만원", out["reply"])
+        self.assertIn("50만원", out["reply"])
+        self.assertEqual(out["dropped_sentences"], [])
+
+    def test_system_prompt_covers_unusual_input_kinds(self):
+        for phrase in ("JSON", "초성", "0xF4240", "부딪치", "기록에 없으면", "관리자 모드", "결제·주문·저장·재고 확보",
+                       "노트북이나 모니터 단품", "show_pcs 를 부르지 않고"):
+            self.assertIn(phrase, AG.SYSTEM, phrase)
