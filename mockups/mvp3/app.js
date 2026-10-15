@@ -281,6 +281,8 @@ function publicBomDetails(configuration,p,information,finalOnly){
     HDD:['저장장치','hard-drive','게임과 파일을 저장하는 부품이에요.'],
     MB:['메인보드','gear','CPU와 메모리 등 여러 부품을 연결하는 부품이에요.'],
     PSU:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    POWER:['파워','plug','각 부품에 전원을 공급하는 부품이에요.'],
+    COOLER:['쿨러','gear','CPU에서 나는 열을 식히는 부품이에요.'],
     CASE:['케이스','computer-tower','부품을 담고 공기가 흐를 공간을 만드는 부품이에요.']};
   const rows=configuration.parts.map(part=>{
     const [label,icon,role]=(Object.hasOwn(roles,part.slot)?roles[part.slot]:null)||[part.pseudo?'서비스':part.slot,'gear','등록된 사양과 설명을 확인해주세요.'];
