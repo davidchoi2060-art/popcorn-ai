@@ -60,10 +60,25 @@ class ReadinessTests(unittest.TestCase):
         module = load_projection(reader, selected)
         conn = object()
         items = module['list_configurations'](conn)
-        reader.assert_called_once_with(conn)
+        reader.assert_called_once_with(conn, with_review=True)
         selected.assert_not_called()
         self.assertEqual(len(items), 104)
         self.assertEqual(rows, before)
+
+    def test_list_and_detail_derive_one_state_from_the_same_review(self):
+        # 기능테스트 ISSUE-02: N02 가 목록·요약은 「확인 필요」, 상세는 「보완 필요」였다.
+        review = dict(state='pending', eligible=False, checks=[],
+                      blockers=['상품명·소개 누락'])
+        data = detail(current_review=review)
+        listed = row(current_review=review, review_state='pending',
+                     review_reasons=['상품명·소개 누락'])
+        module = load_projection(Mock(return_value=[listed]), Mock(return_value=data))
+        (summary,) = module['list_configurations'](object())
+        selected = module['detail_configuration'](object(), 'N07')
+        self.assertEqual(summary['state'], 'needs_work')
+        self.assertEqual(summary['state'], selected['state'])
+        blockers = lambda item: [r['detail'] for r in item['reasons'] if r['key'].startswith('review:blocker')]
+        self.assertEqual(blockers(summary), blockers(selected))
 
     def test_detail_once_reuses_description_rule_and_does_not_mutate_source(self):
         data = detail()

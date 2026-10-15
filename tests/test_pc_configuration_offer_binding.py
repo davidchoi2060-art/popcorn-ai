@@ -17,7 +17,10 @@ SOURCE = ROOT / 'api' / 'pc_configuration_copy.py'
 HELPER = 'read_sold_offer_configuration'
 # 2026-10-09: checked_at 을 timeutil.now_iso() 로 바꾼 import 1줄 + 호출 1줄만 반영해 갱신
 # (회귀 「타임존 없는 isoformat() 금지」 · 갱신 전 03d9fa09…, Python 3.12 ast.dump 기준)
-BEFORE_AST = '08b525df1f58bc897c95a86e937ac128e2fcbe82216a9d5b887e88b093a0a149'
+# 2026-10-15: catalog_rows 가 검토 근거를 load_review 처럼 승인가 고정(pin_rows)으로 계산하고
+# with_review=True 면 current_review 를 함께 돌려주게 갱신(관리자 기능테스트 ISSUE-02 · 갱신 전 08b525df…,
+# 값은 CI Python 3.12 실측)
+BEFORE_AST = '14e31fa35c1138bd46cb47f524d56656fac0a714ba8f4562bb32abe68edbdfb6'
 
 
 def functions(path, names):
