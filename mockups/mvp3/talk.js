@@ -78,8 +78,8 @@ function proposalBlock(p,latest){
   const head=latest?'':'<p class="tk-cards-note">이전 제안 · 그때 조건('+esc(conditionsText(p.talk)||'조건 미확인')+') 기준 금액이에요.</p>';
   // 지난 제안은 비어 있어도 「이전 제안」 머리와 is-past 를 단다 -- 지난 「못 찾았어요」가 지금 답처럼 보였다(2026-10-12 검수 9da2 P2-2).
   if(!products.length)return '<div class="tk-cards is-empty'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+
-    (notes.length?notes.map(n=>'<p class="warn-text tk-group-note">'+esc(n)+'</p>').join(''):'<p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 사람에게 문의할 수 있어요.</p>')+
-    (latest?nextChoices(false)+button('사람에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
+    (notes.length?notes.map(n=>'<p class="warn-text tk-group-note">'+esc(n)+'</p>').join(''):'<p>현재 조건에서 보여드릴 구성을 찾지 못했어요. 조건을 조금 바꾸거나 전문가에게 문의할 수 있어요.</p>')+
+    (latest?nextChoices(false)+button('전문가에게 문의하기','inquiry-open','outline','data-human="1"'):'')+'</div>';
   const many=p.groups.filter(g=>g.products.length).length>1;
   return '<div class="tk-cards'+(latest?'':' is-past')+'" data-proposal="'+p.id+'">'+head+p.groups.filter(g=>g.products.length).map(g=>
     (many&&g.usage?'<h3 class="tk-group">'+esc(g.usage)+'</h3>':'')+
@@ -156,17 +156,17 @@ function renderLog(){
     if(!(m.who==='ai'&&m.text===LF.GREETING))html+='<div class="tk-msg is-'+(m.who==='user'?'user':'ai')+'"><p>'+esc(m.text)+'</p></div>';
     for(const p of after.get(i)||[])html+=proposalBlock(p,p===last&&state.recommendation!==null);
   });
-  if(state.handoffOffer&&!state.inquiry.open&&!state.inquiry.done)html+='<div class="tk-msg-actions">'+button('사람에게 문의하기','inquiry-open','outline','data-human="1"')+'</div>';
+  if(state.handoffOffer&&!state.inquiry.open&&!state.inquiry.done)html+='<div class="tk-msg-actions">'+button('전문가에게 문의하기','inquiry-open','outline','data-human="1"')+'</div>';
   if(state.error){
     const kind=state.retry?.kind,recommend=kind==='recommend'||kind==='resume',reprice=kind==='reprice';
     const wait=Math.max(0,Math.ceil(((state.error.retryAt||0)-Date.now())/1000));
     const head=reprice?(state.error.status===409?'저장하는 사이 금액이 바뀌어 저장하지 못했어요. 지금 견적은 그대로 두었어요. 지금 금액을 다시 확인한 뒤 저장할 수 있어요.':'지금 금액을 다시 확인하지 못했어요. 지금 견적은 그대로 두었어요.')
-      :recommend?'새 추천을 불러오지 못했어요.'+(state.selected?' 앞서 고른 견적은 유지할게요.':''):'이번 답변을 불러오지 못했어요. 다시 시도하거나 사람에게 문의할 수 있어요.';
+      :recommend?'새 추천을 불러오지 못했어요.'+(state.selected?' 앞서 고른 견적은 유지할게요.':''):'이번 답변을 불러오지 못했어요. 다시 시도하거나 전문가에게 문의할 수 있어요.';
     const again=reprice&&state.error.status===409?'지금 금액 다시 확인':'다시 시도';
     html+='<div class="tk-msg is-ai is-error" role="alert"><p>'+head+'</p>'+
       '<p class="muted">'+esc(state.error.message)+'</p><div class="tk-msg-actions">'+
       (state.retry?button(wait?wait+'초 뒤 다시 시도':again,'retry','outline',wait||state.phase?'disabled':''):'')+
-      button('사람에게 문의하기','inquiry-open','outline','data-human="1"')+'</div></div>';
+      button('전문가에게 문의하기','inquiry-open','outline','data-human="1"')+'</div></div>';
   }
   log.innerHTML=html;
   if(atBottom||state.phase==='talk'){if(pageScroll)scrollTo(0,doc.scrollHeight);else log.scrollTop=log.scrollHeight;}
@@ -174,7 +174,7 @@ function renderLog(){
 
 function inquiryForm(){
   const q=state.inquiry;if(!q.open&&!q.done)return '';
-  const human=!!q.human,title=human?'사람에게 문의하기':'구매 조건 문의';
+  const human=!!q.human,title=human?'전문가에게 문의하기':'구매 조건 문의';
   if(q.done)return '<section class="tk-inquiry" role="status" tabindex="-1"><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p><p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 진행되지 않았어요.</p></section>';
   const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft,dis=busy?' disabled':'';
   const err=q.error?'<p class="warn-text" role="alert">'+esc(q.error)+'</p>':'';
@@ -234,7 +234,7 @@ function renderPanel(){
           '<p class="muted">결제는 이 화면이 아니라 팝콘PC 쇼핑몰에서 진행돼요. 누르면 쇼핑몰 상품 페이지가 새 창으로 열려요.</p>')+'</div>';
     }
   }
-  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('사람에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>'+
+  if(!q.open&&!q.done)html+='<div class="tk-ask">'+button('전문가에게 문의하기','inquiry-open','outline',(busy?'disabled ':'')+'data-human="1"')+(p?button('구매 조건 문의','inquiry-open','outline',busy?'disabled':''):'')+'</div>'+
     // 구매 확정은 끝이 아니다 -- 확정 뒤에도 상담사가 전화로 구성을 다시 살펴본다(2026-10-11 사장님).
     '<p class="muted tk-phone">구매를 확정한 뒤에도 상담사가 전화로 구성을 함께 살펴봐요.</p>';
   panel.innerHTML=html+inquiryForm();
@@ -300,7 +300,9 @@ document.addEventListener('click',e=>{
     case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
-    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;condOpen=false;flow.reset();input.value='';count();}break;
+    // 「새 상담」은 묻지 않고 바로 새로 시작한다(2026-10-15 중헌 님: 「지금 견적을 지우고…」 확인 창은 필요 없다 -- 새로 하고 싶으면 이 단추를 누르면 된다).
+    // 서버에 저장한 「내 견적」은 그대로이고, 비우는 것은 이 탭의 대화·조건·지금 견적뿐이다.
+    case 'new':resumed=false;entry=null;condOpen=false;flow.reset();input.value='';count();break;
     case 'toggle-now':{const open=$('#tk-now').classList.toggle('is-open');b.setAttribute('aria-expanded',String(open));break;}
   }
 });

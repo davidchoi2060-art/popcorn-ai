@@ -163,7 +163,7 @@ test('the top label shows the consultation path the server chose',async()=>{
 test('a new consultation drops the earlier starter key and path label',async()=>{
   const h=harness((url,body)=>url==='/api/talk/parse'?{data:{ok:true,state:{usages:[],budget_won:null},missing:[],reply:'어떤 작업에서 느린가요?',answer:'',pc_related:true,chat_flow:body.entry?{smalltalk_turns:0,pc_offered:false,pc_declined:false,entry:body.entry,entry_asked:false}:null}}:{data:{ok:true,quotes:[],has_more:false}});
   try{
-    h.w.confirm=()=>true;
+    let asked=0;h.w.confirm=()=>{asked++;return false;};
     await until(()=>h.doc.querySelector('.tk-welcome'));
     // 단추만 고르고 보내지 않은 채 새 상담 -> 다음 첫 문장에 옛 갈래가 실리지 않는다.
     h.click('[data-action=starter][data-entry=upgrade]');
@@ -182,6 +182,10 @@ test('a new consultation drops the earlier starter key and path label',async()=>
     const third=h.calls.filter(c=>c.url==='/api/talk/parse')[2];
     assert.equal(third.body.entry,undefined);assert.equal(third.body.chat_flow,null);
     assert.equal(h.text('.demo-label'),'PC 상담');
+    // 대화를 나눈 뒤에도 「새 상담」은 확인 창 없이 바로 비운다(2026-10-15 중헌 님).
+    h.click('[data-action=new]');
+    assert.equal(asked,0);
+    assert.ok(!h.text('#tk-log').includes('새 PC를 알아보고 있어요'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -236,7 +240,7 @@ test('general and purchase inquiries use their own titles',async()=>{
     await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
     assert.match(h.text('.tk-phone'),/상담사가 전화로 구성을 함께 살펴봐요/);
     h.click('.tk-ask [data-action=inquiry-open][data-human="1"]');await until(()=>h.doc.querySelector('[data-inquiry=topic]'));
-    assert.equal(h.text('.tk-inquiry h3'),'사람에게 문의하기');
+    assert.equal(h.text('.tk-inquiry h3'),'전문가에게 문의하기');
     h.click('[data-action=inquiry-close]');await tick();
     h.click('.tk-ask [data-action=inquiry-open]:not([data-human])');await until(()=>h.doc.querySelector('[data-inquiry=topic]'));
     assert.equal(h.text('.tk-inquiry h3'),'구매 조건 문의');assert.match(h.text('.tk-inquiry'),/세금계산서/);
