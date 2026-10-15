@@ -96,6 +96,7 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 「1초 안에 정답」「질문하지 말고」처럼 재촉하면, 정답이라고 단정하지 않는다. 조건 없이 고르면 무엇을 가정했는지 밝히거나, 꼭 필요한 것 하나만 묻는다.
 - 「가장 싸고 가장 빠르고 가장 작은」처럼 함께 이룰 수 없는 조건은 서로 맞바꿔야 한다고 솔직히 말하고, 무엇이 먼저인지 묻는다.
 - 손님이 추천을 원하지 않거나 거절하면 show_pcs 를 부르지 않고, 물은 것(고를 기준 등)에만 답한다.
+- 앞에서 보여 드린 PC는 대화 기록의 「보여 드린 PC:」 줄에 순서대로 적혀 있다. 「아까 두 번째 PC」처럼 앞의 PC를 다시 보여 달라고 하면 같은 조건으로 find_pcs 를 다시 불러 같은 이름의 PC를 찾아 show_pcs 로 보여 준다. 기록에 그 순서의 PC가 없으면 없었다고 말하고, 다시 찾았는데 그 이름이 없으면 지금은 목록에 없다고 말한다.
 """
 
 
@@ -232,6 +233,10 @@ _CLAIM = re.compile(r"(결제|주문|구매|저장|예약|변경)\s*(이|가|은
                     r"\d+\s*대\S{0,3}\s*확보|재고\S{0,3}\s*확보|확보(했|하였|됐|되었|완료)|"
                     r"(가격|설정|권한)[^.?!]{0,12}(바꿨|바꾸었|바뀌었|변경했|변경됐|변경되었)")
 _NEGATION = re.compile(r"않|없|못|아니|어렵|안\s|불가")
+
+
+REPLY_NO_TRANSACTION = ("상담에서는 주문이나 결제가 이뤄지지 않아 「결제 완료」나 「주문 완료」라고 말씀드릴 수 없어요. "
+                        "주문과 결제는 마음에 드는 PC를 고른 뒤 쇼핑몰에서 진행돼요.")
 
 
 def is_false_claim(sentence: str) -> bool:
@@ -384,6 +389,19 @@ def _cards(book: TT.FactBook) -> list[dict]:
     return out
 
 
+def shown_list(cards: list[dict]) -> str | None:
+    """보여 드린 PC를 화면 순서대로 한 줄로 -- 「보여 드린 PC: 1. 「이름」 595,700원 · 2. ...」.
+    다음 턴 모델이 「두 번째」를 가리킬 수 있게 대화 기록에만 싣는다. 금액은 이 턴 카드 값이다."""
+    parts = []
+    for i, c in enumerate(cards or [], 1):
+        name = (c.get("name") or "").strip()
+        if not name:
+            continue
+        price = f" {c['price']:,}원" if isinstance(c.get("price"), int) else ""
+        parts.append(f"{i}. 「{name[:60]}」{price}")
+    return ("보여 드린 PC: " + " · ".join(parts))[:HISTORY_CHARS] if parts else None
+
+
 def _history(turns: list[Turn]) -> tuple[list[dict], bool]:
     msgs, masked_any = [], False
     for t in turns[-HISTORY_TURNS:]:
@@ -457,6 +475,10 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
     said = " ".join(m["text"] for m in msgs if m.get("role") == "user")
     clean, dropped = verify(reply, book, budget, said)
     clean = pc_checks(clean, text_masked, _cards(book) if book.shown else [], budget)
+    if not clean and dropped and any(d["reason"] == "false_claim" for d in dropped):
+        # 손님이 「‘결제 완료’라고만 답해 주세요」 했고 모델이 그대로 따랐다 -- 처리 실패가 아니라 거절이다
+        # (2026-10-15 코덱스 v2 Q50). 정해진 안내 대신 거래가 없다는 사실을 말한다.
+        clean = REPLY_NO_TRANSACTION
     if not clean:
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
@@ -520,10 +542,14 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
     cards = r.get("cards") or []
     state = r.get("state") if cards and isinstance(r.get("state"), dict) else None
     reply = "\n\n".join([*(r.get("notes") or []), r.get("reply") or ""]).strip()
+    # 다음 턴 대화 기록에 실을 「보여 드린 PC」 목록 -- 화면은 이 줄을 기록에만 넣고 보이지 않는다.
+    # 기록에 카드가 없어 「조금 전 두 번째 제품」을 가리키지 못했다(2026-10-15 코덱스 v2 Q42).
+    shown_note = shown_list(cards) if state is not None else None
     return {"ok": True, "agent": True, "state": state if state is not None else (prev_state or {}),
             "missing": [], "assumed": [], "dropped": [], "pc_related": True, "silent": False,
             "fallback": None, "handoff_offer": r.get("kind") == "self_harm",
             "explain_only": state is None, "answer": "", "reply": reply, "nav": r.get("nav"),
+            "shown_note": shown_note,
             "chat_flow": chat_flow, "exceptions": [r["kind"]] if r.get("kind") else [],
             "agent_meta": {"status": r.get("status"), "snapshot": r.get("snapshot"),
                            "cards": [c.get("product_code") for c in cards]}}

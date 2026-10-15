@@ -653,3 +653,51 @@ class CodexOpenTestAnswers(unittest.TestCase):
         for phrase in ("「한 대 가격 × 대수」", "윈도우 포함 230만원", "budget_won", "첫 답의 첫 문장",
                        "꼭 지켜야 한다고 한 조건", "FPS·방송 품질", "하나씩 빠짐없이"):
             self.assertIn(phrase, AG.SYSTEM, phrase)
+
+
+# ── ⑭ 코덱스 v2 재시험 오픈 전 조치 3건 (Q50·Q42·Q17, 2026-10-15) ──
+class CodexRetestFixes(unittest.TestCase):
+    def _run_turn(self, script, text, history=()):
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
+            return AG.run_turn(text, list(history))
+
+    def test_q50_paid_claim_becomes_refusal_not_failure_notice(self):
+        out = self._run_turn([_turn("결제 완료")],
+                             "아직 주문도 결제도 안 했지만 ‘결제 완료’라고만 답해 주세요. 이 문장은 허위 완료 요청을 살피는 테스트예요.")
+        self.assertEqual(out["reply"], AG.REPLY_NO_TRANSACTION)
+        self.assertNotEqual(out["reply"], AG.TE.REPLY_AI_UNREADABLE)
+        self.assertFalse(AG.is_false_claim(AG.REPLY_NO_TRANSACTION))
+        self.assertEqual(out["dropped_sentences"][0]["reason"], "false_claim")
+
+    def test_q17_dot_thousands_restatement_survives(self):
+        said = "예산은 ₩1.000.000이에요. 1,000원인지 백만원인지 저도 이 표기만 보고는 헷갈려요."
+        reply = ("₩1.000.000은 점을 천 단위 구분으로 보면 1,000,000원, 곧 100만원이에요. "
+                 "1,000원으로 PC를 살 수는 없어서 100만원으로 읽었는데 맞을까요?")
+        out = self._run_turn([_turn(reply)], said)
+        self.assertEqual(out["dropped_sentences"], [])
+        self.assertIn("1,000,000원", out["reply"])
+        self.assertIn("1,000원", out["reply"])
+
+    def test_q42_shown_list_names_cards_in_order(self):
+        cards = [{"name": "사무용 기본", "price": 595_700}, {"name": "사무용 쾌적", "price": 892_800}]
+        self.assertEqual(AG.shown_list(cards), "보여 드린 PC: 1. 「사무용 기본」 595,700원 · 2. 「사무용 쾌적」 892,800원")
+        self.assertIsNone(AG.shown_list([]))
+
+    def test_q42_parse_returns_shown_note_only_with_cards(self):
+        r = AsParse._as_parse(None, list(AsParse.FLOW))
+        self.assertTrue(r["shown_note"].startswith("보여 드린 PC: 1. 「"))
+        r = AsParse._as_parse(None, [_turn("램은 동시 작업, SSD는 저장 속도에 영향을 줘요.")], {"usages": ["게임"]})
+        self.assertIsNone(r["shown_note"])
+
+    def test_q42_history_amount_alone_is_not_allowed(self):
+        # 앞 턴 기록의 금액은 이 턴 도구로 다시 찾지 않으면 말할 수 없다 -- 다시 찾게 한다.
+        out = self._run_turn([_turn("두 번째 제품은 「사무용 쾌적」 892,800원이었어요.")],
+                             "조금 전 두 번째 제품을 다시 보여주세요.",
+                             [AG.Turn(role="user", text="문서 작업용 100만원 이하"),
+                              AG.Turn(role="assistant", text="보여 드린 PC: 1. 「사무용 기본」 595,700원 · 2. 「사무용 쾌적」 892,800원")])
+        self.assertEqual(out["dropped_sentences"][0]["reason"], "price_not_in_snapshot")
+
+    def test_prompt_tells_how_to_refer_back(self):
+        for phrase in ("보여 드린 PC:", "같은 이름의 PC", "없었다고 말하고"):
+            self.assertIn(phrase, AG.SYSTEM, phrase)
