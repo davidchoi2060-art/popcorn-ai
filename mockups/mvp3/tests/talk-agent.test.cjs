@@ -76,3 +76,18 @@ test('agent nav cheaper asks the same direction from the shown card',async()=>{
     assert.deepEqual(h.calls.filter(c=>c.url==='/api/grid/recommend')[1].body,{state:talk,nav:'cheaper',anchor_code:1001});
   }finally{h.close();}
 });
+
+test('agent shown_note rides in the next turn history but is never shown on screen',async()=>{
+  const NOTE='보여 드린 PC: 1. 「CODE/MOCK 게임 PC」 1,498,000원';
+  let n=0;const h=harness(()=>++n===1?agent({shown_note:NOTE}):agent({explain_only:true,reply:'두 번째 PC는 없었어요.'}),reco);
+  try{
+    await h.flow.submit('게임용 PC 150만원');
+    await until(()=>h.flow.state.phase===null&&h.flow.state.recommendation);
+    await h.flow.submit('조금 전 두 번째 제품을 다시 보여주세요.');
+    await until(()=>h.flow.state.phase===null);
+    const parses=h.calls.filter(c=>c.url==='/api/talk/parse');
+    assert.ok(parses[1].body.history.some(t=>t.role==='assistant'&&t.text===NOTE));
+    assert.ok(!h.flow.state.messages.some(m=>String(m.text).includes('보여 드린 PC')));
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});

@@ -219,6 +219,8 @@
         }
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
+        // 상담원이 고른 PC 목록은 다음 턴 기록에만 싣는다 -- 「조금 전 두 번째 제품」을 가리킬 수 있게(코덱스 v2 Q42). 화면에는 보이지 않는다.
+        if(response.agent===true&&typeof response.shown_note==='string'&&response.shown_note.trim())state.history.push({role:'assistant',text:response.shown_note.slice(0,300)});
         state.history=state.history.slice(-6);
         // 「차이만 설명해 주세요 · 추천은 필요 없어요」면 설명으로 끝낸다 -- 추천 카드를 부르지 않고 보던 것도 그대로 둔다
         // (2026-10-12 카드 검수 X2: 설명 뒤에 카드 3장이 나왔다).
