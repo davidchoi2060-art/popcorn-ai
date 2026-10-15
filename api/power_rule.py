@@ -31,6 +31,11 @@
 # +400W 였고 +200 은 「실판매를 다 통과시키면서 위험 조합은 잡는」 구간에서 고른 값이다.
 SYSTEM_POWER_OVERHEAD_W = 200
 
+# 고객에게 «넉넉한 파워»를 안내하는 여유 기준 -- 그래픽카드 «권장 파워 + 100W»(2026-10-15 사장님 확정
+# 「권장값 + 100W」). 상담 판정(talk_pc_advice.psu_line)과 상세 화면 안내(part_spec_notes.power_spec)가
+# 이 값 하나를 쓴다. 조립 호환 판정(compat_rules power = 소비전력 + ref_offset)과는 다른 축이다.
+PSU_ADVICE_MARGIN_W = 100
+
 
 def required_watt(gpu: dict | None, offset: int = SYSTEM_POWER_OVERHEAD_W):
     """이 GPU 구성이 요구하는 파워 정격(W). 모르면 None(= 판정 불가).

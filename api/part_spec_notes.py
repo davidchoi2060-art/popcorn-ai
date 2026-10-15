@@ -18,9 +18,12 @@
   그래픽카드 상세의 「권장 파워 정격 650(W) 이상」은 판매처 원문(시스템 권장 등급값)이고, 호환 규칙은
   2026-09-17 결정(마이그레이션 0094)대로 `정격 >= 카드 소비전력(gpu_power_draw_watt) + ref_offset` 을 본다.
   그래서 600W 파워가 규칙을 통과한 것은 설계대로다. 다만 화면이 그 차이를 말하지 않았다 —
-  장착 파워가 판매처 권장값보다 낮을 때만 판정 기준을 서버 값(소비전력·규칙 여유)으로 밝힌다.
+  장착 파워가 «판매처 권장 + 100W»(상담과 같은 여유 기준, 2026-10-15 사장님 확정)보다 낮을 때 판정 기준을
+  서버 값(소비전력·규칙 여유)으로 밝힌다.
 """
 import re
+
+from .power_rule import PSU_ADVICE_MARGIN_W
 
 PORTS = {'HDMI': 'HDMI', 'DP': 'DP', 'DISPLAYPORT': 'DP', 'D-SUB': 'D-SUB', 'DSUB': 'D-SUB', 'DVI': 'DVI'}
 GPU_PORT = re.compile(r'출력단자\((HDMI|DP|DVI|D-SUB)\)\s*:\s*(\d+)\s*\(EA\)', re.I)
@@ -105,23 +108,28 @@ def output_spec(row, cpu_without_igpu=False):
 
 
 def power_spec(gpu_row, psu_row, offset):
-    """장착 파워가 판매처 권장 파워보다 낮을 때만 판정 기준 한 줄. 아니면 None.
+    """장착 파워가 «판매처 권장 + 100W»(PSU_ADVICE_MARGIN_W)보다 낮을 때만 판정 기준 한 줄. 아니면 None.
 
     offset 은 활성 파워 규칙(rule_key='power', ref_field='gpu_power_draw_watt')의 ref_offset — 없으면 None.
+    여유 기준은 상담 판정과 같은 「권장값 + 100W」다(2026-10-15 사장님 확정). 조립 호환은 규칙 값으로 따로 밝힌다.
     """
     recommended = _watt(_facts(gpu_row).get('권장 파워'))
     rated = _watt(_facts(psu_row).get('정격 출력'))
-    if not recommended or not rated or rated >= recommended:
+    if not recommended or not rated:
         return None
-    head = f'장착 파워 {rated}W는 판매처 권장 {recommended}W보다 낮아요. '
+    safe = recommended + PSU_ADVICE_MARGIN_W
+    if rated >= safe:
+        return None
+    head = (f'장착 파워 {rated}W는 판매처 권장 {recommended}W보다 낮아요. ' if rated < recommended
+            else f'장착 파워 {rated}W는 판매처 권장 {recommended}W는 넘지만 여유 기준 {safe}W(권장 + {PSU_ADVICE_MARGIN_W}W)보다 낮아요. ')
+    tail = f'여유 있게 쓰시려면 {safe}W 이상 파워로 바꿔 주세요.'
     draw = gpu_row.get('gpu_power_draw_watt')
     if type(draw) is not int or draw <= 0 or type(offset) is not int:
         return dict(label=POWER_LABEL, value=head + '그래픽카드 소비전력 자료가 없어 파워 호환을 확정하지 못했어요. 구매 전 확인이 필요해요.')
     need = draw + offset
     if rated < need:
         return dict(label=POWER_LABEL, value=head + f'호환 기준 {need}W에도 못 미쳐 구성 확인이 필요해요.')
-    return dict(label=POWER_LABEL, value=head + f'호환 판정은 그래픽카드 소비전력 {draw}W + 시스템 여유 {offset}W = {need}W 기준으로 통과했어요. '
-                                        f'판매처 권장값을 따르시려면 {recommended}W 이상 파워로 바꿔 주세요.')
+    return dict(label=POWER_LABEL, value=head + f'조립 호환은 그래픽카드 소비전력 {draw}W + 시스템 여유 {offset}W = {need}W 기준으로 통과했어요. ' + tail)
 
 
 def derived_specs(rows, offset=None):
