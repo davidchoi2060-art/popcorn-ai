@@ -694,7 +694,7 @@ def psu_question(sentence: str) -> tuple[str, int] | None:
     return "%s %s%s" % (g.group(1).upper(), g.group(2), suffix), watts[0]
 
 
-PSU_MARGIN_W = 100      # 권장 파워 + 여유 -- 견적 스튜디오 기준(right-size-check: 하한 = 권장 + 100W, 2026-10-14 사장님 공유 문서 ④)
+from .power_rule import PSU_ADVICE_MARGIN_W as PSU_MARGIN_W   # 권장 파워 + 100W -- 2026-10-15 사장님 확정, 단일 원천은 power_rule
 
 
 def psu_line(chip: str, watt: int, recommended: int | None) -> str | None:

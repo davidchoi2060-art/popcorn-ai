@@ -66,7 +66,7 @@ class PowerBasis(unittest.TestCase):
         value = self.note(self.c06(), 200)[0]['value']
         self.assertIn('장착 파워 600W는 판매처 권장 650W보다 낮아요', value)
         self.assertIn('소비전력 180W + 시스템 여유 200W = 380W 기준으로 통과', value)
-        self.assertIn('650W 이상 파워로 바꿔 주세요', value)
+        self.assertIn('750W 이상 파워로 바꿔 주세요', value)          # 권장 650W + 100W (2026-10-15 사장님 확정)
 
     def test_unknown_draw_or_rule_is_not_called_pass(self):
         for draw, offset in ((None, 200), (180, None)):
@@ -78,8 +78,16 @@ class PowerBasis(unittest.TestCase):
         value = self.note(self.c06(draw=450), 200)[0]['value']
         self.assertIn('호환 기준 650W에도 못 미쳐', value)
 
-    def test_no_note_when_psu_meets_merchant_recommendation(self):
-        self.assertEqual(self.note(self.c06(rated='650(W)'), 200), [])
+    def test_margin_is_recommended_plus_100(self):
+        value = self.note(self.c06(rated='700(W)'), 200)[0]['value']
+        self.assertIn('판매처 권장 650W는 넘지만 여유 기준 750W(권장 + 100W)보다 낮아요', value)
+        self.assertIn('750W 이상 파워로 바꿔 주세요', value)
+        self.assertEqual(self.note(self.c06(rated='750(W)'), 200), [])
+
+    def test_same_margin_as_consultation(self):
+        from api import talk_pc_advice as PA
+        self.assertEqual(PA.PSU_MARGIN_W, N.PSU_ADVICE_MARGIN_W)
+        self.assertIn('750W 이상', PA.psu_line('RTX 5070', 700, 650))
 
 
 if __name__ == '__main__':
