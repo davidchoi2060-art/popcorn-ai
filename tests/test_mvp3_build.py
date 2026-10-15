@@ -307,5 +307,32 @@ class BuildNote(unittest.TestCase):
         self.assertIn('쿨러 호환은 따로 확인', b.BUILD_NOTE_WARNED)
 
 
+class NotStorage(unittest.TestCase):
+    """저장장치 자리의 메모리·도킹스테이션은 고객 후보에서 뺀다(2026-10-15 코덱스 오픈테스트 C02-F01)."""
+    def row(self, name, raw='', part_type='SSD'):
+        return dict(part_type=part_type, product_name=name, spec_source_text=raw)
+
+    def test_memory_and_dock_are_not_storage(self):
+        self.assertTrue(b.not_storage(self.row('비즈텍 TREAVE DDR4 3200 CL22 (8GB)')))
+        self.assertTrue(b.not_storage(self.row('라인업시스템 LANSTAR LS NVDOC M.2 NVMe 듀얼 도킹스테이션 (SSD미포함)')))
+
+    def test_real_drives_stay(self):
+        for name in ('삼성전자 PM9A1 M.2 NVMe (256GB)', 'HIKSEMI Wave Pro(P) 256GB',
+                     'Western Digital WD BLACK SN850X M.2 NVMe 2280 (1TB) 방열판'):
+            self.assertFalse(b.not_storage(self.row(name)), name)
+
+    def test_other_slots_untouched(self):
+        self.assertFalse(b.not_storage(self.row('도킹 무언가', part_type='CASE')))
+
+    def test_apply_changes_refuses_non_storage(self):
+        bom = [dict(ordinal=1, slot='SSD', quantity=1, pseudo=False, product_code=501, name='SSD A',
+                    sale_price=90000, status='판매중')]
+        parts = {502: dict(product_code=502, product_name='비즈텍 TREAVE DDR4 3200 CL22 (8GB)', sale_price=93400,
+                           status='판매중', part_type='SSD', spec_source_text='')}
+        with self.assertRaises(HTTPException) as cm:
+            b.apply_changes(bom, [change(1, 502)], parts)
+        self.assertEqual(cm.exception.status_code, 409)
+
+
 if __name__ == '__main__':
     unittest.main()

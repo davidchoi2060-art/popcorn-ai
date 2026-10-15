@@ -513,3 +513,6 @@ body[data-from-talk="1"] .workspace>.chat{display:none}
 /* 수량·대수 조절(2026-10-12 중헌 님 7번) */
 .qty-stepper{display:inline-flex;align-items:center;gap:8px}.qty-stepper strong{min-width:3em;text-align:center}
 .part-qty,.final-sets{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0}.part-qty p,.final-sets p{flex-basis:100%;margin:0}
+/* 320px 처음 화면: 메뉴 셋이 두 줄로 접히는데 머리띠 높이가 66px 로 묶여 「상품 보기」「내 견적」 윗부분이 화면 밖으로
+   잘렸다(2026-10-15 코덱스 오픈테스트 C03-F01, 단추 y=-13.7px). 좁을 때는 머리띠가 메뉴 높이만큼 늘어나게 둔다. */
+@media(max-width:380px){body[data-surface="gateway"] .topbar,body[data-surface="usage"] .topbar{height:auto;padding-top:6px;padding-bottom:6px}body[data-surface="gateway"] .topbar nav,body[data-surface="usage"] .topbar nav{justify-content:flex-end;row-gap:0}}

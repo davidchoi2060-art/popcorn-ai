@@ -103,6 +103,17 @@ function overBudget(product,talk=state.selectionState||state.talk){
   const won=talk?.budget_won;
   return Number.isInteger(product.price)&&Number.isInteger(won)&&talk.budget_bound!=='이상'&&product.price>won;
 }
+// 상세의 예산 문장은 위 조건 칩(지금 조건 = state.talk)과 같은 기준이어야 한다. 고른 뒤 상담에서 예산을 바꾸면
+// selectionState(고를 때 조건)와 칩이 갈라져, 칩은 80만원인데 초과액은 150만원 기준 124,400원으로 남았다
+// (2026-10-15 코덱스 오픈테스트 C05-F01). 두 기준이 다르면 기준을 밝혀 둘 다 적는다.
+function budgetLines(p){
+  const basis=state.selectionState,now=state.talk,line=(cls,text)=>'<p class="'+cls+'">'+esc(text)+'</p>';
+  const same=!basis||!now||basis.budget_won===now.budget_won&&basis.budget_bound===now.budget_bound;
+  if(same)return line(overBudget(p)?'warn-text':'green',budget(p));
+  const label=t=>Number.isInteger(t?.budget_won)?' 예산 '+money(t.budget_won)+' 기준 · ':' ';
+  return line(overBudget(p,now)?'warn-text':'green','지금'+label(now)+budget(p,now))+
+    line('muted','고를 때'+label(basis)+budget(p,basis));
+}
 function syncChat(){
   const open=!mobile.matches||(chatPreference??state.screen==='welcome');
   const body=$('#chat-body'),toggle=$('#chat-toggle');
@@ -252,7 +263,7 @@ function summaryDescription(p){
 function productSummary(){
   const p=state.selected,description=summaryDescription(p),title=description?.title||p.name;
   const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
-  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+'<p class="'+(overBudget(p)?'warn-text':'green')+'">'+esc(budget(p))+'</p>'+'</div>'+productImage(p,true)+'</section>';
+  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+budgetLines(p)+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){
   const roles={

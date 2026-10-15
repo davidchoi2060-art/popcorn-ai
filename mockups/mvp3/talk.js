@@ -240,11 +240,16 @@ function renderPanel(){
   panel.innerHTML=html+inquiryForm();
 }
 
+// 대화·견적 칸을 그리다 예외가 나도 아래 상태 줄과 보내기 단추 상태는 반드시 갱신한다. 예전에는 그리기가 중간에 죽으면
+// state.phase 가 남은 채 단추는 켜져 있어, 보내기를 눌러도 아무 표시 없이 무시됐다(2026-10-15 코덱스 오픈테스트
+// C01-F02 · C06-F03 · C07-F02 · C08-F02 「보내기 1회 뒤 60초 넘게 반응 없음」).
+let renderFailed=false;
 function render(){
-  renderLog();renderPanel();
+  try{renderLog();renderPanel();renderFailed=false;}
+  catch(error){renderFailed=true;console.error('[mvp3 talk] render failed',error);}
   // 지금 상담 갈래(서버가 글 내용이나 고른 단추로 정한 것)를 상단에 보여 준다.
   const g=STARTERS.find(x=>x.key===state.chatFlow?.entry);$('.demo-label').textContent=g?'PC 상담 · '+g.label:'PC 상담';
-  const busy={talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'';
+  const busy=busyText()||(renderFailed?'화면을 다 그리지 못했어요. 「새 상담」을 누르거나 새로고침해 주세요.':'');
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
   $('#tk-old').href='index.html#'+oldScreen();
@@ -262,15 +267,22 @@ function goDetail(focus){markFromTalk(focus);location.href='index.html#detail';}
 function expandNow(){const now=$('#tk-now');if(now.classList.contains('is-open'))return;now.classList.add('is-open');$('[data-action="toggle-now"]').setAttribute('aria-expanded','true');}
 // 문의 양식이 그려진 뒤 첫 입력 칸(없으면 양식 자체)으로 초점을 옮긴다.
 function focusInquiry(){const box=panel.querySelector('.tk-inquiry');if(!box)return;const f=box.querySelector('[data-inquiry]:not([disabled])')||box;f.focus({preventScroll:true});box.scrollIntoView?.({block:'nearest'});}
+// 진행 중인 요청마다 고객이 읽을 문장. 목록에 없는 단계도 빈칸으로 두지 않는다(빈칸이면 보내기가 왜 안 되는지 알 수 없다).
+function busyText(){
+  if(!state.phase)return '';
+  return {talk:'답변을 준비하고 있어요.',recommend:'구성을 찾고 있어요.',save:'견적을 저장하고 있어요.',reprice:'지금 금액을 다시 확인하고 있어요.',handoff:'쇼핑몰 가격을 확인하고 있어요.'}[state.phase]||'이전 요청을 처리하고 있어요.';
+}
+// 앞 요청이 끝나지 않아 보내지 못하면 말없이 무시하지 않고, 쓴 글은 입력 칸에 둔 채 이유를 알린다.
+function busyNotice(){status.textContent=busyText()+' 끝나면 다시 보내 주세요. 쓴 글은 입력 칸에 그대로 있어요.';status.hidden=false;}
 async function send(){
   const text=input.value;
   if(!text.trim()){status.textContent='궁금한 내용이나 원하는 조건을 적어주세요.';status.hidden=false;input.focus();return;}
   if(text.trim().length>MAX_TEXT){status.textContent='한 번에 20,000자까지 보낼 수 있어요. 나눠서 보내 주세요.';status.hidden=false;return;}
-  if(state.phase)return;
+  if(state.phase){busyNotice();return;}
   input.value='';count();
   const from=entry;entry=null;
   const sent=await flow.submit(text,{entry:from});
-  if(!sent&&!input.value)input.value=text;
+  if(!sent){if(!input.value){input.value=text;count();}if(state.phase)busyNotice();}
 }
 function count(){const n=input.value.length;$('#tk-count').textContent=n>1000?n.toLocaleString('ko-KR')+' / 20,000자':'';}
 
@@ -312,7 +324,7 @@ $('#tk-old').addEventListener('click',()=>markFromTalk(null));
 $('#tk-form').addEventListener('submit',e=>{e.preventDefault();void send();});
 log.addEventListener('submit',e=>{
   const form=e.target.closest('[data-cond-form]');if(!form)return;e.preventDefault();
-  if(state.phase)return;
+  if(state.phase){busyNotice();return;}
   const text=conditionSentence(form);
   if(!text){status.textContent='바꿀 예산이나 용도를 적어 주세요.';status.hidden=false;return;}
   condOpen=false;void flow.submit(text);

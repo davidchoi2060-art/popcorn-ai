@@ -26,7 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
 from . import customer_pc_offer, grid_public, mvp3_quantity as QTY
-from .catalog_map import is_server_ram, is_sodimm
+from .catalog_map import is_accessory, is_server_ram, is_sodimm, wrong_slot
 from .build_check import DISPLAY_KEY, evaluate, load_rules, load_specs
 from .db import engine
 from .product_name import display_name
@@ -108,6 +108,21 @@ def not_desktop_ram(row):
     return is_sodimm(raw) or is_server_ram(raw) or bool(NOT_DESKTOP_NAME.search(row.get('product_name') or ''))
 
 
+# 저장장치 자리에 메모리·도킹스테이션이 올라와 있었다(2026-10-15 코덱스 오픈테스트 C02-F01 -- 「TREAVE DDR4 3200
+# CL22 (8GB)」 · 「NVMe 듀얼 도킹스테이션 (SSD미포함)」이 「호환 규칙을 통과한 부품」으로 떴다). 분류는 적재 소관이지만,
+# 고객 앞 후보에서는 원문·상품명이 스스로 저장장치가 아니라고 말하는 것을 뺀다.
+NOT_DRIVE_NAME = re.compile(r'SSD\s*미포함|도킹|인클로저|외장\s*(케이스|하드\s*케이스)', re.I)
+
+
+def not_storage(row):
+    """저장장치(SSD·HDD) 자리에 왔지만 실제로는 메모리·액세서리인가."""
+    if (row.get('part_type') or '') not in ('SSD', 'HDD'):
+        return False
+    raw, name = row.get('spec_source_text') or '', row.get('product_name') or ''
+    return bool(wrong_slot(row['part_type'], raw + ' ' + name) or is_accessory(raw)
+                or NOT_DRIVE_NAME.search(raw + ' ' + name))
+
+
 def apply_changes(bom, changes, parts):
     """구성표에 바꾼 줄을 얹는다. parts = {product_code: products 행}. 잘못된 변경은 422/409."""
     lines = {l['ordinal']: dict(l) for l in bom}
@@ -126,6 +141,8 @@ def apply_changes(bom, changes, parts):
             raise HTTPException(422, '같은 종류의 부품으로만 바꿀 수 있어요.')
         if not_desktop_ram(new):
             raise HTTPException(409, '노트북용·서버용 메모리는 이 PC에 꽂을 수 없어요. 다른 메모리를 골라 주세요.')
+        if not_storage(new):
+            raise HTTPException(409, '저장장치가 아닌 상품이에요. 다른 저장장치를 골라 주세요.')
         qty = old['quantity'] if ch.quantity is None else ch.quantity
         if qty != old['quantity'] and old['slot'] not in QTY.QTY_SLOTS:
             raise HTTPException(422, '메모리와 저장장치만 수량을 바꿀 수 있어요.')
@@ -286,7 +303,7 @@ def options_for(conn, lines, ordinal, rules):
     specs = load_specs(conn, [l['spec_key'] for l in base_lines] + [r['product_code'] for r in rows])
     ok, untested, warned = [], 0, []
     for r in rows:
-        if not_desktop_ram(r):
+        if not_desktop_ram(r) or not_storage(r):
             continue
         trial = [dict(l, spec_key=r['product_code'], label=str(r['product_code'])) if l['key'] == ordinal else l for l in base_lines]
         display = line['slot'] in ('CPU', 'GPU')
