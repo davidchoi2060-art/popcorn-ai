@@ -15,7 +15,8 @@ function fetch(url){
   return new Promise(res=>pending.push(()=>res({ok:true,json:async()=>({total:60,note:'',
     items:Array.from({length:20},(_,i)=>({product_code:off+i,name:'PC'+(off+i),sale_price:1}))})})));
 }
-vm.runInNewContext(src,{document:{getElementById:id=>id==='pc-cat'?box:null},fetch,URLSearchParams,window:{}});
+// 화면 스크립트는 칩(위 요약)과 표(아래 접힘)가 갈라져 있어 문서 기준으로 찾는다(코덱스 배치 A안).
+vm.runInNewContext(src,{document:{getElementById:id=>id==='pc-cat'?box:null,querySelector:s=>el(s)},fetch,URLSearchParams,window:{}});
 (async()=>{
   const flush=async()=>{while(pending.length){pending.shift()();await new Promise(r=>setImmediate(r));}};
   await flush();
