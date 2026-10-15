@@ -542,3 +542,17 @@ class Lines(unittest.TestCase):
     def test_dropped_line_leaves_no_double_blank(self):
         clean, _ = AG.verify("좋아요.\n\n120만원짜리도 있어요.\n\n이걸 보세요.", self.book)
         self.assertEqual(clean, "좋아요.\n\n이걸 보세요.")
+
+
+# ── ⑩ 금액은 세 자리마다 쉼표 (2026-10-15 사장님 「금액은 중간에 , 표시가 들어가야 해」) ──
+class WonCommas(unittest.TestCase):
+    def test_bare_amounts_get_commas(self):
+        book = TT.FactBook()
+        book.prices = {3_220_500, 12_954_900}
+        clean, dropped = AG.verify("- P1 다이아: RTX 5070, RAM 32GB — 3220500원\n- P2 익스트림: RTX 5090 — 12954900 원", book)
+        self.assertEqual(clean, "- P1 다이아: RTX 5070, RAM 32GB — 3,220,500원\n- P2 익스트림: RTX 5090 — 12,954,900 원")
+        self.assertEqual(dropped, [])
+
+    def test_other_numbers_are_untouched(self):
+        for s in ("150만원이면 충분해요.", "1,624,400원이에요.", "2026년형이고 RTX 5090 32GB예요.", "500원 차이예요."):
+            self.assertEqual(AG._won_commas(s), s)
