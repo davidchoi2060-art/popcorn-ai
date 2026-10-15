@@ -604,3 +604,27 @@ class UnusualInputs(unittest.TestCase):
         for phrase in ("JSON", "초성", "0xF4240", "부딪치", "기록에 없으면", "관리자 모드", "결제·주문·저장·재고 확보",
                        "노트북이나 모니터 단품", "show_pcs 를 부르지 않고"):
             self.assertIn(phrase, AG.SYSTEM, phrase)
+
+
+# ── ⑫ 코덱스 이상질문 60 실측 반영 (2026-10-15 v1·v2 결과) ──
+class CodexUnusualFindings(unittest.TestCase):
+    def test_q13_restated_budget_is_not_unreadable(self):
+        said = "예산은 100만원 아니고 100만 원이에요. 1,000,000원과 같은 뜻으로 읽었나요?"
+        clean, dropped = AG.verify("네, 100만원과 1,000,000원은 같은 금액으로 읽었어요.", TT.FactBook(), None, said)
+        self.assertEqual(clean, "네, 100만원과 1,000,000원은 같은 금액으로 읽었어요.")
+        self.assertEqual(dropped, [])
+
+    def test_q14_backticks_are_removed_and_hex_reading_kept(self):
+        said = "본체 예산은 0xF4240원, 모니터는 0b0개라고 적으면 어떻게 이해해요?"
+        clean, dropped = AG.verify("`0xF4240`은 16진수로 1,000,000원이에요. `0b0개`는 모니터 0개로 이해합니다.",
+                                   TT.FactBook(), None, said)
+        self.assertEqual(clean, "0xF4240은 16진수로 1,000,000원이에요. 0b0개는 모니터 0개로 이해합니다.")
+        self.assertEqual(dropped, [])
+
+    def test_tool_refs_become_card_names(self):
+        book = TT.FactBook()
+        book.add_item({"product_code": 1, "name": "사무용 기본", "price": 595_700})
+        book.add_item({"product_code": 2, "name": "사무용 쾌적", "price": 892_800})
+        clean, _ = AG.verify("두 가지를 골랐습니다.\n- P1: 595700원\n- P2: 892800원\n문서 위주면 P1이 맞아요. P9는 없어요.", book)
+        self.assertEqual(clean, "두 가지를 골랐습니다.\n- 「사무용 기본」: 595,700원\n- 「사무용 쾌적」: 892,800원\n"
+                                "문서 위주면 「사무용 기본」이 맞아요. P9는 없어요.")

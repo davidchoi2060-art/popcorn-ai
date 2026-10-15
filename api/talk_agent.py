@@ -68,6 +68,7 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 
 [말하는 법]
 - 2~5문장. 결론부터. 질문은 한 번에 하나만.
+- 손님 화면에는 P1 같은 번호가 보이지 않는다. PC는 도구가 준 이름(name)으로 부른다.
 - PC 여러 대를 견주면 한 줄에 하나씩 「- 」로 시작해 줄을 바꿔 쓴다. 별표(**) 같은 마크다운 강조는 쓰지 않는다.
 - 손님에게 보낼 답만 한국어로 쓴다. 생각 과정·메모·영어 정리는 쓰지 않는다.
 - 가격은 도구가 준 숫자 그대로만 쓰고, 세 자리마다 쉼표를 넣는다(3,220,500원). price 가 null 이면 「가격 확인 중」이라고 한다.
@@ -142,7 +143,16 @@ def _lines(text_: str) -> list[str]:
 _WON = re.compile(r"(\d[\d,]*)\s*(만\s*)?원")
 _TAG = re.compile(r"<[^>]{1,200}>")
 # 화면은 설명을 글자 그대로 보여 준다 -- 마크다운 강조·제목 기호가 별표·샵으로 남는다.
-_MD = re.compile(r"\*\*|__|^#{1,6}\s+", re.M)
+_MD = re.compile(r"\*\*|__|`|^#{1,6}\s+", re.M)
+# 도구 안의 번호(P1·P2)는 손님 화면에 없다 -- 카드 이름으로 바꾼다(2026-10-15 코덱스 이상질문 Q07·Q43 「P1: 595700원」).
+_REF = re.compile(r"(?<![A-Za-z0-9])P(\d{1,2})(?![A-Za-z0-9])")
+
+
+def _ref_names(text_: str, book: TT.FactBook) -> str:
+    def name(m):
+        it = book.ref_of(m.group(0)) or {}
+        return f"「{it['name']}」" if it.get("name") else m.group(0)
+    return _REF.sub(name, text_ or "")
 
 
 def _amounts(sentence: str) -> list[tuple[int, bool]]:
@@ -233,7 +243,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None, said: s
     · 약속: PROMISE_PATTERNS 에 걸리면 뺀다. 결제·저장·재고 확보가 됐다는 거짓 완료(is_false_claim)도 뺀다.
     · 손님이 직접 쓴 금액(said_amounts)은 되물어 확인하는 문장에 그대로 나와도 된다.
     · 메모: 모델의 속말(is_scratch)이 나오면 그 문장부터 끝까지 뺀다.
-    · HTML 태그와 마크다운 강조(**, __, # 제목)는 지운다(화면이 원문을 렌더하지 않게).
+    · HTML 태그와 마크다운 강조(**, __, `, # 제목)는 지운다(화면이 원문을 렌더하지 않게). 도구 번호(P1)는 카드 이름으로 바꾼다.
     다 빠지면 빈 글을 돌려준다 -- 호출부가 정해진 안내로 바꾼다.
     """
     allowed = set(book.prices)
@@ -242,7 +252,7 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None, said: s
     allowed |= said_amounts(said)
     allowed_man = allowed | {(p + 5_000) // 10_000 * 10_000 for p in allowed}
     dropped, lines, scratch = [], [], False
-    for raw_line in _lines(_MD.sub("", _TAG.sub("", reply or ""))):
+    for raw_line in _lines(_ref_names(_MD.sub("", _TAG.sub("", reply or "")), book)):
         head = _ITEM.match(raw_line)
         mark, body = (head.group(0), raw_line[head.end():]) if head else ("", raw_line)
         kept = []
