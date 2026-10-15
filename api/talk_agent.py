@@ -68,6 +68,8 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 
 [말하는 법]
 - 2~5문장. 결론부터. 질문은 한 번에 하나만.
+- PC 여러 대를 견주면 한 줄에 하나씩 「- 」로 시작해 줄을 바꿔 쓴다. 별표(**) 같은 마크다운 강조는 쓰지 않는다.
+- 손님에게 보낼 답만 한국어로 쓴다. 생각 과정·메모·영어 정리는 쓰지 않는다.
 - 가격은 도구가 준 숫자 그대로만 쓴다. price 가 null 이면 「가격 확인 중」이라고 한다.
 - 「모니터 4대」는 PC를 4대 산다는 뜻이 아니라 모니터 4대를 연결한다는 뜻이다. 우리 자료에는 그래픽카드 출력 단자 수가 없으니, 동시 출력이 가능하다고 단정하지 말고 단자 확인이 필요하다고 말한다.
 - 「해 드릴게요」「확인했습니다」 같은 약속은 하지 않는다. 주문·결제·환불 처리는 이 상담에서 하지 않는다.
@@ -103,6 +105,23 @@ def mask(text: str) -> tuple[str, bool]:
 
 
 _SENT = re.compile(r"(?<=[.!?。])\s+|\n+")
+_ITEM = re.compile(r"^\s*(?:[-*•]|\d{1,2}[.)])\s+")       # 목록 머리 -- 줄째 살린다
+_INLINE_ITEM = re.compile(r"(?<!\d)\s+-\s+(?!\d)")
+
+
+def _lines(text_: str) -> list[str]:
+    """설명을 줄 단위로 -- 화면은 줄바꿈을 그대로 보여 준다(white-space: pre-wrap).
+
+    모델이 목록을 한 줄에 「… 적합합니다. - P1 … - P2 …」로 이어 쓰면(2026-10-15 사장님 「줄바꿈도 안되고」)
+    「 - 」가 둘 이상인 줄만 항목마다 줄을 나눈다. 「8 - 16GB」처럼 숫자 사이 붙임표는 건드리지 않는다.
+    """
+    out = []
+    for line in (text_ or "").split("\n"):
+        if len(_INLINE_ITEM.findall(line)) >= 2:
+            out += [x for x in _INLINE_ITEM.sub("\n- ", line).split("\n")]
+        else:
+            out.append(line)
+    return out
 _WON = re.compile(r"(\d[\d,]*)\s*(만\s*)?원")
 _TAG = re.compile(r"<[^>]{1,200}>")
 # 화면은 설명을 글자 그대로 보여 준다 -- 마크다운 강조·제목 기호가 별표·샵으로 남는다.
@@ -158,23 +177,30 @@ def verify(reply: str, book: TT.FactBook, budget_won: int | None = None) -> tupl
     if budget_won:
         allowed.add(budget_won)
     allowed_man = allowed | {(p + 5_000) // 10_000 * 10_000 for p in allowed}
-    kept, dropped = [], []
-    scratch = False
-    for s in [x.strip() for x in _SENT.split(_MD.sub("", _TAG.sub("", reply or ""))) if x and x.strip()]:
-        # 메모가 한 번 나오면 그 뒤는 전부 메모다(답을 다 쓴 뒤 속말이 이어졌다) -- 섞인 한국어 조각까지 함께 뺀다.
-        scratch = scratch or is_scratch(s)
-        if scratch:
-            dropped.append({"sentence": s, "reason": "scratch"})
-            continue
-        bad = [a for a, man in _amounts(s) if a not in (allowed_man if man else allowed)]
-        if bad:
-            dropped.append({"sentence": s, "reason": "price_not_in_snapshot"})
-            continue
-        if TR.promise_flags(s):
-            dropped.append({"sentence": s, "reason": "promise"})
-            continue
-        kept.append(s)
-    return " ".join(kept).strip(), dropped
+    dropped, lines, scratch = [], [], False
+    for raw_line in _lines(_MD.sub("", _TAG.sub("", reply or ""))):
+        head = _ITEM.match(raw_line)
+        mark, body = (head.group(0), raw_line[head.end():]) if head else ("", raw_line)
+        kept = []
+        for s in [x.strip() for x in _SENT.split(body) if x and x.strip()]:
+            # 메모가 한 번 나오면 그 뒤는 전부 메모다(답을 다 쓴 뒤 속말이 이어졌다) -- 섞인 한국어 조각까지 함께 뺀다.
+            scratch = scratch or is_scratch(s)
+            if scratch:
+                dropped.append({"sentence": s, "reason": "scratch"})
+                continue
+            bad = [a for a, man in _amounts(s) if a not in (allowed_man if man else allowed)]
+            if bad:
+                dropped.append({"sentence": s, "reason": "price_not_in_snapshot"})
+                continue
+            if TR.promise_flags(s):
+                dropped.append({"sentence": s, "reason": "promise"})
+                continue
+            kept.append(s)
+        if kept:
+            lines.append(mark + " ".join(kept))
+        elif not raw_line.strip() and lines and lines[-1]:
+            lines.append("")              # 빈 줄(문단 구분)은 한 번만
+    return "\n".join(lines).strip(), dropped
 
 
 _OVER_WORDS = ("넘", "초과", "벗어")
@@ -217,7 +243,7 @@ def pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | No
             log.warning("[talk_agent] psu check skipped: %s", type(e).__name__)
     if psu:
         line, watt = psu
-        out = (line + " " + PA.drop_watt_sentences(out, watt)).strip()
+        out = (line + "\n\n" + PA.drop_watt_sentences(out, watt)).strip()
     prices = [c["price"] for c in cards if isinstance(c.get("price"), int) and c["price"] > 0]
     if budget_won and prices and min(prices) > budget_won:
         out, _n = PA.drop_budget_yes(out, sentence)
@@ -339,9 +365,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
         lead = budget_lead(cards, budget, clean)
         note = None if lead else budget_note(cards, budget, clean)
         if lead:
-            clean = f"{lead} {clean}".strip()
+            clean = f"{lead}\n\n{clean}".strip()
         elif note:
-            clean = f"{clean} {note}".strip()
+            clean = f"{clean}\n\n{note}".strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls

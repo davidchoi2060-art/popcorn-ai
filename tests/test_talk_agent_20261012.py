@@ -365,7 +365,7 @@ class BudgetNote(unittest.TestCase):
 
     def test_markdown_is_stripped(self):
         clean, _ = AG.verify("**추천**은 __이것__입니다.\n## 요약\n좋아요.", TT.FactBook())
-        self.assertEqual(clean, "추천은 이것입니다. 요약 좋아요.")
+        self.assertEqual(clean, "추천은 이것입니다.\n요약\n좋아요.")          # 줄은 살린다(⑨)
 
     def test_run_turn_appends_note_for_over_budget_card(self):
         over = dict(ITEM, price=1_624_400, over_budget=True)
@@ -377,7 +377,7 @@ class BudgetNote(unittest.TestCase):
         ], reco=reco)
         # 보여 준 카드가 모두 예산을 넘으면 끝에 붙이는 대신 맨 앞에서 먼저 말한다(K1 솔직히 알림).
         self.assertEqual(out["reply"], "예산 1,500,000원 안에는 지금 판매 중인 PC가 없어요. 조건에 맞는 가장 싼 PC는"
-                                       " 1,624,400원이에요. 게임 PC A를 추천해요.")
+                                       " 1,624,400원이에요.\n\n게임 PC A를 추천해요.")
 
 
 # ── ⑥ 옛 경로의 PC 설명 검사를 도구 상담에도 건다 (2026-10-14 사장님 결함 2·3 · 권고 7, 「이어서 연결」) ──
@@ -519,3 +519,26 @@ class OpenAIAnswerText(unittest.TestCase):
         r = self._resp(self._msg("thinking about tools", "commentary"),
                        SimpleNamespace(type="function_call", content=None))
         self.assertEqual(llm._openai_answer_text(r), "")
+
+
+# ── ⑨ 줄바꿈을 살린다 (2026-10-15 사장님 「줄바꿈도 안되고」) ──
+class Lines(unittest.TestCase):
+    def setUp(self):
+        self.book = TT.FactBook()
+        self.book.prices = {1_624_400, 3_220_500}
+
+    def test_line_breaks_and_list_marks_are_kept(self):
+        clean, _ = AG.verify("추천은 둘이에요.\n\n- P1 골드: 1,624,400원\n- P2 다이아: 3,220,500원\n\nFHD면 P1이에요.", self.book)
+        self.assertEqual(clean, "추천은 둘이에요.\n\n- P1 골드: 1,624,400원\n- P2 다이아: 3,220,500원\n\nFHD면 P1이에요.")
+
+    def test_inline_list_is_split_into_lines(self):
+        clean, _ = AG.verify("아래 둘이 맞아요. - P1 골드: 1,624,400원 — FHD 편집용 - P2 다이아: 3,220,500원 — 4K 편집용", self.book)
+        self.assertEqual(clean, "아래 둘이 맞아요.\n- P1 골드: 1,624,400원 — FHD 편집용\n- P2 다이아: 3,220,500원 — 4K 편집용")
+
+    def test_single_dash_and_number_ranges_are_not_split(self):
+        clean, _ = AG.verify("램은 16 - 32GB면 돼요. 영상 편집 - 특히 4K는 32GB가 편해요.", self.book)
+        self.assertEqual(clean, "램은 16 - 32GB면 돼요. 영상 편집 - 특히 4K는 32GB가 편해요.")
+
+    def test_dropped_line_leaves_no_double_blank(self):
+        clean, _ = AG.verify("좋아요.\n\n120만원짜리도 있어요.\n\n이걸 보세요.", self.book)
+        self.assertEqual(clean, "좋아요.\n\n이걸 보세요.")
