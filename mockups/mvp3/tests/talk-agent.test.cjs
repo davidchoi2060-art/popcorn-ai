@@ -77,6 +77,17 @@ test('agent nav cheaper asks the same direction from the shown card',async()=>{
   }finally{h.close();}
 });
 
+test('agent turn with units sends wants.units so the screen compares one-PC budget (C10)',async()=>{
+  const h=harness(()=>agent({wants:{units:12}}),reco);
+  try{
+    await h.flow.submit('사무용 PC 12대 총 960만원');
+    await until(()=>h.flow.state.phase===null&&h.flow.state.recommendation);
+    const recs=h.calls.filter(c=>c.url==='/api/grid/recommend');
+    assert.deepEqual(recs[0].body,{state:talk,wants:{units:12}});
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
 test('agent shown_note rides in the next turn history but is never shown on screen',async()=>{
   const NOTE='보여 드린 PC: 1. 「CODE/MOCK 게임 PC」 1,498,000원';
   let n=0;const h=harness(()=>++n===1?agent({shown_note:NOTE}):agent({explain_only:true,reply:'두 번째 PC는 없었어요.'}),reco);

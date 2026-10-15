@@ -656,6 +656,47 @@ class CodexOpenTestAnswers(unittest.TestCase):
             self.assertIn(phrase, AG.SYSTEM, phrase)
 
 
+# ── ⑭ 상담 경로 구매 대수 (2026-10-15 코덱스 고객10 C10 · 사장님 「오류 모두 수정」) ──
+class Units(unittest.TestCase):
+    def _flow(self, find_args):
+        return [_turn(calls=[{"id": "a", "name": "find_pcs", "args": find_args}]),
+                _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+                _turn("한 대 기준으로 게임 PC A가 맞아요.")]
+
+    def _as_parse(self, script, text, seen):
+        from api import grid_public as GP
+        def reco(b):
+            seen.append(b)
+            return _reco()
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)), patch.object(GP, "recommend", reco):
+            return AG.as_parse(text, [], None, None)
+
+    def test_units_from_tool_reach_engine_and_screen(self):
+        seen = []
+        out = self._as_parse(self._flow({"usages": ["게임"], "budget_won": 9_600_000, "units": 12}), "게임 PC 12대 총 960만원", seen)
+        self.assertEqual(seen[0].wants, {"units": 12})
+        self.assertEqual(out["wants"], {"units": 12})          # 화면이 /grid/recommend 를 다시 물을 때 싣는다
+
+    def test_units_fall_back_to_customer_sentence(self):
+        from api import reco_explore as EX
+        seen = []
+        with patch.object(EX, "extract", lambda t: {"units": 15} if "15대" in (t or "") else {}):
+            out = self._as_parse(self._flow({"usages": ["게임"]}), "15대로 늘었어요", seen)
+        self.assertEqual(out["wants"], {"units": 15})
+
+    def test_single_pc_or_explain_turn_has_no_wants(self):
+        seen = []
+        out = self._as_parse(self._flow({"usages": ["게임"]}), "게임 PC 한 대", seen)
+        self.assertIsNone(out["wants"])
+        self.assertIsNone(seen[0].wants)
+        out = self._as_parse([_turn("램은 동시 작업에 영향을 줘요.")], "12대 살 건데 램이 뭐예요?", [])
+        self.assertIsNone(out["wants"])
+
+    def test_bad_units_is_invalid(self):
+        for bad in (0, 501, "12", 2.5):
+            self.assertEqual(TT.find_pcs({"usages": ["게임"], "units": bad}, TT.FactBook())["status"], "invalid", bad)
+
 # ── ⑭ 코덱스 v2 재시험 오픈 전 조치 3건 (Q50·Q42·Q17, 2026-10-15) ──
 class CodexRetestFixes(unittest.TestCase):
     def _run_turn(self, script, text, history=()):

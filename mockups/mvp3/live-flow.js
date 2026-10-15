@@ -254,7 +254,8 @@
         // LLM 상담(response.agent, api/talk_agent.as_parse · 2026-10-14 중헌 님): AI 가 엔진에 넘긴 조건 그대로 카드를
         // 다시 묻는다 -- wants·문장은 보내지 않았고, 「더 싸게/더 좋게」면 같은 방향이다(A-02 같은 엔진·같은 순서).
         // 엔진 안내 문장은 AI 설명과 겹치므로 붙이지 않는다.
-        else if(response.agent===true){state.pendingText='';await recommendFor(op,{wants:null,...(['cheaper','better'].includes(response.nav)?{nav:response.nav}:{})},{notes:false});}
+        // 여러 대 구매(response.wants.units, 코덱스 C10)는 그대로 실어 화면이 한 대 예산으로 견주게 한다.
+        else if(response.agent===true){state.pendingText='';await recommendFor(op,{wants:M.object(response.wants)?M.copy(response.wants):null,...(['cheaper','better'].includes(response.nav)?{nav:response.nav}:{})},{notes:false});}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
         if(current(op)){

@@ -52,6 +52,7 @@ class FactBook:
     condition: dict | None = None            # 마지막 find_pcs 가 실제로 쓴 정규화 조건
     state: dict | None = None                # 마지막 find_pcs 가 엔진에 넘긴 조건 원문 -- 화면이 같은 엔진으로 카드를 다시 받는다
     nav: str | None = None                   # 마지막 find_pcs 의 「더 싸게/더 좋게」
+    units: int | None = None                 # 손님이 말한 PC 구매 대수 -- 화면이 한 대 예산(총예산 ÷ 대수)으로 견준다
     anchor_code: int | None = None
     items: dict[str, dict] = field(default_factory=dict)    # ref -> 서버가 낸 상품 값
     prices: set[int] = field(default_factory=set)           # 이 턴에 말해도 되는 금액(원)
@@ -95,6 +96,7 @@ def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
              "resolution": {"type": "string", "enum": resolutions},
              "platform": {"type": "string", "enum": ["인텔", "AMD"]},
              "prefs": {"type": "array", "items": {"type": "string", "enum": ["저소음", "화이트"]}},
+             "units": {"type": "integer", "description": "손님이 말한 PC 구매 대수(2대 이상일 때만). 모니터·사람 수는 넣지 않는다."},
              "nav": {"type": "string", "enum": ["cheaper", "better"],
                      "description": "직전에 보여 준 PC보다 더 싸게(cheaper) 또는 더 좋게(better)"},
          }, "required": ["usages"]}},
@@ -158,12 +160,17 @@ def find_pcs(args: dict, book: FactBook) -> dict:
         return _invalid("nav 는 cheaper 또는 better")
     if nav and book.anchor_code is None:
         return _invalid("nav 는 이 턴에 find_pcs 로 PC를 먼저 보여 준 뒤에만 쓴다")
+    units = args.get("units")
+    if units is not None and (type(units) is not int or not 1 <= units <= 500):
+        return _invalid("units 는 1~500 사이 정수(PC 대수)여야 한다")
     raw = {"usages": usages, "budget_won": budget, "budget_bound": args.get("budget_bound"),
            "platform": args.get("platform"), "prefs": prefs}
     if games or args.get("resolution"):
         # 등급·grade_src 는 받지 않는다 -- 확정 목록 등급만 서버가 붙인다(모듈 docstring 「읽기만 한다」).
         raw["game"] = {"names": games, "resolution": args.get("resolution")}
-    res = GP.recommend(GP.RecommendBody(state=raw, nav=nav, anchor_code=book.anchor_code if nav else None))
+    book.units = units if units and units >= 2 else book.units
+    res = GP.recommend(GP.RecommendBody(state=raw, nav=nav, anchor_code=book.anchor_code if nav else None,
+                                        wants={"units": book.units} if book.units else None))
     book.condition = {"usages": usages, "budget_won": res.get("budget_won"), "budget_bound": res.get("budget_bound"),
                       "games": games, "game_grade": res.get("game_grade"),
                       "resolution": res.get("game_resolution"), "platform": res.get("platform")}

@@ -81,6 +81,7 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 다른 언어로 물어도 답은 한국어로 한다. 알아들은 조건(용도·예산)은 한국어로 다시 말해 확인한다.
 - 금액·수량 표기가 흔하지 않으면(0xF4240 · 1e6 · ₩1.000.000 · ±10% · 0.001PB) 도구를 부르기 전에 어떻게 읽었는지 밝히고 맞는지 묻는다. 손님이 해석부터 말해 달라고 하면 해석을 먼저 말한다.
 - 사람 수·모니터 수·노트북 수는 PC 대수가 아니다. 대수와 품목을 나눠 다시 말한다. 여러 대·주변기기는 shop_policy 로 안내한다.
+- PC를 여러 대 사려 하면 find_pcs 의 units 에 대수를 넣는다(추천은 한 대 기준이다).
 - 여러 대의 가격을 물으면 한 대 가격과 「한 대 가격 × 대수」 PC 합계를 나눠 말한다. 총예산을 대수로 나눈 한 대 예산도 말해도 된다. 부가세·윈도우·배송·설치를 넣은 최종 총액은 확인하지 않았다고 밝힌다.
 - 손님이 말한 예산은 「윈도우 포함 230만원」처럼 포함 항목이 섞여 있어도 find_pcs 의 budget_won 으로 넣는다. 카드 가격이 그 총액 안에 든다고 단정하지 말고, 포함 항목은 shop_policy 로 확인한 것만 말한다.
 - 우리 가격은 PC 본체 가격이다. 배송·윈도우·주변기기를 넣은 총액은 도구로 확인하지 않았으면 계산해 말하지 않는다.
@@ -445,6 +446,18 @@ def _key(call: dict) -> str:
     return call["name"] + ":" + json.dumps(call.get("args"), ensure_ascii=False, sort_keys=True, default=str)
 
 
+def said_units(texts: list[str]) -> int | None:
+    """손님 말에서 PC 구매 대수 -- 고객 문장 규칙(reco_explore.extract 의 units)을 그대로 쓴다. 마지막으로 말한 대수가 이긴다.
+    AI 가 find_pcs 에 units 를 안 넣어도 화면이 한 대 예산으로 견주게 한다(2026-10-15 코덱스 고객10 C10)."""
+    from . import reco_explore as EXPLORE
+    n = None
+    for t in texts:
+        u = EXPLORE.extract(t).get("units")
+        if type(u) is int:
+            n = u
+    return n
+
+
 def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) -> dict:
     """한 턴을 끝까지 돈다. DB 한도 확인(access_gate)은 라우터가 먼저 한다 -- 이 함수는 시험에서 바로 부른다."""
     t0 = time.monotonic()
@@ -522,6 +535,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
             # 카드를 고르지 않은 턴(설명만)은 null -- 화면은 보던 견적을 그대로 둔다.
             "state": book.state if status != "failed" and book.shown else None,
             "nav": book.nav if status != "failed" and book.shown else None,
+            # 여러 대 구매면 화면이 추천을 다시 물을 때 wants.units 로 함께 보낸다 -- 한 대 예산으로 견준다(C10).
+            "units": (book.units or said_units([m["text"] for m in msgs if m.get("role") == "user"]))
+            if status != "failed" and book.shown else None,
             "anchor_code": book.anchor_code, "dropped_sentences": dropped, "meta": meta}
 
 
@@ -571,6 +587,7 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
             "missing": [], "assumed": [], "dropped": [], "pc_related": True, "silent": False,
             "fallback": None, "handoff_offer": r.get("kind") == "self_harm",
             "explain_only": state is None, "answer": "", "reply": reply, "nav": r.get("nav"),
+            "wants": {"units": r["units"]} if state is not None and type(r.get("units")) is int else None,
             "shown_note": shown_note,
             "chat_flow": chat_flow, "exceptions": [r["kind"]] if r.get("kind") else [],
             "agent_meta": {"status": r.get("status"), "snapshot": r.get("snapshot"),
