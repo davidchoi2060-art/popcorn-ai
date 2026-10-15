@@ -42,7 +42,9 @@ class WorkspaceTests(unittest.TestCase):
   with patch.object(w,'permission'),patch.object(w,'read',return_value=row),patch.object(w.llm,'call',return_value=result) as call:
    out=w.propose(1,w.Suggest(basis=w.basis(row)),req)
    self.assertEqual(out['changes'][0]['value'],'쉬운 설명');self.assertEqual(call.call_args.kwargs['fallback_order'],[])
-  changed=copy.deepcopy(row);changed['sale_price']=2
+  priced=copy.deepcopy(row);priced['sale_price']=2
+  self.assertEqual(w.basis(priced),w.basis(row))
+  changed=copy.deepcopy(row);changed['content']['role']='바뀐 설명'
   with patch.object(w,'permission'),patch.object(w,'read',side_effect=[row,changed]),patch.object(w.llm,'call',return_value=result):
    with self.assertRaises(HTTPException):w.propose(1,w.Suggest(basis=w.basis(row)),req)
  def test_approval_state_requires_audit_record(self):

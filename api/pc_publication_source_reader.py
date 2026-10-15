@@ -94,9 +94,9 @@ def make_source_reader(*, image_reader=None, business_rights_reference=None):
                 _require(event is not None and event['action']=='approve' and current['allowed'] is True
                          and current['state']=='approved' and current['event_seq']==event['event_seq']
                          and current['source_product_code']==code and current['scope']==part.SCOPE
-                         and current['basis']==event['approval_basis']==part.basis(row)
+                         and current['approved_basis']==event['approval_basis']==part.basis(part.pinned(row,event))
                          and current['explanation_hash']==part._current(row,event)['explanation_hash']
-                         and part.basis(row)==part.basis(rows[code]),
+                         and part.basis(part.pinned(row,event))==part.basis(part.pinned(rows[code],event)),
                          'publication_native_part_not_current')
                 photo_event=photo._latest(conn,code)
                 _require(photo_event is not None and photo_event['action']=='approve',
@@ -133,7 +133,7 @@ def make_source_reader(*, image_reader=None, business_rights_reference=None):
                          'publication_native_photo_not_current',503 if photo_current['state']=='unknown' else 422)
                 # Native description may be withdrawn while the bytes port runs.
                 refreshed=part._read(conn,code)
-                _require(part.basis(refreshed)==part.basis(row) and part._latest(conn,code)==event
+                _require(part.basis(part.pinned(refreshed,event))==part.basis(part.pinned(row,event)) and part._latest(conn,code)==event
                          and photo._latest(conn,code)==photo_event,
                          'publication_native_evidence_changed')
                 _snapshot(conn,transaction)
@@ -146,12 +146,12 @@ def make_source_reader(*, image_reader=None, business_rights_reference=None):
             row,current,event,photo_event,photo_current,data=native[p['explanation_code']]
             _require(p['explanation_hash']==current['explanation_hash'], 'publication_native_bom_hash_changed')
             part_proofs.append(publication.PartApproval(p['ordinal'],p['explanation_code'],
-                publication.component_basis(configuration,p,row),
+                publication.component_basis(configuration,p,part.pinned(row,event)),
                 f'part-explanation-approval:{p["explanation_code"]}:{event["event_seq"]}:{event["approval_basis"]}',
                 event['operator_id'],_utc(event['recorded_at'])))
             proof=photo_event['snapshot']['provenance']
             photo_proofs.append(publication.PhotoApproval(p['ordinal'],p['explanation_code'],
-                publication.photo_basis(configuration,p,row),photo_current['reference'],photo_event['operator_id'],
+                publication.photo_basis(configuration,p,part.pinned(row,event)),photo_current['reference'],photo_event['operator_id'],
                 _utc(photo_event['recorded_at']),proof['kind'],proof['source_reference'],proof['rights_reference'],data))
         _snapshot(conn,transaction)
         return publication.PublicationSources(publication.SOURCE_POLICY,tuple(part_proofs),tuple(photo_proofs))

@@ -99,6 +99,28 @@ def basis(row):
     return _digest(dict(version=VERSION, scope=SCOPE, row=_snapshot(row)))
 
 
+def pinned(row, event):
+    """Row with sale_price as recorded at approval: a part price change alone is not a source change."""
+    result = dict(row)
+    if event and event.get('action')=='approve' and type(event.get('snapshot')) is dict and 'sale_price' in event['snapshot']:
+        result['sale_price'] = event['snapshot']['sale_price']
+    return result
+
+
+def pin_rows(conn, rows):
+    """In place: sale_price of each row := price in its latest approve event; live price when none."""
+    codes = [c for c in rows if rows[c] is not None]
+    if not codes:
+        return rows
+    for r in conn.execute(text('''SELECT source_product_code,jsonb_exists(snapshot,'sale_price') AS has,
+            snapshot->'sale_price' AS price FROM (SELECT DISTINCT ON (source_product_code) source_product_code,snapshot
+            FROM part_explanation_approval_events WHERE action='approve' AND source_product_code=ANY(:codes)
+            ORDER BY source_product_code,event_seq DESC) latest'''),dict(codes=codes)).mappings().all():
+        if r['has'] and r['source_product_code'] in rows:
+            rows[r['source_product_code']]['sale_price'] = r['price']
+    return rows
+
+
 def _read(conn, code, lock=False):
     from .part_explanations import SELECT
     if lock:
@@ -212,14 +234,15 @@ def _current(row, latest):
             state, reason = 'draft', 'part_approval_metadata_changed'
         elif reason:
             state = 'stale'
-        elif row.get('status')!='approved' or basis(row) != latest['approval_basis']:
+        elif row.get('status')!='approved' or basis(pinned(row,latest)) != latest['approval_basis']:
             state, reason = 'stale', 'part_approval_metadata_or_source_changed'
         else:
             state = 'approved'
     from .pc_configuration_copy import explanation_digest
     return dict(source_product_code=row['source_product_code'],scope=SCOPE,
         event_seq=latest['event_seq'] if latest else 0,state=state,allowed=state=='approved',
-        basis=basis(row), approval_basis=latest['approval_basis'] if latest else None,
+        basis=basis(row), approved_basis=basis(pinned(row,latest)),
+        approval_basis=latest['approval_basis'] if latest else None,
         explanation_hash=explanation_digest(row),reason=reason)
 
 

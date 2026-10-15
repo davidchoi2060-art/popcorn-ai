@@ -60,7 +60,7 @@ def permission(request):
     return actor
 
 def basis(row):
-    return digest({k:row.get(k) for k in ('content','source_snapshot','source_fingerprint','updated_at','product_name','spec_source_text','sale_status','sale_price')})
+    return digest({k:row.get(k) for k in ('content','source_snapshot','source_fingerprint','updated_at','product_name','spec_source_text','sale_status')})
 def editable(content):
     value={k:content.get(k, '' if k=='role' else []) for k in FIELDS}
     value['facts']=[dict(label=f['label'],value=f['value']) for f in value['facts']]

@@ -103,6 +103,17 @@ function overBudget(product,talk=state.selectionState||state.talk){
   const won=talk?.budget_won;
   return Number.isInteger(product.price)&&Number.isInteger(won)&&talk.budget_bound!=='이상'&&product.price>won;
 }
+// 상세의 예산 문장은 위 조건 칩(지금 조건 = state.talk)과 같은 기준이어야 한다. 고른 뒤 상담에서 예산을 바꾸면
+// selectionState(고를 때 조건)와 칩이 갈라져, 칩은 80만원인데 초과액은 150만원 기준 124,400원으로 남았다
+// (2026-10-15 코덱스 오픈테스트 C05-F01). 두 기준이 다르면 기준을 밝혀 둘 다 적는다.
+function budgetLines(p){
+  const basis=state.selectionState,now=state.talk,line=(cls,text)=>'<p class="'+cls+'">'+esc(text)+'</p>';
+  const same=!basis||!now||basis.budget_won===now.budget_won&&basis.budget_bound===now.budget_bound;
+  if(same)return line(overBudget(p)?'warn-text':'green',budget(p));
+  const label=t=>Number.isInteger(t?.budget_won)?' 예산 '+money(t.budget_won)+' 기준 · ':' ';
+  return line(overBudget(p,now)?'warn-text':'green','지금'+label(now)+budget(p,now))+
+    line('muted','고를 때'+label(basis)+budget(p,basis));
+}
 function syncChat(){
   const open=!mobile.matches||(chatPreference??state.screen==='welcome');
   const body=$('#chat-body'),toggle=$('#chat-toggle');
@@ -215,7 +226,7 @@ function productCard(product,action='detail',id=product.index,comparison=null){
 // 용도 적합도는 서버 판정(fit · 정보 없음)을 그대로 적는다 — 정보가 없어도 숨기지 않는다(2026-10-10 결정).
 function customCards(group){
   if(!group.custom?.length)return '';
-  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립PC</h4><div class="quote-cards">'+group.custom.map(c=>
+  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립완제PC</h4><div class="quote-cards">'+group.custom.map(c=>
     '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 나온 PC</span><h3>'+esc(c.title)+'</h3>'+
     '<strong class="price">'+money(c.price)+'</strong><p class="muted">'+esc(c.price_note)+'</p>'+
     '<p class="custom-pc-fit">용도 적합도: '+esc(c.fit==='fit'?c.level_text:'정보 없음')+'</p>'+
@@ -252,7 +263,7 @@ function summaryDescription(p){
 function productSummary(){
   const p=state.selected,description=summaryDescription(p),title=description?.title||p.name;
   const intro=state.savedQuote?'금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.':description?.intro||p.reasons[0]||p.tag||p.level||'판매 중인 완제품 구성입니다.';
-  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+'<p class="'+(overBudget(p)?'warn-text':'green')+'">'+esc(budget(p))+'</p>'+'</div>'+productImage(p,true)+'</section>';
+  return '<section class="final-summary live-summary"><div class="live-summary-copy"><h3>'+esc(title)+'</h3>'+(title!==p.name?'<p class="live-product-name">'+esc(p.name)+'</p>':'')+(M.changedPartsNote(p.build)?'<p class="muted" data-changed-parts>'+esc(M.changedPartsNote(p.build))+'</p>':'')+'<p>'+esc(intro)+'</p></div><div class="final-summary-price"><strong>'+money(p.price)+'</strong>'+(p.build?'<p class="muted">부품 '+p.build.changes.length+'개를 바꾼 금액이에요 · 기본 구성 대비 '+signedMoney(p.price-p.build.base_price)+'</p>'+(p.build.warnings||[]).map(w=>'<p class="warn-text">'+esc(w)+'</p>').join(''):'')+(p.sets>1&&Number.isSafeInteger(p.price)?'<p data-sets-total><strong>같은 구성 '+p.sets+'대 · 합계 '+money(p.price*p.sets)+'</strong></p>':'')+budgetLines(p)+'</div>'+productImage(p,true)+'</section>';
 }
 function publicBomDetails(configuration,p,information,finalOnly){
   const roles={
@@ -426,7 +437,7 @@ function productDetails(finalOnly=false){
   const cardRows=M.cardSpecRows(p.spec),cardGrid=cardRows.length?'<dl class="live-spec-grid" data-card-spec>'+cardRows.map(([label,value])=>'<div><dt>'+esc(label)+'</dt><dd>'+esc(value)+'</dd></div>').join('')+'</dl>':'';
   return '<section class="final-parts"><h3>부품 구성과 선택 이유</h3><p class="public-bom-empty" role="status">부품 구성 정보는 아직 연결되지 않았어요. 이 상품은 부품별 구성표와 부품 가격이 등록되지 않아'+(cardGrid?', 추천 카드와 같은 등록 사양을 먼저 보여 드려요.':' 등록된 완제품 사양을 먼저 확인해주세요.')+'</p>'+cardGrid+'<div class="final-table-wrap"><table class="final-table"><colgroup><col class="part-description-col"><col class="part-price-col"><col class="part-action-col"></colgroup>'+
     '<thead><tr><th scope="col">상품 · 등록 사양</th><th scope="col">금액</th><th scope="col">변경</th></tr></thead><tbody><tr data-part="pc"><td><div class="final-part-description">'+uiIcon('computer-tower','part-symbol')+
-    '<div><h4><span>조립 PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
+    '<div><h4><span>조립완제PC</span><span class="part-name">'+esc(p.name)+'</span></h4><p>등록된 판매 상품의 구성입니다.</p><details data-detail="spec"><summary><span class="when-closed">'+(finalOnly?'상세 사양·추천 근거·변경 안내 펼치기':'상세 사양 펼치기')+'</span><span class="when-open">'+(finalOnly?'상세 사양·추천 근거·변경 안내 접기':'상세 사양 접기')+'</span>'+uiIcon('caret-down')+'</summary><div class="final-part-expanded">'+spec+(finalOnly?information:'')+'</div></details></div></div></td><td class="final-part-price">'+money(p.price)+'</td><td class="final-part-change"><span aria-label="부품 변경 미지원">-</span></td></tr></tbody>'+
     '<tfoot><tr><th scope="row">상품 참고 금액</th><td colspan="2">'+money(p.price)+'</td></tr></tfoot></table></div></section>'+(finalOnly?'':information);
 }
 function finalConditions(){
@@ -541,8 +552,19 @@ const PREP_LONG_MS=10000;let prepStarted=0,prepTimer;
 function renderPreparing(){
   if(!prepStarted){prepStarted=Date.now();clearTimeout(prepTimer);prepTimer=setTimeout(()=>{if(restoring)render();},PREP_LONG_MS);}
   const long=Date.now()-prepStarted>=PREP_LONG_MS;
-  view.innerHTML='<section class="ai-prep" role="status" aria-live="polite"><div class="ai-prep-mark" aria-hidden="true"><span></span><span></span><span></span></div>'+
-    '<h2 tabindex="-1">AI 답변 준비중</h2><p class="ai-prep-text">'+(long?'조금 더 걸리고 있어요. 잠시만 기다려 주세요.':'고르신 PC의 구성과 금액을 지금 기준으로 다시 확인하고 있어요.')+'</p></section>';
+  const msg=long?'조금 더 걸리고 있어요.<span class="ai-prep-pause">잠시만 기다려 주세요.</span>':'고르신 PC의 구성과 금액을<span class="ai-prep-pause">지금 기준으로 다시 확인하고 있어요.</span>';
+  // 머리띠 높이는 화면 폭마다 다르다(PC 82~84px · 좁으면 줄바꿈). 덮개 윗변을 실측값에 맞춘다.
+  const bar=document.querySelector('.topbar');document.documentElement.style.setProperty('--ai-prep-top',(bar?Math.max(0,Math.round(bar.getBoundingClientRect().bottom)):82)+'px');
+  // 다시 그려질 때마다 움직임이 처음부터 시작되지 않게, 이미 떠 있으면 문구만 바꾼다(10초가 지나면 한 번).
+  const shown=view.querySelector('.ai-prep-message');
+  if(shown){if(shown.dataset.long!==String(long)){shown.innerHTML=msg;shown.dataset.long=String(long);}actions.hidden=true;return;}
+  const spark='<svg class="ai-prep-spark ai-prep-spark--KIND" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+  view.innerHTML='<section class="ai-prep-root ai-prep-overlay" role="status" aria-live="polite" aria-atomic="true" aria-labelledby="ai-prep-title"><div class="ai-prep-content">'+
+    '<div class="ai-prep-scene" aria-hidden="true"><div class="ai-prep-halo"></div><div class="ai-prep-orbit"><span class="ai-prep-orbit-dot"></span><span class="ai-prep-orbit-dot ai-prep-orbit-dot--small"></span></div>'+
+    '<img class="ai-prep-image" src="assets/welcome-pc.png" alt="" width="350" height="350">'+spark.replace('KIND','one')+spark.replace('KIND','two')+'</div>'+
+    '<h2 class="ai-prep-title" id="ai-prep-title" tabindex="-1">AI 답변 준비중</h2>'+
+    '<p class="ai-prep-description"><span class="ai-prep-message" data-long="'+long+'">'+msg+'</span></p>'+
+    '<div class="ai-prep-indicator" aria-hidden="true"><span class="ai-prep-dot"></span><span class="ai-prep-dot"></span><span class="ai-prep-dot"></span></div></div></section>';
   actions.hidden=true;
 }
 function render(){

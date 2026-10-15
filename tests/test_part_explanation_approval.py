@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = '_part_approval_source_test'
 PAST = datetime(2020,1,1,tzinfo=timezone.utc)
 NOW = datetime(2020,1,2,tzinfo=timezone.utc)
+GOLDEN_PART_BASIS = '91c7a190794db818dc52b6142158559e4c346d32a8f94b69b490454e477c88e9'  # computed on origin/main
 
 
 def selected(name, filename, functions, assignments=(), namespace=None):
@@ -89,8 +90,9 @@ class Connection:
     def get_transaction(self): return self.transaction
     def execute(self,statement,params=None):
         q=str(statement); p=params or {}; self.calls.append((q,deepcopy(p)))
-        if not q.startswith('/*part_approval:'): raise AssertionError('unexpected SQL '+q)
-        tag=q.split('*/',1)[0].split(':',1)[1]
+        if q.startswith('SELECT source_product_code,jsonb_exists(snapshot'): tag='pin'  # pin_rows runs untagged (read paths allow only SELECT)
+        elif not q.startswith('/*part_approval:'): raise AssertionError('unexpected SQL '+q)
+        else: tag=q.split('*/',1)[0].split(':',1)[1]
         if tag==self.fail_tag: raise self.error
         if tag=='catalog_lock': return Result()
         if tag=='row':
@@ -101,6 +103,12 @@ class Connection:
             return Result([dict(product_code=p['code'])] if p['code'] in self.products else [])
         if tag=='actor': return Result([deepcopy(self.actor)] if p['operator_id']==self.actor['operator_id'] else [])
         if tag=='latest': return Result(deepcopy(sorted((e for e in self.events if e['source_product_code']==p['code']),key=lambda e:e['event_seq'],reverse=True)[:1]))
+        if tag=='pin':
+            latest={}
+            for e in sorted(self.events,key=lambda e:e['event_seq']):
+                if e['action']=='approve' and e['source_product_code'] in p['codes']: latest[e['source_product_code']]=e
+            return Result([dict(source_product_code=c,has='sale_price' in e['snapshot'],price=e['snapshot'].get('sale_price'))
+                           for c,e in sorted(latest.items())])
         if tag=='request': return Result([deepcopy(e) for e in self.events if e['request_id']==p['uid']])
         if tag=='approve_metadata':
             e=self.explanations[p['code']]
@@ -320,11 +328,43 @@ class PartApprovalTests(unittest.TestCase):
             lambda:self.conn.explanations[11].update(approved_by=7),
             lambda:self.conn.explanations[11].update(approved_at=PAST),
             lambda:self.conn.explanations[11].update(updated_at=NOW+timedelta(seconds=1)),
-            lambda:self.conn.products[101].update(spec_source_text='new'),
-            lambda:self.conn.products[101].update(sale_price=Decimal('200.00')))
+            lambda:self.conn.products[101].update(spec_source_text='new'))
         for mutate in mutations:
             self.setUp(); self.approve(); mutate()
             self.assertFalse(self.core.read_current(self.conn,11)['allowed'])
+
+    def test_live_price_change_keeps_approval_but_raw_basis_still_moves(self):
+        self.approve(); before=self.core.read_current(self.conn,11)
+        self.conn.products[101].update(sale_price=Decimal('200.00'))
+        after=self.core.read_current(self.conn,11)
+        self.assertTrue(after['allowed']); self.assertEqual(after['state'],'approved')
+        self.assertNotEqual(after['basis'],before['basis'])           # raw basis (approve guard) sees the live price
+        self.assertEqual(after['approved_basis'],before['approved_basis'])
+        self.assertEqual(after['approved_basis'],self.conn.events[-1]['approval_basis'])
+        self.assertEqual(after['explanation_hash'],before['explanation_hash'])
+
+    def test_no_approve_event_falls_back_to_live_price(self):
+        row=self.conn.row(11)
+        self.assertEqual(self.core.pinned(row,None),row)
+        self.assertEqual(self.core.read_current(self.conn,11)['approved_basis'],self.core.basis(row))
+        revoke=dict(action='revoke',snapshot=dict(sale_price=1))
+        self.assertEqual(self.core.pinned(row,revoke)['sale_price'],row['sale_price'])
+        self.assertEqual(self.core.pinned(row,dict(action='approve',snapshot={}))['sale_price'],row['sale_price'])
+        self.assertEqual(self.core.pinned(row,dict(action='approve',snapshot=dict(sale_price=7)))['sale_price'],7)
+        self.assertEqual(row['sale_price'],Decimal('100.00'))          # input row not mutated
+
+    def test_pin_rows_uses_latest_approve_and_falls_back(self):
+        rows={11:dict(sale_price=999),12:dict(sale_price=555)}
+        self.approve()
+        self.core.pin_rows(self.conn,rows)
+        self.assertEqual(rows[11]['sale_price'],self.conn.events[-1]['snapshot']['sale_price'])
+        self.assertEqual(rows[12]['sale_price'],555)
+
+    def test_unchanged_fixture_hashes_equal_origin_main(self):
+        self.approve(); cur=self.core.read_current(self.conn,11)
+        self.assertEqual(cur['basis'],cur['approved_basis'])
+        self.assertEqual(cur['approval_basis'],cur['basis'])
+        self.assertEqual(cur['basis'],GOLDEN_PART_BASIS)
 
     def test_retired_null_or_review_issues_cannot_be_approved(self):
         mutations=(lambda:self.conn.explanations[11].update(status='retired'),

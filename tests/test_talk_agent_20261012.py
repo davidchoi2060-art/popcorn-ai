@@ -542,3 +542,114 @@ class Lines(unittest.TestCase):
     def test_dropped_line_leaves_no_double_blank(self):
         clean, _ = AG.verify("좋아요.\n\n120만원짜리도 있어요.\n\n이걸 보세요.", self.book)
         self.assertEqual(clean, "좋아요.\n\n이걸 보세요.")
+
+
+# ── ⑩ 금액은 세 자리마다 쉼표 (2026-10-15 사장님 「금액은 중간에 , 표시가 들어가야 해」) ──
+class WonCommas(unittest.TestCase):
+    def test_bare_amounts_get_commas(self):
+        book = TT.FactBook()
+        book.prices = {3_220_500, 12_954_900}
+        clean, dropped = AG.verify("- P1 다이아: RTX 5070, RAM 32GB — 3220500원\n- P2 익스트림: RTX 5090 — 12954900 원", book)
+        self.assertEqual(clean, "- P1 다이아: RTX 5070, RAM 32GB — 3,220,500원\n- P2 익스트림: RTX 5090 — 12,954,900 원")
+        self.assertEqual(dropped, [])
+
+    def test_other_numbers_are_untouched(self):
+        for s in ("150만원이면 충분해요.", "1,624,400원이에요.", "2026년형이고 RTX 5090 32GB예요.", "500원 차이예요."):
+            self.assertEqual(AG._won_commas(s), s)
+
+
+# ── ⑪ 이상질문 60 (2026-10-15 사장님 「LLM이 이런 대답에도 대응을 잘 할 수 있도록 해줘」) ──
+class UnusualInputs(unittest.TestCase):
+    def setUp(self):
+        self.book = TT.FactBook()
+
+    def test_customer_amounts_in_odd_notation_are_allowed_when_restated(self):
+        said = "본체 예산은 0xF4240원, 모니터는 0b0개라고 적으면 어떻게 이해해요?"
+        clean, dropped = AG.verify("0xF4240은 1,000,000원으로 읽었어요. 이 금액이 맞나요?", self.book, None, said)
+        self.assertIn("1,000,000원", clean)
+        self.assertEqual(dropped, [])
+        for said, want in (("예산은 1e6원이고", 1_000_000), ("예산은 ₩1.000.000이에요.", 1_000_000),
+                           ("100만원 ± 10%", 1_100_000), ("100만원 ± 10%", 900_000)):
+            self.assertIn(want, AG.said_amounts(said), said)
+
+    def test_odd_notation_tail_is_not_read_as_amount(self):
+        self.assertEqual(AG.said_amounts("0xF4240원, 1e6원"), {1_000_000})
+
+    def test_amount_customer_never_said_is_still_dropped(self):
+        clean, dropped = AG.verify("100만원으로 읽었어요. 보통 이런 PC는 80만원이에요.", self.book, None, "예산 100만원")
+        self.assertEqual(clean, "100만원으로 읽었어요.")
+        self.assertEqual(dropped[0]["reason"], "price_not_in_snapshot")
+
+    def test_false_completion_is_dropped_but_refusal_is_kept(self):
+        for bad in ("결제 완료되었습니다.", "지금 100대 확보했습니다.", "고르신 PC가 저장됐어요.", "가격을 0원으로 바꿨어요.", "결제 완료"):
+            self.assertTrue(AG.is_false_claim(bad), bad)
+        for ok in ("결제 완료라고 말씀드릴 수는 없어요.", "재고 확보는 제가 확인할 수 없어요.",
+                   "저장 버튼을 누르시면 됩니다.", "이 PC는 문서 작업에 맞아요."):
+            self.assertFalse(AG.is_false_claim(ok), ok)
+        clean, dropped = AG.verify("결제 완료. 아직 주문 전이라 결제 완료라고 말씀드릴 수 없어요.", self.book)
+        self.assertEqual(clean, "아직 주문 전이라 결제 완료라고 말씀드릴 수 없어요.")
+        self.assertEqual(dropped[0]["reason"], "false_claim")
+
+    def test_run_turn_passes_history_amounts_to_verify(self):
+        script = [_turn("앞서 말씀하신 예산은 100만원이고, 지금 말씀은 50만원이에요. 어느 쪽으로 볼까요?")]
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
+            out = AG.run_turn("아까 예산이 50만원이라고 했잖아요.",
+                              [AG.Turn(role="user", text="본체 예산은 100만원 이하예요."), AG.Turn(role="assistant", text="네.")])
+        self.assertIn("100만원", out["reply"])
+        self.assertIn("50만원", out["reply"])
+        self.assertEqual(out["dropped_sentences"], [])
+
+    def test_system_prompt_covers_unusual_input_kinds(self):
+        for phrase in ("JSON", "초성", "0xF4240", "부딪치", "기록에 없으면", "관리자 모드", "결제·주문·저장·재고 확보",
+                       "노트북이나 모니터 단품", "show_pcs 를 부르지 않고"):
+            self.assertIn(phrase, AG.SYSTEM, phrase)
+
+
+# ── ⑫ 코덱스 이상질문 60 실측 반영 (2026-10-15 v1·v2 결과) ──
+class CodexUnusualFindings(unittest.TestCase):
+    def test_q13_restated_budget_is_not_unreadable(self):
+        said = "예산은 100만원 아니고 100만 원이에요. 1,000,000원과 같은 뜻으로 읽었나요?"
+        clean, dropped = AG.verify("네, 100만원과 1,000,000원은 같은 금액으로 읽었어요.", TT.FactBook(), None, said)
+        self.assertEqual(clean, "네, 100만원과 1,000,000원은 같은 금액으로 읽었어요.")
+        self.assertEqual(dropped, [])
+
+    def test_q14_backticks_are_removed_and_hex_reading_kept(self):
+        said = "본체 예산은 0xF4240원, 모니터는 0b0개라고 적으면 어떻게 이해해요?"
+        clean, dropped = AG.verify("`0xF4240`은 16진수로 1,000,000원이에요. `0b0개`는 모니터 0개로 이해합니다.",
+                                   TT.FactBook(), None, said)
+        self.assertEqual(clean, "0xF4240은 16진수로 1,000,000원이에요. 0b0개는 모니터 0개로 이해합니다.")
+        self.assertEqual(dropped, [])
+
+    def test_tool_refs_become_card_names(self):
+        book = TT.FactBook()
+        book.add_item({"product_code": 1, "name": "사무용 기본", "price": 595_700})
+        book.add_item({"product_code": 2, "name": "사무용 쾌적", "price": 892_800})
+        clean, _ = AG.verify("두 가지를 골랐습니다.\n- P1: 595700원\n- P2: 892800원\n문서 위주면 P1이 맞아요. P9는 없어요.", book)
+        self.assertEqual(clean, "두 가지를 골랐습니다.\n- 「사무용 기본」: 595,700원\n- 「사무용 쾌적」: 892,800원\n"
+                                "문서 위주면 「사무용 기본」이 맞아요. P9는 없어요.")
+
+
+# ── ⑬ 코덱스 고객10 오픈테스트 상담 답 결함 (C04·C06·C08·C10, 2026-10-15) ──
+class CodexOpenTestAnswers(unittest.TestCase):
+    def test_c10_unit_price_and_quantity_total_survive(self):
+        book = TT.FactBook()
+        book.add_item({"product_code": 1, "name": "사무용 기본", "price": 595_700})
+        said = ("회사 사무용 PC 12대 … 총 960만원까지예요. 수량이 15대로 늘었지만 총예산은 960만원 그대로입니다. "
+                "한 대 가격과 15대 총액을 나눠 보여주세요.")
+        reply = ("한 대 가격은 595,700원이고, 15대면 PC 합계가 8,935,500원이에요. 총예산 960만원을 15대로 나누면 "
+                 "한 대 640,000원이고, PC 합계만 보면 664,500원이 남아요. 부가세·윈도우·배송·설치를 넣은 최종 총액은 확인하지 못했어요.")
+        clean, dropped = AG.verify(reply, book, 640_000, said)
+        self.assertEqual(dropped, [])
+        self.assertIn("8,935,500원", clean)
+
+    def test_quantity_amounts_need_customer_count(self):
+        self.assertEqual(AG.quantity_amounts({595_700}, {9_600_000}, "예산 960만원"), set())
+        self.assertNotIn(595_700 * 30, AG.quantity_amounts({595_700}, set(), "저는 30대 후반이에요"))
+        clean, dropped = AG.verify("12대면 7,000,000원이에요.", TT.FactBook(), None, "12대 필요해요")
+        self.assertEqual(dropped[0]["reason"], "price_not_in_snapshot")
+
+    def test_prompt_covers_open_test_findings(self):
+        for phrase in ("「한 대 가격 × 대수」", "윈도우 포함 230만원", "budget_won", "첫 답의 첫 문장",
+                       "꼭 지켜야 한다고 한 조건", "FPS·방송 품질", "하나씩 빠짐없이"):
+            self.assertIn(phrase, AG.SYSTEM, phrase)
