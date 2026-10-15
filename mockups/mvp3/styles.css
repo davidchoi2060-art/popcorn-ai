@@ -723,3 +723,10 @@ body[data-screen="detail"] .actionbar .footer-buttons button{border-radius:7px;m
   body.live-mode.original-flow .dt-detail .live-capabilities>div>button{flex:1 1 calc(50% - 10px)}
   body.live-mode.original-flow .dt-detail .final-conditions-grid{gap:0 18px}
 }
+
+/* 부품 구성 표의 금액 칸: 「조립 전용 부품 · 따로 팔지 않아요 · PC 금액에 포함」처럼 두 줄 문구가 한 줄(가로 flex·줄바꿈 금지)로
+   늘어서 옆 「변경」 단추 밑으로 넘쳐 겹쳤다(2026-10-15 중헌 님 캡처, 1920 폭 CPU·메인보드 줄). 칸 안에서 위아래로 쌓고 줄바꿈한다. */
+body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price{flex-direction:column;text-align:center;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;min-width:0;padding:6px 8px;line-height:1.4}
+body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price .foot-note{display:block;margin-top:2px}
+body.live-mode.original-flow .dt-detail .public-bom-disclosure>summary>span{border-left:0}
+@media(max-width:760px){body.live-mode.original-flow .public-bom-disclosure>summary>.final-part-price{align-items:flex-start;text-align:left;padding:6px 0}}
