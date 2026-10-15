@@ -240,7 +240,7 @@ test('general and purchase inquiries use their own titles',async()=>{
     await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
     assert.match(h.text('.tk-phone'),/상담사가 전화로 구성을 함께 살펴봐요/);
     h.click('.tk-ask [data-action=inquiry-open][data-human="1"]');await until(()=>h.doc.querySelector('[data-inquiry=topic]'));
-    assert.equal(h.text('.tk-inquiry h3'),'사람에게 문의하기');
+    assert.equal(h.text('.tk-inquiry h3'),'전문가에게 문의하기');
     h.click('[data-action=inquiry-close]');await tick();
     h.click('.tk-ask [data-action=inquiry-open]:not([data-human])');await until(()=>h.doc.querySelector('[data-inquiry=topic]'));
     assert.equal(h.text('.tk-inquiry h3'),'구매 조건 문의');assert.match(h.text('.tk-inquiry'),/세금계산서/);
