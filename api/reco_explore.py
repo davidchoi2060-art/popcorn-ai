@@ -27,7 +27,7 @@ from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_monitor_count,
 log = logging.getLogger("reco_explore")
 
 CHEAPER, BETTER = "cheaper", "better"
-WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors")
+WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors", "units")
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ _SILENT = re.compile(r"조용|저소음|무소음|소음.{0,3}(적|없|작)|sile
 _MONITOR = re.compile(r"모니터.{0,6}(포함|같이|까지|도\s|도$|함께|세트|추가)")
 _MONITOR_OWNED = re.compile(r"모니터.{0,6}(있|보유|가지)")
 _MULTI = re.compile(r"(\d{1,3})\s*대")
+_AGE_TAIL = re.compile(r"\s*(초반|중반|후반)")      # 「30대 후반」은 나이다
 _MULTI_WORD = re.compile(r"여러\s*대|대량|단체")
 _UHD = re.compile(r"4\s*k|uhd|4천", re.I)
 # 고객이 «한 단계 위 작업»을 직접 말했으면 그 용도의 추천 기준표(product_fit_levels) 그 단계부터 고른다
@@ -184,9 +185,17 @@ def extract(raw: str | None) -> dict:
         out["silent"] = True
     if _MONITOR.search(s) and not _MONITOR_OWNED.search(s):
         out["monitor"] = True
-    m = _MULTI.search(drop_monitor_count(s))        # 「모니터가 4대」는 여러 대 구매가 아니다
+    no_monitors = drop_monitor_count(s)
+    m = _MULTI.search(no_monitors)        # 「모니터가 4대」는 여러 대 구매가 아니다
     if (m and 2 <= int(m.group(1)) <= 500) or _MULTI_WORD.search(s):
         out["multi"] = True
+    # 몇 대인가(wants.units) -- 추천은 한 대 기준이라 화면이 총예산을 한 대 가격과 견주면 안 된다(2026-10-15 코덱스
+    # C10-F01: 12대 총 960만원에 892,800원 카드가 「예산보다 8,707,200원 낮아요」). 대수 N(1~500)이면 화면이 한 대
+    # 예산(총예산 ÷ N)으로 견주고, 「여러 대·대량」처럼 대수를 모르면 0 -- 화면이 견주지 않는다. 「1대」는 한 대로 되돌린다.
+    if m and 1 <= int(m.group(1)) <= 500 and not _AGE_TAIL.match(no_monitors, m.end()):
+        out["units"] = int(m.group(1))
+    elif _MULTI_WORD.search(s):
+        out["units"] = 0
     mons = monitor_count(s)
     if mons and mons >= MONITORS_NEED_DGPU:
         out["monitors"] = mons
@@ -213,6 +222,9 @@ def clean_wants(raw) -> dict:
     for k in ("white", "silent", "monitor", "uhd"):
         if raw.get(k) is True:
             out[k] = True
+    n = raw.get("units")
+    if type(n) is int and 0 <= n <= 500:
+        out["units"] = n
     n = raw.get("monitors")
     if type(n) is int and MONITORS_NEED_DGPU <= n <= 8:
         out["monitors"] = n

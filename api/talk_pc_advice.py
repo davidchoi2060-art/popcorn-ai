@@ -584,11 +584,16 @@ _BUDGET_NO = re.compile(r"어렵|어려|힘들|빠듯|부족|넘어|넘는|넘�
 _ASKS_BUDGET = re.compile(r"(?:되|돼|가능|될까|맞출|맞춰|충분|괜찮)[^.!?]{0,8}(?:나요|까요|요\?|\?|ㅂ니까|습니까)")
 
 
+# 부정 형태로 된 긍정(「부족함 없이 충분」「어렵지 않아요」) -- 「부족」「없」「어렵」만 보고 부정으로 읽으면
+# 「150만원이면 부족함 없이 충분해요」가 걷히지 않고 초과 안내와 함께 남았다(2026-10-15 코덱스 P2 F3 · R02).
+POSITIVE_NEG = re.compile(r"부족함?\s*(?:이\s*)?없|부족하지\s*않|모자라지\s*않|모자람\s*없|어렵지\s*않|어려울\s*(?:게|것)\s*없|"
+                          r"힘들지\s*않|빠듯하지\s*않|무리\s*(?:가\s*)?없|문제\s*(?:가\s*)?없|걱정\s*(?:은\s*|이\s*)?없")
+
+
 def _says_budget_yes(s: str) -> bool:
-    if not _BUDGET_YES.search(s):
+    if not (_BUDGET_YES.search(s) or POSITIVE_NEG.search(s)):
         return False
-    neg = re.sub(r"무리\s*없|문제\s*없", "", s)
-    return not _BUDGET_NO.search(neg)
+    return not _BUDGET_NO.search(POSITIVE_NEG.sub("", s))
 
 
 def drop_budget_yes(text_: str, sentence: str = "", bare_ok: bool = False) -> tuple[str, int]:
@@ -640,14 +645,53 @@ _PSU_GPU = re.compile(r"(?<![a-z])(RTX|GTX|RX)\s?(\d{4})\s?(Ti|SUPER|XTX|XT)?(?!
 _PSU_WATT = re.compile(r"(?<!\d)(\d{3,4})\s*(?:W|와트)(?![a-z])", re.I)
 
 
-def psu_question(sentence: str) -> tuple[str, int] | None:
-    """문장이 «그래픽카드 + 파워 용량»을 묻는가 -> (칩셋 키 「RTX 5070」, 와트). 아니면 None."""
+# 와트 숫자의 역할 -- 앞뒤 말로 가른다. 첫 숫자를 손님 파워로 읽으면 「소비전력은 250W인데 750W 파워면?」에
+# 「250W 파워는 부족해요」가 나왔다(2026-10-15 코덱스 P2 F4 · R10).
+_W_REF = re.compile(r"권장|추천|최소|요구|필요")
+_W_GPU = re.compile(r"소비\s*전력|소모\s*전력|전력\s*소모|소비|소모|TDP|TBP|TGP", re.I)
+_W_PSU_AFTER = re.compile(r"^\s*(?:짜리\s*|급\s*|정격\s*)?(?:파워|전원|psu|SMPS)", re.I)
+_W_OR_AFTER = re.compile(r"^\s*(?:또는|이나|나|아니면|혹은|or|vs|/|,|와|과|랑|하고)", re.I)   # 「500W 또는 750W 파워」
+_W_PSU_BEFORE = re.compile(r"(?:파워|전원|psu|SMPS)\s*(?:는|은|가|이|를|로|도)?\s*(?:지금\s*|현재\s*)?$", re.I)
+
+
+def psu_watts(sentence: str) -> list[int]:
+    """손님 파워 용량으로 읽히는 와트들(중복 없이 나온 순서). 소비전력·권장값은 빼고, 역할이 안 보이는 숫자는
+    그 숫자 하나뿐일 때만 파워로 본다(「RTX 5070에 500W 돼요?」)."""
     s = sentence or ""
-    g, w = _PSU_GPU.search(s), _PSU_WATT.search(s)
-    if not g or not w or not re.search(r"파워|전원|psu|w\b|와트", s, re.I):
+    psu, unknown, joined, other = [], [], [], 0
+    prev_end = 0
+    for m in _PSU_WATT.finditer(s):
+        before = s[max(prev_end, m.start() - 14):m.start()]
+        after = s[m.end():m.end() + 8]
+        prev_end = m.end()
+        w = int(m.group(1))
+        if _W_REF.search(before):
+            other += 1
+        elif _W_GPU.search(before):
+            other += 1
+        elif _W_PSU_AFTER.search(after) or _W_PSU_BEFORE.search(before):
+            psu.append(w)
+        elif _W_OR_AFTER.search(after):
+            joined.append(w)            # 뒤 숫자와 같은 역할 -- 뒤 숫자가 파워면 이것도 파워 후보다
+        else:
+            unknown.append(w)
+    if psu:
+        return list(dict.fromkeys(joined + psu))
+    return unknown if len(unknown) == 1 and not other else []
+
+
+def psu_question(sentence: str) -> tuple[str, int] | None:
+    """문장이 «그래픽카드 + 파워 용량»을 묻는가 -> (칩셋 키 「RTX 5070」, 손님 파워 와트). 아니면 None.
+    파워 후보가 둘 이상(「500W 또는 750W 중」)이면 하나를 손님 파워로 정하지 않는다 -- None(설명 AI 가 비교한다)."""
+    s = sentence or ""
+    g = _PSU_GPU.search(s)
+    if not g or not re.search(r"파워|전원|psu|w\b|와트", s, re.I):
+        return None
+    watts = psu_watts(s)
+    if len(watts) != 1:
         return None
     suffix = " " + g.group(3).upper() if g.group(3) else ""      # catalog_map.gpu_chipset_key 와 같은 키 모양
-    return "%s %s%s" % (g.group(1).upper(), g.group(2), suffix), int(w.group(1))
+    return "%s %s%s" % (g.group(1).upper(), g.group(2), suffix), watts[0]
 
 
 PSU_MARGIN_W = 100      # 권장 파워 + 여유 -- 견적 스튜디오 기준(right-size-check: 하한 = 권장 + 100W, 2026-10-14 사장님 공유 문서 ④)

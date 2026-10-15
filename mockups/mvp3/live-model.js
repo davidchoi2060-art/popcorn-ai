@@ -56,16 +56,59 @@
     for(const c of changes){
       const rule=CHANGE_ROWS[String(c?.slot||'').toUpperCase()];
       if(!rule||!c.after?.name)continue;
-      for(const label of rule[0])names.set(label,[...(names.get(label)||[]),c.after.name]);
+      for(const label of rule[0])names.set(label,[...(names.get(label)||[]),partWithQty(c)]);
       for(const label of rule[1])drop.add(label);
     }
-    return rows.filter(([label])=>!drop.has(label)).map(([label,value])=>names.has(label)?[label,names.get(label).join(', ')+' (바꾼 부품)']:[label,value]);
+    // 메모리는 서버가 준 바꾼 뒤 합계를 앞에 둔다(「32GB · 이름 × 2」) -- 이름의 (16GB)는 한 개 용량이다(코덱스 C04-F04).
+    const ram=systemRamGb(build);
+    return rows.filter(([label])=>!drop.has(label)).map(([label,value])=>names.has(label)
+      ?[label,(ram&&(label==='RAM'||label==='메모리')?'총 '+ram+'GB · ':'')+names.get(label).join(', ')+' (바꾼 부품)']:[label,value]);
+  }
+  // 바꾼 부품 이름 + 수량(2개 이상일 때) -- 「16GB」 이름만 보이면 두 개를 꽂은 줄 모른다.
+  function partWithQty(c){return c.after.name+(Number.isSafeInteger(c.quantity)&&c.quantity>1?' × '+c.quantity:'');}
+  // 메모리 줄을 바꾼 구성의 시스템 메모리 합계(서버 값). 모르면 null.
+  function systemRamGb(build){
+    const changes=object(build)&&Array.isArray(build.changes)?build.changes:[];
+    const c=changes.filter(x=>String(x?.slot||'').toUpperCase()==='RAM'&&Number.isSafeInteger(x.system_ram_gb)&&x.system_ram_gb>0).pop();
+    return c?c.system_ram_gb:null;
   }
   // 상품 이름은 쇼핑몰의 기본 구성 이름이다. 부품을 바꿨으면 이름 아래에 무엇을 바꿨는지 밝힌다.
   function changedPartsNote(build){
     const changes=object(build)&&Array.isArray(build.changes)?build.changes:[];
-    const list=changes.filter(c=>c?.after?.name).map(c=>(text(c.label)||c.slot)+' '+c.after.name);
-    return list.length?'상품 이름은 기본 구성 기준이에요. 바꾼 부품: '+list.join(', '):'';
+    const list=changes.filter(c=>c?.after?.name).map(c=>(text(c.label)||c.slot)+' '+partWithQty(c));
+    const ram=systemRamGb(build);
+    return list.length?'상품 이름은 기본 구성 기준이에요. 바꾼 부품: '+list.join(', ')+(ram?' · 바꾼 구성의 시스템 메모리 총 '+ram+'GB':''):'';
+  }
+  // 소개 글은 기본 구성 기준으로 쓰였다. 메모리를 바꿨고 서버가 합계를 알면 「시스템 메모리는 16GB입니다」 문장을
+  // 바꾼 구성의 합계로 고친다(코덱스 C04-F04). 그 문장이 없으면 글은 그대로다(위 changedPartsNote 가 합계를 밝힌다).
+  function changedIntro(intro,build){
+    const ram=systemRamGb(build);
+    return ram&&typeof intro==='string'?intro.replace(/시스템\s*메모리는\s*(?:총\s*)?[\d,]+\s*GB\s*입니다\.?/g,'바꾼 구성의 시스템 메모리는 총 '+ram+'GB입니다.'):intro;
+  }
+  // 예산 비교 기준(2026-10-15 코덱스 C10-F01). 추천과 가격은 한 대 기준인데, 여러 대를 살 때 총예산과 한 대 가격을
+  // 견주면 12대 960만원에 892,800원 카드가 「예산보다 8,707,200원 낮아요」가 된다. 서버가 고객 문장에서 읽은 대수
+  // (wants.units, api/reco_explore.extract)가 2 이상이면 한 대 예산(총예산 ÷ 대수, 원 단위 버림)으로 견주고,
+  // 0(여러 대 · 대수 모름)이면 견주지 않는다(won=null). 없거나 1이면 총예산 그대로다.
+  function budgetBasis(talk,wants){
+    const won=talk?.budget_won;
+    if(!Number.isSafeInteger(won))return null;
+    const n=object(wants)&&Number.isSafeInteger(wants.units)&&wants.units>=0&&wants.units<=500?wants.units:1;
+    if(n===0)return {won:null,units:0,bound:talk.budget_bound};
+    return n>1?{won:Math.floor(won/n),units:n,bound:talk.budget_bound}:{won,units:1,bound:talk.budget_bound};
+  }
+  // 「예산보다 ○원 낮아요/높아요」 -- 여러 대면 몇 대 기준 한 대 예산인지 밝힌다. 견줄 수 없으면 그 사실을 말한다.
+  function budgetGapText(price,talk,wants,money){
+    const b=budgetBasis(talk,wants);
+    if(!b||!Number.isSafeInteger(price))return '';
+    if(b.units===0)return '여러 대 구매 · 대수를 몰라 총예산과 한 대 가격은 견주지 않았어요';
+    const head=b.units>1?b.units+'대 기준 한 대 예산 '+money(b.won):'예산';
+    const d=b.won-price;
+    return d>0?head+'보다 '+money(d)+' 낮아요':d<0?head+'보다 '+money(-d)+' 높아요':head+'과 같아요';
+  }
+  // 한 대 가격이 비교 기준 예산을 넘는가(하한 「이상」은 넘지 않는다 · 견줄 수 없으면 false).
+  function overUnitBudget(price,talk,wants){
+    const b=budgetBasis(talk,wants);
+    return !!b&&b.won!==null&&b.bound!=='이상'&&Number.isSafeInteger(price)&&price>b.won;
   }
   function specText(spec){return typeof spec==='string'?spec:specRows(spec).map(([label,value])=>label+' '+value).join('\n');}
   function safeUrl(value){
@@ -153,7 +196,9 @@
       if(!object(c)||!Number.isSafeInteger(c.ordinal)||c.ordinal<0||!text(c.slot)||!Number.isSafeInteger(c.delta)||!before||!after)return null;
       const quantity=Number.isSafeInteger(c.quantity)&&c.quantity>0?c.quantity:1;
       // base_quantity: 구성표 원래 수량(api/mvp3_quantity). 예전 견적에는 없어 바꾼 수량과 같다고 본다.
-      return {ordinal:c.ordinal,slot:c.slot,label:text(c.label)||c.slot,quantity,base_quantity:Number.isSafeInteger(c.base_quantity)&&c.base_quantity>0?c.base_quantity:quantity,before,after,delta:c.delta};
+      // system_ram_gb: 메모리 줄을 바꾼 뒤 구성의 시스템 메모리 합계(api/mvp3_build.quote). 서버가 모르면 없다.
+      return {ordinal:c.ordinal,slot:c.slot,label:text(c.label)||c.slot,quantity,base_quantity:Number.isSafeInteger(c.base_quantity)&&c.base_quantity>0?c.base_quantity:quantity,before,after,delta:c.delta,
+        ...(Number.isSafeInteger(c.system_ram_gb)&&c.system_ram_gb>0?{system_ram_gb:c.system_ram_gb}:{})};
     });
     return out.every(Boolean)?out:null;
   }
@@ -290,6 +335,6 @@
     return parts.filter(p=>!p.pseudo&&p.photo?.state==='approved'&&partPhoto(p).state==='approved')
       .map(p=>({ordinal:p.ordinal,label:CARD_PART_LABELS[p.slot]||p.slot,name:p.name||'',url:p.photo.url}));
   }
-  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,changedSpecRows,changedPartsNote,cardFallbackIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,customItem,partOptions,buildOptions,buildQuote,quote,sources,conditions};
+  const model={object,text,copy,uuid,safeUrl,publicSpec,partPhoto,publicConfiguration,specRows,cardSpecRows,changedSpecRows,changedPartsNote,cardFallbackIntro,budgetBasis,budgetGapText,overUnitBudget,systemRamGb,changedIntro,cardPartPhotos,conditionChips,specText,product,gameContext,recommendations,customItem,partOptions,buildOptions,buildQuote,quote,sources,conditions};
   if(typeof module!=='undefined')module.exports=model;else root.MVP3LiveModel=model;
 })(typeof window==='undefined'?globalThis:window);

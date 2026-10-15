@@ -146,6 +146,20 @@
         retryAfter:error?.retryAfter||0,retryAt:Date.now()+(error?.retryAfter||0)*1000};
       state.retry=retry;
     }
+    // 추천 조회가 일시적 연결 실패(API 재시작 중 nginx 가 낸 5xx HTML)로 끝나면 같은 요청을 잠시 뒤 다시 묻는다.
+    // 첫 답변이 이미 후보를 말했는데 카드 자리만 「새 추천을 불러오지 못했어요」가 되던 일(2026-10-15 오픈테스트 C04·C07)의
+    // 원인으로 본다(실패 문구가 JSON 읽기 실패에서만 나온다) -- 고객이 다시 시도하지 않아도 화면을 다시 오가면 회복됐다. 서버가 JSON 으로 낸 오류(그 판단)와
+    // 429·연결 끊김은 다시 묻지 않는다(그대로 알리고 「다시 시도」를 둔다). 기다리는 동안 이 요청이 밀려나면(새 문장·새 상담) 더 묻지 않는다.
+    const TRANSIENT=new Set(['gateway_error']),RETRY_DELAYS=Array.isArray(options.retryDelays)?options.retryDelays:[1500,4000];
+    function pause(ms,signal){return new Promise(resolve=>{if(signal.aborted)return resolve();const t=setTimeout(done,ms);function done(){clearTimeout(t);signal.removeEventListener('abort',done);resolve();}signal.addEventListener('abort',done,{once:true});});}
+    async function recommendRetrying(op,...args){
+      for(let i=0;;i++){
+        try{return await api.recommend(...args);}
+        catch(error){if(i>=RETRY_DELAYS.length||!TRANSIENT.has(error?.code)||!current(op))throw error;}
+        await pause(RETRY_DELAYS[i],op.signal);
+        if(!current(op))throw Object.assign(new Error('요청을 취소했어요.'),{code:'aborted'});
+      }
+    }
     function reset({restore=false}={}){
       cancel();Object.assign(state,{restoredCurrent:null,restoredShown:false,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
@@ -167,7 +181,7 @@
     async function recommendFor(op,extra={},{notes=true}={}){
       state.phase='recommend';emit();
       const sentAnchor=state.anchorCode;
-      const response=await api.recommend(state.talk,{signal:op.signal},{wants:state.wants,anchor_code:state.anchorCode,...extra});
+      const response=await recommendRetrying(op,state.talk,{signal:op.signal},{wants:state.wants,anchor_code:state.anchorCode,...extra});
       if(!current(op))return;
       // 「더 싸게·더 높은 사양」으로 받은 카드는 같은 방향·기준 카드로 물어야 다시 나온다 -- 고를 때 함께 기억한다
       // (2026-10-13 사장님: 대화 화면 「더 높은 사양」 카드의 상세 보기가 상세 대신 다른 추천 목록으로 갔다).
@@ -184,7 +198,7 @@
       // 그때 값 그대로 「이전 제안」으로 둔다 -- 새 추천으로 덮지 않는다(코덱스 1816 보강3 §2).
       // 안내(예산·못 맞춘 조건·되묻기) 다음에 남긴다: AI 설명 -> 예산 안내 -> 카드 -> 다음 선택 단추 순서
       // (2026-10-12 사장님 결정 · 카드 검수 C1 「예산 안내가 카드 아래 말풍선으로 붙음」).
-      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk)}].slice(-10);
+      state.proposals=[...state.proposals,{id:++proposalSeq,at:state.messages.length,groups:parsed.groups,talk:M.copy(state.talk),wants:M.object(parsed.wants)?M.copy(parsed.wants):null}].slice(-10);
       state.history=state.history.slice(-6);
       if(!keepCurrent){state.selected=null;state.selectionState=null;state.selectionWants=null;state.selectionQuery=null;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;}
       state.screen='results';
@@ -219,6 +233,8 @@
         }
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
+        // 상담원이 고른 PC 목록은 다음 턴 기록에만 싣는다 -- 「조금 전 두 번째 제품」을 가리킬 수 있게(코덱스 v2 Q42). 화면에는 보이지 않는다.
+        if(response.agent===true&&typeof response.shown_note==='string'&&response.shown_note.trim())state.history.push({role:'assistant',text:response.shown_note.slice(0,300)});
         state.history=state.history.slice(-6);
         // 「차이만 설명해 주세요 · 추천은 필요 없어요」면 설명으로 끝낸다 -- 추천 카드를 부르지 않고 보던 것도 그대로 둔다
         // (2026-10-12 카드 검수 X2: 설명 뒤에 카드 3장이 나왔다).
@@ -294,7 +310,7 @@
       let p=!fresh&&JSON.stringify(basis)===JSON.stringify(state.talk)?pick(state.groups):null;
       // 고를 때 추천 조건(wants)도 함께 보낸다 -- 빼면 서버가 다른 PC 를 추천해 고른 PC 를 못 찾는다.
       const q=validQuery(query);
-      if(!p){const r=M.recommendations(await api.recommend(M.copy(basis),{signal:op.signal},{...(M.object(wants)?{wants:M.copy(wants)}:{}),...(q||{})}));if(!current(op))return undefined;p=pick(r.groups);}
+      if(!p){const r=M.recommendations(await recommendRetrying(op,M.copy(basis),{signal:op.signal},{...(M.object(wants)?{wants:M.copy(wants)}:{}),...(q||{})}));if(!current(op))return undefined;p=pick(r.groups);}
       return p&&M.copy(p);
     }
     // 바꿨던 부품을 서버 계산으로 다시 적용한다. 못 하면 기본 구성으로 두고 그 사실을 note 로 돌려준다.

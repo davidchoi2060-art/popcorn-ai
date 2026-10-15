@@ -155,7 +155,7 @@ test('after a part change the detail says the product name is the base build and
     await until(()=>d.querySelector('[data-build-option]'));
     d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
     await until(()=>h.flow.state.selected.price===1400000);
-    assert.equal(text(d.querySelector('.live-summary [data-changed-parts]')),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 램 32GB');
+    assert.equal(text(d.querySelector('.live-summary [data-changed-parts]')),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 램 32GB × 2');
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -210,4 +210,31 @@ test('the whole build can be quoted for several units; the save sends the unit p
     assert.equal(save.body.sets,3);assert.equal(save.body.expected_price,1300000);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
+});
+
+// 2026-10-15 코덱스 오픈테스트 C04-F04: 메모리를 16GB × 2 로 바꿔도 소개 글은 「시스템 메모리는 16GB」였고 짧은 RAM 줄에도
+// 수량·합계가 없었다. 서버가 준 바꾼 뒤 합계(system_ram_gb)로 소개 문장·바꾼 부품 안내·사양 줄을 고친다.
+test('memory change: intro, changed-part note and spec row use the server system memory total',()=>{
+  const M=require('../live-model.js');
+  const build={changes:[{slot:'RAM',label:'메모리',quantity:2,after:{name:'KLEVV DDR5-5600 (16GB)'},system_ram_gb:32}]};
+  const intro='Ryzen 5 9600X와 RTX 5070 12GB를 중심으로 구성했습니다. 저장공간은 1TB SSD입니다. 시스템 메모리는 16GB입니다.';
+  assert.equal(M.changedIntro(intro,build),'Ryzen 5 9600X와 RTX 5070 12GB를 중심으로 구성했습니다. 저장공간은 1TB SSD입니다. 바꾼 구성의 시스템 메모리는 총 32GB입니다.');
+  assert.equal(M.changedPartsNote(build),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 KLEVV DDR5-5600 (16GB) × 2 · 바꾼 구성의 시스템 메모리 총 32GB');
+  assert.deepEqual(M.changedSpecRows(M.cardSpecRows({cpu:'C',ram_gb:16,ssd_gb:1000}),build).find(r=>r[0]==='RAM'),['RAM','총 32GB · KLEVV DDR5-5600 (16GB) × 2 (바꾼 부품)']);
+  // 서버가 합계를 모르면 지어내지 않는다 -- 소개 글은 그대로, 수량만 밝힌다.
+  const unknown={changes:[{slot:'RAM',label:'메모리',quantity:2,after:{name:'램'}}]};
+  assert.equal(M.changedIntro(intro,unknown),intro);
+  assert.equal(M.changedPartsNote(unknown),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 램 × 2');
+  const q=M.buildQuote({ok:true,base_code:1,base_price:10,total:20,changes:[{ordinal:1,slot:'RAM',delta:10,quantity:2,system_ram_gb:32,before:{product_code:1,name:'a',price:5},after:{product_code:2,name:'b',price:10}}]},1);
+  assert.equal(q.changes[0].system_ram_gb,32);
+});
+test('budget basis: per-unit budget for several units, withheld when the count is unknown',()=>{
+  const M=require('../live-model.js'),money=n=>n.toLocaleString('ko-KR')+'원',t={budget_won:9600000,budget_bound:'이하'};
+  assert.equal(M.budgetGapText(892800,t,null,money),'예산보다 8,707,200원 낮아요');
+  assert.equal(M.budgetGapText(892800,t,{units:12},money),'12대 기준 한 대 예산 800,000원보다 92,800원 높아요');
+  assert.equal(M.budgetGapText(800000,t,{units:12},money),'12대 기준 한 대 예산 800,000원과 같아요');
+  assert.equal(M.budgetGapText(892800,t,{units:0},money),'여러 대 구매 · 대수를 몰라 총예산과 한 대 가격은 견주지 않았어요');
+  assert.equal(M.overUnitBudget(892800,t,{units:12}),true);
+  assert.equal(M.overUnitBudget(892800,t,{units:0}),false);
+  assert.equal(M.overUnitBudget(892800,t,{units:1}),false);
 });
