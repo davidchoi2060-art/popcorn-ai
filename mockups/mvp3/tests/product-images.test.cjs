@@ -113,8 +113,8 @@ test('approved-ui: selected BOM, photo, game context and native GPU disclosure s
     assert.deepEqual(clone(h.flow.state.selectionState),talkState);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 하나/);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 둘/);
     const selected=clone(h.flow.state.selected),calls=clone(h.calls);doc.querySelector('details[data-detail="bom-1"]').open=true;h.flow.emit();
     assert.equal(doc.querySelector('details[data-detail="bom-1"]').open,true);assert.match(doc.querySelector('tr[data-part="bom-1"]').textContent,/Fixture 8GB/);
-    assert.ok([...doc.querySelectorAll('.public-bom [data-action=unavailable]')].every(b=>b.disabled));assert.equal(doc.querySelectorAll('.public-bom tbody .final-part-price').length,2);
-    assert.ok([...doc.querySelectorAll('.public-bom tbody .final-part-price')].every(e=>e.textContent==='기본 구성'));assert.match(doc.querySelector('.public-bom-photo').textContent,/정보 없음/);
+    assert.ok([...doc.querySelectorAll('.public-bom [data-action=unavailable]')].every(b=>b.disabled));assert.equal(doc.querySelectorAll('.public-bom tbody .final-part-price').length,0,'상세 v2 줄에는 금액 칸이 없다');
+    assert.equal(doc.querySelectorAll('.dv2-row .dv2-model').length,2);assert.match(doc.querySelector('.public-bom-photo').textContent,/정보 없음/);
     doc.querySelector('[data-product-image]').dispatchEvent(new h.w.Event('error'));assert.equal(doc.querySelector('figcaption').textContent,NOTICE);assert.equal(doc.querySelector('[data-product-image-status]').hidden,false);
     assert.deepEqual(clone(h.flow.state.selected),selected);assert.deepEqual(h.calls,calls);assert.match(doc.querySelector('#actions').textContent,/900,000원/);
     h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');assert.ok(doc.querySelector('.public-bom-information .live-explanation'));assert.equal(doc.querySelector('.public-bom-information').open,false);

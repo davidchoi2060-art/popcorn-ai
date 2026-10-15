@@ -602,9 +602,12 @@
     function pickBuild(code){
       const data=state.build.data;
       if(state.phase||!data||!state.selected)return;
-      const o=data.options.find(x=>x.product_code===code);if(!o||!Number.isSafeInteger(o.price_diff))return;
-      const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
       const was=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal),original=was?.before.product_code;
+      let o=data.options.find(x=>x.product_code===code);
+      // 기본 부품으로 되돌리는 선택(상세 v2 「원래 부품으로」): 후보 목록에 없어도 서버가 준 변경 줄의 before 가 근거다.
+      if(!o&&was&&code===original)o={product_code:code,name:was.before.name,price_diff:0};
+      if(!o||!Number.isSafeInteger(o.price_diff))return;
+      const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
       // 수량을 바꿔 둔 줄은 제품을 바꿔도 그 수량을 지킨다.
       const quantity=was&&was.quantity!==was.base_quantity?{quantity:was.quantity}:{};
       if(code!==original||quantity.quantity)changes.push({ordinal:data.ordinal,product_code:code,...quantity});
@@ -628,9 +631,23 @@
       const next={...p};if(n>1)next.sets=n;else delete next.sets;
       state.selected=next;state.savedQuote=null;state.saveState='idle';state.needsRefresh=false;state.handoff=null;emit();
     }
-    function resetBuild(){
+    // 패널이 닫힌 채 실행한 되돌리기가 실패하면 오류를 둘 자리가 없다 -- 그 줄의 패널을 오류 상태로 열어 사유를 보인다(조용히 삼키지 않는다).
+    function surfaceBuildError(ordinal){
+      if(state.build.ordinal===null&&state.build.error){const message=state.build.error;state.build={ordinal,data:null,error:message};emit();}
+    }
+    async function resetBuild(){
       if(state.phase||!state.selected?.build)return;
-      return applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 PC 총액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
+      const first=state.selected.build.changes[0].ordinal;state.build=emptyBuild();
+      await applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 PC 총액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
+      surfaceBuildError(first);
+    }
+    // 한 줄만 원래 부품으로(상세 v2 줄의 「원래 부품으로」). 나머지 변경과 수량은 그대로 두고 서버가 금액을 다시 계산한다.
+    async function undoBuild(ordinal){
+      const c=state.selected?.build?.changes.find(x=>x.ordinal===ordinal);
+      if(state.phase||!c)return;
+      const changes=changesOf(state.selected).filter(x=>x.ordinal!==ordinal);state.build=emptyBuild();
+      await applyBuild(changes,q=>c.label+' 부품을 원래 부품 「'+c.before.name+'」으로 되돌렸어요. 바꾼 구성 PC 총액은 '+q.total.toLocaleString('ko-KR')+'원이에요(한 대 기준).');
+      surfaceBuildError(ordinal);
     }
     async function list(){
       const op=begin('list');state.screen='saved';emit();
@@ -671,7 +688,7 @@
       else if(task.kind==='list')await list();
       else if(task.kind==='handoff')await handoff();
     }
-    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild,setBuildQuantity,setSets};
+    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild,undoBuild,setBuildQuantity,setSets};
   }
   // 「쇼핑몰에서 구매 이어가기」 한 번으로 쇼핑몰까지 간다(2026-10-12 중헌 님 고객단 6번: 연결 번호가 생긴 뒤 같은 단추를
   // 한 번 더 눌러야 쇼핑몰이 열렸다). 연결 번호는 그대로 만든다 -- 인계 기록(관리자 「인계 기록」·유입 성과)과 쇼핑몰 가격

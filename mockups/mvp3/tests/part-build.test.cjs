@@ -54,6 +54,8 @@ function harness({quoteFail=false,total=1400000,limit=null}={}){
   return {w,d:w.document,get flow(){return flow;},errors,calls,close:()=>dom.window.close()};
 }
 const text=e=>e.textContent.replace(/\s+/g,' ').trim();
+// 후보 임시 선택(라디오) -> 「선택한 부품 적용」. 적용 전에는 서버 재계산이 일어나지 않는다.
+function pickOption(d,code){d.querySelector('input[name=dv2-pick][value="'+code+'"]').click();d.querySelector('[data-action=build-apply]').click();}
 async function toDetail(h){
   const d=h.d,input=d.querySelector('#request');input.value='게임 150만원';input.dispatchEvent(new h.w.Event('input',{bubbles:true}));
   d.querySelector('#chat-form').dispatchEvent(new h.w.Event('submit',{bubbles:true,cancelable:true}));
@@ -65,7 +67,8 @@ async function toDetail(h){
 test('every real BOM row has a working 변경; the service row does not; old other-PC buttons are gone',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     assert.deepEqual([...d.querySelectorAll('[data-action=build-options]')].map(b=>b.dataset.ordinal),['0','1']);
-    assert.ok(d.querySelector('[data-part="bom-8"] [data-action=unavailable]').disabled);
+    assert.equal(d.querySelector('[data-part="bom-8"] [data-action=build-options]'),null,'서비스 줄에는 변경 단추가 없다');
+    assert.match(text(d.querySelector('[data-part="bom-8"] .dv2-act')),/변경 불가/);
     assert.equal(d.querySelector('#part-change [data-action=part-options]'),null);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
@@ -76,24 +79,37 @@ test('options come from the server; picking one recomputes on the server and cha
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
     assert.deepEqual(h.calls.find(c=>c.url==='/api/mvp3/build/options').body,{state:talkState,product_code:12,changes:[],ordinal:1});
-    assert.equal(text(d.querySelector('.build-options-row h4')),'메모리 바꾸기 · 지금 램 16GB');
-    assert.ok(text(d.querySelector('.build-options-row')).includes('확인하지 못한 부품 1개'));
+    const panel=text(d.querySelector('.dv2-panel'));
+    assert.equal(text(d.querySelector('.dv2-panel-head h3')),'메모리 변경');
+    assert.ok(panel.includes('사용할 부품을 골라 주세요.')&&panel.includes('기본 구성과 비교한 금액이에요.')&&panel.includes('적용 전에는 구성이 바뀌지 않아요.'));
     const rows=[...d.querySelectorAll('[data-build-option]')];
-    assert.ok(text(d.querySelector('.build-options-row')).includes('확인한 차액이 없는 후보는 선택할 수 없어요'));
-    assert.ok(text(rows[1]).includes('+100,000원')&&text(rows[1]).includes('추가'));
-    assert.ok(!text(rows[1]).includes('1,400,000원')&&!text(rows[1]).includes('110,000원')&&!text(rows[0]).includes('1,240,000원'),'후보 옆에 단품·PC 금액이 없다');
-    assert.ok(text(rows[0]).includes('\u221260,000원')&&text(rows[0]).includes('감소'));
-    rows[1].querySelector('[data-action=build-pick]').click();
+    assert.deepEqual(rows.map(r=>r.dataset.buildOption),['501','503','502']);
+    assert.ok(text(rows[0]).includes('기본 메모리')&&text(rows[0]).includes('추가 금액 없음')&&text(rows[0]).includes('현재 선택'));
+    assert.ok(text(rows[2]).includes('+100,000원')&&!text(rows[2]).includes('1,400,000원')&&!text(rows[2]).includes('110,000원'),'후보 옆에 단품·PC 금액이 없다');
+    assert.ok(text(rows[1]).includes('−60,000원')&&!text(rows[1]).includes('1,240,000원'));
+    const apply=d.querySelector('[data-action=build-apply]');
+    assert.equal(apply.disabled,true,'같은 후보(현재 적용된 것)에는 적용할 수 없다');
+    // 임시 선택은 본문·총액·변경 개수를 바꾸지 않는다.
+    d.querySelector('input[name=dv2-pick][value="502"]').click();
+    assert.equal(apply.disabled,false);assert.equal(h.flow.state.selected.price,1300000);assert.equal(h.flow.state.selected.build,null);
+    assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/build/quote'),'적용 전에는 서버 재계산 요청이 없다');
+    assert.ok(text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
+    d.querySelector('input[name=dv2-pick][value="501"]').click();assert.equal(apply.disabled,true);
+    d.querySelector('input[name=dv2-pick][value="502"]').click();apply.click();
     await until(()=>h.flow.state.selected.price===1400000);
     assert.deepEqual(h.calls.find(c=>c.url==='/api/mvp3/build/quote').body,{state:talkState,product_code:12,changes:[{ordinal:1,product_code:502}]});
     assert.equal(h.flow.state.selected.product_code,12);
+    assert.equal(d.querySelector('.dv2-panel'),null,'적용이 성공하면 패널이 닫힌다');
     const row=d.querySelector('[data-part="bom-1"]');
-    assert.ok(text(row).includes('램 32GB')&&text(row).includes('기본 구성: 램 16GB')&&text(row).includes('변경함')&&text(row).includes('+100,000원'));
+    assert.ok(text(row).includes('램 32GB')&&text(row).includes('기본 구성: 램 16GB')&&text(row).includes('변경됨')&&text(row).includes('+100,000원'));
     assert.ok(!text(row).includes('110,000원')&&!text(row).includes('60,000원'),'바꾼 줄에도 부품 판매가가 없다');
-    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('기본구성PC총액1,300,000원'));
-    assert.ok(text(d.querySelector('.live-summary')).includes('기본 구성 1,300,000원 \u2192 바꾼 구성 1,400,000원'));assert.ok(text(d.querySelector('.public-bom tfoot')).includes('변경 후 총액을 한 대 기준으로 표시해요'));
-    assert.doesNotMatch(text(d.querySelector('.public-bom')),/조립·기타|부품 합계|부품 변경/);
+    assert.ok(row.querySelector('[data-action=build-undo]'));
+    const side=text(d.querySelector('.dv2-side'));
+    assert.ok(side.includes('1,400,000원')&&side.includes('기본 구성 금액1,300,000원')&&side.includes('부품 변경 금액+100,000원')&&side.includes('변경 내역 1개'));
+    assert.doesNotMatch(text(d.querySelector('.dv2-parts')),/조립·기타|부품 합계/);
+    assert.equal(d.querySelector('.dv2-parts tfoot'),null);
     assert.ok(text(d.querySelector('#actions')).includes('1,400,000원'));
+    assert.equal(d.activeElement?.dataset?.ordinal,'1','닫으면 포커스가 연 변경 단추로 돌아온다');
     assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리 부품을 「램 32GB」 제품으로 바꿨어요.'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
@@ -103,7 +119,7 @@ test('save sends the changed rows and the server total; handoff says the mall pa
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    pickOption(d,502);
     await until(()=>h.flow.state.selected.price===1400000);
     await h.flow.save();
     const save=h.calls.find(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST').body;
@@ -119,33 +135,34 @@ test('a refused combination keeps the old price and says why; reset goes back to
   const h=harness({quoteFail:true});try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
-    await until(()=>d.querySelector('.build-options-row [role=alert]'));
+    pickOption(d,502);
+    await until(()=>d.querySelector('.dv2-panel [role=alert]'));
     assert.equal(h.flow.state.selected.price,1300000);
-    assert.ok(text(d.querySelector('.build-options-row')).includes('호환되지 않아요'));
+    assert.ok(text(d.querySelector('.dv2-panel [role=alert]')).includes('호환되지 않아요'));
+    assert.ok(d.querySelector('input[name=dv2-pick][value="502"]').checked,'실패해도 고르던 후보가 남는다');
   }finally{h.close();}
   const g=harness();try{await toDetail(g);const d=g.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    pickOption(d,502);
     await until(()=>g.flow.state.selected.price===1400000);
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>g.flow.state.selected.price===1300000);
     assert.equal(g.flow.state.selected.build,null);
-    assert.ok(text(d.querySelector('.public-bom tfoot')).replace(/\s/g,'').includes('기본구성PC총액1,300,000원'));
+    assert.ok(text(d.querySelector('.dv2-side')).includes('변경 없음')&&text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
   }finally{g.close();}
 });
 
 test('the summary keeps the budget line after a change and judges it on the new total',async()=>{
   const h=harness({total:1580300});try{await toDetail(h);const d=h.d;
-    const line=()=>d.querySelector('.final-summary-price p:last-child');
+    const line=()=>d.querySelector('.dv2-notes p:last-child');
     assert.equal(text(line()),'예산보다 200,000원 낮아요');assert.ok(line().classList.contains('green'));
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    pickOption(d,502);
     await until(()=>h.flow.state.selected.price===1580300);
-    const box=text(d.querySelector('.final-summary-price'));
-    assert.ok(box.includes('바꾼 부품 1개 · 기본 구성 1,300,000원 \u2192 바꾼 구성 1,580,300원')&&!box.includes('280,300'),box);
+    const box=text(d.querySelector('.dv2-side'));
+    assert.ok(box.includes('1,580,300원')&&box.includes('기본 구성 금액1,300,000원')&&box.includes('+280,300원'),box);
     assert.equal(text(line()),'예산보다 80,300원 높아요');assert.ok(line().classList.contains('warn-text'));
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>h.flow.state.selected.price===1300000);
@@ -159,9 +176,11 @@ test('after a part change the detail says the product name is the base build and
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    pickOption(d,502);
     await until(()=>h.flow.state.selected.price===1400000);
-    assert.equal(text(d.querySelector('.live-summary [data-changed-parts]')),'상품 이름은 기본 구성 기준이에요. 바꾼 부품: 메모리 램 32GB × 2');
+    // 상품 이름은 식별 정보로 두고, 바꾼 내용은 「변경 내역」에 구분해 적는다.
+    assert.equal(text(d.querySelector('.dv2-name')),'PC 12');
+    assert.ok(text(d.querySelector('.dv2-changes')).includes('메모리 변경')&&text(d.querySelector('.dv2-changes')).includes('+100,000원'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -186,7 +205,7 @@ test('memory quantity goes up to the board limit the server gives; the server re
     assert.match(text(d.querySelector('[data-part="bom-1"]')),/수량 3/);
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
-    d.querySelector('[data-build-option="502"] [data-action=build-pick]').click();
+    pickOption(d,502);
     await until(()=>h.calls.filter(c=>c.url==='/api/mvp3/build/quote').length===2&&!h.flow.state.phase);await tick();
     assert.deepEqual(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').at(-1).body.changes,[{ordinal:1,product_code:502,quantity:3}],'a picked part keeps the chosen quantity');
     assert.deepEqual(h.errors,[]);
@@ -243,4 +262,64 @@ test('budget basis: per-unit budget for several units, withheld when the count i
   assert.equal(M.overUnitBudget(892800,t,{units:12}),true);
   assert.equal(M.overUnitBudget(892800,t,{units:0}),false);
   assert.equal(M.overUnitBudget(892800,t,{units:1}),false);
+});
+
+// ===== 상세 v2 (2026-10-16 통합안): 선택한 부품 표 + 오른쪽 변경 패널 =====
+test('v2 detail: no part price, parts sum or 조립·기타 row; only the server total and diffs',async()=>{
+  const h=harness();try{await toDetail(h);const d=h.d;
+    const body=text(d.querySelector('.dv2'));
+    assert.doesNotMatch(body,/조립·기타|조립 · 기타|부품 합계|60,000원|110,000원|30,000원/);
+    assert.equal(d.querySelectorAll('.dv2-row .final-part-price').length,0);
+    assert.equal(d.querySelectorAll('.dv2-parts tfoot').length,0);
+    assert.ok(text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
+    assert.match(text(d.querySelector('.dv2-side')),/현재 조회 금액이며 구매 시 최종 금액을 확인해 주세요\./);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('v2 picker: a candidate without a server diff is shown as 차액 확인 필요 and cannot be chosen (never 0)',async()=>{
+  options.options.push({product_code:504,name:'차액 없는 램',price:1,price_diff:null});
+  const h=harness();try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+    await until(()=>d.querySelector('[data-build-option="504"]'));
+    const row=d.querySelector('[data-build-option="504"]');
+    assert.ok(text(row).includes('차액 확인 필요')&&text(row).includes('선택 불가')&&!text(row).includes('추가 금액 없음'));
+    assert.equal(row.querySelector('input').disabled,true);
+    d.querySelector('[data-action=build-apply]').click();
+    assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/build/quote'));
+  }finally{options.options.pop();h.close();}
+});
+test('v2 picker: temporary choice never changes the body; apply is disabled when the choice equals the applied part; 원래 부품으로 is also temporary',async()=>{
+  const h=harness();try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+    pickOption(d,502);await until(()=>h.flow.state.selected.price===1400000);
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+    const apply=()=>d.querySelector('[data-action=build-apply]'),quotes=()=>h.calls.filter(c=>c.url==='/api/mvp3/build/quote').length;
+    assert.equal(apply().disabled,true);assert.ok(text(d.querySelector('[data-build-option="502"]')).includes('현재 선택'));
+    d.querySelector('[data-action=build-pick-base]').click();
+    assert.equal(d.querySelector('input[value="501"]').checked,true);assert.equal(apply().disabled,false);
+    assert.equal(h.flow.state.selected.price,1400000);assert.equal(quotes(),1,'적용 전에는 서버 재계산이 없다');
+    assert.ok(text(d.querySelector('[data-part="bom-1"]')).includes('램 32GB'),'본문은 아직 그대로');
+    apply().click();await until(()=>h.flow.state.selected.price===1300000);
+    assert.equal(h.flow.state.selected.build,null);assert.equal(d.querySelector('.dv2-panel'),null);
+    assert.deepEqual(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').at(-1).body.changes,[]);
+  }finally{h.close();}
+});
+test('v2 row 원래 부품으로 reverts one row; Escape and cancel keep applied changes and the PC count',async()=>{
+  const h=harness();try{await toDetail(h);const d=h.d;
+    d.querySelector('[data-sets] [data-action=sets][data-sets="2"]').click();await until(()=>d.querySelector('[data-sets-total]'));
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+    pickOption(d,502);await until(()=>h.flow.state.selected.price===1400000);
+    assert.equal(h.flow.state.selected.sets,2);
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+    d.querySelector('input[value="503"]').click();
+    d.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+    assert.equal(d.querySelector('.dv2-panel'),null);assert.equal(h.flow.state.selected.price,1400000);assert.equal(h.flow.state.selected.sets,2);
+    assert.ok(text(d.querySelector('[data-part="bom-1"]')).includes('램 32GB'));
+    d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+    assert.equal(d.querySelector('input[value="502"]').checked,true,'다시 열면 임시 선택이 아니라 적용된 부품이 선택돼 있다');
+    d.querySelector('.dv2-cancel').click();assert.equal(d.querySelector('.dv2-panel'),null);
+    d.querySelector('[data-part="bom-1"] [data-action=build-undo]').click();await until(()=>h.flow.state.selected.price===1300000);
+    assert.equal(h.flow.state.selected.sets,2,'대수는 되돌려도 그대로');assert.equal(h.flow.state.selected.build,null);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
 });

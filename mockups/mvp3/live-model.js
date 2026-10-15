@@ -220,7 +220,7 @@
       throw new Error('바꿀 부품 선택지를 확인할 수 없어요.');
     const options=value.options.map(o=>object(o)&&Number.isSafeInteger(o.product_code)&&o.product_code>0&&text(o.name).trim()
       // 차액이 없는 후보도 버리지 않는다 -- 「차액 확인 필요」로 보이고 선택할 수 없다(null 을 0 으로 바꾸지 않는다).
-      ?{product_code:o.product_code,name:o.name,price_diff:Number.isSafeInteger(o.price_diff)?o.price_diff:null}:null).filter(Boolean);
+      ?{product_code:o.product_code,name:o.name,price_diff:Number.isSafeInteger(o.price_diff)?o.price_diff:null,total:Number.isSafeInteger(o.total)?o.total:null}:null).filter(Boolean);
     // 메모리·저장장치 수량 범위(api/mvp3_quantity.limit_for). 서버가 준 범위만 쓴다 -- 없으면 수량을 바꾸지 않는다.
     const l=value.quantity_limit,q=value.quantity;
     const quantity=object(l)&&Number.isSafeInteger(q)&&Number.isSafeInteger(l.max)&&l.max>=q&&q>=1

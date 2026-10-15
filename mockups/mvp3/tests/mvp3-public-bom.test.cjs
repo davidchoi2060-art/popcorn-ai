@@ -116,11 +116,12 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
         const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);
         assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,3);
         const row=doc.querySelector('tr[data-part="bom-0"]');assert.ok(row.querySelector('h4').textContent.includes(slot));
-        assert.equal(row.querySelector('.final-part-price').textContent,'기본 구성');
+        if(screen==='final')assert.equal(row.querySelector('.final-part-price').textContent,'기본 구성');
+        else assert.equal(row.querySelector('.final-part-price'),null,'상세 v2 줄에는 금액 칸이 없다');
         const details=row.querySelector('details');details.open=true;h.flow.emit();
         assert.equal(doc.querySelector('details[data-detail="bom-0"]').open,true);
         assert.match(doc.querySelector('.public-bom-role').textContent,slot==='CPU'?/프로그램의 명령/:/등록된 사양과 설명/);
-        assert.match(doc.querySelector('.final-summary-price').textContent,/900,000원/);
+        assert.match(doc.querySelector(screen==='final'?'.final-summary-price':'.dv2-summary').textContent,/900,000원/);
         const explanation=doc.querySelector('.live-explanation');assert.ok(explanation);
         assert.equal(!!explanation.closest('details.public-bom-information'),screen==='final');
       }
