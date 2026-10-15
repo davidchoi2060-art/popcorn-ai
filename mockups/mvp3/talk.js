@@ -300,7 +300,9 @@ document.addEventListener('click',e=>{
     case 'inquiry-open':expandNow();void flow.openInquiry({human:b.dataset.human==='1'}).then(focusInquiry);break;
     case 'inquiry-close':flow.closeInquiry();break;
     case 'inquiry-send':void flow.inquire(inquiryValues());break;
-    case 'new':if(!state.messages.some(m=>m.who==='user')||confirm('지금 대화와 지금 견적을 지우고 새 상담을 시작할까요?')){resumed=false;entry=null;condOpen=false;flow.reset();input.value='';count();}break;
+    // 「새 상담」은 묻지 않고 바로 새로 시작한다(2026-10-15 중헌 님: 「지금 견적을 지우고…」 확인 창은 필요 없다 -- 새로 하고 싶으면 이 단추를 누르면 된다).
+    // 서버에 저장한 「내 견적」은 그대로이고, 비우는 것은 이 탭의 대화·조건·지금 견적뿐이다.
+    case 'new':resumed=false;entry=null;condOpen=false;flow.reset();input.value='';count();break;
     case 'toggle-now':{const open=$('#tk-now').classList.toggle('is-open');b.setAttribute('aria-expanded',String(open));break;}
   }
 });
