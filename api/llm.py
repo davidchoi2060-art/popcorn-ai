@@ -1251,8 +1251,23 @@ def _tools_openai(model, messages, tools, system, max_output_tokens, timeout_sec
     raw = [it.model_dump(exclude_none=True) for it in resp.output or []]
     u = resp.usage
     cached = getattr(getattr(u, "input_tokens_details", None), "cached_tokens", None) if u else None
-    return (resp.output_text or ""), calls, raw, (u.input_tokens if u else None), \
+    return _openai_answer_text(resp), calls, raw, (u.input_tokens if u else None), \
         (u.output_tokens if u else None), cached, resp.status
+
+
+def _openai_answer_text(resp) -> str:
+    """고객에게 갈 글만 -- 중간 메모(phase="commentary") 메시지는 뺀다.
+
+    resp.output_text 는 모든 메시지를 이어 붙여 모델이 속으로 정리한 메모(「budget question Korean. Need ask one
+    question…」)까지 고객 답에 섞였다(2026-10-15 사장님 영상편집 상담). 최종 답(final_answer·표시 없음)이 있으면 그것만,
+    메모뿐이면 빈 글이다 -- 호출부는 빈 글을 「답 없음」으로 다룬다.
+    """
+    parts = []
+    for it in resp.output or []:
+        if getattr(it, "type", None) != "message" or getattr(it, "phase", None) == "commentary":
+            continue
+        parts += [c.text for c in getattr(it, "content", None) or [] if getattr(c, "type", None) == "output_text"]
+    return "".join(parts)
 
 
 _TOOL_CALLERS = {"claude": _tools_claude, "codex": _tools_openai}
