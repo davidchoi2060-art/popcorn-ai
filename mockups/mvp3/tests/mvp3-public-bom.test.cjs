@@ -150,7 +150,7 @@ test('a pseudo GPU line says there is no separate graphics card instead of 정�
 });
 test('footer amounts sit in the price column, not centered across price and change columns',()=>{
   const html=render(fixture());
-  assert.match(html,/<th scope="row">기본 구성 PC 총액<\/th><td class="final-part-price">900,000원<small /);
+  assert.match(html,/<th scope="row">기본 구성 PC 총액<\/th><td class="final-part-price">900,000원<\/td>/);
   assert.doesNotMatch(html.slice(html.indexOf('<tfoot>')),/colspan="2"/);
 });
 test('POWER and COOLER rows get Korean labels and roles, not raw slot codes (open test C06)',()=>{
