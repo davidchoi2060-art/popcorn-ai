@@ -183,15 +183,13 @@ test('AI-composed product (server flag, no mall page) still opens the picker pan
   }finally{h.close();}
 });
 
-test('C06: with real conditions and nothing picked at the gateway, the header shows the applied conditions, never 미정',async()=>{
+test('C06: with real conditions, the product and result screens never say 미정',async()=>{
+  // 첫 화면 입구(용도·예산 고르기)는 2026-10-16 걷었다 -- 그 초안 머리 칸도 함께 없다.
   const h=harness();try{await toDetail(h);const d=h.d;
-    d.querySelector('[data-action=gateway]').click();d.querySelector('[data-action=gateway-use]').click();d.querySelector('[data-action=gateway-begin]').click();
-    // 상품 화면은 상담창 없이 한 열이라 상담 조건 머리 칸을 두지 않는다 -- 그래도 「미정」을 말하지 않는다.
     assert.equal(d.body.dataset.page,'product');assert.equal(d.querySelector('[data-draft-context]'),null);
     assert.doesNotMatch(text(d.querySelector('#view')),/용도 미정|예산 미정/);
     d.querySelector('#consult-back').click();await until(()=>h.flow.state.screen==='results');
-    const box=d.querySelector('[data-draft-context]');assert.ok(box);
-    assert.equal(box.dataset.draftContext,'applied');assert.match(text(box),/현재 상담 조건.*게임/);
+    assert.equal(d.querySelector('[data-draft-context]'),null);
     assert.doesNotMatch(text(d.querySelector('#view')),/용도 미정|예산 미정/);
   }finally{h.close();}
 });
