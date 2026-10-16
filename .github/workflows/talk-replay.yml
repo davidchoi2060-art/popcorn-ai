@@ -3,6 +3,10 @@ name: 화면 대화 다시 돌리기
 
 on:
   workflow_dispatch:
+    inputs:
+      text:
+        description: '문장 하나만 보낼 때(비우면 중헌 님 대화). 긴 글은 @long:글|끝 문장|글자 수'
+        default: ''
 
 jobs:
   replay:
@@ -17,4 +21,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python tools/quality/screen_replay.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - env:
+          TEXT: ${{ inputs.text }}
+        run: python tools/quality/screen_replay.py | tee -a "$GITHUB_STEP_SUMMARY"
