@@ -925,6 +925,14 @@ class NoDeadEnd(unittest.TestCase):
             self.assertIn(phrase, AG.SYSTEM)
         self.assertNotIn("여기서 도와드리기 어렵다고 짧게 말하고", AG.SYSTEM)
 
+    def test_prompt_covers_second_round_on_dev_server(self):
+        # 2026-10-16 배포 뒤 86문항 2회차: 부품 질문(램·파워·인텔/AMD·그래픽카드 하나)이 여전히 되묻기로 끝났고,
+        # 예산 초과 때 더 싸게 찾아도 0장이었으며, 답이 일반 AI 보다 짧고 기준이 빠졌다는 판정이 많았다.
+        for phrase in ("되묻기만 하지 않는다. 설명한 뒤 가장 흔한 용도(게임, FHD)로 find_pcs", "부품 단품은 팔지 않는다",
+                       "게임 이름을 빼고 용도·예산만으로", "기준·수치·이유", "과한 사양을 먼저 권하지 않는다"):
+            self.assertIn(phrase, AG.SYSTEM)
+        self.assertNotIn("- 2~5문장.", AG.SYSTEM)
+
 
 class LlmAnswerAsIs(unittest.TestCase):
     """2026-10-16 중헌 님: 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」."""
