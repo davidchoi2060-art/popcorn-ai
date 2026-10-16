@@ -859,3 +859,60 @@ class CodexP2Watt(unittest.TestCase):
         line, watt = AG.PA.psu_note(_PsuConn(650), "RTX 5070 소비전력은 250W인데 750W 파워면 괜찮나요?")
         self.assertEqual(watt, 750)
         self.assertEqual(AG.PA.drop_watt_sentences("소비전력 250W는 GPU 기준이에요. 750W면 돼요.", watt), "소비전력 250W는 GPU 기준이에요.")
+
+
+class NoDeadEnd(unittest.TestCase):
+    """2026-10-16 중헌 님: 「고객이 뭔가를 물어봤을때.. 제대로된 답변과 제품을 보여주던, 대안을 내놓던 해야 해」."""
+
+    def _seq(self, *answers):
+        from api import grid_public as GP
+        seen, queue = [], list(answers)
+        def fake(body):
+            seen.append(json.loads(json.dumps(body.state)))
+            return queue.pop(0) if queue else _reco(card_sets=[{"usage": "게임", "items": []}])
+        return patch.object(GP, "recommend", fake), seen
+
+    def test_unknown_game_falls_back_to_resolution_and_says_so(self):
+        p, seen = self._seq(_reco(card_sets=[], needs=["game.grade"]), _reco())
+        with p:
+            book = TT.FactBook()
+            r = TT.find_pcs({"usages": ["게임"], "games": ["듣보잡 게임"], "budget_won": 1_500_000}, book)
+        self.assertEqual(r["status"], "nearest")
+        self.assertIn("듣보잡 게임", r["relaxed"][0])
+        self.assertEqual(r["asked"]["games"], ["듣보잡 게임"])
+        self.assertEqual(seen[1]["game"], {"names": [], "resolution": None})
+        self.assertEqual(seen[1]["budget_won"], 1_500_000)        # 예산은 그대로 두고 게임 이름만 풀었다
+        self.assertEqual(book.state, seen[1])                     # 화면이 같은 조건으로 같은 카드를 다시 받는다
+        self.assertEqual(book.condition["games"], [])
+        self.assertEqual(r["sets"][0]["items"][0]["ref"], "P1")
+
+    def test_relaxes_one_condition_at_a_time_cumulatively(self):
+        empty = _reco(card_sets=[{"usage": "게임", "items": []}])
+        p, seen = self._seq(empty, empty, _reco())
+        with p:
+            r = TT.find_pcs({"usages": ["게임"], "prefs": ["화이트"], "platform": "AMD", "budget_won": 900_000},
+                            TT.FactBook())
+        self.assertEqual(r["status"], "nearest")
+        self.assertEqual(len(r["relaxed"]), 2)
+        self.assertEqual((seen[1]["prefs"], seen[1]["platform"]), ([], "AMD"))
+        self.assertEqual((seen[2]["prefs"], seen[2]["platform"], seen[2]["budget_won"]), ([], None, 900_000))
+
+    def test_usage_is_never_relaxed_and_nothing_found_stays_empty(self):
+        p, seen = self._seq()
+        with p:
+            r = TT.find_pcs({"usages": ["게임"], "budget_won": 300_000}, TT.FactBook())
+        self.assertEqual(r["status"], "empty")
+        self.assertNotIn("relaxed", r)
+        self.assertTrue(all(s["usages"] == ["게임"] for s in seen))
+
+    def test_found_as_asked_does_not_relax(self):
+        p, seen = self._seq(_reco())
+        with p:
+            r = TT.find_pcs({"usages": ["게임"], "prefs": ["화이트"]}, TT.FactBook())
+        self.assertEqual((r["status"], len(seen)), ("ok", 1))
+
+    def test_prompt_keeps_every_answer_moving(self):
+        self.assertIn("막다른 길로 끝나지 않는다", AG.SYSTEM)
+        self.assertIn("nearest", AG.SYSTEM)
+        self.assertNotIn("일반 설명만 원하는 질문에는 도구를 부르지 않는다", AG.SYSTEM)
+        self.assertNotIn("도구를 부르지 말고, 무엇이 왜 부딪치는지", AG.SYSTEM)

@@ -15,6 +15,7 @@
 
 ■ 결과는 상태를 밝힌다
   ok · empty(조건에 맞는 것이 없음) · needs(조건이 더 필요함) · unknown(자료 없음) · invalid(인자 거절) · error(조회 실패).
+  find_pcs 는 말한 조건으로 0장이면 조건을 하나씩 풀어 찾고 nearest(풀어서 찾은 가장 가까운 PC · asked/relaxed 동봉)로 낸다.
   빈 결과가 「없음」인지 「조회 실패」인지 섞지 않는다. 모르는 가격은 null 로 두고 AI 도 그 사실을 받는다.
 
 ■ 한 턴의 사실은 한 묶음(FactBook)에 있다
@@ -85,8 +86,9 @@ def _invalid(reason: str) -> dict:
 def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
     return [
         {"name": "find_pcs",
-         "description": ("팝콘PC가 지금 판매 중인 조립 PC 중에서 조건에 맞는 것을 찾는다. 손님이 PC 추천·구매를 원할 때만 부른다."
-                         " 설명만 원하는 질문에는 부르지 않는다. 손님이 말하지 않은 조건은 넣지 않는다."),
+         "description": ("팝콘PC가 지금 판매 중인 조립 PC 중에서 조건에 맞는 것을 찾는다. 손님이 PC 추천·구매를 원하거나,"
+                         " 부품·성능을 물어 그 기준에 맞는 PC를 보여 줄 수 있을 때 부른다. 손님이 말하지 않은 조건은 넣지 않는다."
+                         " 말한 조건 그대로 맞는 PC가 없으면 조건을 풀어 찾은 가장 가까운 PC를 status=nearest 로 준다."),
          "parameters": {"type": "object", "additionalProperties": False, "properties": {
              "usages": {"type": "array", "items": {"type": "string", "enum": usage_labels},
                         "description": "용도. 목록에 있는 값만."},
@@ -144,6 +146,33 @@ def _compact_item(it: dict) -> dict:
             "public_configuration": bool(it.get("public_configuration"))}
 
 
+def _relaxations(raw: dict, needs: list[str]) -> list[tuple[str, object]]:
+    """0장일 때 풀어 볼 조건 -- 앞에서부터 하나씩 «누적해서» 푼다. (손님에게 밝힐 말, 바꾸는 함수).
+
+    게임 이름이 확정 목록에 없어 등급을 모르면(needs=game.grade) 다른 조건을 풀어도 0장이라 그것부터 푼다.
+    용도는 풀지 않는다 -- 용도까지 바꾸면 손님이 찾던 PC가 아니다.
+    """
+    steps: list[tuple[str, object]] = []
+    game = raw.get("game") or {}
+
+    def drop_game_names(r: dict) -> None:
+        if r.get("game"):
+            r["game"] = {"names": [], "resolution": (r.get("game") or {}).get("resolution")}
+    names_step = ("게임 이름(%s)은 우리 자료로 사양을 확인하지 못해 게임 이름 없이 해상도 기준으로 찾음"
+                  % ", ".join(game.get("names") or []), drop_game_names)
+    if game.get("names") and "game.grade" in needs:
+        steps.append(names_step)
+    if raw.get("prefs"):
+        steps.append(("%s 조건을 빼고 찾음" % "·".join(raw["prefs"]), lambda r: r.update(prefs=[])))
+    if raw.get("platform"):
+        steps.append(("%s 조건을 빼고 찾음" % raw["platform"], lambda r: r.update(platform=None)))
+    if raw.get("budget_won") is not None:
+        steps.append(("예산 조건을 빼고 찾음", lambda r: r.update(budget_won=None, budget_bound=None)))
+    if game.get("names") and "game.grade" not in needs:
+        steps.append(names_step)
+    return steps
+
+
 def find_pcs(args: dict, book: FactBook) -> dict:
     from . import grid_public as GP
 
@@ -163,16 +192,41 @@ def find_pcs(args: dict, book: FactBook) -> dict:
     units = args.get("units")
     if units is not None and (type(units) is not int or not 1 <= units <= 500):
         return _invalid("units 는 1~500 사이 정수(PC 대수)여야 한다")
+    asked = {"usages": usages, "budget_won": budget, "budget_bound": args.get("budget_bound"), "games": games,
+             "resolution": args.get("resolution"), "platform": args.get("platform"), "prefs": prefs}
     raw = {"usages": usages, "budget_won": budget, "budget_bound": args.get("budget_bound"),
            "platform": args.get("platform"), "prefs": prefs}
     if games or args.get("resolution"):
         # 등급·grade_src 는 받지 않는다 -- 확정 목록 등급만 서버가 붙인다(모듈 docstring 「읽기만 한다」).
         raw["game"] = {"names": games, "resolution": args.get("resolution")}
     book.units = units if units and units >= 2 else book.units
-    res = GP.recommend(GP.RecommendBody(state=raw, nav=nav, anchor_code=book.anchor_code if nav else None,
-                                        wants={"units": book.units} if book.units else None))
+
+    def ask(state: dict) -> dict:
+        return GP.recommend(GP.RecommendBody(state=state, nav=nav, anchor_code=book.anchor_code if nav else None,
+                                             wants={"units": book.units} if book.units else None))
+
+    def count(r: dict) -> int:
+        return sum(1 for cs in r.get("card_sets") or [] for it in (cs.get("items") or [])[:MAX_ITEMS_PER_SET]
+                   if type(it.get("product_code")) is int)
+
+    res = ask(raw)
+    first_needs = res.get("needs") or []
+    relaxed: list[str] = []
+    if not count(res) and not nav:
+        # 말한 조건 그대로는 0장이면 막다른 답으로 끝내지 않는다(2026-10-16 중헌 님 「제대로된 답변과 제품을 보여주던,
+        # 대안을 내놓던 해야 해」). 조건을 하나씩 풀어 «가장 가까운» 판매 PC 를 찾고, 무엇을 풀었는지 함께 준다.
+        try_raw = dict(raw)
+        for label, change in _relaxations(raw, first_needs):
+            change(try_raw)
+            relaxed.append(label)
+            alt = ask(try_raw)
+            if count(alt):
+                res, raw = alt, try_raw
+                break
+        else:
+            relaxed = []
     book.condition = {"usages": usages, "budget_won": res.get("budget_won"), "budget_bound": res.get("budget_bound"),
-                      "games": games, "game_grade": res.get("game_grade"),
+                      "games": (raw.get("game") or {}).get("names") or [], "game_grade": res.get("game_grade"),
                       "resolution": res.get("game_resolution"), "platform": res.get("platform")}
     book.anchor_code = res.get("anchor_code") or book.anchor_code
     book.state, book.nav = raw, nav
@@ -189,8 +243,9 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                      "min_level_work": cs.get("min_level_work"), "items": out,
                      "empty_reason": cs.get("empty_note") or cs.get("empty_reason")})
     found = sum(len(s["items"]) for s in sets)
-    status = "ok" if found else ("needs" if res.get("needs") else "empty")
-    return _res(status, snapshot_id=book.snapshot_id, as_of=book.as_of, condition=book.condition,
+    status = ("nearest" if relaxed else "ok") if found else ("needs" if res.get("needs") else "empty")
+    extra = {"asked": asked, "relaxed": relaxed, "asked_needs": first_needs} if relaxed else {}
+    return _res(status, snapshot_id=book.snapshot_id, as_of=book.as_of, condition=book.condition, **extra,
                 needs=res.get("needs") or [], assumed=res.get("assumed") or [],
                 dropped=[{"field": d.get("field"), "reason": d.get("reason")} for d in res.get("dropped") or []],
                 notes=res.get("talk_notes") or [], sets=sets)
