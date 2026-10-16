@@ -163,6 +163,21 @@ class ParseTests(unittest.TestCase):
                 self.assertIn(token, condition.cpu)
                 self.assertIsNone(F.cpu_rule(condition.cpu))
 
+    def test_next_part_clause_is_not_a_cpu_suffix(self):
+        for request, cpu, other in (
+                ('i9 14900 RAM 32GB', 'i9 14900', {'ram_gb': 32}),
+                ('i9 14900 RTX 5060 Ti', 'i9 14900', {'gpu': 'RTX 5060 TI'}),
+                ('Ultra7 265 SSD 1TB', 'Ultra7 265', {'ssd_gb': 1000}),
+                ('i9 14900 K RAM 32GB', 'i9 14900K', {'ram_gb': 32}),
+                ('i9 14900 SSD1TB', 'i9 14900', {'ssd_gb': 1000}),
+                ('Ryzen 7 9700 X RTX 5060 Ti', 'Ryzen 7 9700X', {'gpu': 'RTX 5060 TI'})):
+            with self.subTest(request=request):
+                condition = F.parse_text(request)
+                self.assertEqual(condition.cpu, cpu)
+                self.assertIsNotNone(F.cpu_rule(condition.cpu))
+                for key, expected in other.items():
+                    self.assertEqual(getattr(condition, key), expected)
+
 
 @patch.object(F, 'load_specs', side_effect=specs_for)
 @patch.object(F, 'load', side_effect=load_rows)
@@ -233,6 +248,21 @@ class BuildTests(unittest.TestCase):
                 with self.subTest(request=request):
                     res = F.start_build(None, F.parse_text(request), RULES)
                     self.assertEqual(next(l for l in res['lines'] if l['slot'] == 'CPU')['product_code'], code)
+
+    def test_multi_part_text_build_preserves_cpu_and_other_requests(self, *_):
+        models = [row(204, 'CPU', '인텔 코어i9-14900', 100000), row(205, 'CPU', '인텔 코어 Ultra7 265', 200000)]
+        with patch(__name__ + '.ROWS', ROWS + models), patch.dict(SPECS, {204: dict(SPECS[1]), 205: dict(SPECS[1])}):
+            for request, cpu_code, other_slot, other_code in (
+                    ('i9 14900 RAM 32GB', 204, 'RAM', 22),
+                    ('i9 14900 RTX 5060 Ti', 204, 'GPU', 30),
+                    ('Ultra7 265 SSD 1TB', 205, 'SSD', 61)):
+                with self.subTest(request=request):
+                    res = F.start_build(None, F.parse_text(request), RULES)
+                    by = {l['slot']: l for l in res['lines']}
+                    self.assertEqual(by['CPU']['product_code'], cpu_code)
+                    self.assertEqual(by[other_slot]['product_code'], other_code)
+                    if other_slot == 'RAM':
+                        self.assertEqual(by['RAM']['quantity'], 2)
 
     def test_requested_ultra_model_does_not_pick_cheaper_same_series(self, *_):
         # 호환 사양은 합성 fixture다. 실제 제품 지원 여부를 주장하지 않는다.

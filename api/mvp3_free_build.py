@@ -100,10 +100,18 @@ def gpu_matches(name, want):
     return False
 
 
+_CPU_NEXT_PART = (r'(?:RAM|SSD|HDD|CPU|GPU|DDR[345]|RTX|GTX|RX|ARC|NVIDIA|GEFORCE|RADEON|'
+                  r'POWER|PSU|CASE|COOLER|MB|MOTHERBOARD)(?=\d|[^A-Za-z0-9]|$)')
+
+
 def _cpu_model_spacing(s):
     """모델 숫자와 ASCII 접미사 사이 공백만 접는다. 뒤의 한국어 설명은 건드리지 않는다."""
+    def join(match):
+        if re.match(_CPU_NEXT_PART, match[2], re.I):
+            return match[0]       # RAM/SSD/RTX 등 다음 부품절을 CPU 접미사로 붙이지 않는다.
+        return match[1] + match[2]
     return re.sub(r'(?<![A-Za-z0-9])([GNJ]?\d{3,5})\s+([A-Za-z][A-Za-z0-9]*)(?![A-Za-z0-9])',
-                  r'\1\2', s, flags=re.I)
+                  join, s, flags=re.I)
 
 
 def cpu_rule(s):
@@ -182,9 +190,10 @@ def parse_text(s):
         if m:
             family = 'RTX' if m[1].upper() == 'RTS' else m[1].upper()
             out['gpu'] = family + ' ' + gpu[0] + (' ' + gpu[1] if gpu[1] else '')
-    cpu = (re.search(r'(?<![A-Za-z0-9])i\s*[3579](?:\s*-?\s*\d{4,5}[A-Za-z0-9]*(?:\s+[A-Za-z][A-Za-z0-9]*)?)?', u, re.I)
-           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*-?\s*\d{3}[A-Za-z0-9]*(?:\s+[A-Za-z][A-Za-z0-9]*)?)?', u, re.I)
-           or re.search(r'(?:라이젠|ryzen)\s*[3579](?:\s*-?\s*\d{4}[A-Za-z0-9]*(?:\s+[A-Za-z][A-Za-z0-9]*)?)?', u, re.I)
+    cpu_tail = r'[A-Za-z0-9]*(?:\s+(?!' + _CPU_NEXT_PART + r')[A-Za-z][A-Za-z0-9]*)?'
+    cpu = (re.search(r'(?<![A-Za-z0-9])i\s*[3579](?:\s*-?\s*\d{4,5}' + cpu_tail + r')?', u, re.I)
+           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*-?\s*\d{3}' + cpu_tail + r')?', u, re.I)
+           or re.search(r'(?:라이젠|ryzen)\s*[3579](?:\s*-?\s*\d{4}' + cpu_tail + r')?', u, re.I)
            or re.search(r'(?<![0-9])\d{4,5}\s*(?:X3D|KF|KS|K)(?![0-9A-Za-z])', u, re.I)
            or re.search(r'(?<![0-9])\d{3}\s*(?:KF|K|F|HX|H|U|V)(?![0-9A-Za-z])', u, re.I))
     if cpu:
