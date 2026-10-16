@@ -57,12 +57,13 @@ test('unsent draft typed on the talk screen comes back to the first screen as an
   }finally{a.close();}
 });
 
-test('generated first-screen guide text is not handed over; an emptied input clears a stale handoff',async()=>{
+test('an untouched first screen hands nothing over; an emptied input clears a stale handoff',async()=>{
+  // 옛 입구 주소(#purpose)도 단일 첫 화면(상담)으로 연다(2026-10-16). 고객이 쓰지 않은 입력은 넘기지 않는다.
   const ss=storage(),a=page('index.html',ss,'#purpose');
   try{
-    a.w.document.querySelector('[data-usage="game"]').click();
-    assert.ok(a.input.value.trim(),'gateway generated a guide sentence');a.leave();
-    assert.equal(ss.getItem(LF.DRAFT_KEY),null,'auto-generated text is not the customer draft');
+    assert.equal(a.w.document.querySelector('[data-usage]'),null,'no usage gateway');
+    assert.equal(a.input.value,'');a.leave();
+    assert.equal(ss.getItem(LF.DRAFT_KEY),null,'nothing the customer did not write is handed over');
   }finally{a.close();}
   ss.setItem(LF.DRAFT_KEY,JSON.stringify({version:1,saved_at:Date.now(),text:'옛 문장'}));
   const b=page('talk.html',ss);

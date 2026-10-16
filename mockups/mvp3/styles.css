@@ -1094,3 +1094,17 @@ a.tf-wide.primary{color:#fff}
   .tf-detail .dv2-row>td>details>summary{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"cat act" "model act" "chg act" "more act";gap:4px 12px}
   .tf-detail .dv2-chg{text-align:left}
 }
+/* 첫 화면 아래 「팝콘PC가 맞춰 둔 PC」(welcome-pcs.js · 2026-10-16 단일 첫 화면). 기존 카드 선·글자색만 쓴다. */
+.welcome-pcs{margin:20px 0 24px;padding:24px 28px;border:1px solid var(--line);border-radius:11px;text-align:left}
+.welcome-pcs header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:16px}
+.welcome-pcs h3{font-size:22px;font-weight:750;letter-spacing:-.4px;margin:0}
+.welcome-pcs header a{font-size:15px;color:var(--muted)}
+.welcome-pcs ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.welcome-pc{display:flex;flex-direction:column;gap:8px;height:100%;padding:18px;border:1px solid var(--line);border-radius:10px;color:inherit;text-decoration:none;box-sizing:border-box}
+.welcome-pc:hover,.welcome-pc:focus-visible{border-color:var(--green);background:var(--tint)}
+.welcome-pc strong{font-size:17px;line-height:1.4;word-break:keep-all}
+.welcome-pc span{font-size:14px;line-height:1.5;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.welcome-pc b{font-size:18px;margin-top:auto;color:var(--green)}
+.welcome-pc small{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
+.welcome-pc small .ui-icon{width:16px;height:16px}
+@media(max-width:760px){.welcome-pcs{padding:18px 16px}.welcome-pcs h3{font-size:19px}}
