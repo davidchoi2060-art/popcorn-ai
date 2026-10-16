@@ -52,3 +52,14 @@ def judge(sp, usage, level):
 def reached(sp, usage):
     """그 용도에서 넘은 가장 높은 단계 이름, 없으면 None."""
     return evaluate(sp).get(usage, (None, []))[0]
+
+
+def usage_summary(parts):
+    """구성표 부품으로 넘은 용도와 그 최고 단계 [{usage, level}] — 게임 먼저, 나머지는 기준표 순서.
+
+    「새로 구성된 PC」(2026-10-16 중헌 님 — 관리자가 부품으로 용도를 맞춰 구성한 완제조립PC) 카드에
+    용도를 적는 근거다. 못 넘은 용도·정보 없음은 싣지 않는다(지어내지 않는다).
+    """
+    reached_all = evaluate(spec_from_parts(parts))
+    order = ['게임'] + [u for u in REQUIREMENTS if u != '게임']
+    return [dict(usage=u, level=reached_all[u][0]) for u in order if reached_all.get(u, (None,))[0]]

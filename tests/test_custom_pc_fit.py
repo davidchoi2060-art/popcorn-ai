@@ -27,6 +27,14 @@ def pc(code, price, **kw):
 
 
 class Spec(unittest.TestCase):
+    def test_usage_summary_lists_reached_usages_game_first(self):
+        got = F.usage_summary(parts())
+        self.assertEqual(got[0], dict(usage='게임', level=F.reached(F.spec_from_parts(parts()), '게임')))
+        self.assertTrue(all(x['level'] for x in got))
+        self.assertEqual(len({x['usage'] for x in got}), len(got))
+        # 아무것도 못 읽으면 용도를 지어내지 않는다
+        self.assertEqual(F.usage_summary([dict(slot='CASE', slot_label='케이스', name='케이스', quantity=1)]), [])
+
     def test_reads_part_names_with_quantity(self):
         sp = F.spec_from_parts(parts())
         self.assertEqual((sp['ram'], sp['ssd']), (32, 1000))

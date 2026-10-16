@@ -84,7 +84,7 @@ def _row(r, full: bool) -> dict:
 
 _SELECT = f"""
     SELECT i.*, {IS_TEST} AS is_test,
-           COALESCE(s.product_snapshot->>'name', '새로 나온 PC · ' || (pc.content->>'title')) AS product_name,
+           COALESCE(s.product_snapshot->>'name', '새로 구성된 PC · ' || (pc.content->>'title')) AS product_name,
            o.name AS assignee_name
       FROM purchase_inquiries i
       LEFT JOIN mvp3_saved_recommendations s ON s.quote_id = i.quote_id

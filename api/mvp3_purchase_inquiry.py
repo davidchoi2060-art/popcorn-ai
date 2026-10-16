@@ -110,7 +110,7 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
                 code = snap_code if type(snap_code) is int else code
         cfg = None
         if body.configuration_id is not None:
-            # 「새로 나온 PC」에서 온 신청만 잇는다 — 지금 공개 중인 신규 조립PC 일 때만(부품 상품화 4단계).
+            # 「새로 구성된 PC」에서 온 신청만 잇는다 — 지금 공개 중인 신규 조립PC 일 때만(부품 상품화 4단계).
             from .custom_pc import customer_list
             if not customer_list(conn, [body.configuration_id]):
                 raise HTTPException(409, '이 PC는 지금 공개되어 있지 않아요. 목록을 새로 열어 확인해 주세요.')
