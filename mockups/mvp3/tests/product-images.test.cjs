@@ -109,35 +109,60 @@ test('approved-ui: selected BOM, photo, game context and native GPU disclosure s
   const talkState={usages:['게임'],budget_won:1500000,game:{names:['CODE/MOCK 게임'],resolution:'1080p'}};
   const h=harness({item,talkState,groups:[{kind:'sold',usage_grid:'게임',usage:'게임',game_context:gameContext,items:[item]}]});try{
     await h.flow.submit('CODE/MOCK 같은 문맥');h.click('[data-action=detail]');
-    const doc=h.w.document;assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,2);assert.match(doc.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
+    const doc=h.w.document;assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,2);
+    // 완제품(팝콘PC 판매 상품) 상세 = 승인 시안 「상품 구성 확인」.
+    assert.equal(doc.querySelector('.tf-detail h2').textContent,'상품 구성 확인');assert.equal(doc.querySelector('.tf-detail .tf-eyebrow').textContent,'팝콘PC 판매 상품');
+    const gameShownOnDetail=/같은 게임 문맥의 안내/.test(doc.querySelector('#view').textContent);
     assert.deepEqual(clone(h.flow.state.selectionState),talkState);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 하나/);assert.match(doc.querySelector('#view').textContent,/고객 추천 이유 둘/);
     const selected=clone(h.flow.state.selected),calls=clone(h.calls);doc.querySelector('details[data-detail="bom-1"]').open=true;h.flow.emit();
     assert.equal(doc.querySelector('details[data-detail="bom-1"]').open,true);assert.match(doc.querySelector('tr[data-part="bom-1"]').textContent,/Fixture 8GB/);
-    assert.ok([...doc.querySelectorAll('.public-bom [data-action=unavailable]')].every(b=>b.disabled));assert.equal(doc.querySelectorAll('.public-bom tbody .final-part-price').length,0,'상세 v2 줄에는 금액 칸이 없다');
+    // 완제품은 이 화면에서 부품을 바꾸지 않는다: 줄의 「변경」은 팝콘PC 안내창만 열고 부품 선택 패널·요청을 만들지 않는다.
+    const changes=[...doc.querySelectorAll('.public-bom [data-action=build-options]')];assert.equal(changes.length,2);assert.ok(changes.every(b=>b.textContent==='변경'));
+    changes[1].click();assert.ok(doc.querySelector('[data-mall-dialog]'),'mall guidance dialog');
+    // 이 fixture 에는 상품 주소(mall_url)가 없다 -- 안내창은 이동 단추 없이 주소 확인 중이라고만 말한다.
+    assert.equal(doc.querySelector('[data-mall-dialog] [data-action=mall-move]'),null);assert.ok(doc.querySelector('[data-mall-dialog] [data-mall-state=no-url]'));
+    assert.ok(doc.querySelector('aside.tf-side [data-action=mall-view]').disabled);assert.ok(doc.querySelector('aside.tf-side [data-mall-state=no-url]'));
+    assert.equal(h.flow.state.build.ordinal,null);assert.equal(doc.querySelector('.dv2-side.is-panel'),null);assert.deepEqual(h.calls,calls);
+    doc.querySelector('[data-mall-dialog] .mall-dlg-actions [data-action=mall-dialog-close]').click();assert.equal(doc.querySelector('[data-mall-dialog]'),null);
+    assert.equal(doc.querySelectorAll('.public-bom tbody .final-part-price').length,0,'상세 v2 줄에는 금액 칸이 없다');
     assert.equal(doc.querySelectorAll('.dv2-row .dv2-model').length,2);assert.match(doc.querySelector('.public-bom-photo').textContent,/정보 없음/);
     doc.querySelector('[data-product-image]').dispatchEvent(new h.w.Event('error'));assert.equal(doc.querySelector('figcaption').textContent,NOTICE);assert.equal(doc.querySelector('[data-product-image-status]').hidden,false);
-    assert.deepEqual(clone(h.flow.state.selected),selected);assert.deepEqual(h.calls,calls);assert.match(doc.querySelector('#actions').textContent,/900,000원/);
-    h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');assert.ok(doc.querySelector('.public-bom-information .live-explanation'));assert.equal(doc.querySelector('.public-bom-information').open,false);
+    assert.deepEqual(clone(h.flow.state.selected),selected);assert.deepEqual(h.calls,calls);
+    // 하단 액션바는 숨고, 금액·주 동작은 오른쪽 칸에 있다(옛 「선택한 구성 확인」 단추 없음).
+    assert.equal(doc.querySelector('#actions').hidden,true);assert.equal(doc.querySelector('[data-action=final]'),null);
+    assert.equal(doc.querySelector('aside.tf-side [data-dv2-total]').textContent,'900,000원');assert.ok(doc.querySelector('aside.tf-side [data-action=mall-view]'));
+    // 완제품이 final 화면이 되면(보관 견적 열기 등) 같은 상세를 그린다 -- 옛 최종 견적 화면은 없다.
+    h.flow.navigate('final');assert.equal(h.flow.state.screen,'final');
+    assert.equal(doc.querySelector('.tf-detail h2').textContent,'상품 구성 확인');assert.equal(doc.querySelector('.public-bom-information'),null);assert.doesNotMatch(doc.querySelector('#view').textContent,/최종 견적 확인/);
+    assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,2);
     assert.equal(doc.querySelector('[data-product-image]').getAttribute('src'),URL);assert.deepEqual(h.calls,calls);assert.deepEqual(h.errors,[]);
+    // 게임 안내(game_context)는 고른 추천 묶음의 것이 상세에 남아야 한다. (마지막에 확인 -- 앞의 검사를 가리지 않게)
+    assert.ok(gameShownOnDetail,'selected group game_context (why_this_pc) is shown on the product detail');
   }finally{h.close();}
 });
 test('approved-ui: same SKU in another usage and a loaded saved quote cannot inherit the prior game context',async()=>{
   const item={...product,photo:available,public_configuration:publicBom()};
   const h=harness({item,groups:[{kind:'sold',usage_grid:'게임',game_context:gameContext,items:[item]},{kind:'sold',usage_grid:'영상 편집',items:[item]}]});try{
-    await h.flow.submit('CODE/MOCK 재선택');h.flow.select(0);assert.match(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
+    await h.flow.submit('CODE/MOCK 재선택');h.flow.select(0);const gameShown=/같은 게임 문맥의 안내/.test(h.w.document.querySelector('#view').textContent);
     h.flow.navigate('results');h.flow.select(1);assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
-    h.flow.select(0);await h.flow.list();h.flow.load(qid);assert.equal(h.flow.state.screen,'final');assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
-    assert.match(h.w.document.querySelector('.live-summary').textContent,/보관 시점/);assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,2);
+    h.flow.select(0);await h.flow.list();h.click('[data-action=load]');assert.equal(h.flow.state.screen,'final');assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/같은 게임 문맥의 안내/);
+    assert.match(h.w.document.querySelector('.tf-detail .dv2-head').textContent,/보관 시점/);assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,2);
     assert.equal(h.w.document.querySelector('figcaption').textContent,NOTICE);h.flow.reset();assert.equal(h.flow.state.selected,null);assert.equal(h.flow.state.groups.length,0);
     assert.deepEqual(h.errors,[]);
+    // 다른 용도·보관 견적으로 새지 않는다는 위 검사는 원래 용도에서는 보였다는 전제가 있어야 의미가 있다. (마지막에 확인)
+    assert.ok(gameShown,'the game usage selection shows its own game_context');
   }finally{h.close();}
 });
 test('approved-ui: missing/rejected BOM preserves the complete-product fallback and valid photo binding',async()=>{
   for(const configuration of [undefined,{...publicBom(),product_code:113835}]){
     const h=harness({item:{...product,photo:available,public_configuration:configuration}});try{
       await recommend(h);h.click('[data-action=detail]');assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,0);assert.ok(h.w.document.querySelector('tr[data-part=pc]'));
+      assert.equal(h.w.document.querySelector('.tf-detail'),null,'구성표가 없으면 옛 상세 배치');assert.ok(h.w.document.querySelector('.dt-detail'));
       assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),URL);assert.match(h.w.document.querySelector('#actions').textContent,/900,000원/);
-      h.click('[data-action=final]');assert.ok(h.w.document.querySelector('details[data-detail=spec] .live-explanation'));assert.equal(h.w.document.querySelector('details[data-detail=spec]').open,false);assert.equal(h.calls.length,2);
+      assert.equal(h.w.document.querySelector('#actions').hidden,false);assert.equal(h.w.document.querySelector('[data-action=back]'),null);assert.ok(h.w.document.querySelector('[data-mall-state=no-url]'));assert.ok(h.w.document.querySelector('#actions [data-action=mall-view]'));assert.equal(h.w.document.querySelector('[data-action=final]'),null);
+      // final 화면이 되어도 같은 완제품 상세(옛 최종 견적 화면 없음).
+      h.flow.navigate('final');assert.equal(h.flow.state.screen,'final');assert.ok(h.w.document.querySelector('.dt-detail tr[data-part=pc]'));assert.doesNotMatch(h.w.document.querySelector('#view').textContent,/최종 견적 확인/);
+      assert.equal(h.w.document.querySelectorAll('tr[data-part^="bom-"]').length,0);assert.equal(h.w.document.querySelector('[data-product-image]').getAttribute('src'),URL);assert.equal(h.calls.length,2);
     }finally{h.close();}
   }
 });

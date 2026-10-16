@@ -51,6 +51,22 @@ class ContactRules(unittest.TestCase):
         self.assertEqual(v, {'has_contact': True, 'masked_phone': '010-****-5678', 'name': '홍'})
         self.assertEqual(C.view(None), {'has_contact': False, 'masked_phone': None, 'name': None})
 
+    def test_consent_text_says_inquiry_copy_goes_with_the_contact(self):
+        self.assertIn('상담 신청에 함께 보낸 연락처도 같은 날 지웁니다', C.CONSENT_TEXT)
+
+    def test_saved_product_keeps_server_kind_and_mall_url(self):
+        # 독립 검수 F2: 보관 스냅숏이 서버가 판정한 종류를 버리지 않는다.
+        item = {'product_code': 1, 'name': 'PC', 'price': 100}
+        mall = m.public_product({**item, 'mall_url': 'https://www.popcornpc.co.kr/goods/1'})
+        self.assertEqual((mall['mall_url'], mall['ai_composed']), ('https://www.popcornpc.co.kr/goods/1', False))
+        ai = m.public_product({**item, 'ai_composed': True})
+        self.assertEqual((ai['mall_url'], ai['ai_composed']), (None, True))
+        # 주소가 없다는 것만으로 AI 구성이 되지 않는다 · 쇼핑몰 주소가 있으면 AI 표시를 믿지 않는다 · 참 값만 받는다.
+        self.assertFalse(m.public_product(item)['ai_composed'])
+        self.assertFalse(m.public_product({**item, 'ai_composed': True, 'mall_url': 'https://x.kr/1'})['ai_composed'])
+        self.assertFalse(m.public_product({**item, 'ai_composed': 'true'})['ai_composed'])
+        self.assertIsNone(m.public_product({**item, 'mall_url': 'javascript:alert(1)'})['mall_url'])
+
     def test_one_definition_of_regex_and_keep_days(self):
         self.assertIs(PI.PHONE_RE, C.PHONE_RE)
         self.assertIs(PI.EMAIL_RE, C.EMAIL_RE)
@@ -238,6 +254,9 @@ class OnPostgres(unittest.TestCase):
         self.assertEqual((row['topic'], row['contact_phone'], row['contact_name'], row['contact_email'], row['message'],
                           row['product_code']), ('주문 희망', '010-1234-5678', '홍', 'a@b.co', '급해요', 123))
         self.assertTrue(dt.timedelta(days=179) < row['keep'] <= dt.timedelta(days=180))
+        same = self.one('SELECT i.purge_at = c.purge_at FROM purchase_inquiries i JOIN mvp3_visitor_contacts c'
+                        ' ON c.user_id = i.user_id WHERE i.inquiry_no = :n', n=a['inquiry_no'])
+        self.assertTrue(same)
         b = self.from_quote(qid).json()
         self.assertEqual((b['already'], b['inquiry_no']), (True, a['inquiry_no']))
         self.assertEqual(self.one('SELECT count(*) FROM purchase_inquiries WHERE quote_id = :q', q=qid), 1)
@@ -271,7 +290,27 @@ class OnPostgres(unittest.TestCase):
         res = self.client.post('/api/mvp3/purchase-inquiries/from-quote', json={'quote_id': qid},
                                headers={'X-Access-Key': self.key, 'Origin': 'https://evil.invalid'})
         self.assertEqual(res.status_code, 403)
-        self.assertEqual(self.from_quote(qid, topic='기타').status_code, 422)
+        self.assertEqual(self.from_quote(qid, marketing=True).status_code, 422)
+        self.assertEqual(self.from_quote(qid, topic='새 주제').status_code, 422)
+        self.assertEqual(self.one('SELECT count(*) FROM purchase_inquiries WHERE user_id = :u', u=self.uid), 0)
+
+    def test_from_quote_topic_is_one_of_existing_topics(self):
+        qid = self.quote(); self.put()
+        r = self.from_quote(qid, topic='여러 대 구매')
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.one('SELECT topic FROM purchase_inquiries WHERE inquiry_no = :n', n=r.json()['inquiry_no']),
+                         '여러 대 구매')
+
+    def test_inquiry_copy_never_outlives_the_contact(self):
+        # 독립 검수 F3: 등록 뒤 179일에 접수해도 신청서 연락처는 연락처와 같은 날 지운다(접수일 + 180일이 아니다).
+        qid = self.quote(); self.put()
+        self.run_sql("UPDATE mvp3_visitor_contacts SET purge_at = now() + interval '1 day',"
+                     " consent_at = now() - interval '179 days' WHERE user_id = :u", u=self.uid)
+        r = self.from_quote(qid).json()
+        keep = self.one('SELECT purge_at - now() FROM purchase_inquiries WHERE inquiry_no = :n', n=r['inquiry_no'])
+        self.assertTrue(dt.timedelta(hours=23) < keep <= dt.timedelta(days=1), keep)
+        self.assertTrue(self.one('SELECT i.purge_at = c.purge_at FROM purchase_inquiries i JOIN mvp3_visitor_contacts c'
+                                 ' ON c.user_id = i.user_id WHERE i.inquiry_no = :n', n=r['inquiry_no']))
 
     def test_purged_inquiry_is_not_reused(self):
         qid = self.quote(); self.put()

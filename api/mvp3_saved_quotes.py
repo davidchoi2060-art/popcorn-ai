@@ -90,6 +90,12 @@ def public_product(item):
     out['spec'] = public_spec(item.get('spec'))
     out['reasons'] = [v for v in item.get('reasons', []) if isinstance(v, str)]
     out['price_confirmed'] = False
+    # 상품 종류는 서버가 판정한 값만 보관한다(2026-10-16 독립 검수 F2). 쇼핑몰 상품 주소는 공개값이고
+    # 보관 뒤 다시 열 때도 「팝콘PC에서 상품 보기」가 같은 주소를 쓴다. 팝콘AI 구성은 서버 추천 항목이
+    # ai_composed 를 true 로 실었고 쇼핑몰 주소가 없을 때만 true 다 -- 고객 요청 값이나 주소 누락만으로 정하지 않는다.
+    url = item.get('mall_url')
+    out['mall_url'] = url if isinstance(url, str) and url.startswith('https://') and len(url) <= 2048 else None
+    out['ai_composed'] = item.get('ai_composed') is True and out['mall_url'] is None
     return out
 
 

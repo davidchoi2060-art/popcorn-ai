@@ -104,18 +104,24 @@ test('options come from the server; picking one recomputes on the server and cha
     assert.ok(text(row).includes('램 32GB')&&text(row).includes('기본 구성: 램 16GB')&&text(row).includes('변경됨')&&text(row).includes('+100,000원'));
     assert.ok(!text(row).includes('110,000원')&&!text(row).includes('60,000원'),'바꾼 줄에도 부품 판매가가 없다');
     assert.ok(row.querySelector('[data-action=build-undo]'));
-    const side=text(d.querySelector('.dv2-side'));
-    assert.ok(side.includes('1,400,000원')&&side.includes('기본 구성 금액1,300,000원')&&side.includes('부품 변경 금액+100,000원')&&side.includes('변경 내역 1개'));
+    // 2026-10-16 P2-1: 오른쪽 aside 「선택한 구성」 -- 「변경 내용 N개」 + 줄별 차액 + 기본 구성 금액.
+    const side=text(d.querySelector('aside.tf-side'));
+    assert.ok(side.includes('선택한 구성')&&side.includes('1,400,000원')&&side.includes('기본 구성 금액1,300,000원')&&side.includes('메모리 변경+100,000원'),side);
+    assert.equal(text(d.querySelector('aside.tf-side [data-pc-total-move]')),'변경 내용 1개');
     assert.doesNotMatch(text(d.querySelector('.dv2-parts')),/조립·기타|부품 합계/);
     assert.equal(d.querySelector('.dv2-parts tfoot'),null);
-    assert.ok(text(d.querySelector('#actions')).includes('1,400,000원'));
+    // 하단 액션바는 구성표 있는 상세에서 숨는다. 「선택한 구성 확인」·「이전 화면」은 없고 주 버튼은 aside 의 「견적 보관하기」다.
+    assert.equal(d.querySelector('#actions').hidden,true);
+    assert.equal(d.querySelector('[data-action=final]'),null);assert.equal(d.querySelector('[data-action=back]'),null);
+    assert.equal(text(d.querySelector('aside.tf-side [data-action=save]')),'견적 보관하기');
+    assert.ok(text(d.querySelector('aside.tf-side [data-dv2-total]')).includes('1,400,000원'));
     assert.equal(d.activeElement?.dataset?.ordinal,'1','닫으면 포커스가 연 변경 단추로 돌아온다');
     assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리 부품을 「램 32GB」 제품으로 바꿨어요.'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
 
-test('save sends the changed rows and the server total; handoff says the mall page is the base build',async()=>{
+test('save sends the changed rows and the server total; the kept page names the changed part and the handoff keeps the server number',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
@@ -125,8 +131,16 @@ test('save sends the changed rows and the server total; handoff says the mall pa
     const save=h.calls.find(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST').body;
     assert.equal(save.expected_price,1400000);assert.deepEqual(save.changes,[{ordinal:1,product_code:502}]);
     assert.equal(h.flow.state.savedQuote.product.build.changes.length,1);
-    await h.flow.handoff();await until(()=>d.querySelector('.live-handoff'));
-    assert.ok(text(d.querySelector('.live-handoff')).includes('쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 1개는 연결 번호 HO-4001로 기록해 두었어요.'));
+    // 2026-10-16 P2-1: 보관 뒤에는 옛 최종 화면(인계 칸 .live-handoff) 대신 보관 완료 화면이 바꾼 부품과 서버 금액을 말한다.
+    await until(()=>d.querySelector('section.tf-kept[data-keep-done]'));
+    const kept=d.querySelector('section.tf-kept[data-keep-done]');
+    assert.ok(text(kept).includes('메모리 변경 · 램 32GB')&&text(kept.querySelector('.tf-card-price')).includes('1,400,000원'),text(kept));
+    assert.equal(d.querySelector('.live-handoff'),null,'old handoff panel is gone');
+    // 인계 기록은 서버가 준 연결 번호와 바꾼 부품을 그대로 싣는다. 맞춤 구성은 몰 이동 화면(.tf-moved)을 그리지 않는다.
+    await h.flow.handoff();await until(()=>h.flow.state.handoff);
+    assert.equal(h.flow.state.handoff.handoff_no,'HO-4001');assert.equal(h.flow.state.handoff.changes,1,'the changed part is recorded with the handoff number');
+    assert.equal(h.calls.filter(c=>c.url.endsWith('/handoff')).length,1);
+    assert.equal(d.querySelector('.tf-moved'),null);assert.ok(d.querySelector('section.tf-kept[data-keep-done]'));
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -149,24 +163,28 @@ test('a refused combination keeps the old price and says why; reset goes back to
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>g.flow.state.selected.price===1300000);
     assert.equal(g.flow.state.selected.build,null);
-    assert.ok(text(d.querySelector('.dv2-side')).includes('변경 없음')&&text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
+    // 변경이 없으면 aside 에 「변경 내용」 칸과 「전체 원래 구성으로」가 없다.
+    assert.equal(d.querySelector('aside.tf-side [data-pc-total-move]'),null);assert.equal(d.querySelector('[data-action=build-reset]'),null);
+    assert.ok(text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
   }finally{g.close();}
 });
 
-test('the summary keeps the budget line after a change and judges it on the new total',async()=>{
+test('the summary judges the budget on the new total after a change (over-budget line only)',async()=>{
   const h=harness({total:1580300});try{await toDetail(h);const d=h.d;
-    const line=()=>d.querySelector('.dv2-notes p:last-child');
-    assert.equal(text(line()),'예산보다 200,000원 낮아요');assert.ok(line().classList.contains('green'));
+    // 2026-10-16 P2-1: aside 의 예산 줄(.dv2-notes)은 예산을 넘을 때만 나온다(tfOver). 예산 안이면 줄이 없다.
+    const line=()=>d.querySelector('aside.tf-side .dv2-notes p:last-child');
+    assert.equal(line(),null,'within budget: no budget line in the aside');
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     await until(()=>d.querySelector('[data-build-option]'));
     pickOption(d,502);
     await until(()=>h.flow.state.selected.price===1580300);
-    const box=text(d.querySelector('.dv2-side'));
-    assert.ok(box.includes('1,580,300원')&&box.includes('기본 구성 금액1,300,000원')&&box.includes('+280,300원'),box);
+    const box=text(d.querySelector('aside.tf-side'));
+    assert.ok(box.includes('1,580,300원')&&box.includes('기본 구성 금액1,300,000원'),box);
+    assert.ok(text(d.querySelector('.dv2-mchanges')).includes('기본 구성보다 280,300원 추가'),'the move is judged on the new server total');
     assert.equal(text(line()),'예산보다 80,300원 높아요');assert.ok(line().classList.contains('warn-text'));
     d.querySelector('[data-action=build-reset]').click();
     await until(()=>h.flow.state.selected.price===1300000);
-    assert.equal(text(line()),'예산보다 200,000원 낮아요');assert.ok(line().classList.contains('green'));
+    assert.equal(line(),null,'back within budget: the over-budget line is gone');
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -180,7 +198,9 @@ test('after a part change the detail says the product name is the base build and
     await until(()=>h.flow.state.selected.price===1400000);
     // 상품 이름은 식별 정보로 두고, 바꾼 내용은 「변경 내역」에 구분해 적는다.
     assert.equal(text(d.querySelector('.dv2-name')),'PC 12');
-    assert.ok(text(d.querySelector('.dv2-changes')).includes('메모리 변경')&&text(d.querySelector('.dv2-changes')).includes('+100,000원'));
+    // 바꾼 내용은 머리의 「변경 내역」(.dv2-mchanges)과 aside 의 「변경 내용 N개」에 적는다.
+    const head=text(d.querySelector('.dv2-mchanges'));assert.ok(head.includes('변경 내역 1개')&&head.includes('메모리 변경')&&head.includes('+100,000원'),head);
+    const side=text(d.querySelector('aside.tf-side .tf-changes'));assert.ok(side.includes('변경 내용 1개')&&side.includes('메모리 변경')&&side.includes('+100,000원'),side);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -272,7 +292,7 @@ test('v2 detail: no part price, parts sum or 조립·기타 row; only the server
     assert.equal(d.querySelectorAll('.dv2-row .final-part-price').length,0);
     assert.equal(d.querySelectorAll('.dv2-parts tfoot').length,0);
     assert.ok(text(d.querySelector('[data-dv2-total]')).includes('1,300,000원'));
-    assert.match(text(d.querySelector('.dv2-side')),/현재 조회 금액이며 구매 시 최종 금액을 확인해 주세요\./);
+    assert.match(text(d.querySelector('aside.tf-side')),/최종 금액, 재고와 운영체제·보증 포함 여부는 구매 상담 때 확인해 주세요\./);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -288,7 +308,7 @@ test('v2 picker: a candidate without a server diff is shown as 차액 확인 필
     assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/build/quote'));
   }finally{options.options.pop();h.close();}
 });
-test('v2 picker: temporary choice never changes the body; apply is disabled when the choice equals the applied part; 원래 부품으로 is also temporary',async()=>{
+test('v2 picker: temporary choice never changes the body; apply is disabled when the choice equals the applied part; 기본 부품으로 is also temporary',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
     pickOption(d,502);await until(()=>h.flow.state.selected.price===1400000);
@@ -304,7 +324,7 @@ test('v2 picker: temporary choice never changes the body; apply is disabled when
     assert.deepEqual(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').at(-1).body.changes,[]);
   }finally{h.close();}
 });
-test('v2 row 원래 부품으로 reverts one row; Escape and cancel keep applied changes and the PC count',async()=>{
+test('v2 row 기본 부품으로 reverts one row; Escape and cancel keep applied changes and the PC count',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-sets] [data-action=sets][data-sets="2"]').click();await until(()=>d.querySelector('[data-sets-total]'));
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
@@ -318,6 +338,7 @@ test('v2 row 원래 부품으로 reverts one row; Escape and cancel keep applied
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
     assert.equal(d.querySelector('input[value="502"]').checked,true,'다시 열면 임시 선택이 아니라 적용된 부품이 선택돼 있다');
     d.querySelector('.dv2-cancel').click();assert.equal(d.querySelector('.dv2-panel'),null);
+    assert.equal(text(d.querySelector('[data-part="bom-1"] [data-action=build-undo]')),'기본 부품으로');
     d.querySelector('[data-part="bom-1"] [data-action=build-undo]').click();await until(()=>h.flow.state.selected.price===1300000);
     assert.equal(h.flow.state.selected.sets,2,'대수는 되돌려도 그대로');assert.equal(h.flow.state.selected.build,null);
     assert.deepEqual(h.errors,[]);

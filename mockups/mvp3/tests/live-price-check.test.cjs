@@ -7,7 +7,8 @@ const {JSDOM,VirtualConsole}=require('jsdom');
 const base=path.resolve(__dirname,'..'),read=n=>fs.readFileSync(path.join(base,n),'utf8');
 const qid='33333333-3333-4333-8333-333333333333';
 const talk={usages:['사무용'],budget_won:1700000};
-const item={product_code:98149,name:'CODE/MOCK 골드 PC',price:1585100,price_src:'판매가',spec:{cpu:'CPU'},reasons:['이유'],over_budget:false};
+const item={product_code:98149,name:'CODE/MOCK 골드 PC',price:1585100,price_src:'판매가',spec:{cpu:'CPU'},reasons:['이유'],over_budget:false,ai_composed:true};
+// 2026-10-16 P2-1: 견적 보관은 맞춤 구성(ai_composed)만 한다. 보관은 창이 아니라 화면이고, 옛 최종 화면의 가격 확인 칸(priceCheckPanel)은 삭제됐다.
 const CHANGED='쇼핑몰 현재 가격이 1,585,100원에서 1,624,400원으로 바뀌었습니다. 바뀐 가격으로 보관했습니다.';
 const UNCHECKED='현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다';
 const tick=()=>new Promise(r=>setImmediate(r));
@@ -35,8 +36,11 @@ function harness(saved){
 }
 async function save(h){
   await h.flow.submit('CODE/MOCK 사무용');await until(()=>h.doc.querySelector('[data-action=detail]'));
-  h.click('[data-action=detail]');h.click('[data-action=final]');h.click('[data-action=save]');
-  await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');
+  h.click('[data-action=detail]');
+  assert.equal(h.doc.querySelector('[data-action=final]'),null,'no 선택한 구성 확인 step before saving');
+  h.click('#actions [data-action=save]');
+  await until(()=>h.doc.querySelector('section[data-keep-page] [data-kact=submit]'));
+  assert.equal(h.doc.querySelector('[data-keep-dialog]'),null,'keep is a page, not a dialog');h.click('[data-kact=submit]');
   await until(()=>h.flow.state.phase===null&&h.flow.state.saveState!=='saving');
 }
 async function run(saved,body){
@@ -44,25 +48,33 @@ async function run(saved,body){
   try{await body(h);passed=true;}
   finally{await new Promise(r=>setTimeout(r,50));const errors=[...h.errors];h.close();if(passed)assert.deepEqual(errors,[]);}
 }
+// 보관 완료 화면(section.tf-kept[data-keep-done])이 보관된 금액(서버 값)을 보인다. 옛 가격 확인 칸은 없다.
+function keptPrice(h){
+  const kept=h.doc.querySelector('section.tf-kept[data-keep-done]');assert.ok(kept,'kept page shown');
+  assert.equal(h.doc.querySelector('.live-price-check'),null,'old price-check panel is gone');
+  return kept.querySelector('.tf-card-price strong').textContent;
+}
 const check=(status,mall,message)=>({status,quoted:1585100,mall,diff:mall===null?null:mall-1585100,saved:status==='changed',message,checked_at:'2026-10-11T01:00:00Z'});
 
-test('changed mall price at save: saved at the mall price and the server sentence is shown',async()=>{
+test('changed mall price at save: saved at the mall price and the kept page shows that price (old price-check panel removed)',async()=>{
   await run(body=>({...item,price:1624400,price_check:check('changed',1624400,CHANGED)}),async h=>{
     await save(h);
     assert.equal(h.flow.state.saveState,'saved');
     assert.equal(h.flow.state.savedQuote.product.price,1624400);
     assert.equal(h.calls.find(c=>c.method==='POST'&&c.url==='/api/mvp3/saved-quotes').body.expected_price,1585100);
-    const panel=h.doc.querySelector('.live-price-check');
-    assert.ok(panel,'price notice shown');assert.equal(panel.dataset.priceCheck,'changed');
-    assert.match(panel.textContent,/1,585,100원에서 1,624,400원으로/);
+    assert.match(keptPrice(h),/1,624,400원/);
+    assert.doesNotMatch(keptPrice(h),/1,585,100원/,'old card price not shown as the kept price');
+    // 바뀐 이유를 밝힌다: 보던 가격 -> 보관 가격
+    assert.match(h.doc.querySelector('[data-keep-done] [data-price-changed]')?.textContent||'',/1,585,100원에서 1,624,400원으로 바뀌어/);
   });
 });
 
-test('unreadable mall price at save: saved at the card price with the final-check sentence',async()=>{
+test('unreadable mall price at save: saved at the card price; kept page shows it without the removed panel',async()=>{
   await run(body=>({...item,price:body.expected_price,price_check:check('unchecked',null,UNCHECKED)}),async h=>{
     await save(h);
     assert.equal(h.flow.state.saveState,'saved');
-    assert.equal(h.doc.querySelector('.live-price-check').textContent.includes(UNCHECKED),true);
+    assert.equal(h.flow.state.savedQuote.price_check.status,'unchecked');
+    assert.match(keptPrice(h),/1,585,100원/);assert.equal(h.doc.querySelector('[data-price-changed]'),null);
   });
 });
 
@@ -70,7 +82,7 @@ test('same mall price: no notice',async()=>{
   await run(body=>({...item,price:body.expected_price,price_check:check('same',1585100,null)}),async h=>{
     await save(h);
     assert.equal(h.flow.state.saveState,'saved');
-    assert.equal(h.doc.querySelector('.live-price-check'),null);
+    assert.match(keptPrice(h),/1,585,100원/);assert.equal(h.doc.querySelector('[data-price-changed]'),null);
   });
 });
 

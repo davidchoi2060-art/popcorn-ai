@@ -124,8 +124,8 @@
       // 연락처(api/mvp3_quote_consult): 처음 보관할 때 한 번만 받는다. 응답에는 가린 번호만 온다.
       contact:options=>request('GET','/api/mvp3/contact',null,options),
       saveContact:(payload,options)=>request('PUT','/api/mvp3/contact',payload,{...options,existingKeyOnly:true}),
-      // 보관 견적 + 등록 연락처로 상담 신청 접수. 같은 견적은 서버가 한 건만 만든다.
-      consultFromQuote:(quoteId,message,options)=>request('POST','/api/mvp3/purchase-inquiries/from-quote',{quote_id:String(quoteId).toLowerCase(),...(message?{message}:{})},{...options,existingKeyOnly:true})};
+      // 보관 견적 + 등록 연락처로 상담 신청 접수. 같은 견적은 서버가 한 건만 만든다. 주제는 서버 TOPICS 중 하나(없으면 서버 기본값).
+      consultFromQuote:(quoteId,message,options,topic)=>request('POST','/api/mvp3/purchase-inquiries/from-quote',{quote_id:String(quoteId).toLowerCase(),...(message?{message}:{}),...(topic?{topic}:{})},{...options,existingKeyOnly:true})};
   }
   const exported={ApiError,createClient,errorMessage,KEY};
   if(typeof module!=='undefined')module.exports=exported;else root.MVP3Api={...exported,...createClient()};
