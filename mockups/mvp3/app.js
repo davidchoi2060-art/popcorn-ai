@@ -110,7 +110,7 @@ function renderMessages(){
   if(key!==lastMessages){
     $('#messages').innerHTML=state.messages.map(x=>'<div class="message '+(x.who==='user'?'user':'ai')+'"><span class="avatar">'+(x.who==='user'?uiIcon('user'):'<img class="avatar-mark" src="assets/popcorn-mark.png" alt="팝콘AI">')+'</span><div class="message-content"><p>'+(
       x.text==='안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요.'&&state.screen==='welcome'?
-      '안녕하세요! 어떤 용도로 쓰실 PC인지와<br>예산을 알려주시면 맞는 PC를<br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
+      '안녕하세요! 어떤 용도로 쓰실 PC인지와 <br>예산을 알려주시면 맞는 PC를 <br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
     scrollToLatest();lastMessages=key;
   }
   // 고객이 한 번 말한 뒤에는 첫 질문 머리말을 감춘다(2026-10-12 사장님 「계속 어떤 PC를 찾으세요? 이게 나오는데」).
