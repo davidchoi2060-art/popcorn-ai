@@ -1100,6 +1100,9 @@ body.has-welcome-pcs[data-screen="welcome"] .chat{margin:0;padding:28px 20px;min
 body.has-welcome-pcs[data-screen="welcome"] .view{padding:0;overflow:visible}
 body.has-welcome-pcs[data-screen="welcome"] .chat h1{font-size:27px}
 body.has-welcome-pcs[data-screen="welcome"] .chat-intro{padding:0}
+/* 상담 칸이 좁아져(29%) 인사말의 고정 줄바꿈이 「와」만 한 줄로 떨어뜨렸다 — 이 화면에서는 단어 단위로만 줄을 바꾼다. */
+body.has-welcome-pcs[data-screen="welcome"] .message-content p br{display:none}
+body.has-welcome-pcs[data-screen="welcome"] .message-content p,body.has-welcome-pcs[data-screen="welcome"] .start-example span{word-break:keep-all}
 .welcome-pcs{margin:0;text-align:left;min-width:0}
 .welcome-pcs header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin:0 0 26px}
 .welcome-pcs #welcome-pcs-title{font-size:38px;line-height:1.25;letter-spacing:-1.2px;margin:0}
