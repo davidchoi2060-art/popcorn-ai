@@ -144,13 +144,14 @@
   // 화면 식별자만 보낸다. 제목·가격·부품·연락처는 요청 자료로 믿지 않고 서버가 공개 구성에서 다시 읽는다.
   function displayContext(state,keepCurrent,extraCards){
     const screen=['welcome','results','detail','final','saved'].includes(state.screen)?state.screen:'welcome';
-    const selected=screen!=='saved'&&(keepCurrent||['detail','final'].includes(screen))?state.selected:null;
+    const selected=screen!=='saved'&&(keepCurrent||['detail','final'].includes(screen))?(state.selected||(keepCurrent?state.restoredCurrent:null)):null;
     const positive=n=>Number.isSafeInteger(n)&&n>0;
     const identity=p=>positive(p?.product_code)?{product_code:p.product_code}:
       typeof p?.configuration_id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(p.configuration_id)?{configuration_id:p.configuration_id}:null;
     // 선택 견적을 추천 배열 앞에 끼우면 「세 번째 PC」의 순서가 바뀐다. 선택은 따로 보낸다.
     const currentSelection=identity(selected);
-    const shown=screen==='results'?(state.groups||[]).flatMap(g=>[...(Array.isArray(g.products)?g.products:[]),...(Array.isArray(g.custom)?g.custom:[])]):
+    // 대화 화면(keepCurrent)은 견적을 불러오거나 고른 뒤에도 오른쪽 카드가 그대로 보인다 -- 그 카드도 보낸다(2026-10-16 중헌 님 「오른쪽 화면에 뜬 세가지 PC는 뭐야?」).
+    const shown=screen==='results'||(keepCurrent&&screen!=='saved')?(state.groups||[]).flatMap(g=>[...(Array.isArray(g.products)?g.products:[]),...(Array.isArray(g.custom)?g.custom:[])]):
       screen==='welcome'&&Array.isArray(extraCards)?extraCards:[];
     // 같은 PC가 여러 용도 그룹에 다시 나타나도 화면의 카드 순번은 그대로 둔다.
     const identities=shown.map(identity).filter(Boolean),cards=identities.slice(0,6);
