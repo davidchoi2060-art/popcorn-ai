@@ -57,10 +57,17 @@ async function withHarness(options,body){
   finally{await new Promise(r=>setTimeout(r,50));const errors=[...h.errors];h.close();if(passed)assert.deepEqual(errors,[],'jsdom errors through settle');}
 }
 function finalView(h){return h.doc.querySelector('#view');}
-function assertSavedBasis(h,{photo,bom}){
+// notice: 'full' = 구성표 없는 상세(옛 배치)는 기준 문장 전체를 화면에 둔다.
+//         'short' = 구성표 있는 상세(tf-detail, 승인 시안)는 머리에 「금액과 상품 기록은 보관 시점 기준이에요.」만 두고, 전체 문장은 상담 메시지에 남는다.
+//         'none' = 방금 보관한 견적을 다시 수정하러 연 구성표 상세(보관 시점 = 지금)는 기준 문장을 두지 않는다(구성표 없는 옛 배치는 'full').
+const SHORT_BASIS='금액과 상품 기록은 보관 시점 기준이에요.';
+function assertSavedBasis(h,{photo,bom,notice=bom?'short':'full',screen='final'}){
   const view=finalView(h),text=view.textContent;
-  assert.equal(h.flow.state.screen,'final');assert.ok(h.flow.state.savedQuote);
-  assert.ok(text.includes(BASIS),'saved/current basis notice');
+  assert.equal(h.flow.state.screen,screen);assert.ok(h.flow.state.savedQuote);
+  if(notice==='full')assert.ok(text.includes(BASIS),'saved/current basis notice');
+  else if(notice==='short'){assert.ok(view.querySelector('.tf-detail'),'approved product detail');assert.ok(text.includes(SHORT_BASIS),'saved basis notice in the detail head');
+    assert.ok(h.flow.state.messages.at(-1).text.endsWith(BASIS),'full basis sentence stays in the consultation message');}
+  else{assert.ok(!text.includes(BASIS));assert.ok(!text.includes(SHORT_BASIS));}
   assert.match(text,/900,000원/);assert.doesNotMatch(text,/950,000원/);
   assert.equal(h.flow.state.selected.spec.cpu,'SAVED CPU');
   const img=view.querySelector('[data-product-image]');
@@ -70,12 +77,21 @@ function assertSavedBasis(h,{photo,bom}){
   else{assert.ok(text.includes(EMPTY_BOM));assert.equal(view.querySelector('.public-bom'),null);assert.doesNotMatch(text,/CODE\/MOCK GPU/);}
 }
 async function loadSaved(h){await until(()=>h.doc.querySelector('[data-action=load]'));h.click('[data-action=load]');await until(()=>h.flow.state.screen==='final');}
+// 견적 보관은 팝콘AI 맞춤 구성만 한다(완제품은 「팝콘PC에서 상품 보기」). 상세의 「견적 보관하기」 -> 보관 화면 -> 보관 완료 화면.
+// 보관 완료 화면은 서버가 돌려준 금액·견적 번호로 그리고, 「구성 다시 수정」으로 연 상세가 돌려받은 사진·구성표를 쓴다.
 async function saveCurrent(h){
   await h.flow.submit('CODE/MOCK 사무용');await until(()=>h.doc.querySelector('[data-action=detail]'));
-  h.click('[data-action=detail]');h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');
-  h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');await until(()=>h.flow.state.saveState==='saved'&&h.flow.phase!=='save'&&h.flow.state.phase===null);
+  h.click('[data-action=detail]');assert.equal(h.flow.state.screen,'detail');assert.equal(h.doc.querySelector('[data-action=final]'),null,'no 「선택한 구성 확인」 step');
+  h.click('[data-action=save]');await until(()=>h.doc.querySelector('section[data-keep-page] [data-kact=submit]'));
+  assert.equal(h.doc.querySelector('[data-keep-dialog]'),null);
+  h.click('[data-keep-page] [data-kact=submit]');await until(()=>h.flow.state.saveState==='saved'&&h.flow.state.phase===null);
+  assert.equal(h.flow.state.screen,'final');
+  const kept=h.doc.querySelector('section.tf-kept[data-keep-done]');assert.ok(kept,'보관 완료 화면');
+  assert.match(kept.textContent,/견적을 보관했어요/);assert.match(kept.textContent,/Q-22222222/);
+  assert.match(kept.textContent,/900,000원/);assert.doesNotMatch(kept.textContent,/950,000원/);
+  assert.doesNotMatch(kept.textContent,/RECOMMEND GPU/);
+  h.click('section.tf-kept [data-action=edit]');assert.equal(h.flow.state.screen,'detail');assert.ok(h.flow.state.savedQuote);
 }
-
 test('saved-basis GET load: saved price/spec with current photo and public BOM plus basis notice',async()=>{
   await withHarness({quoteProduct:{...savedProduct,photo:available,public_configuration:publicBom()}},async h=>{
     await loadSaved(h);assertSavedBasis(h,{photo:true,bom:true});
@@ -91,11 +107,12 @@ test('saved-basis GET load: photo unavailable and public_configuration null/with
   }
 });
 // POST 두 검사는 expected_price 가 서버 반환과 일치하는 «성공» 경로만 다룬다. 추천 응답과 반환 saved.product 의
-// 사진·BOM 을 서로 다르게 두어, 최종 화면이 반환값을 채택했는지 구별되게 한다.
+// 사진·BOM 을 서로 다르게 두어, 보관 뒤 화면(보관 완료 -> 「구성 다시 수정」 상세)이 반환값을 채택했는지 구별되게 한다.
 test('saved-basis POST performSave (expected_price match success): returned saved.product photo and BOM replace different recommendation photo/BOM',async()=>{
-  await withHarness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:{state:'temporarily_unavailable',url:null},public_configuration:publicBom(113836,'RECOMMEND GPU')},
-    postProduct:{...savedProduct,photo:available,public_configuration:publicBom()}},async h=>{
-    await saveCurrent(h);assertSavedBasis(h,{photo:true,bom:true});
+  await withHarness({hash:'welcome',recommendItem:{...currentProduct,ai_composed:true,price:900000,photo:{state:'temporarily_unavailable',url:null},public_configuration:publicBom(113836,'RECOMMEND GPU')},
+    postProduct:{...savedProduct,ai_composed:true,photo:available,public_configuration:publicBom()}},async h=>{
+    await saveCurrent(h);assertSavedBasis(h,{photo:true,bom:true,notice:'none',screen:'detail'});
+    assert.ok(h.doc.querySelector('.tf-side [data-action=final]'),'보관된 견적이면 「보관한 견적 보기」');assert.equal(h.doc.querySelector('[data-action=save]'),null);
     const view=finalView(h);assert.doesNotMatch(view.textContent,/RECOMMEND GPU/);
     // 추천의 temporarily_unavailable 상태 그림이 남지 않는다(사용 가능 사진의 숨은 오류 문구는 textContent 에 포함되므로 구조로 본다).
     assert.equal(view.querySelector('[data-image-state="temporarily_unavailable"]'),null);assert.equal(view.querySelector('[data-product-image-status]').hidden,true);
@@ -104,9 +121,9 @@ test('saved-basis POST performSave (expected_price match success): returned save
 });
 test('saved-basis POST performSave (expected_price match success): unavailable photo and null/withdrawn BOM in saved.product override the recommendation view',async()=>{
   for(const [photo,configuration] of withdrawn){
-    await withHarness({hash:'welcome',recommendItem:{...currentProduct,price:900000,photo:available,public_configuration:publicBom(113836,'RECOMMEND GPU')},
-      postProduct:{...savedProduct,photo,public_configuration:configuration}},async h=>{
-      await saveCurrent(h);assertSavedBasis(h,{photo:false,bom:false});assert.doesNotMatch(finalView(h).textContent,/RECOMMEND GPU/);
+    await withHarness({hash:'welcome',recommendItem:{...currentProduct,ai_composed:true,price:900000,photo:available,public_configuration:publicBom(113836,'RECOMMEND GPU')},
+      postProduct:{...savedProduct,ai_composed:true,photo,public_configuration:configuration}},async h=>{
+      await saveCurrent(h);assertSavedBasis(h,{photo:false,bom:false,notice:'full',screen:'detail'});assert.doesNotMatch(finalView(h).textContent,/RECOMMEND GPU/);
       assert.equal(h.calls.filter(c=>c.method==='POST'&&c.url==='/api/mvp3/saved-quotes').length,1);
     });
   }

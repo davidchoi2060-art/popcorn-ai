@@ -68,8 +68,21 @@ test('back from a detail opened from the chat goes back to the chat, not to an e
   await until(()=>w.document.querySelector('#view .final-table'));for(let i=0;i<5;i++)await tick();
   assert.equal(w.location.hash,'#detail');
   assert.equal(w.history.length,length,'restoring the quote replaces the entry instead of adding #results/#detail');
+  // 상품 화면의 되돌아가기는 머리띠의 「상담으로 돌아가기」다(옛 「이전 화면」·「선택한 구성 확인」 단추는 없다).
+  const doc=w.document,back=doc.querySelector('#consult-back');
+  assert.equal(doc.body.dataset.page,'product');
+  assert.equal(back.hidden,false);assert.equal(back.textContent,'상담으로 돌아가기');
+  assert.equal(doc.querySelector('[data-action="back"]'),null,'no 「이전 화면」 on the product page');assert.equal(doc.querySelector('[data-action="final"]'),null);
+  assert.ok(doc.querySelector('#actions [data-action="mall-view"]'),'구성표 없는 완제품 상세의 액션바는 「팝콘PC에서 상품 보기」');
+  assert.ok(doc.querySelector('.dt-aside [data-mall-state="no-url"]'),'주소 없는 완제품은 상세 칸에서 주소 확인 중이라고 말한다');
+  // 대화에서 왔으면 대화 화면(talk.html)으로 간다 -- 이 문서 안에서 빈 첫 화면(#welcome)이나 추천 목록으로 가지 않는다.
+  // 다른 문서로 가는 이동은 jsdom 이 지원하지 않아 그 알림이 남는 것으로 확인한다.
+  back.click();for(let i=0;i<5;i++)await tick();
+  assert.equal(errors.filter(m=>/navigation/i.test(m)).length,1,'consult-back leaves the document for the talk screen');
+  assert.equal(w.location.hash,'#detail');assert.notEqual(doc.body.dataset.screen,'welcome');assert.equal(w.history.length,length);
   // 그 뒤 고객이 직접 옮겨 다니면 평소처럼 기록이 쌓인다.
-  w.document.querySelector('[data-action="final"]').click();await until(()=>w.location.hash==='#final');
+  doc.querySelector('[data-action="saved"]').click();await until(()=>w.location.hash==='#saved');
   assert.equal(w.history.length,length+1);
-  assert.deepEqual(errors,[]);dom.window.close();
+  await until(()=>calls.some(c=>c.url.startsWith('/api/mvp3/saved-quotes'))&&!doc.querySelector('#view [aria-busy=true]'));for(let i=0;i<20;i++)await tick();
+  assert.deepEqual(errors.filter(m=>!/navigation/i.test(m)),[]);dom.window.close();
 });

@@ -9,7 +9,9 @@
   · 이 방문자(방문자 쿠키 + 보관 키)의 견적일 때만 -- 아니면 404. 견적 참조 없이 성공 처리하지 않는다
     (일반 문의 `POST /purchase-inquiries` 는 quote_id 가 선택이라 따로 둔다 -- 그쪽은 그대로다).
   · 등록된 연락처가 없으면 409 `contact_required`(화면이 연락처 입력으로 보낸다).
-  · 문의 주제는 기존 값 「주문 희망」으로 정한다(새 값을 만들지 않는다).
+  · 문의 주제는 기존 값(`TOPICS`) 중 고객이 고른 것, 고르지 않았으면 「주문 희망」이다(새 값을 만들지 않는다).
+  · 보유 기한은 연락처의 기한을 넘지 않는다(2026-10-16 독립 검수 F3). 신청서에 복사한 연락처는
+    등록 연락처의 `purge_at` 과 같은 날 지운다 -- 「등록하거나 바꾼 뒤 N일」 동의 문구보다 오래 남지 않는다.
   · 같은 견적에 이미 접수된 신청이 있으면 새로 만들지 않고 그것을 `already: true` 로 돌려준다.
     견적 하나에 잠금을 잡고 보므로 동시에 두 번 눌러도 한 건이다.
   · 접수 순서는 서버가 받은 시각(`created_at`)과 신청 번호 순서다. 연락 시각·기한은 약속하지 않는다.
@@ -18,7 +20,6 @@
   응답에는 가린 번호만 싣는다. 로그에는 신청 번호만 찍는다(번호·이메일은 찍지 않는다).
 """
 import logging
-from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, Response
@@ -57,6 +58,7 @@ class FromQuoteBody(BaseModel):
     model_config = ConfigDict(extra='forbid')
     quote_id: UUID
     message: str | None = Field(default=None, max_length=500)
+    topic: str | None = Field(default=None, max_length=20)
 
 
 @router.get('/contact')
@@ -127,18 +129,20 @@ def inquiry_from_quote(body: FromQuoteBody, request: Request, response: Response
         access_gate.check_rate(conn, request, what='mvp3.quote_consult', policy_key=CONSULT_POLICY_KEY,
                                default_per_minute=CONSULT_PER_MINUTE, default_per_day=CONSULT_PER_DAY,
                                messages=CONSULT_LIMIT_MESSAGES)
+        topic = body.topic or FROM_QUOTE_TOPIC
+        if topic not in TOPICS:
+            raise HTTPException(422, '상담 주제를 다시 골라 주세요.')
         code = (quote['product_snapshot'] or {}).get('product_code')
         code = code if type(code) is int else None
         no = _no(conn)
-        now = datetime.now(timezone.utc)
         conn.execute(text(
             'INSERT INTO purchase_inquiries (inquiry_no, user_id, quote_id, product_code, topic, contact_name,'
             ' contact_phone, contact_email, message, consent_at, data_origin, purge_at)'
             ' VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :consent, :origin, :purge)'),
-            {'no': no, 'u': uid, 'q': qid, 'c': code, 't': FROM_QUOTE_TOPIC, 'n': contact['contact_name'],
+            {'no': no, 'u': uid, 'q': qid, 'c': code, 't': topic, 'n': contact['contact_name'],
              'p': contact['contact_phone'], 'e': contact['contact_email'],
              'm': (body.message or '').strip() or None, 'consent': contact['consent_at'],
-             'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=mvp3_contact.KEEP_DAYS)})
+             'origin': _resolve_data_origin(request), 'purge': contact['purge_at']})
     log.info('[quote-consult] %s accepted', no)
     return {'ok': True, 'already': False, 'inquiry_no': no, 'quote_id': qid,
             'masked_phone': mvp3_contact.mask_phone(contact['contact_phone'])}

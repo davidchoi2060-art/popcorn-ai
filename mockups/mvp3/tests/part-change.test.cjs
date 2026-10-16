@@ -81,17 +81,24 @@ test('ram options come from the server and swapping changes product, price and w
     assert.equal(d.querySelector('.part-option'),null);
     assert.ok(text(d.querySelector('#actions')).includes('1,350,000원'));
     assert.ok(text([...d.querySelectorAll('.message.ai')].at(-1)).startsWith('메모리를 32GB로 바꿨어요. 이 구성으로 판매 중인 PC로 옮겼어요. 기본 부품 대비 차액은 +50,000원이고, PC 총액은 1,350,000원이에요.'));
-    d.querySelector('#actions [data-action=final]').click();
-    await until(()=>h.flow.state.screen==='final'&&d.querySelector('[data-action=save]'));
-    d.querySelector('[data-action=save]').click();
-    await until(()=>d.querySelector('[data-kact=submit]'));d.querySelector('[data-kact=submit]').click();
-    await until(()=>h.flow.state.saveState==='saved'&&d.querySelector('[data-action=handoff]'));
+    // 2026-10-16 P2-1: 「선택한 구성 확인」(final) 단계가 없다. 견적 보관하기 -> 보관 화면(section[data-keep-page]) -> 보관 완료 화면.
+    assert.equal(d.querySelector('[data-action=final]'),null);
+    d.querySelector('#actions [data-action=save]').click();
+    await until(()=>d.querySelector('section[data-keep-page] [data-kact=submit]'));
+    assert.equal(d.querySelector('[data-keep-dialog]'),null,'keep is a page, not a dialog');
+    d.querySelector('section[data-keep-page] [data-kact=submit]').click();
+    await until(()=>h.flow.state.saveState==='saved'&&d.querySelector('section.tf-kept[data-keep-done]'));
     const save=h.calls.find(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST');
     assert.equal(save.body.product_code,22);assert.equal(save.body.expected_price,1350000);assert.deepEqual(save.body.state,talkState);
-    d.querySelector('[data-action=handoff]').click();
-    await until(()=>d.querySelector('.live-handoff'));
+    const kept=d.querySelector('section.tf-kept[data-keep-done]');
+    assert.ok(text(kept).includes('PC 22')&&text(kept.querySelector('.tf-card-price')).includes('1,350,000원'),text(kept));
+    // 맞춤 구성 보관 견적의 다음 단계는 구매 상담 신청이다. 옛 쇼핑몰 연결 단추·인계 칸은 없다.
+    assert.ok(kept.querySelector('[data-action=consult-send]'));
+    assert.equal(d.querySelector('[data-action=handoff]'),null);assert.equal(d.querySelector('.live-handoff'),null);
+    // 인계 기록(서버)은 여전히 바뀐 상품의 보관 견적으로 간다.
+    await h.flow.handoff();await until(()=>h.flow.state.handoff);
     assert.ok(h.calls.some(c=>c.url==='/api/mvp3/saved-quotes/'+qid+'/handoff'));
-    assert.equal(d.querySelector('.live-handoff a').getAttribute('href'),MALL);
+    assert.equal(h.flow.state.handoff.quote_id,qid);assert.equal(h.flow.state.savedQuote.product.product_code,22);assert.equal(h.flow.state.handoff.mall_url,MALL);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });

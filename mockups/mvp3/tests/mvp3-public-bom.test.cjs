@@ -111,19 +111,27 @@ for(const slot of ['__proto__','constructor','toString','CPU','CUSTOM_SERVICE'])
     try{
       assert.equal(h.flow.state.error,null);assert.equal(h.flow.state.screen,'results');
       h.flow.select(0);
+      // 2026-10-16 P2-1: 몰 상품은 final 화면이어도 같은 상품 구성 상세(.tf-detail)를 그린다. 옛 최종 화면(기본 구성 금액 칸 ·
+      // .final-summary-price · 접힌 추천 근거)은 삭제됐고, 금액은 오른쪽 aside 의 「상품 금액」, 추천 이유는 aside 안 .tf-info 다.
       for(const screen of ['detail','final']){
         if(screen==='final')h.flow.navigate('final');
-        const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);
+        const doc=h.dom.window.document;assert.equal(doc.body.dataset.screen,screen);assert.equal(doc.body.dataset.page,'product');
+        assert.ok(doc.querySelector('.tf-detail'),'mall product detail is drawn on '+screen);
+        assert.equal(doc.querySelector('.tf-detail h2').textContent,'상품 구성 확인');
+        assert.equal(doc.querySelector('.final-summary-price'),null,'old final summary is gone');
+        assert.equal(doc.querySelector('details.public-bom-information'),null,'old collapsed final information is gone');
+        assert.doesNotMatch(doc.querySelector('#view').textContent,/최종 견적 확인/);
         assert.equal(doc.querySelectorAll('tr[data-part^="bom-"]').length,3);
         const row=doc.querySelector('tr[data-part="bom-0"]');assert.ok(row.querySelector('h4').textContent.includes(slot));
-        if(screen==='final')assert.equal(row.querySelector('.final-part-price').textContent,'기본 구성');
-        else assert.equal(row.querySelector('.final-part-price'),null,'상세 v2 줄에는 금액 칸이 없다');
+        assert.equal(row.querySelector('.final-part-price'),null,'상세 v2 줄에는 금액 칸이 없다');
         const details=row.querySelector('details');details.open=true;h.flow.emit();
         assert.equal(doc.querySelector('details[data-detail="bom-0"]').open,true);
         assert.match(doc.querySelector('.public-bom-role').textContent,slot==='CPU'?/프로그램의 명령/:/등록된 사양과 설명/);
-        assert.match(doc.querySelector(screen==='final'?'.final-summary-price':'.dv2-summary').textContent,/900,000원/);
-        const explanation=doc.querySelector('.live-explanation');assert.ok(explanation);
-        assert.equal(!!explanation.closest('details.public-bom-information'),screen==='final');
+        const side=doc.querySelector('aside.tf-side');assert.ok(side);assert.match(side.querySelector('.tf-sum').textContent,/상품 금액/);
+        assert.match(side.querySelector('[data-dv2-total]').textContent,/900,000원/);
+        const reason=[...side.querySelectorAll('.tf-info')].find(x=>x.textContent.includes('이 상품을 추천한 이유'));
+        assert.ok(reason,'recommendation reason sits in the aside');assert.match(reason.textContent,/추천 근거/);
+        details.open=false;h.flow.emit();
       }
       assert.deepEqual(h.calls,{parse:1,recommend:1,network:0,save:0});
     }finally{h.dom.window.close();}

@@ -113,8 +113,8 @@
   // 연락처는 처음 보관할 때 한 번만 받는다. 전체 번호는 화면이 서버에서 되받지 않는다 -- 가린 번호만 들고 있다.
   // draft 는 고객이 지금 적는 값이라 이 탭 메모리에만 있고, 대화 보관(conversationSnapshot)·보관 복구(journal)에 싣지 않는다.
   function emptyContact(){return {loaded:false,has:false,masked:'',name:'',consentText:''};}
-  function emptyKeep(){return {open:false,purpose:'save',after:null,editing:false,busy:false,error:'',failed:false,draft:{phone:'',name:'',email:'',consent:false}};}
-  function emptyConsult(){return {open:false,message:'',done:null,showRows:false,error:''};}
+  function emptyKeep(){return {open:false,purpose:'save',after:null,editing:false,busy:false,error:'',failed:false,code:'',draft:{phone:'',name:'',email:'',consent:false}};}
+  function emptyConsult(){return {open:false,message:'',topic:'',done:null,showRows:false,error:''};}
   function emptyMall(){return {open:false,step:'ask',error:'',blocked:false};}
   function contactProblem(d){
     const phone=String(d.phone||'').replace(/\s+/g,''),email=String(d.email||'').trim();
@@ -538,8 +538,16 @@
 
     // ===== 연락처 · 견적 보관 창 · 상담 신청 접수 (2026-10-16 두 구매 흐름) =====
     // 견적 보관(저장)과 상담 신청 접수는 다른 상태다. 보관만으로는 신청이 생기지 않고, 상담사가 먼저 연락하지도 않는다.
-    async function loadContact(){
+    // quiet: 보관 견적서를 다시 열 때 등록 연락처(가린 번호)만 조용히 읽는다 -- 실패해도 화면 위 오류 칸을 띄우지 않는다.
+    async function loadContact({quiet=false}={}){
       if(state.phase)return false;
+      if(quiet){
+        try{const r=await api.contact({});
+          if(r?.ok===true&&typeof r.has_contact==='boolean'&&(!r.has_contact||typeof r.masked_phone==='string')){
+            state.contact={loaded:true,has:r.has_contact,masked:r.has_contact?r.masked_phone:'',name:M.text(r.name),consentText:M.text(r.consent_text)};emit();return true;}
+        }catch{}
+        return false;
+      }
       const op=begin('contact');
       try{
         const r=await api.contact({signal:op.signal});
@@ -587,7 +595,7 @@
         // 서버가 연락처가 없다고 돌려보냈거나(기한 만료) 보관하지 못했다 -- 이유는 보관 창 안에서 말한다.
         const err=state.error;state.error=null;state.retry=null;
         if(err?.code==='contact_required'){state.contact={...state.contact,has:false,masked:''};k.editing=false;}
-        k.error=err?.message||'견적을 보관하지 못했어요.';k.failed=true;emit();return;
+        k.error=err?.message||'견적을 보관하지 못했어요.';k.failed=true;k.code=err?.code||'';emit();return;
       }
       const ok=await putContact(contact);
       k.busy=false;
@@ -606,19 +614,32 @@
       }catch(error){if(current(op)){state.keep.error=error?.message||'연락처를 저장하지 못했어요.';}return false;}
       finally{if(current(op)){state.phase=null;controller=null;}}
     }
-    function consultToggle(open,message){
-      state.consult.open=open===true;if(typeof message==='string')state.consult.message=message.slice(0,500);emit();
+    // 「상담 내용 남기기 (선택)」: 상담 주제 선택지는 서버(구매 상담 신청 양식)가 준 것만 쓴다. 못 읽으면 주제 없이 보내고
+    // 서버가 기본값(주문 희망)으로 접수한다.
+    async function consultToggle(open,message){
+      state.consult.open=open===true;state.consult.error='';if(typeof message==='string')state.consult.message=message.slice(0,500);emit();
+      if(state.consult.open){topicsAsked=false;await loadConsultTopics();}
     }
+    // 상담 주제 선택지(구매 상담 신청 양식). 한 번만 묻는다 -- 못 읽으면 주제 없이 보내고 서버가 「주문 희망」으로 접수한다.
+    let topicsAsked=false;
+    async function loadConsultTopics(){
+      if(state.inquiry.meta||topicsAsked)return;topicsAsked=true;
+      try{const r=await api.inquiryForm({});
+        if(r?.ok===true&&Array.isArray(r.topics)&&r.topics.length&&r.topics.every(t=>typeof t==='string')&&typeof r.consent_text==='string'){
+          state.inquiry.meta={topics:r.topics.slice(0,10),consent_text:r.consent_text};emit();}
+      }catch{}
+    }
+    function consultTopic(topic){if(typeof topic==='string'&&(state.inquiry.meta?.topics||[]).includes(topic))state.consult.topic=topic;}
     function consultDraft(message){if(typeof message==='string')state.consult.message=message.slice(0,500);}
     function consultRows(show){state.consult.showRows=show===true;emit();}
     // 보관 견적 + 등록 연락처로 상담 신청 접수(api/mvp3_quote_consult). 같은 견적은 서버가 한 건만 만든다.
     async function consult(){
       const q=state.savedQuote;
       if(state.phase||!q||!M.uuid(q.id)||state.consult.done?.quote_id===q.id)return;
-      const text=state.consult.message.trim();
+      const text=state.consult.message.trim(),topic=(state.inquiry.meta?.topics||[]).includes(state.consult.topic)?state.consult.topic:null;
       const op=begin('consult');state.consult.error='';
       try{
-        const r=await api.consultFromQuote(q.id,text||null,{signal:op.signal});
+        const r=await api.consultFromQuote(q.id,text||null,{signal:op.signal},topic);
         if(!current(op))return;
         if(r?.ok!==true||typeof r.inquiry_no!=='string'||!/^PI-\d{1,12}$/.test(r.inquiry_no)||r.quote_id!==q.id||typeof r.masked_phone!=='string')
           throw new Error('상담 신청 접수 결과를 확인할 수 없어요.');
@@ -756,7 +777,7 @@
       if(state.phase||!data||!state.selected)return;
       const was=state.selected.build?.changes.find(c=>c.ordinal===data.ordinal),original=was?.before.product_code;
       let o=data.options.find(x=>x.product_code===code);
-      // 기본 부품으로 되돌리는 선택(상세 v2 「원래 부품으로」): 후보 목록에 없어도 서버가 준 변경 줄의 before 가 근거다.
+      // 기본 부품으로 되돌리는 선택(상세 v2 「기본 부품으로」): 후보 목록에 없어도 서버가 준 변경 줄의 before 가 근거다.
       if(!o&&was&&code===original)o={product_code:code,name:was.before.name,price_diff:0};
       if(!o||!Number.isSafeInteger(o.price_diff))return;
       const changes=changesOf(state.selected).filter(c=>c.ordinal!==data.ordinal);
@@ -793,7 +814,7 @@
       await applyBuild([],q=>'바꾼 부품을 모두 되돌렸어요. 기본 구성 PC 총액 '+q.total.toLocaleString('ko-KR')+'원이에요.');
       surfaceBuildError(first);
     }
-    // 한 줄만 원래 부품으로(상세 v2 줄의 「원래 부품으로」). 나머지 변경과 수량은 그대로 두고 서버가 금액을 다시 계산한다.
+    // 한 줄만 원래 부품으로(상세 v2 줄의 「기본 부품으로」). 나머지 변경과 수량은 그대로 두고 서버가 금액을 다시 계산한다.
     async function undoBuild(ordinal){
       const c=state.selected?.build?.changes.find(x=>x.ordinal===ordinal);
       if(state.phase||!c)return;
@@ -825,6 +846,7 @@
       if(state.phase)return;
       const q=state.quotes.find(q=>q.id===id);if(!q)return;
       cancel();state.inquiry=emptyInquiry();state.parts=emptyParts();state.build=emptyBuild();state.selectedContext=null;state.selected=M.copy(q.product);state.selectionState=M.copy(q.state);state.selectionWants=null;state.talk=M.copy(q.state);state.chatFlow=offerFlags(state.chatFlow);state.history=[];
+      state.keep=emptyKeep();state.mall=emptyMall();state.consult={...emptyConsult(),done:state.consult.done};
       state.savedQuote=M.copy(q);state.saveState='saved';state.needsRefresh=false;state.error=null;state.retry=null;state.screen='final';
       message('이 브라우저에서 보관한 '+q.product.name+'을 불러왔어요. 금액과 상품 기록은 보관 시점 기준입니다. 부품 구성과 사진은 조회 시점의 공개 상태를 따릅니다.');emit();
     }
@@ -841,7 +863,7 @@
       else if(task.kind==='handoff')await handoff();
       else if(task.kind==='keep')await openKeep();
     }
-    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,loadContact,openKeep,openContactChange,closeKeep,keepDraft,keepEditing,submitKeep,consultToggle,consultDraft,consultRows,consult,openMall,closeMall,mallHandoff,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild,undoBuild,setBuildQuantity,setSets};
+    return {state,reset,submit,refresh,resume,reprice,explore,select,navigate,save,recover,list,load,retry,cancel,message,emit,handoff,openInquiry,closeInquiry,inquiryDraft,inquire,loadContact,openKeep,openContactChange,closeKeep,keepDraft,keepEditing,submitKeep,consultToggle,loadConsultTopics,consultTopic,consultDraft,consultRows,consult,openMall,closeMall,mallHandoff,openParts,closeParts,swapPart,openBuild,closeBuild,pickBuild,resetBuild,undoBuild,setBuildQuantity,setSets};
   }
   // 「쇼핑몰에서 구매 이어가기」 한 번으로 쇼핑몰까지 간다(2026-10-12 중헌 님 고객단 6번: 연결 번호가 생긴 뒤 같은 단추를
   // 한 번 더 눌러야 쇼핑몰이 열렸다). 연결 번호는 그대로 만든다 -- 인계 기록(관리자 「인계 기록」·유입 성과)과 쇼핑몰 가격
@@ -863,7 +885,10 @@
   // ===== 견적 보관 창 · 보관 견적서의 상담 신청 접수 칸 (2026-10-16 두 구매 흐름) =====
   // index(app.js)와 대화 화면(talk.js)이 같은 조각을 쓴다 -- 두 화면에 따로 그리면 한쪽만 고쳐진다.
   // 문구 정본: 대표 전달 「화면별-문구-정본.csv」. 번호·금액은 서버가 준 값만 쓴다(가린 번호 · 신청 번호 · 보관 견적 번호는 견적 id 에서 앞 8자리).
-  function createKeepUi(flow,doc){
+  // page:true(index) -- 보관 창을 띄우지 않고 화면(app.js)이 pageHtml() 을 상세 자리에 그린다(승인 시안 07·08 「견적 보관」 화면).
+  // 대화 화면(talk.js)은 지금처럼 창으로 쓴다.
+  function createKeepUi(flow,doc,opts={}){
+    const page=opts.page===true;
     const state=flow.state,esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const money=v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미확인';
     const quoteNo=id=>'Q-'+String(id||'').slice(0,8).toUpperCase();
@@ -875,9 +900,9 @@
       return '<div class="keep-sum"><strong>'+esc(p.name)+'</strong>'+(note?'<small>'+esc(note)+'</small>':'')+
         '<span class="keep-sum-price">'+money(p.price)+'<small> · '+sets+'대'+(sets>1&&Number.isInteger(p.price)?' · 합계 '+money(p.price*sets):'')+'</small></span></div>';
     }
-    function inputs(k){
+    function inputs(k,tag='h4'){
       const d=k.draft,dis=k.busy?' disabled':'';
-      return '<h4>연락받을 정보</h4>'+
+      return '<'+tag+'>연락받을 정보</'+tag+'>'+
         '<label class="keep-field"><span>전화번호 <em>필수</em></span><input data-keep="phone" type="tel" maxlength="20" autocomplete="tel" inputmode="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'></label>'+
         '<p class="keep-note">'+NO_CALL+'</p>'+
         '<div class="keep-two"><label class="keep-field"><span>이름 <em>선택</em></span><input data-keep="name" maxlength="30" autocomplete="name" placeholder="이름을 입력해 주세요" value="'+esc(d.name)+'"'+dis+'></label>'+
@@ -908,6 +933,45 @@
         '<button type="button" class="outline" data-kact="cancel"'+dis+'>취소</button></div>'+
         (k.purpose==='save'&&!has?'<p class="keep-foot">구매 상담 신청은 보관 후 진행할 수 있어요.</p>':'')+'</div>';
     }
+    // 보관 화면(page). steps·summary 는 화면이 그려 준다(견적 진행 단계 · 구성 요약).
+    function pageHtml({steps='',summary:sum=''}={}){
+      const k=state.keep,has=state.contact.has,showInputs=k.purpose==='contact'||!has||k.editing,dis=k.busy?' disabled':'';
+      const consultFirst=k.purpose==='contact'&&k.after==='consult',contactOnly=k.purpose==='contact'&&!consultFirst;
+      const title=consultFirst?'연락처 등록':contactOnly?'연락처 변경':'견적 보관';
+      const sub=consultFirst?'상담 신청을 접수하려면 전화번호가 필요해요.':contactOnly?'바꾼 연락처는 앞으로 보관하거나 신청하는 견적에 쓰여요. 이미 보관한 견적은 그대로예요.':
+        (!has?'전화번호는 처음 보관할 때 한 번만 입력해 주세요.':'등록한 연락처로 새 견적을 보관해요.');
+      let body='';
+      if(k.purpose==='save')body+=sum||summary();
+      if(k.purpose==='save'&&has){
+        body+='<div class="keep-reg tf-reg"><span>등록된 연락처</span><strong>'+esc(state.contact.masked)+'</strong>'+
+          (k.editing?'<button type="button" class="keep-link" data-kact="edit-cancel"'+dis+'>연락처 변경 취소</button>':'<button type="button" class="keep-link" data-kact="edit"'+dis+'>연락처 변경</button>')+'</div>';
+        if(!k.editing)body+='<p class="keep-note">이 연락처로 견적을 보관해요.</p><p class="keep-note keep-nocall">'+NO_CALL+'</p>';
+      }
+      let err='';
+      if(k.error)err=k.failed?'<div class="keep-error" role="alert" tabindex="-1"><strong>'+(k.purpose==='save'?'견적을 보관하지 못했어요.':'연락처를 저장하지 못했어요.')+'</strong><p>'+(k.purpose==='save'?'선택한 부품과 금액은 그대로예요. ':'')+esc(k.error)+'</p></div>':
+        '<p class="keep-error" role="alert" tabindex="-1">'+esc(k.error)+'</p>';
+      const go=k.busy?'처리하는 중…':k.purpose==='save'?(k.failed?'다시 보관하기':'견적 보관'):consultFirst?'등록하고 상담 신청 접수':'연락처 저장';
+      return '<section class="tf-page tf-keep" data-keep-page>'+steps+'<p class="tf-eyebrow">'+(k.purpose==='save'?'내 견적':'연락처')+'</p><h2 id="keep-title" tabindex="-1">'+title+'</h2><p class="tf-sub">'+sub+'</p>'+
+        body+(showInputs?'<div class="tf-keep-form">'+inputs(k,'h3')+'</div>':'')+'<div class="tf-keep-actions">'+err+
+        '<button type="button" class="primary tf-wide" data-kact="submit"'+dis+'>'+go+'</button>'+
+        (k.purpose==='save'&&!has?'<p class="keep-foot">구매 상담 신청은 보관 후 진행할 수 있어요.</p>':'')+
+        '<button type="button" class="tf-textbtn" data-kact="cancel"'+dis+'>취소</button></div></section>';
+    }
+    function valuesIn(root){
+      const out={};for(const e of root.querySelectorAll('[data-keep]'))out[e.dataset.keep]=e.type==='checkbox'?e.checked:e.value;return out;
+    }
+    if(page){
+      // 보관 화면의 단추·입력. 상세의 「다시 보관하기」([data-keep-retry])는 적어 둔 값 그대로 다시 보낸다.
+      doc.addEventListener('click',e=>{
+        const b=e.target.closest?.('[data-kact]');if(!b||b.disabled||!b.closest('[data-keep-page],[data-keep-retry]'))return;
+        e.preventDefault();const root=doc.querySelector('[data-keep-page]'),vals=root?valuesIn(root):{},a=b.dataset.kact;
+        if(a==='cancel')flow.closeKeep();else if(a==='edit')flow.keepEditing(true);else if(a==='edit-cancel')flow.keepEditing(false);
+        else if(a==='submit')void flow.submitKeep(vals);
+      });
+      const sink=e=>{const root=e.target.closest?.('[data-keep-page]');if(root&&e.target.dataset?.keep)flow.keepDraft(valuesIn(root));};
+      doc.addEventListener('input',sink);doc.addEventListener('change',sink);
+      doc.addEventListener('keydown',e=>{const root=e.target.closest?.('[data-keep-page]');if(root&&e.key==='Enter'&&e.target.matches('input:not([type=checkbox])')){e.preventDefault();void flow.submitKeep(valuesIn(root));}});
+    }
     function values(){
       const out={};for(const e of el.querySelectorAll('[data-keep]'))out[e.dataset.keep]=e.type==='checkbox'?e.checked:e.value;return out;
     }
@@ -929,6 +993,7 @@
     }
     // 화면을 다시 그릴 때마다 부른다. 보관 창 상태가 바뀐 때만 창을 다시 만든다(적는 중에는 건드리지 않는다).
     function sync(){
+      if(page)return;
       const k=state.keep;
       if(!k.open){close();return;}
       const next=JSON.stringify([k.purpose,k.after,k.editing,k.busy,k.error,k.failed,state.contact.has,state.contact.masked,state.contact.consentText,state.selected?.product_code,state.selected?.price]);
@@ -992,7 +1057,7 @@
       }
     }
     doc.addEventListener('input',e=>{if(e.target?.matches?.('[data-consult-message]')){flow.consultDraft(e.target.value);const n=doc.querySelector('.consult-count');if(n)n.textContent=e.target.value.length+' / 500자';}});
-    return {sync,panelHtml,handle,quoteNo,close};
+    return {sync,panelHtml,pageHtml,handle,quoteNo,close,NO_CALL,ORDER_LINE,doneRows};
   }
   // 쇼핑몰 완제품 「팝콘PC로 이동」(2026-10-16 두 구매 흐름). 새 창은 누른 순간에 열어 둔다(서버 응답 뒤에 열면 팝업으로 막힌다).
   // 인계 기록이 성공한 뒤에만 그 창을 쇼핑몰 주소로 옮긴다. 실패하면 창을 닫고 이동 완료 화면을 보이지 않는다.

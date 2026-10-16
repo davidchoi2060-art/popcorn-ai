@@ -71,23 +71,29 @@ test('mall PC detail: 변경 opens the 팝콘PC 이동 dialog, never the picker;
     const dlg=d.querySelector('[data-mall-dialog]');assert.ok(dlg,'안내창이 열린다');
     assert.equal(d.querySelector('.dv2-panel'),null,'부품 선택 패널은 열리지 않는다');
     assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/build/options'),'후보 조회 요청이 없다');
-    assert.equal(text(dlg.querySelector('h3')),'팝콘PC에서 부품을 변경해 주세요');
-    assert.equal(text(dlg.querySelector('#mall-dlg-desc')),'이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요. 선택한 옵션에 따라 금액이 달라져요. 팝콘PC로 이동할까요?');
-    const go=dlg.querySelector('[data-action=mall-move]'),cancel=dlg.querySelector('[data-action=mall-dialog-close]');
-    assert.equal(text(go),'팝콘PC로 이동');assert.equal(text(cancel),'취소');
+    // 제목은 승인 시안대로 두 줄(<br>)이다.
+    assert.equal(dlg.querySelector('h3').innerHTML,'팝콘PC에서 부품을<br>변경해 주세요');
+    assert.equal(text(dlg.querySelector('#mall-dlg-desc')),'이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요.');
+    assert.match(text(dlg),/선택한 옵션에 따라 금액이 달라져요\. ?팝콘PC로 이동할까요\?/);
+    const go=dlg.querySelector('[data-action=mall-move]'),cancel=dlg.querySelector('.mall-dlg-actions [data-action=mall-dialog-close]'),x=dlg.querySelector('.mall-dlg-x');
+    assert.equal(text(go),'팝콘PC로 이동 ↗');assert.equal(text(cancel),'취소');
+    assert.equal(x.dataset.action,'mall-dialog-close');assert.equal(x.getAttribute('aria-label'),'안내 닫기');
     assert.equal(dlg.querySelector('[role=dialog]').getAttribute('aria-modal'),'true');
     assert.equal(d.activeElement.id,'mall-dlg-title');
     // 아직 아무것도 보내지 않았다 -- 이동을 누르기 전에는 인계 기록도 새 창도 없다.
     assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/saved-quotes'||c.url.endsWith('/handoff')));
     assert.equal(h.tabs.length,0);
-    // 초점은 안내창 안에서만 돈다.
-    cancel.focus();key(h,'Tab');assert.equal(d.activeElement,go);
+    // 초점은 안내창 안에서만 돈다(× 닫기 -> 이동 -> 취소).
+    cancel.focus();key(h,'Tab');assert.equal(d.activeElement,x);
     key(h,'Tab',{shiftKey:true});assert.equal(d.activeElement,cancel);
     // Escape 로 닫고 눌렀던 단추로 돌아온다. 새 창·인계 요청은 없다.
     key(h,'Escape');assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement.dataset.action,'build-options');assert.equal(d.activeElement.dataset.ordinal,'1');
     // 취소도 같다.
     const b0=d.querySelector('[data-action=build-options][data-ordinal="0"]');b0.focus();b0.click();d.querySelector('[data-action=mall-dialog-close]').click();
     assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement.dataset.action,'build-options');assert.equal(d.activeElement.dataset.ordinal,'0');
+    // × 「안내 닫기」도 같다.
+    const b0b=d.querySelector('[data-action=build-options][data-ordinal="0"]');b0b.focus();b0b.click();d.querySelector('[data-mall-dialog] .mall-dlg-x').click();
+    assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement.dataset.ordinal,'0');
     assert.equal(h.tabs.length,0);assert.ok(!h.calls.some(c=>c.url.endsWith('/handoff')||c.url==='/api/mvp3/saved-quotes'));
     assert.equal(h.flow.state.screen,'detail');assert.equal(h.flow.state.selected.build,null);
     assert.deepEqual(h.errors,[]);
@@ -103,12 +109,16 @@ test('mall PC: 팝콘PC로 이동 records the handoff first, then moves the pre-
     assert.deepEqual(post.map(c=>c.url),['/api/mvp3/saved-quotes','/api/mvp3/saved-quotes/'+qid+'/handoff'],'보관 -> 인계 기록 순서, 각 한 번');
     assert.equal(post[0].body.purpose,'handoff');assert.equal(post[0].body.contact,undefined,'쇼핑몰 이동은 연락처를 받지 않는다');
     assert.equal(h.tabs.length,1);assert.equal(h.tabs[0].location.href,MALL);assert.equal(h.tabs[0].opener,null);
-    const t=text(d.querySelector('[data-mall-dialog]'));
-    assert.match(t,/팝콘PC에서 원하는 옵션을 선택해 주세요\./);assert.match(t,/HO-5001/);assert.match(t,/주문이나 결제가 완료된 상태는 아니에요/);
+    // 이동 성공 뒤에는 안내창이 닫히고 상품 화면 자리에 이동 안내 화면이 그려진다.
+    assert.equal(d.querySelector('[data-mall-dialog]'),null,'이동 뒤에는 안내창이 닫힌다');
+    const moved=d.querySelector('#view .tf-moved[data-mall-state=moved]');assert.ok(moved);
+    const t=text(moved);
+    assert.equal(text(moved.querySelector('h2')),'팝콘PC에서 원하는 옵션을 선택해 주세요.');assert.match(t,/연결 번호 ?HO-5001/);assert.match(t,/주문이나 결제가 완료된 상태는 아니에요\./);
     assert.doesNotMatch(t,/주문이 접수|결제가 완료됐|주문 완료/);
     assert.equal(d.querySelector('[data-mall-reopen]').getAttribute('href'),MALL);
     assert.equal(h.flow.state.screen,'detail');
-    d.querySelector('[data-action=mall-dialog-close]').click();assert.equal(d.querySelector('[data-mall-dialog]'),null);
+    const back=moved.querySelector('[data-action=mall-dialog-close]');assert.equal(text(back),'상세로 돌아가기');back.click();
+    assert.equal(d.querySelector('.tf-moved'),null);assert.ok(d.querySelector('.tf-detail'),'상세로 돌아온다');assert.equal(d.querySelector('[data-mall-dialog]'),null);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
@@ -116,27 +126,36 @@ test('mall PC: 팝콘PC로 이동 records the handoff first, then moves the pre-
 test('mall PC detail has no 원래 부품으로, change list, 부품 변경 금액, 저장 wording or negative total explanations',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d,all=text(d.querySelector('.dv2'));
     assert.equal(d.querySelector('[data-action=build-undo]'),null);assert.equal(d.querySelector('[data-action=build-reset]'),null);
-    assert.doesNotMatch(all,/원래 부품으로|변경 내역|부품 변경 금액/);assert.doesNotMatch(all,NEG);
-    assert.ok(d.querySelector('[data-mall-hint]'),'쇼핑몰 구성 한 줄 안내');
-    const confirm=[...d.querySelectorAll('[data-action=final]')];
-    assert.ok(confirm.length>=1);for(const b of confirm){assert.match(text(b),/선택한 구성 확인/);assert.doesNotMatch(text(b),/저장|보관/);}
-    assert.equal(d.querySelector('#actions [data-action=final]').textContent.includes('저장'),false);
+    assert.doesNotMatch(all,/원래 부품으로|기본 부품으로|변경 내역|부품 변경 금액/);assert.doesNotMatch(all,NEG);
+    // 쇼핑몰 구성 안내: 표 머리와 표 아래 한 줄.
+    assert.equal(text(d.querySelector('.tf-parts-head h3')),'기본 구성 부품');assert.equal(text(d.querySelector('.tf-parts-head span')),'옵션 변경은 팝콘PC에서');
+    assert.match(text(d.querySelector('.tf-foot-note')),/부품 옵션을 바꾸려면 팝콘PC 상품 페이지로 이동해 주세요\./);
+    // 「선택한 구성 확인」·「견적 보관하기」는 없다 -- 주 버튼은 「팝콘PC에서 상품 보기」 하나다.
+    assert.equal(d.querySelectorAll('[data-action=final],[data-action=save]').length,0);assert.equal(d.querySelector('#actions').hidden,true);
+    const main=d.querySelectorAll('aside.tf-side [data-action=mall-view]');assert.equal(main.length,1);
+    assert.equal(text(main[0]),'팝콘PC에서 상품 보기 ↗');assert.doesNotMatch(text(main[0]),/저장|보관/);assert.equal(main[0].disabled,false);
     assert.doesNotMatch(all,/미확인 *$|재확인 필요/);
-    assert.match(all,/팝콘PC 상품 페이지에서 포함 여부 확인/);assert.match(all,/주문 전 팝콘PC에서 확인/);
+    assert.match(all,/현재 판매 구성과 재고, 운영체제·보증 포함 여부는 팝콘PC 상품 페이지에서 확인해 주세요\./);
     assert.equal(d.querySelectorAll('[data-action=unavailable]').length,0,'비활성 질문 단추가 없다');
   }finally{h.close();}
 });
 
-test('final screen: no disabled 변경 buttons, single 상세로 돌아가기 path, 견적 저장 only after the real save',async()=>{
+// 옛 최종 화면(「최종 견적 확인」·견적 저장·「상세로 돌아가기」·「이전 화면」)은 없어졌다. 몰 상품이 final 이 되어도 같은 상품 상세를 그리고,
+// 돌아가는 길은 머리띠의 「상담으로 돌아가기」 하나다.
+test('final screen of a mall PC: same product detail, no old final page, no 견적 저장, one 상담으로 돌아가기 path',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
-    d.querySelector('#actions [data-action=final]').click();await until(()=>h.flow.state.screen==='final');
+    assert.equal(d.querySelector('[data-action=final]'),null,'「선택한 구성 확인」 단추가 없다');
+    h.flow.navigate('final');await until(()=>h.flow.state.screen==='final'&&d.querySelector('.tf-detail'));
     const v=text(d.querySelector('#view'));
-    assert.equal(d.querySelectorAll('#view [data-action=unavailable],#view [data-action=build-options]').length,0);
-    assert.doesNotMatch(v,NEG);assert.match(text(d.querySelector('.final-back')),/상세로 돌아가기/);
-    assert.match(v,/저장 전/);assert.doesNotMatch(v,/저장됨|저장 완료/);
-    const save=d.querySelector('[data-action=save]');assert.equal(text(save),'견적 저장');
-    save.click();await until(()=>d.querySelector('[data-kact=submit]'));d.querySelector('[data-kact=submit]').click();await until(()=>h.flow.state.saveState==='saved');
-    assert.match(text(d.querySelector('#view')),/서버에 저장됨/);assert.equal(text(d.querySelector('[data-action=save]')),'저장 완료');
+    assert.equal(text(d.querySelector('#view h2')),'상품 구성 확인');assert.match(v,/팝콘PC 판매 상품/);
+    assert.doesNotMatch(v,/최종 견적 확인|견적 저장|저장 전|저장됨|저장 완료|상세로 돌아가기/);assert.doesNotMatch(v,NEG);
+    assert.equal(d.querySelectorAll('.final-back,[data-action=back],[data-action=save],[data-action=handoff],[data-action=unavailable]').length,0);
+    assert.equal(d.querySelectorAll('#view [data-action=build-options][disabled]').length,0,'비활성 변경 단추가 없다');
+    assert.equal(d.body.dataset.page,'product');
+    const cb=d.querySelector('#consult-back');assert.equal(cb.hidden,false);assert.equal(cb.dataset.action,'consult-back');assert.match(text(cb),/상담으로 돌아가기/);
+    cb.click();await until(()=>h.flow.state.screen==='results');assert.equal(d.querySelector('#consult-back').hidden,true);
+    assert.equal(h.calls.filter(c=>c.method==='POST'&&c.url.startsWith('/api/mvp3/saved-quotes')).length,0,'아무것도 보관하지 않았다');
+    assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
 
@@ -146,7 +165,8 @@ test('older saved mall quote with changes: read-only rows, no undo/reset, note t
     const row=d.querySelector('[data-part="bom-1"]');
     assert.ok(text(row).includes('램 32GB')&&text(row).includes('변경됨')&&text(row).includes('+100,000원'));
     assert.equal(d.querySelector('[data-action=build-undo]'),null);assert.equal(d.querySelector('[data-action=build-reset]'),null);
-    assert.match(text(d.querySelector('.dv2-side')),/쇼핑몰 상품 페이지는 기본 구성 기준/);
+    assert.match(text(d.querySelector('.dv2-side')),/팝콘PC 상품 페이지는 기본 구성 기준이에요\./);
+    assert.doesNotMatch(text(d.querySelector('.dv2')),/기본 부품으로|원래 부품으로|전체 원래 구성으로/,'쇼핑몰 PC 에는 되돌리기 문구가 없다');
     row.querySelector('[data-action=build-options]').click();
     assert.ok(d.querySelector('[data-mall-dialog]'));assert.equal(d.querySelector('.dv2-panel'),null);
     assert.deepEqual(h.errors,[]);
@@ -166,6 +186,10 @@ test('AI-composed product (server flag, no mall page) still opens the picker pan
 test('C06: with real conditions and nothing picked at the gateway, the header shows the applied conditions, never 미정',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=gateway]').click();d.querySelector('[data-action=gateway-use]').click();d.querySelector('[data-action=gateway-begin]').click();
+    // 상품 화면은 상담창 없이 한 열이라 상담 조건 머리 칸을 두지 않는다 -- 그래도 「미정」을 말하지 않는다.
+    assert.equal(d.body.dataset.page,'product');assert.equal(d.querySelector('[data-draft-context]'),null);
+    assert.doesNotMatch(text(d.querySelector('#view')),/용도 미정|예산 미정/);
+    d.querySelector('#consult-back').click();await until(()=>h.flow.state.screen==='results');
     const box=d.querySelector('[data-draft-context]');assert.ok(box);
     assert.equal(box.dataset.draftContext,'applied');assert.match(text(box),/현재 상담 조건.*게임/);
     assert.doesNotMatch(text(d.querySelector('#view')),/용도 미정|예산 미정/);
