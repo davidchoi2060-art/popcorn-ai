@@ -62,6 +62,8 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 팝콘PC가 파는 상품·가격·구성·판매 조건은 도구로 확인한 것만 말한다. 도구 결과에 없는 상품·가격·재고·배송·할인·설치를 지어내지 않는다.
 
 [도구]
+- 손님이 부품을 직접 고르고 조합하거나, 원하는 CPU·그래픽카드·메모리 조건으로 새 PC를 구성하려 하면 open_free_build 로 부품 직접 고르기 시작 화면을 안내한다. 뜻은 네가 대화로 판단한다. 부품 모델 이름만 나왔다고 일반 지식 질문을 이 화면으로 돌리지 않는다. 이 도구는 실제 이번 고객 문장을 전달할 뿐이며 부품을 선택하거나 견적·가격·호환·재고를 확정하지 않는다. 이동은 화면이 붙이는 버튼으로 하므로 답 본문에 URL·파일 경로·마크다운 링크를 쓰지 않는다.
+- 몰에 상품번호가 있는 기존 완제품의 부품 변경은 팝콘PC 사이트에서 확인하도록 안내한다. open_free_build 로 그 완제품을 실제 변경했다고 말하지 않는다. 손님이 별도로 새 PC의 부품을 직접 고르려 할 때 새 구성 화면을 안내한다.
 - 손님이 PC를 사려 하거나 추천을 원하면 find_pcs 로 찾는다. 손님이 말하지 않은 조건(예산·게임·해상도)은 넣지 않는다.
 - 추천할 PC를 정했으면 show_pcs 로 화면에 보여 줄 번호(ref)를 고른다. 설명은 보여 준 PC의 실제 사양과 맞아야 한다.
 - 손님이 무엇을 묻든 답은 막다른 길로 끝나지 않는다. 물은 것에 제대로 답하고, 맞는 PC를 보여 주거나 고를 수 있는 대안을 내놓는다.
@@ -436,6 +438,28 @@ def _sentences(text_: str) -> list[str]:
     return [x.strip() for x in _SENT.split(text_ or "") if x and x.strip()]
 
 
+_ACTION_LINK = re.compile(
+    r"\b(?:https?|ftp|file|javascript|data)\s*:|\b[a-z][a-z0-9+.-]*\s*:\s*[/\\]{2}"
+    r"|\bwww\.|\]\s*\(|\bhref\s*="
+    r"|(?<![\w])\.\.?/[a-z0-9_.~-]+"
+    r"|(?<![\w])/{1,2}(?:[a-z0-9_.~-]+/|[a-z0-9_.~-]+\.(?:html?|php|aspx?|jsp)\b|(?:mvp\d*|api|free-build)\b)"
+    r"|\b(?:mvp\d*|api|free-build)(?:/[a-z0-9_.~-]+)+(?:[/?.#]|\b)"
+    r"|\b[a-z0-9_.~-]+\.(?:html?|php|aspx?|jsp)(?:\b|[/?.#])"
+    r"|\b[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}(?:\b|[/?.#])",
+    re.I,
+)
+REPLY_FREE_BUILD_BUTTON = "부품 직접 고르기는 화면의 ‘부품 직접 고르기’ 버튼으로 시작해 주세요."
+
+
+def _free_build_action_reply(reply: str) -> str:
+    """화면 이동 도구를 쓴 턴만 서버 버튼으로 안내한다. 무관한 설명 문장은 보존한다."""
+    sentences = _sentences(reply)
+    if not any(_ACTION_LINK.search(sentence) for sentence in sentences):
+        return reply
+    kept = [sentence for sentence in sentences if not _ACTION_LINK.search(sentence)]
+    return "\n\n".join([*kept, REPLY_FREE_BUILD_BUTTON])
+
+
 def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
     """보여 준 카드가 예산을 넘는데 설명이 그 말을 안 하면, 서버가 사실 문장을 붙인다.
 
@@ -569,10 +593,13 @@ def said_units(texts: list[str]) -> int | None:
 
 
 def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, *,
-             prev_state: dict | None = None, display_context: TS.DisplayContext | None = None) -> dict:
+             prev_state: dict | None = None, display_context: TS.DisplayContext | None = None,
+             request_text: str | None = None) -> dict:
     """한 턴을 끝까지 돈다. DB 한도 확인(access_gate)은 라우터가 먼저 한다 -- 이 함수는 시험에서 바로 부른다."""
     t0 = time.monotonic()
     text_masked, masked = mask(text_in)
+    # /parse가 길이 때문에 AI 입력을 줄여도, 시작 화면에는 모델이 읽은 요약 대신 실제 요청 문장을 넘긴다.
+    source_text, source_masked = mask(request_text if request_text is not None else text_in)
     kinds = TE.classify(text_masked, masked=masked)
     if "self_harm" in kinds:
         return _fixed(TE.REPLY_SELF_HARM, "self_harm", t0)
@@ -613,7 +640,7 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     tools = TT.definitions(vocab.usage_labels, list(vocab.resolutions))
     msgs, hist_masked = _history(history)
     msgs.append({"role": "user", "text": text_masked})
-    book = TT.FactBook(anchor_code=anchor_code)
+    book = TT.FactBook(anchor_code=anchor_code, request_text=source_text)
     if facts:
         for item in [*facts["cards"], *([facts["selected"]] if facts["selected"] is not None else [])]:
             if type(item.get("price")) is int:
@@ -652,6 +679,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         log.warning("[talk_agent] llm failed after %s rounds: %s: %s", meta["rounds"], type(e).__name__, e)
         status = "failed"
 
+    if status == "ok" and book.screen_action is not None:
+        # 모델 URL을 고객에게 넘기지 않는다. 금액/약속 등 기존 사실 검사는 아래에서 그대로 거친다.
+        reply = _free_build_action_reply(reply)
     budget = (book.condition or {}).get("budget_won")
     said = " ".join(m["text"] for m in msgs if m.get("role") == "user")
     clean, dropped = verify(reply, book, budget, said)
@@ -674,10 +704,11 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         clean = TE.REPLY_AI_UNREADABLE
     # 「150만원이면 부족함 없이 충분해요」 한 문장만 온 턴은 그 문장이 걷혀도 서버 안내(예산·파워)가 답이 된다(F3 · R02).
     clean = "\n\n".join(x for x in (lead, psu_line, clean, note) if x).strip()
-    notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked) else []
+    notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked or source_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls
     return {"ok": status != "failed", "status": status, "reply": clean, "notes": notes,
+            **({"action": book.screen_action} if status == "ok" and book.screen_action is not None else {}),
             "cards": _cards(book) if status != "failed" else [],
             "snapshot": {"id": book.snapshot_id, "as_of": book.as_of, "condition": book.condition},
             # 고객 화면은 카드를 이 조건으로 /api/grid/recommend 에 다시 물어 그린다(같은 엔진·같은 순서, A-02).
@@ -714,7 +745,7 @@ CHAT_MAX = 2000   # ChatBody.text 한도와 같다 -- 더 긴 글은 지금 경�
 
 
 def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict | None, *,
-             display_context: TS.DisplayContext | None = None) -> dict | None:
+             display_context: TS.DisplayContext | None = None, request_text: str | None = None) -> dict | None:
     """/api/talk/parse 가 스위치가 켜져 있을 때 부른다(2026-10-14 중헌 님 「고객 상담을 LLM 중심으로 해」).
 
     고객 화면은 바뀌지 않은 채 같은 경로를 부르고, 응답 모양도 /parse 계약을 따른다 -- `agent: true` 로
@@ -724,7 +755,8 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
     방문자 한도 확인은 /parse 가 먼저 한다.
     """
     turns = [Turn(role=getattr(t, "role", ""), text=(getattr(t, "text", "") or "")[:4000]) for t in history or []]
-    r = run_turn(text, turns, prev_state=prev_state, display_context=display_context)
+    r = run_turn(text, turns, prev_state=prev_state, display_context=display_context,
+                 **({"request_text": request_text} if request_text is not None else {}))
     if not r.get("ok") or r.get("status") == "failed":
         return None
     cards = r.get("cards") or []
@@ -734,6 +766,7 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
     # 기록에 카드가 없어 「조금 전 두 번째 제품」을 가리키지 못했다(2026-10-15 코덱스 v2 Q42).
     shown_note = shown_list(cards) if state is not None else None
     return {"ok": True, "agent": True, "state": state if state is not None else (prev_state or {}),
+            **({"action": r["action"]} if isinstance(r.get("action"), dict) else {}),
             "missing": [], "assumed": [], "dropped": [], "pc_related": True, "silent": False,
             "fallback": None, "handoff_offer": r.get("kind") == "self_harm",
             "explain_only": state is None, "answer": "", "reply": reply, "nav": r.get("nav"),

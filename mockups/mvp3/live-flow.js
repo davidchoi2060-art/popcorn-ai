@@ -109,6 +109,32 @@
     if(d.consent!==true)return '연락처를 받으려면 개인정보 수집에 동의해 주세요.';
     return '';
   }
+function inquiryHtml(q,{phase=null}={}){
+  const state={phase};if(!q.open&&!q.done)return '';
+  // 「사람 상담 남기기」 단추로 열었으면 구매 상담 문구 대신 일반 상담 문구를 쓴다(코덱스 PR136 검수 「신청 문구의 범위」).
+  const button=(label,action,cls='',attrs='')=>'<button type="button" data-action="'+action+'" class="'+cls+'" '+attrs+'>'+label+'</button>';
+  const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const human=!!q.human,title=human?'사람 상담 남기기':'구매 상담 신청';
+  if(q.done)return '<section class="live-explanation live-inquiry" role="status" data-inquiry-done><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p>'+
+    '<p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 아직 진행되지 않았어요.</p></section>';
+  const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft;
+  const err=q.error?'<p class="live-inquiry-error" role="alert" tabindex="-1">'+esc(q.error)+'</p>':'';
+  if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
+    (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline',human?'data-human="1"':''))+'</section>';
+  const field=(name,label,input)=>'<label class="live-inquiry-field"><span>'+label+'</span>'+input+'</label>';
+  const dis=busy?' disabled':'';
+  return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
+    '<p class="muted">'+(human?'상담에서 바로 답하기 어려운 내용은 팝콘PC 담당자가 연락드려 안내해요.':'여러 대 구매 · 할인 · 세금계산서처럼 상담에서 정할 수 없는 내용은 팝콘PC 담당자가 연락드려 안내해요.')+' 이 신청으로 주문이나 결제가 진행되지는 않아요.</p>'+
+    field('topic','문의 주제','<select data-inquiry="topic"'+dis+'><option value="">주제를 골라 주세요</option>'+q.meta.topics.map(t=>'<option'+(d.topic===t?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select>')+
+    field('name','이름 (선택)','<input data-inquiry="name" maxlength="30" autocomplete="name" value="'+esc(d.name)+'"'+dis+'>')+
+    field('phone','전화번호','<input data-inquiry="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'>')+
+    field('email','이메일','<input data-inquiry="email" type="email" maxlength="120" autocomplete="email" value="'+esc(d.email)+'"'+dis+'>')+
+    '<p class="muted live-inquiry-hint">전화번호나 이메일 중 하나는 적어 주세요.</p>'+
+    field('message','문의 내용 (선택)','<textarea data-inquiry="message" maxlength="500" rows="3"'+dis+'>'+esc(d.message)+'</textarea>')+
+    '<label class="live-inquiry-consent"><input type="checkbox" data-inquiry="consent"'+(d.consent?' checked':'')+dis+'><span>'+esc(q.meta.consent_text)+' 동의합니다.</span></label>'+
+    err+'<div class="live-inquiry-buttons">'+button('닫기','inquiry-close','outline',busy?'disabled':'')+
+    button(state.phase==='inquiry'?'보내는 중…':'신청 보내기','inquiry-send','primary',busy?'disabled':'')+'</div></section>';
+}
   // 견적 보관 창(연락처) · 상담 신청 접수 · 쇼핑몰 이동 안내창의 상태 (2026-10-16 두 구매 흐름).
   // 연락처는 처음 보관할 때 한 번만 받는다. 전체 번호는 화면이 서버에서 되받지 않는다 -- 가린 번호만 들고 있다.
   // draft 는 고객이 지금 적는 값이라 이 탭 메모리에만 있고, 대화 보관(conversationSnapshot)·보관 복구(journal)에 싣지 않는다.
@@ -166,7 +192,7 @@
     const state={screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
       selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,phase:null,error:null,retry:null,
       saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],pendingSave:null,pendingProblem:'',handoff:null,
-      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,restoredCurrent:null,restoredShown:false,proposals:[],
+      wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,freeBuildOffer:null,handoffOffer:false,restoredCurrent:null,restoredShown:false,proposals:[],
       contact:emptyContact(),keep:emptyKeep(),consult:emptyConsult(),mall:emptyMall()};
     let generation=0,controller=null,pendingProduct=null,pendingContact=null,pendingPurpose='keep',stayOnScreen=false;const saveIds=new Map(),journal=createJournal(options),conversation=createConversationStore(options);
     // 화면을 그릴 때마다 대화 상태를 이 탭에 남긴다. 보관이 막혀 있어도 상담은 그대로 간다.
@@ -201,7 +227,7 @@
     function reset({restore=false}={}){
       cancel();Object.assign(state,{restoredCurrent:null,restoredShown:false,proposals:[],screen:'welcome',talk:null,chatFlow:null,history:[],messages:[],groups:[],recommendation:null,
         selected:null,selectionState:null,selectionWants:null,selectionQuery:null,lastQuery:null,savedQuote:null,quotes:[],hasMore:false,error:null,retry:null,saveState:'idle',needsRefresh:false,lastText:'',missing:[],assumed:[],handoff:null,
-        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,handoffOffer:false,
+        wants:null,choices:[],anchorCode:null,pendingText:'',inquiry:emptyInquiry(),parts:emptyParts(),build:emptyBuild(),selectedContext:null,freeBuildOffer:null,handoffOffer:false,
         keep:emptyKeep(),consult:emptyConsult(),mall:emptyMall()});
       try{state.pendingSave=journal.read();state.pendingProblem='';if(state.pendingSave)state.saveState='uncertain';}
       catch{state.pendingProblem='이 탭의 보관 복구 기록을 확인할 수 없어 새 보관 요청을 보내지 않습니다. 내 견적은 확인할 수 있어요.';}
@@ -247,7 +273,7 @@
       const text=String(raw||'').trim();
       if(!text||text.length>MAX_TEXT||state.phase)return false;
       const previous=state.history.slice(-6),previousTalk=state.talk,op=begin('talk');
-      state.lastText=text;if(!repeat)message(text,'user');emit();
+      state.freeBuildOffer=null;state.lastText=text;if(!repeat)message(text,'user');emit();
       // 새 조건으로 다시 찾다가 실패하면 보던 견적으로 되돌린다(코덱스 PR136 검수 「추천 실패 때 이전 추천 복원」).
       let prior=null;
       try{
@@ -271,6 +297,8 @@
           if(answer.trim())state.history.push({role:'assistant',text:answer.slice(0,300)});
           if(reply.trim())state.history.push({role:'assistant',text:reply.slice(0,300)});
         }
+        const actionEntry=typeof module!=='undefined'?require('./free-build-entry.js'):root.MVP3FreeBuildEntry;
+        if(actionEntry?.validAction(response.action,text)){state.freeBuildOffer=M.copy(response.action);return true;}
         // 예외 입력(이상한 말·사람 상담 요청·AI 가 못 읽은 말)에는 서버가 사람 상담 길을 연다(api/talk_exceptions).
         if(response.handoff_offer===true)state.handoffOffer=true;
         // 상담원이 고른 PC 목록은 다음 턴 기록에만 싣는다 -- 「조금 전 두 번째 제품」을 가리킬 수 있게(코덱스 v2 Q42). 화면에는 보이지 않는다.
@@ -1097,5 +1125,5 @@
     s.mall={...s.mall,step:'moved',error:'',blocked:!moved};flow.emit();
     return true;
   }
-  if(typeof module!=='undefined')module.exports={moveToMall,createKeepUi,createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,CONVERSATION_KEY,conversationSnapshot,validConversation,DRAFT_KEY,DRAFT_TTL_MS,createDraftHandoff,handoffAndOpen};else root.MVP3LiveFlow={moveToMall,createKeepUi,createFlow,GREETING,createDraftHandoff,handoffAndOpen};
+  if(typeof module!=='undefined')module.exports={moveToMall,createKeepUi,createFlow,GREETING,JOURNAL_KEY,validPending,inquiryProblem,inquiryHtml,CONVERSATION_KEY,conversationSnapshot,validConversation,DRAFT_KEY,DRAFT_TTL_MS,createDraftHandoff,handoffAndOpen};else root.MVP3LiveFlow={moveToMall,createKeepUi,createFlow,GREETING,inquiryProblem,inquiryHtml,createDraftHandoff,handoffAndOpen};
 })(typeof window==='undefined'?globalThis:window);

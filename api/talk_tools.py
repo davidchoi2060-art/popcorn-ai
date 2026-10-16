@@ -59,6 +59,8 @@ class FactBook:
     prices: set[int] = field(default_factory=set)           # 이 턴에 말해도 되는 금액(원)
     shown: list[str] = field(default_factory=list)          # show_pcs 로 고른 ref
     calls: list[dict] = field(default_factory=list)         # [{name, status}] -- 응답 meta 용
+    request_text: str | None = None                       # 이 턴 실제 고객 문장(개인정보 마스킹 후)
+    screen_action: dict | None = None                     # 저장/주문이 아닌 화면 이동 안내
 
     def add_item(self, it: dict) -> str:
         for ref, old in self.items.items():
@@ -85,6 +87,11 @@ def _invalid(reason: str) -> dict:
 # ── 도구 정의(AI 에게 보이는 계약) ─────────────────────────────────────────
 def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
     return [
+        {"name": "open_free_build",
+         "description": ("손님이 PC 부품을 직접 고르거나 원하는 CPU·그래픽카드·메모리 조건으로 새 PC를 구성하려 할 때,"
+                         " 부품 직접 고르기 시작 화면으로 이어 준다. 실제 이번 고객 문장만 서버가 전달하므로 인자는 없다."
+                         " 상품 선택·가격 확정·주문·저장·상담 접수는 하지 않는다. 기존 몰 완제품을 변경해 주는 도구가 아니다."),
+         "parameters": {"type": "object", "additionalProperties": False, "properties": {}}},
         {"name": "find_pcs",
          "description": ("팝콘PC가 지금 판매 중인 조립 PC 중에서 조건에 맞는 것을 찾는다. 손님이 PC 추천·구매를 원하거나,"
                          " 부품·성능을 물어 그 기준에 맞는 PC를 보여 줄 수 있을 때 부른다. 손님이 말하지 않은 조건은 넣지 않는다."
@@ -424,8 +431,25 @@ def show_pcs(args: dict, book: FactBook) -> dict:
     return _res("ok", shown=book.shown)
 
 
+def open_free_build(args: dict, book: FactBook) -> dict:
+    """LLM이 고른 화면 이동 의도만 받는다. 고객 원문/조건을 모델 인자로 만들지 않는다."""
+    if args:
+        return _invalid("open_free_build 는 인자를 받지 않는다. 이번 고객 문장을 그대로 사용한다")
+    raw = book.request_text
+    if not isinstance(raw, str) or not raw.strip() or len(raw) > 2000:
+        return _invalid("이번 고객 문장이 없거나 화면 전달 길이를 넘었다")
+    from .mvp3_free_build import parse_text
+
+    conditions = parse_text(raw).model_dump(exclude_none=True)
+    book.screen_action = {"type": "open_free_build", "request_text": raw,
+                          "conditions": conditions, "conditions_source": "request_text"}
+    return _res("ok", action="open_free_build", conditions=conditions, conditions_source="request_text",
+                note="고객 문장과 읽은 조건을 시작 화면에 전달할 뿐이다. 부품 후보·호환·재고·금액은 아직 조회하지 않았고 주문·저장·접수도 하지 않았다.")
+
+
 EXECUTORS = {"find_pcs": find_pcs, "pc_detail": pc_detail, "other_pcs_by_part": other_pcs_by_part,
-             "game_facts": game_facts, "shop_policy": shop_policy, "show_pcs": show_pcs}
+             "game_facts": game_facts, "shop_policy": shop_policy, "show_pcs": show_pcs,
+             "open_free_build": open_free_build}
 
 
 def run(name: str, args: dict, book: FactBook) -> dict:

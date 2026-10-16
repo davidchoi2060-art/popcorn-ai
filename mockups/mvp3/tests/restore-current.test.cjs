@@ -74,7 +74,10 @@ test('the inquiry follows the button it was opened with',async()=>{
 });
 test('the retry button keeps the general inquiry wording',()=>{
   const app=require('node:fs').readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
-  assert.match(app,/button\('다시 불러오기','inquiry-open','outline',human\?'data-human="1"':''\)/);
+  const html=require('../live-flow.js').inquiryHtml({open:true,human:true,meta:null,error:'양식 확인 필요'});
+  assert.match(html,/data-action="inquiry-open"[^>]*data-human="1"/);
+  assert.match(html,/사람 상담 남기기/);
+  assert.match(app,/MVP3LiveFlow\.inquiryHtml\(state\.inquiry/);
   assert.match(app,/willResume=initial&&screen!=='saved'&&state\.restoredCurrent&&state\.talk/);
   assert.match(app,/if\(willResume\)\{void flow\.resume\(\{arrived:!!arrival\}\)/);
 });
