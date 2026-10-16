@@ -6,14 +6,15 @@
    주소 매개변수
      case    ai(기본) | mall | mall-nourl | mall-fail     상품 종류와 몰 연결 결과
      has     1                                           연락처가 이미 등록된 고객(다음 견적 보관 · 승인 08)
-     save    fail                                        견적 보관 실패(승인 14)
+     save    fail | unknown                              fail = 확정 실패 422(승인 14 · 다시 보관하기) · unknown = 응답 불명 503(복구 안내)
      consult fail | already                              상담 접수 실패(승인 15) · 이미 접수된 견적
-     step    detail(기본) | change | keep | kept | consult | done | ask | moved
-             change = 맞춤 구성 쿨러를 바꾼 상세(승인 06 적용 뒤) · ask = 완제품 「변경」 안내창(승인 02)
+     close   cancel | x | esc                            step=pick 뒤 패널을 그 방법으로 닫는다(구성·금액·초점 보존 확인)
+     step    detail(기본) | open | pick | change | keep | kept | consult | done | ask | moved
+             open = 쿨러 후보 패널을 연 채(승인 06) · pick = 후보를 임시로 고른 채(적용 전) · change = 쿨러를 바꿔 적용한 상세 · ask = 완제품 「변경」 안내창(승인 02)
      w       390 처럼 숫자를 주면 화면 폭 안내만 붙인다(실제 폭은 브라우저 창으로 맞춘다) */
 (function(){'use strict';
 const q=new URLSearchParams(location.search),CASE=q.get('case')||'ai',STEP=q.get('step')||'detail';
-const AI=CASE==='ai',HAS=q.get('has')==='1',SAVE_FAIL=q.get('save')==='fail',CONSULT=q.get('consult')||'ok';
+const CLOSE=q.get('close')||'',AI=CASE==='ai',HAS=q.get('has')==='1',SAVE=q.get('save')||'ok',SAVE_FAIL=SAVE==='fail'||SAVE==='unknown',CONSULT=q.get('consult')||'ok';
 // 이 탭 메모리 보관함 -- 같은 주소의 실제 보관 키·견적 기록과 섞이지 않게 한다.
 function memStore(){const m=new Map();return {getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>{m.set(k,String(v));},removeItem:k=>{m.delete(k);},clear:()=>m.clear(),key:i=>[...m.keys()][i]??null,get length(){return m.size;}};}
 for(const name of ['localStorage','sessionStorage'])try{Object.defineProperty(window,name,{value:memStore(),configurable:true});}catch{}
@@ -52,7 +53,9 @@ window.fetch=async(url,init={})=>{
   if(path.startsWith('/api/mvp3/saved-quotes')&&method==='GET')return reply(200,{ok:true,quotes:server.saved?[server.saved]:[],has_more:false});
   if(path==='/api/mvp3/saved-quotes'&&method==='POST'){
     if(body.purpose!=='handoff'){
-      if(SAVE_FAIL)return reply(503,{detail:'검수용 예시 · 보관 실패'});
+      // fail = 서버가 보관하지 않고 돌려보냄(확정 실패 422 · 승인 14) / unknown = 응답 불명(503 · 복구 안내, 다시 보내지 않음)
+      if(SAVE==='fail')return reply(422,{detail:'검수용 예시 · 보관하지 않았어요.'});
+      if(SAVE==='unknown')return reply(503,{detail:'검수용 예시 · 응답 불명'});
       if(!body.contact&&!server.has)return reply(422,{detail:{error:'contact_required',contact_required:true,detail:'견적을 보관하려면 전화번호를 입력하고 개인정보 수집·이용에 동의해 주세요.'}});
       if(body.contact)server.has=true;
     }
@@ -93,14 +96,22 @@ async function drive(){
     return;
   }
   click('[data-action=build-options][data-ordinal="5"]');
-  const radio=await wait(()=>$('[data-dv2-radio][value="7002"]'));radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));
+  const radio=await wait(()=>$('[data-dv2-radio][value="7002"]'));
+  if(STEP==='open')return;   // 승인 06: 후보 패널을 연 채(아직 아무것도 고르지 않음)
+  radio.checked=true;radio.dispatchEvent(new Event('change',{bubbles:true}));
+  if(STEP==='pick'){         // 후보를 임시로 골랐지만 적용 전 -- 표·금액은 원 구성 그대로
+    if(CLOSE==='cancel')click('.dv2-panel .dv2-cancel');
+    else if(CLOSE==='x')click('.dv2-panel .dv2-x');
+    else if(CLOSE==='esc')document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+    return;
+  }
   click('[data-dv2-apply]');await wait(()=>$('[data-pc-total-move]'));
   if(STEP==='change')return;
   click('[data-action=save]');await wait(()=>$('[data-keep-page]'));
   if(STEP==='keep')return;
   if(!HAS){fill('phone','010-0000-0000');fill('consent',true);}
   click('[data-keep-page] [data-kact=submit]');
-  await wait(()=>$('.tf-kept')||$('[data-keep-retry]'));
+  await wait(()=>$('.tf-kept')||$('[data-keep-retry]')||(SAVE==='unknown'&&!$('[data-keep-page]')&&$('.live-recovery [data-action=recover]')));
   if(STEP==='kept'||SAVE_FAIL)return;
   if(STEP==='consult'){click('[data-action=consult-note]');await wait(()=>$('.tf-consult select'));return;}
   if(STEP==='done'){click('[data-action=consult-send]');await wait(()=>$('.tf-done')||$('.tf-consult .tf-alert')||$('[data-consult-done]'));}
