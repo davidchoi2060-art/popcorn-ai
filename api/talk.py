@@ -555,6 +555,8 @@ class ParseBody(BaseModel):
     # 않는다: 프롬프트에 «이전까지 파악한 상태»로 실을 뿐이고, 모델이 낸 새 state 를
     # `validate_state` 가 다시 검증한다. 화면이 조작해 보낸 어휘 밖 값도 그 층에서 걸린다.
     state: dict | None = None
+    # 상품번호만 받으며, 실제 공개 구성은 도구 상담이 서버에서 다시 읽는다.
+    display_context: TS.DisplayContext | None = None
     # 대화 흐름 카운터(2026-09-17 잡담 허용 단계). 계약은 `talk_schema.ChatFlow` --
     # **TalkState 와 형제**이고 부분집합이 아니다(그 파일 §1-b 에 근거). 화면이 응답의
     # 같은 필드를 그대로 되돌려 보낸다. 없으면 0(첫 문장)으로 본다. 서버는 이 값을 믿지
@@ -1361,7 +1363,8 @@ def parse_talk(body: ParseBody, request: Request):
     if AGENT.enabled() and len(text) <= AGENT.CHAT_MAX:
         with engine.connect() as conn:
             access_gate.check_rate(conn, request, what="talk.parse")
-        agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow)
+        agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow,
+                                  display_context=body.display_context)
         if agent_res is not None:
             if truncated:
                 agent_res["reply"] = (TX.NOTE_TOO_LONG % format(len(text), ",") + "\n\n" + agent_res["reply"]).strip()

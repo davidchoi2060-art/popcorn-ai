@@ -23,9 +23,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from sqlalchemy import text
 
 from . import usage_floors as UF   # 용도 어휘의 정본 로더 — 다시 짜지 않는다
@@ -52,6 +52,38 @@ EXCLUDE_VALUES: tuple[str, ...] = ("모니터 보유", "OS 제외", "본체만")
 BUDGET_BOUND_VALUES: tuple[str, ...] = ("이상", "이하")
 # GRADE_SRC_VALUES: §4 game.grade_src.
 GRADE_SRC_VALUES: tuple[str, ...] = ("catalog", "ai_estimate")
+
+
+ProductCode = Annotated[int, Field(strict=True, gt=0, le=2**63 - 1)]
+
+
+class DisplayCard(BaseModel):
+    """쇼핑몰 PC 또는 신규 구성 PC. 식별자는 정확히 하나만 받는다."""
+    model_config = ConfigDict(extra="forbid")
+
+    product_code: ProductCode | None = None
+    configuration_id: Annotated[str, Field(strict=True, min_length=1, max_length=64,
+                                           pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")] | None = None
+
+    @model_validator(mode="after")
+    def one_identity(self):
+        if (self.product_code is None) == (self.configuration_id is None):
+            raise ValueError("exactly one product identifier is required")
+        return self
+
+    def identity(self):
+        return ("product_code", self.product_code) if self.product_code is not None else ("configuration_id", self.configuration_id)
+
+
+class DisplayContext(BaseModel):
+    """실제 카드 순서와 선택 PC를 분리한다. 가격·연락처·설명문은 받지 않는다."""
+    model_config = ConfigDict(extra="forbid")
+
+    screen: Literal["welcome", "results", "detail", "final", "saved"]
+    source: Literal["recommendation", "saved_quote", "new_pcs", "custom_build"]
+    cards: list[DisplayCard] = Field(default_factory=list, max_length=6)
+    selected: DisplayCard | None = None
+    cards_truncated: Annotated[bool, Field(strict=True)] = False
 
 # missing 좌표 이름 — talk.py · grid_public.py · 화면이 같은 문자열을 본다.
 MISSING_USAGES = "usages"

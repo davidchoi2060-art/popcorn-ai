@@ -10,7 +10,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+name+'.svg" alt="">';
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const money=value=>Number.isInteger(value)?value.toLocaleString('ko-KR')+'원':'금액 미확인';
-const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state,keepUi=window.MVP3LiveFlow.createKeepUi(flow,document,{page:true});
+const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render,getDisplayCards:()=>window.MVP3WelcomePcs?.context?.()||[]}),state=flow.state,keepUi=window.MVP3LiveFlow.createKeepUi(flow,document,{page:true});
 // 대화 화면(talk.html)에서 넘어왔는지(talk.js FROM_TALK_KEY · 한 번 읽고 지운다). 넘어왔으면 「대화로 돌아가기」를
 // 보이고, 「부품 바꾸기」로 넘어왔으면 상세가 열린 뒤 부품 바꾸기 칸으로 옮긴다. 대화·견적은 같은 탭 보관으로 온다.
 const FROM_TALK_KEY='popcorn-mvp3-from-talk-v1';
@@ -62,11 +62,22 @@ function budgetLines(p){
     line('muted','고를 때'+label(basis)+budget(p,basis));
 }
 function syncChat(){
-  const open=!mobile.matches||(chatPreference??state.screen==='welcome');
   const body=$('#chat-body'),toggle=$('#chat-toggle');
+  const hasPcs=state.screen==='welcome'&&!!view.querySelector('.welcome-pcs');
+  document.body.classList.toggle('has-welcome-pcs',hasPcs);
+  // 같은 상담 DOM을 옮겨 모바일의 읽기·탭 순서도 상품 → 상담으로 맞춘다.
+  // 비동기 목록 도착이나 화면 폭 변경 중에 작성한 입력·선택·포커스를 보존한다.
+  const chat=$('.chat'),workspace=$('.workspace'),content=$('.content'),active=document.activeElement;
+  const selection=active=== $('#request')?[active.selectionStart,active.selectionEnd,active.selectionDirection]:null;
+  const moveAfter=mobile.matches&&hasPcs;
+  if(moveAfter?content.nextElementSibling!==chat:workspace.firstElementChild!==chat){
+    workspace.insertBefore(chat,moveAfter?content.nextElementSibling:content);
+    if(chat.contains(active)){active.focus({preventScroll:true});if(selection)active.setSelectionRange(...selection);}
+  }
+  const open=!mobile.matches||(chatPreference??(state.screen==='welcome'&&(!hasPcs||body.contains(active))));
   if(!open&&body.contains(document.activeElement))toggle.focus({preventScroll:true});
-  body.hidden=!open;toggle.setAttribute('aria-expanded',String(open));$('#chat-toggle-label').textContent=open?'상담 접기 ▴':'상담 내용 보기 ▾';
-  $('#chat-summary').textContent=M.conditions(state.talk).join(' · ')||'게임과 예산을 알려주세요';
+  body.hidden=!open;toggle.setAttribute('aria-expanded',String(open));$('#chat-toggle-label').textContent=open?'상담 접기 ▴':hasPcs?'상담 열기 ▾':'상담 내용 보기 ▾';
+  $('#chat-summary').textContent=M.conditions(state.talk).join(' · ')||(hasPcs?'상담으로 추천받기':'게임과 예산을 알려주세요');
 }
 // Quick replies follow what the consultation is asking for: the server's `missing`
 // (usages → 용도, game.grade → 게임). Game-only options stay for game talk.
@@ -826,7 +837,7 @@ function renderSaved(){
     (state.hasMore?'<p class="muted">최근 20개의 보관 기록을 표시하고 있어요.</p>':'');
   actions.hidden=true;
 }
-function renderWelcome(){view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header>${welcomePcs()}<section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
+function renderWelcome(){const pcs=welcomePcs();if(pcs){view.innerHTML=pcs;actions.hidden=true;return;}view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header>${welcomePcs()}<section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
 // 「AI 답변 준비중」(2026-10-15 중헌 님 「로딩되는 순간 메인화면이 보이니까.. 헷갈려」). 대화 화면에서 상세로 넘어오거나
 // 새로고침해 보던 견적을 다시 불러오는 동안(restoring) 상세가 아직 없으면 첫 화면 대신 이것을 그린다.
 // 진행률은 모르므로 숫자를 말하지 않는다. 10초가 넘으면 문장만 바꾼다.
@@ -1019,5 +1030,8 @@ window.addEventListener('popstate',e=>{
 const draftHandoff=window.MVP3LiveFlow.createDraftHandoff();
 window.addEventListener('pagehide',()=>{captureDraft();draftHandoff.put(draft.draft_edited?draft.draft_text:'');});
 {const carried=draftHandoff.take();if(carried&&!(draft.draft_edited&&draft.draft_text.trim()))setDraft(carried,true);}
-enterRoute(location.hash,true);focusConsultation();settleArrival();
+enterRoute(location.hash,true);
+// 모바일 첫 화면은 상품을 먼저 읽게 한다. 상담은 고객이 펼칠 때 입력으로 진입한다.
+if(mobile.matches&&state.screen==='welcome'){view.querySelector('h2')?.focus({preventScroll:true});syncChat();}else focusConsultation();
+settleArrival();
 })();

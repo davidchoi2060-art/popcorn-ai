@@ -6,7 +6,7 @@
 'use strict';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=x=>Number.isInteger(x)?x.toLocaleString('ko-KR')+'원':'금액 확인 중';
-const MAX=6,MAX_USAGES=3,KEY_SLOTS=['CPU','GPU'];
+const MAX=3,MAX_USAGES=3,KEY_SLOTS=['CPU','GPU','RAM','SSD'];
 const PLACEHOLDER=/^운영자가 부품을 선택한/;   // api/custom_pc.PLACEHOLDER_INTRO — 고객 문구가 아니다
 let items=[];
 function blurb(x){
@@ -15,21 +15,23 @@ function blurb(x){
 }
 function card(x){
   const usages=(Array.isArray(x.usages)?x.usages:[]).slice(0,MAX_USAGES);
-  const keys=(Array.isArray(x.parts)?x.parts:[]).filter(p=>KEY_SLOTS.includes(p.slot));
+  const keys=(Array.isArray(x.parts)?x.parts:[]).filter(p=>p&&KEY_SLOTS.includes(p.slot)&&p.name);
   const text=blurb(x);
-  return '<li><a class="welcome-pc" href="new-pcs.html#'+encodeURIComponent(x.configuration_id)+'">'+
+  return '<li><article class="welcome-pc">'+
     (usages.length?'<span class="welcome-pc-usages" aria-label="맞춘 용도">'+usages.map(u=>'<em>'+esc(u.usage)+' '+esc(u.level)+'</em>').join('')+'</span>':'')+
-    '<strong>'+esc(x.title)+'</strong>'+(text?'<span>'+esc(text)+'</span>':'')+
-    (keys.length?'<dl class="welcome-pc-parts">'+keys.map(p=>'<div><dt>'+esc(p.slot_label)+'</dt><dd>'+esc(p.name)+'</dd></div>').join('')+'</dl>':'')+
-    '<b>'+money(x.price)+'</b><small>자세히 보기 <img class="ui-icon" src="assets/icons/arrow-right.svg" alt=""></small></a></li>';
+    '<h3>'+esc(x.title)+'</h3>'+(text?'<p class="welcome-pc-blurb">'+esc(text)+'</p>':'')+
+    (keys.length?'<dl class="welcome-pc-parts">'+keys.map(p=>'<div><dt>'+esc(p.slot_label)+'</dt><dd>'+esc(p.name)+(p.quantity>1?' × '+esc(p.quantity):'')+'</dd></div>').join('')+'</dl>':'')+
+    '<b>'+money(x.price)+'</b><a class="welcome-pc-config" href="new-pcs.html#'+encodeURIComponent(x.configuration_id)+'">구성 보기 <img class="ui-icon" src="assets/icons/arrow-right.svg" alt=""></a></article></li>';
 }
 function html(){
   if(!items.length)return '';
-  return '<section class="welcome-pcs" aria-labelledby="welcome-pcs-title"><header><div><h3 id="welcome-pcs-title">새로 구성된 PC</h3>'+
-    '<p>팝콘PC가 용도에 맞춰 부품을 직접 골라 구성한 완제조립PC예요.</p></div>'+
-    (items.length>MAX?'<a href="new-pcs.html">전체 보기</a>':'')+'</header><ul>'+items.slice(0,MAX).map(card).join('')+'</ul></section>';
+  return '<section class="welcome-pcs" aria-labelledby="welcome-pcs-title"><header><div><h2 id="welcome-pcs-title" tabindex="-1">새로 구성된 PC</h2>'+
+    '<p>팝콘PC가 용도에 맞춰 부품을 직접 골라 구성했어요.</p></div>'+
+    '<a class="welcome-pcs-all" href="new-pcs.html">전체 보기 <img class="ui-icon" src="assets/icons/arrow-right.svg" alt=""></a></header><ul class="'+(items.length===1?'one-item':'')+'">'+items.slice(0,MAX).map(card).join('')+'</ul></section>';
 }
-window.MVP3WelcomePcs={html};
+// 상담에는 실제 홈 카드 순서의 공개 구성 식별자만 넘긴다. 표시 문구·금액·부품은 싣지 않는다.
+function context(){return items.slice(0,MAX).map(x=>({configuration_id:x.configuration_id}));}
+window.MVP3WelcomePcs={html,context};
 (async()=>{
   try{
     const r=await fetch('/api/mvp3/custom-pcs',{credentials:'same-origin'});if(!r.ok)return;
