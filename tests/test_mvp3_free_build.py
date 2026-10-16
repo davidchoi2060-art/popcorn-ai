@@ -112,6 +112,27 @@ class ParseTests(unittest.TestCase):
         self.assertIn('265V', F.parse_text('Ultra 7 265V').cpu)
         self.assertFalse(F.cpu_rule(F.parse_text('Ultra 7 265V').cpu)('인텔 코어 울트라 7 265K'))
 
+    def test_exact_cpu_keeps_missing_suffix_brand_and_series(self):
+        for request, exact, wrong in (
+                ('Ultra 7 265', '인텔 코어 울트라 7 265', '인텔 코어 울트라 7 265K'),
+                ('i9-14900', '인텔 코어i9-14900', '인텔 코어i9-14900KF'),
+                ('인텔 i7-6700', '인텔 코어i7-6700', 'AMD A10-6700'),
+                ('인텔 i7-6700', '인텔 코어i7-6700', '인텔 코어i5-6700')):
+            with self.subTest(request=request, wrong=wrong):
+                match = F.cpu_rule(request)
+                self.assertTrue(match(exact))
+                self.assertFalse(match(wrong))
+        self.assertTrue(F.cpu_rule('i9')('인텔 코어i9-14900KF'))
+        self.assertTrue(F.cpu_rule('라이젠 7')('AMD 라이젠7-9700X'))
+
+    def test_text_keeps_unsupported_suffix_instead_of_cutting_it(self):
+        for request, model in (('i9 14900ZZ', '14900ZZ'), ('i9 14900KFZZ', '14900KFZZ'),
+                               ('라이젠7 9700ZZ', '9700ZZ')):
+            with self.subTest(request=request):
+                condition = F.parse_text(request)
+                self.assertIn(model, condition.cpu)
+                self.assertIsNone(F.cpu_rule(condition.cpu))
+
 
 @patch.object(F, 'load_specs', side_effect=specs_for)
 @patch.object(F, 'load', side_effect=load_rows)
@@ -164,6 +185,13 @@ class BuildTests(unittest.TestCase):
             with self.subTest(cpu=cpu), patch.object(F, 'load', side_effect=AssertionError('must reject before DB read')):
                 with self.assertRaises(HTTPException) as e:
                     self.start(cpu=cpu)
+                self.assertEqual(e.exception.status_code, 422)
+
+    def test_text_with_unsupported_cpu_suffix_is_rejected_before_catalog(self, *_):
+        for request in ('i9 14900ZZ', 'i9 14900KFZZ', '라이젠7 9700ZZ'):
+            with self.subTest(request=request), patch.object(F, 'load', side_effect=AssertionError('must reject before DB read')):
+                with self.assertRaises(HTTPException) as e:
+                    F.start_build(None, F.parse_text(request), RULES)
                 self.assertEqual(e.exception.status_code, 422)
 
     def test_requested_ultra_model_does_not_pick_cheaper_same_series(self, *_):

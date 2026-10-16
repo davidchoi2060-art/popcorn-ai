@@ -103,28 +103,39 @@ def gpu_matches(name, want):
 def cpu_rule(s):
     """CPU 조건 글을 판정 함수로 바꾼다. 알아보지 못하면 None(지어내지 않는다)."""
     u = (s or '').upper()
-    model = (re.search(r'(?<![0-9])(\d{4,5})\s*(X3D|KF|KS|K|F|X|G|T)?(?![0-9A-Z])', u)
-             or re.search(r'(?:ULTRA|울트라)\s*[579]\s*-?\s*(\d{3})\s*(KF|K|F|HX|H|U|V)?(?![0-9A-Z])', u)
-             or re.search(r'(?<![0-9])(\d{3})\s*(KF|K|F|HX|H|U|V)(?![0-9A-Z])', u))
-    if model:
-        num, suf = model[1], model[2]
-        pat = re.compile(r'(?<![0-9])' + num + ((r'\s*' + suf + r'(?![0-9A-Z])') if suf else r'(?![0-9])'))
-        return lambda name: bool(pat.search((name or '').upper()))
-    if re.search(r'\d{3,5}', u):
-        return None              # 모델 번호를 읽지 못했는데 시리즈 조건으로 낮추지 않는다.
     series = re.search(r'(?<![A-Z0-9])I\s*([3579])(?![0-9])', u)
-    if series:
-        pat = re.compile(r'(?<![A-Z0-9])I' + series[1] + r'(?![0-9])')
-        return lambda name: bool(pat.search((name or '').upper()))
     ultra = re.search(r'(ULTRA|울트라)\s*([579])(?![0-9])', u)
-    if ultra:
-        pat = re.compile(r'(ULTRA|울트라)\s*' + ultra[2] + r'(?![0-9])')
-        return lambda name: bool(pat.search((name or '').upper()))
     ryzen = re.search(r'(RYZEN|라이젠)\s*([3579])(?![0-9])', u)
+    intel = bool(series or ultra or INTEL_RX.search(u))
+    amd = bool(ryzen or AMD_RX.search(u))
+    if intel and amd:
+        return None
+    brand = (re.compile(INTEL_RX.pattern + r'|(?<![A-Z0-9])I\s*[3579](?![0-9])|ULTRA|울트라', re.I)
+             if intel else AMD_RX if amd else None)
+    series_pat = None
+    if series:
+        series_pat = re.compile(r'(?<![A-Z0-9])I\s*' + series[1] + r'(?![0-9])')
+    if ultra:
+        series_pat = re.compile(r'(ULTRA|울트라)\s*' + ultra[2] + r'(?![0-9])')
     if ryzen:
-        pat = re.compile(r'(RYZEN|라이젠)\s*' + ryzen[2] + r'(?![0-9])')
-        return lambda name: bool(pat.search((name or '').upper()))
-    return None
+        series_pat = re.compile(r'(RYZEN|라이젠)\s*' + ryzen[2] + r'(?![0-9])')
+    model = re.search(r'(?<![A-Z0-9])([GNJ]?\d{4,5}[A-Z0-9]*|\d{3}[A-Z0-9]*)(?![A-Z0-9])', u)
+    model_pat = None
+    if model:
+        token = model[1]
+        valid = re.fullmatch(r'([GNJ]?\d{4,5}|\d{3})(X3D|KF|KS|GE|HX|HS|K|F|X|G|T|U|H|V)?', token)
+        if not valid or (len(valid[1]) == 3 and not ultra and not valid[2]):
+            return None          # 모르는 접미사를 자르거나 모델 조건을 시리즈로 낮추지 않는다.
+        model_pat = re.compile(r'(?<![A-Z0-9])' + re.escape(token) + r'(?![A-Z0-9])')
+    elif re.search(r'\d{3,5}', u) or series_pat is None:
+        return None
+
+    def matches(name):
+        name = (name or '').upper()
+        return bool((brand is None or brand.search(name))
+                    and (series_pat is None or series_pat.search(name))
+                    and (model_pat is None or model_pat.search(name)))
+    return matches
 
 
 INTEL_RX = re.compile(r'INTEL|인텔|코어|CORE', re.I)
@@ -165,9 +176,9 @@ def parse_text(s):
         if m:
             family = 'RTX' if m[1].upper() == 'RTS' else m[1].upper()
             out['gpu'] = family + ' ' + gpu[0] + (' ' + gpu[1] if gpu[1] else '')
-    cpu = (re.search(r'(?<![A-Za-z0-9])i\s*[3579](?:\s*-?\s*\d{4,5}\s*(?:KF|KS|K|F|T)?)?', u, re.I)
-           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*-?\s*\d{3}[A-Za-z]{0,3})?', u, re.I)
-           or re.search(r'(?:라이젠|ryzen)\s*[3579](?:\s*-?\s*\d{4}\s*(?:X3D|X|G|F)?)?', u, re.I)
+    cpu = (re.search(r'(?<![A-Za-z0-9])i\s*[3579](?:\s*-?\s*\d{4,5}[A-Za-z0-9]*)?', u, re.I)
+           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*-?\s*\d{3}[A-Za-z0-9]*)?', u, re.I)
+           or re.search(r'(?:라이젠|ryzen)\s*[3579](?:\s*-?\s*\d{4}[A-Za-z0-9]*)?', u, re.I)
            or re.search(r'(?<![0-9])\d{4,5}\s*(?:X3D|KF|KS|K)(?![0-9A-Za-z])', u, re.I)
            or re.search(r'(?<![0-9])\d{3}\s*(?:KF|K|F|HX|H|U|V)(?![0-9A-Za-z])', u, re.I))
     if cpu:
