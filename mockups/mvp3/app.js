@@ -553,6 +553,19 @@ function dv2Totals(p){
   return '<div class="dv2-total-box"><div><strong>현재 적용된 구성</strong><small>1대 기준</small></div><strong class="dv2-total-num" data-dv2-total>'+money(p.price)+'</strong></div>'+
     '<dl class="dv2-sums"><div><dt>기본 구성</dt><dd>'+(b?money(b.base_price):money(p.price))+'</dd></div><div><dt>부품 변경 합계</dt><dd>'+(b?dv2Diff(move):'변경 없음')+'</dd></div></dl>';
 }
+// 임시 선택의 예상 PC 총액. 후보 응답의 total/price_diff만 쓰며 단품 가격으로 재계산하지 않는다.
+function dv2Preview(q){
+  const d=q?.data;if(!d||dv2.temp===dv2.applied)return '';
+  const o=d.options.find(x=>x.product_code===dv2.temp);
+  let total=null,diff=null;
+  if(Number.isSafeInteger(d.total)&&d.total>=0&&o&&Number.isSafeInteger(o.total)&&o.total>=0&&hasDiff(o.price_diff)&&Number.isSafeInteger(d.total+o.price_diff)&&o.total===d.total+o.price_diff){
+    total=o.total;diff=o.price_diff;
+  }
+  // 기본 부품으로 되돌릴 때도 같은 계약이다. 유지될 수량/다른 변경 줄의 금액을 추정하지 않는다.
+  if(total===null)return '<p class="muted">선택 적용 후 금액 확인 중</p>';
+  return '<div class="dv2-preview-head"><strong>선택 적용 후</strong><small>1대 기준 · 예상 금액</small><strong class="dv2-preview-total" data-dv2-preview-total>'+money(total)+'</strong></div>'+
+    '<dl class="dv2-sums"><div><dt>현재 구성 대비 차액</dt><dd>'+dv2Diff(diff)+'</dd></div></dl>';
+}
 function dv2Panel(p,labelOf){
   const q=state.build,d=q.data,label=labelOf(q.ordinal)||d?.label||'부품',busy=state.phase==='build';
   const modal=mob768.matches;
@@ -578,7 +591,7 @@ function dv2Panel(p,labelOf){
     (q.error?'<p class="warn-text" role="alert">'+esc(q.error)+'</p>':'')+(warned?'<p class="warn-text">'+esc(d.note||d.warnings.join(' '))+'</p>':'')+
     '<ul class="dv2-cands" role="radiogroup" aria-labelledby="dv2-panel-title">'+list+'</ul>'+none+untested+
     (changed?button('<span aria-hidden="true">↶</span> 기본 부품으로','build-pick-base','dv2-link dv2-base-link','data-code="'+baseCode+'"'+(state.phase?' disabled':'')):'')+quantityBlock(d)+
-    dv2Totals(p)+'<p class="dv2-assembly muted">변경한 구성의 실제 조립 검수는 확인이 필요해요.</p>'+
+    dv2Totals(p)+'<section class="dv2-preview" data-dv2-preview aria-live="polite" aria-atomic="true"'+(dv2.temp===applied?' hidden':'')+'>'+dv2Preview(q)+'</section><p class="dv2-assembly muted">변경한 구성의 실제 조립 검수는 확인이 필요해요.</p>'+
     '<div class="dv2-actions">'+button(busy?'적용하는 중이에요':'선택한 부품 적용','build-apply','primary dv2-apply','data-dv2-apply'+(state.phase||dv2.temp===applied?' disabled':''))+button('취소','build-close','dv2-cancel')+'</div>'+
     '<p class="dv2-foot muted">적용 전에는 구성이 바뀌지 않아요.</p>');
 }
@@ -586,6 +599,7 @@ function dv2SelectTemp(code){
   dv2.temp=code;
   for(const li of view.querySelectorAll('.dv2-cand')){const on=Number(li.dataset.buildOption)===code;li.classList.toggle('is-picked',on);const r=li.querySelector('input');if(r)r.checked=on;}
   const apply=view.querySelector('[data-dv2-apply]');if(apply)apply.disabled=!!state.phase||code===dv2.applied;
+  const preview=view.querySelector('[data-dv2-preview]');if(preview){preview.innerHTML=dv2Preview(state.build);preview.hidden=code===dv2.applied;}
 }
 function dv2Inert(on){
   for(const el of [document.querySelector('.topbar'),document.querySelector('.chat'),actions,view.querySelector('.dv2-head'),view.querySelector('.dv2-main')])if(el)el.inert=on;
@@ -998,7 +1012,7 @@ function consultBack(){
 }
 // 신청 칸은 다시 그려져도 적던 값이 남게 입력마다 상태에 옮긴다(다시 그리지는 않는다).
 view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
-// 상세 v2: 라디오로 고르는 것은 임시 선택이다(화면을 다시 그리지 않고 적용 단추 상태만 바꾼다). 접힌 칸의 열림 상태는 다시 그려도 지킨다.
+// 상세 v2: 라디오는 임시 선택이다(전체 화면을 다시 그리지 않고 예상 금액과 적용 단추만 바꾼다). 접힌 칸은 유지한다.
 view.addEventListener('change',e=>{if(e.target.matches?.('[data-dv2-radio]'))dv2SelectTemp(Number(e.target.value));});
 view.addEventListener('toggle',e=>{const k=e.target?.dataset?.detail;if(k&&k.startsWith('dv2-'))dv2.open[k]=e.target.open;},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.defaultPrevented&&state.screen==='detail'&&state.build?.ordinal!==null&&canSwapHere(state.selected)){e.preventDefault();flow.closeBuild();}});

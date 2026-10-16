@@ -839,6 +839,11 @@ details[open]>summary .dv2-more .ui-icon{transform:rotate(180deg)}
 .dv2-total-box{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-bottom:0;padding:14px;margin-top:14px}
 .dv2-total-box small{display:block}.dv2-total-box .dv2-total-num{font-size:30px}
 .dv2-panel .dv2-sums{border:1px solid var(--line);padding:12px 14px;margin:0}
+.dv2-preview{margin-top:12px;padding:14px;border:2px solid var(--green);border-radius:6px;background:var(--tint)}
+.dv2-preview[hidden]{display:none}
+.dv2-preview-head{display:grid;gap:4px;min-width:0}.dv2-preview-head small{font-size:14px;color:var(--muted)}
+.dv2-preview-total{font-size:30px;line-height:1.25;letter-spacing:-.6px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dv2-preview .dv2-sums{margin-top:10px;padding:10px 0 0;border:0;border-top:1px solid var(--line)}
 .dv2-assembly{font-size:13.5px;margin:12px 0 0}
 .dv2-actions{display:grid;gap:6px;margin-top:14px}
 .dv2-apply{width:100%;padding:15px;font-size:17px;border-radius:8px}
