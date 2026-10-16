@@ -738,12 +738,14 @@ function renderConsultPage(){
   const topic=topics?'<label class="keep-field"><span>상담 주제</span><select data-consult-topic'+(busy?' disabled':'')+'>'+topics.map(t=>'<option'+(t===sel?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select></label>':
     '<p class="consult-topic"><span>상담 주제</span><strong>주문 희망</strong></p>';
   view.innerHTML='<div class="tf-wrap is-wide"><section class="tf-page tf-consult">'+tfSteps(3)+'<p class="tf-eyebrow">구매 상담</p><h2 tabindex="-1">상담할 내용을 남겨 주세요</h2><p class="tf-sub">상담 전에 궁금한 점을 적어 주셔도 좋아요.</p>'+
-    '<div class="tf-consult-grid"><div class="tf-consult-form"><h3>연락받을 곳</h3>'+tfReg(busy)+'<p class="keep-note">견적을 보관할 때 등록한 전화번호예요.</p>'+topic+
+    '<div class="tf-consult-grid">'+
+    // 견적을 먼저 확인하고 연락처·접수로 간다(승인 모바일 10·15 순서 · 키보드 순서도 같다). PC는 CSS가 견적을 오른쪽에 둔다.
+    '<aside class="tf-consult-side"><h3>상담할 견적</h3>'+tfCard(p,{parts:true})+'<p class="keep-note">'+uiIcon('file-text')+'이 견적이 상담 신청에 함께 전달돼요.</p>'+button('내 견적 보기','saved','tf-textbtn')+'</aside>'+
+    '<div class="tf-consult-form"><h3>연락받을 곳</h3>'+tfReg(busy)+'<p class="keep-note">견적을 보관할 때 등록한 전화번호예요.</p>'+topic+
     '<label class="keep-field"><span>상담할 내용 <em>선택</em></span><textarea data-consult-message maxlength="500" rows="4" placeholder="궁금한 점이나 연락받기 편한 때를 적어 주세요."'+(busy?' disabled':'')+'>'+esc(c.message)+'</textarea></label>'+
     '<small class="consult-count">'+c.message.length+' / 500자</small><p class="keep-note">이 견적과 등록한 연락처가 상담 담당자에게 함께 전달돼요.</p>'+
     (c.error?'<div class="tf-alert" role="alert" tabindex="-1"><strong>상담 신청을 접수하지 못했어요.</strong><p>보관한 견적과 입력한 내용은 그대로예요. 다시 신청해 주세요.</p></div>':'')+
-    button(state.phase==='consult'?'접수하는 중…':'상담 신청 접수','consult-send','primary tf-wide',busy?'disabled':'')+'<p class="keep-foot">상담 신청만 접수돼요. 주문·결제는 진행되지 않아요.</p></div>'+
-    '<aside class="tf-consult-side"><h3>상담할 견적</h3>'+tfCard(p,{parts:true})+'<p class="keep-note">'+uiIcon('file-text')+'이 견적이 상담 신청에 함께 전달돼요.</p>'+button('내 견적 보기','saved','tf-textbtn')+'</aside></div></section></div>';
+    button(state.phase==='consult'?'접수하는 중…':'상담 신청 접수','consult-send','primary tf-wide',busy?'disabled':'')+'<p class="keep-foot">상담 신청만 접수돼요. 주문·결제는 진행되지 않아요.</p></div></div></section></div>';
   actions.hidden=true;
 }
 // 접수 완료(승인 시안 11). 실제 접수 성공 응답(PI 번호)을 받은 뒤에만 그린다.
@@ -891,7 +893,9 @@ function settleProductFocus(){
     if(!mallDialogShown())(view.querySelector('#keep-title')||view.querySelector('h2'))?.focus({preventScroll:true});
   }
   if(alert&&akey!==settleProductFocus.alert){const t=alert.matches('[data-mall-state=failed]')?alert.querySelector('button'):alert;if(t){if(!t.hasAttribute('tabindex')&&t.tagName!=='BUTTON')t.tabIndex=-1;t.focus({preventScroll:true});t.scrollIntoView?.({block:'nearest'});}}
-  settleProductFocus.alert=akey;productPage=key;
+  // 같은 화면을 다시 그리면(예: 상담 주제 목록이 늦게 도착) 초점이 있던 요소가 사라져 body 로 떨어진다 -- 제목으로 되돌린다.
+  else if(key&&key===productPage&&settleProductFocus.inView&&document.activeElement===document.body&&!mallDialogShown())(alert&&alert.hasAttribute('tabindex')?alert:view.querySelector('#keep-title')||view.querySelector('h2'))?.focus({preventScroll:true});
+  settleProductFocus.alert=akey;productPage=key;settleProductFocus.inView=view.contains(document.activeElement);
 }
 // 「부품 전체 구성 확인 및 변경」(대화 화면 · 2026-10-12 중헌 님 고객단 5번)과 아래 「부품 바꾸기」가 여기로 온다.
 // 구성표가 공개된 PC 는 부품 구성 표(줄마다 「변경」)로, 아니면 다른 판매 PC 로 옮기는 부품 바꾸기 칸으로 옮긴다.

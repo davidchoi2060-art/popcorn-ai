@@ -1030,7 +1030,7 @@ a.tf-wide.primary{color:#fff}
 .tf-center{text-align:center;margin-top:12px}
 .tf-foot{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--line)}
 .tf-foot .outline{min-height:44px;padding:10px 32px}
-.tf-consult-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:0 56px;margin-top:34px;align-items:start}
+.tf-consult-grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"form side";gap:0 56px;margin-top:34px;align-items:start}.tf-consult-form{grid-area:form;min-width:0}.tf-consult-side{grid-area:side;min-width:0}
 .tf-consult-form h3,.tf-consult-side>h3{margin:0;font-size:19px;padding-bottom:12px}
 .tf-consult-side{border-left:1px solid var(--line);padding-left:28px}
 .tf-consult-side .tf-card{grid-template-columns:minmax(0,1fr);margin-top:0;border-top:1px solid var(--line)}
@@ -1071,7 +1071,7 @@ a.tf-wide.primary{color:#fff}
   .tf-page h2,.tf-detail .dv2-head-copy h2{font-size:27px}
   .tf-steps{font-size:13px}.tf-steps li+li::before{margin:0 6px}
   .tf-card{grid-template-columns:minmax(0,1fr)}.tf-card-price{text-align:left}
-  .tf-consult-grid{grid-template-columns:minmax(0,1fr);gap:28px}
+  .tf-consult-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"side" "form";gap:28px}
   .tf-consult-side{border-left:0;padding-left:0;border-top:2px solid var(--green);padding-top:18px}
   .tf-go{width:100%;min-width:0}
   .tf-foot{flex-direction:column;align-items:stretch}.tf-foot .outline{width:100%}

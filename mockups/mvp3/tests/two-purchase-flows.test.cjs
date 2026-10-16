@@ -49,7 +49,8 @@ function harness(opts={}){
     if(url==='/api/mvp3/contact'&&init.method==='PUT'){server.has=true;server.phone=body.phone;return reply(200,{ok:true,has_contact:true,masked_phone:'010-****-9999',name:null});}
     if(url==='/api/mvp3/saved-quotes'&&init.method==='POST'){
       if(server.saveFail>0||o.saveFail>server.sets++&&false)return reply(500,{detail:'x'});
-      if(o.saveFail&&server.sets<=o.saveFail)return reply(503,{detail:'서버 점검 중'});
+      // saveStatus: 422 = 서버가 보관하지 않고 돌려보냄(확정 실패) · 503 = 응답 불명(보관됐는지 모름)
+      if(o.saveFail&&server.sets<=o.saveFail)return reply(o.saveStatus||422,{detail:'서버 점검 중'});
       if(body.purpose!=='handoff'){
         if(!body.contact&&!server.has)return reply(422,{detail:{error:'contact_required',contact_required:true,detail:'견적을 보관하려면 전화번호를 입력하고 개인정보 수집·이용에 동의해 주세요.',consent_text:'서버 동의 문구'}});
         if(body.contact){server.has=true;server.phone=body.contact.phone;}
@@ -229,7 +230,7 @@ test('changing the contact while saving sends the new contact together with the 
   }finally{h.close();}
 });
 
-test('save failure (design 14): says it failed with the reason, keeps the configuration, shows no 보관했어요, and 다시 보관하기 retries',async()=>{
+test('confirmed save failure 422 (design 14): says it failed with the reason, keeps the configuration, shows no 보관했어요, and 다시 보관하기 retries',async()=>{
   const h=harness({has:true,saveFail:1,product:ai});try{await toDetail(h);const d=h.d;await openKeep(h);
     // 실패하면 보관 화면을 닫고 상세 오른쪽 칸 안에서 말한다.
     submitKeep(h);await until(()=>d.querySelector('aside.tf-side [data-keep-retry]')&&!h.flow.state.phase);
@@ -244,6 +245,24 @@ test('save failure (design 14): says it failed with the reason, keeps the config
     assert.equal(h.posts('/api/mvp3/saved-quotes').length,2,'다시 보관하기는 한 번 더 보낸다');
     assert.equal(h.posts('/api/mvp3/saved-quotes')[0].body.request_id,h.posts('/api/mvp3/saved-quotes')[1].body.request_id,'같은 요청으로 다시 보낸다');
     assert.match(text(d.querySelector('[data-keep-done]')),/견적을 보관했어요/);
+  }finally{h.close();}
+});
+
+// 응답 불명(5xx·네트워크)은 보관됐는지 모른다: 「다시 보관하기」로 새로 보내지 않는다. 보관 화면을 닫고
+// 「이전 보관 요청 확인」 복구만 남긴다 -- 복구는 같은 요청 번호로만 한 번 보낸다(중복 보관 방지).
+test('unknown save result 503: no 다시 보관하기, the recovery banner re-checks the same request once (no duplicate save)',async()=>{
+  const h=harness({has:true,saveFail:1,saveStatus:503,product:ai});try{await toDetail(h);const d=h.d;await openKeep(h);
+    submitKeep(h);await until(()=>!h.flow.state.phase&&!keepDlg(h)&&d.querySelector('.live-recovery [data-action=recover]'));
+    assert.equal(h.flow.state.saveState,'uncertain');
+    assert.equal(d.querySelector('[data-keep-retry]'),null,'응답 불명에는 다시 보관하기를 내밀지 않는다');
+    assert.equal(d.querySelector('[data-keep-done]'),null);
+    assert.equal(h.posts('/api/mvp3/saved-quotes').length,1,'저절로 다시 보내지 않는다');
+    assert.match(text(d.querySelector('.live-recovery')),/이전 보관 요청 확인/);
+    d.querySelector('.live-recovery [data-action=recover]').click();
+    await until(()=>h.flow.state.saveState==='saved'&&!h.flow.state.phase);
+    const posts=h.posts('/api/mvp3/saved-quotes');
+    assert.equal(posts.length,2,'복구 확인은 한 번만 보낸다');
+    assert.equal(posts[0].body.request_id,posts[1].body.request_id,'같은 요청 번호로만 확인한다');
   }finally{h.close();}
 });
 

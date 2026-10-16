@@ -592,6 +592,9 @@
         k.busy=false;
         if(state.saveState==='saved'){state.keep=emptyKeep();emit();return;}
         if(state.needsRefresh){state.keep=emptyKeep();emit();return;}   // 금액이 바뀐 것은 화면 위 안내가 말한다
+        // 응답을 받지 못했다(5xx·네트워크): 보관됐는지 모른다. 「다시 보관하기」로 새로 보내지 않고 보관 화면을 닫는다 --
+        // 화면 위 복구 안내(이전 보관 요청 확인)가 같은 요청 번호로만 결과를 확인한다(중복 보관 방지).
+        if(state.saveState==='uncertain'){state.keep=emptyKeep();emit();return;}
         // 서버가 연락처가 없다고 돌려보냈거나(기한 만료) 보관하지 못했다 -- 이유는 보관 창 안에서 말한다.
         const err=state.error;state.error=null;state.retry=null;
         if(err?.code==='contact_required'){state.contact={...state.contact,has:false,masked:''};k.editing=false;}
