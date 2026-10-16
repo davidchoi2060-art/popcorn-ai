@@ -8,7 +8,7 @@
      has     1                                           연락처가 이미 등록된 고객(다음 견적 보관 · 승인 08)
      save    fail | unknown                              fail = 확정 실패 422(승인 14 · 다시 보관하기) · unknown = 응답 불명 503(복구 안내)
      consult fail | already                              상담 접수 실패(승인 15) · 이미 접수된 견적
-     close   cancel | x | esc                            step=pick 뒤 패널을 그 방법으로 닫는다(구성·금액·초점 보존 확인)
+     close   cancel | x | esc                            step=pick(맞춤 후보 패널)·step=ask(완제품 안내창, 승인 04) 뒤 그 방법으로 닫는다
      step    detail(기본) | open | pick | change | keep | kept | consult | done | ask | moved
              open = 쿨러 후보 패널을 연 채(승인 06) · pick = 후보를 임시로 고른 채(적용 전) · change = 쿨러를 바꿔 적용한 상세 · ask = 완제품 「변경」 안내창(승인 02)
      w       390 처럼 숫자를 주면 화면 폭 안내만 붙인다(실제 폭은 브라우저 창으로 맞춘다) */
@@ -91,7 +91,13 @@ async function drive(){
   await wait(()=>$('.tf-detail'));
   if(STEP==='detail')return;
   if(!AI){
-    if(STEP==='ask'){click('[data-action=build-options][data-ordinal="1"]');return;}
+    if(STEP==='ask'){click('[data-action=build-options][data-ordinal="1"]');
+      // 승인 04(취소 뒤): close=cancel|x|esc 로 안내창을 닫는다 -- 상세·금액은 그대로, 초점은 누른 「변경」으로 돌아간다
+      if(CLOSE){await wait(()=>$('[data-mall-dialog]'));
+        if(CLOSE==='cancel')click('[data-mall-dialog] [data-action=mall-dialog-close]:not(.mall-dlg-x)');
+        else if(CLOSE==='x')click('[data-mall-dialog] .mall-dlg-x');
+        else if(CLOSE==='esc')$('[data-mall-dialog]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));}
+      return;}
     if(STEP==='moved'){click('[data-action=mall-view]');await wait(()=>$('[data-mall-state=moved],[data-mall-state=failed]'));}
     return;
   }
