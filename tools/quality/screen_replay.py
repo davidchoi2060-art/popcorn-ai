@@ -49,7 +49,26 @@ def show(items: list[dict]) -> str:
                      for i in items[:6])
 
 
+def one(text: str) -> int:
+    """문장 하나를 화면과 같은 본문으로 보내고 응답(설명·카드·조건)을 그대로 남긴다 -- 점검에서 이상한 답을 다시 볼 때."""
+    if text.startswith("@long:"):
+        # 「@long:반복할 글|끝 문장|글자 수」 -- 아주 긴 글 점검(E16·E17)
+        body, tail, n = (text[6:].split("|") + ["", "20000"])[:3]
+        text = (body * (int(n) // max(1, len(body)) + 1))[:int(n)] + "\n" + tail
+    code, res = post("/api/talk/parse", {"text": text, "history": [], "defer_answer": True})
+    keep = {k: res.get(k) for k in ("ok", "agent", "reply", "answer", "explain_only", "state", "missing", "fallback",
+                                    "truncated", "agent_meta", "exceptions", "silent", "agent_cards")}
+    out = "HTTP %s 글자 %d\n%s" % (code, len(text), json.dumps(keep, ensure_ascii=False, indent=1)[:6000])
+    print(out)
+    for i in range(0, len(out), 1300):
+        print("::notice title=문장 하나 %d::%s" % (i // 1300 + 1,
+              out[i:i + 1300].replace("%", "%25").replace("\r", "").replace("\n", "%0A")))
+    return 0
+
+
 def main() -> int:
+    if os.environ.get("TEXT"):
+        return one(os.environ["TEXT"])
     log: list[str] = []
     state, flow, history, right, selected = None, None, [], [], None
 
