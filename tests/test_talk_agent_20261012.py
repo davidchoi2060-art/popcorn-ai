@@ -964,3 +964,83 @@ class LlmAnswerAsIs(unittest.TestCase):
         self.assertNotIn("not truncated and len(text) <= AGENT.CHAT_MAX", src)
         self.assertIn("TX.NOTE_TOO_LONG", src[src.index("AGENT.enabled()"):src.index("TS.load_vocab")])
         self.assertLess(talk.MAX_TEXT_LEN + len("\n(중략)\n"), AG.CHAT_MAX)   # 앞·끝만 읽은 글은 도구 상담 한도 안이다
+
+
+class ScreenActs(unittest.TestCase):
+    """2026-10-16 중헌 님 「고객이 화면을 보고있는데, LLM은 뭔지도 모른다?」 -- 화면 PC 로 바로 바꾸기·보여 주기·비교."""
+
+    PRODUCTS = {
+        2001: {"code": 2001, "name": "다이아 265K 5070Ti", "price": 2_890_000, "url": "https://m/2001",
+               "spec": {"cpu": "Ultra 7 265K", "gpu": "RTX 5070 Ti"}},
+        2002: {"code": 2002, "name": "골드 12400F 5060", "price": 1_190_000, "url": "https://m/2002",
+               "spec": {"cpu": "i5-12400F", "gpu": "RTX 5060"}},
+    }
+
+    def _stack(self, eligible=None):
+        from api import grid_public as GP, sold_reco as SOLD
+        st = contextlib.ExitStack()
+        st.enter_context(patch.object(SOLD, "load", lambda: ([], self.PRODUCTS)))
+        st.enter_context(patch.object(SOLD, "card_spec", lambda p: p["spec"]))
+        st.enter_context(patch.object(GP, "eligible_sold_item", lambda raw, code: (eligible or {}).get(code)))
+        return st
+
+    def _facts(self, cards=(), selected=None):
+        return {"screen": "final", "source": "saved_quote", "selected": dict(selected) if selected else None,
+                "cards": [dict(c, card_position=i + 1) for i, c in enumerate(cards)]}
+
+    def test_screen_pcs_get_refs_prices_and_condition(self):
+        facts = self._facts([{"product_code": 2002}, {"configuration_id": "CP-1"}, {"product_code": 999}],
+                            {"product_code": 2001})
+        book = TT.FactBook()
+        with self._stack():
+            TT.register_display(facts, {"usages": ["게임"], "budget_won": 1_500_000}, book)
+        self.assertEqual((facts["cards"][0]["ref"], facts["selected"]["ref"]), ("P1", "P2"))
+        self.assertEqual(facts["selected"]["price_now"], 2_890_000)
+        self.assertNotIn("ref", facts["cards"][1])                 # 신규 구성·판매 안 하는 번호는 번호를 주지 않는다
+        self.assertNotIn("ref", facts["cards"][2])
+        self.assertEqual({2_890_000, 1_190_000} & book.prices, {2_890_000, 1_190_000})
+        self.assertEqual(book.anchor_code, 2001)                   # 손님이 보고 있는 PC 가 기준
+        self.assertEqual(book.condition["usages"], ["게임"])
+        self.assertEqual(book.state["budget_won"], 1_500_000)
+
+    def test_eligible_item_preferred_and_nothing_without_screen(self):
+        hit = {"product_code": 2002, "name": "골드 추천값", "price": 1_190_000, "spec": {}, "level": "골드"}
+        facts, book = self._facts([{"product_code": 2002}]), TT.FactBook()
+        with self._stack({2002: hit}):
+            TT.register_display(facts, {"usages": ["게임"]}, book)
+            TT.register_display(None, {"usages": ["게임"]}, TT.FactBook())
+        self.assertEqual(book.items["P1"]["name"], "골드 추천값")
+
+    def test_swap_gpu_on_screen_pc_without_find_pcs(self):
+        from api import grid_public as GP
+        facts, book = self._facts(selected={"product_code": 2001}), TT.FactBook()
+        with self._stack():
+            TT.register_display(facts, {"usages": ["게임"]}, book)
+        opt = {"product_code": 2003, "name": "다이아 265K 5090", "price": 4_500_000, "spec": {},
+               "swap": {"value": "RTX 5090", "price_diff": 1_610_000}}
+        with patch.object(GP, "sold_part_options", lambda raw, code, slot: {"label": "그래픽카드", "options": [opt]}):
+            r = TT.other_pcs_by_part({"ref": "P1", "slot": "gpu"}, book)
+        self.assertEqual((r["status"], r["options"][0]["ref"]), ("ok", "P2"))
+
+    def test_run_turn_shows_screen_pc_with_server_price(self):
+        from api import customer_pc_offer as OFFER
+        from api import talk_schema as TS
+        sent = []
+        script = [_turn(calls=[{"id": "s", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+                  _turn("지금 보시는 다이아 265K 5070Ti는 2,890,000원이에요.")]
+        def fake_call(msgs, tools, **kw):
+            sent.append(kw["system"])
+            return script.pop(0)
+        ctx = TS.DisplayContext(screen="final", source="saved_quote", cards=[], selected={"product_code": 2001})
+        with self._stack(), patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(TT, "engine", _Engine()), patch.object(OFFER, "public_item", return_value={}), \
+                patch.object(AG.llm, "call_tools", fake_call):
+            out = AG.run_turn("지금 보는 PC 다시 보여줘", [], prev_state={"usages": ["게임"]}, display_context=ctx)
+        data = json.loads(sent[0].split("\n")[-1])
+        self.assertEqual((data["display"]["selected"]["ref"], data["display"]["selected"]["price_now"]), ("P1", 2_890_000))
+        self.assertIn("2,890,000원", out["reply"])
+        self.assertEqual([c["product_code"] for c in out["cards"]], [2001])
+
+    def test_prompt_rules(self):
+        self.assertIn("[현재 화면과 이전 조건 자료]가 있으면", AG.SYSTEM)
+        self.assertIn("보여 드린 PC가 없다고 되묻지 않는다", AG.SYSTEM)

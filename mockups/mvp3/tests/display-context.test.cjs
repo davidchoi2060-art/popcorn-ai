@@ -48,3 +48,11 @@ test('a repeated PC in different groups retains the third position instead of sh
   assert.deepEqual(p.display_context.cards,[{product_code:1},{product_code:2},{product_code:2},{product_code:3}]);
   assert.equal(p.display_context.cards_truncated,undefined);
 });
+test('talk screen keeps sending the right-panel cards after a saved quote is loaded (2026-10-16 「오른쪽 화면에 뜬 세가지 PC」)',async()=>{
+  const p=await sent({screen:'final',history:[],selected:{product_code:12},savedQuote:{product:{product_code:12}},groups:[{products:[{product_code:1},{product_code:2},{product_code:3}]}]},{keepCurrent:true});
+  assert.deepEqual(p.display_context,{screen:'final',cards:[{product_code:1},{product_code:2},{product_code:3}],selected:{product_code:12},source:'saved_quote'});
+});
+test('talk screen restored after refresh names the PC it was showing',async()=>{
+  const p=await sent({screen:'results',restoredCurrent:{product_code:44},groups:[{products:[{product_code:1}]}]},{keepCurrent:true});
+  assert.deepEqual(p.display_context.selected,{product_code:44});
+});

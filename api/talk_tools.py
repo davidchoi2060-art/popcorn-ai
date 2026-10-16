@@ -218,6 +218,73 @@ def display_facts(context) -> dict | None:
     return result
 
 
+def _screen_item(state_raw: dict | None, code: int) -> dict | None:
+    """화면에 보이는 판매 PC 하나의 지금 판매가·사양 -- 판매 중인 상품만. 이 상담 용도를 채우면 추천과 같은 값,
+    아니면(불러온 견적이 다른 용도였던 경우) 판매 원천의 이름·가격·사양 그대로. 화면이 보낸 값은 번호만 쓴다."""
+    from . import grid_public as GP
+    from . import sold_reco as SOLD
+    from .product_name import card_name, match_storage_shorthand
+
+    if state_raw and state_raw.get("usages"):
+        try:
+            it = GP.eligible_sold_item(state_raw, code)
+        except Exception:  # noqa: BLE001 -- 화면 조건이 낡았으면 판매 원천으로 넘어간다
+            log.info("[talk_tools] screen eligible check failed code=%s", code, exc_info=True)
+            it = None
+        if it:
+            return it
+    _levels, products = SOLD.load()
+    p = products.get(code)
+    if p is None or type(p.get("price")) is not int:
+        return None
+    return {"product_code": p["code"], "name": match_storage_shorthand(card_name(p["name"]), p["spec"]),
+            "price": p["price"], "mall_url": p.get("url"), "spec": SOLD.card_spec(p),
+            "level": None, "over_budget": False, "reasons": []}
+
+
+def register_display(facts: dict | None, state_raw: dict | None, book: FactBook) -> None:
+    """화면 카드·선택 PC(판매 PC)를 이 턴의 번호(ref)로 올리고 지금 판매가·사양을 붙인다(facts 를 고친다).
+
+    2026-10-16 중헌 님 「고객이 화면을 보고있는데, LLM은 뭔지도 모른다?」 -- 화면 PC 의 이름·부품만으로는
+    「가장 비싼 GPU로 바꿔줘」(부품 바꾸기)·「저 중 가장 좋은 걸로」(보여 주기)·예산 비교를 할 수 없었다.
+    번호가 있어야 other_pcs_by_part·show_pcs·pc_detail 이 그 PC 로 바로 돈다. 가격은 판매 원천에서 다시 읽는다.
+    """
+    if not facts:
+        return
+    entries = [*(facts.get("cards") or []), *([facts["selected"]] if facts.get("selected") else [])]
+    first = None
+    for e in entries:
+        code = e.get("product_code")
+        if type(code) is not int:
+            continue
+        try:
+            it = _screen_item(state_raw, code)
+        except Exception:  # noqa: BLE001 -- 확인이 실패하면 번호 없이 둔다(상담은 계속한다)
+            log.warning("[talk_tools] display item check failed code=%s", code, exc_info=True)
+            it = None
+        if it is None:
+            continue
+        e["ref"] = book.add_item(it)
+        e["price_now"] = it["price"]
+        e.setdefault("name", None)
+        e["name"] = e["name"] or it.get("name")
+        e["spec"] = it.get("spec")
+        first = first or code
+    selected = facts.get("selected") or {}
+    anchor = selected.get("product_code") if selected.get("ref") else first
+    if anchor and book.anchor_code is None:
+        book.anchor_code = anchor
+    if anchor and book.condition is None and isinstance(state_raw, dict) and _str_list(state_raw.get("usages")):
+        # 부품 바꾸기(other_pcs_by_part)는 상담 조건이 필요하다 -- 불러온 견적은 find_pcs 없이 지금 조건을 쓴다.
+        game = state_raw.get("game") if isinstance(state_raw.get("game"), dict) else {}
+        book.condition = {"usages": _str_list(state_raw.get("usages")), "budget_won": state_raw.get("budget_won"),
+                          "budget_bound": state_raw.get("budget_bound"),
+                          "games": _str_list(game.get("names")) or [], "game_grade": None,
+                          "resolution": game.get("resolution"), "platform": state_raw.get("platform")}
+        book.state = {k: v for k, v in state_raw.items()
+                      if k in ("usages", "budget_won", "budget_bound", "platform", "prefs", "game")}
+
+
 def _relaxations(raw: dict, needs: list[str]) -> list[tuple[str, object]]:
     """0장일 때 풀어 볼 조건 -- 앞에서부터 하나씩 «누적해서» 푼다. (손님에게 밝힐 말, 바꾸는 함수).
 
