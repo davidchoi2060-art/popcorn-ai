@@ -326,6 +326,43 @@ def _cell(s: str, limit: int = 0) -> str:
     return (s or "(빈 답)").replace("|", "\\|").replace("\r", "").replace("\n", "<br>")
 
 
+def dead_end(r: dict) -> bool:
+    """제품 카드 없이 끝난 답 -- 판매 안내·주제 밖 질문도 걸리므로 판정이 아니라 읽을 목록이다."""
+    meta = r.get("ours_meta") or {}
+    return bool(meta.get("ok")) and not meta.get("cards") and not meta.get("silent")
+
+
+def _esc(s: str) -> str:
+    return s.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+
+
+def annotate(rows: list[dict], chunk: int = 1300, per_kind: int = 9) -> None:
+    """못한 답과 제품 없이 끝난 답을 GitHub 주석으로 남긴다.
+
+    작업 기록과 산출물(zip)은 이 저장소를 보는 일부 환경에서 내려받지 못한다(2026-10-16). 주석은
+    check-run API 로 읽히므로, 무엇이 왜 못했는지 거기서도 되짚을 수 있게 한다. 한 단계당 종류별
+    주석 10개 한도라 여러 줄을 묶어 notice·warning·error 에 나눠 싣는다. 주석 하나는 4KB 안팎에서 잘리므로
+    (한글 한 자 3바이트) 한 묶음을 1,300자 안으로 둔다. error 하나는 --gate 의 빨간불 줄 몫으로 남긴다.
+    """
+    picked = [r for r in rows if r["verdict"] == WORSE or dead_end(r)]
+    blocks, cur = [], ""
+    for r in picked:
+        tag = ("못함" if r["verdict"] == WORSE else r["verdict"]) + (" · 제품 없음" if dead_end(r) else "")
+        one = "[%s] %s | Q: %s | 우리: %s | 이유: %s" % (
+            r["id"], tag, (r.get("question") or "")[:120], (r.get("ours") or "(빈 답)")[:320],
+            (r.get("reason") or "")[:160])
+        if cur and len(cur) + len(one) > chunk:
+            blocks.append(cur)
+            cur = ""
+        cur = (cur + "\n\n" + one) if cur else one
+    if cur:
+        blocks.append(cur)
+    kinds = ("notice", "warning", "error")
+    for i, b in enumerate(blocks[:per_kind * len(kinds)]):
+        kind = kinds[i // per_kind]
+        print("::%s title=답 점검 %d/%d::%s" % (kind, i + 1, len(blocks), _esc(b)))
+
+
 def cmd_combine(args) -> int:
     rows, base, model = [], BASE, ""
     for d in args.dirs:
@@ -375,6 +412,8 @@ def cmd_combine(args) -> int:
         for r in rows:
             print("ROW " + json.dumps({k: r.get(k) for k in ("id", "question", "ours", "generic", "verdict", "reason")},
                                       ensure_ascii=False))
+    if getattr(args, "annotate", False):
+        annotate(rows)
     print("못함 %d · 비슷 %d · 나음 %d · 측정 못함 %d" % (count[WORSE], count[SAME], count[BETTER], count[UNMEASURED]))
     if args.gate and count[WORSE]:
         print("::error::일반 AI 보다 못한 답 %d개" % count[WORSE])
@@ -409,6 +448,7 @@ def main() -> int:
     c.add_argument("--summary", default=None)
     c.add_argument("--gate", action="store_true", help="우리가 못함이 하나라도 있으면 실패")
     c.add_argument("--print-rows", action="store_true", help="결과를 한 줄 JSON 으로 작업 기록에 남긴다")
+    c.add_argument("--annotate", action="store_true", help="못한 답·제품 없이 끝난 답을 GitHub 주석으로 남긴다")
     c.add_argument("--require-judge", action="store_true", help="판정이 하나도 없으면 실패")
     a = ap.parse_args()
     return cmd_run(a) if a.cmd == "run" else cmd_combine(a)
