@@ -133,6 +133,36 @@ class ParseTests(unittest.TestCase):
                 self.assertIn(model, condition.cpu)
                 self.assertIsNone(F.cpu_rule(condition.cpu))
 
+    def test_space_separated_cpu_suffix_stays_in_exact_model(self):
+        for request, wanted, wrong in (
+                ('i9 14900 K', '인텔 코어i9-14900K', '인텔 코어i9-14900'),
+                ('i9 14900 KF', '인텔 코어i9-14900KF', '인텔 코어i9-14900K'),
+                ('Ryzen 7 9700 X', 'AMD Ryzen 7 9700X', 'AMD Ryzen 7 9700'),
+                ('Ultra 7 265 K', '인텔 코어 Ultra 7 265K', '인텔 코어 Ultra 7 265')):
+            with self.subTest(request=request):
+                condition = F.parse_text(request)
+                self.assertTrue(F.cpu_rule(condition.cpu)(wanted))
+                self.assertFalse(F.cpu_rule(condition.cpu)(wrong))
+                self.assertTrue(F.cpu_rule(request)(wanted))
+
+    def test_korean_explanation_after_number_is_not_a_model_suffix(self):
+        for request, model, wanted in (
+                ('i9 14900 게임용으로 부탁해요', '14900', '인텔 코어i9-14900'),
+                ('Ryzen 7 9700 사무용으로 부탁해요', '9700', 'AMD Ryzen 7 9700'),
+                ('Ultra 7 265 기본형으로 부탁해요', '265', '인텔 코어 Ultra 7 265')):
+            with self.subTest(request=request):
+                condition = F.parse_text(request)
+                self.assertTrue(condition.cpu.endswith(model))
+                self.assertTrue(F.cpu_rule(condition.cpu)(wanted))
+
+    def test_space_separated_unknown_suffix_is_not_silently_cut(self):
+        for request, token in (('i9 14900 ZZ', '14900ZZ'), ('i9 14900 KFZZ', '14900KFZZ'),
+                               ('Ryzen 7 9700 ZZ', '9700ZZ')):
+            with self.subTest(request=request):
+                condition = F.parse_text(request)
+                self.assertIn(token, condition.cpu)
+                self.assertIsNone(F.cpu_rule(condition.cpu))
+
 
 @patch.object(F, 'load_specs', side_effect=specs_for)
 @patch.object(F, 'load', side_effect=load_rows)
@@ -188,11 +218,21 @@ class BuildTests(unittest.TestCase):
                 self.assertEqual(e.exception.status_code, 422)
 
     def test_text_with_unsupported_cpu_suffix_is_rejected_before_catalog(self, *_):
-        for request in ('i9 14900ZZ', 'i9 14900KFZZ', '라이젠7 9700ZZ'):
+        for request in ('i9 14900ZZ', 'i9 14900KFZZ', '라이젠7 9700ZZ',
+                        'i9 14900 ZZ', 'i9 14900 KFZZ', 'Ryzen 7 9700 ZZ'):
             with self.subTest(request=request), patch.object(F, 'load', side_effect=AssertionError('must reject before DB read')):
                 with self.assertRaises(HTTPException) as e:
                     F.start_build(None, F.parse_text(request), RULES)
                 self.assertEqual(e.exception.status_code, 422)
+
+    def test_text_spaced_model_suffix_selects_exact_variant(self, *_):
+        models = [row(203, 'CPU', '인텔 코어i9-14900KF', 200000), row(204, 'CPU', '인텔 코어i9-14900', 100000)]
+        with patch(__name__ + '.ROWS', ROWS + models), patch.dict(SPECS, {203: dict(SPECS[1]), 204: dict(SPECS[1])}):
+            for request, code in (('i9 14900 K', 1), ('i9 14900 KF', 203),
+                                  ('Ryzen 7 9700 X', 3), ('i9 14900 게임용으로 부탁해요', 204)):
+                with self.subTest(request=request):
+                    res = F.start_build(None, F.parse_text(request), RULES)
+                    self.assertEqual(next(l for l in res['lines'] if l['slot'] == 'CPU')['product_code'], code)
 
     def test_requested_ultra_model_does_not_pick_cheaper_same_series(self, *_):
         # 호환 사양은 합성 fixture다. 실제 제품 지원 여부를 주장하지 않는다.
