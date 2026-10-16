@@ -98,6 +98,20 @@ class ParseTests(unittest.TestCase):
         self.assertTrue(F.cpu_rule('라이젠 7')('AMD 라이젠7-6세대 9700X'))
         self.assertIsNone(F.cpu_rule('빠른 거'))
 
+    def test_ultra_exact_model_is_not_reduced_to_series(self):
+        for request in ('인텔 코어 울트라 7 265K', 'Ultra 7 265K', '265K'):
+            with self.subTest(request=request):
+                self.assertIn('265K', F.parse_text(request).cpu)
+                match = F.cpu_rule(request)
+                self.assertTrue(match('인텔 코어 울트라 7 265K'))
+                self.assertFalse(match('인텔 코어 울트라 7 255H'))
+                self.assertFalse(match('인텔 코어 울트라 7 265KF'))
+        self.assertIsNone(F.cpu_rule('Ultra 7 265ZZ'))
+        self.assertIsNone(F.cpu_rule('i9 14900ZZ'))
+        self.assertIn('265ZZ', F.parse_text('Ultra 7 265ZZ').cpu)
+        self.assertIn('265V', F.parse_text('Ultra 7 265V').cpu)
+        self.assertFalse(F.cpu_rule(F.parse_text('Ultra 7 265V').cpu)('인텔 코어 울트라 7 265K'))
+
 
 @patch.object(F, 'load_specs', side_effect=specs_for)
 @patch.object(F, 'load', side_effect=load_rows)
@@ -145,6 +159,51 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 409)
         self.assertEqual(e.exception.detail['unmatched'][0]['slot'], 'GPU')
 
+    def test_unreadable_structured_cpu_is_rejected_before_catalog(self, *_):
+        for cpu in ('빠른 거', '', '   ', 'Ultra 7 265ZZ'):
+            with self.subTest(cpu=cpu), patch.object(F, 'load', side_effect=AssertionError('must reject before DB read')):
+                with self.assertRaises(HTTPException) as e:
+                    self.start(cpu=cpu)
+                self.assertEqual(e.exception.status_code, 422)
+
+    def test_requested_ultra_model_does_not_pick_cheaper_same_series(self, *_):
+        # 호환 사양은 합성 fixture다. 실제 제품 지원 여부를 주장하지 않는다.
+        models = [row(201, 'CPU', '인텔 코어 울트라 7 255H', 100000),
+                  row(202, 'CPU', '인텔 코어 울트라 7 265K', 200000)]
+        with patch(__name__ + '.ROWS', ROWS + models), patch.dict(SPECS, {201: dict(SPECS[1]), 202: dict(SPECS[1])}):
+            res = self.start(cpu='인텔 코어 울트라 7 265K')
+        cpu = next(l for l in res['lines'] if l['slot'] == 'CPU')
+        self.assertEqual(cpu['product_code'], 202)
+        self.assertTrue(cpu['from_request'])
+
+    def test_ssd_quantity_respects_known_board_capacity(self, *_):
+        res = self.start(cpu='i9')
+        parts = [F.Pick(slot=l['slot'], product_code=l['product_code'], quantity=2 if l['slot'] == 'SSD' else l['quantity'])
+                 for l in res['lines'] if l['product_code']]
+        for kind, key in (('M.2', 'm2_slots'), ('2.5 SATA', 'sata_ports')):
+            for limit in (1, None):
+                with self.subTest(kind=kind, limit=limit), patch.dict(SPECS, {
+                        12: dict(SPECS[12], **{key: limit}), 60: dict(SPECS[60], form_factor=kind)}):
+                    with self.assertRaises(HTTPException) as e:
+                        F.quote_build(None, parts, RULES)
+                    self.assertEqual(e.exception.status_code, 409)
+            with patch.dict(SPECS, {12: dict(SPECS[12], **{key: 2}), 60: dict(SPECS[60], form_factor=kind)}):
+                _, quote = F.quote_build(None, parts, RULES)
+            self.assertEqual(next(l for l in quote['lines'] if l['slot'] == 'SSD')['quantity'], 2)
+
+    def test_board_options_keep_room_for_both_ssds(self, *_):
+        parts = [F.Pick(slot='CPU', product_code=1), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=20),
+                 F.Pick(slot='CASE', product_code=40), F.Pick(slot='COOLER', product_code=50),
+                 F.Pick(slot='SSD', product_code=60, quantity=2), F.Pick(slot='POWER', product_code=70)]
+        boards = [row(13, 'MB', '합성 DDR5 보드 M.2 하나', 130000), row(14, 'MB', '합성 DDR5 보드 M.2 둘', 140000)]
+        with patch(__name__ + '.ROWS', ROWS + boards), patch.dict(SPECS, {
+                10: dict(SPECS[10], m2_slots=2), 13: dict(SPECS[10], m2_slots=1),
+                14: dict(SPECS[10], m2_slots=2), 60: dict(SPECS[60], form_factor='M.2')}):
+            res = F.options_build(None, parts, 'MB', RULES)
+        codes = {o['product_code'] for o in res['options']}
+        self.assertNotIn(13, codes)
+        self.assertIn(14, codes)
+
     def test_quote_rejects_incompatible(self, *_):
         parts = [F.Pick(slot='CPU', product_code=3), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=21),
                  F.Pick(slot='CASE', product_code=40), F.Pick(slot='SSD', product_code=60), F.Pick(slot='POWER', product_code=70)]
@@ -182,6 +241,26 @@ if __name__ == '__main__':
 
 
 class InquiryHookTests(unittest.TestCase):
+    def test_inquiry_refuses_ssd_over_capacity_before_insert(self):
+        from fastapi import Request, Response
+        from api import mvp3_purchase_inquiry as PI
+        parts = [F.Pick(slot='CPU', product_code=1), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=20),
+                 F.Pick(slot='CASE', product_code=40), F.Pick(slot='COOLER', product_code=50),
+                 F.Pick(slot='SSD', product_code=60, quantity=2), F.Pick(slot='POWER', product_code=70)]
+        body = PI.InquiryBody(topic='주문 희망', consent=True, email='qa@example.invalid', free_build=parts)
+        request = Request({'type': 'http', 'method': 'POST', 'path': '/api/mvp3/purchase-inquiries',
+                           'headers': [(b'host', b'mock.invalid'), (b'origin', b'https://mock.invalid')],
+                           'scheme': 'https', 'server': ('mock.invalid', 443), 'query_string': b''})
+        with patch.object(PI, 'engine') as engine, patch.object(PI.visitor, 'resolve', return_value=1), \
+             patch.object(PI.access_gate, 'check_rate'), patch.object(F, 'load', side_effect=load_rows), \
+             patch.object(F, 'load_specs', side_effect=specs_for), patch.object(F, 'load_rules', return_value=RULES), \
+             patch.dict(SPECS, {10: dict(SPECS[10], m2_slots=1), 60: dict(SPECS[60], form_factor='M.2')}):
+            conn = engine.begin.return_value.__enter__.return_value
+            with self.assertRaises(HTTPException) as e:
+                PI.create_inquiry(body, request, Response())
+            self.assertEqual(e.exception.status_code, 409)
+            conn.execute.assert_not_called()
+
     def test_inquiry_body_takes_picks_only(self):
         from pydantic import ValidationError
         from api import mvp3_purchase_inquiry as PI

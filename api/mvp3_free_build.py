@@ -103,11 +103,15 @@ def gpu_matches(name, want):
 def cpu_rule(s):
     """CPU 조건 글을 판정 함수로 바꾼다. 알아보지 못하면 None(지어내지 않는다)."""
     u = (s or '').upper()
-    model = re.search(r'(?<![0-9])(\d{4,5})\s*(X3D|KF|KS|K|F|X|G|T)?(?![0-9A-Z])', u)
+    model = (re.search(r'(?<![0-9])(\d{4,5})\s*(X3D|KF|KS|K|F|X|G|T)?(?![0-9A-Z])', u)
+             or re.search(r'(?:ULTRA|울트라)\s*[579]\s*-?\s*(\d{3})\s*(KF|K|F|HX|H|U|V)?(?![0-9A-Z])', u)
+             or re.search(r'(?<![0-9])(\d{3})\s*(KF|K|F|HX|H|U|V)(?![0-9A-Z])', u))
     if model:
         num, suf = model[1], model[2]
         pat = re.compile(r'(?<![0-9])' + num + ((r'\s*' + suf + r'(?![0-9A-Z])') if suf else r'(?![0-9])'))
         return lambda name: bool(pat.search((name or '').upper()))
+    if re.search(r'\d{3,5}', u):
+        return None              # 모델 번호를 읽지 못했는데 시리즈 조건으로 낮추지 않는다.
     series = re.search(r'(?<![A-Z0-9])I\s*([3579])(?![0-9])', u)
     if series:
         pat = re.compile(r'(?<![A-Z0-9])I' + series[1] + r'(?![0-9])')
@@ -162,9 +166,10 @@ def parse_text(s):
             family = 'RTX' if m[1].upper() == 'RTS' else m[1].upper()
             out['gpu'] = family + ' ' + gpu[0] + (' ' + gpu[1] if gpu[1] else '')
     cpu = (re.search(r'(?<![A-Za-z0-9])i\s*[3579](?:\s*-?\s*\d{4,5}\s*(?:KF|KS|K|F|T)?)?', u, re.I)
-           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*\d{3}[KFH]{0,2})?', u, re.I)
+           or re.search(r'(?:울트라|ultra)\s*[579](?:\s*-?\s*\d{3}[A-Za-z]{0,3})?', u, re.I)
            or re.search(r'(?:라이젠|ryzen)\s*[3579](?:\s*-?\s*\d{4}\s*(?:X3D|X|G|F)?)?', u, re.I)
-           or re.search(r'(?<![0-9])\d{4,5}\s*(?:X3D|KF|KS|K)(?![0-9A-Za-z])', u, re.I))
+           or re.search(r'(?<![0-9])\d{4,5}\s*(?:X3D|KF|KS|K)(?![0-9A-Za-z])', u, re.I)
+           or re.search(r'(?<![0-9])\d{3}\s*(?:KF|K|F|HX|H|U|V)(?![0-9A-Za-z])', u, re.I))
     if cpu:
         out['cpu'] = re.sub(r'\s+', ' ', cpu[0]).strip()
     if 'cpu' not in out:
@@ -271,6 +276,17 @@ def ram_fits(picks, specs):
     return b['mem_max_gb'] is None or not ram.get('gb') or ram['gb'] <= b['mem_max_gb']
 
 
+def storage_refusal(picks, specs):
+    """SSD를 늘릴 때 메인보드의 M.2/SATA 수를 지킨다. 지원 정보를 모르면 늘리지 않는다."""
+    lines = [dict(ordinal=KEY[s], slot=s, product_code=p['product_code'], quantity=p['quantity'], name=p['name'])
+             for s, p in picks.items() if p is not None]
+    raws = {p['product_code']: p['row'].get('spec_source_text') for p in picks.values() if p is not None}
+    usage = QTY.usage(lines, specs, raws)
+    raised = {KEY[s]: p['quantity'] for s, p in picks.items()
+              if s == 'SSD' and p is not None and p['quantity'] > 1}
+    return QTY.refusal(usage, raised)
+
+
 def blocking(checks, keys, empty, by_key):
     """받아들일 수 없는 판정. keys = 이번에 본 줄 번호, empty = 아직 고르지 않았거나 일부러 비운 자리."""
     bad = []
@@ -370,6 +386,8 @@ def load(conn, codes=None):
 
 
 def start_build(conn, cond, rules=None):
+    if cond.cpu is not None and cpu_rule(cond.cpu) is None:
+        raise HTTPException(422, 'CPU 조건을 읽지 못했어요. CPU 시리즈나 정확한 모델명을 확인해 주세요.')
     rows = load(conn)
     specs = load_specs(conn, [r['product_code'] for r in rows])
     rules = load_rules(conn) if rules is None else rules
@@ -448,6 +466,9 @@ def check_build(picks, specs, rules):
         raise HTTPException(409, '이 CPU는 내장 그래픽이 없어 그래픽카드를 골라야 해요.')
     if not ram_fits(picks, specs):
         raise HTTPException(409, '메모리 개수나 용량이 메인보드가 받는 범위를 넘어요. 메모리를 다시 골라 주세요.')
+    storage_error = storage_refusal(picks, specs)
+    if storage_error:
+        raise HTTPException(409, storage_error)
     bad, _ = judge(picks, specs, rules, list(KEY.values()), final=True)
     if bad:
         failed = [c for c in bad if c['state'] == 'fail']
@@ -488,7 +509,7 @@ def options_build(conn, parts, slot, rules=None):
             continue
         trial = dict(picks, **{slot: c})
         bad, _ = judge(trial, specs, rules, list(KEY.values()), final=True)
-        if bad or not ram_fits(trial, specs):
+        if bad or not ram_fits(trial, specs) or storage_refusal(trial, specs):
             untested += bool(bad) and all(x['state'] == 'unknown' for x in bad)
             continue
         diff = c['cost'] - now_cost
