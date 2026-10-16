@@ -244,6 +244,20 @@
       state.screen='results';
       if(parsed.unsupported&&!parsed.groups.length)message('현재 추천 원천은 이 화면의 판매 중 PC 목록과 연결되지 않았어요. 상담 조건은 유지됩니다.');
     }
+    // AI 가 고른 PC 가 조건으로 다시 받은 카드에 없으면(부품 바꾸기로 옮긴 PC·화면에서 고른 PC) 그 PC 를 맨 앞 묶음으로 그린다.
+    // 말과 카드가 달랐다(2026-10-16 「가장 비싼 GPU로 바꿔줘」 -- 설명은 RTX 5070 Ti PC, 카드는 150만원 추천). 값은 서버가 준 것만 쓴다.
+    function agentCards(list){
+      if(!Array.isArray(list)||!list.length)return;
+      const have=new Set((state.groups||[]).flatMap(g=>(g.products||[]).map(p=>p.product_code)));
+      if(list.every(c=>have.has(c?.product_code)))return;
+      let picked;try{picked=M.recommendations({ok:true,card_sets:[{kind:'sold',usage:'상담에서 고른 PC',items:list}]}).groups[0];}catch{return;}
+      if(!picked||!picked.products.length)return;
+      const codes=new Set(picked.products.map(p=>p.product_code));
+      const rest=(state.groups||[]).map(g=>({...g,products:(g.products||[]).filter(p=>!codes.has(p.product_code))})).filter(g=>g.products.length||(g.custom||[]).length);
+      let index=0;state.groups=[picked,...rest].map(g=>({...g,products:g.products.map(p=>({...p,index:index++}))}));
+      if(state.recommendation)state.recommendation={...state.recommendation,groups:state.groups};
+      const last=state.proposals[state.proposals.length-1];if(last)last.groups=state.groups;
+    }
     async function submit(raw,{repeat=false,entry=null}={}){
       const text=String(raw||'').trim();
       if(!text||text.length>MAX_TEXT||state.phase)return false;
@@ -296,7 +310,7 @@
         // 다시 묻는다 -- wants·문장은 보내지 않았고, 「더 싸게/더 좋게」면 같은 방향이다(A-02 같은 엔진·같은 순서).
         // 엔진 안내 문장은 AI 설명과 겹치므로 붙이지 않는다.
         // 여러 대 구매(response.wants.units, 코덱스 C10)는 그대로 실어 화면이 한 대 예산으로 견주게 한다.
-        else if(response.agent===true){state.pendingText='';await recommendFor(op,{wants:M.object(response.wants)?M.copy(response.wants):null,...(['cheaper','better'].includes(response.nav)?{nav:response.nav}:{})},{notes:false});}
+        else if(response.agent===true){state.pendingText='';await recommendFor(op,{wants:M.object(response.wants)?M.copy(response.wants):null,...(['cheaper','better'].includes(response.nav)?{nav:response.nav}:{})},{notes:false});if(current(op))agentCards(response.agent_cards);}
         else {await recommendFor(op,{text:state.pendingText});}
       }catch(error){
         if(current(op)){

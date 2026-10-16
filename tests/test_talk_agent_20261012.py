@@ -307,6 +307,8 @@ class AsParse(unittest.TestCase):
         self.assertIn("1,498,000원", r["reply"])
         self.assertEqual(r["agent_meta"]["cards"], [1001])
         self.assertEqual(r["chat_flow"], {"smalltalk_turns": 0})
+        # AI 가 고른 카드(서버 값)를 화면에 넘긴다 -- 다시 받은 추천에 없으면 화면이 이 카드를 그린다.
+        self.assertEqual([(c["product_code"], c["price"]) for c in r["agent_cards"]], [(1001, 1_498_000)])
 
     def test_explanation_keeps_previous_state(self):
         prev = {"usages": ["사무·인강"], "budget_won": 800_000}
