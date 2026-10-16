@@ -103,7 +103,7 @@ def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
                      "description": "직전에 보여 준 PC보다 더 싸게(cheaper) 또는 더 좋게(better)"},
          }, "required": ["usages"]}},
         {"name": "pc_detail",
-         "description": "find_pcs 가 준 PC 번호(ref)의 공개 부품 구성과 부품별 판매가. 가격을 모르는 부품은 null 이다.",
+          "description": "find_pcs 가 준 PC 번호(ref)의 공개 부품 구성. 부품별 판매가는 주지 않으며 PC 총액만 알려 준다.",
          "parameters": {"type": "object", "additionalProperties": False,
                         "properties": {"ref": {"type": "string"}}, "required": ["ref"]}},
         {"name": "other_pcs_by_part",
@@ -144,6 +144,78 @@ def _compact_item(it: dict) -> dict:
             "spec": it.get("spec"), "level": it.get("level"), "over_budget": it.get("over_budget"),
             "reasons": (it.get("reasons") or [])[:3],
             "public_configuration": bool(it.get("public_configuration"))}
+
+
+def display_facts(context) -> dict | None:
+    """화면 카드 순서와 선택 PC를 현재 공개 자료로 확인한다.
+
+    공개 판정은 public_item / custom_pc.customer_list가 맡는다. 부품 가격이나 보관 이력은 읽지 않는다.
+    """
+    if context is None:
+        return None
+    from . import customer_pc_offer as OFFER, custom_pc
+
+    identities = [*context.cards, *([context.selected] if context.selected is not None else [])]
+    unique = {item.identity(): item for item in identities}
+    config_ids = [value for kind, value in unique if kind == "configuration_id"]
+    custom = {}
+    if config_ids:
+        try:
+            with engine.connect() as conn:
+                custom = {item["configuration_id"]: item for item in custom_pc.customer_list(conn, ids=config_ids)}
+        except Exception:
+            custom = {}
+    checked = {}
+    for key, identity in unique.items():
+        item = {**identity.model_dump(exclude_none=True), "status": "unknown", "price": None}
+        cfg, parts, title = None, [], None
+        if identity.product_code is not None:
+            try:
+                cfg = OFFER.public_item(identity.product_code).get("public_configuration")
+            except Exception:
+                cfg = None
+            if isinstance(cfg, dict):
+                description = cfg.get("description") or {}
+                title = description.get("title") if isinstance(description, dict) else None
+                parts = cfg.get("parts") or []
+        else:
+            cfg = custom.get(identity.configuration_id)
+            if isinstance(cfg, dict):
+                title, parts = cfg.get("title"), cfg.get("parts") or []
+                # 신규 구성 총액은 같은 customer_list가 현재 부품으로 계산한다. 보관/변경 후 화면 금액과 구분한다.
+                price = cfg.get("price")
+                if context.source not in ("saved_quote", "custom_build") and type(price) is int and price > 0:
+                    item["price"] = price
+        if isinstance(cfg, dict):
+            item.update(status="current_public", name=title[:160] if isinstance(title, str) else None, parts=[])
+            for part in parts[:12]:
+                if not isinstance(part, dict) or part.get("pseudo") is True:
+                    continue
+                specs = [{"label": spec["label"][:60], "value": spec["value"][:160]}
+                         for spec in (part.get("specs") or [])[:4]
+                         if isinstance(spec, dict) and isinstance(spec.get("label"), str) and isinstance(spec.get("value"), str)]
+                name, quantity, slot, label = (part.get(field) for field in ("name", "quantity", "slot", "slot_label"))
+                item["parts"].append({"name": name[:160] if isinstance(name, str) else None,
+                                      "slot": slot[:40] if isinstance(slot, str) else None,
+                                      "slot_label": label[:60] if isinstance(label, str) else None,
+                                      "quantity": quantity if type(quantity) is int and 0 < quantity <= 100 else None,
+                                      "specs": specs})
+        checked[key] = item
+    cards = [{**checked[identity.identity()], "card_position": i + 1} for i, identity in enumerate(context.cards)]
+    selected = checked[context.selected.identity()] if context.selected is not None else None
+    result = {"screen": context.screen, "source": context.source, "cards": cards, "selected": selected,
+              "cards_truncated": context.cards_truncated,
+              "scope": "cards의 card_position은 화면 표시 순서다. 같은 PC가 다시 보여도 순번을 합치지 않는다. selected는 선택 PC이며 카드 순서에 끼워 넣지 않는다. 현재 공개 원본만 확인함. 보관 당시/변경 구성·재고·주문/접수 상태는 미확인."}
+    if context.cards_truncated:
+        result["scope"] += " 앞의 최대 6개 카드만 확인했으며 뒤 카드는 확인 범위 밖이다."
+    # 공개 자료가 길어도 식별자·순서·선택은 보존하고 부품 설명만 줄인다.
+    while len(json.dumps(result, ensure_ascii=False)) > RESULT_MAX_CHARS:
+        longest = max([*cards, *([selected] if selected is not None else [])], key=lambda item: len(item.get("parts") or []), default={})
+        if not longest.get("parts"):
+            break
+        longest["parts"].pop()
+        result["truncated"] = True
+    return result
 
 
 def _relaxations(raw: dict, needs: list[str]) -> list[tuple[str, object]]:

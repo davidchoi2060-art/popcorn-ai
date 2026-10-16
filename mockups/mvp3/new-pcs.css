@@ -1,23 +1,40 @@
-/* 「새로 나온 PC」(부품 상품화 4단계). 색은 styles.css :root 를 그대로 쓴다. */
+/* 새로 구성된 PC 목록: 첫 화면과 같은 카드·토큰. 실제 사진 계약은 아직 없다. */
 html,body{height:auto}
-.new-pcs{max-width:960px;margin:0 auto;padding:28px 34px 48px}
-.new-pcs h1{font-size:30px;margin:0 0 6px;letter-spacing:-.5px}
+.new-pcs-page .brand-mark{display:inline-block}
+.new-pcs{max-width:1230px;margin:0 auto;padding:36px 36px 48px}
+.new-pcs h1{font-size:38px;margin:0 0 12px;letter-spacing:-1.2px;line-height:1.25}
 .new-pcs .muted{color:var(--muted)}
-.new-pc{border:1px solid var(--line);border-radius:14px;padding:22px;margin:18px 0;background:#fff}
-.new-pc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
-.new-pc-head h2{font-size:24px;margin:0;overflow-wrap:anywhere}
-.new-pc-usages{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.new-pc-usages em{font-style:normal;font-size:13px;font-weight:650;padding:3px 8px;border-radius:999px;background:var(--tint);color:var(--green)}
-.new-pc-price{text-align:right}.new-pc-price strong{display:block;font-size:28px;color:var(--green)}.new-pc-price small{color:var(--muted);font-size:14px}
-.new-pc-parts{width:100%;border-collapse:collapse;margin:16px 0}
+#new-pcs-note{font-size:16px;margin:0 0 28px}
+#new-pcs-list.has-pcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;align-items:start}
+.new-pc{border:1px solid var(--line);border-radius:14px;padding:22px;background:#fff;min-width:0;display:flex;flex-direction:column;gap:14px}
+.new-pc-head h2{font-size:23px;margin:0;line-height:1.4;letter-spacing:-.45px;overflow-wrap:anywhere}
+.new-pc-usages{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 10px}
+.new-pc-usages em{font-style:normal;font-size:12px;font-weight:650;padding:4px 9px;border-radius:999px;background:var(--tint);color:var(--green)}
+.new-pc-key-parts{display:grid;gap:4px;margin:0;font-size:14px}
+.new-pc-key-parts>div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px}
+.new-pc-key-parts dt{color:var(--muted)}.new-pc-key-parts dd{margin:0;overflow-wrap:anywhere}
+.new-pc-price{margin-top:auto;padding-top:6px}.new-pc-price strong{display:block;font-size:28px;line-height:1.3;letter-spacing:-.8px;color:var(--green)}
+.new-pc-configuration{min-width:0}.new-pc-configuration>summary{display:flex;align-items:center;justify-content:center;gap:18px;border-radius:9px;background:var(--tint);padding:11px 16px;min-height:44px;font-size:15px;font-weight:700;color:var(--green);cursor:pointer;list-style:none}
+.new-pc-configuration>summary::-webkit-details-marker{display:none}.new-pc-configuration>summary .ui-icon{width:20px;height:20px}
+.new-pc-configuration[open]>summary .ui-icon{transform:rotate(90deg)}
+.new-pc-detail{border-top:1px solid var(--line);margin-top:18px;padding-top:8px;font-size:15px;overflow-wrap:anywhere}
+.new-pc-detail>p{margin:10px 0}.new-pc-detail ul{padding-left:20px;margin:8px 0}.new-pc-detail h3{font-size:18px;margin:16px 0 4px}
+.new-pc-parts{width:100%;border-collapse:collapse;margin:16px 0;table-layout:fixed}
 .new-pc-parts th,.new-pc-parts td{border:0;text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
-.new-pc-parts th{width:110px;color:var(--muted);font-weight:500}
-.new-pc ul{padding-left:20px;margin:8px 0}.new-pc h3{font-size:18px;margin:16px 0 4px}
+.new-pc-parts th{width:90px;color:var(--muted);font-weight:500}
 .new-pc-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
 .new-pc-form{display:grid;gap:10px;margin-top:16px;padding:16px;border-radius:12px;background:var(--tint)}
 .new-pc-form label{display:grid;gap:4px;font-size:15px}
-.new-pc-form input,.new-pc-form textarea{border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:#fff}
-.new-pc-form .consent{display:flex;gap:8px;align-items:flex-start}
-.new-pc-form .consent input{margin-top:5px}
+.new-pc-form input,.new-pc-form textarea{border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:#fff;min-width:0;width:100%}
+.new-pc-form .consent{display:flex;gap:8px;align-items:flex-start}.new-pc-form .consent input{margin-top:5px;width:auto;flex:none}
 .new-pc-done{color:var(--green);font-weight:600}.new-pc-error{color:var(--amber)}
-@media(max-width:760px){.new-pcs{padding:20px 16px 36px}.new-pc{padding:16px}.new-pc-price{text-align:left}.new-pc-parts th{width:84px}.new-pc-head h2{font-size:21px}}
 .new-pc.is-target{border-color:var(--green);box-shadow:0 0 0 2px var(--tint)}
+.new-pcs-empty{padding:60px 16px;border-top:1px solid var(--line);text-align:center}
+.new-pcs-empty h2{font-size:24px;line-height:1.4}.new-pcs-empty p{margin:12px 0 24px;color:var(--muted)}
+.new-pcs-empty a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:11px 17px;border-radius:9px;text-decoration:none}
+@media(max-width:760px){
+ .new-pcs{padding:24px 14px 36px}.new-pcs h1{font-size:28px;letter-spacing:-.9px}#new-pcs-note{font-size:14px;margin-bottom:20px}
+ #new-pcs-list.has-pcs{grid-template-columns:minmax(0,1fr);gap:14px}.new-pc{padding:16px;border-radius:12px;gap:12px}.new-pc-head h2{font-size:20px}
+ .new-pc-price strong{font-size:26px}.new-pc-parts th{width:78px}.new-pc-form{padding:12px}.new-pcs-empty{padding:40px 8px}.new-pcs-empty h2{font-size:22px}
+}
+@media(max-width:370px){.new-pcs{padding-left:12px;padding-right:12px}.new-pcs h1{font-size:26px}.new-pc{padding:14px}.new-pc-key-parts>div{grid-template-columns:64px minmax(0,1fr);gap:6px}}

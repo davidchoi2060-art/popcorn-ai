@@ -942,10 +942,13 @@ class LlmAnswerAsIs(unittest.TestCase):
                 patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
             return AG.run_turn(text, [])
 
-    def test_all_price_sentences_dropped_sends_ai_answer_not_fixed_notice(self):
+    def test_all_price_sentences_keep_the_explanation_without_unverified_prices(self):
         out = self._run_turn([_turn("RTX 5060 그래픽카드는 보통 45만원 안팎에서 팔려요.")], "RTX 5060 얼마쯤 해요?")
         self.assertNotEqual(out["reply"], AG.TE.REPLY_AI_UNREADABLE)
-        self.assertIn("45만원", out["reply"])
+        # 원답 허용도 부품별 가격 비노출·금액 지어내기 금지보다 우선하지 않는다.
+        self.assertNotIn("45만원", out["reply"])
+        self.assertIn("RTX 5060", out["reply"])
+        self.assertIn("금액 확인 필요", out["reply"])
         self.assertEqual(out["dropped_sentences"][0]["reason"], "price_not_in_snapshot")
 
     def test_promise_and_scratch_still_fall_back(self):
