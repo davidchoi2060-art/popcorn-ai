@@ -25,11 +25,13 @@ class StarterKeys(unittest.TestCase):
         for k in talk.ENTRY_KEYS:
             self.assertTrue(k.isascii())
 
-    def test_landing_paths_use_the_same_keys(self):
+    def test_landing_has_no_start_gateway(self):
+        # 2026-10-16 중헌 님 「첫화면 게이트웨이를 세군대로 나누는게 의미가 없어 … 예전처럼 단일 화면으로」.
+        # 처음 화면(index.html)은 갈래 없이 상담 화면을 연다. 시작 단추 셋은 대화 화면(talk.js STARTERS)에만 남는다.
         app = (ROOT / "mockups/mvp3/app.js").read_text(encoding="utf-8")
-        block = app[app.index("const GATEWAY_PATHS=["):app.index("]];", app.index("const GATEWAY_PATHS=[")) + 3]
-        # 줄 끝 키만 센다 -- 줄 앞 아이콘 목록(['cpu','memory'])도 같은 꼴로 끝나므로 뒤가 줄바꿈·끝인 것만.
-        self.assertEqual(set(re.findall(r"'([a-z_]+)'\](?=\]|,\s*\n)", block)), set(talk.ENTRY_KEYS))
+        self.assertNotIn("GATEWAY_PATHS", app)
+        self.assertNotIn("talk.html?start=", app)
+        self.assertNotRegex(app, r"data-action=\"gateway|'gateway-")
 
     def test_starters_do_not_lead_with_games(self):
         # 사장님 2026-10-11 「게임.. 뭐 이런건 빼고」 -- 시작 단추가 게임 탐색을 권하지 않는다.
