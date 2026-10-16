@@ -78,6 +78,9 @@ def main() -> int:
                 rb.update(nav=res["nav"], anchor_code=(selected or (right[0] if right else {})).get("product_code"))
             c2, rec = post("/api/grid/recommend", rb)
             new = cards_of(rec) if c2 == 200 else []
+            picked = [c for c in res.get("agent_cards") or [] if type(c.get("product_code")) is int]
+            if picked and not {c["product_code"] for c in picked} <= {c["product_code"] for c in new}:
+                new = picked + [c for c in new if c["product_code"] not in {p["product_code"] for p in picked}]
             if new:
                 right = new
                 log.append("  [오른쪽 카드가 바뀜]\n" + show(right))

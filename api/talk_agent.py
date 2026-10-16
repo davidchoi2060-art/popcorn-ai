@@ -714,6 +714,8 @@ def _fixed(reply: str, kind: str, t0: float) -> dict:
             "meta": {"rounds": 0, "tool_calls": 0, "elapsed_sec": round(time.monotonic() - t0, 3)}}
 
 
+AGENT_CARD_KEYS = ("product_code", "name", "price", "price_src", "mall_url", "spec", "level", "over_budget", "reasons",
+                   "public_configuration")
 CHAT_MAX = 2000   # ChatBody.text 한도와 같다 -- 더 긴 글은 지금 경로(/parse)가 앞·끝만 읽고 밝힌다
 
 
@@ -743,6 +745,9 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
             "explain_only": state is None, "answer": "", "reply": reply, "nav": r.get("nav"),
             "wants": {"units": r["units"]} if state is not None and type(r.get("units")) is int else None,
             "shown_note": shown_note,
+            # AI 가 고른 PC(서버 값) -- 화면이 조건으로 다시 받은 카드에 없으면 이 카드를 그대로 그린다. 부품 바꾸기로 옮긴
+            # PC·화면에서 고른 PC 는 그 조건의 추천 목록에 없을 수 있다(2026-10-16 「가장 비싼 GPU로 바꿔줘」 다시 돌리기).
+            "agent_cards": [{k: c.get(k) for k in AGENT_CARD_KEYS} for c in cards] if state is not None else [],
             "chat_flow": chat_flow, "exceptions": [r["kind"]] if r.get("kind") else [],
             "agent_meta": {"status": r.get("status"), "snapshot": r.get("snapshot"),
                            "cards": [c.get("product_code") for c in cards]}}

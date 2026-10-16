@@ -102,3 +102,24 @@ test('agent shown_note rides in the next turn history but is never shown on scre
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
+
+test('a PC the AI picked outside the re-asked list is drawn first, so words and cards match',async()=>{
+  const SWAP={product_code:2002,name:'CODE/MOCK 5070 Ti PC',price:4114100,spec:{gpu:'RTX 5070 Ti'}};
+  const h=harness(()=>agent({agent_cards:[SWAP]}),reco);
+  try{
+    await h.flow.submit('가장 비싼 GPU로 바꿔줘');
+    await until(()=>h.flow.state.phase===null&&h.flow.state.groups.length);
+    assert.equal(JSON.stringify(h.flow.state.groups.map(g=>g.products.map(p=>p.product_code))),'[[2002],[1001]]');
+    assert.equal(h.flow.state.groups[0].products[0].price,4114100);
+    assert.equal(JSON.stringify(h.flow.state.proposals.at(-1).groups.map(g=>g.products.map(p=>p.index))),'[[0],[1]]');
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+test('AI cards already in the re-asked list change nothing',async()=>{
+  const h=harness(()=>agent({agent_cards:[CARD]}),reco);
+  try{
+    await h.flow.submit('게임용 PC 150만원');
+    await until(()=>h.flow.state.phase===null&&h.flow.state.groups.length);
+    assert.equal(JSON.stringify(h.flow.state.groups.map(g=>[g.usage,g.products.map(p=>p.product_code)])),'[["게임",[1001]]]');
+  }finally{h.close();}
+});
