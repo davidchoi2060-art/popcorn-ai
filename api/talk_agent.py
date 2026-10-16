@@ -266,6 +266,18 @@ def quantity_amounts(prices: set[int], budgets: set[int], said: str) -> set[int]
     return {a for a in out if a > 0}
 
 
+# 걸러 낸 문장뿐인 답에서도 끝까지 내보내지 않는 것 -- 거래가 된 척하는 말 · 해 드리겠다는 약속.
+HARD_DROPS = ("false_claim", "promise")
+
+
+def soft_reply(dropped: list[dict]) -> str:
+    """verify 가 모든 문장을 걸렀을 때 내보낼 AI 답 -- 금액 확인만 못 한 문장을 원래 순서대로 잇는다.
+
+    속말(scratch)은 손님에게 쓴 말이 아니라 여기서도 뺀다. 남는 것이 없으면 빈 문자열(정해 둔 안내로 간다).
+    """
+    return _won_commas(" ".join(d["sentence"] for d in dropped if d["reason"] == "price_not_in_snapshot")).strip()
+
+
 def verify(reply: str, book: TT.FactBook, budget_won: int | None = None, said: str = "") -> tuple[str, list[dict]]:
     """설명을 문장 단위로 사실 묶음과 대조한다 -> (남긴 글, 뺀 문장[{sentence, reason}]).
 
@@ -525,6 +537,11 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None) 
     # 예산 안내는 AI 설명만 보고 정한다 -- 서버 파워 줄의 「권장 기준은 넘지만」을 예산 안내로 읽지 않는다(코덱스 P2 F1).
     lead = budget_lead(cards, budget, clean) if status != "failed" and cards else None
     note = budget_note(cards, budget, clean) if status != "failed" and cards and not lead else None
+    if not clean and reply.strip() and not any(d["reason"] in HARD_DROPS for d in dropped):
+        # 걸러 낸 문장뿐이라 남은 답이 없으면 정해 둔 「잘 정리하지 못했어요」 대신 AI 답을 내보낸다
+        # (2026-10-16 중헌 님 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」). 거래가 된 척하는 말·약속은
+        # 여기서도 내보내지 않는다(HARD_DROPS). 금액은 걸러진 그대로다 -- 확인 안 된 금액만 「확인 필요」로 바꾼다.
+        clean = soft_reply(dropped)
     if not clean and not (lead or psu_line):
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE

@@ -916,3 +916,32 @@ class NoDeadEnd(unittest.TestCase):
         self.assertIn("nearest", AG.SYSTEM)
         self.assertNotIn("일반 설명만 원하는 질문에는 도구를 부르지 않는다", AG.SYSTEM)
         self.assertNotIn("도구를 부르지 말고, 무엇이 왜 부딪치는지", AG.SYSTEM)
+
+
+class LlmAnswerAsIs(unittest.TestCase):
+    """2026-10-16 중헌 님: 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」."""
+
+    def _run_turn(self, script, text):
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda m, t, **k: script.pop(0)):
+            return AG.run_turn(text, [])
+
+    def test_all_price_sentences_dropped_sends_ai_answer_not_fixed_notice(self):
+        out = self._run_turn([_turn("RTX 5060 그래픽카드는 보통 45만원 안팎에서 팔려요.")], "RTX 5060 얼마쯤 해요?")
+        self.assertNotEqual(out["reply"], AG.TE.REPLY_AI_UNREADABLE)
+        self.assertIn("45만원", out["reply"])
+        self.assertEqual(out["dropped_sentences"][0]["reason"], "price_not_in_snapshot")
+
+    def test_promise_and_scratch_still_fall_back(self):
+        out = self._run_turn([_turn("바로 주문 처리해 드릴게요.")], "주문해줘")
+        self.assertNotIn("처리해 드릴게요", out["reply"])
+        out = self._run_turn([_turn("Need ask budget question in Korean.")], "컴퓨터")
+        self.assertEqual(out["reply"], AG.TE.REPLY_AI_UNREADABLE)
+
+    def test_long_text_also_goes_to_ai_with_read_length_note(self):
+        import inspect
+        from api import talk
+        src = inspect.getsource(talk.parse_talk)
+        self.assertNotIn("not truncated and len(text) <= AGENT.CHAT_MAX", src)
+        self.assertIn("TX.NOTE_TOO_LONG", src[src.index("AGENT.enabled()"):src.index("TS.load_vocab")])
+        self.assertLess(talk.MAX_TEXT_LEN + len("\n(중략)\n"), AG.CHAT_MAX)   # 앞·끝만 읽은 글은 도구 상담 한도 안이다
