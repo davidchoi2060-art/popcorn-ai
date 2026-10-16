@@ -18,11 +18,11 @@ function deferred(){let resolve,reject;const promise=new Promise((a,b)=>{resolve
 async function until(check){const end=Date.now()+2000;for(let i=0;i<80||Date.now()<end;i++){if(check())return;await tick();}throw Error('probe did not settle');}
 function standard(url){return url==='/api/talk/parse'?parsed:url==='/api/grid/recommend'?recommendation:url==='/api/mvp3/contact'?{ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'}:empty;}
 const active=[];
-function harness({hash='#welcome',respond=standard,journal=null,fromTalk=false}={}){
+function harness({hash='#welcome',respond=standard,journal=null,fromTalk=false,mobile=false}={}){
   const disposed=deferred(),calls=[],errors=[];
   const vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'http://qa.invalid/'+hash,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
-  const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
+  const w=dom.window,media={matches:mobile,listener:null,addEventListener(type,fn){if(type==='change')this.listener=fn;}};w.matchMedia=()=>media;w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   Object.defineProperty(w,'crypto',{value:webcrypto});
   w.localStorage.setItem(KEY,ACCESS);if(journal)w.sessionStorage.setItem(JOURNAL,journal);if(fromTalk)w.sessionStorage.setItem('popcorn-mvp3-from-talk-v1',JSON.stringify({focus:'parts'}));
   w.eval(read('live-model.js'));w.eval(read('api-client.js'));
@@ -36,6 +36,7 @@ function harness({hash='#welcome',respond=standard,journal=null,fromTalk=false}=
   w.MVP3LiveFlow.createFlow=(api,options)=>flow=factory(api,{...options,uuid:()=>ID});
   w.eval(read('live-photo.js'));w.eval(read('app.js'));
   const h={dom,w,flow,calls,errors,input:w.document.querySelector('#request'),
+    setMobile(value){media.matches=value;media.listener?.();},
     click(action){const button=w.document.querySelector('[data-action="'+action+'"]');assert.ok(button,'actual rendered action '+action);button.click();},
     postCount(){return calls.filter(c=>c.method==='POST').length;},
     pop(hash){w.history.replaceState({screen:hash.slice(1)},'',hash);w.dispatchEvent(new w.PopStateEvent('popstate',{state:w.history.state}));},
@@ -44,6 +45,16 @@ function harness({hash='#welcome',respond=standard,journal=null,fromTalk=false}=
   active.push(h);return h;
 }
 test.afterEach(async()=>{for(const h of active.splice(0)){assert.deepEqual(h.errors,[]);h.close();}await tick();});
+test('the real welcome-card loader and app pass only their displayed identities to the consultation',async()=>{
+  const h=harness(),pcs=[{configuration_id:'A-03',title:'사무 PC',price:1000000},{configuration_id:'A-01',title:'게임 PC',price:null},{configuration_id:'A-02',title:'다른 PC',price:900000},{configuration_id:'A-04',title:'숨겨진 네 번째 PC',price:800000}];
+  h.w.fetch=async()=>({ok:true,json:async()=>({ok:true,items:pcs})});
+  h.w.eval(read('welcome-pcs.js'));
+  await until(()=>h.w.document.querySelectorAll('.welcome-pc').length===3);
+  edit(h,'세 번째 PC를 설명해 주세요');send(h);
+  await until(()=>h.calls.some(c=>c.url==='/api/talk/parse'));
+  const context=h.calls.find(c=>c.url==='/api/talk/parse').body.display_context;
+  assert.deepEqual(copy(context),{screen:'welcome',cards:[{configuration_id:'A-03'},{configuration_id:'A-01'},{configuration_id:'A-02'}],selected:null,source:'new_pcs'});
+});
 function edit(h,text){h.input.value=text;h.input.dispatchEvent(new h.w.Event('input',{bubbles:true}));}
 function choose(h,usage){h.w.document.querySelector('[data-usage="'+usage+'"]').click();}
 function budget(h,n){const e=h.w.document.querySelector('#gateway-budget');e.value=n;e.dispatchEvent(new h.w.Event('change',{bubbles:true}));}
@@ -135,6 +146,39 @@ test('the welcome screen shows the curated PC list only when welcome-pcs provide
   h.w.MVP3WelcomePcs={html:()=>'<section class="welcome-pcs"><a class="welcome-pc" href="new-pcs.html#c1">맞춘 PC</a></section>'};
   h.w.dispatchEvent(new h.w.Event('mvp3:welcome-pcs'));assert.equal(d.querySelector('#view .welcome-pcs a').getAttribute('href'),'new-pcs.html#c1');assert.equal(h.calls.length,0);
   await h.flow.submit('조건');assert.equal(h.flow.state.screen,'results');assert.equal(d.querySelector('.welcome-pcs'),null);
+});
+
+test('mobile curated PCs precede the same collapsed consultation DOM and can be expanded',()=>{
+  const h=harness({mobile:true}),d=h.w.document,input=h.input;
+  h.w.MVP3WelcomePcs={html:()=>'<section class="welcome-pcs"><h2 tabindex="-1">새로 구성된 PC</h2><a href="new-pcs.html#c1">구성 보기</a></section>'};
+  h.w.dispatchEvent(new h.w.Event('mvp3:welcome-pcs'));
+  assert.equal(d.querySelector('.workspace').firstElementChild,d.querySelector('.content'));
+  assert.equal(d.querySelector('#chat-body').hidden,true);assert.equal(d.querySelector('#chat-toggle').getAttribute('aria-expanded'),'false');
+  assert.equal(d.querySelector('.welcome-card'),null);assert.equal(d.querySelector('#request'),input);
+  d.querySelector('#chat-toggle').click();assert.equal(d.querySelector('#chat-body').hidden,false);
+  assert.equal(d.querySelector('#chat-toggle').getAttribute('aria-expanded'),'true');assert.equal(h.calls.length,0);
+});
+
+test('product arrival and responsive moves preserve the typed consultation, selection and focus',()=>{
+  const h=harness({mobile:true}),d=h.w.document,input=h.input;
+  edit(h,'입력 중인 조건과 예산');input.focus();input.setSelectionRange(3,7,'backward');
+  h.w.MVP3WelcomePcs={html:()=>'<section class="welcome-pcs"><h2 tabindex="-1">새로 구성된 PC</h2></section>'};
+  h.w.dispatchEvent(new h.w.Event('mvp3:welcome-pcs'));
+  for(const small of [false,true,false,true]){
+    h.setMobile(small);assert.equal(d.querySelector('#request'),input);assert.equal(input.value,'입력 중인 조건과 예산');
+    assert.equal(d.activeElement,input);assert.equal(input.selectionStart,3);assert.equal(input.selectionEnd,7);assert.equal(input.selectionDirection,'backward');
+    assert.equal(d.querySelector('#chat-body').hidden,false);
+    assert.equal(d.querySelector('.workspace').firstElementChild,d.querySelector(small?'.content':'.chat'));
+  }
+  assert.equal(h.calls.length,0);
+});
+
+test('a mobile home without public PCs keeps the consultation and its original guidance',()=>{
+  const h=harness({mobile:true}),d=h.w.document;
+  assert.equal(d.querySelector('.workspace').firstElementChild,d.querySelector('.chat'));
+  assert.equal(d.querySelector('#chat-body').hidden,false);assert.ok(d.querySelector('.welcome-card'));
+  h.w.MVP3WelcomePcs={html:()=>''};h.w.dispatchEvent(new h.w.Event('mvp3:welcome-pcs'));
+  assert.equal(d.body.classList.contains('has-welcome-pcs'),false);assert.equal(h.calls.length,0);
 });
 test('first question header hides once the customer has spoken (2026-10-12 owner report)',async()=>{
   const h=harness(),intro=h.w.document.querySelector('#chat-body .chat-intro');assert.equal(intro.hidden,false);

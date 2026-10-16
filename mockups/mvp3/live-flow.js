@@ -141,6 +141,23 @@
   const GREETING='안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요.';
   const ANSWER_WRITING='설명을 쓰고 있어요. 아래 추천부터 먼저 보여 드릴게요.';
   const ANSWER_MISSING='설명을 불러오지 못했어요. 아래 추천을 먼저 확인해 주세요.';
+  // 화면 식별자만 보낸다. 제목·가격·부품·연락처는 요청 자료로 믿지 않고 서버가 공개 구성에서 다시 읽는다.
+  function displayContext(state,keepCurrent,extraCards){
+    const screen=['welcome','results','detail','final','saved'].includes(state.screen)?state.screen:'welcome';
+    const selected=screen!=='saved'&&(keepCurrent||['detail','final'].includes(screen))?state.selected:null;
+    const positive=n=>Number.isSafeInteger(n)&&n>0;
+    const identity=p=>positive(p?.product_code)?{product_code:p.product_code}:
+      typeof p?.configuration_id==='string'&&/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(p.configuration_id)?{configuration_id:p.configuration_id}:null;
+    // 선택 견적을 추천 배열 앞에 끼우면 「세 번째 PC」의 순서가 바뀐다. 선택은 따로 보낸다.
+    const currentSelection=identity(selected);
+    const shown=screen==='results'?(state.groups||[]).flatMap(g=>[...(Array.isArray(g.products)?g.products:[]),...(Array.isArray(g.custom)?g.custom:[])]):
+      screen==='welcome'&&Array.isArray(extraCards)?extraCards:[];
+    // 같은 PC가 여러 용도 그룹에 다시 나타나도 화면의 카드 순번은 그대로 둔다.
+    const identities=shown.map(identity).filter(Boolean),cards=identities.slice(0,6);
+    const source=currentSelection?.product_code&&state.savedQuote?.product?.product_code===currentSelection.product_code?'saved_quote':
+      selected?.build?'custom_build':screen==='welcome'&&cards.some(c=>c.configuration_id)?'new_pcs':'recommendation';
+    return {screen,cards,selected:currentSelection,source,...(identities.length>6?{cards_truncated:true}:{})};
+  }
   function createFlow(api,options={}){
     const changed=options.onChange||(()=>{}), uuid=options.uuid||(()=>root.crypto.randomUUID());
     // keepCurrent: 2차 대화 화면(talk.html). 고객이 고른 구성(지금 견적)은 새 조건·새 추천이 와도 지우지 않고,
@@ -236,7 +253,8 @@
       try{
         // entry: 대화 화면 시작 단추로 시작한 문장이면 그 단추 키(서버가 로그로만 센다).
         // defer_answer: 「카드 먼저」(2026-10-14) -- 서버가 설명을 기다리지 않고 답한다. 설명은 fillAnswer 가 따로 받아 채운다.
-        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous,defer_answer:true};if(entry)payload.entry=entry;
+        const shown=state.screen==='welcome'&&typeof options.getDisplayCards==='function'?options.getDisplayCards():[];
+        const payload={text,state:state.talk,chat_flow:state.chatFlow,history:previous,defer_answer:true,display_context:displayContext(state,keepCurrent,shown)};if(entry)payload.entry=entry;
         const response=await api.parse(payload,{signal:op.signal});
         if(!current(op))return false;
         if(!M.object(response)||response.ok!==true||!M.object(response.state))throw new Error('상담 응답 형식을 확인할 수 없어요.');
