@@ -410,7 +410,7 @@ def cmd_combine(args) -> int:
         for r in rows:
             print("ROW " + json.dumps({k: r.get(k) for k in ("id", "question", "ours", "generic", "verdict", "reason")},
                                       ensure_ascii=False))
-    if args.annotate:
+    if getattr(args, "annotate", False):
         annotate(rows)
     print("못함 %d · 비슷 %d · 나음 %d · 측정 못함 %d" % (count[WORSE], count[SAME], count[BETTER], count[UNMEASURED]))
     if args.gate and count[WORSE]:
