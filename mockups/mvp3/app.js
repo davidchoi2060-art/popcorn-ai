@@ -19,7 +19,7 @@ const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const uiIcon=(name,cls='')=>'<img class="ui-icon '+cls+'" src="assets/icons/'+name+'.svg" alt="">';
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const money=value=>Number.isInteger(value)?value.toLocaleString('ko-KR')+'원':'금액 미확인';
-const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state;
+const flow=window.MVP3LiveFlow.createFlow(A,{onChange:render}),state=flow.state,keepUi=window.MVP3LiveFlow.createKeepUi(flow,document);
 // 대화 화면(talk.html)에서 넘어왔는지(talk.js FROM_TALK_KEY · 한 번 읽고 지운다). 넘어왔으면 「대화로 돌아가기」를
 // 보이고, 「부품 바꾸기」로 넘어왔으면 상세가 열린 뒤 부품 바꾸기 칸으로 옮긴다. 대화·견적은 같은 탭 보관으로 온다.
 const FROM_TALK_KEY='popcorn-mvp3-from-talk-v1';
@@ -403,17 +403,20 @@ function mallUrlOf(p){
   const h=state.handoff,q=state.savedQuote;
   return h&&q&&p===state.selected&&h.quote_id===q.id?M.safeUrl(h.mall_url):null;
 }
-function canSwapHere(p){return !mallUrlOf(p);}
+// 팝콘AI 가 직접 구성한 상품(서버가 ai_composed 로 확인해 준 것)만 우리 화면에서 부품을 바꾼다. 쇼핑몰 상품이 주소만 없다고 AI 구성으로 바꾸지 않는다 --
+// 주소가 없으면 「연결할 수 없음」으로 안내한다(2026-10-16 두 구매 흐름 기준).
+function canSwapHere(p){return p?.ai_composed===true;}
 let mallDlg=null;
 function closeMallDialog(){
-  if(!mallDlg)return;
-  const {el,opener,ordinal}=mallDlg;mallDlg=null;el.remove();document.removeEventListener('keydown',mallDlgKey,true);
-  let target=opener&&opener.isConnected?opener:null;
+  if(state.mall.step==='moving')return;
+  const had=mallDlg;flow.closeMall();     // 상태를 비우면 syncMallDialog 가 창을 지운다 -- 아래는 초점만 돌려준다
+  if(!had)return;
+  const {opener,ordinal}=had;let target=opener&&opener.isConnected?opener:null;
   if(!target&&ordinal!==undefined)target=[...document.querySelectorAll('[data-action=build-options],[data-action=mall-change]')].find(e=>e.dataset.ordinal===ordinal)||document.querySelector('[data-action=mall-change]');
   target?.focus({preventScroll:true});
 }
 function mallDlgKey(e){
-  if(!mallDlg)return;
+  if(!mallDlg?.el)return;
   if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeMallDialog();return;}
   if(e.key!=='Tab')return;
   const items=[...mallDlg.el.querySelectorAll('a[href],button:not([disabled])')];if(!items.length)return;
@@ -422,18 +425,48 @@ function mallDlgKey(e){
   else if(e.shiftKey&&now===first){e.preventDefault();last.focus();}
   else if(!e.shiftKey&&now===last){e.preventDefault();first.focus();}
 }
+// 「변경」을 누르면 이 창을 연다(팝콘PC 로 이동 안내). 문구 정본: 대표 전달 「화면별-문구-정본.csv」.
 function openMallDialog(opener){
-  const url=mallUrlOf(state.selected);if(!url||mallDlg)return;
-  const el=document.createElement('div');el.className='mall-dlg';el.dataset.mallDialog='';
-  el.innerHTML='<div class="mall-dlg-card" role="dialog" aria-modal="true" aria-labelledby="mall-dlg-title" aria-describedby="mall-dlg-desc"><h3 id="mall-dlg-title" tabindex="-1">부품 변경 안내</h3>'+
-    '<p id="mall-dlg-desc">이 PC는 팝콘PC 쇼핑몰에서 파는 구성 그대로 보여 드려요. 부품을 바꾸려면 팝콘PC 상품 페이지에서 이 추천 PC를 기준으로 변경해 주세요.</p>'+
-    '<p class="mall-dlg-ask">팝콘PC로 이관시켜 드릴까요?</p><div class="mall-dlg-actions"><a class="primary" data-mall-confirm href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">팝콘PC에서 변경하기</a>'+
-    '<button type="button" class="outline" data-action="mall-dialog-close">취소</button></div></div>';
-  el.addEventListener('click',e=>{if(e.target===el)closeMallDialog();});
-  el.querySelector('[data-mall-confirm]').addEventListener('click',()=>{setTimeout(closeMallDialog,0);});
-  document.body.append(el);mallDlg={el,opener,ordinal:opener?.dataset?.ordinal};
-  document.addEventListener('keydown',mallDlgKey,true);
-  el.querySelector('#mall-dlg-title').focus({preventScroll:true});
+  if(state.mall.open)return;
+  mallDlg={opener,ordinal:opener?.dataset?.ordinal};flow.openMall();
+}
+function mallDialogHtml(){
+  const m=state.mall,p=state.selected,url=mallUrlOf(p),h=state.handoff&&state.savedQuote&&state.handoff.quote_id===state.savedQuote.id?state.handoff:null;
+  const card=(title,inner)=>'<div class="mall-dlg-card" role="dialog" aria-modal="true" aria-labelledby="mall-dlg-title"><h3 id="mall-dlg-title" tabindex="-1">'+title+'</h3>'+inner+'</div>';
+  // 주소를 모르는 상품 -- 이동도 인계 기록도 만들지 않는다.
+  if(m.step==='ask'&&!url)
+    return card('상품 페이지를 확인하고 있어요.','<p id="mall-dlg-desc" data-mall-state="no-url">지금은 연결할 수 없어요. 상품 주소를 확인한 뒤 다시 안내해 드릴게요.</p><div class="mall-dlg-actions"><button type="button" class="outline" data-action="mall-dialog-close">닫기</button></div>');
+  if(m.step==='failed')
+    return card('상품 페이지를 열지 못했어요.','<p id="mall-dlg-desc" data-mall-state="failed">현재 구성은 그대로예요. 잠시 후 다시 시도해 주세요.'+(m.error?' ('+esc(m.error)+')':'')+'</p><div class="mall-dlg-actions"><button type="button" class="primary" data-action="mall-move">다시 연결하기</button><button type="button" class="outline" data-action="mall-dialog-close">취소</button></div>');
+  if(m.step==='moved'&&h){
+    const base=h.status==='가격변동'&&Number.isInteger(h.price_mall)?h.price_mall:h.price_quoted;
+    return card('팝콘PC에서 원하는 옵션을 선택해 주세요.','<p id="mall-dlg-desc" data-mall-state="moved">선택한 옵션에 따라 금액이 달라져요. 주문과 결제는 팝콘PC에서 진행해요.</p>'+
+      '<p class="mall-dlg-base"><strong>'+esc(p?.name||'')+'</strong><span>기본 구성 '+money(base)+'</span></p>'+
+      '<p class="mall-dlg-ho"><span>연결 번호</span><strong>'+esc(h.handoff_no)+'</strong></p>'+
+      (m.blocked?'<p class="warn-text" role="status">새 창이 열리지 않았어요. 아래 「상품 페이지 다시 보기」를 눌러 주세요.</p>':'')+
+      '<div class="mall-dlg-actions"><a class="primary" data-mall-reopen href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">상품 페이지 다시 보기</a>'+
+      '<button type="button" class="outline" data-action="mall-dialog-close">상세로 돌아가기</button></div><p class="muted mall-dlg-foot">주문이나 결제가 완료된 상태는 아니에요.</p>');
+  }
+  const busy=m.step==='moving';
+  return card('팝콘PC에서 부품을 변경해 주세요','<p id="mall-dlg-desc">이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요. 선택한 옵션에 따라 금액이 달라져요. 팝콘PC로 이동할까요?</p>'+
+    '<div class="mall-dlg-actions"><button type="button" class="primary" data-action="mall-move"'+(busy?' disabled':'')+'>'+(busy?'이동하는 중…':'팝콘PC로 이동')+'</button>'+
+    '<button type="button" class="outline" data-action="mall-dialog-close"'+(busy?' disabled':'')+'>취소</button></div>');
+}
+// 화면을 그릴 때마다 부른다. 안내창은 상태(state.mall)가 말하는 대로만 그린다.
+function syncMallDialog(){
+  const m=state.mall;
+  if(!m.open){if(mallDlg?.el){mallDlg.el.remove();document.removeEventListener('keydown',mallDlgKey,true);mallDlg.el=null;}return;}
+  mallDlg=mallDlg||{};
+  const key=m.step+'|'+m.blocked+'|'+(m.error||'')+'|'+(state.handoff?.handoff_no||'');
+  if(mallDlg.el&&mallDlg.key===key)return;
+  const fresh=!mallDlg.el;
+  if(fresh){
+    const el=document.createElement('div');el.className='mall-dlg';el.dataset.mallDialog='';
+    el.addEventListener('click',e=>{if(e.target===el)closeMallDialog();});
+    mallDlg.el=el;document.body.append(el);document.addEventListener('keydown',mallDlgKey,true);
+  }
+  mallDlg.key=key;mallDlg.el.innerHTML=mallDialogHtml();
+  mallDlg.el.querySelector('#mall-dlg-title').focus({preventScroll:true});
 }
 const SWAP_OF={CPU:'cpu',GPU:'gpu',RAM:'ram',SSD:'ssd'};
 const SWAP_BUTTONS=[['cpu','CPU','cpu'],['gpu','그래픽카드','graphics-card'],['ram','메모리','memory'],['ssd','저장장치','hard-drive']];
@@ -754,7 +787,7 @@ function renderFinal(){
     (handoffDone?'<a class="primary final-mall-link" href="'+esc(state.handoff.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰 상품 페이지 열기</a>':'')+
     '</div>'+handoffError()+'<small>'+(saved?'결제와 배송은 팝콘PC 쇼핑몰에서 진행돼요. 이 화면에서는 결제하지 않아요.':'주문 · 결제 · 가격 확정 · 재고 확보는 진행되지 않습니다. 견적을 저장하면 팝콘PC 쇼핑몰 구매로 이어갈 수 있어요.')+'</small></div></footer>'+
     // 쇼핑몰 연결과 구매 상담은 화면 폭 전체에 나란히 둔다(2026-10-12 사장님 「한쪽으로 쏠려 있고, 아래쪽에 있는지도 몰랐어」).
-    '<div class="final-next">'+(handoffDone?handoffPanel(state.handoff):'')+
+    '<div class="final-next">'+keepUi.panelHtml()+(handoffDone?handoffPanel(state.handoff):'')+
     (!state.inquiry.open&&!state.inquiry.done?'<section class="live-explanation live-inquiry live-inquiry-open"><h3>구매 상담 신청</h3><p class="muted">여러 대 구매 · 할인 · 세금계산서는 팝콘PC 담당자가 연락드려 안내해요.</p>'+button('구매 상담 신청하기','inquiry-open','outline',state.phase?'disabled':'')+'</section>':'')+
     inquiryPanel()+'</div>'+
     (state.savedQuote?'<p class="muted live-saved-note">저장일 '+esc(new Date(state.savedQuote.saved_at).toLocaleString('ko-KR'))+' · 이 브라우저의 보관 키로 접근합니다.</p>':'');
@@ -823,6 +856,7 @@ function render(){
   if(!(restoring&&state.screen==='welcome')){prepStarted=0;clearTimeout(prepTimer);}
   clearTimeout(retryTimer);if(state.error?.retryAt>Date.now())retryTimer=setTimeout(()=>render(),1000);
   settleArrival();
+  keepUi.sync();syncMallDialog();      // 안내창은 화면 위에 뜬다 -- 그린 뒤 마지막에 초점을 가져간다
 }
 // 「부품 전체 구성 확인 및 변경」(대화 화면 · 2026-10-12 중헌 님 고객단 5번)과 아래 「부품 바꾸기」가 여기로 온다.
 // 구성표가 공개된 PC 는 부품 구성 표(줄마다 「변경」)로, 아니면 다른 판매 PC 로 옮기는 부품 바꾸기 칸으로 옮긴다.
@@ -868,6 +902,7 @@ async function submit(text,{fromInput=false}={}){if(!String(text||'').trim()){no
 // 되돌리려면 DIRECT_ACTION 을 'gateway-direct' 로 바꾼다.
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;e.preventDefault();
+  if(keepUi.handle(b.dataset.action,b))return;
   switch(b.dataset.action){
     case 'gateway':showSurface('gateway');break;
     case 'gateway-use':draft.start_mode='use_first';showSurface('usage');break;
@@ -888,7 +923,6 @@ document.addEventListener('click',e=>{
     case 'edit':flow.navigate('detail');break;
     case 'results':flow.navigate('results');break;
     case 'back':back();break;
-    case 'save':void flow.save();break;
     case 'handoff':void window.MVP3LiveFlow.handoffAndOpen(flow,window);break;
     case 'inquiry-open':void flow.openInquiry({human:b.dataset.human==='1'});break;
     case 'part-options':void flow.openParts(b.dataset.slot);break;
@@ -896,6 +930,7 @@ document.addEventListener('click',e=>{
     case 'part-swap':flow.swapPart(Number(b.dataset.code));break;
     case 'mall-change':openMallDialog(b);break;
     case 'mall-dialog-close':closeMallDialog();break;
+    case 'mall-move':void window.MVP3LiveFlow.moveToMall(flow,window);break;
     case 'build-options':{if(!canSwapHere(state.selected)){openMallDialog(b);break;}if(b.dataset.retry)flow.state.build.error='';void flow.openBuild(Number(b.dataset.ordinal));break;}
     case 'build-close':flow.closeBuild();break;
     case 'build-pick':void flow.pickBuild(Number(b.dataset.code));break;

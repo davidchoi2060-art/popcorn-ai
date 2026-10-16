@@ -9,7 +9,7 @@ const base=path.resolve(__dirname,'..'),read=n=>fs.readFileSync(path.join(base,n
 const tick=()=>new Promise(r=>setImmediate(r));
 async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 const qid='44444444-4444-4444-8444-444444444444';
-const pc=(code,price,extra={})=>({product_code:code,name:'PC '+code,price,price_src:'현재 판매가',spec:{cpu:'i5-14400F',gpu:'RTX 5060 8GB',ram_gb:16,ssd_gb:500,vram_gb:8},reasons:['게임 FHD'],over_budget:false,...extra});
+const pc=(code,price,extra={})=>({product_code:code,name:'PC '+code,price,price_src:'현재 판매가',spec:{cpu:'i5-14400F',gpu:'RTX 5060 8GB',ram_gb:16,ssd_gb:500,vram_gb:8},reasons:['게임 FHD'],over_budget:false,ai_composed:true,...extra});
 const talkState={usages:['게임'],budget_won:1500000,budget_bound:'이하',game:{names:['배그']}};
 const reco={ok:true,assumed:[],anchor_code:12,wants:{},card_sets:[{kind:'sold',usage:'게임',usage_grid:'게임',items:[pc(12,1300000,{tag:'추천 구성',role:'recommended'})]}],talk_notes:[],choices:[]};
 const swapped=pc(22,1350000,{tag:'고른 구성',role:'chosen',spec:{cpu:'i5-14400F',gpu:'RTX 5060 8GB',ram_gb:32,ssd_gb:500,vram_gb:8},
@@ -32,6 +32,7 @@ function harness({options=[swapped,bigger],fail=false}={}){
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:
       url==='/api/grid/recommend'?reco:
       url==='/api/mvp3/part-options'?{ok:true,slot:body.slot,label:'메모리',current:'16GB',base_code:body.product_code,base_price:1300000,options}:
+      url==='/api/mvp3/contact'?{ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'}:
       url==='/api/mvp3/saved-quotes'&&init.method==='POST'?{ok:true,quote:{id:qid,product:{...swapped,swap:undefined},state:talkState,saved_at:'2026-10-11T00:00:00Z'}}:
       url.endsWith('/handoff')?{ok:true,handoff_no:'HO-3001',quote_id:qid,product_code:22,name:'PC 22',price_quoted:1350000,price_mall:1350000,mall_status:'확인됨',mall_url:MALL}:
       {ok:true,quotes:[],has_more:false};
@@ -83,6 +84,7 @@ test('ram options come from the server and swapping changes product, price and w
     d.querySelector('#actions [data-action=final]').click();
     await until(()=>h.flow.state.screen==='final'&&d.querySelector('[data-action=save]'));
     d.querySelector('[data-action=save]').click();
+    await until(()=>d.querySelector('[data-kact=submit]'));d.querySelector('[data-kact=submit]').click();
     await until(()=>h.flow.state.saveState==='saved'&&d.querySelector('[data-action=handoff]'));
     const save=h.calls.find(c=>c.url==='/api/mvp3/saved-quotes'&&c.method==='POST');
     assert.equal(save.body.product_code,22);assert.equal(save.body.expected_price,1350000);assert.deepEqual(save.body.state,talkState);

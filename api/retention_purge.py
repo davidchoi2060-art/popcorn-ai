@@ -8,6 +8,8 @@
     talk_reply        talk_reply_reviews.ai_reply · shown_reply · answer   purge_at
     inquiry_contact   purchase_inquiries.contact_name · phone · email · message
                       (+ contact_purged_at 에 지운 시각)              purge_at
+    visitor_contact   mvp3_visitor_contacts.contact_name · phone · email (0158, 견적 보관 연락처)
+                      (+ contact_purged_at 에 지운 시각)              purge_at
 
 운영자 메모(`memo`)는 고객이 쓴 글이 아니라 지우지 않는다. 다만 구매 상담 메모에 옮겨 적힌
 연락처는 기한이 지나면 가린다(inquiry_memo, `_mask_memos`).
@@ -52,6 +54,10 @@ TARGETS = (
      "purchase_inquiries WHERE purge_at <= :now AND contact_purged_at IS NULL",
      "contact_name = NULL, contact_phone = NULL, contact_email = NULL, message = NULL,"
      " contact_purged_at = :now"),
+    # 견적 보관 때 받은 방문자 연락처(0158). 줄은 남기고 값만 비운다 -- 보관 기한은 등록·변경 때마다 새로 잡힌다.
+    ("visitor_contact",
+     "mvp3_visitor_contacts WHERE purge_at <= :now AND contact_purged_at IS NULL",
+     "contact_name = NULL, contact_phone = NULL, contact_email = NULL, contact_purged_at = :now"),
 )
 
 

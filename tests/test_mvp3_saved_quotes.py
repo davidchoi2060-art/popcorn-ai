@@ -46,13 +46,23 @@ class Result:
 
 
 class Store:
-    def __init__(self): self.rows = []; self.executed = []
+    def __init__(self):
+        self.rows = []; self.executed = []
+        # 방문자 연락처(mvp3_visitor_contacts) -- 기본은 이미 등록된 방문자(기존 검사들이 연락처 없이도 보관되던 때와 같다)
+        self.contact = {'contact_phone': '010-1234-5678', 'contact_name': None, 'contact_email': None,
+                        'consent_at': datetime.now(timezone.utc), 'purge_at': datetime.now(timezone.utc)}
     @contextmanager
     def begin(self): yield self
     def execute(self, sql, p):
         sql = str(sql); self.executed.append((sql, p))
         if 'rate_limit_policies' in sql:
             return Result([])
+        if 'mvp3_visitor_contacts' in sql:
+            if sql.lstrip().upper().startswith('INSERT'):
+                self.contact = {'contact_phone': p['p'], 'contact_name': p['n'], 'contact_email': p['e'],
+                                'consent_at': p['now'], 'purge_at': p['purge'], 'consent_text': p['t']}
+                return Result([])
+            return Result([self.contact] if self.contact else [])
         if 'INSERT INTO' in sql:
             import json
             if not any(r['user_id'] == p['u'] and r['owner_key_hash'] == p['owner'] and r['request_id'] == p['r'] for r in self.rows):

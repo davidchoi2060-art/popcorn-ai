@@ -11,7 +11,7 @@ const tick=()=>new Promise(r=>setImmediate(r));
 async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 function storage(){const map=new Map();return {getItem:k=>map.get(k)??null,setItem:(k,v)=>map.set(k,v),removeItem:k=>map.delete(k),key:i=>[...map.keys()][i]??null,get length(){return map.size;}};}
 const talkState={usages:['게임'],budget_won:1500000,budget_bound:'이하'};
-const pc=(code,price,extra={})=>({product_code:code,name:'CODE/MOCK PC '+code,price,price_src:'현재 판매가',spec:{cpu:'CPU',gpu:'RTX 5060 8GB',ram_gb:16,ssd_gb:500,vram_gb:8},reasons:['CODE/MOCK 이유'],tag:'추천',...extra});
+const pc=(code,price,extra={})=>({product_code:code,name:'CODE/MOCK PC '+code,price,price_src:'현재 판매가',spec:{cpu:'CPU',gpu:'RTX 5060 8GB',ram_gb:16,ssd_gb:500,vram_gb:8},reasons:['CODE/MOCK 이유'],tag:'추천',ai_composed:true,...extra});
 const reco={ok:true,assumed:[],needs:[],card_sets:[{kind:'sold',usage:'게임',items:[pc(12,1300000),pc(13,1400000)]}]};
 // GPU 만 다른 판매 PC. 추천 목록에는 없다 -- 돌아갈 때 부품 바꾸기 선택지에서 다시 찾아야 한다.
 const swapped=pc(22,1450000,{spec:{cpu:'CPU',gpu:'RTX 5070 12GB',ram_gb:16,ssd_gb:500,vram_gb:12},swap:{slot:'gpu',value:'RTX 5070 12GB',price_diff:150000,also:[]}});

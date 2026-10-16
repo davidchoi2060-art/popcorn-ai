@@ -9,7 +9,7 @@ const money=v=>Number.isInteger(v)?v.toLocaleString('ko-KR')+'원':'금액 미�
 const button=(label,action,cls='',data='')=>'<button type="button" class="'+cls+'" data-action="'+action+'" '+data+'>'+label+'</button>';
 const MAX_TEXT=20000;
 const log=$('#tk-log'),panel=$('#tk-now-body'),input=$('#tk-input'),status=$('#tk-status');
-const flow=LF.createFlow(A,{onChange:render,keepCurrent:true}),state=flow.state;
+const flow=LF.createFlow(A,{onChange:render,keepCurrent:true}),state=flow.state,keepUi=LF.createKeepUi(flow,document);
 // 새로고침 전에 보던 구성을 다시 연 경우. 그 전에 보관했는지는 이 탭이 모르므로 「아직 저장하지 않았어요」라고 단정하지 않는다.
 let resumed=false;
 // 첫 화면 시작 단추(코덱스 1816 보강6 의견 v1 §2 — 입구는 하나, 안에 시작 단추 셋). 문구는 여기 한곳에서 바꾼다.
@@ -222,6 +222,7 @@ function renderPanel(){
         button(saved?'저장 완료':state.phase==='save'?'저장하는 중…':'견적 저장','save','primary',busy||saved||state.needsRefresh||!!state.pendingSave||!!state.pendingProblem||!Number.isInteger(p.price)?'disabled':''))+'</div>';
     if(saved){
       const h=state.handoff?.quote_id===state.savedQuote.id?state.handoff:null;
+      html+=keepUi.panelHtml();
       html+='<div class="tk-buy">'+(h?'<a class="primary tk-link" href="'+esc(h.mall_url)+'" target="_blank" rel="noopener noreferrer">쇼핑몰에서 구매 이어가기</a>'+
         // 쇼핑몰 상품 페이지는 기본 구성이다 -- 바꾼 부품은 연결 번호로만 전해진다(옛 화면 app.js 와 같은 안내).
         (h.changes?'<p class="warn-text">쇼핑몰 상품 페이지는 기본 구성 기준이에요. 바꾼 부품 '+esc(h.changes)+'개는 연결 번호 '+esc(h.handoff_no)+'로 기록해 두었어요. 주문할 때 요청사항에 이 번호를 적어 주세요.</p>':'')+
@@ -252,6 +253,7 @@ function render(){
   status.textContent=busy;status.hidden=!busy;
   $('#tk-send').disabled=!!state.phase;
   $('#tk-old').href='index.html#'+oldScreen();
+  keepUi.sync();
 }
 
 // 기존 상담 화면(index.html)으로 넘어간다. 대화·조건·지금 견적은 같은 탭 보관(CONVERSATION_KEY)으로 넘어가고,
@@ -287,6 +289,7 @@ function count(){const n=input.value.length;$('#tk-count').textContent=n>1000?n.
 
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;
+  if(keepUi.handle(b.dataset.action,b))return;
   switch(b.dataset.action){
     case 'starter':{
       const t=STARTERS.find(x=>x.key===b.dataset.entry);if(!t)break;
@@ -301,7 +304,6 @@ document.addEventListener('click',e=>{
       if(state.selected&&!confirm('상세를 열면 지금 견적이 「'+x.name+'」 구성으로 바뀌어요. 계속할까요?'))break;
       flow.select(i);if(state.selected)goDetail();break;}
     case 'open-detail':if(state.selected)goDetail(b.dataset.focus);break;
-    case 'save':void flow.save();break;
     case 'reprice':void flow.reprice();break;
     case 'handoff':void LF.handoffAndOpen(flow,window);break;
     case 'retry':void flow.retry();break;

@@ -96,7 +96,12 @@ class PurgeOnPostgres(unittest.TestCase):
                 'CREATE TABLE purchase_inquiries (inquiry_id BIGSERIAL PRIMARY KEY, contact_name VARCHAR(30),'
                 ' contact_phone VARCHAR(20), contact_email VARCHAR(120), message TEXT, memo TEXT,'
                 ' purge_at TIMESTAMPTZ NOT NULL,'
-                ' CHECK(contact_phone IS NOT NULL OR contact_email IS NOT NULL))'):
+                ' CHECK(contact_phone IS NOT NULL OR contact_email IS NOT NULL))',
+                # 0158 의 해당 칸만(방문자 연락처 -- users FK 는 이 격리 스키마에 두지 않는다)
+                'CREATE TABLE mvp3_visitor_contacts (user_id BIGINT PRIMARY KEY, contact_phone VARCHAR(20),'
+                ' contact_name VARCHAR(30), contact_email VARCHAR(120), purge_at TIMESTAMPTZ NOT NULL,'
+                ' contact_purged_at TIMESTAMPTZ,'
+                ' CHECK(contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL))'):
                 c.execute(text(stmt))
             _migration_mod = _migration()
             with patch.object(_migration_mod, 'op', _Op(c)):
@@ -111,6 +116,8 @@ class PurgeOnPostgres(unittest.TestCase):
             c.execute(text("INSERT INTO purchase_inquiries (contact_name, contact_phone, contact_email, message,"
                            " memo, purge_at) VALUES ('홍', '010', NULL, '문의', '010-1234-5678 로 연락함', :p),"
                            " ('김', NULL, 'a@b.c', '문의', NULL, :f)"), {'p': past, 'f': future})
+            c.execute(text("INSERT INTO mvp3_visitor_contacts (user_id, contact_phone, contact_name, purge_at)"
+                           " VALUES (1, '010-1234-5678', '옛', :p), (2, '010-2222-3333', '새', :f)"), {'p': past, 'f': future})
         self.patch = patch.object(RP, 'engine', self.engine)
         self.patch.start()
 
@@ -127,7 +134,7 @@ class PurgeOnPostgres(unittest.TestCase):
 
     def test_dry_run_counts_only_and_records(self):
         res = RP.purge('manual', apply=False, now=self.NOW)
-        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'inquiry_memo': 1})
+        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'visitor_contact': 1, 'inquiry_memo': 1})
         self.assertTrue(res['dry_run'])
         self.assertEqual(self.q('SELECT count(*) FROM talk_intent_hits WHERE raw_text IS NOT NULL')[0][0], 2)
         self.assertEqual(self.q('SELECT count(*) FROM purchase_inquiries WHERE contact_purged_at IS NULL')[0][0], 2)
@@ -136,7 +143,7 @@ class PurgeOnPostgres(unittest.TestCase):
 
     def test_apply_clears_only_expired_values(self):
         res = RP.purge('manual', apply=True, now=self.NOW)
-        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'inquiry_memo': 1})
+        self.assertEqual(res['counts'], {'talk_raw': 1, 'talk_reply': 1, 'inquiry_contact': 1, 'visitor_contact': 1, 'inquiry_memo': 1})
         self.assertEqual(self.q('SELECT hit_id, raw_text FROM talk_intent_hits ORDER BY hit_id'),
                          [(1, None), (2, '새 질문'), (3, None)])
         self.assertEqual(self.q('SELECT hit_id, ai_reply, shown_reply, answer, memo FROM talk_reply_reviews'
@@ -152,12 +159,20 @@ class PurgeOnPostgres(unittest.TestCase):
         self.assertIsNone(rows[1][5])
         # 다시 돌리면 지울 것이 없다
         self.assertEqual(RP.purge('manual', apply=True, now=self.NOW)['counts'],
-                         {'talk_raw': 0, 'talk_reply': 0, 'inquiry_contact': 0, 'inquiry_memo': 0})
+                         {'talk_raw': 0, 'talk_reply': 0, 'inquiry_contact': 0, 'visitor_contact': 0, 'inquiry_memo': 0})
         # 비운 뒤 운영자가 메모에 연락처를 다시 적어도 다음 실행이 가린다
         with self.engine.begin() as c:
             c.execute(self.text("UPDATE purchase_inquiries SET memo = 'a@b.co 재연락' WHERE inquiry_id = 1"))
         self.assertEqual(RP.purge('manual', apply=True, now=self.NOW)['counts']['inquiry_memo'], 1)
         self.assertNotIn('a@b.co', self.q('SELECT memo FROM purchase_inquiries WHERE inquiry_id = 1')[0][0])
+
+    def test_visitor_contact_values_cleared_row_kept(self):
+        RP.purge('manual', apply=True, now=self.NOW)
+        rows = self.q('SELECT user_id, contact_phone, contact_name, contact_purged_at FROM mvp3_visitor_contacts'
+                      ' ORDER BY user_id')
+        self.assertEqual(rows[0], (1, None, None, self.NOW))
+        self.assertEqual(rows[1][:3], (2, '010-2222-3333', '새'))
+        self.assertIsNone(rows[1][3])
 
     def test_contact_check_still_guards_live_rows(self):
         from sqlalchemy.exc import IntegrityError

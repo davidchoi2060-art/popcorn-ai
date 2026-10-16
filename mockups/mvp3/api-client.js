@@ -9,7 +9,10 @@
     const code=typeof value?.error==='string'?value.error:'';
     // 부품 직접 바꾸기는 서버가 고객에게 보일 이유(호환 실패 · 구성 비공개 · 판매 중 아님)를 문장으로 준다.
     if(path.startsWith('/api/mvp3/build/')&&[404,409,422].includes(status)&&typeof detail==='string'&&detail.length<=200)return detail;
-    if(status===422&&typeof detail==='string'&&detail.length<=120)return detail;
+    // 연락처·상담 신청 접수는 서버가 고객에게 보일 이유를 문장으로 준다(연락처 없음 · 형식 · 견적을 찾지 못함).
+    const sentence=typeof detail==='string'?detail:typeof detail?.detail==='string'?detail.detail:'';
+    if(/^\/api\/mvp3\/(contact|purchase-inquiries\/from-quote)$/.test(path)&&[404,409,422,429].includes(status)&&sentence&&sentence.length<=200)return sentence;
+    if(status===422&&sentence&&sentence.length<=200)return sentence;
     if(status===429)return '요청이 많아 잠시 기다려야 해요. 잠시 후 다시 시도해주세요.';
     if(status===409)return '상품 가격이나 추천 조건이 달라졌어요. 최신 추천을 다시 확인해주세요.';
     if(status===401||status===403)return '이 브라우저의 보관 기록에 접근할 수 없어요. 보관 키와 브라우저 설정을 확인해주세요.';
@@ -44,8 +47,9 @@
     }
     const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&(['/api/talk/parse','/api/talk/answer','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote'].includes(path)||HANDOFF_RE.test(path)))
-        ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'));
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/talk/answer','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/purchase-inquiries/from-quote','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote'].includes(path)||HANDOFF_RE.test(path)))
+        ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'||path==='/api/mvp3/contact'))
+        ||(method==='PUT'&&path==='/api/mvp3/contact');
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
       if(!fetchImpl)throw new ApiError('서버 연결을 사용할 수 없어요.',0,'network');
       const controller=new AbortController(), signal=options.signal;
@@ -54,7 +58,8 @@
       let timedOut=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},options.timeoutMs||60000);
       try{
         const headers=body?{'Content-Type':'application/json'}:{};
-        if(path.startsWith('/api/mvp3/saved-quotes'))headers['X-Access-Key']=guestKey(options.existingKeyOnly===true);
+        // 보관 견적·연락처·견적으로 상담 신청 접수는 같은 보관 키로 이 브라우저의 것임을 서버가 확인한다.
+        if(path.startsWith('/api/mvp3/saved-quotes')||path==='/api/mvp3/contact'||path==='/api/mvp3/purchase-inquiries/from-quote')headers['X-Access-Key']=guestKey(options.existingKeyOnly===true);
         const response=await fetchImpl(path,{method,headers,credentials:'same-origin',cache:'no-store',signal:controller.signal,...(body?{body:JSON.stringify(body)}:{})});
         const retryOf=value=>{const rawRetry=response.headers?.get('Retry-After');return Number(rawRetry)||Math.max(0,(Date.parse(rawRetry)-Date.now())/1000)||Number(value?.retry_after_sec)||0;};
         let data;try{data=await response.json();}catch(error){
@@ -115,7 +120,12 @@
       buildQuote:(state,productCode,changes,options)=>request('POST','/api/mvp3/build/quote',{state,product_code:productCode,changes},options),
       // 구매 상담 신청(api/mvp3_purchase_inquiry.py). 연락처를 남길 뿐 주문·결제는 하지 않는다.
       inquiryForm:options=>request('GET','/api/mvp3/purchase-inquiries/form',null,options),
-      inquiry:(payload,options)=>request('POST','/api/mvp3/purchase-inquiries',payload,options)};
+      inquiry:(payload,options)=>request('POST','/api/mvp3/purchase-inquiries',payload,options),
+      // 연락처(api/mvp3_quote_consult): 처음 보관할 때 한 번만 받는다. 응답에는 가린 번호만 온다.
+      contact:options=>request('GET','/api/mvp3/contact',null,options),
+      saveContact:(payload,options)=>request('PUT','/api/mvp3/contact',payload,{...options,existingKeyOnly:true}),
+      // 보관 견적 + 등록 연락처로 상담 신청 접수. 같은 견적은 서버가 한 건만 만든다.
+      consultFromQuote:(quoteId,message,options)=>request('POST','/api/mvp3/purchase-inquiries/from-quote',{quote_id:String(quoteId).toLowerCase(),...(message?{message}:{})},{...options,existingKeyOnly:true})};
   }
   const exported={ApiError,createClient,errorMessage,KEY};
   if(typeof module!=='undefined')module.exports=exported;else root.MVP3Api={...exported,...createClient()};

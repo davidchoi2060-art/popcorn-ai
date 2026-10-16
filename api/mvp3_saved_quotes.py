@@ -2,15 +2,17 @@
 import hashlib
 import json
 import re
+from typing import Literal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_quantity, visitor
+from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_contact, mvp3_quantity, visitor
 from .sold_reco import public_spec
 from .db import engine
+from .recommend import _resolve_data_origin
 from .talk_schema import load_vocab, validate_state
 from .timeutil import iso
 
@@ -39,6 +41,12 @@ class SaveBody(BaseModel):
     changes: list[mvp3_build.Change] = Field(default_factory=list, max_length=mvp3_build.MAX_CHANGES)
     # 같은 구성을 몇 대 사나(2026-10-12 중헌 님 7번). 금액(price)은 한 대 값 그대로 두고 대수만 함께 보관한다.
     sets: StrictInt = Field(default=1, ge=1, le=mvp3_quantity.MAX_SETS)
+    # 연락처(2026-10-16 대표 지시): 이 방문자에게 유효한 연락처가 없으면 보관하려면 전화번호 + 동의가 필요하다.
+    # 있으면 보내지 않아도 된다(재사용). 연락처는 지문(fingerprint)에 넣지 않는다 -- 같은 요청의 재전송은 연락처 없이도 같은 결과다.
+    contact: mvp3_contact.ContactIn | None = None
+    # 'handoff' = 쇼핑몰 상품 「팝콘PC로 이동」을 위해 인계 기록에 걸 견적을 조용히 보관한다(고객이 견적 보관을 누른 것이 아니다).
+    # 연락처를 받지도 쓰지도 않는다. 상담 신청은 연락처가 있어야 하므로(from-quote) 이 견적으로 상담을 신청하면 그때 묻는다.
+    purpose: Literal['keep', 'handoff'] = 'keep'
 
 
 def same_origin(request):
@@ -50,6 +58,8 @@ def same_origin(request):
 
 def fingerprint(body):
     dump = body.model_dump(mode='json')
+    dump.pop('contact', None)         # 연락처·목적은 견적 내용이 아니다 -- 지문에 넣으면 재전송이 다른 요청이 된다
+    dump.pop('purpose', None)
     if not dump.get('changes'):
         dump.pop('changes', None)     # 부품을 바꾸지 않은 저장은 예전과 같은 지문이다
     for c in dump.get('changes') or []:
@@ -145,14 +155,21 @@ def save_quote(body: SaveBody, request: Request, response: Response):
             if previous['request_basis'] != basis:
                 raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
             quote = render_quote(previous)
+            contact_row = mvp3_contact.current(conn, uid)
         else:
+            contact_row = mvp3_contact.current(conn, uid)
+            if body.purpose == 'keep':
+                if body.contact is not None:
+                    mvp3_contact.clean(body.contact)         # 형식·동의가 틀리면 한도를 쓰기 전에 422
+                elif contact_row is None:
+                    raise mvp3_contact.required_error()      # 연락처 없이 처음 보관하는 요청
             # Idempotent replays above are free; only new saves count.
             access_gate.check_rate(conn, request, what='mvp3.save', policy_key=SAVE_POLICY_KEY,
                                    default_per_minute=SAVE_PER_MINUTE, default_per_day=SAVE_PER_DAY,
                                    messages=SAVE_LIMIT_MESSAGES)
             state, _ = validate_state(body.state, load_vocab(conn))
     if previous:
-        return {'ok': True, 'quote': with_live_offer([quote])[0]}
+        return {'ok': True, 'quote': with_live_offer([quote])[0], 'contact': mvp3_contact.view(contact_row)}
     if body.changes:
         product = built_product(state.model_dump(), body)
     else:
@@ -179,6 +196,13 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         # Recheck the opaque owner cookie in the insertion transaction.
         if visitor.resolve(conn, request) != uid:
             raise HTTPException(403, '견적 보관 연결이 변경되었습니다.')
+        if body.purpose == 'keep':
+            # 연락처 등록(또는 변경)은 견적 보관과 같은 트랜잭션이다 -- 한쪽만 남지 않는다.
+            if body.contact is not None:
+                mvp3_contact.upsert(conn, uid, body.contact, _resolve_data_origin(request))
+            elif mvp3_contact.current(conn, uid) is None:
+                raise mvp3_contact.required_error()          # 그 사이 기한이 지난 경우
+            contact_row = mvp3_contact.current(conn, uid)
         conn.execute(text('''INSERT INTO mvp3_saved_recommendations
           (quote_id,user_id,owner_key_hash,request_id,request_basis,product_snapshot,talk_state)
           VALUES (:id,:u,:owner,:r,:basis,CAST(:product AS jsonb),CAST(:state AS jsonb))
@@ -188,7 +212,7 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         if row['request_basis'] != basis:
             raise HTTPException(409, '같은 저장 요청의 내용이 달라졌습니다.')
         quote = render_quote(row)
-    return {'ok': True, 'quote': with_live_offer([quote])[0]}
+    return {'ok': True, 'quote': with_live_offer([quote])[0], 'contact': mvp3_contact.view(contact_row)}
 
 
 def built_product(state_raw, body):
