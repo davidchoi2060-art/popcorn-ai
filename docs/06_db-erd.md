@@ -1953,3 +1953,22 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 ### 36. 상담 해석 바로잡기 — 시험 기록 (2026-10-11, 0154)
 
 `talk_text_fixes` 에 `tested_sig`(VARCHAR(120)) · `tested_at`(TIMESTAMPTZ) · `tested_by`(BIGINT)를 더한다. 저장된 규칙을 시험(`POST /api/admin/talk-text-fixes/try` 에 `fix_id`)해 그 규칙이 문장에 실제로 맞았을 때만 값의 지문(표현 · 종류 · 예산 · 경계 · 해상도, 메모 제외)을 남긴다. 새 규칙은 «미사용»으로만 만들고, «사용»으로 올리려면 지금 값의 지문이 `tested_sig` 와 같아야 한다(코덱스 검수 #111). 이미 «사용»인 규칙은 값을 바꾸지 않으면 그대로 저장할 수 있다. 기존 행은 바꾸지 않는다.
+
+### 37. 방문자 연락처 `mvp3_visitor_contacts` (2026-10-16, 0158)
+
+고객 화면(mvp3)에서 견적을 처음 보관할 때 받는 전화번호(필수)·이름(선택)·이메일(선택)을 **방문자 한 명에 한 줄** 둔다. 같은 방문자의 다음 견적은 이 줄을 재사용하고 연락처를 견적마다 복제하지 않는다. 견적 보관만으로는 상담 신청이 생기지 않는다 — 상담 신청(`purchase_inquiries`)은 고객이 「상담 신청 접수」를 눌렀을 때만 이 줄의 연락처를 복사해 별도로 만든다.
+
+| 컬럼 | 타입 | 설명 |
+|---|---|---|
+| user_id | BIGINT PK FK `users` | `visitor.resolve` 가 돌려주는 방문자 번호. 한 방문자에 한 줄 |
+| contact_phone | VARCHAR(20) | 전화번호. 보관 기한이 지나 비우면 NULL |
+| contact_name | VARCHAR(30) | 이름(선택) |
+| contact_email | VARCHAR(120) | 이메일(선택) |
+| consent_at | TIMESTAMPTZ | 개인정보 수집·이용 동의 시각 |
+| consent_text | TEXT | 동의한 문구 그대로(서버 상수의 그 시점 값) |
+| data_origin | VARCHAR(8) | `real` · `test` |
+| created_at · updated_at | TIMESTAMPTZ | |
+| purge_at | TIMESTAMPTZ | 보관 기한. 등록·변경할 때마다 지금 + 180일로 새로 잡는다 |
+| contact_purged_at | TIMESTAMPTZ | 연락처를 비운 시각 |
+
+CHECK: `contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL`. 기한이 지난 줄은 「없는 것」으로 읽는다(`purge_at > now() AND contact_purged_at IS NULL`일 때만 유효). 일일 지우기 작업(`api/retention_purge.py`)이 `visitor_contact` 대상으로 기한 지난 줄의 값을 비우고 `contact_purged_at` 을 채운다 — 줄은 지우지 않는다. 기한 180일은 `purchase_inquiries` 와 같은 값(`api/mvp3_contact.KEEP_DAYS`)이며, 새 보관 연락처 전체에 이 기한과 동의 문구를 적용해도 되는지는 운영 정책 확인이 필요하다. downgrade 는 줄이 하나라도 있으면 거부한다.

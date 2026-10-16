@@ -11,7 +11,7 @@ const item={product_code:98149,name:'CODE/MOCK 골드 PC',price:1585100,price_sr
 const CHANGED='쇼핑몰 현재 가격이 1,585,100원에서 1,624,400원으로 바뀌었습니다. 바뀐 가격으로 보관했습니다.';
 const UNCHECKED='현재 가격 확인이 안 되어 쇼핑몰에서 최종 확인됩니다';
 const tick=()=>new Promise(r=>setImmediate(r));
-async function until(check){for(let n=0;n<80;n++){if(check())return;await tick();}throw Error('render did not settle');}
+async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 function harness(saved){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
@@ -23,6 +23,7 @@ function harness(saved){
     let data;
     if(url==='/api/talk/parse')data={ok:true,state:talk,history:[],missing:[]};
     else if(url==='/api/grid/recommend')data={ok:true,card_sets:[{kind:'sold',usage:'사무용',items:[item]}]};
+    else if(options.method==='GET'&&url==='/api/mvp3/contact')data={ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'};
     else if(options.method==='POST'&&url==='/api/mvp3/saved-quotes')data={ok:true,quote:{id:qid,product:saved(body),state:body.state,saved_at:'2026-10-11T01:00:00Z'}};
     else data={ok:true,quotes:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
@@ -35,6 +36,7 @@ function harness(saved){
 async function save(h){
   await h.flow.submit('CODE/MOCK 사무용');await until(()=>h.doc.querySelector('[data-action=detail]'));
   h.click('[data-action=detail]');h.click('[data-action=final]');h.click('[data-action=save]');
+  await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');
   await until(()=>h.flow.state.phase===null&&h.flow.state.saveState!=='saving');
 }
 async function run(saved,body){

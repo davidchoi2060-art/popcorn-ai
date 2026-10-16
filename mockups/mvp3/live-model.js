@@ -182,7 +182,9 @@
       price_src:text(value.price_src),spec:publicSpec(value.spec),reasons:Array.isArray(value.reasons)?value.reasons.filter(x=>typeof x==='string'):[],
       mall_url:safeUrl(value.mall_url),level:text(value.level),tag:text(value.tag),role:productRole(value),over_budget:value.over_budget===true,
       public_configuration:publicConfiguration(value.public_configuration,value.product_code),build:build(value.build),
-      ...(Number.isSafeInteger(value.sets)&&value.sets>1&&value.sets<=10?{sets:value.sets}:{})};
+      ...(Number.isSafeInteger(value.sets)&&value.sets>1&&value.sets<=10?{sets:value.sets}:{}),
+      // 서버가 「팝콘AI 가 직접 구성한 상품」이라고 확인해 준 것만 true -- 이것만 우리 화면에서 부품을 바꾼다(쇼핑몰 상품은 팝콘PC 로 이동).
+      ...(value.ai_composed===true?{ai_composed:true}:{})};
   }
   // 부품 직접 바꾸기(api/mvp3_build): 같은 PC 의 구성표에서 바꾼 줄들. 금액·차액은 서버가 준 값만 쓴다.
   function buildPart(v){

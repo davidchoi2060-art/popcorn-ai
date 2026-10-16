@@ -24,6 +24,7 @@ from sqlalchemy import text
 
 from . import access_gate, visitor
 from .db import engine
+from .mvp3_contact import EMAIL_RE, KEEP_DAYS, PHONE_RE   # 정규식·보관 기한은 한 곳(mvp3_contact)
 from .mvp3_saved_quotes import same_origin
 from .recommend import _resolve_data_origin
 
@@ -31,7 +32,6 @@ router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
 log = logging.getLogger(__name__)      # ASCII only (server stdout is cp949)
 
 TOPICS = ('여러 대 구매', '할인', '세금계산서·영수증', '주문 희망', '기타')
-KEEP_DAYS = 180
 POLICY_KEY = 'visitor.purchase_inquiry'
 PER_MINUTE = 3
 PER_DAY = 10
@@ -39,8 +39,6 @@ LIMIT_MESSAGES = {
     'minute': '잠시 동안 신청이 많았습니다. {retry_after_sec}초 후 다시 시도해 주세요.',
     'day': '오늘 남길 수 있는 구매 상담 신청 수에 도달했습니다. 내일 다시 시도해 주세요.',
 }
-PHONE_RE = re.compile(r'^0\d{1,2}-?\d{3,4}-?\d{4}$')
-EMAIL_RE = re.compile(r'^[^@\s]{1,64}@[^@\s]{1,100}\.[^@\s]{2,}$')
 CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다.'
                 % KEEP_DAYS)
 

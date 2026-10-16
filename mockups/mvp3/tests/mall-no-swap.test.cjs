@@ -31,6 +31,7 @@ function harness(product=pc){
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
   const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   w.HTMLElement.prototype.scrollIntoView=function(){};
+  const tabs=[];w.open=()=>{const t={opener:{},closed:false,location:{href:''},document:{title:''},close(){t.closed=true;}};tabs.push(t);return t;};
   Object.defineProperty(w,'crypto',{value:webcrypto});w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
   w.eval(read('live-model.js'));w.eval(read('api-client.js'));
   const card={...reco,card_sets:[{kind:'sold',usage:'게임',usage_grid:'게임',items:[product]}]};
@@ -40,6 +41,8 @@ function harness(product=pc){
       url==='/api/grid/recommend'?card:
       url==='/api/mvp3/saved-quotes'&&init.method==='POST'?{ok:true,quote:{id:qid,product,state:talkState,saved_at:'2026-10-11T00:00:00Z'}}:
       url==='/api/mvp3/build/options'?{ok:true,base_code:12,ordinal:1,slot:'RAM',label:'메모리',quantity:2,current:{product_code:501,name:'램 16GB',price:60000},total:1300000,checked:1,untested:0,note:'',options:[{product_code:502,name:'램 32GB',price:110000,price_diff:100000,total:1400000}]}:
+      url==='/api/mvp3/contact'?{ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'}:
+      url.endsWith('/handoff')?{ok:true,handoff_no:'HO-5001',quote_id:qid,product_code:12,name:'PC 12',price_quoted:1300000,price_mall:1300000,mall_status:'확인됨',mall_url:MALL,changes:[]}:
       url==='/api/mvp3/inquiry-form'||url.includes('purchase-inquiry/form')?{ok:true,topics:['기타'],consent_text:'동의'}:
       {ok:true,quotes:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
@@ -47,7 +50,7 @@ function harness(product=pc){
   const create=w.MVP3LiveFlow.createFlow;let flow;
   w.MVP3LiveFlow.createFlow=(...args)=>{flow=create(...args);return flow;};
   w.eval(read('live-photo.js'));w.eval(read('app.js'));
-  return {w,d:w.document,get flow(){return flow;},errors,calls,close:()=>dom.window.close()};
+  return {w,d:w.document,get flow(){return flow;},errors,calls,tabs,close:()=>dom.window.close()};
 }
 const text=e=>e.textContent.replace(/\s+/g,' ').trim();
 async function toDetail(h){
@@ -60,7 +63,7 @@ async function toDetail(h){
 const key=(h,k,extra={})=>h.d.dispatchEvent(new h.w.KeyboardEvent('keydown',{key:k,bubbles:true,cancelable:true,...extra}));
 const NEG=/부품별 금액을 더해|단품 금액 표시 없음|부품 질문은 아직 지원|이 부품 질문하기/;
 
-test('mall PC detail: 변경 opens the 이관 dialog, never the picker; no part-options call; link is the mall page',async()=>{
+test('mall PC detail: 변경 opens the 팝콘PC 이동 dialog, never the picker; no part-options call; cancel keeps everything',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     const btns=[...d.querySelectorAll('[data-action=build-options]')];
     assert.deepEqual(btns.map(b=>b.dataset.ordinal),['0','1']);
@@ -68,32 +71,45 @@ test('mall PC detail: 변경 opens the 이관 dialog, never the picker; no part-
     const dlg=d.querySelector('[data-mall-dialog]');assert.ok(dlg,'안내창이 열린다');
     assert.equal(d.querySelector('.dv2-panel'),null,'부품 선택 패널은 열리지 않는다');
     assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/build/options'),'후보 조회 요청이 없다');
-    const t=text(dlg);
-    assert.ok(t.includes('팝콘PC 쇼핑몰에서 파는 구성 그대로')&&t.includes('이 추천 PC를 기준으로')&&t.includes('팝콘PC로 이관시켜 드릴까요?'));
-    const go=dlg.querySelector('a[data-mall-confirm]');
-    assert.equal(go.href,MALL);assert.equal(go.target,'_blank');assert.match(go.rel,/noopener/);assert.equal(text(go),'팝콘PC에서 변경하기');
+    assert.equal(text(dlg.querySelector('h3')),'팝콘PC에서 부품을 변경해 주세요');
+    assert.equal(text(dlg.querySelector('#mall-dlg-desc')),'이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요. 선택한 옵션에 따라 금액이 달라져요. 팝콘PC로 이동할까요?');
+    const go=dlg.querySelector('[data-action=mall-move]'),cancel=dlg.querySelector('[data-action=mall-dialog-close]');
+    assert.equal(text(go),'팝콘PC로 이동');assert.equal(text(cancel),'취소');
     assert.equal(dlg.querySelector('[role=dialog]').getAttribute('aria-modal'),'true');
     assert.equal(d.activeElement.id,'mall-dlg-title');
+    // 아직 아무것도 보내지 않았다 -- 이동을 누르기 전에는 인계 기록도 새 창도 없다.
+    assert.ok(!h.calls.some(c=>c.url==='/api/mvp3/saved-quotes'||c.url.endsWith('/handoff')));
+    assert.equal(h.tabs.length,0);
     // 초점은 안내창 안에서만 돈다.
-    dlg.querySelector('[data-action=mall-dialog-close]').focus();key(h,'Tab');assert.equal(d.activeElement,go);
-    key(h,'Tab',{shiftKey:true});assert.equal(d.activeElement,dlg.querySelector('[data-action=mall-dialog-close]'));
-    // Escape 로 닫고 눌렀던 단추로 돌아온다.
-    key(h,'Escape');assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement,btns[1]);
+    cancel.focus();key(h,'Tab');assert.equal(d.activeElement,go);
+    key(h,'Tab',{shiftKey:true});assert.equal(d.activeElement,cancel);
+    // Escape 로 닫고 눌렀던 단추로 돌아온다. 새 창·인계 요청은 없다.
+    key(h,'Escape');assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement.dataset.action,'build-options');assert.equal(d.activeElement.dataset.ordinal,'1');
     // 취소도 같다.
-    btns[0].focus();btns[0].click();d.querySelector('[data-action=mall-dialog-close]').click();
-    assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement,btns[0]);
+    const b0=d.querySelector('[data-action=build-options][data-ordinal="0"]');b0.focus();b0.click();d.querySelector('[data-action=mall-dialog-close]').click();
+    assert.equal(d.querySelector('[data-mall-dialog]'),null);assert.equal(d.activeElement.dataset.action,'build-options');assert.equal(d.activeElement.dataset.ordinal,'0');
+    assert.equal(h.tabs.length,0);assert.ok(!h.calls.some(c=>c.url.endsWith('/handoff')||c.url==='/api/mvp3/saved-quotes'));
+    assert.equal(h.flow.state.screen,'detail');assert.equal(h.flow.state.selected.build,null);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
 
-test('mall PC: confirming opens the mall URL in a new tab and closes the dialog; the stage stays unchanged',async()=>{
+test('mall PC: 팝콘PC로 이동 records the handoff first, then moves the pre-opened tab to the mall page; the dialog turns into the after-move notice',async()=>{
   const h=harness();try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="0"]').click();
-    const go=d.querySelector('[data-mall-confirm]');let seen=null;
-    d.addEventListener('click',e=>{const a=e.target.closest('a[data-mall-confirm]');if(a){seen={href:a.href,target:a.target};e.preventDefault();}});
-    go.click();assert.deepEqual(seen,{href:MALL,target:'_blank'});
-    await tick();await tick();assert.equal(d.querySelector('[data-mall-dialog]'),null);
-    assert.equal(h.flow.state.screen,'detail');assert.equal(h.flow.state.selected.build,null);
+    d.querySelector('[data-action=mall-move]').click();
+    await until(()=>d.querySelector('[data-mall-state=moved]'));
+    const post=h.calls.filter(c=>c.method==='POST'&&(c.url==='/api/mvp3/saved-quotes'||c.url.endsWith('/handoff')));
+    assert.deepEqual(post.map(c=>c.url),['/api/mvp3/saved-quotes','/api/mvp3/saved-quotes/'+qid+'/handoff'],'보관 -> 인계 기록 순서, 각 한 번');
+    assert.equal(post[0].body.purpose,'handoff');assert.equal(post[0].body.contact,undefined,'쇼핑몰 이동은 연락처를 받지 않는다');
+    assert.equal(h.tabs.length,1);assert.equal(h.tabs[0].location.href,MALL);assert.equal(h.tabs[0].opener,null);
+    const t=text(d.querySelector('[data-mall-dialog]'));
+    assert.match(t,/팝콘PC에서 원하는 옵션을 선택해 주세요\./);assert.match(t,/HO-5001/);assert.match(t,/주문이나 결제가 완료된 상태는 아니에요/);
+    assert.doesNotMatch(t,/주문이 접수|결제가 완료됐|주문 완료/);
+    assert.equal(d.querySelector('[data-mall-reopen]').getAttribute('href'),MALL);
+    assert.equal(h.flow.state.screen,'detail');
+    d.querySelector('[data-action=mall-dialog-close]').click();assert.equal(d.querySelector('[data-mall-dialog]'),null);
+    assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
 
@@ -119,7 +135,7 @@ test('final screen: no disabled 변경 buttons, single 상세로 돌아가기 pa
     assert.doesNotMatch(v,NEG);assert.match(text(d.querySelector('.final-back')),/상세로 돌아가기/);
     assert.match(v,/저장 전/);assert.doesNotMatch(v,/저장됨|저장 완료/);
     const save=d.querySelector('[data-action=save]');assert.equal(text(save),'견적 저장');
-    save.click();await until(()=>h.flow.state.saveState==='saved');
+    save.click();await until(()=>d.querySelector('[data-kact=submit]'));d.querySelector('[data-kact=submit]').click();await until(()=>h.flow.state.saveState==='saved');
     assert.match(text(d.querySelector('#view')),/서버에 저장됨/);assert.equal(text(d.querySelector('[data-action=save]')),'저장 완료');
   }finally{h.close();}
 });
@@ -137,8 +153,8 @@ test('older saved mall quote with changes: read-only rows, no undo/reset, note t
   }finally{h.close();}
 });
 
-test('non-mall product (no mall page) still opens the picker panel',async()=>{
-  const own={...pc};delete own.mall_url;
+test('AI-composed product (server flag, no mall page) still opens the picker panel',async()=>{
+  const own={...pc,ai_composed:true};delete own.mall_url;
   const h=harness(own);try{await toDetail(h);const d=h.d;
     d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
     assert.equal(d.querySelector('[data-mall-dialog]'),null);

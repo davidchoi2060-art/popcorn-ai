@@ -24,6 +24,7 @@ function harness(script,ss=storage(),url='https://qa.invalid/mvp3/talk.html'){
   w.MVP3Api=w.MVP3Api.createClient({storage:w.localStorage,cryptoImpl:webcrypto,fetchImpl:async(url,options)=>{
     const body=options.body?JSON.parse(options.body):null;calls.push({url,body});
     if(url==='/api/mvp3/purchase-inquiries/form')return reply(200,FORM);
+    if(url==='/api/mvp3/contact')return reply(200,{ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'});
     const r=script(url,body);return reply(r.status||200,r.data);
   }});
   w.eval(read('live-flow.js'));w.eval(read('live-photo.js'));w.eval(read('talk.js'));
@@ -270,13 +271,13 @@ test('a price change on save keeps the quote and offers a fresh price check befo
   });
   try{
     await h.say('150만원 게임용');h.doc.querySelector('[data-action=choose][data-index="0"]').click();await tick();
-    h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-action=reprice]'));
+    h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');await until(()=>h.doc.querySelector('[data-action=reprice]'));
     assert.match(h.text('.tk-msg.is-error'),/금액이 바뀌어 저장하지 못했어요/);assert.match(h.text('#tk-now-body'),/CODE\/MOCK A/);
     assert.equal(h.doc.querySelector('[data-action=save]'),null,'old price cannot be resent');
     h.click('[data-action=reprice]');await until(()=>h.doc.querySelector('[data-action=save]')&&!h.doc.querySelector('[data-action=save]').disabled);
     assert.match(h.text('#tk-now-body'),/1,470,000원/);assert.match(h.text('#tk-log'),/1,450,000원에서 1,470,000원으로/);
     assert.deepEqual(posts,[1450000]);
-    h.click('[data-action=save]');await until(()=>/견적을 저장했어요/.test(h.text('#tk-now-body')));
+    h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');await until(()=>/견적을 저장했어요/.test(h.text('#tk-now-body')));
     assert.deepEqual(posts,[1450000,1470000]);assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });

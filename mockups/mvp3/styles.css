@@ -900,5 +900,54 @@ details[open]>summary .dv2-more .ui-icon{transform:rotate(180deg)}
 .mall-dlg-ask{font-weight:650;margin-top:12px}
 .mall-dlg-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .mall-dlg-actions a,.mall-dlg-actions button{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 18px;border-radius:9px;text-decoration:none;font-size:15px}
-@media (max-width:480px){.mall-dlg{align-items:flex-end;padding:0}.mall-dlg-card{width:100%;border-radius:16px 16px 0 0}.mall-dlg-actions{flex-direction:column-reverse}.mall-dlg-actions a,.mall-dlg-actions button{width:100%}}
+@media (max-width:480px){.mall-dlg{padding:16px}.mall-dlg-card{width:100%;border-radius:14px;padding:22px 18px 18px}.mall-dlg-actions{flex-direction:column}.mall-dlg-actions a,.mall-dlg-actions button{width:100%}}
 .dv2-mallhint{margin:0 0 8px}
+
+/* 이동 후 · 주소 확인 필요 · 연결 실패(2026-10-16 두 구매 흐름) -- 같은 안내창 안에서 바뀐다 */
+.mall-dlg-card p{overflow-wrap:anywhere}
+.mall-dlg-base{display:flex;flex-direction:column;gap:2px;margin:14px 0 4px;padding-top:12px;border-top:1px solid var(--line)}
+.mall-dlg-base span{color:var(--muted);font-size:14px}
+.mall-dlg-ho{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin:8px 0 0;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mall-dlg-ho span{color:var(--muted);font-size:14px}.mall-dlg-ho strong{color:var(--green);overflow-wrap:anywhere}
+.mall-dlg-foot{text-align:center;margin:12px 0 0}
+.mall-dlg-actions .primary{color:#fff}
+/* 견적 보관 창(연락처) -- 안내창과 같은 바탕 위에 그린다 */
+.keep-dlg-card{width:min(520px,100%)}
+.keep-dlg-card h3:focus,.keep-error:focus{outline:none}
+.keep-sub{color:var(--muted);font-size:15px;margin:6px 0 12px}
+.keep-sum{display:flex;flex-direction:column;gap:4px;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);margin-bottom:12px}
+.keep-sum strong{overflow-wrap:anywhere}.keep-sum small{overflow-wrap:anywhere}
+.keep-sum-price{font-size:20px;font-weight:750}.keep-sum-price small{font-weight:400}
+.keep-dlg-card h4{font-size:17px;margin:14px 0 6px}
+.keep-field{display:flex;flex-direction:column;gap:6px;margin:10px 0;font-size:14px;min-width:0}
+.keep-field>span{font-weight:650;color:var(--ink)}.keep-field em{font-style:normal;font-weight:500;font-size:12px;color:var(--green);margin-left:4px}
+.keep-field :is(input,textarea){border:1px solid #c9d6d1;border-radius:8px;padding:11px 12px;font-size:16px;min-height:44px;width:100%;color:var(--ink);background:#fff}
+.keep-field textarea{resize:vertical;min-height:84px}
+.keep-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.keep-note{font-size:14px;color:var(--muted);margin:6px 0}
+.keep-nocall{color:var(--green);font-weight:600}
+.keep-consent{display:flex;gap:10px;align-items:center;margin:14px 0 2px;font-size:15px;cursor:pointer;min-height:44px}
+.keep-consent input{accent-color:var(--green);width:22px;height:22px;flex:none}
+.keep-consent-text{font-size:14px;color:var(--muted);margin:0 0 8px 32px}.keep-consent-text summary{cursor:pointer;min-height:32px;display:flex;align-items:center}
+.keep-reg{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 0}
+.keep-reg>span{color:var(--muted);font-size:14px}.keep-reg>strong{overflow-wrap:anywhere}
+.keep-link{padding:6px 2px;min-height:44px;text-decoration:underline;font-size:14px;font-weight:650;margin-left:auto}
+.keep-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.keep-actions button{min-height:44px;padding:10px 20px;font-size:15px}
+.keep-foot{text-align:center;color:var(--muted);font-size:14px;margin:12px 0 0}
+.keep-error{border:1px solid #e3b48c;background:#fff3e8;color:#7a3b0b;border-radius:10px;padding:10px 12px;margin:12px 0;font-size:14px}
+.keep-error p{margin:4px 0 0}
+/* 보관 견적서 아래 칸: 보관 완료 · 상담 신청 접수 · 접수 결과 */
+.keep-done{margin-bottom:14px}
+.keep-done .keep-qno{display:flex;gap:10px;align-items:baseline}.keep-done .keep-qno span{color:var(--muted);font-size:14px}.keep-done .keep-qno strong{color:var(--green)}
+.consult-ask,.consult-done{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.consult-ask h4,.consult-done h4{font-size:18px}
+.consult-buttons{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.consult-buttons .primary{min-height:44px;padding:10px 22px}
+.consult-buttons .keep-link{margin-left:0}
+.consult-note{margin-top:10px}.consult-topic{display:flex;gap:10px;align-items:baseline}.consult-topic span{color:var(--muted);font-size:14px}
+.consult-count{display:block;text-align:right}
+.consult-order{color:var(--green);font-weight:700}
+.consult-rows{margin:12px 0;padding:12px 14px;background:var(--tint);border-radius:10px;display:flex;flex-direction:column;gap:8px}
+.consult-rows>div{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.consult-rows dt{color:var(--muted);font-size:14px}.consult-rows dd{font-weight:700;overflow-wrap:anywhere}
+@media(max-width:520px){.keep-two{grid-template-columns:1fr}.keep-actions{flex-direction:column-reverse}.keep-actions button{width:100%}.keep-link{margin-left:0}}

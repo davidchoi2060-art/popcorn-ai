@@ -24,7 +24,7 @@ const savedProduct={product_code:113836,name:'CODE/MOCK 보관 PC',price:900000,
 const currentProduct={...savedProduct,name:'CODE/MOCK 현재 PC',price:950000,spec:{cpu:'CURRENT CPU'},reasons:['현재 이유']};
 const withdrawn=[[{state:'unavailable',url:URL},null],[undefined,undefined]];
 const tick=()=>new Promise(r=>setImmediate(r));
-async function until(check){for(let n=0;n<80;n++){if(check())return;await tick();}throw Error('render did not settle');}
+async function until(check){for(let n=0;n<400;n++){if(check())return;await tick();}throw Error('render did not settle');}
 function harness({hash='saved',quoteProduct=savedProduct,recommendItem=currentProduct,postProduct=null}={}){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#'+hash,runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
@@ -39,6 +39,7 @@ function harness({hash='saved',quoteProduct=savedProduct,recommendItem=currentPr
     else if(url==='/api/grid/recommend')data={ok:true,card_sets:[{kind:'sold',usage:'사무용',items:[recommendItem]}]};
     // POST: 이 fixture 는 product_code·price 를 요청 값으로 채운다. 즉 「expected_price 일치 성공」만 다룬다
     // (불일치·409 는 다른 검사 몫). 사진·BOM 은 postProduct 그대로 돌려준다.
+    else if(options.method==='GET'&&url==='/api/mvp3/contact')data={ok:true,has_contact:true,masked_phone:'010-****-5678',name:null,consent_text:'동의 문구'};
     else if(options.method==='POST'&&url==='/api/mvp3/saved-quotes')data={ok:true,quote:{id:qid,product:{...postProduct,product_code:body.product_code,price:body.expected_price},state:body.state,saved_at:'2026-10-08T01:00:00Z'}};
     else data={ok:true,quotes:hash==='saved'?[quote]:[],has_more:false};
     return {ok:true,status:200,json:async()=>data,headers:{get:()=>null}};
@@ -72,7 +73,7 @@ async function loadSaved(h){await until(()=>h.doc.querySelector('[data-action=lo
 async function saveCurrent(h){
   await h.flow.submit('CODE/MOCK 사무용');await until(()=>h.doc.querySelector('[data-action=detail]'));
   h.click('[data-action=detail]');h.click('[data-action=final]');assert.equal(h.flow.state.screen,'final');
-  h.click('[data-action=save]');await until(()=>h.flow.state.saveState==='saved'&&h.flow.phase!=='save'&&h.flow.state.phase===null);
+  h.click('[data-action=save]');await until(()=>h.doc.querySelector('[data-kact=submit]'));h.click('[data-kact=submit]');await until(()=>h.flow.state.saveState==='saved'&&h.flow.phase!=='save'&&h.flow.state.phase===null);
 }
 
 test('saved-basis GET load: saved price/spec with current photo and public BOM plus basis notice',async()=>{
