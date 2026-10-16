@@ -606,10 +606,10 @@ def game_min_rank(g, levels, vocab, notes) -> int:
     return r
 
 
-# ── 새로 나온 PC(운영자가 부품을 골라 만든 조립PC · 부품 상품화 5단계) ─────────────────────
+# ── 새로 구성된 PC(운영자가 부품을 골라 만든 조립PC · 부품 상품화 5단계) ─────────────────────
 # 공개 판정·가격은 api/custom_pc 한 곳, 용도 평가는 api/custom_pc_fit(몰 상품과 같은 기준표)이다.
 # 몰 카드(items)와 섞지 않고 set 의 custom_items 로 따로 싣는다 — 몰 상품번호가 없어 보관 견적·쇼핑몰
-# 연결 경로를 탈 수 없고, 구매는 「새로 나온 PC」 화면의 구매 상담 신청으로 받는다.
+# 연결 경로를 탈 수 없고, 구매는 「새로 구성된 PC」 화면의 구매 상담 신청으로 받는다.
 MAX_CUSTOM_ITEMS = 2
 CUSTOM_PC_URL = "new-pcs.html#"
 

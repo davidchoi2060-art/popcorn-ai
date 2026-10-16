@@ -30,7 +30,7 @@ function card(x){
     `<div class="builder-money"><span>지금 고객 가격</span><b>${money(x.price)}</b></div>${blockers}${notes}${last}${actions}</section>`;
 }
 function draw(){
-  const head=`<h2 class="release-title">고객 공개</h2><p class="builder-note">「신규 조립PC 생성」으로 저장한 제품군을 고객 화면 「새로 나온 PC」에 공개합니다. ${esc(priceNote)}. 부품이 품절되거나 호환 불일치가 생기면 고객 화면에서 자동으로 빠집니다. 쇼핑몰 상품번호가 없어 구매는 구매 상담 신청으로 받습니다.</p>`+
+  const head=`<h2 class="release-title">고객 공개</h2><p class="builder-note">「신규 조립PC 생성」으로 저장한 제품군을 고객 화면 「새로 구성된 PC」에 공개합니다. ${esc(priceNote)}. 부품이 품절되거나 호환 불일치가 생기면 고객 화면에서 자동으로 빠집니다. 쇼핑몰 상품번호가 없어 구매는 구매 상담 신청으로 받습니다.</p>`+
     (msg?`<p class="${err?'builder-error':'builder-success'}" role="status">${esc(msg)}</p>`:'');
   if(items===null){box.innerHTML=head;return;}
   box.innerHTML=head+(items.length?items.map(card).join(''):'<p class="builder-empty">신규 조립PC 생성에서 저장한 제품군이 없습니다.</p>');

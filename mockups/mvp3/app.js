@@ -2,7 +2,7 @@
 // 처음 화면은 하나다(2026-10-16 중헌 님 「첫화면 게이트웨이를 세군대로 나누는게 의미가 없어 … 예전처럼 단일 화면으로」).
 // 서비스의 핵심은 완제 조립PC와 관리자가 맞춰 둔 PC를 보여 주는 것이라, 들어오면 바로 상담 + 추천 PC 화면이다.
 // 세 갈래 입구(#151·#159)와 그 앞의 두 갈래(용도부터/바로 상담, 1ecf4df)는 걷었다. 대화 화면(talk.html)은 머리띠
-// 「대화 화면」으로, 관리자가 맞춰 둔 PC 는 첫 화면 아래 목록과 머리띠 「새로 나온 PC」로 간다.
+// 「대화 화면」으로, 관리자가 맞춰 둔 PC 는 첫 화면 아래 목록과 머리띠 「새로 구성된 PC」로 간다.
 const M=window.MVP3LiveModel,A=window.MVP3Api;
 const {customerPhoto}=window.MVP3LivePhoto;
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
@@ -169,12 +169,12 @@ function productCard(product,action='detail',id=product.index,comparison=null){
     (overBudget(product,state.talk)?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
     button(strong?'추천 견적 자세히 보기'+uiIcon('arrow-right'):'구성 자세히 보기',action,(strong?'primary':'outline')+' card-detail','data-id="'+esc(id)+'"')+'</section>';
 }
-// 새로 나온 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 나온 PC」 화면으로 보낸다.
+// 새로 구성된 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 구성된 PC」 화면으로 보낸다.
 // 용도 적합도는 서버 판정(fit · 정보 없음)을 그대로 적는다 — 정보가 없어도 숨기지 않는다(2026-10-10 결정).
 function customCards(group){
   if(!group.custom?.length)return '';
-  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립완제PC</h4><div class="quote-cards">'+group.custom.map(c=>
-    '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 나온 PC</span><h3>'+esc(c.title)+'</h3>'+
+  return '<section class="custom-pc-group" aria-label="새로 구성된 PC"><h4>새로 구성된 PC · 팝콘PC가 용도에 맞춰 부품을 골라 구성한 완제조립PC</h4><div class="quote-cards">'+group.custom.map(c=>
+    '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 구성된 PC</span><h3>'+esc(c.title)+'</h3>'+
     '<strong class="price">'+money(c.price)+'</strong><p class="muted">'+esc(c.price_note)+'</p>'+
     '<p class="custom-pc-fit">용도 적합도: '+esc(c.fit==='fit'?c.level_text:'정보 없음')+'</p>'+
     (c.parts.length?'<dl class="live-card-spec">'+c.parts.map(x=>'<div><dt>'+esc(x.slot_label)+'</dt><dd>'+esc(x.name)+(x.quantity>1?' × '+x.quantity:'')+'</dd></div>').join('')+'</dl>':'')+

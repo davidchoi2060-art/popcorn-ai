@@ -1094,7 +1094,7 @@ a.tf-wide.primary{color:#fff}
   .tf-detail .dv2-row>td>details>summary{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"cat act" "model act" "chg act" "more act";gap:4px 12px}
   .tf-detail .dv2-chg{text-align:left}
 }
-/* 첫 화면 아래 「팝콘PC가 맞춰 둔 PC」(welcome-pcs.js · 2026-10-16 단일 첫 화면). 기존 카드 선·글자색만 쓴다. */
+/* 첫 화면 「새로 구성된 PC」(welcome-pcs.js · 2026-10-16 단일 첫 화면). 기존 카드 선·글자색만 쓴다 — 최종 디자인은 코덱스 요청서. */
 .welcome-pcs{margin:20px 0 24px;padding:24px 28px;border:1px solid var(--line);border-radius:11px;text-align:left}
 .welcome-pcs header{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:16px}
 .welcome-pcs h3{font-size:22px;font-weight:750;letter-spacing:-.4px;margin:0}
@@ -1107,4 +1107,11 @@ a.tf-wide.primary{color:#fff}
 .welcome-pc b{font-size:18px;margin-top:auto;color:var(--green)}
 .welcome-pc small{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:var(--muted)}
 .welcome-pc small .ui-icon{width:16px;height:16px}
+.welcome-pcs header p{margin:6px 0 0;font-size:15px;color:var(--muted)}
+.welcome-pc .welcome-pc-usages{display:flex;flex-wrap:wrap;gap:6px;-webkit-line-clamp:unset;overflow:visible}
+.welcome-pc-usages em{font-style:normal;font-size:13px;font-weight:650;padding:3px 8px;border-radius:999px;background:var(--tint);color:var(--green)}
+.welcome-pc-parts{margin:0;display:grid;gap:4px;font-size:14px}
+.welcome-pc-parts div{display:grid;grid-template-columns:72px 1fr;gap:8px}
+.welcome-pc-parts dt{color:var(--muted)}
+.welcome-pc-parts dd{margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media(max-width:760px){.welcome-pcs{padding:18px 16px}.welcome-pcs h3{font-size:19px}}

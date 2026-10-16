@@ -1,6 +1,6 @@
 'use strict';
 // 2026-10-11 중헌 님 「신규 조립PC 제품도 출시할 수 있어야 함」(부품 상품화 4단계).
-// 「새로 나온 PC」는 서버가 준 공개 PC 와 그 가격만 보이고, 구매는 그 PC 번호를 붙인 구매 상담 신청으로 받는다.
+// 「새로 구성된 PC」는 서버가 준 공개 PC 와 그 가격만 보이고, 구매는 그 PC 번호를 붙인 구매 상담 신청으로 받는다.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
 const {JSDOM,VirtualConsole}=require('jsdom');

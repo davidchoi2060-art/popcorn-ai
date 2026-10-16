@@ -129,7 +129,7 @@ test('quick replies follow what the consultation asks: usage question gets usage
   assert.deepEqual(chips(b),['배그를 해요','롤을 해요','배그와 롤 둘 다 해요']);
   const c=harness();assert.ok(chips(c).includes('QHD로 해줘요'));
 });
-// 첫 화면 아래 「팝콘PC가 맞춰 둔 PC」: welcome-pcs.js 가 준 목록만 그리고, 도착하면 첫 화면을 다시 그린다. 상세·추천 화면에는 싣지 않는다.
+// 첫 화면 「새로 구성된 PC」: welcome-pcs.js 가 준 목록만 그리고, 도착하면 첫 화면을 다시 그린다. 상세·추천 화면에는 싣지 않는다.
 test('the welcome screen shows the curated PC list only when welcome-pcs provides one',async()=>{
   const h=harness({hash:''}),d=h.w.document;assert.equal(d.querySelector('.welcome-pcs'),null);
   h.w.MVP3WelcomePcs={html:()=>'<section class="welcome-pcs"><a class="welcome-pc" href="new-pcs.html#c1">맞춘 PC</a></section>'};

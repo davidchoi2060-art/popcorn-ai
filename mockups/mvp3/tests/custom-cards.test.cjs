@@ -1,6 +1,6 @@
 'use strict';
-// 2026-10-11 부품 상품화 5단계: 운영자 신규 조립PC 가 추천 결과에 「새로 나온 PC」 카드로 함께 나온다.
-// 몰 카드와 섞지 않고, 용도 적합도는 서버 판정(정보 없음 포함)을 그대로 적고, 「새로 나온 PC」 화면으로 보낸다.
+// 2026-10-11 부품 상품화 5단계: 운영자 신규 조립PC 가 추천 결과에 「새로 구성된 PC」 카드로 함께 나온다.
+// 몰 카드와 섞지 않고, 용도 적합도는 서버 판정(정보 없음 포함)을 그대로 적고, 「새로 구성된 PC」 화면으로 보낸다.
 const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),{webcrypto}=require('node:crypto');
 const {JSDOM,VirtualConsole}=require('jsdom');

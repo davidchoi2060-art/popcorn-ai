@@ -6,6 +6,7 @@ html,body{height:auto}
 .new-pc{border:1px solid var(--line);border-radius:14px;padding:22px;margin:18px 0;background:#fff}
 .new-pc-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .new-pc-head h2{font-size:24px;margin:0;overflow-wrap:anywhere}
+.new-pc-usages{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 0}.new-pc-usages em{font-style:normal;font-size:13px;font-weight:650;padding:3px 8px;border-radius:999px;background:var(--tint);color:var(--green)}
 .new-pc-price{text-align:right}.new-pc-price strong{display:block;font-size:28px;color:var(--green)}.new-pc-price small{color:var(--muted);font-size:14px}
 .new-pc-parts{width:100%;border-collapse:collapse;margin:16px 0}
 .new-pc-parts th,.new-pc-parts td{border:0;text-align:left;padding:9px 6px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
