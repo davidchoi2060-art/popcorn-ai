@@ -1,4 +1,4 @@
-// 「새로 나온 PC」(부품 상품화 4단계 · api/mvp3_custom_pcs.py). 운영자가 부품을 골라 만든 조립PC 중
+// 「새로 구성된 PC」(부품 상품화 4단계 · api/mvp3_custom_pcs.py). 운영자가 부품을 골라 만든 조립PC 중
 // 고객 공개된 것만 서버가 준다. 가격은 서버가 오늘 부품 판매가로 다시 센 값만 쓴다(화면이 더하지 않는다).
 // 쇼핑몰 상품번호가 없으므로 구매는 구매 상담 신청(api/mvp3_purchase_inquiry.py)으로 받는다.
 (()=>{
@@ -31,9 +31,10 @@ function card(x){
   const parts=x.parts.map(p=>`<tr><th scope="row">${esc(p.slot_label)}</th><td>${esc(p.name)}${p.quantity>1?' × '+p.quantity:''}</td></tr>`).join('');
   const benefits=x.benefits.length?`<h3>이런 점이 좋아요</h3><ul>${x.benefits.map(b=>`<li><strong>${esc(b.title)}</strong> ${esc(b.text)}</li>`).join('')}</ul>`:'';
   const checks=x.checks.length?`<h3>구매 전에 확인해 주세요</h3><ul>${x.checks.map(c=>`<li>${esc(c)}</li>`).join('')}</ul>`:'';
-  return `<article class="new-pc" data-pc="${esc(id)}"><div class="new-pc-head"><div><h2>${esc(x.title)}</h2></div>
+  const usages=Array.isArray(x.usages)&&x.usages.length?`<p class="new-pc-usages"><span class="sr-only">맞춘 용도</span>${x.usages.map(u=>`<em>${esc(u.usage)} ${esc(u.level)}</em>`).join('')}</p>`:'';
+  return `<article class="new-pc" data-pc="${esc(id)}"><div class="new-pc-head"><div><h2>${esc(x.title)}</h2>${usages}</div>
     <div class="new-pc-price"><strong>${money(x.price)}</strong><small>한 대 기준 · 실제 구매 금액과 포함 품목은 구매 전에 확인해 주세요.</small></div></div>
-    <p>${esc(x.intro)}</p>${x.scene?`<p class="muted">${esc(x.scene)}</p>`:''}
+    ${x.intro&&!/^운영자가 부품을 선택한/.test(x.intro)?`<p>${esc(x.intro)}</p>`:''}${x.scene?`<p class="muted">${esc(x.scene)}</p>`:''}
     <table class="new-pc-parts"><caption class="sr-only">부품 구성</caption><tbody>${parts}</tbody></table>${benefits}${checks}
     <p class="muted">쇼핑몰 상품 페이지가 아직 없는 PC예요. 구매 상담을 신청하시면 담당자가 연락드려 주문을 도와드려요. 가격은 연락드릴 때 다시 확인해 드려요.</p>
     <div class="new-pc-actions"><button type="button" class="${openId===id?'outline':'primary'}" data-inquiry="${esc(id)}" aria-expanded="${openId===id}">구매 상담 신청</button></div>

@@ -9,7 +9,8 @@ const fs=require('node:fs'),path=require('node:path'),{webcrypto}=require('node:
 const {JSDOM,VirtualConsole}=require('jsdom');
 const base=path.resolve(__dirname,'..'),read=n=>fs.readFileSync(path.join(base,n),'utf8');
 const tick=()=>new Promise(r=>setImmediate(r));
-async function until(check){for(let n=0;n<600;n++){if(check())return;await tick();}throw Error('render did not settle');}
+// 틱 수만 세면 Web Crypto(접근 키 해시)처럼 스레드 풀에서 끝나는 일이 부하에 따라 늦어 가끔 실패한다 -- 3초까지 기다린다.
+async function until(check){const end=Date.now()+3000;for(let n=0;n<600||Date.now()<end;n++){if(check())return;await tick();}throw Error('render did not settle');}
 const qid='55555555-5555-4555-8555-555555555555';
 const MALL='https://popcornpc.co.kr/shop/product_detail.html?pd_no=12';
 const configuration={product_code:12,configuration_id:'P10',revision:1,offer_id:'P12',

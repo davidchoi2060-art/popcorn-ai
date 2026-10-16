@@ -238,8 +238,8 @@
     out.source={kind:'game_customer_copy',fields:Array.isArray(value.source.fields)?value.source.fields.filter(x=>typeof x==='string'):[],url:safeUrl(value.source.url)};
     return out;
   }
-  // 새로 나온 PC(api/sold_reco.custom_items · 부품 상품화 5단계): 몰 상품번호가 없는 운영자 신규 조립PC.
-  // 몰 카드(products)와 섞지 않는다 — 보관 견적·쇼핑몰 연결 대신 「새로 나온 PC」 화면으로 보낸다.
+  // 새로 구성된 PC(api/sold_reco.custom_items · 부품 상품화 5단계): 몰 상품번호가 없는 운영자 신규 조립PC.
+  // 몰 카드(products)와 섞지 않는다 — 보관 견적·쇼핑몰 연결 대신 「새로 구성된 PC」 화면으로 보낸다.
   function customItem(v){
     if(!object(v)||typeof v.configuration_id!=='string'||!/^A[0-9A-F]{16}$/.test(v.configuration_id)||!text(v.title).trim()||!Number.isSafeInteger(v.price)||v.price<=0)return null;
     const parts=Array.isArray(v.parts)?v.parts.filter(p=>object(p)&&text(p.slot_label)&&text(p.name)).map(p=>({slot_label:p.slot_label,name:p.name,quantity:Number.isSafeInteger(p.quantity)&&p.quantity>0?p.quantity:1})):[];

@@ -1,17 +1,8 @@
 (function(){'use strict';
-const DIRECT_ACTION='gateway-talk';
-// 처음 화면의 세 갈래(사장님 2026-10-11 「첫화면에서 세갈래 길이 생긴다는 느낌이 없어」, 코덱스 1816 보강6 의견 §3 문구).
-// 어느 갈래든 같은 대화 화면으로 들어가고, 고른 갈래의 첫 문장 초안만 입력창에 넣어 둔다(보내지 않는다).
-// 키는 talk.js STARTERS 와 같다. 예전 두 갈래(용도부터 / 바로 상담)로 되돌리려면 GATEWAY_PATHS 를 null 로 둔다.
-const GATEWAY_PATHS=[
-  // 아이콘은 사장님 확정 시안 01(큰카드 입구 v3): 모니터 / 톱니 / CPU+메모리. 둘 이상이면 나란히 그린다.
-  [['monitor'],'새 PC 고르기','어떤 일에 쓸지부터 함께 정리해요.','새 PC 상담 시작','new_pc'],
-  [['gear'],'쓰던 PC 업그레이드','불편한 점과 바꾸고 싶은 부품을 말씀해 주세요.','업그레이드 상담 시작','upgrade'],
-  [['cpu','memory'],'부품·구성 알아보기','부품의 차이와 내게 필요한 구성을 물어보세요.','부품 상담 시작','parts']];
-// 처음 화면 채팅창에 쓴 글(사장님 2026-10-11 「위 채팅 내용을 보고 적당한 화면으로 보내야지」). 글은 주소에
-// 싣지 않고(접속 기록에 남는다) 이 탭 보관함에 잠깐 두고 대화 화면으로 간다. 대화 화면이 꺼내 바로 보내고,
-// 서버가 글 내용으로 세 갈래 중 하나를 고른다(api/talk_entry). 키는 talk.js FIRST_KEY 와 같다.
-const FIRST_KEY='popcorn-mvp3-first-message-v1';let gatewayText='',lastGatewayHtml='';
+// 처음 화면은 하나다(2026-10-16 중헌 님 「첫화면 게이트웨이를 세군대로 나누는게 의미가 없어 … 예전처럼 단일 화면으로」).
+// 서비스의 핵심은 완제 조립PC와 관리자가 맞춰 둔 PC를 보여 주는 것이라, 들어오면 바로 상담 + 추천 PC 화면이다.
+// 세 갈래 입구(#151·#159)와 그 앞의 두 갈래(용도부터/바로 상담, 1ecf4df)는 걷었다. 대화 화면(talk.html)은 머리띠
+// 「대화 화면」으로, 관리자가 맞춰 둔 PC 는 첫 화면 아래 목록과 머리띠 「새로 구성된 PC」로 간다.
 const M=window.MVP3LiveModel,A=window.MVP3Api;
 const {customerPhoto}=window.MVP3LivePhoto;
 const $=s=>document.querySelector(s),view=$('#view'),actions=$('#actions'),mobile=matchMedia('(max-width:760px)');
@@ -31,79 +22,16 @@ if(arrival){$('#back-to-talk').hidden=false;document.body.dataset.fromTalk='1';}
 // 늘리면 대화 화면에서 상세로 온 고객이 「뒤로」를 눌렀을 때 대화가 아니라 빈 첫 화면이 나온다(2026-10-12 고객단 끝까지 검수 E15).
 let restoring=false;
 let lastScreen=null,chatPreference=null,noticeTimer,retryTimer,lastMessages='',enteringRoute=true;
-const draft={version:1,start_mode:null,usage_choice:null,budget_won:null,budget_bound:null,draft_text:'',draft_edited:false};
-const ui={surface:!location.hash||location.hash==='#start'?'gateway':location.hash==='#purpose'?'usage':'consultation',epoch:window.crypto.randomUUID?window.crypto.randomUUID():Array.from(window.crypto.getRandomValues(new Uint32Array(4)),x=>x.toString(16)).join('-')};
-const workspace=$('.workspace'),gateway=document.createElement('main'),toolbar=document.createElement('nav');
-gateway.id='gateway-root';gateway.className='gateway-root';gateway.setAttribute('aria-label','시작방식 선택');
-toolbar.className='gateway-route-toolbar';toolbar.setAttribute('aria-label','시작 경로');
-workspace.before(gateway,toolbar);
-const productsButton=document.createElement('button');productsButton.type='button';productsButton.dataset.action='gateway-products';productsButton.className='gateway-products';productsButton.textContent='상품 보기';$('.topbar nav').prepend(productsButton);
-$('.brand').dataset.action='gateway';
-const usageLabels={game:'게임',edit:'영상 편집',office:'사무',unknown:'아직 모르겠어요'};
+const draft={version:1,draft_text:'',draft_edited:false};
+$('.brand').dataset.action='home';
 const screenNames=['welcome','results','detail','final','saved'];
-function draftSummary(){return (usageLabels[draft.usage_choice]||'용도 미정')+' · '+(draft.budget_won?draft.budget_won/10000+'만원 이하':'예산 미정');}
-// 상담 머리띠: 실제로 반영된 조건(state.talk)이 있으면 그것을, 없으면 고른 것만 말한다. 정해지지 않은 항목을 「미정」이라 쓰지 않는다(코덱스 C06).
-function draftKnown(){
-  const out=[];
-  if(draft.usage_choice&&draft.usage_choice!=='unknown')out.push(usageLabels[draft.usage_choice]);
-  if(draft.budget_won)out.push(draft.budget_won/10000+'만원 이하');
-  return out.join(' · ');
-}
-function generatedDraft(){
-  const known=draft.usage_choice&&draft.usage_choice!=='unknown';
-  if(!known&&draft.budget_won===null)return '어떤 PC가 좋을지 함께 정하고 싶어요.';
-  return (known?(draft.usage_choice==='office'?'문서 작업과 일상 업무':usageLabels[draft.usage_choice])+'에 쓸 PC를 찾고 있어요.':'어떤 PC가 좋을지 함께 정하고 싶어요.')+' '+(draft.budget_won===null?'예산은 아직 정하지 않았어요.':'예산은 '+draft.budget_won/10000+'만원 이하예요.');
-}
 function captureDraft(){draft.draft_text=$('#request').value;}
 function setDraft(text,edited=false){draft.draft_text=text;draft.draft_edited=edited;$('#request').value=text;}
-function refreshDraft(){if(!draft.draft_edited)setDraft(generatedDraft());}
-function uiHash(){return ui.surface==='gateway'?'#start':ui.surface==='usage'?'#purpose':'#'+state.screen;}
-function uiEntry(){return {screen:state.screen,surface:ui.surface,ui_epoch:ui.epoch};}
-function showSurface(surface,{push=true,focus=true}={}){
-  captureDraft();
-  if(ui.surface===surface){render();if(focus)focusSurface();return;}
-  // Direct #welcome and actual result entries also need a UI-only return anchor
-  // before opening gateway/usage; otherwise Back delegates to cancel/navigate.
-  if(push)history.replaceState(uiEntry(),'',location.hash);
-  ui.surface=surface;
-  if(push)history.pushState(uiEntry(),'',uiHash());
-  render();if(focus)focusSurface();
-}
-function focusSurface(){
-  if(ui.surface==='consultation'){chatPreference=true;syncChat();if(!state.phase)$('#request').focus({preventScroll:true});else view.querySelector('h2')?.focus({preventScroll:true});}
-  else{gateway.querySelector('h1')?.focus({preventScroll:true});window.scrollTo(0,0);}
-}
-function renderGateway(){
-  const icon=name=>uiIcon(name),arrow=icon('arrow-right');let html;
-  if(ui.surface==='gateway'&&GATEWAY_PATHS)html='<section class="gateway-screen is-v3"><div class="gateway-intro"><h1 tabindex="-1">어떤 PC가 필요하세요?</h1><p>PC로 할 일이나 궁금한 점을 편하게 말씀해 주세요.</p></div>'+
-    '<form id="gateway-chat" class="gateway-chat"><label class="sr-only" for="gateway-text">PC로 할 일이나 궁금한 점</label><textarea id="gateway-text" rows="3" maxlength="2000" placeholder="PC로 할 일이나 궁금한 점을 적어주세요.">'+esc(gatewayText)+'</textarea><button type="submit" class="gateway-button">보내기 '+uiIcon('paper-plane-tilt-fill')+'</button></form><p id="gateway-chat-status" class="gateway-chat-status" role="status" aria-live="polite" hidden></p>'+
-    '<div class="gateway-choices is-three">'+
-    GATEWAY_PATHS.map(([images,title,text,go,key])=>button('<span class="entry-icons">'+images.map(image=>uiIcon(image,'entry-icon')).join('')+'</span><span class="entry-copy"><h2>'+title+'</h2><p>'+text+'</p></span><span class="entry-action"><span class="entry-action-label">'+go+'</span> '+arrow+'</span>','gateway-start','entry-card','data-start="'+key+'"')).join('')+
-    '</div><div class="gateway-more">'+button(uiIcon('chat-circle','talk-icon')+'<span class="talk-copy"><strong>아직 정하지 못했나요? 편하게 상담하기 '+arrow+'</strong><small class="change-note">어느 쪽으로 시작해도 같은 상담에서 이어 갈 수 있어요.</small></span>',DIRECT_ACTION,'gateway-talk-link')+
-    '<div class="gateway-more-links">'+button('용도와 예산부터 고르기 '+arrow,'gateway-use','continue-draft')+
-    (draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</div></div></section>';
-  else if(ui.surface==='gateway')html='<section class="gateway-screen"><div class="gateway-intro"><h1 tabindex="-1"><span>어디서부터</span> 시작할까요?</h1><p>용도를 고르며 시작하거나,<br class="mobile-break"> 원하는 조건을 바로 이야기해 주세요.</p></div><div class="gateway-choices">'+
-    [['game-controller','용도부터 시작하기','게임, 작업, 일상 중 필요한 용도부터 골라요.','예산은 아직 몰라도 괜찮아요.','gateway-use'],['chat-circle','바로 상담하기','원하는 사양이나 조건을 자유롭게 이야기해 주세요.','생각해 둔 조건부터 말해 주세요.',DIRECT_ACTION]].map(([image,title,text,small,action])=>button(uiIcon(image,'entry-icon')+'<h2>'+title+'</h2><p>'+text+'</p><small>'+small+'</small><span class="entry-action">'+title+' '+arrow+'</span>',action,'entry-card')).join('')+'</div><p class="change-note">선택한 방식은 언제든 바꿀 수 있어요.</p>'+(draft.draft_text||state.talk?button('작성하던 상담 이어가기 '+arrow,'gateway-continue','continue-draft'):'')+'</section>';
-  else html=button(icon('arrow-left')+' 처음으로 돌아가기','gateway','route-back')+'<section class="purpose-layout"><div class="purpose-controls"><h1 tabindex="-1">어떤 일에 쓸 PC인가요?</h1><p class="purpose-description">부품 이름보다, 하고 싶은 일부터 시작하세요.</p><fieldset><legend class="sr-only">PC 용도</legend><div class="usage-grid">'+
-    [['game','game-controller','즐겨 하는 게임에 쓸 PC예요.'],['edit','video-camera','영상 편집과 작업에 쓸 PC예요.'],['office','monitor','문서 작업과 일상 업무에 써요.'],['unknown','question','어떤 용도가 좋을지 함께 정해요.']].map(([value,image,text])=>button(icon(image)+'<strong>'+usageLabels[value]+'</strong><span>'+text+'</span>','gateway-usage','','data-usage="'+value+'" aria-pressed="'+(draft.usage_choice===value)+'"')).join('')+'</div></fieldset><div class="budget-controls"><label for="gateway-budget">예산은 어느 정도인가요?</label><select id="gateway-budget"><option value="">예산 미정도 괜찮아요</option>'+[100,150,200,250].map(n=>'<option value="'+n+'" '+(draft.budget_won===n*10000?'selected':'')+'>'+n+'만원 이하</option>').join('')+'</select></div><p class="condition-summary" aria-live="polite">'+draftSummary()+'</p>'+button('이 조건으로 상담 시작 '+arrow,'gateway-begin','gateway-button')+'</div><figure class="purpose-image"><img src="assets/gateway-pc-example.png" alt="PC 본체 예시 이미지"><figcaption>예시 이미지 · 실제 추천 상품과 다를 수 있어요.</figcaption></figure></section>';
-  html+='<footer class="gateway-footer"><span class="gateway-brand"><img src="assets/popcorn-mark.png" alt=""><strong>팝콘AI</strong></span><small>나에게 맞는 PC를 함께 찾아요.</small></footer>';
-  // 같은 화면이면 다시 그리지 않는다. 다른 일(진행 중인 추천·재시도 초읽기)로 render() 가 돌 때마다 시작 카드를 새로 만들면
-  // 누르는 사이(mousedown -> mouseup)에 단추가 바뀌어 클릭이 사라진다 -- 기존 상담이 있는 #start 에서 「새 PC 고르기」를
-  // 눌러도 이동하지 않던 일(2026-10-15 오픈테스트 C06-F05).
-  if(html!==lastGatewayHtml||!gateway.firstChild){gateway.innerHTML=html;lastGatewayHtml=html;}
-}
-function renderSurface(){
-  const consultation=ui.surface==='consultation';document.body.dataset.surface=ui.surface;workspace.hidden=!consultation;gateway.hidden=consultation;toolbar.hidden=!consultation||state.screen==='results'||document.body.dataset.page==='product';
-  $('.topbar [data-action="new"]').hidden=!consultation;productsButton.hidden=consultation;
-  if(!consultation)renderGateway();
-  toolbar.innerHTML=(draft.start_mode==='use_first'?button(uiIcon('arrow-left')+' 용도 선택으로 돌아가기','gateway-use',''):'<span></span>')+button('시작방식 바꾸기','gateway','');
-  if(consultation&&document.body.dataset.page!=='product'&&(draft.start_mode==='use_first'||draft.usage_choice||draft.budget_won)){
-    const applied=M.conditions(state.talk),known=draftKnown();
-    // 초안에서 고른 것이 없는데 실제 반영된 조건이 있으면 그 조건을 말한다. 고른 것이 있으면 그것을 초안으로 보이되 정해지지 않은 항목은 쓰지 않는다.
-    if(applied.length&&!known)view.insertAdjacentHTML('afterbegin','<section class="draft-context" data-draft-context="applied"><strong>현재 상담 조건</strong><p>'+applied.map(esc).join(' · ')+'</p><p>조건을 바꾸려면 입력창에 말씀해 주세요.</p></section>');
-    else{view.insertAdjacentHTML('afterbegin','<section class="draft-context" data-draft-context="draft"><strong>상담 초안</strong>'+(known?'<p>'+esc(known)+'</p>':'')+'<p>선택한 조건을 입력창에서 확인하고 수정해 주세요.</p>'+button('선택 조건으로 초안 바꾸기','gateway-rebuild','',''+(state.phase?'disabled':''))+'</section>');}
-  }
-}
+function focusConsultation(){chatPreference=true;syncChat();if(!state.phase)$('#request').focus({preventScroll:true});else view.querySelector('h2')?.focus({preventScroll:true});}
+// 첫 화면 아래 「팝콘PC가 맞춰 둔 PC」 목록은 welcome-pcs.js 가 불러와 그린다(이 파일은 서버를 API 클라이언트로만 부른다).
+// 목록이 도착하면 첫 화면을 한 번 다시 그린다.
+const welcomePcs=()=>window.MVP3WelcomePcs?.html()||'';
+window.addEventListener('mvp3:welcome-pcs',()=>{if(state.screen==='welcome')render();});
 function notice(text){$('#notice').textContent=text;$('#notice').hidden=false;clearTimeout(noticeTimer);noticeTimer=setTimeout(()=>$('#notice').hidden=true,7000);}
 // 여러 대(wants.units)면 한 대 예산으로 견준다(M.budgetGapText · 코덱스 C10-F01). 조건과 같은 때의 wants 를 쓴다.
 function wantsFor(talk){return talk&&talk===state.selectionState?state.selectionWants:state.wants;}
@@ -241,12 +169,12 @@ function productCard(product,action='detail',id=product.index,comparison=null){
     (overBudget(product,state.talk)?'<p class="warn-text">'+esc(budget(product,state.talk))+'</p>':'')+
     button(strong?'추천 견적 자세히 보기'+uiIcon('arrow-right'):'구성 자세히 보기',action,(strong?'primary':'outline')+' card-detail','data-id="'+esc(id)+'"')+'</section>';
 }
-// 새로 나온 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 나온 PC」 화면으로 보낸다.
+// 새로 구성된 PC(부품 상품화 5단계): 운영자가 부품을 골라 만든 조립PC. 몰 카드와 따로 두고 「새로 구성된 PC」 화면으로 보낸다.
 // 용도 적합도는 서버 판정(fit · 정보 없음)을 그대로 적는다 — 정보가 없어도 숨기지 않는다(2026-10-10 결정).
 function customCards(group){
   if(!group.custom?.length)return '';
-  return '<section class="custom-pc-group" aria-label="새로 나온 PC"><h4>새로 나온 PC · 팝콘PC가 부품을 골라 만든 조립완제PC</h4><div class="quote-cards">'+group.custom.map(c=>
-    '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 나온 PC</span><h3>'+esc(c.title)+'</h3>'+
+  return '<section class="custom-pc-group" aria-label="새로 구성된 PC"><h4>새로 구성된 PC · 팝콘PC가 용도에 맞춰 부품을 골라 구성한 완제조립PC</h4><div class="quote-cards">'+group.custom.map(c=>
+    '<section class="quote-card live-product-card custom-pc-card" data-custom-pc="'+esc(c.configuration_id)+'"><span class="pill">새로 구성된 PC</span><h3>'+esc(c.title)+'</h3>'+
     '<strong class="price">'+money(c.price)+'</strong><p class="muted">'+esc(c.price_note)+'</p>'+
     '<p class="custom-pc-fit">용도 적합도: '+esc(c.fit==='fit'?c.level_text:'정보 없음')+'</p>'+
     (c.parts.length?'<dl class="live-card-spec">'+c.parts.map(x=>'<div><dt>'+esc(x.slot_label)+'</dt><dd>'+esc(x.name)+(x.quantity>1?' × '+x.quantity:'')+'</dd></div>').join('')+'</dl>':'')+
@@ -898,7 +826,7 @@ function renderSaved(){
     (state.hasMore?'<p class="muted">최근 20개의 보관 기록을 표시하고 있어요.</p>':'');
   actions.hidden=true;
 }
-function renderWelcome(){view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header><section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
+function renderWelcome(){view.innerHTML=`<header class="welcome-heading"><h2 tabindex="-1">나에게 맞는 PC</h2><p>말씀해주신 조건에 맞춰 이곳에 견적을 정리해드려요.</p></header>${welcomePcs()}<section class="welcome-card"><div class="welcome-illustration"><img src="assets/welcome-pc.png" alt="옅은 민트색 PC 본체 일러스트"></div><h3>어떤 PC가 필요한지 들려주세요</h3><p class="welcome-subtitle">게임과 예산만 알려주셔도 시작할 수 있어요.</p><ol class="welcome-steps"><li><span class="step-icon">${uiIcon('chat-circle')}</span><h4>원하는 조건 말하기</h4><p>게임, 예산, 용도 등을<br>자유롭게 말씀해주세요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('file-text')}</span><h4>추천 견적 비교하기</h4><p>입력하신 조건에 맞춰<br>최적의 견적을 제안해드려요.</p>${uiIcon('arrow-right','step-arrow')}</li><li><span class="step-icon">${uiIcon('gear')}</span><h4>부품 구성 확인하기</h4><p>상세한 부품과 사양을<br>한눈에 확인할 수 있어요.</p></li></ol><p class="welcome-help">${uiIcon('info')}잘 모르는 항목은 상담하면서 정하면 돼요.</p></section>`;actions.hidden=true;}
 // 「AI 답변 준비중」(2026-10-15 중헌 님 「로딩되는 순간 메인화면이 보이니까.. 헷갈려」). 대화 화면에서 상세로 넘어오거나
 // 새로고침해 보던 견적을 다시 불러오는 동안(restoring) 상세가 아직 없으면 첫 화면 대신 이것을 그린다.
 // 진행률은 모르므로 숫자를 말하지 않는다. 10초가 넘으면 문장만 바꾼다.
@@ -924,10 +852,9 @@ function renderPreparing(){
 function render(){
   const changed=lastScreen!==state.screen,openDetails=[...view.querySelectorAll('details[open]')].map(e=>e.dataset.detail),scroll=view.scrollTop,focused=document.activeElement?.dataset.action,focusedOrd=document.activeElement?.dataset.ordinal;
   dv2.focusHandled=false;actions.classList.remove('dv2-bar');if(state.screen!=='detail'){dv2.panelFor=null;dv2.temp=null;dv2Inert(false);}
-  const gatewayFocus=gateway.contains(document.activeElement)?{id:document.activeElement.id,usage:document.activeElement.dataset.usage,action:focused,heading:document.activeElement.tagName==='H1'}:null;
   document.body.dataset.screen=state.screen;
   // 상품 화면은 상담창 없이 한 열(승인 시안 01~15). 머리띠는 「상담으로 돌아가기」·「내 견적」만 남긴다.
-  if(ui.surface==='consultation'&&state.selected&&['detail','final'].includes(state.screen))document.body.dataset.page='product';else delete document.body.dataset.page;
+  if(state.selected&&['detail','final'].includes(state.screen))document.body.dataset.page='product';else delete document.body.dataset.page;
   $('#consult-back').hidden=document.body.dataset.page!=='product';document.body.classList.add('live-mode');document.body.classList.toggle('original-flow',['welcome','results','detail','final'].includes(state.screen));
   view.dataset.screen=state.screen;
   // 예외 입력·상담 실패 뒤에는 사람 상담 길을 연다(서버 handoff_offer). 신청 칸은 구매 상담 신청과 같다.
@@ -942,15 +869,11 @@ function render(){
   else if(state.screen==='final'&&state.selected)renderProduct();
   else if(state.screen==='saved')renderSaved();
   const recovery=recoveryBanner();if(recovery)view.insertAdjacentHTML('afterbegin',recovery);
-  renderMessages();syncChat();renderSurface();
-  if(ui.surface==='consultation'){
+  renderMessages();syncChat();document.body.dataset.surface='consultation';
+  {
     if(!changed){for(const e of view.querySelectorAll('details'))if(openDetails.includes(e.dataset.detail))e.open=true;view.scrollTop=scroll;if(focused&&!dv2.focusHandled)[...document.querySelectorAll('[data-action]')].find(e=>e.dataset.action===focused&&!e.disabled&&(focusedOrd===undefined||e.dataset.ordinal===focusedOrd))?.focus({preventScroll:true});}
     else{view.scrollTop=0;view.querySelector('h2')?.focus({preventScroll:true});if(mobile.matches)window.scrollTo(0,0);}
     if(!enteringRoute&&lastScreen!==state.screen&&location.hash!=='#'+state.screen)history[restoring?'replaceState':'pushState']({screen:state.screen},'','#'+state.screen);
-  }else{
-    if(!enteringRoute)history.replaceState(uiEntry(),'',uiHash());
-    const target=gatewayFocus?.id?$('#'+gatewayFocus.id):gatewayFocus?.usage?gateway.querySelector('[data-usage="'+gatewayFocus.usage+'"]'):gatewayFocus?.action?gateway.querySelector('[data-action="'+gatewayFocus.action+'"]'):gatewayFocus?.heading?gateway.querySelector('h1'):null;
-    target?.focus({preventScroll:true});
   }
   lastScreen=state.screen;
   if(!(restoring&&state.screen==='welcome')){prepStarted=0;clearTimeout(prepTimer);}
@@ -983,15 +906,13 @@ function focusParts(){
 }
 // 넘어온 직후 견적을 다시 불러오는 일이 끝나면 한 번만 부품 바꾸기 칸으로 옮긴다(못 불러왔으면 옮기지 않고 끝낸다).
 function settleArrival(){if(!arrival?.focus||enteringRoute||state.phase)return;arrival.focus=false;if(state.screen==='detail'&&state.selected)focusParts();}
-function openSaved(){ui.surface='consultation';if(state.screen==='saved'&&state.phase==='list'){render();return;}void flow.list();}
+function openSaved(){if(state.screen==='saved'&&state.phase==='list'){render();return;}void flow.list();}
 function enterRoute(hash,initial=false){
   enteringRoute=true;
   try{
     if(initial)flow.reset({restore:true});
-    if(initial&&(!hash||hash==='#start'||hash==='#purpose')){
-      ui.surface=hash==='#purpose'?'usage':'gateway';history.replaceState(uiEntry(),'',uiHash());render();return;
-    }
-    ui.surface='consultation';let screen=hash.slice(1);const asked=screen;
+    // 옛 입구 주소(#start · #purpose)와 빈 주소는 모두 상담 첫 화면(#welcome)이다.
+    let screen=hash.slice(1);const asked=screen;
     if(!screenNames.includes(screen)||(['detail','final'].includes(screen)&&!state.selected)||(screen==='results'&&!state.recommendation))screen='welcome';
     if(initial||hash!=='#'+screen)history.replaceState({screen},'','#'+screen);
     const willResume=initial&&screen!=='saved'&&state.restoredCurrent&&state.talk,willRefresh=!willResume&&initial&&screen==='welcome'&&['results','detail'].includes(asked)&&state.talk;
@@ -1011,26 +932,14 @@ async function submit(text,{fromInput=false}={}){if(!String(text||'').trim()){no
   const sent=text.trim();await flow.submit(text);
   // submit() also returns true after errors. Only validated conversation history
   // with no current error permits clearing the unchanged, visible input.
-  if(fromInput&&ui.surface==='consultation'&&!state.error&&state.history.some(x=>x.role==='user'&&x.text===sent)&&draft.draft_text===text)setDraft('');
+  if(fromInput&&!state.error&&state.history.some(x=>x.role==='user'&&x.text===sent)&&draft.draft_text===text)setDraft('');
 }
-// 「바로 상담하기」는 2차 대화 화면(talk.html)으로 간다(2026-10-11 사장님 「그냥 다 풀어」).
-// 이 화면의 상담(기존 상담 화면)은 지우지 않았다 -- 상단 「새 상담」과 대화 화면의 「기존 상담 화면」으로 들어온다.
-// 되돌리려면 DIRECT_ACTION 을 'gateway-direct' 로 바꾼다.
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;e.preventDefault();
   if(keepUi.handle(b.dataset.action,b))return;
   switch(b.dataset.action){
-    case 'gateway':showSurface('gateway');break;
-    case 'gateway-use':draft.start_mode='use_first';showSurface('usage');break;
-    case 'gateway-direct':draft.start_mode='direct';showSurface('consultation');break;
-    case 'gateway-talk':location.href='talk.html';break;
-    case 'gateway-start':location.href='talk.html?start='+encodeURIComponent(b.dataset.start);break;
-    case 'gateway-continue':showSurface('consultation');break;
-    case 'gateway-usage':captureDraft();draft.usage_choice=draft.usage_choice===b.dataset.usage?null:b.dataset.usage;if(!draft.draft_edited)refreshDraft();render();gateway.querySelector('[data-usage="'+b.dataset.usage+'"]')?.focus({preventScroll:true});break;
-    case 'gateway-begin':draft.start_mode='use_first';if(!draft.draft_edited)refreshDraft();showSurface('consultation');break;
-    case 'gateway-rebuild':refreshDraftExplicitly();break;
-    case 'gateway-products':if(state.recommendation){showSurface('consultation',{focus:false});flow.navigate('results');}else{showSurface('consultation');notice('원하는 용도와 예산을 상담창에 알려주시면 추천 상품을 확인할 수 있어요.');}break;
-    case 'new':chatPreference=null;lastMessages='';Object.assign(draft,{start_mode:null,usage_choice:null,budget_won:null,budget_bound:null});setDraft('');ui.surface='consultation';flow.reset();break;
+    case 'home':if(state.screen!=='welcome'&&!state.phase)flow.navigate('welcome');else{view.scrollTop=0;window.scrollTo(0,0);}break;
+    case 'new':chatPreference=null;lastMessages='';setDraft('');flow.reset();break;
     case 'saved':captureDraft();openSaved();break;
     case 'prompt':submit(b.dataset.text);break;
     case 'explore':void flow.explore(b.dataset.dir,b.dataset.label);break;
@@ -1076,8 +985,6 @@ function consultBack(){
   if(arrival){location.href='talk.html';return;}
   flow.navigate(state.recommendation?'results':'welcome');
 }
-function refreshDraftExplicitly(){setDraft(generatedDraft());$('#request').focus({preventScroll:true});}
-document.addEventListener('change',e=>{if(e.target.id==='gateway-budget'){captureDraft();const n=Number(e.target.value);draft.budget_won=[100,150,200,250].includes(n)?n*10000:null;draft.budget_bound=draft.budget_won===null?null:'이하';if(!draft.draft_edited)refreshDraft();render();$('#gateway-budget')?.focus({preventScroll:true});}});
 // 신청 칸은 다시 그려져도 적던 값이 남게 입력마다 상태에 옮긴다(다시 그리지는 않는다).
 view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
 // 상세 v2: 라디오로 고르는 것은 임시 선택이다(화면을 다시 그리지 않고 적용 단추 상태만 바꾼다). 접힌 칸의 열림 상태는 다시 그려도 지킨다.
@@ -1086,15 +993,6 @@ view.addEventListener('toggle',e=>{const k=e.target?.dataset?.detail;if(k&&k.sta
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.defaultPrevented&&state.screen==='detail'&&state.build?.ordinal!==null&&canSwapHere(state.selected)){e.preventDefault();flow.closeBuild();}});
 view.addEventListener('change',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());if(e.target.matches?.('[data-consult-topic]'))flow.consultTopic(e.target.value);});
 $('#request').addEventListener('input',()=>{captureDraft();draft.draft_edited=true;});
-document.addEventListener('input',e=>{if(e.target.id==='gateway-text')gatewayText=e.target.value;});
-document.addEventListener('submit',e=>{
-  if(e.target.id!=='gateway-chat')return;e.preventDefault();
-  const text=$('#gateway-text').value.trim(),note=$('#gateway-chat-status');
-  if(!text){note.textContent='PC로 할 일이나 궁금한 점을 적어주세요.';note.hidden=false;$('#gateway-text').focus();return;}
-  try{sessionStorage.setItem(FIRST_KEY,JSON.stringify({text,at:Date.now()}));}
-  catch{note.textContent='이 브라우저에서 글을 넘기지 못했어요. 아래 「편하게 상담하기」로 들어가 다시 적어 주세요.';note.hidden=false;return;}
-  location.href='talk.html';
-});
 $('#chat-form').addEventListener('submit',e=>{e.preventDefault();if(state.phase)return;captureDraft();void submit(draft.draft_text,{fromInput:true});});
 $('#request').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();$('#chat-form').requestSubmit();}});
 $('#chat-toggle').addEventListener('click',()=>{chatPreference=$('#chat-toggle').getAttribute('aria-expanded')!=='true';syncChat();if(!$('#chat-body').hidden)scrollToLatest();});
@@ -1113,15 +1011,13 @@ window.addEventListener('popstate',e=>{
   // 모바일 선택창: 뒤로가기는 화면을 옮기지 않고 패널만 닫는다(적용된 구성 · 대수 · 스크롤은 그대로).
   if(dv2.skipPop){dv2.skipPop=false;return;}
   if(dv2.hist){dv2.hist=false;if(state.screen==='detail'&&state.build?.ordinal!==null)flow.closeBuild();return;}
-  captureDraft();const entry=e.state;
-  if(entry?.ui_epoch===ui.epoch&&['gateway','usage','consultation'].includes(entry.surface)&&screenNames.includes(entry.screen)){
-    enteringRoute=true;try{ui.surface=entry.surface;render();history.replaceState(uiEntry(),'',uiHash());focusSurface();}finally{enteringRoute=false;}
-  }else enterRoute(location.hash);
+  captureDraft();
+  enterRoute(location.hash);
 });
 // 대화 화면(talk.html)과 오갈 때 보내지 않은 입력 문장을 넘긴다(코덱스 #148 검수 P2). 고객이 직접 쓴 문장만
 // 넘기고(자동으로 만든 안내 문장은 넘기지 않는다), 받은 문장은 입력 칸에 채우기만 한다 -- 보내지 않는다.
 const draftHandoff=window.MVP3LiveFlow.createDraftHandoff();
 window.addEventListener('pagehide',()=>{captureDraft();draftHandoff.put(draft.draft_edited?draft.draft_text:'');});
 {const carried=draftHandoff.take();if(carried&&!(draft.draft_edited&&draft.draft_text.trim()))setDraft(carried,true);}
-enterRoute(location.hash,true);focusSurface();settleArrival();
+enterRoute(location.hash,true);focusConsultation();settleArrival();
 })();

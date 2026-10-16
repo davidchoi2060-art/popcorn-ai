@@ -58,7 +58,7 @@ test('results: R01 heading, chips, four spec rows, single comparison line, footn
     assert.deepEqual([...d.querySelectorAll('.condition-chip')].map(text),['배그×','롤×','예산 1,500,000원×','게임×','FHD · 임시 기준']);
     assert.ok(d.querySelector('.condition-chip.is-assumed').title.includes('FHD(1080p)'));
     assert.equal(d.querySelector('.live-result-group>h3'),null);
-    assert.equal(d.querySelector('.gateway-route-toolbar').hidden,true);
+    assert.equal(d.querySelector('.gateway-route-toolbar'),null);
     assert.deepEqual([...cards[0].querySelectorAll('.live-card-spec dt')].map(text),['CPU','GPU','RAM','저장장치']);
     assert.equal(cards[0].querySelector('.live-reasons'),null);
     assert.equal(cards[0].querySelector('.live-price-difference'),null);

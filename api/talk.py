@@ -1356,11 +1356,16 @@ def parse_talk(body: ParseBody, request: Request):
     # 이 문장은 도구 상담(api/talk_agent)이 받는다. 응답은 이 경로의 계약 모양 그대로(`agent: true`)이고,
     # AI 가 실패하면 None 이 와서 아래 지금 경로가 그대로 받는다. 꺼져 있으면 이 블록은 아무 일도 안 한다.
     from . import talk_agent as AGENT   # 순환 import 를 피해 여기서 부른다
-    if AGENT.enabled() and not truncated and len(text) <= AGENT.CHAT_MAX:
+    # 아주 긴 글도 앞·끝만 읽은 글로 도구 상담이 받는다(2026-10-16 중헌 님 「우리가 준비못한 답변은 LLM의 답변을
+    # 그대로 내보내도 돼」) -- 읽은 길이는 지금 경로와 같은 안내로 밝힌다.
+    if AGENT.enabled() and len(text) <= AGENT.CHAT_MAX:
         with engine.connect() as conn:
             access_gate.check_rate(conn, request, what="talk.parse")
         agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow)
         if agent_res is not None:
+            if truncated:
+                agent_res["reply"] = (TX.NOTE_TOO_LONG % format(len(text), ",") + "\n\n" + agent_res["reply"]).strip()
+                agent_res["truncated"] = True
             return agent_res
 
     # 입력 검사 뒤 · LLM 호출 앞.

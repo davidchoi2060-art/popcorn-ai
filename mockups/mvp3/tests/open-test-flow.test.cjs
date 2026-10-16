@@ -84,21 +84,15 @@ function gatewayHarness(){
   return {w,get flow(){return flow;},errors,close:()=>w.close()};
 }
 
-test('C06-F05: with an own consultation on #start, re-renders keep the start cards so a click still navigates',()=>{
+// 2026-10-16 단일 첫 화면: 옛 입구 주소 #start 로 와도 갈래 카드 없이 상담 화면을 열고, 이 탭에 있던 본인 상담을 그대로 잇는다.
+test('C06-F05: an old #start link with an own consultation opens the single consultation screen and keeps the talk',()=>{
   const h=gatewayHarness();
   try{
-    const d=h.w.document,card=d.querySelector('[data-action="gateway-start"][data-start="new_pc"]');
-    assert.ok(d.querySelector('[data-action="gateway-continue"]'),'own consultation is offered');
-    // 진행 중인 일·초읽기로 render() 가 다시 돌아도 같은 단추가 남아야 누르는 사이 클릭이 사라지지 않는다.
-    card.dispatchEvent(new h.w.MouseEvent('mousedown',{bubbles:true}));
-    h.flow.emit();h.flow.emit();
-    assert.equal(d.querySelector('[data-action="gateway-start"][data-start="new_pc"]'),card);
-    assert.ok(card.isConnected);
-    card.querySelector('h2').click();
-    // jsdom 은 다른 문서로 이동하지 못한다 -- 이동을 시도했다는 기록으로 확인한다.
-    assert.ok(h.errors.some(m=>/navigation/i.test(m)),'click attempted navigation to talk.html');
-    // 내용이 바뀌면 다시 그린다(입력한 글은 그대로 남는다).
-    const text=d.querySelector('#gateway-text');text.value='새 글';text.dispatchEvent(new h.w.Event('input',{bubbles:true}));h.flow.emit();
-    assert.equal(d.querySelector('#gateway-text').value,'새 글');
+    const d=h.w.document;
+    assert.equal(h.w.location.hash,'#welcome');assert.equal(d.body.dataset.surface,'consultation');
+    assert.equal(d.querySelector('#gateway-root'),null);assert.equal(d.querySelector('[data-action^="gateway"]'),null);
+    assert.match(d.querySelector('#messages').textContent,/P1 을 권해요\./);
+    h.flow.emit();h.flow.emit();assert.match(d.querySelector('#messages').textContent,/P1 을 권해요\./);
+    assert.deepEqual(h.errors,[]);
   }finally{h.close();}
 });
