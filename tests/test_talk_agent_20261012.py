@@ -917,6 +917,14 @@ class NoDeadEnd(unittest.TestCase):
         self.assertNotIn("일반 설명만 원하는 질문에는 도구를 부르지 않는다", AG.SYSTEM)
         self.assertNotIn("도구를 부르지 말고, 무엇이 왜 부딪치는지", AG.SYSTEM)
 
+    def test_prompt_covers_dead_ends_found_on_dev_server(self):
+        # 2026-10-16 개발 서버 86문항: 판매 안내 「쇼핑몰에서 확인」만 · 주제 밖 거절 · 경쟁사 「확인 불가」만 ·
+        # 용도 없이 「조용한/화이트」에 되묻기만 · 예산 초과 PC만 보여 준 답이 일반 AI 보다 못하다고 판정됐다.
+        for phrase in ("일반 안내라고 밝혀 덧붙인다", "거절하지 말고 일반 지식으로", "비교하는 요령",
+                       "가장 흔한 용도로 find_pcs", "nav=cheaper 로 한 번 더", "사람 상담 남기기"):
+            self.assertIn(phrase, AG.SYSTEM)
+        self.assertNotIn("여기서 도와드리기 어렵다고 짧게 말하고", AG.SYSTEM)
+
 
 class LlmAnswerAsIs(unittest.TestCase):
     """2026-10-16 중헌 님: 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」."""

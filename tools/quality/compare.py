@@ -336,28 +336,30 @@ def _esc(s: str) -> str:
     return s.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
 
 
-def annotate(rows: list[dict], chunk: int = 3500, per_kind: int = 10) -> None:
+def annotate(rows: list[dict], chunk: int = 1300, per_kind: int = 9) -> None:
     """못한 답과 제품 없이 끝난 답을 GitHub 주석으로 남긴다.
 
     작업 기록과 산출물(zip)은 이 저장소를 보는 일부 환경에서 내려받지 못한다(2026-10-16). 주석은
     check-run API 로 읽히므로, 무엇이 왜 못했는지 거기서도 되짚을 수 있게 한다. 한 단계당 종류별
-    주석 10개 한도라 여러 줄을 묶어 싣는다.
+    주석 10개 한도라 여러 줄을 묶어 notice·warning·error 에 나눠 싣는다. 주석 하나는 4KB 안팎에서 잘리므로
+    (한글 한 자 3바이트) 한 묶음을 1,300자 안으로 둔다. error 하나는 --gate 의 빨간불 줄 몫으로 남긴다.
     """
     picked = [r for r in rows if r["verdict"] == WORSE or dead_end(r)]
     blocks, cur = [], ""
     for r in picked:
         tag = ("못함" if r["verdict"] == WORSE else r["verdict"]) + (" · 제품 없음" if dead_end(r) else "")
         one = "[%s] %s | Q: %s | 우리: %s | 이유: %s" % (
-            r["id"], tag, (r.get("question") or "")[:120], (r.get("ours") or "(빈 답)")[:500],
-            (r.get("reason") or "")[:200])
+            r["id"], tag, (r.get("question") or "")[:120], (r.get("ours") or "(빈 답)")[:320],
+            (r.get("reason") or "")[:160])
         if cur and len(cur) + len(one) > chunk:
             blocks.append(cur)
             cur = ""
         cur = (cur + "\n\n" + one) if cur else one
     if cur:
         blocks.append(cur)
-    for i, b in enumerate(blocks[:per_kind * 2]):
-        kind = "notice" if i < per_kind else "warning"
+    kinds = ("notice", "warning", "error")
+    for i, b in enumerate(blocks[:per_kind * len(kinds)]):
+        kind = kinds[i // per_kind]
         print("::%s title=답 점검 %d/%d::%s" % (kind, i + 1, len(blocks), _esc(b)))
 
 
