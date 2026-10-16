@@ -76,6 +76,8 @@ def _row(r, full: bool) -> dict:
         "quote_id": str(r["quote_id"]) if r["quote_id"] else None,
         "product_code": r["product_code"], "product_name": r["product_name"],
         "configuration_id": r.get("configuration_id"),
+        # 고객이 부품을 직접 고른 구성(api/mvp3_free_build) — 신청 순간 다시 계산한 부품·판매가·총액
+        "free_build": r.get("free_build"),
         "assignee": r["assignee_name"], "assignee_id": r["assignee_id"],
         "updated_at": iso(r["updated_at"]), "purge_at": iso(r["purge_at"]),
         "test": bool(r["is_test"]),

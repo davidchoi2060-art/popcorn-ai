@@ -1,0 +1,204 @@
+"""MVP3 부품 직접 고르기(api/mvp3_free_build) — DB 없이 판정·채우기·가격 노출을 본다."""
+import unittest
+from unittest.mock import patch
+
+from fastapi import HTTPException
+
+from api import mvp3_free_build as F
+from api.orders import ASSEMBLY_FEE
+
+
+def row(code, part_type, name, price, raw='', maker=None):
+    return dict(product_code=code, product_name=name, sale_price=price, status='판매중', part_type=part_type,
+                spec_source_text=raw, maker=maker)
+
+
+ROWS = [
+    row(1, 'CPU', '인텔 코어i9-14세대 14900K (랩터레이크 리프레시)', 700000, maker='인텔'),
+    row(2, 'CPU', '인텔 코어i5-14세대 14400F', 250000, maker='인텔'),
+    row(3, 'CPU', 'AMD 라이젠7-6세대 9700X', 450000, maker='AMD'),
+    row(10, 'MB', 'ASUS PRIME B760M-A D5', 150000, '슬롯: 4 / 최대 192(GB)'),
+    row(11, 'MB', 'MSI B650M 박격포', 200000, '슬롯: 4 / 최대 192(GB)'),
+    row(12, 'MB', 'ASRock H610M-HDV DDR4', 90000, '슬롯: 2 / 최대 64(GB)'),
+    row(20, 'RAM', '삼성전자 DDR5-5600 (16GB)', 60000),
+    row(21, 'RAM', '삼성전자 DDR5-5600 (32GB)', 130000),
+    row(22, 'RAM', 'TeamGroup DDR4-3200 (16GB)', 40000),
+    row(23, 'RAM', '삼성전자 노트북 DDR5-5600 (32GB)', 90000, 'SO-DIMM'),
+    row(30, 'GPU', 'MSI 지포스 RTX 5060 Ti 벤투스 2X OC D7 8GB', 600000),
+    row(31, 'GPU', 'MSI 지포스 RTX 5060 벤투스 2X OC D7 8GB', 450000),
+    row(32, 'GPU', 'ZOTAC RTX 5070 Ti', 1100000),
+    row(40, 'CASE', '앱코 미들타워 케이스', 50000),
+    row(50, 'COOLER_CPU_AIR', '쿨러 A', 30000),
+    row(60, 'SSD', 'WD SN580 M.2 NVMe (500GB)', 60000),
+    row(61, 'SSD', 'WD SN580 M.2 NVMe (1TB)', 90000),
+    row(62, 'SSD', '구형 SSD (256GB)', 30000),
+    row(70, 'POWER', '파워 500W', 50000),
+    row(71, 'POWER', '파워 750W', 90000),
+]
+SPECS = {
+    1: dict(part_type='CPU', socket='LGA1700', cpu_gpu=True), 2: dict(part_type='CPU', socket='LGA1700', cpu_gpu=False),
+    3: dict(part_type='CPU', socket='AM5', cpu_gpu=True),
+    10: dict(part_type='MB', socket='LGA1700', mem_type='DDR5'), 11: dict(part_type='MB', socket='AM5', mem_type='DDR5'),
+    12: dict(part_type='MB', socket='LGA1700', mem_type='DDR4'),
+    20: dict(part_type='RAM', mem_type='DDR5', capacity_gb=16), 21: dict(part_type='RAM', mem_type='DDR5', capacity_gb=32),
+    22: dict(part_type='RAM', mem_type='DDR4', capacity_gb=16), 23: dict(part_type='RAM', mem_type='DDR5', capacity_gb=32),
+    30: dict(part_type='GPU', gpu_watt=650), 31: dict(part_type='GPU', gpu_watt=550), 32: dict(part_type='GPU', gpu_watt=750),
+    40: dict(part_type='CASE'), 50: dict(part_type='COOLER_CPU_AIR', socket_list=['LGA1700']),
+    60: dict(part_type='SSD', capacity_gb=500), 61: dict(part_type='SSD', capacity_gb=1000), 62: dict(part_type='SSD', capacity_gb=256),
+    70: dict(part_type='POWER', watt=500), 71: dict(part_type='POWER', watt=750),
+}
+RULES = [
+    dict(rule_key='socket', label='CPU 소켓', slot='MB', ref_slot='CPU', field='socket', ref_field='socket', op='eq',
+         part_types=[], ref_offset=0, null_ref_mode='block'),
+    dict(rule_key='mem', label='메모리 규격', slot='RAM', ref_slot='MB', field='mem_type', ref_field='mem_type', op='eq',
+         part_types=[], ref_offset=0, null_ref_mode='block'),
+    dict(rule_key='power', label='파워 용량', slot='POWER', ref_slot='GPU', field='watt', ref_field='gpu_watt', op='gte',
+         part_types=[], ref_offset=0, null_ref_mode='skip'),
+    dict(rule_key='cooler_socket', label='쿨러 소켓', slot='COOLER', ref_slot='CPU', field='socket_list', ref_field='socket',
+         op='contains', part_types=[], ref_offset=0, null_ref_mode='block'),
+]
+
+
+def specs_for(_conn, codes):
+    return {c: SPECS[c] for c in codes if c in SPECS}
+
+
+def load_rows(_conn, codes=None):
+    return [dict(r) for r in ROWS if codes is None or r['product_code'] in codes]
+
+
+class ParseTests(unittest.TestCase):
+    def test_owner_example(self):
+        c = F.parse_text('메모리 32기가, RTS 5060ti, CPU는 i9 시리즈')
+        self.assertEqual(c.ram_gb, 32)
+        self.assertEqual(c.gpu, 'RTX 5060 TI')
+        self.assertEqual(c.cpu, 'i9')
+
+    def test_other_words(self):
+        c = F.parse_text('라이젠 7 9700X에 램 64GB, SSD 2TB, RX 9070 XT')
+        self.assertEqual((c.ram_gb, c.ssd_gb, c.gpu), (64, 2000, 'RX 9070 XT'))
+        self.assertTrue(c.cpu.startswith('라이젠 7'))
+        self.assertEqual(F.parse_text('인텔로 맞춰 주세요').platform, '인텔')
+        self.assertEqual(F.parse_text('그냥 좋은 걸로').model_dump(exclude_none=True), {})
+
+    def test_gpu_match_keeps_suffix(self):
+        want = F.gpu_model('RTX 5060 Ti')
+        self.assertTrue(F.gpu_matches('MSI 지포스 RTX 5060 Ti 벤투스 2X OC D7 8GB', want))
+        self.assertFalse(F.gpu_matches('MSI 지포스 RTX 5060 벤투스 2X OC D7 8GB', want))
+        self.assertFalse(F.gpu_matches('ZOTAC RTX 5070 Ti', want))
+        self.assertTrue(F.gpu_matches('MSI RTX 5060 벤투스', F.gpu_model('5060')))
+
+    def test_cpu_series_and_model(self):
+        i9 = F.cpu_rule('i9 시리즈')
+        self.assertTrue(i9('인텔 코어i9-14세대 14900K'))
+        self.assertFalse(i9('인텔 코어i5-14세대 14400F'))
+        k = F.cpu_rule('14900K')
+        self.assertTrue(k('인텔 코어i9-14세대 14900K'))
+        self.assertFalse(k('인텔 코어i9-14세대 14900KF'))
+        self.assertTrue(F.cpu_rule('라이젠 7')('AMD 라이젠7-6세대 9700X'))
+        self.assertIsNone(F.cpu_rule('빠른 거'))
+
+
+@patch.object(F, 'load_specs', side_effect=specs_for)
+@patch.object(F, 'load', side_effect=load_rows)
+class BuildTests(unittest.TestCase):
+    def start(self, **cond):
+        return F.start_build(None, F.Conditions(**cond), RULES)
+
+    def test_owner_example_fills_the_rest(self, *_):
+        res = self.start(**F.parse_text('메모리 32기가, RTS 5060ti, CPU는 i9 시리즈').model_dump())
+        by = {l['slot']: l for l in res['lines']}
+        self.assertEqual(by['CPU']['product_code'], 1)
+        self.assertEqual(by['GPU']['product_code'], 30)
+        self.assertEqual(by['MB']['product_code'], 12)          # 소켓이 맞는 보드 중 가장 싼 DDR4 보드
+        self.assertEqual((by['RAM']['product_code'], by['RAM']['quantity']), (22, 2))  # 그 보드에 맞는 DDR4 16GB × 2
+        self.assertEqual(by['POWER']['product_code'], 71)       # 500W 는 650W 그래픽카드를 못 받는다
+        self.assertEqual(by['SSD']['product_code'], 60)         # 말하지 않으면 500GB 이상 중 싼 것
+        self.assertTrue(by['CPU']['from_request'] and by['GPU']['from_request'] and by['RAM']['from_request'])
+        self.assertFalse(by['MB']['from_request'])
+        expected = 700000 + 90000 + 40000 * 2 + 600000 + 50000 + 30000 + 60000 + 90000 + ASSEMBLY_FEE
+        self.assertEqual(res['total'], expected)
+
+    def test_no_part_price_in_lines(self, *_):
+        res = self.start(cpu='i9')
+        for line in res['lines']:
+            self.assertFalse({'price', 'sale_price', 'cost', 'row'} & set(line), line)
+
+    def test_integrated_graphics_when_gpu_not_asked(self, *_):
+        by = {l['slot']: l for l in self.start(cpu='i9')['lines']}
+        self.assertIsNone(by['GPU']['product_code'])
+        self.assertEqual(by['GPU']['name'], 'CPU 내장 그래픽')
+        # 내장 그래픽이 없는 CPU 면 그래픽카드를 넣는다
+        by = {l['slot']: l for l in self.start(cpu='14400F')['lines']}
+        self.assertEqual(by['GPU']['product_code'], 31)
+
+    def test_cooler_left_empty_when_none_fits(self, *_):
+        res = self.start(cpu='라이젠 7')             # 쿨러 A 는 LGA1700 만 받는다
+        by = {l['slot']: l for l in res['lines']}
+        self.assertEqual(by['MB']['product_code'], 11)
+        self.assertIsNone(by['COOLER']['product_code'])
+        self.assertIn(F.WARNING_COOLER, res['warnings'])
+
+    def test_unmatched_condition_is_named(self, *_):
+        with self.assertRaises(HTTPException) as e:
+            self.start(gpu='RTX 5090')
+        self.assertEqual(e.exception.status_code, 409)
+        self.assertEqual(e.exception.detail['unmatched'][0]['slot'], 'GPU')
+
+    def test_quote_rejects_incompatible(self, *_):
+        parts = [F.Pick(slot='CPU', product_code=3), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=21),
+                 F.Pick(slot='CASE', product_code=40), F.Pick(slot='SSD', product_code=60), F.Pick(slot='POWER', product_code=70)]
+        with self.assertRaises(HTTPException) as e:
+            F.quote_build(None, parts, RULES)
+        self.assertIn('CPU 소켓', e.exception.detail)
+
+    def test_quote_refuses_laptop_ram_and_wrong_slot(self, *_):
+        parts = [F.Pick(slot='CPU', product_code=1), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=23),
+                 F.Pick(slot='CASE', product_code=40), F.Pick(slot='SSD', product_code=60), F.Pick(slot='POWER', product_code=70)]
+        with self.assertRaises(HTTPException):
+            F.quote_build(None, parts, RULES)
+        with self.assertRaises(HTTPException):
+            F.quote_build(None, [F.Pick(slot='GPU', product_code=1)] + parts[1:], RULES)
+
+    def test_options_show_diff_only_and_compatible(self, *_):
+        parts = [F.Pick(slot='CPU', product_code=1), F.Pick(slot='MB', product_code=10), F.Pick(slot='RAM', product_code=20, quantity=2),
+                 F.Pick(slot='GPU', product_code=30), F.Pick(slot='CASE', product_code=40), F.Pick(slot='COOLER', product_code=50),
+                 F.Pick(slot='SSD', product_code=60), F.Pick(slot='POWER', product_code=71)]
+        _, base = F.quote_build(None, parts, RULES)
+        res = F.options_build(None, parts, 'MB', RULES)
+        codes = [o['product_code'] for o in res['options']]
+        self.assertEqual(codes, [])                    # 11 은 소켓이, 12 는 DDR4 라 메모리가 안 맞는다
+        res = F.options_build(None, parts, 'GPU', RULES)
+        by = {o['product_code']: o for o in res['options']}
+        self.assertEqual(set(by), {31, 32})            # 5070 Ti 750W 는 750W 파워와 같아 통과한다
+        self.assertEqual(by[31]['price_diff'], 450000 - 600000)
+        self.assertEqual(by[31]['total'], base['total'] - 150000)
+        self.assertFalse({'price', 'sale_price'} & set(by[31]))
+        self.assertEqual(res['clear']['price_diff'], -600000)
+
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+class InquiryHookTests(unittest.TestCase):
+    def test_inquiry_body_takes_picks_only(self):
+        from pydantic import ValidationError
+        from api import mvp3_purchase_inquiry as PI
+        b = PI.InquiryBody(topic='주문 희망', consent=True, phone='010-1234-5678',
+                           free_build=[{'slot': 'CPU', 'product_code': 1}])
+        self.assertEqual(b.free_build[0].quantity, 1)
+        for bad in ([{'slot': 'CPU', 'product_code': 1, 'sale_price': 1}], [{'slot': 'HDD', 'product_code': 1}], []):
+            with self.subTest(bad=bad), self.assertRaises(ValidationError):
+                PI.InquiryBody(topic='주문 희망', consent=True, phone='010-1234-5678', free_build=bad)
+
+    def test_admin_row_carries_build(self):
+        from datetime import datetime, timedelta, timezone
+        from api import admin_purchase_inquiries as AP
+        now = datetime.now(timezone.utc)
+        r = dict(inquiry_id=1, inquiry_no='PI-1001', created_at=now, topic='주문 희망', status='대기', contact_name=None,
+                 contact_phone='01012345678', contact_email=None, message=None, memo=None, user_id=None, quote_id=None,
+                 product_code=None, product_name='직접 고른 PC · 1,000원', configuration_id=None,
+                 free_build={'parts': [], 'total': 1000}, assignee_name=None, assignee_id=None, updated_at=now,
+                 purge_at=now + timedelta(days=1), is_test=False)
+        self.assertEqual(AP._row(r, True)['free_build']['total'], 1000)
