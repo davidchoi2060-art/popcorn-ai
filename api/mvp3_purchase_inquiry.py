@@ -13,6 +13,7 @@
 ■ 개인정보
   연락처는 이 표에만 둔다. 로그에는 신청 번호만 찍는다. 보관 기한은 신청 후 180일.
 """
+import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,8 @@ from . import access_gate, visitor
 from .db import engine
 from .mvp3_contact import EMAIL_RE, KEEP_DAYS, PHONE_RE   # 정규식·보관 기한은 한 곳(mvp3_contact)
 from .mvp3_saved_quotes import same_origin
+from .orders import ASSEMBLY_FEE
+from .mvp3_free_build import Pick as FreePick, quote_build as free_quote
 from .recommend import _resolve_data_origin
 
 router = APIRouter(prefix='/api/mvp3', tags=['mvp3'])
@@ -54,6 +57,8 @@ class InquiryBody(BaseModel):
     quote_id: UUID | None = None
     product_code: StrictInt | None = Field(default=None, gt=0)
     configuration_id: str | None = Field(default=None, pattern=r'^A[0-9A-F]{16}$')
+    # 「부품 직접 고르기」 구성(api/mvp3_free_build). 화면이 보낸 값은 부품 번호·수량만 믿고 금액·호환은 다시 센다.
+    free_build: list[FreePick] | None = Field(default=None, min_length=1, max_length=8)
 
 
 def _clean(body: InquiryBody):
@@ -115,14 +120,27 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
             if not customer_list(conn, [body.configuration_id]):
                 raise HTTPException(409, '이 PC는 지금 공개되어 있지 않아요. 목록을 새로 열어 확인해 주세요.')
             cfg = body.configuration_id
+        free = None
+        if body.free_build is not None:
+            # 지금 판매가·호환으로 다시 계산한 구성만 붙인다 — 판매 중이 아니거나 호환이 깨졌으면 409(고객이 다시 고른다).
+            picks, built = free_quote(conn, body.free_build)
+            free = json.dumps({'parts': [dict(slot=s, product_code=p['product_code'], name=p['name'],
+                                              quantity=p['quantity'], sale_price=p['row']['sale_price'])
+                                         for s, p in picks.items() if p is not None],
+                               'empty': [s for s, p in picks.items() if p is None],
+                               'assembly_fee': ASSEMBLY_FEE, 'total': built['total'],
+                               'warnings': built['warnings'], 'priced_at': datetime.now(timezone.utc).isoformat()},
+                              ensure_ascii=False)
         no = _no(conn)
         now = datetime.now(timezone.utc)
         conn.execute(text("""
             INSERT INTO purchase_inquiries
                 (inquiry_no, user_id, quote_id, product_code, topic, contact_name, contact_phone,
-                 contact_email, message, consent_at, data_origin, purge_at""" + (', configuration_id' if cfg else '') + """)
-            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge""" + (', :cfg' if cfg else '') + """)
-        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 't': body.topic, 'n': name,
+                 contact_email, message, consent_at, data_origin, purge_at""" + (', configuration_id' if cfg else '')
+            + (', free_build' if free else '') + """)
+            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge""" + (', :cfg' if cfg else '')
+            + (', CAST(:free AS jsonb)' if free else '') + """)
+        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 'free': free, 't': body.topic, 'n': name,
                'p': phone, 'e': email, 'm': message, 'now': now,
                'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS)})
     log.info('[purchase-inquiry] %s topic_ok=%s quote=%s', no, True, qid is not None)
