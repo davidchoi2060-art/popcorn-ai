@@ -971,7 +971,7 @@ function settleProductFocus(){
   }
   if(alert&&akey!==settleProductFocus.alert){const t=alert.matches('[data-mall-state=failed]')?alert.querySelector('button'):alert;if(t){if(!t.hasAttribute('tabindex')&&t.tagName!=='BUTTON')t.tabIndex=-1;t.focus({preventScroll:true});t.scrollIntoView?.({block:'nearest'});}}
   // 같은 화면을 다시 그리면(예: 상담 주제 목록이 늦게 도착) 초점이 있던 요소가 사라져 body 로 떨어진다 -- 제목으로 되돌린다.
-  else if(key&&key===productPage&&settleProductFocus.inView&&document.activeElement===document.body&&!mallDialogShown())(view.querySelector('#keep-title')||view.querySelector('h2'))?.focus({preventScroll:true});
+  else if(key&&key===productPage&&settleProductFocus.inView&&document.activeElement===document.body&&!mallDialogShown())(alert&&alert.hasAttribute('tabindex')?alert:view.querySelector('#keep-title')||view.querySelector('h2'))?.focus({preventScroll:true});
   settleProductFocus.alert=akey;productPage=key;settleProductFocus.inView=view.contains(document.activeElement);
 }
 // 「부품 전체 구성 확인 및 변경」(대화 화면 · 2026-10-12 중헌 님 고객단 5번)과 아래 「부품 바꾸기」가 여기로 온다.
