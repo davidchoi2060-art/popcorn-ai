@@ -179,6 +179,7 @@ class ParseTests(unittest.TestCase):
                     self.assertEqual(getattr(condition, key), expected)
 
 
+@patch.object(F, 'load_advice', return_value={})
 @patch.object(F, 'load_specs', side_effect=specs_for)
 @patch.object(F, 'load', side_effect=load_rows)
 class BuildTests(unittest.TestCase):
@@ -412,3 +413,23 @@ class UsedParts(unittest.TestCase):
         base = dict(status='판매중', sale_price=50000, part_type='POWER', spec_source_text='')
         self.assertTrue(F._usable(dict(base, product_name='마이크로닉스 Classic II 700W')))
         self.assertFalse(F._usable(dict(base, product_name='마이크로닉스 Classic II 700W +12V Single Rail 85+ [중고]')))
+
+
+class PowerAdvice(unittest.TestCase):
+    """파워는 상담 안내와 같은 «권장 파워 + 100W»를 넘는 것부터 고른다(2026-10-17 개발 서버: RTX 5060 Ti 에 500W)."""
+    gpu = dict(GPU=dict(product_code=1, row=dict(product_name='ZOTAC 지포스 RTX 5060 Ti 8GB')))
+    opts = [dict(product_code=c) for c in (500, 550, 650)]
+    specs = {500: dict(rated_watt=500), 550: dict(rated_watt=550), 650: dict(rated_watt=650)}
+
+    def order(self, picks, advice):
+        return [o['product_code'] for o in F.power_order(self.opts, picks, self.specs, advice)]
+
+    def test_advised_power_first(self):
+        self.assertEqual(self.order(self.gpu, {'RTX 5060 TI': 450}), [550, 650, 500])
+
+    def test_falls_back_when_nothing_is_enough(self):
+        self.assertEqual(self.order(self.gpu, {'RTX 5060 TI': 800}), [500, 550, 650])
+
+    def test_no_gpu_or_unknown_chip_keeps_price_order(self):
+        self.assertEqual(self.order({}, {'RTX 5060 TI': 450}), [500, 550, 650])
+        self.assertEqual(self.order(self.gpu, {}), [500, 550, 650])
