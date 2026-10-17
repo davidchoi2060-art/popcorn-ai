@@ -217,3 +217,51 @@ def test_action_link_guard_does_not_change_an_unrelated_consultation_turn():
     with mocked([turn(explanation)]):
         result = AG.run_turn("부품 비교 자료는 어떻게 봐요?", [])
     assert "action" not in result and result["reply"] == explanation
+
+
+# ── 미리 채우기(free_build_preview) -- 상담이 무엇이 채워지는지 알고 답한다 ──────────────
+def _preview(text, start=None, exc=None):
+    from fastapi import HTTPException
+    book = TT.FactBook(request_text=text)
+
+    def fake_start(conn, cond):
+        if exc:
+            raise HTTPException(409, exc)
+        return start
+
+    with patch.object(TT, "engine", Engine()), patch.object(FB, "start_build", side_effect=fake_start):
+        return TT.run("free_build_preview", {}, book), book
+
+
+def test_preview_returns_filled_lines_and_total_without_part_prices():
+    start = {"lines": [{"slot": "CPU", "label": "CPU", "product_code": 11, "name": "인텔 i9-14900K", "quantity": 1,
+                        "from_request": True},
+                       {"slot": "GPU", "label": "그래픽카드", "product_code": 12, "name": "RTX 5060 Ti", "quantity": 1,
+                        "from_request": True}],
+             "total": 2_345_000, "assembly_fee_included": True, "warnings": ["쿨러 상담"], "requested": []}
+    out, book = _preview("메모리 32기가, RTX 5060 Ti, CPU i9로 맞춰줘", start)
+    assert out["status"] == "ok" and out["total"] == 2_345_000
+    assert [l["name"] for l in out["lines"]] == ["인텔 i9-14900K", "RTX 5060 Ti"]
+    assert "product_code" not in out["lines"][0] and "price" not in out["lines"][0]
+    assert book.prices == {2_345_000}                       # 총액만 말해도 되는 금액
+    assert out["conditions"]["ram_gb"] == 32
+
+
+def test_preview_no_match_names_the_missing_condition():
+    out, book = _preview("RTX 5090 i9 으로 맞춰줘", exc={"error": "no_match", "detail": "없음",
+                                                     "unmatched": [{"slot": "GPU", "label": "그래픽카드", "value": "RTX 5090"}]})
+    assert out["status"] == "no_match"
+    assert out["unmatched"] == [{"label": "그래픽카드", "value": "RTX 5090"}]
+    assert book.prices == set()
+
+
+def test_preview_takes_no_model_arguments_and_needs_conditions():
+    assert TT.run("free_build_preview", {"text": "x"}, TT.FactBook(request_text="i9"))["status"] == "invalid"
+    out, _ = _preview("부품 직접 고르고 싶어요")
+    assert out["status"] == "no_conditions"
+
+
+def test_prompt_tells_ai_to_preview_then_open():
+    assert "먼저 free_build_preview 로 채워 보고" in AG.SYSTEM
+    names = [t["name"] for t in TT.definitions(["게임"], ["1080p"])]
+    assert "free_build_preview" in names
