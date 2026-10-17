@@ -245,6 +245,9 @@ def test_preview_returns_filled_lines_and_total_without_part_prices():
     assert "product_code" not in out["lines"][0] and "price" not in out["lines"][0]
     assert book.prices == {2_345_000}                       # 총액만 말해도 되는 금액
     assert out["conditions"]["ram_gb"] == 32
+    # 미리 채운 구성을 말하는 턴엔 모델이 open_free_build 를 빠뜨려도 화면 버튼이 붙는다
+    assert book.screen_action["type"] == "open_free_build"
+    assert book.screen_action["request_text"] == "메모리 32기가, RTX 5060 Ti, CPU i9로 맞춰줘"
 
 
 def test_preview_no_match_names_the_missing_condition():
@@ -253,6 +256,7 @@ def test_preview_no_match_names_the_missing_condition():
     assert out["status"] == "no_match"
     assert out["unmatched"] == [{"label": "그래픽카드", "value": "RTX 5090"}]
     assert book.prices == set()
+    assert book.screen_action is None                       # 못 채운 조건으로 화면을 열지 않는다
 
 
 def test_preview_takes_no_model_arguments_and_needs_conditions():
