@@ -390,3 +390,11 @@ class SqlColumns(unittest.TestCase):
             cols = set(re.findall(r'p\.([a-z_]+)', sql.split('FROM')[0]))
             self.assertLessEqual({'product_code', 'product_name', 'sale_price', 'status', 'part_type',
                                   'spec_source_text', 'maker'}, cols, sql)
+
+
+class FillReport(unittest.TestCase):
+    def test_no_build_reports_shape(self):
+        picks, report = F.fill({}, {}, [])
+        self.assertIsNone(picks)
+        self.assertEqual(set(report), {'stuck', 'exhausted', 'reasons'})
+        self.assertEqual(report['reasons'], [])
