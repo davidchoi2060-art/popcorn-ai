@@ -157,6 +157,20 @@ def free_build(text):
     TEXT 를 「FREE:<고객 문장>」으로 주면 이 모드다. start -> 자리별 options -> quote 를 화면과 같은 순서로 부르고,
     ① 줄에 부품 가격이 없는지 ② 후보를 고른 뒤 quote 총액이 options 가 말한 총액과 같은지 본다.
     """
+    cases = [t.strip() for t in text.split(' || ')]
+    if len(cases) > 1:
+        # 여러 경우를 start 만 차례로 부른다 -- 어느 조건에서 실패하는지 가르는 용도. {..} 는 conditions 로 보낸다.
+        bad = 0
+        for c in cases:
+            body = {'conditions': json.loads(c)} if c.startswith('{') else {'text': c}
+            try:
+                r, code, sec = post('/api/mvp3/free-build/start', body)
+                print(f"- {c!r}: HTTP {code}, {sec:.1f}s, 총액 {r.get('total')}, 빈 자리 "
+                      f"{[ln['slot'] for ln in r.get('lines') or [] if not ln.get('product_code')]}")
+            except urllib.error.HTTPError as e:
+                bad += e.code >= 500
+                print(f"- {c!r}: HTTP {e.code}: {(e.read() or b'')[:200].decode('utf-8', 'replace')!r}")
+        return 1 if bad else 0
     print('### 개발 서버 부품 직접 고르기 점검')
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
     print(f'- 문장: {text}')
