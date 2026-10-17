@@ -379,3 +379,14 @@ class InquiryHookTests(unittest.TestCase):
                  free_build={'parts': [], 'total': 1000}, assignee_name=None, assignee_id=None, updated_at=now,
                  purge_at=now + timedelta(days=1), is_test=False)
         self.assertEqual(AP._row(r, True)['free_build']['total'], 1000)
+
+
+
+class SqlColumns(unittest.TestCase):
+    def test_sql_selects_every_column_the_code_reads(self):
+        """가짜 행으로 도는 시험이 못 잡던 결함(2026-10-17 개발 서버 500): 후보 SQL 이 status 를 안 읽었다."""
+        import re
+        for sql in (F.CANDIDATES_SQL, F.PARTS_SQL):
+            cols = set(re.findall(r'p\.([a-z_]+)', sql.split('FROM')[0]))
+            self.assertLessEqual({'product_code', 'product_name', 'sale_price', 'status', 'part_type',
+                                  'spec_source_text', 'maker'}, cols, sql)

@@ -58,7 +58,9 @@ NOTE = ('호환 규칙을 통과한 판매 중 부품만 넣었어요. 금액은
 PARTS_SQL = """SELECT p.product_code, p.product_name, p.sale_price, p.status, p.part_type, p.spec_source_text, p.maker
                  FROM products p JOIN product_specs s ON s.product_code = p.product_code
                 WHERE p.product_code = ANY(:codes) AND p.data_origin = 'real' AND NOT p.review_required_yn"""
-CANDIDATES_SQL = CANDIDATE_SQL.replace('p.spec_source_text', 'p.spec_source_text, p.maker')
+# 후보 거름은 mvp3_build 와 같고, 여기서 더 읽는 열(status · maker)만 붙인다 — _usable 이 status 를 본다.
+CANDIDATES_SQL = CANDIDATE_SQL.replace('p.spec_source_text', 'p.spec_source_text, p.maker, p.status', 1)
+assert 'p.status' in CANDIDATES_SQL and 'p.maker' in CANDIDATES_SQL
 
 
 # ── 조건 ────────────────────────────────────────────────────────────────
