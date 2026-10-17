@@ -33,10 +33,11 @@ from sqlalchemy import text
 
 from . import mvp3_quantity as QTY
 from .build_check import evaluate, load_rules, load_specs
-from .catalog_map import has_used_mark
+from .catalog_map import gpu_chipset_key, has_used_mark
 from .db import engine
 from .mvp3_build import CANDIDATE_SQL, not_desktop_ram, not_storage, settled, touches
 from .orders import ASSEMBLY_FEE
+from .power_rule import PSU_ADVICE_MARGIN_W
 from .product_name import display_name
 from .taxonomy import QUOTE_SLOTS, SLOT_LABELS, slot_of
 
@@ -56,6 +57,7 @@ MAX_STICKS_UNCHECKED = 2  # 메인보드 슬롯 수를 모를 때 꽂는 모듈 
 WARNING_COOLER = '이 구성에 맞는 CPU 쿨러를 호환 자료로 확인하지 못해 쿨러는 비워 두었어요. 상담에서 맞춰 드려요.'
 NOTE = ('호환 규칙을 통과한 판매 중 부품만 넣었어요. 금액은 PC 총액이고, 부품을 바꾸면 차액만 보여 드려요. '
         '몰 장바구니가 아니라 「이 구성으로 구매 상담 신청」으로 주문을 도와드려요.')
+ADVICE_SQL = 'SELECT chipset_key, recommended_watt FROM gpu_power_reference'   # 상담 파워 안내와 같은 표(talk_pc_advice.psu_note)
 PARTS_SQL = """SELECT p.product_code, p.product_name, p.sale_price, p.status, p.part_type, p.spec_source_text, p.maker
                  FROM products p JOIN product_specs s ON s.product_code = p.product_code
                 WHERE p.product_code = ANY(:codes) AND p.data_origin = 'real' AND NOT p.review_required_yn"""
@@ -346,7 +348,32 @@ def judge(picks, specs, rules, keys, final=False):
     return blocking(out['checks'], keys, empty, by_key), out
 
 
-def fill(cands, specs, rules, gpu_optional=False):
+def psu_advice_watt(picks, advice):
+    """고른 그래픽카드의 «권장 파워 + 100W»(상담 안내와 같은 기준 · power_rule.PSU_ADVICE_MARGIN_W). 모르면 None."""
+    gpu = picks.get('GPU')
+    if gpu is None or not advice:
+        return None
+    rec = advice.get(gpu_chipset_key(gpu['row']['product_name']) or '')
+    return rec + PSU_ADVICE_MARGIN_W if rec else None
+
+
+def power_order(options, picks, specs, advice):
+    """파워는 여유 기준을 넘는 것부터 싼 순서로 본다. 넘는 것이 없을 때만 호환 기준만 통과한 파워로 내려간다.
+
+    호환 규칙(소비전력 + 시스템 여유)만 보면 RTX 5060 Ti 에 500W 가 들어갔다 — 상담은 같은 카드에 550W 이상을
+    안내한다(2026-10-17 개발 서버).
+    """
+    safe = psu_advice_watt(picks, advice)
+    if not safe:
+        return options
+
+    def ok(o):
+        w = (specs.get(o['product_code']) or {}).get('rated_watt')
+        return type(w) is int and w >= safe
+    return [o for o in options if ok(o)] + [o for o in options if not ok(o)]
+
+
+def fill(cands, specs, rules, gpu_optional=False, advice=None):
     """자리마다 싼 것부터, 앞 자리와 호환되는 첫 조합을 찾는다(깊이 우선 · 판정 NODE_CAP 회까지).
 
     찾으면 (picks, 막힌 횟수), 못 찾으면 (None, 막힌 횟수).
@@ -367,6 +394,8 @@ def fill(cands, specs, rules, gpu_optional=False):
             options = [None] + options      # 내장 그래픽을 쓰는 PC 를 먼저 본다(그래픽카드를 말하지 않았다)
         elif slot == 'COOLER':
             options = options + [None]      # 맞는 쿨러를 못 찾으면 비우고 알린다
+        elif slot == 'POWER':
+            options = power_order(options, picks, specs, advice)
         tried = 0
         for o in options:
             if budget[0] <= 0:
@@ -430,6 +459,11 @@ def load(conn, codes=None):
     return rows
 
 
+def load_advice(conn):
+    """칩 키 -> 그래픽카드 권장 파워(W)."""
+    return {k.upper(): w for k, w in conn.execute(text(ADVICE_SQL)) if k and type(w) is int and w > 0}
+
+
 def start_build(conn, cond, rules=None):
     if cond.cpu is not None and cpu_rule(cond.cpu) is None:
         raise HTTPException(422, 'CPU 조건을 읽지 못했어요. CPU 시리즈나 정확한 모델명을 확인해 주세요.')
@@ -446,7 +480,7 @@ def start_build(conn, cond, rules=None):
         raise HTTPException(409, dict(error='no_match', unmatched=missing,
                                       detail='말씀하신 조건에 맞는 판매 부품을 찾지 못했어요: '
                                              + ' · '.join(f"{m['label']} {m['value']}" for m in missing)))
-    picks, stuck = fill(cands, specs, rules, gpu_optional=not cond.gpu)
+    picks, stuck = fill(cands, specs, rules, gpu_optional=not cond.gpu, advice=load_advice(conn))
     if picks is None:
         raise HTTPException(409, dict(error='no_build', detail='말씀하신 조건을 모두 함께 쓰는 호환 구성을 찾지 못했어요. '
                                                                '조건 하나를 바꿔 다시 시도해 주세요.',
