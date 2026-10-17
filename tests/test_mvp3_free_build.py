@@ -405,3 +405,10 @@ class FillReport(unittest.TestCase):
         self.assertIsNone(picks)
         self.assertEqual(set(report), {'stuck', 'exhausted', 'reasons'})
         self.assertEqual(report['reasons'], [])
+
+
+class UsedParts(unittest.TestCase):
+    def test_used_mark_is_not_a_candidate(self):
+        base = dict(status='판매중', sale_price=50000, part_type='POWER', spec_source_text='')
+        self.assertTrue(F._usable(dict(base, product_name='마이크로닉스 Classic II 700W')))
+        self.assertFalse(F._usable(dict(base, product_name='마이크로닉스 Classic II 700W +12V Single Rail 85+ [중고]')))
