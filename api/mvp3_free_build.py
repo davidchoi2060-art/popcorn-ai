@@ -33,6 +33,7 @@ from sqlalchemy import text
 
 from . import mvp3_quantity as QTY
 from .build_check import evaluate, load_rules, load_specs
+from .catalog_map import has_used_mark
 from .db import engine
 from .mvp3_build import CANDIDATE_SQL, not_desktop_ram, not_storage, settled, touches
 from .orders import ASSEMBLY_FEE
@@ -222,8 +223,11 @@ def condition_view(cond):
 
 # ── 후보 ────────────────────────────────────────────────────────────────
 def _usable(r):
+    # 중고·리퍼 표시가 있는 상품은 새 PC 에 넣지 않는다(사장님 2026-08-16 「중고 부품은 견적에서 빼둔다」) —
+    # 개발 서버에서 「[중고]」 파워가 가장 싸다는 이유로 들어갔다(2026-10-17).
     return (r['status'] == '판매중' and type(r['sale_price']) is int and r['sale_price'] > 0
-            and slot_of(r['part_type'] or '') in ORDER and not not_desktop_ram(r) and not not_storage(r))
+            and slot_of(r['part_type'] or '') in ORDER and not not_desktop_ram(r) and not not_storage(r)
+            and not has_used_mark(r['product_name'], r.get('spec_source_text') or ''))
 
 
 def ram_cap(row, spec):
