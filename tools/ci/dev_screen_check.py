@@ -151,7 +151,104 @@ def talk_cases(texts):
     return 1 if failed else 0
 
 
+def free_build(text):
+    """부품 직접 고르기(/api/mvp3/free-build/*) 점검 -- 읽기 전용(조회만 하고 신청은 보내지 않는다).
+
+    TEXT 를 「FREE:<고객 문장>」으로 주면 이 모드다. start -> 자리별 options -> quote 를 화면과 같은 순서로 부르고,
+    ① 줄에 부품 가격이 없는지 ② 후보를 고른 뒤 quote 총액이 options 가 말한 총액과 같은지 본다.
+    """
+    cases = [t.strip() for t in text.split(' || ')]
+    if len(cases) > 1:
+        # 여러 경우를 start 만 차례로 부른다 -- 어느 조건에서 실패하는지 가르는 용도. {..} 는 conditions 로 보낸다.
+        bad = 0
+        for c in cases:
+            body = {'conditions': json.loads(c)} if c.startswith('{') else {'text': c}
+            try:
+                r, code, sec = post('/api/mvp3/free-build/start', body)
+                print(f"- {c!r}: HTTP {code}, {sec:.1f}s, 총액 {r.get('total')}, 빈 자리 "
+                      f"{[ln['slot'] for ln in r.get('lines') or [] if not ln.get('product_code')]}")
+            except urllib.error.HTTPError as e:
+                bad += e.code >= 500
+                print(f"- {c!r}: HTTP {e.code}: {(e.read() or b'')[:200].decode('utf-8', 'replace')!r}")
+        return 1 if bad else 0
+    print('### 개발 서버 부품 직접 고르기 점검')
+    print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
+    print(f'- 문장: {text}')
+    failed = 0
+    try:
+        res, code, sec = post('/api/mvp3/free-build/start', {'text': text})
+    except urllib.error.HTTPError as e:
+        print(f"- start: HTTP {e.code}: {(e.read() or b'')[:400].decode('utf-8', 'replace')!r}")
+        return 1
+    print(f"- start: HTTP {code}, {sec:.1f}s, 조건 {res.get('conditions')!r}, 총액 {res.get('total')}원")
+    print(f"- warnings: {res.get('warnings')!r}")
+    print()
+    print('| 자리 | 부품 | 수량 | 요청 반영 |')
+    print('|---|---|---|---|')
+    lines = res.get('lines') or []
+    for ln in lines:
+        print(f"| {ln.get('label')} | {ln.get('product_code') or ''} {str(ln.get('name') or '')[:50]} | "
+              f"{ln.get('quantity') or ''} | {'예' if ln.get('from_request') else ''} |")
+    print()
+    leaked = [k for ln in lines for k in ln if 'price' in k or 'cost' in k or 'margin' in k]
+    if leaked:
+        print(f'- 실패: 줄에 가격 키가 있음 {sorted(set(leaked))}')
+        failed += 1
+    parts = [{'slot': ln['slot'], 'product_code': ln['product_code'], 'quantity': ln['quantity']}
+             for ln in lines if ln.get('product_code')]
+    try:
+        q, code, sec = post('/api/mvp3/free-build/quote', {'parts': parts})
+        same = q.get('total') == res.get('total')
+        print(f"- quote(그대로): HTTP {code}, {sec:.1f}s, 총액 {q.get('total')}원 {'(start 와 같음)' if same else '(start 와 다름!)'}")
+        failed += not same
+    except urllib.error.HTTPError as e:
+        print(f"- quote(그대로): HTTP {e.code}: {(e.read() or b'')[:300].decode('utf-8', 'replace')!r}")
+        failed += 1
+    for slot in ('GPU', 'RAM', 'CASE', 'SSD'):
+        try:
+            o, code, sec = post('/api/mvp3/free-build/options', {'parts': parts, 'slot': slot})
+        except urllib.error.HTTPError as e:
+            print(f"- options {slot}: HTTP {e.code}: {(e.read() or b'')[:300].decode('utf-8', 'replace')!r}")
+            failed += 1
+            continue
+        opts = o.get('options') or []
+        print(f"- options {slot}: HTTP {code}, {sec:.1f}s, 후보 {len(opts)}개 (검사 {o.get('checked')}, 미판정 {o.get('untested')})"
+              + (f", 내장 그래픽 {o['clear']['price_diff']}원" if o.get('clear') else ''))
+        for x in opts[:3]:
+            print(f"  - {x['product_code']} {str(x['name'])[:45]} x{x['quantity']} | 차액 {x['price_diff']:+}원 | 총액 {x['total']}원")
+        if opts:
+            pick = opts[0]
+            trial = [dict(p, product_code=pick['product_code'], quantity=pick['quantity']) if p['slot'] == slot else p
+                     for p in parts]
+            if not any(p['slot'] == slot for p in parts):
+                trial.append({'slot': slot, 'product_code': pick['product_code'], 'quantity': pick['quantity']})
+            try:
+                q, code, _ = post('/api/mvp3/free-build/quote', {'parts': trial})
+                ok = q.get('total') == pick['total']
+                print(f"  - 첫 후보로 quote: HTTP {code}, 총액 {q.get('total')}원 {'(options 와 같음)' if ok else '(options 와 다름!)'}")
+                failed += not ok
+            except urllib.error.HTTPError as e:
+                print(f"  - 첫 후보로 quote: HTTP {e.code}: {(e.read() or b'')[:300].decode('utf-8', 'replace')!r}")
+                failed += 1
+    print()
+    if failed:
+        print(f'- 실패: {failed}건')
+    return 1 if failed else 0
+
+
 def main():
+    if TEXT.startswith('FREE:'):
+        # 결과를 실행 요약과 함께 주석(annotation)으로도 남긴다 -- 로그를 못 받는 클라우드 세션도 API 로 읽게.
+        import contextlib, io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = free_build(TEXT[len('FREE:'):].strip())
+        out = buf.getvalue()
+        print(out)
+        for i in range(0, min(len(out), 9 * 3000), 3000):
+            chunk = out[i:i + 3000].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+            print(f'::notice title=free-build {i // 3000 + 1}::{chunk}')
+        return rc
     texts = [t.strip() for t in TEXT.split('||')]
     if len(texts) > 1:
         return talk_cases(texts)
