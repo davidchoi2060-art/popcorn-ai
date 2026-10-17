@@ -442,3 +442,14 @@ test('after a refused apply the estimate remains a preview, and only successful 
     }finally{h.close();}
   }
 });
+test('PC part panel is a modal drawer like the mobile one: background is inert while open and comes back on close',async()=>{
+  for(const width of [1440,390]){
+    const h=harness({width});try{await toDetail(h);const d=h.d;
+      d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+      assert.equal(d.querySelector('.dv2-panel').getAttribute('aria-modal'),'true',width+'px aria-modal');
+      assert.equal(d.querySelector('.dv2-main').inert,true,width+'px 뒤 화면 inert');
+      d.querySelector('[data-action=build-close].dv2-cancel').click();await until(()=>!d.querySelector('.dv2-panel'));
+      assert.equal(d.querySelector('.dv2-main').inert,false,width+'px 닫으면 다시 누를 수 있다');
+    }finally{h.close();}
+  }
+});

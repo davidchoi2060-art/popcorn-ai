@@ -568,9 +568,8 @@ function dv2Preview(q){
 }
 function dv2Panel(p,labelOf){
   const q=state.build,d=q.data,label=labelOf(q.ordinal)||d?.label||'부품',busy=state.phase==='build';
-  const modal=mob768.matches;
   const head='<div class="dv2-panel-head"><h3 id="dv2-panel-title" tabindex="-1">'+esc(label)+' 변경</h3>'+button('<span aria-hidden="true">×</span>','build-close','dv2-x','aria-label="'+esc(label)+' 변경 닫기"')+'</div>';
-  const shell=inner=>'<div class="dv2-panel" role="dialog" aria-labelledby="dv2-panel-title"'+(modal?' aria-modal="true"':'')+'>'+head+inner+'</div>';
+  const shell=inner=>'<div class="dv2-panel" role="dialog" aria-labelledby="dv2-panel-title" aria-modal="true">'+head+inner+'</div>';
   if(!d){
     if(q.error)return shell('<p class="warn-text" role="alert">'+esc(q.error)+'</p><div class="dv2-actions">'+button('다시 찾기','build-options','outline','data-ordinal="'+q.ordinal+'" data-retry="1"')+button('취소','build-close','dv2-link')+'</div>');
     return shell('<p class="muted" role="status">이 PC에 맞는 판매 부품을 찾는 중이에요.</p><div class="dv2-actions">'+button('취소','build-close','dv2-link')+'</div>');
@@ -692,7 +691,8 @@ function renderDetailV2(p,configuration){
     '<div class="dv2-layout"><div class="dv2-main">'+head+'<section class="final-parts public-bom dv2-parts"><div class="tf-parts-head"><h3>'+(ai?'선택한 부품':'기본 구성 부품')+'</h3><span>'+(ai?'나에게 맞게 바꿔 보세요':'옵션 변경은 팝콘PC에서')+'</span></div><div class="final-table-wrap"><table class="final-table dv2-table"><thead><tr><th scope="col">분류</th><th scope="col">현재 선택된 모델</th><th scope="col">변경</th></tr></thead><tbody>'+
     configuration.parts.map(x=>dv2Row(x,p)).join('')+'</tbody></table></div><p class="tf-foot-note">'+uiIcon('info')+(ai?'부품을 바꾼 뒤 견적을 보관하면 구매 상담을 신청할 수 있어요.':'부품 옵션을 바꾸려면 팝콘PC 상품 페이지로 이동해 주세요.')+'</p></section></div>'+side+'</div></div>';
   actions.hidden=true;
-  dv2Inert(mob768.matches&&cur!==null);
+  // 부품 패널은 PC(오른쪽 510px 창)·모바일(전체 화면) 모두 덮개 창이다(승인 06). 뒤 화면은 열린 동안 누를 수 없다.
+  dv2Inert(cur!==null);
   if(opened&&mob768.matches&&!dv2.hist){try{history.pushState(history.state,'',location.href);dv2.hist=true;}catch{}}
   if(closed&&dv2.hist){dv2.hist=false;dv2.skipPop=true;try{history.back();}catch{dv2.skipPop=false;}}
   // 후보를 불러오거나 적용에 실패해 패널이 다시 그려져도 초점이 몸통으로 빠지지 않게 제목으로 되돌린다(눌러 둔 단추는 render 가 따로 되살린다).
