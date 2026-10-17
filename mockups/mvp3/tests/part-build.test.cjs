@@ -25,10 +25,10 @@ const options={ok:true,base_code:12,ordinal:1,slot:'RAM',label:'메모리',quant
   note:'호환 규칙을 모두 통과한 판매 중 부품만 보여 드려요.',
   options:[{product_code:503,name:'램 8GB',price:30000,price_diff:-60000,total:1240000},{product_code:502,name:'램 32GB',price:110000,price_diff:100000,total:1400000}]};
 
-function harness({quoteFail=false,total=1400000,limit=null}={}){
+function harness({quoteFail=false,total=1400000,limit=null,optionData=options,product=pc,width=1440}={}){
   const errors=[],calls=[],vc=new VirtualConsole();vc.on('jsdomError',e=>errors.push(e.message));
   const dom=new JSDOM(read('index.html'),{url:'https://qa.invalid/mvp3/#welcome',runScripts:'outside-only',pretendToBeVisual:true,virtualConsole:vc});
-  const w=dom.window;w.matchMedia=()=>({matches:false,addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
+  const w=dom.window;w.matchMedia=q=>({matches:width<=Number(q.match(/max-width:\s*(\d+)px/)?.[1]||0),addEventListener(){}});w.scrollTo=()=>{};w.TextEncoder=TextEncoder;
   w.HTMLElement.prototype.scrollIntoView=function(){};
   Object.defineProperty(w,'crypto',{value:webcrypto});w.localStorage.setItem('popcorn-mvp3-guest-access-v1','a'.repeat(64));
   w.eval(read('live-model.js'));w.eval(read('api-client.js'));
@@ -37,8 +37,8 @@ function harness({quoteFail=false,total=1400000,limit=null}={}){
     if(url==='/api/mvp3/build/quote'&&quoteFail)return {ok:false,status:409,json:async()=>({detail:'이 조합은 호환되지 않아요: CPU-보드 소켓'}),headers:{get:()=>null}};
     const changes=body?.changes||[];
     const data=url==='/api/talk/parse'?{ok:true,state:talkState,history:[],missing:[]}:
-      url==='/api/grid/recommend'?reco:
-      url==='/api/mvp3/build/options'?(limit?{...options,quantity_limit:limit}:options):
+      url==='/api/grid/recommend'?{...reco,card_sets:[{...reco.card_sets[0],items:[product]}]}:
+      url==='/api/mvp3/build/options'?(limit?{...optionData,quantity_limit:limit}:typeof optionData==='function'?optionData(body):optionData):
       url==='/api/mvp3/build/quote'&&changes[0]?.quantity?{ok:true,base_code:12,base_price:1300000,total:1300000+60000*(changes[0].quantity-2),compat:{ok:true},
         changes:[{...change,quantity:changes[0].quantity,base_quantity:2,after:change.before,delta:60000*(changes[0].quantity-2)}]}:
       url==='/api/mvp3/build/quote'?{ok:true,base_code:12,base_price:1300000,total:changes.length?total:1300000,changes:changes.length?[change]:[],compat:{ok:true}}:
@@ -343,4 +343,113 @@ test('v2 row 기본 부품으로 reverts one row; Escape and cancel keep applied
     assert.equal(h.flow.state.selected.sets,2,'대수는 되돌려도 그대로');assert.equal(h.flow.state.selected.build,null);
     assert.deepEqual(h.errors,[]);
   }finally{h.close();}
+});
+
+// 2026-10-17 승인06 잔여: 임시 선택은 적용 후 예상 PC 총액만 미리 보이고 실제 구성/보관 상태를 바꾸지 않는다.
+const previewProduct={...pc,price:891700,public_configuration:{...configuration,parts:[configuration.parts[0],
+  {...configuration.parts[1],slot:'COOLER',quantity:1,name:'기본 쿨러'}]}};
+const previewOptions={...options,slot:'COOLER',label:'쿨러',quantity:1,total:891700,
+  current:{product_code:501,name:'기본 쿨러',price:32999},
+  options:[{product_code:502,name:'3RSYS Socool RC750N PWM',price:49999,price_diff:17000,total:908700}]};
+const appliedSnapshot=h=>JSON.stringify({selected:h.flow.state.selected,savedQuote:h.flow.state.savedQuote,
+  saveState:h.flow.state.saveState,pendingSave:h.flow.state.pendingSave,inquiry:h.flow.state.inquiry});
+async function openPreview(h){h.d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>h.d.querySelector('[data-build-option="502"]'));}
+for(const width of [1440,390,360])test('temporary preview at '+width+': current 891700 and expected 908700 stay separate, without changing parts/count/saved quote or making requests',async()=>{
+  const h=harness({product:previewProduct,optionData:previewOptions,width});try{await toDetail(h);const d=h.d;
+    h.flow.setSets(2);
+    h.flow.state.savedQuote={id:qid,product:JSON.parse(JSON.stringify(h.flow.state.selected))};h.flow.state.saveState='saved';h.flow.emit();
+    await openPreview(h);
+    const box=d.querySelector('[data-dv2-preview]');assert.ok(box);assert.equal(box.hidden,true);
+    const before=appliedSnapshot(h),calls=h.calls.length;
+    d.querySelector('input[name=dv2-pick][value="502"]').click();
+    assert.equal(box.hidden,false);assert.match(text(box),/선택 적용 후/);assert.match(text(box),/1대 기준/);
+    assert.equal(text(box.querySelector('[data-dv2-preview-total]')),'908,700원');assert.match(text(box),/\+17,000원/);
+    assert.equal(text(d.querySelector('[data-dv2-total]')),'891,700원');
+    assert.match(text(d.querySelector('[data-part="bom-1"]')),/기본 쿨러/);
+    assert.equal(h.flow.state.selected.sets,2);assert.equal(h.flow.state.selected.public_configuration.parts[1].quantity,1);
+    assert.equal(appliedSnapshot(h),before);assert.equal(h.calls.length,calls,'radio selection calls no quote/save/PI/LLM endpoint');
+    assert.doesNotMatch(text(d.querySelector('.dv2-panel')),/32,999원|49,999원/,'part prices stay private');
+    d.querySelector('input[name=dv2-pick][value="501"]').click();assert.equal(box.hidden,true);assert.equal(text(box),'');
+    assert.equal(appliedSnapshot(h),before);assert.equal(h.calls.length,calls);
+    d.querySelector('input[name=dv2-pick][value="502"]').click();d.querySelector('.dv2-cancel').click();
+    assert.equal(d.querySelector('[data-dv2-preview]'),null);assert.equal(appliedSnapshot(h),before);
+    assert.deepEqual(h.errors,[]);
+  }finally{h.close();}
+});
+
+test('preview uses validated server PC total for positive, zero and negative diffs; invalid/missing totals remain unknown',async()=>{
+  for(const [delta,total,expected] of [[17000,908700,'908,700원'],[0,891700,'891,700원'],[-17000,874700,'874,700원'],
+    [17000,null,null],[17000,'908700',null],[17000,-1,null],[17000,908701,null]]){
+    const optionData={...previewOptions,options:[{...previewOptions.options[0],price_diff:delta,total}]};
+    const h=harness({product:previewProduct,optionData});try{await toDetail(h);await openPreview(h);const before=appliedSnapshot(h),calls=h.calls.length;
+      h.d.querySelector('input[value="502"]').click();const box=h.d.querySelector('[data-dv2-preview]');assert.ok(box);
+      if(expected){assert.equal(text(box.querySelector('[data-dv2-preview-total]')),expected);assert.doesNotMatch(text(box),/금액 확인 중/);}
+      else{assert.equal(box.querySelector('[data-dv2-preview-total]'),null);assert.match(text(box),/금액 확인 중/);}
+      assert.equal(appliedSnapshot(h),before);assert.equal(h.calls.length,calls);assert.deepEqual(h.errors,[]);
+    }finally{h.close();}
+  }
+});
+
+test('malformed current response totals are refused; negative/inconsistent current totals cannot produce an estimate',async()=>{
+  for(const currentTotal of [null,'891700',NaN,Number.MAX_SAFE_INTEGER+1,-1,891701]){
+    const optionData={...previewOptions,total:currentTotal};
+    const h=harness({product:previewProduct,optionData});try{await toDetail(h);const d=h.d;
+      const before=appliedSnapshot(h);d.querySelector('[data-action=build-options][data-ordinal="1"]').click();
+      if(!Number.isSafeInteger(currentTotal)){
+        await until(()=>d.querySelector('.dv2-panel [role=alert]'));
+        assert.equal(d.querySelector('[data-dv2-preview-total]'),null);assert.equal(d.querySelector('[data-build-option]'),null);
+      }else{
+        await until(()=>d.querySelector('[data-build-option="502"]'));d.querySelector('input[value="502"]').click();
+        assert.equal(d.querySelector('[data-dv2-preview-total]'),null);assert.match(text(d.querySelector('[data-dv2-preview]')),/금액 확인 중/);
+      }
+      assert.equal(appliedSnapshot(h),before);assert.equal(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').length,0);
+      assert.deepEqual(h.errors,[]);
+    }finally{h.close();}
+  }
+});
+
+test('base-part preview uses its server candidate total with other changes/quantities; absent candidate totals are never guessed',async()=>{
+  for(const [quantity,hasBaseOption,omitBaseQuantity] of [[2,true,false],[3,true,false],[2,false,false],[3,false,false],[3,false,true]]){
+    const row={...change,base_quantity:2,quantity,delta:quantity===2?100000:160000};
+    if(omitBaseQuantity)delete row.base_quantity;
+    const cpu={...change,ordinal:0,slot:'CPU',label:'CPU',quantity:1,base_quantity:1,delta:100000,
+      before:{product_code:601,name:'CPU A',price:100000},after:{product_code:602,name:'CPU B',price:200000}};
+    const product={...pc,price:1300000+row.delta+cpu.delta,build:{base_price:1300000,changes:[row,cpu]}};
+    const expectedTotal=1300000+cpu.delta+(quantity-2)*60000;
+    const optionData={...options,total:product.price,current:row.after,options:hasBaseOption?[{
+      ...row.before,price_diff:expectedTotal-product.price,total:expectedTotal}]:[]};
+    const h=harness({product,optionData});try{await toDetail(h);const d=h.d;
+      d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-action=build-pick-base]'));
+      const before=appliedSnapshot(h),calls=h.calls.length;d.querySelector('[data-action=build-pick-base]').click();
+      const box=d.querySelector('[data-dv2-preview]');assert.ok(box);assert.equal(box.hidden,false);
+      if(hasBaseOption){assert.equal(text(box.querySelector('[data-dv2-preview-total]')),expectedTotal.toLocaleString('ko-KR')+'원');assert.match(text(box),/−100,000원/);}
+      else{assert.equal(box.querySelector('[data-dv2-preview-total]'),null);assert.match(text(box),/금액 확인 중/);}
+      assert.equal(appliedSnapshot(h),before);assert.equal(h.calls.length,calls);assert.deepEqual(h.errors,[]);
+    }finally{h.close();}
+  }
+});
+
+test('after a refused apply the estimate remains a preview, and only successful server quote changes the actual total',async()=>{
+  for(const quoteFail of [true,false]){
+    const h=harness({quoteFail});try{await toDetail(h);await openPreview(h);const d=h.d;
+      d.querySelector('input[value="502"]').click();assert.equal(text(d.querySelector('[data-dv2-preview-total]')),'1,400,000원');
+      d.querySelector('[data-action=build-apply]').click();await until(()=>!h.flow.state.phase);
+      assert.equal(h.calls.filter(c=>c.url==='/api/mvp3/build/quote').length,1);
+      assert.equal(h.flow.state.selected.price,quoteFail?1300000:1400000);
+      if(quoteFail){assert.equal(text(d.querySelector('[data-dv2-total]')),'1,300,000원');assert.equal(text(d.querySelector('[data-dv2-preview-total]')),'1,400,000원');}
+      else assert.equal(d.querySelector('[data-dv2-preview]'),null);
+      assert.deepEqual(h.errors,[]);
+    }finally{h.close();}
+  }
+});
+test('PC part panel is a modal drawer like the mobile one: background is inert while open and comes back on close',async()=>{
+  for(const width of [1440,390]){
+    const h=harness({width});try{await toDetail(h);const d=h.d;
+      d.querySelector('[data-action=build-options][data-ordinal="1"]').click();await until(()=>d.querySelector('[data-build-option]'));
+      assert.equal(d.querySelector('.dv2-panel').getAttribute('aria-modal'),'true',width+'px aria-modal');
+      assert.equal(d.querySelector('.dv2-main').inert,true,width+'px 뒤 화면 inert');
+      d.querySelector('[data-action=build-close].dv2-cancel').click();await until(()=>!d.querySelector('.dv2-panel'));
+      assert.equal(d.querySelector('.dv2-main').inert,false,width+'px 닫으면 다시 누를 수 있다');
+    }finally{h.close();}
+  }
 });

@@ -839,6 +839,19 @@ details[open]>summary .dv2-more .ui-icon{transform:rotate(180deg)}
 .dv2-total-box{display:flex;justify-content:space-between;align-items:center;gap:12px;border:1px solid var(--line);border-bottom:0;padding:14px;margin-top:14px}
 .dv2-total-box small{display:block}.dv2-total-box .dv2-total-num{font-size:30px}
 .dv2-panel .dv2-sums{border:1px solid var(--line);padding:12px 14px;margin:0}
+.dv2-preview{margin-top:12px;padding:14px;border:1px solid var(--green);border-top-width:3px;background:#fff}
+.dv2-preview[hidden]{display:none}
+.dv2-preview-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 12px;min-width:0}
+.dv2-preview-head small{grid-column:1;font-size:14px;color:var(--muted)}
+.dv2-preview-total{grid-column:2;grid-row:1/3;font-size:28px;line-height:1.25;letter-spacing:-.6px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere;text-align:right}
+.dv2-preview .dv2-sums{margin-top:10px;padding:10px 0 0;border:0;border-top:1px solid var(--line)}
+/* PC 부품 패널 = 오른쪽 510px 덮개 창(승인 PC1440-06: x 930~1440, 화면 높이 전체). 뒤 화면은 어둡게 가린다. */
+@media(min-width:769px){
+  .tf-detail .dv2-side.is-panel{position:fixed;top:0;right:0;bottom:0;width:min(510px,100vw);z-index:100;margin:0;padding:28px 30px 0;border:0;background:#fff;overflow:auto;overscroll-behavior:contain;box-shadow:-12px 0 40px #0000001a}
+  .tf-detail .dv2-side.is-panel::before{content:"";position:fixed;top:0;bottom:0;left:0;right:min(510px,100vw);background:#18352e70}
+  .tf-detail .dv2-side.is-panel .dv2-actions{position:sticky;bottom:0;background:#fff;padding:14px 0 10px;border-top:1px solid var(--line);z-index:1}
+  .tf-detail .dv2-side.is-panel .dv2-foot{padding-bottom:18px;margin:0}
+}
 .dv2-assembly{font-size:13.5px;margin:12px 0 0}
 .dv2-actions{display:grid;gap:6px;margin-top:14px}
 .dv2-apply{width:100%;padding:15px;font-size:17px;border-radius:8px}
