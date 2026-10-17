@@ -554,11 +554,23 @@ function dv2Totals(p){
   return '<div class="dv2-total-box"><div><strong>현재 적용된 구성</strong><small>1대 기준</small></div><strong class="dv2-total-num" data-dv2-total>'+money(p.price)+'</strong></div>'+
     '<dl class="dv2-sums"><div><dt>기본 구성</dt><dd>'+(b?money(b.base_price):money(p.price))+'</dd></div><div><dt>부품 변경 합계</dt><dd>'+(b?dv2Diff(move):'변경 없음')+'</dd></div></dl>';
 }
+// 임시 선택의 예상 PC 총액. 후보 응답의 total/price_diff만 쓰며 단품 가격으로 재계산하지 않는다.
+function dv2Preview(q){
+  const d=q?.data;if(!d||dv2.temp===dv2.applied)return '';
+  const o=d.options.find(x=>x.product_code===dv2.temp);
+  let total=null,diff=null;
+  if(Number.isSafeInteger(d.total)&&d.total>=0&&o&&Number.isSafeInteger(o.total)&&o.total>=0&&hasDiff(o.price_diff)&&Number.isSafeInteger(d.total+o.price_diff)&&o.total===d.total+o.price_diff){
+    total=o.total;diff=o.price_diff;
+  }
+  // 기본 부품으로 되돌릴 때도 같은 계약이다. 유지될 수량/다른 변경 줄의 금액을 추정하지 않는다.
+  if(total===null)return '<p class="muted">선택 적용 후 금액 확인 중</p>';
+  return '<div class="dv2-preview-head"><strong>선택 적용 후</strong><small>1대 기준 · 예상 금액</small><strong class="dv2-preview-total" data-dv2-preview-total>'+money(total)+'</strong></div>'+
+    '<dl class="dv2-sums"><div><dt>현재 구성 대비 차액</dt><dd>'+dv2Diff(diff)+'</dd></div></dl>';
+}
 function dv2Panel(p,labelOf){
   const q=state.build,d=q.data,label=labelOf(q.ordinal)||d?.label||'부품',busy=state.phase==='build';
-  const modal=mob768.matches;
   const head='<div class="dv2-panel-head"><h3 id="dv2-panel-title" tabindex="-1">'+esc(label)+' 변경</h3>'+button('<span aria-hidden="true">×</span>','build-close','dv2-x','aria-label="'+esc(label)+' 변경 닫기"')+'</div>';
-  const shell=inner=>'<div class="dv2-panel" role="dialog" aria-labelledby="dv2-panel-title"'+(modal?' aria-modal="true"':'')+'>'+head+inner+'</div>';
+  const shell=inner=>'<div class="dv2-panel" role="dialog" aria-labelledby="dv2-panel-title" aria-modal="true">'+head+inner+'</div>';
   if(!d){
     if(q.error)return shell('<p class="warn-text" role="alert">'+esc(q.error)+'</p><div class="dv2-actions">'+button('다시 찾기','build-options','outline','data-ordinal="'+q.ordinal+'" data-retry="1"')+button('취소','build-close','dv2-link')+'</div>');
     return shell('<p class="muted" role="status">이 PC에 맞는 판매 부품을 찾는 중이에요.</p><div class="dv2-actions">'+button('취소','build-close','dv2-link')+'</div>');
@@ -579,7 +591,7 @@ function dv2Panel(p,labelOf){
     (q.error?'<p class="warn-text" role="alert">'+esc(q.error)+'</p>':'')+(warned?'<p class="warn-text">'+esc(d.note||d.warnings.join(' '))+'</p>':'')+
     '<ul class="dv2-cands" role="radiogroup" aria-labelledby="dv2-panel-title">'+list+'</ul>'+none+untested+
     (changed?button('<span aria-hidden="true">↶</span> 기본 부품으로','build-pick-base','dv2-link dv2-base-link','data-code="'+baseCode+'"'+(state.phase?' disabled':'')):'')+quantityBlock(d)+
-    dv2Totals(p)+'<p class="dv2-assembly muted">변경한 구성의 실제 조립 검수는 확인이 필요해요.</p>'+
+    dv2Totals(p)+'<section class="dv2-preview" data-dv2-preview aria-live="polite" aria-atomic="true"'+(dv2.temp===applied?' hidden':'')+'>'+dv2Preview(q)+'</section><p class="dv2-assembly muted">변경한 구성의 실제 조립 검수는 확인이 필요해요.</p>'+
     '<div class="dv2-actions">'+button(busy?'적용하는 중이에요':'선택한 부품 적용','build-apply','primary dv2-apply','data-dv2-apply'+(state.phase||dv2.temp===applied?' disabled':''))+button('취소','build-close','dv2-cancel')+'</div>'+
     '<p class="dv2-foot muted">적용 전에는 구성이 바뀌지 않아요.</p>');
 }
@@ -587,6 +599,7 @@ function dv2SelectTemp(code){
   dv2.temp=code;
   for(const li of view.querySelectorAll('.dv2-cand')){const on=Number(li.dataset.buildOption)===code;li.classList.toggle('is-picked',on);const r=li.querySelector('input');if(r)r.checked=on;}
   const apply=view.querySelector('[data-dv2-apply]');if(apply)apply.disabled=!!state.phase||code===dv2.applied;
+  const preview=view.querySelector('[data-dv2-preview]');if(preview){preview.innerHTML=dv2Preview(state.build);preview.hidden=code===dv2.applied;}
 }
 function dv2Inert(on){
   for(const el of [document.querySelector('.topbar'),document.querySelector('.chat'),actions,view.querySelector('.dv2-head'),view.querySelector('.dv2-main')])if(el)el.inert=on;
@@ -679,7 +692,8 @@ function renderDetailV2(p,configuration){
     '<div class="dv2-layout"><div class="dv2-main">'+head+'<section class="final-parts public-bom dv2-parts"><div class="tf-parts-head"><h3>'+(ai?'선택한 부품':'기본 구성 부품')+'</h3><span>'+(ai?'나에게 맞게 바꿔 보세요':'옵션 변경은 팝콘PC에서')+'</span></div><div class="final-table-wrap"><table class="final-table dv2-table"><thead><tr><th scope="col">분류</th><th scope="col">현재 선택된 모델</th><th scope="col">변경</th></tr></thead><tbody>'+
     configuration.parts.map(x=>dv2Row(x,p)).join('')+'</tbody></table></div><p class="tf-foot-note">'+uiIcon('info')+(ai?'부품을 바꾼 뒤 견적을 보관하면 구매 상담을 신청할 수 있어요.':'부품 옵션을 바꾸려면 팝콘PC 상품 페이지로 이동해 주세요.')+'</p></section></div>'+side+'</div></div>';
   actions.hidden=true;
-  dv2Inert(mob768.matches&&cur!==null);
+  // 부품 패널은 PC(오른쪽 510px 창)·모바일(전체 화면) 모두 덮개 창이다(승인 06). 뒤 화면은 열린 동안 누를 수 없다.
+  dv2Inert(cur!==null);
   if(opened&&mob768.matches&&!dv2.hist){try{history.pushState(history.state,'',location.href);dv2.hist=true;}catch{}}
   if(closed&&dv2.hist){dv2.hist=false;dv2.skipPop=true;try{history.back();}catch{dv2.skipPop=false;}}
   // 후보를 불러오거나 적용에 실패해 패널이 다시 그려져도 초점이 몸통으로 빠지지 않게 제목으로 되돌린다(눌러 둔 단추는 render 가 따로 되살린다).
@@ -977,7 +991,7 @@ function consultBack(){
 }
 // 신청 칸은 다시 그려져도 적던 값이 남게 입력마다 상태에 옮긴다(다시 그리지는 않는다).
 view.addEventListener('input',e=>{if(e.target.closest?.('[data-inquiry]'))flow.inquiryDraft(inquiryValues());});
-// 상세 v2: 라디오로 고르는 것은 임시 선택이다(화면을 다시 그리지 않고 적용 단추 상태만 바꾼다). 접힌 칸의 열림 상태는 다시 그려도 지킨다.
+// 상세 v2: 라디오는 임시 선택이다(전체 화면을 다시 그리지 않고 예상 금액과 적용 단추만 바꾼다). 접힌 칸은 유지한다.
 view.addEventListener('change',e=>{if(e.target.matches?.('[data-dv2-radio]'))dv2SelectTemp(Number(e.target.value));});
 view.addEventListener('toggle',e=>{const k=e.target?.dataset?.detail;if(k&&k.startsWith('dv2-'))dv2.open[k]=e.target.open;},true);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!e.defaultPrevented&&state.screen==='detail'&&state.build?.ordinal!==null&&canSwapHere(state.selected)){e.preventDefault();flow.closeBuild();}});
