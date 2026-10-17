@@ -92,6 +92,12 @@ def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
                          " 부품 직접 고르기 시작 화면으로 이어 준다. 실제 이번 고객 문장만 서버가 전달하므로 인자는 없다."
                          " 상품 선택·가격 확정·주문·저장·상담 접수는 하지 않는다. 기존 몰 완제품을 변경해 주는 도구가 아니다."),
          "parameters": {"type": "object", "additionalProperties": False, "properties": {}}},
+        {"name": "free_build_preview",
+         "description": ("손님이 말한 부품 조건(CPU·그래픽카드·메모리·SSD·인텔/AMD)으로 판매 중인 부품을 골라 호환되는 PC 한 대를"
+                         " 미리 채워 본다. 이번 고객 문장만 서버가 읽으므로 인자는 없다. 자리마다 고른 부품 이름·수량과 PC 총액"
+                         "(조립비 포함)을 준다. 부품별 판매가는 주지 않는다. 조건에 맞는 부품이 없으면 status=no_match 와 맞지 않은"
+                         " 조건을, 함께 쓸 수 없으면 status=no_build 를 준다. 저장·주문·접수는 하지 않는다."),
+         "parameters": {"type": "object", "additionalProperties": False, "properties": {}}},
         {"name": "find_pcs",
          "description": ("팝콘PC가 지금 판매 중인 조립 PC 중에서 조건에 맞는 것을 찾는다. 손님이 PC 추천·구매를 원하거나,"
                          " 부품·성능을 물어 그 기준에 맞는 PC를 보여 줄 수 있을 때 부른다. 손님이 말하지 않은 조건은 넣지 않는다."
@@ -514,9 +520,47 @@ def open_free_build(args: dict, book: FactBook) -> dict:
                 note="고객 문장과 읽은 조건을 시작 화면에 전달할 뿐이다. 부품 후보·호환·재고·금액은 아직 조회하지 않았고 주문·저장·접수도 하지 않았다.")
 
 
+def free_build_preview(args: dict, book: FactBook) -> dict:
+    """부품 직접 고르기 미리 채우기(api/mvp3_free_build.start_build 와 같은 판정, 읽기만).
+
+    2026-10-16 중헌 님 「메모리 32기가, RTX 5060 Ti, CPU i9 .. 그대로 부품카테고리에 반영하고 나머지를 고를 수 있도록」·
+    「제대로된 답변과 제품을 보여주던, 대안을 내놓던 해야 해」 -- 시작 화면으로 보내기만 하면 상담은 무엇이 채워질지,
+    말한 부품이 지금 있는지 모른 채 답했다. 조건은 open_free_build 와 같이 이번 고객 문장에서만 읽는다.
+    """
+    from fastapi import HTTPException
+
+    from . import mvp3_free_build as FB
+
+    if args:
+        return _invalid("free_build_preview 는 인자를 받지 않는다. 이번 고객 문장을 그대로 사용한다")
+    raw = book.request_text
+    if not isinstance(raw, str) or not raw.strip() or len(raw) > 2000:
+        return _invalid("이번 고객 문장이 없거나 길이를 넘었다")
+    cond = FB.parse_text(raw)
+    conditions = cond.model_dump(exclude_none=True)
+    if not conditions:
+        return _res("no_conditions", reason="고객 문장에서 CPU·그래픽카드·메모리·SSD 조건을 읽지 못했다. 원하는 부품을 묻는다.")
+    try:
+        with engine.connect() as conn:
+            res = FB.start_build(conn, cond)
+    except HTTPException as e:
+        d = e.detail if isinstance(e.detail, dict) else {"detail": str(e.detail)}
+        status = {"no_match": "no_match", "no_build": "no_build"}.get(d.get("error"), "unknown")
+        return _res(status, conditions=conditions, detail=d.get("detail"),
+                    unmatched=[{"label": u.get("label"), "value": u.get("value")} for u in d.get("unmatched") or []],
+                    note="맞는 부품이 없다고 말하고, 조건 하나를 바꾸는 대안(가까운 부품·인텔/AMD 바꾸기)이나 find_pcs 로 완제품 대안을 낸다.")
+    if type(res.get("total")) is int:
+        book.prices.add(res["total"])
+    lines = [{"label": l.get("label"), "name": l.get("name"), "quantity": l.get("quantity"),
+              "from_request": l.get("from_request")} for l in res.get("lines") or []]
+    return _res("ok", conditions=conditions, lines=lines, total=res.get("total"),
+                assembly_fee_included=res.get("assembly_fee_included"), warnings=res.get("warnings") or [],
+                note="미리 채운 구성이다. 손님은 부품 직접 고르기 화면에서 자리마다 바꿀 수 있다. 부품별 가격은 말하지 않는다.")
+
+
 EXECUTORS = {"find_pcs": find_pcs, "pc_detail": pc_detail, "other_pcs_by_part": other_pcs_by_part,
              "game_facts": game_facts, "shop_policy": shop_policy, "show_pcs": show_pcs,
-             "open_free_build": open_free_build}
+             "open_free_build": open_free_build, "free_build_preview": free_build_preview}
 
 
 def run(name: str, args: dict, book: FactBook) -> dict:
