@@ -46,7 +46,7 @@ ORDER = ('CPU', 'MB', 'RAM', 'GPU', 'CASE', 'COOLER', 'SSD', 'POWER')
 KEY = {s: i for i, s in enumerate(ORDER)}
 REQUIRED = ('CPU', 'MB', 'RAM', 'SSD', 'POWER', 'CASE')
 OPTIONAL = ('GPU', 'COOLER')
-PER_SLOT = 12            # 자리마다 싼 것부터 이만큼만 채우기 탐색에 넣는다(같은 이름은 하나로)
+PER_SLOT = 12            # 자리마다 호환을 통과한 것 중 싼 것부터 이만큼만 다음 자리로 넘긴다(같은 이름은 하나로)
 NODE_CAP = 4000          # 채우기 탐색에서 판정하는 횟수 상한 — 넘으면 «채우지 못함»으로 끝낸다
 OPTIONS_CHEAPER, OPTIONS_PRICIER = 6, 10
 DEFAULT_RAM_GB = 16      # 고객이 메모리를 말하지 않았을 때
@@ -355,14 +355,19 @@ def fill(cands, specs, rules, gpu_optional=False):
             bad, _ = judge(picks, specs, rules, list(KEY.values()), final=True)
             return picks if not bad else None
         slot = ORDER[i]
-        options = cands.get(slot, [])[:PER_SLOT]
+        # 싼 것부터 보되, 막힌 후보는 PER_SLOT 에 세지 않는다 — 싼 파워 12개가 그래픽카드 전력에 모두 모자라
+        # 그래픽카드를 지정한 요청이 전부 「못 채움」이던 것(2026-10-17 개발 서버). 판정 횟수는 NODE_CAP 이 묶는다.
+        options = cands.get(slot, [])
         if slot == 'GPU' and gpu_optional:
             options = [None] + options      # 내장 그래픽을 쓰는 PC 를 먼저 본다(그래픽카드를 말하지 않았다)
         elif slot == 'COOLER':
             options = options + [None]      # 맞는 쿨러를 못 찾으면 비우고 알린다
+        tried = 0
         for o in options:
             if budget[0] <= 0:
                 return None
+            if o is not None and tried >= PER_SLOT:
+                continue                    # 비우는 선택지(None)는 상한과 무관하게 본다
             trial = dict(picks, **{slot: o})
             if o is not None:
                 budget[0] -= 1
@@ -374,6 +379,7 @@ def fill(cands, specs, rules, gpu_optional=False):
                 cpu = trial.get('CPU')
                 if cpu is None or (specs.get(cpu['product_code']) or {}).get('cpu_gpu') is not True:
                     continue
+            tried += 1
             got = step(i + 1, trial)
             if got is not None:
                 return got
