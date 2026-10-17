@@ -553,9 +553,14 @@ def free_build_preview(args: dict, book: FactBook) -> dict:
         book.prices.add(res["total"])
     lines = [{"label": l.get("label"), "name": l.get("name"), "quantity": l.get("quantity"),
               "from_request": l.get("from_request")} for l in res.get("lines") or []]
+    # 미리 채운 구성을 말하면 그 화면으로 가는 버튼도 붙어야 한다. 모델이 open_free_build 를 빠뜨리고
+    # 「화면으로 이어졌습니다」라고만 답한 실측(2026-10-17 talk-replay 38997643515)이 있어 서버가 붙인다.
+    book.screen_action = {"type": "open_free_build", "request_text": raw,
+                          "conditions": conditions, "conditions_source": "request_text"}
     return _res("ok", conditions=conditions, lines=lines, total=res.get("total"),
                 assembly_fee_included=res.get("assembly_fee_included"), warnings=res.get("warnings") or [],
-                note="미리 채운 구성이다. 손님은 부품 직접 고르기 화면에서 자리마다 바꿀 수 있다. 부품별 가격은 말하지 않는다.")
+                note="미리 채운 구성이다. 화면이 부품 직접 고르기 버튼을 이미 붙였고 손님은 그 화면에서 자리마다 바꿀 수 있다. "
+                     "부품별 가격은 말하지 않는다.")
 
 
 EXECUTORS = {"find_pcs": find_pcs, "pc_detail": pc_detail, "other_pcs_by_part": other_pcs_by_part,
