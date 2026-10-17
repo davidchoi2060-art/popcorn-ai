@@ -349,6 +349,7 @@ def fill(cands, specs, rules, gpu_optional=False):
     """
     budget = [NODE_CAP]
     stuck = {}
+    reasons = {}      # (자리, 규칙 이름, fail|unknown) -> 횟수 — 못 채웠을 때 무엇에 막혔는지 알린다
 
     def step(i, picks):
         if i == len(ORDER):
@@ -369,6 +370,9 @@ def fill(cands, specs, rules, gpu_optional=False):
                 bad, _ = judge(trial, specs, rules, [KEY[slot]])
                 if bad or (slot in ('RAM', 'MB') and not ram_fits(trial, specs)):
                     stuck[slot] = stuck.get(slot, 0) + 1
+                    for c in bad or [dict(label='메모리 슬롯·용량', state='fail')]:
+                        why = (slot, c['label'], c['state'])
+                        reasons[why] = reasons.get(why, 0) + 1
                     continue
             elif slot == 'GPU':
                 cpu = trial.get('CPU')
@@ -379,7 +383,10 @@ def fill(cands, specs, rules, gpu_optional=False):
                 return got
         return None
 
-    return step(0, {}), stuck
+    picks = step(0, {})
+    return picks, dict(stuck=stuck, exhausted=budget[0] <= 0,
+                       reasons=[dict(slot=k[0], rule=k[1], state=k[2], count=n)
+                                for k, n in sorted(reasons.items(), key=lambda kv: -kv[1])[:5]])
 
 
 # ── 결과 ────────────────────────────────────────────────────────────────
@@ -432,7 +439,8 @@ def start_build(conn, cond, rules=None):
     picks, stuck = fill(cands, specs, rules, gpu_optional=not cond.gpu)
     if picks is None:
         raise HTTPException(409, dict(error='no_build', detail='말씀하신 조건을 모두 함께 쓰는 호환 구성을 찾지 못했어요. '
-                                                               '조건 하나를 바꿔 다시 시도해 주세요.'))
+                                                               '조건 하나를 바꿔 다시 시도해 주세요.',
+                                      blocked=stuck['reasons'], exhausted=stuck['exhausted']))
     return view(picks, cond, {x['slot'] for x in condition_view(cond)})
 
 
