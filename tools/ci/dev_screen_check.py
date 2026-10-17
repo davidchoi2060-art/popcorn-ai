@@ -224,7 +224,17 @@ def free_build(text):
 
 def main():
     if TEXT.startswith('FREE:'):
-        return free_build(TEXT[len('FREE:'):].strip())
+        # 결과를 실행 요약과 함께 주석(annotation)으로도 남긴다 -- 로그를 못 받는 클라우드 세션도 API 로 읽게.
+        import contextlib, io
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = free_build(TEXT[len('FREE:'):].strip())
+        out = buf.getvalue()
+        print(out)
+        for i in range(0, min(len(out), 9 * 3000), 3000):
+            chunk = out[i:i + 3000].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+            print(f'::notice title=free-build {i // 3000 + 1}::{chunk}')
+        return rc
     texts = [t.strip() for t in TEXT.split('||')]
     if len(texts) > 1:
         return talk_cases(texts)
