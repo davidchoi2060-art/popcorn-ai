@@ -185,6 +185,13 @@ class BuildTests(unittest.TestCase):
     def start(self, **cond):
         return F.start_build(None, F.Conditions(**cond), RULES)
 
+    def test_failed_cheap_parts_do_not_use_up_the_slot_limit(self, *_):
+        """싼 파워가 그래픽카드 전력에 모자라도 더 비싼 파워까지 본다(2026-10-17 개발 서버: 그래픽카드 지정 시 늘 못 채움)."""
+        with patch.object(F, 'PER_SLOT', 1):
+            res = self.start(gpu='RTX 5060 Ti')
+        by = {l['slot']: l for l in res['lines']}
+        self.assertEqual(by['POWER']['product_code'], 71)
+
     def test_owner_example_fills_the_rest(self, *_):
         res = self.start(**F.parse_text('메모리 32기가, RTS 5060ti, CPU는 i9 시리즈').model_dump())
         by = {l['slot']: l for l in res['lines']}

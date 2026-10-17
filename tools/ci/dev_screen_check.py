@@ -169,7 +169,7 @@ def free_build(text):
                       f"{[ln['slot'] for ln in r.get('lines') or [] if not ln.get('product_code')]}")
             except urllib.error.HTTPError as e:
                 bad += e.code >= 500
-                print(f"- {c!r}: HTTP {e.code}: {(e.read() or b'')[:200].decode('utf-8', 'replace')!r}")
+                print(f"- {c!r}: HTTP {e.code}: {(e.read() or b'')[:900].decode('utf-8', 'replace')!r}")
         return 1 if bad else 0
     print('### 개발 서버 부품 직접 고르기 점검')
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
