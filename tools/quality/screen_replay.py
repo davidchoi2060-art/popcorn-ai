@@ -66,7 +66,7 @@ def one(text: str) -> int:
         return 0
     code, res = post("/api/talk/parse", {"text": text, "history": [], "defer_answer": True})
     keep = {k: res.get(k) for k in ("ok", "agent", "reply", "answer", "explain_only", "state", "missing", "fallback",
-                                    "truncated", "agent_meta", "exceptions", "silent", "agent_cards")}
+                                    "truncated", "agent_meta", "exceptions", "silent", "agent_cards", "action")}
     out = "HTTP %s 글자 %d\n%s" % (code, len(text), json.dumps(keep, ensure_ascii=False, indent=1)[:6000])
     print(out)
     for i in range(0, len(out), 1300):
