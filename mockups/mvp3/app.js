@@ -106,11 +106,12 @@ function scrollToLatest(){
 // A scrolled log gets an upper edge so the clipped bubble does not look stuck to the intro.
 function markScroll(){const log=$('#messages'),on=log.scrollTop>0;log.classList.toggle('is-scrolled',on);$('#chat-body').classList.toggle('log-scrolled',on);}
 function renderMessages(){
-  const key=JSON.stringify(state.messages);
+  const key=JSON.stringify([state.messages,state.freeBuildOffer]);
   if(key!==lastMessages){
     $('#messages').innerHTML=state.messages.map(x=>'<div class="message '+(x.who==='user'?'user':'ai')+'"><span class="avatar">'+(x.who==='user'?uiIcon('user'):'<img class="avatar-mark" src="assets/popcorn-mark.png" alt="팝콘AI">')+'</span><div class="message-content"><p>'+(
       x.text==='안녕하세요! 어떤 용도로 쓰실 PC인지와 예산을 알려주시면 맞는 PC를 함께 찾아드릴게요.'&&state.screen==='welcome'?
       '안녕하세요! 어떤 용도로 쓰실 PC인지와 <br>예산을 알려주시면 맞는 PC를 <br>함께 찾아드릴게요.':esc(x.text))+'</p></div></div>').join('');
+    if(state.freeBuildOffer)$('#messages').insertAdjacentHTML('beforeend','<div class="message ai"><div class="message-content">'+button('이 조건으로 부품 고르기','free-build-open','outline')+'</div></div>');
     scrollToLatest();lastMessages=key;
   }
   // 고객이 한 번 말한 뒤에는 첫 질문 머리말을 감춘다(2026-10-12 사장님 「계속 어떤 PC를 찾으세요? 이게 나오는데」).
@@ -811,30 +812,7 @@ function renderDetail(){
 }
 // 구매 상담 신청 칸(api/mvp3_purchase_inquiry.py). 주제·동의 문구는 서버가 준 것만 쓴다.
 // 연락처를 남길 뿐 주문·결제·가격 확정은 하지 않는다고 칸 안에서 먼저 말한다.
-function inquiryPanel(){
-  const q=state.inquiry;if(!q.open&&!q.done)return '';
-  // 「사람 상담 남기기」 단추로 열었으면 구매 상담 문구 대신 일반 상담 문구를 쓴다(코덱스 PR136 검수 「신청 문구의 범위」).
-  const human=!!q.human,title=human?'사람 상담 남기기':'구매 상담 신청';
-  if(q.done)return '<section class="live-explanation live-inquiry" role="status" data-inquiry-done><h3>'+title+'</h3><p>'+esc(q.done.note)+'</p>'+
-    '<p class="muted">신청 번호 '+esc(q.done.inquiry_no)+' · 주문과 결제는 아직 진행되지 않았어요.</p></section>';
-  const busy=state.phase==='inquiry'||state.phase==='inquiry-form',d=q.draft;
-  const err=q.error?'<p class="live-inquiry-error" role="alert">'+esc(q.error)+'</p>':'';
-  if(!q.meta)return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
-    (busy?'<p class="muted">신청 양식을 불러오는 중이에요.</p>':err+button('다시 불러오기','inquiry-open','outline',human?'data-human="1"':''))+'</section>';
-  const field=(name,label,input)=>'<label class="live-inquiry-field"><span>'+label+'</span>'+input+'</label>';
-  const dis=busy?' disabled':'';
-  return '<section class="live-explanation live-inquiry" data-inquiry-form><h3>'+title+'</h3>'+
-    '<p class="muted">'+(human?'상담에서 바로 답하기 어려운 내용은 팝콘PC 담당자가 연락드려 안내해요.':'여러 대 구매 · 할인 · 세금계산서처럼 상담에서 정할 수 없는 내용은 팝콘PC 담당자가 연락드려 안내해요.')+' 이 신청으로 주문이나 결제가 진행되지는 않아요.</p>'+
-    field('topic','문의 주제','<select data-inquiry="topic"'+dis+'><option value="">주제를 골라 주세요</option>'+q.meta.topics.map(t=>'<option'+(d.topic===t?' selected':'')+'>'+esc(t)+'</option>').join('')+'</select>')+
-    field('name','이름 (선택)','<input data-inquiry="name" maxlength="30" autocomplete="name" value="'+esc(d.name)+'"'+dis+'>')+
-    field('phone','전화번호','<input data-inquiry="phone" type="tel" maxlength="20" autocomplete="tel" placeholder="010-1234-5678" value="'+esc(d.phone)+'"'+dis+'>')+
-    field('email','이메일','<input data-inquiry="email" type="email" maxlength="120" autocomplete="email" value="'+esc(d.email)+'"'+dis+'>')+
-    '<p class="muted live-inquiry-hint">전화번호나 이메일 중 하나는 적어 주세요.</p>'+
-    field('message','문의 내용 (선택)','<textarea data-inquiry="message" maxlength="500" rows="3"'+dis+'>'+esc(d.message)+'</textarea>')+
-    '<label class="live-inquiry-consent"><input type="checkbox" data-inquiry="consent"'+(d.consent?' checked':'')+dis+'><span>'+esc(q.meta.consent_text)+' 동의합니다.</span></label>'+
-    err+'<div class="live-inquiry-buttons">'+button('닫기','inquiry-close','outline',busy?'disabled':'')+
-    button(state.phase==='inquiry'?'보내는 중…':'신청 보내기','inquiry-send','primary',busy?'disabled':'')+'</div></section>';
-}
+function inquiryPanel(){return window.MVP3LiveFlow.inquiryHtml(state.inquiry,{phase:state.phase});}
 function inquiryValues(){
   const out={};
   for(const e of view.querySelectorAll('[data-inquiry]'))out[e.dataset.inquiry]=e.type==='checkbox'?e.checked:e.value;
@@ -963,6 +941,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;e.preventDefault();
   if(keepUi.handle(b.dataset.action,b))return;
   switch(b.dataset.action){
+    case 'free-build-open':if(!state.phase&&state.freeBuildOffer&&!window.MVP3FreeBuildEntry?.open(state.freeBuildOffer))notice('조건을 다음 화면으로 옮기지 못했어요. 부품 직접 고르기 화면에서 다시 적어 주세요.');break;
     case 'home':if(state.screen!=='welcome'&&!state.phase)flow.navigate('welcome');else{view.scrollTop=0;window.scrollTo(0,0);}break;
     case 'new':chatPreference=null;lastMessages='';setDraft('');flow.reset();break;
     case 'saved':captureDraft();openSaved();break;

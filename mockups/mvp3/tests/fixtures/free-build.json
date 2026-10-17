@@ -1,0 +1,242 @@
+{
+  "source_commit": "6c3d7e4284ea86d6fa5f786b4b816b48dba0a147",
+  "source": "B tests/test_mvp3_free_build.py synthetic catalog, actual F.start/options/quote export; not live prices",
+  "request": "메모리 32기가, RTX 5060 Ti, CPU는 i9 시리즈",
+  "start": {
+    "lines": [
+      {
+        "slot": "CPU",
+        "label": "CPU",
+        "product_code": 1,
+        "name": "인텔 코어i9-14세대 14900K (랩터레이크 리프레시)",
+        "quantity": 1,
+        "from_request": true
+      },
+      {
+        "slot": "MB",
+        "label": "메인보드",
+        "product_code": 12,
+        "name": "ASRock H610M-HDV DDR4",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "RAM",
+        "label": "메모리",
+        "product_code": 22,
+        "name": "TeamGroup DDR4-3200 (16GB)",
+        "quantity": 2,
+        "from_request": true
+      },
+      {
+        "slot": "GPU",
+        "label": "그래픽카드",
+        "product_code": 30,
+        "name": "MSI 지포스 RTX 5060 Ti 벤투스 2X OC D7 8GB",
+        "quantity": 1,
+        "from_request": true
+      },
+      {
+        "slot": "CASE",
+        "label": "케이스",
+        "product_code": 40,
+        "name": "앱코 미들타워 케이스",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "COOLER",
+        "label": "CPU쿨러",
+        "product_code": 50,
+        "name": "쿨러 A",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "SSD",
+        "label": "SSD",
+        "product_code": 60,
+        "name": "WD SN580 M.2 NVMe (500GB)",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "POWER",
+        "label": "파워",
+        "product_code": 71,
+        "name": "파워 750W",
+        "quantity": 1,
+        "from_request": false
+      }
+    ],
+    "total": 1730000,
+    "assembly_fee_included": true,
+    "warnings": [],
+    "requested": [
+      {
+        "slot": "CPU",
+        "label": "CPU",
+        "value": "i9"
+      },
+      {
+        "slot": "GPU",
+        "label": "그래픽카드",
+        "value": "RTX 5060 TI"
+      },
+      {
+        "slot": "RAM",
+        "label": "메모리",
+        "value": "32GB"
+      }
+    ],
+    "note": "호환 규칙을 통과한 판매 중 부품만 넣었어요. 금액은 PC 총액이고, 부품을 바꾸면 차액만 보여 드려요. 몰 장바구니가 아니라 「이 구성으로 구매 상담 신청」으로 주문을 도와드려요.",
+    "ok": true
+  },
+  "options": {
+    "ok": true,
+    "slot": "GPU",
+    "label": "그래픽카드",
+    "current": {
+      "slot": "GPU",
+      "label": "그래픽카드",
+      "product_code": 30,
+      "name": "MSI 지포스 RTX 5060 Ti 벤투스 2X OC D7 8GB",
+      "quantity": 1,
+      "from_request": false
+    },
+    "total": 1730000,
+    "options": [
+      {
+        "product_code": 31,
+        "name": "MSI 지포스 RTX 5060 벤투스 2X OC D7 8GB",
+        "quantity": 1,
+        "price_diff": -150000,
+        "total": 1580000
+      },
+      {
+        "product_code": 32,
+        "name": "ZOTAC RTX 5070 Ti",
+        "quantity": 1,
+        "price_diff": 500000,
+        "total": 2230000
+      }
+    ],
+    "clear": {
+      "name": "CPU 내장 그래픽 사용",
+      "price_diff": -600000,
+      "total": 1130000
+    }
+  },
+  "replacement": {
+    "lines": [
+      {
+        "slot": "CPU",
+        "label": "CPU",
+        "product_code": 1,
+        "name": "인텔 코어i9-14세대 14900K (랩터레이크 리프레시)",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "MB",
+        "label": "메인보드",
+        "product_code": 12,
+        "name": "ASRock H610M-HDV DDR4",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "RAM",
+        "label": "메모리",
+        "product_code": 22,
+        "name": "TeamGroup DDR4-3200 (16GB)",
+        "quantity": 2,
+        "from_request": false
+      },
+      {
+        "slot": "GPU",
+        "label": "그래픽카드",
+        "product_code": 31,
+        "name": "MSI 지포스 RTX 5060 벤투스 2X OC D7 8GB",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "CASE",
+        "label": "케이스",
+        "product_code": 40,
+        "name": "앱코 미들타워 케이스",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "COOLER",
+        "label": "CPU쿨러",
+        "product_code": 50,
+        "name": "쿨러 A",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "SSD",
+        "label": "SSD",
+        "product_code": 60,
+        "name": "WD SN580 M.2 NVMe (500GB)",
+        "quantity": 1,
+        "from_request": false
+      },
+      {
+        "slot": "POWER",
+        "label": "파워",
+        "product_code": 71,
+        "name": "파워 750W",
+        "quantity": 1,
+        "from_request": false
+      }
+    ],
+    "total": 1580000,
+    "assembly_fee_included": true,
+    "warnings": [],
+    "requested": [],
+    "note": "호환 규칙을 통과한 판매 중 부품만 넣었어요. 금액은 PC 총액이고, 부품을 바꾸면 차액만 보여 드려요. 몰 장바구니가 아니라 「이 구성으로 구매 상담 신청」으로 주문을 도와드려요.",
+    "ok": true
+  },
+  "unmatched": {
+    "request": "메모리 32기가, RTX 5090, CPU는 i9 시리즈",
+    "conditions": {
+      "cpu": "i9",
+      "gpu": "RTX 5090",
+      "ram_gb": 32
+    },
+    "requested": [
+      {
+        "slot": "CPU",
+        "label": "CPU",
+        "value": "i9"
+      },
+      {
+        "slot": "GPU",
+        "label": "그래픽카드",
+        "value": "RTX 5090"
+      },
+      {
+        "slot": "RAM",
+        "label": "메모리",
+        "value": "32GB"
+      }
+    ],
+    "status": 409,
+    "error": {
+      "error": "no_match",
+      "unmatched": [
+        {
+          "slot": "GPU",
+          "label": "그래픽카드",
+          "value": "RTX 5090",
+          "reason": "지금 판매 중인 부품 중 이 조건에 맞는 것이 없어요."
+        }
+      ],
+      "detail": "말씀하신 조건에 맞는 판매 부품을 찾지 못했어요: 그래픽카드 RTX 5090"
+    }
+  }
+}

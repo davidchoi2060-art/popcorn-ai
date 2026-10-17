@@ -1364,7 +1364,7 @@ def parse_talk(body: ParseBody, request: Request):
         with engine.connect() as conn:
             access_gate.check_rate(conn, request, what="talk.parse")
         agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow,
-                                  display_context=body.display_context)
+                                  display_context=body.display_context, request_text=body.text)
         if agent_res is not None:
             if truncated:
                 agent_res["reply"] = (TX.NOTE_TOO_LONG % format(len(text), ",") + "\n\n" + agent_res["reply"]).strip()

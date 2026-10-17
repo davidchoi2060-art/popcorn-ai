@@ -161,6 +161,12 @@
     line(b,'연락처',contact(it));
     line(b,'문의 내용',it.message||(it.contact_purged?'보관 기간 지남':'적지 않음'));
     line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음')+(it.quote_id?' (보관 견적)':''));
+    if (it.free_build && it.free_build.parts){
+      var fb=it.free_build;
+      line(b,'고객이 고른 부품',fb.parts.map(function(p){ return p.slot+' '+p.name+(p.quantity>1?' × '+p.quantity:'')+' · '+Number(p.sale_price*p.quantity).toLocaleString('ko-KR')+'원'; }).join('\n')
+        +'\n조립비 '+Number(fb.assembly_fee).toLocaleString('ko-KR')+'원 · 총액 '+Number(fb.total).toLocaleString('ko-KR')+'원 (신청 시각 판매가)'
+        +((fb.empty||[]).length?'\n비운 자리: '+fb.empty.join(', '):''));
+    }
     if (it.visitor){ var a=el('a',null,'이 방문자의 문의 · 보관 견적 보기'); a.href='/admin2/mvp3-consults#'+it.visitor; b.appendChild(a); }
     b.appendChild(el('span','pi-lbl','연락처 보관 기한 '+when(it.purge_at)));
     b.appendChild(el('span','pi-lbl','처리'));

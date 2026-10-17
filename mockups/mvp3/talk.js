@@ -155,6 +155,7 @@ function renderLog(){
     if(!(m.who==='ai'&&m.text===LF.GREETING))html+='<div class="tk-msg is-'+(m.who==='user'?'user':'ai')+'"><p>'+esc(m.text)+'</p></div>';
     for(const p of after.get(i)||[])html+=proposalBlock(p,p===last&&state.recommendation!==null);
   });
+  if(state.freeBuildOffer)html+='<div class="tk-msg-actions">'+button('이 조건으로 부품 고르기','free-build-open','outline',state.phase?'disabled':'')+'</div>';
   if(state.handoffOffer&&!state.inquiry.open&&!state.inquiry.done)html+='<div class="tk-msg-actions">'+button('전문가에게 문의하기','inquiry-open','outline','data-human="1"')+'</div>';
   if(state.error){
     const kind=state.retry?.kind,recommend=kind==='recommend'||kind==='resume',reprice=kind==='reprice';
@@ -291,6 +292,7 @@ document.addEventListener('click',e=>{
   const b=e.target.closest('[data-action]');if(!b||b.disabled)return;
   if(keepUi.handle(b.dataset.action,b))return;
   switch(b.dataset.action){
+    case 'free-build-open':if(!state.phase&&state.freeBuildOffer&&!window.MVP3FreeBuildEntry?.open(state.freeBuildOffer)){status.textContent='조건을 다음 화면으로 옮기지 못했어요. 부품 직접 고르기 화면에서 다시 적어 주세요.';status.hidden=false;}break;
     case 'starter':{
       const t=STARTERS.find(x=>x.key===b.dataset.entry);if(!t)break;
       const now=input.value.trim();

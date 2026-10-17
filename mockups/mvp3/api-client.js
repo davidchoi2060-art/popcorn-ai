@@ -8,10 +8,11 @@
     const detail=data&&data.detail, value=typeof detail==='object'&&detail?detail:data;
     const code=typeof value?.error==='string'?value.error:'';
     // 부품 직접 바꾸기는 서버가 고객에게 보일 이유(호환 실패 · 구성 비공개 · 판매 중 아님)를 문장으로 준다.
-    if(path.startsWith('/api/mvp3/build/')&&[404,409,422].includes(status)&&typeof detail==='string'&&detail.length<=200)return detail;
+    if((path.startsWith('/api/mvp3/build/')||path.startsWith('/api/mvp3/free-build/'))&&[404,409,422].includes(status)&&typeof detail==='string'&&detail.length<=200)return detail;
     // 연락처·상담 신청 접수는 서버가 고객에게 보일 이유를 문장으로 준다(연락처 없음 · 형식 · 견적을 찾지 못함).
     const sentence=typeof detail==='string'?detail:typeof detail?.detail==='string'?detail.detail:'';
     if(/^\/api\/mvp3\/(contact|purchase-inquiries\/from-quote)$/.test(path)&&[404,409,422,429].includes(status)&&sentence&&sentence.length<=200)return sentence;
+    if(path.startsWith('/api/mvp3/free-build/')&&[409,422].includes(status)&&sentence&&sentence.length<=300)return sentence;
     if(status===422&&sentence&&sentence.length<=200)return sentence;
     if(status===429)return '요청이 많아 잠시 기다려야 해요. 잠시 후 다시 시도해주세요.';
     if(status===409)return '상품 가격이나 추천 조건이 달라졌어요. 최신 추천을 다시 확인해주세요.';
@@ -47,7 +48,7 @@
     }
     const HANDOFF_RE=/^\/api\/mvp3\/saved-quotes\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/handoff$/;
     async function request(method,path,body,options={}){
-      const allowed=(method==='POST'&&(['/api/talk/parse','/api/talk/answer','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/purchase-inquiries/from-quote','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote'].includes(path)||HANDOFF_RE.test(path)))
+      const allowed=(method==='POST'&&(['/api/talk/parse','/api/talk/answer','/api/grid/recommend','/api/mvp3/saved-quotes','/api/mvp3/purchase-inquiries','/api/mvp3/purchase-inquiries/from-quote','/api/mvp3/part-options','/api/mvp3/build/options','/api/mvp3/build/quote','/api/mvp3/free-build/start','/api/mvp3/free-build/options','/api/mvp3/free-build/quote'].includes(path)||HANDOFF_RE.test(path)))
         ||(method==='GET'&&(/^\/api\/mvp3\/saved-quotes(?:\?limit=(?:1|20))?$/.test(path)||path==='/api/mvp3/purchase-inquiries/form'||path==='/api/mvp3/contact'))
         ||(method==='PUT'&&path==='/api/mvp3/contact');
       if(!allowed)throw new ApiError('지원하지 않는 고객 요청입니다.',0,'unsupported');
@@ -74,7 +75,8 @@
         if(!response.ok){
           const value=typeof data?.detail==='object'&&data.detail?data.detail:data;
           const retry=retryOf(value);
-          throw new ApiError(errorMessage(response.status,data,path),response.status,typeof value?.error==='string'?value.error:'http_error',Math.ceil(retry));
+          const error=new ApiError(errorMessage(response.status,data,path),response.status,typeof value?.error==='string'?value.error:'http_error',Math.ceil(retry));
+          if(path.startsWith('/api/mvp3/free-build/'))error.detail=value;throw error;
         }
         return data;
       }catch(error){
@@ -118,6 +120,9 @@
       // 부품 직접 바꾸기(api/mvp3_build.py): 같은 PC 의 부품 한 줄을 호환되는 판매 부품으로. 읽기만 한다.
       buildOptions:(state,productCode,changes,ordinal,options)=>request('POST','/api/mvp3/build/options',{state,product_code:productCode,changes,ordinal},options),
       buildQuote:(state,productCode,changes,options)=>request('POST','/api/mvp3/build/quote',{state,product_code:productCode,changes},options),
+      freeStart:(payload,options)=>request('POST','/api/mvp3/free-build/start',payload,options),
+      freeOptions:(parts,slot,options)=>request('POST','/api/mvp3/free-build/options',{parts,slot},options),
+      freeQuote:(parts,options)=>request('POST','/api/mvp3/free-build/quote',{parts},options),
       // 구매 상담 신청(api/mvp3_purchase_inquiry.py). 연락처를 남길 뿐 주문·결제는 하지 않는다.
       inquiryForm:options=>request('GET','/api/mvp3/purchase-inquiries/form',null,options),
       inquiry:(payload,options)=>request('POST','/api/mvp3/purchase-inquiries',payload,options),
