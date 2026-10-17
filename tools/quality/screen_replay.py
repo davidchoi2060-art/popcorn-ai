@@ -55,6 +55,15 @@ def one(text: str) -> int:
         # 「@long:반복할 글|끝 문장|글자 수」 -- 아주 긴 글 점검(E16·E17)
         body, tail, n = (text[6:].split("|") + ["", "20000"])[:3]
         text = (body * (int(n) // max(1, len(body)) + 1))[:int(n)] + "\n" + tail
+    if text.startswith("@fb:"):
+        # 「@fb:고객 문장」 -- 부품 직접 고르기 시작(/api/mvp3/free-build/start) 응답을 그대로 본다
+        code, res = post("/api/mvp3/free-build/start", {"text": text[4:]})
+        out = "HTTP %s\n%s" % (code, json.dumps(res, ensure_ascii=False, indent=1)[:6000])
+        print(out)
+        for i in range(0, len(out), 1300):
+            print("::notice title=문장 하나 %d::%s" % (i // 1300 + 1,
+                  out[i:i + 1300].replace("%", "%25").replace("\r", "").replace("\n", "%0A")))
+        return 0
     code, res = post("/api/talk/parse", {"text": text, "history": [], "defer_answer": True})
     keep = {k: res.get(k) for k in ("ok", "agent", "reply", "answer", "explain_only", "state", "missing", "fallback",
                                     "truncated", "agent_meta", "exceptions", "silent", "agent_cards")}
