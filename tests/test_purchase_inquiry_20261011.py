@@ -88,7 +88,13 @@ class AdminView(unittest.TestCase):
         self.assertIn('FROM purchase_inquiries', src)
         tpl = (ROOT / 'templates/admin/mvp3_consults.html.j2').read_text(encoding='utf-8')
         self.assertIn("/admin2/purchase-inquiries#", tpl)
-        self.assertNotIn('contact_phone', src, 'consults screen never carries contacts')
+        # 2026-10-18 관리자 정리 기획 A02: 등록 연락처 카드는 생겼지만 가린 번호만 싣는다.
+        # 원래 번호가 응답으로 나가는 자리는 _mask_phone 를 거치는 한 곳뿐이어야 한다.
+        uses = [ln for ln in src.splitlines() if 'contact_phone' in ln]
+        self.assertEqual(len(uses), 2, uses)
+        self.assertIn('_mask_phone(row["contact_phone"])', src)
+        self.assertNotIn("'contact_phone':", src)
+        self.assertNotIn('"contact_phone":', src)
 
 
 class Migration(unittest.TestCase):

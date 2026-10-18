@@ -379,12 +379,26 @@ a.hl-navbtn{color:var(--rv-canvas)}
         + '<div class="hl-cell num">' + won(r.total_quoted) + '</div>'
         + '<div class="hl-cell num mall ' + mallCls + '">' + won(r.total_mall) + mallSub + '</div>'
         + '<div class="hl-cell">' + chkHtml(r) + '</div>'
-        + '<div class="hl-cell note">' + esc(r.note) + '</div>'
+        + '<div class="hl-cell note">' + esc(r.note) + (r.mvp3 ? ' · ' + esc(r.mvp3.reason) + ' · ' + esc(r.mvp3.result) : '') + '</div>'
         + '</div>';
     }).join('');
   }
 
   // ── 서랍 ─────────────────────────────────────────────────────────
+  // 고객 화면 완제품 이동(2026-10-18 관리자 정리 기획 A04) — 연결 견적 · 대수 · 바꾼 부품.
+  // 이동 이유 · 구매 결과는 저장하지 않는다 — 바꾼 부품이 있어도 「변경」 단추에서 왔다고 단정하지 않는다.
+  function mvp3Html(m) {
+    if (!m) return '';
+    var sign = function (n) { return (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString('ko-KR') + '원'; };
+    return '<div class="hl-dwnote"><b>고객 화면 완제품 이동</b><br>'
+      + (m.quote_id ? '연결 견적 ' + esc(m.quote_id.slice(0, 8)) + '…' : '연결 견적 없음')
+      + (m.sets > 1 ? ' · ' + fmt(m.sets) + '대' : '')
+      + (m.changes.length ? '<br>바꾼 부품 ' + fmt(m.changes.length) + '개 · 차액 ' + esc(sign(m.delta_sum))
+        + m.changes.map(function (c) { return '<br>· ' + esc(c.label || '부품') + ' ' + esc(c.before || '—') + ' → ' + esc(c.after || '—') + ' (' + esc(sign(c.delta)) + ')'; }).join('') : '')
+      + '<br>' + esc(m.reason) + ' · ' + esc(m.result)
+      + (m.visitor ? '<br><a href="/admin2/mvp3-consults#' + esc(m.visitor) + '">이 방문자의 고객 기록 보기</a>' : '')
+      + '</div>';
+  }
   function navBtnHtml(navInfo, sessionId) {
     if (sessionId == null) {
       return '<span class="hl-navbtn off" title="이 인계에는 연결된 세션 번호가 없습니다">이 상담 세션 보기</span>';
@@ -469,6 +483,7 @@ a.hl-navbtn{color:var(--rv-canvas)}
       + '<div class="hl-totalcard"><div class="lbl">우리 총액</div><div class="val">' + won(row.total_quoted) + '</div></div>'
       + '<div class="hl-totalcard"><div class="lbl">몰 총액</div><div class="val ' + totalMallCls + '">' + won(row.total_mall) + '</div>' + replNote + '</div>'
       + '</div>'
+      + mvp3Html(row.mvp3)
       + '<div class="hl-sessnav">' + navBtnHtml(nav.consult_sessions, row.session_id)
       + (sgNote ? ('<div class="hl-sessgroup">' + esc(sgNote) + '</div>') : '') + '</div>'
       + '<div><div class="hl-panelsub" style="margin-bottom:8px">라인 목록 — 당시 표시명 그대로</div>'

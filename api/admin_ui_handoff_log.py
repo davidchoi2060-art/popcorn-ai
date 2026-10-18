@@ -95,6 +95,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 
+from . import admin_mvp3_links as L
 from .admin_ui_common import render
 from .admin_nav import NAV
 from .auth import COOKIE, resolve_session
@@ -160,6 +161,12 @@ def _tier(quote_type):
     return {"code": quote_type, "label": quote_type or "미상", "cls": "unk"}
 
 
+def _mvp3(h):
+    n = L.handoff_note(h["h_note"]) or {"quote_id": None, "sets": 1, "changes": [], "delta_sum": 0,
+                                         "reason": L.NO_REASON, "result": L.NO_RESULT}
+    return {**n, "visitor": ("u%d" % h["user_id"]) if h["user_id"] is not None else None}
+
+
 def _load(limit: int, offset: int) -> dict:
     """읽기 전용 집계 + 페이지. 집계(KPI)는 전체 테이블 기준, `rows`만 페이지 적용."""
     with engine.connect() as conn:
@@ -202,7 +209,7 @@ def _load(limit: int, offset: int) -> dict:
         page_rows = conn.execute(text(
             "SELECT h.handoff_id, h.handoff_no, h.session_id, h.snapshot_id, h.quote_type,"
             " h.member_id, h.user_id, h.total_quoted, h.total_mall, h.price_checked,"
-            " h.changed_cnt, h.soldout_cnt, h.status, h.created_at,"
+            " h.changed_cnt, h.soldout_cnt, h.status, h.created_at, h.note AS h_note,"
             " hi.line_no, hi.product_code, hi.item_kind, hi.part_type, hi.name_snap,"
             " hi.price_quoted, hi.price_mall, hi.qty, hi.mall_status, p.data_origin"
             " FROM (SELECT * FROM handoffs ORDER BY created_at DESC, handoff_id DESC"
@@ -268,6 +275,9 @@ def _load(limit: int, offset: int) -> dict:
             "unknown_count": unknown_count, "status": h["status"],
             "line_count": len(items_raw), "note": note_text, "items": items,
             "session_group": sess_multi.get(int(sid)) if sid is not None else None,
+            # 고객 화면 완제품 이동(2026-10-18 관리자 정리 기획 A04) — 연결 견적 · 대수 · 바꾼 부품.
+            # 이동 이유와 구매 결과는 남기지 않으므로 「미기록」·「미확인」으로 준다(api/admin_mvp3_links).
+            "mvp3": _mvp3(h) if h["quote_type"] == "mvp3" else None,
         })
 
     return {

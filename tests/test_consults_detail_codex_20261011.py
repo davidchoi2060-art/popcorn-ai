@@ -18,6 +18,7 @@ class R:
     def __init__(self, rows): self.rows = rows
     def mappings(self): return self
     def all(self): return self.rows
+    def first(self): return self.rows[0] if self.rows else None
 
 
 def hit(i):
@@ -45,6 +46,8 @@ class DB:
             rows = self.quotes
         elif "FROM purchase_inquiries" in s:
             rows = self.inquiries
+        elif "FROM handoffs" in s or "FROM mvp3_visitor_contacts" in s:
+            rows = []   # 2026-10-18 관리자 정리 기획: 인계 · 등록 연락처(이 검사에서는 없음)
         else:
             raise AssertionError(s)
         n = (p or {}).get("n")
@@ -72,7 +75,7 @@ class Detail(unittest.TestCase):
             out = MC.visitor_detail("u5")
         self.assertIn("ORDER BY h.created_at DESC", db.sql[0])
         self.assertEqual(out["hits"], MC.DETAIL_LIMITS["hits"])
-        self.assertEqual(out["truncated"], {"hits": True, "saved": False, "inquiries": False})
+        self.assertEqual(out["truncated"], {"hits": True, "saved": False, "inquiries": False, "handoffs": False})
         ats = [e["at"] for e in out["timeline"]]
         self.assertEqual(ats, sorted(ats))                     # 화면은 여전히 시간 순서
         iso = MC.iso
@@ -81,7 +84,7 @@ class Detail(unittest.TestCase):
     def test_under_the_limit_is_not_marked(self):
         with patch.object(MC, "engine", DB(hits=[hit(1), hit(2)])):
             out = MC.visitor_detail("u5")
-        self.assertEqual(out["truncated"], {"hits": False, "saved": False, "inquiries": False})
+        self.assertEqual(out["truncated"], {"hits": False, "saved": False, "inquiries": False, "handoffs": False})
 
 
 
