@@ -1,0 +1,148 @@
+{#
+  보관 기한 · 파기 이력 (ADM-SYS-031 · 가칭) — 2026-10-18 관리자 정리 기획 A05(대표 승인 · 2묶음)
+
+  고객 개인정보의 보관 기한이 어디까지 왔는지(대상별 건수)와 일일 파기 작업의 실행 기록을 나눠 본다.
+  데이터 = `GET /api/admin/retention` (`api/admin_retention.py` — 정의는 그 파일 docstring).
+
+  ■ 읽기 전용이다. 실행 · 재시도 · 기한 연장 버튼을 두지 않는다.
+  ■ 「기한 지남」을 「파기 완료」로 적지 않는다. 보유 기간 일수를 고정 문구로 적지 않는다.
+  ■ 서버가 준 문자열은 textContent 로만 넣는다(innerHTML 금지). 팔레트는 셸 `admin2.css` 의 `--rv-*` 만.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}보관 기한 · 파기 이력{% endblock %}
+
+{% block head_extra %}
+<style>
+.rt-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:14px}
+.rt-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.rt-box{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:10px 14px;font-size:13px;display:flex;flex-direction:column;gap:4px}
+.rt-box h2{font-size:13.5px;margin:0;color:var(--rv-ink-soft)}
+.rt-table{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;overflow-x:auto}
+.rt-table table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:820px}
+.rt-table caption{text-align:left;padding:10px 12px 0;font-weight:600;color:var(--rv-ink-soft)}
+.rt-table th{background:var(--rv-panel);text-align:left;font-weight:600;color:var(--rv-ink-soft);padding:9px 12px;border-bottom:1px solid var(--rv-dim4);white-space:nowrap}
+.rt-table td{padding:9px 12px;border-bottom:1px solid var(--rv-panel2);vertical-align:top;color:var(--rv-ink)}
+.rt-num{font-family:var(--rv-mono);text-align:right;white-space:nowrap}
+.rt-at{font-family:var(--rv-mono);white-space:nowrap}
+.rt-muted{color:var(--rv-faint)}
+.rt-sub{display:block;font-size:12px;color:var(--rv-muted)}
+.rt-warn{color:var(--rv-red)}
+.rt-empty{padding:28px;text-align:center;color:var(--rv-muted)}
+.rt-pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:13px}
+.rt-pager button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+.rt-pager button:disabled{opacity:.45;cursor:default}
+@media (max-width:768px){ .rt-wrap{padding:12px 16px 24px} }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rt-wrap" data-keep="1">
+  <p class="rt-note" id="rtNote">불러오는 중입니다.</p>
+  <div class="rt-table">
+    <table>
+      <caption>대상별 보관 기한</caption>
+      <thead><tr>
+        <th scope="col">대상</th><th scope="col">전체</th><th scope="col">기한 남음</th>
+        <th scope="col" id="rtSoonHead">곧 지남</th><th scope="col">기한 지남 · 값 남음</th>
+        <th scope="col">기한 지남 · 값 없음</th><th scope="col">지운 시각 기록</th>
+      </tr></thead>
+      <tbody id="rtSummary"><tr><td colspan="7" class="rt-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+  <section class="rt-box" aria-label="파기 작업 설정">
+    <h2>파기 작업 설정 (이 서버 프로세스 기준)</h2>
+    <div id="rtProcess">—</div>
+    <span class="rt-sub" id="rtProcessNote"></span>
+  </section>
+  <div class="rt-table">
+    <table>
+      <caption>파기 작업 실행 기록</caption>
+      <thead><tr>
+        <th scope="col">시작 시각</th><th scope="col">실행</th><th scope="col">종류</th>
+        <th scope="col">결과</th><th scope="col">대상별 건수</th><th scope="col">끝난 시각</th>
+      </tr></thead>
+      <tbody id="rtRuns"><tr><td colspan="6" class="rt-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+  <div class="rt-pager">
+    <span id="rtPage" class="rt-muted"></span>
+    <button type="button" id="rtPrev">이전</button><button type="button" id="rtNext">다음</button>
+  </div>
+</div>
+<script>
+(function(){
+  var API = '/api/admin/retention';
+  var st = {offset:0, limit:50, total:0};
+  var $ = function(id){ return document.getElementById(id); };
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function num(n){ return n==null ? '—' : Number(n).toLocaleString('ko-KR'); }
+  function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function msgRow(id, cols, msg){ var b=$(id); b.textContent=''; var tr=el('tr'); var td=el('td','rt-empty',msg); td.colSpan=cols; tr.appendChild(td); b.appendChild(tr); }
+  function summary(rows){
+    var b=$('rtSummary'); b.textContent='';
+    rows.forEach(function(s){
+      var tr=el('tr');
+      var name=el('td',null,s.label);
+      if (s.no_deadline) name.appendChild(el('span','rt-sub','기한 없음 '+num(s.no_deadline)+'건'));
+      tr.appendChild(name);
+      tr.appendChild(el('td','rt-num',num(s.total)));
+      tr.appendChild(el('td','rt-num',num(s.valid)));
+      tr.appendChild(el('td','rt-num',num(s.soon)));
+      tr.appendChild(el('td','rt-num'+(s.expired_holding?' rt-warn':''),num(s.expired_holding)));
+      tr.appendChild(el('td','rt-num',num(s.expired_cleared)));
+      var pg=el('td',null);
+      if (s.purge_recorded){
+        pg.appendChild(el('span','rt-num',num(s.purged)+'건'));
+        pg.appendChild(el('span','rt-sub','마지막 '+when(s.last_purged_at)));
+      } else {
+        pg.appendChild(el('span','rt-muted','지운 시각 칸 없음 · 값 없음이 지운 것인지 미확인'));
+      }
+      tr.appendChild(pg);
+      b.appendChild(tr);
+    });
+  }
+  function runs(list){
+    if (!list.length){ msgRow('rtRuns',6,'아직 파기 작업 실행 기록이 없습니다.'); return; }
+    var b=$('rtRuns'); b.textContent='';
+    list.forEach(function(r){
+      var tr=el('tr');
+      tr.appendChild(el('td','rt-at',when(r.started_at)));
+      tr.appendChild(el('td',null,r.moment_label));
+      tr.appendChild(el('td',null,r.kind_label));
+      var res=el('td',r.state==='failed'?'rt-warn':(r.state==='unknown'?'rt-muted':null),r.state_label);
+      if (r.error) res.appendChild(el('span','rt-sub',r.error));
+      tr.appendChild(res);
+      var c=el('td',null);
+      if (!r.counts.length) c.appendChild(el('span','rt-muted','건수 기록 없음'));
+      r.counts.forEach(function(x){ c.appendChild(el('span','rt-sub',x.label+' '+num(x.n)+'건')); });
+      tr.appendChild(c);
+      tr.appendChild(el('td','rt-at',when(r.finished_at)));
+      b.appendChild(tr);
+    });
+  }
+  function load(){
+    fetch(API+'?offset='+st.offset).then(function(r){ if(!r.ok) throw new Error('보관 기한 자료를 불러오지 못했습니다'); return r.json(); })
+    .then(function(d){
+      st.limit=d.limit; st.total=d.runs_total;
+      $('rtNote').textContent=d.note+' 실제 비움 실행 '+num(d.runs_applied)+'회 · 마지막 '+when(d.last_applied_at)+'.';
+      $('rtSoonHead').textContent='곧 지남 ('+d.due_soon_days+'일 이내)';
+      summary(d.summary);
+      var p=d.process;
+      $('rtProcess').textContent='실제로 지우기: '+(p.apply?'켜짐':'꺼짐 · 미리보기만')+' · 매일 정기 실행: '+(p.schedule?'켜짐':'꺼짐');
+      $('rtProcessNote').textContent=p.note;
+      runs(d.runs);
+      $('rtPage').textContent=d.runs_total?('실행 기록 전체 '+num(d.runs_total)+'건 중 '+(d.offset+1)+'–'+Math.min(d.offset+d.limit,d.runs_total)):'';
+      $('rtPrev').disabled=d.offset===0; $('rtNext').disabled=d.offset+d.limit>=d.runs_total;
+    })
+    .catch(function(e){
+      $('rtNote').textContent=e.message+'. 잠시 뒤 다시 열어 주세요.';
+      msgRow('rtSummary',7,e.message); msgRow('rtRuns',6,e.message);
+    });
+  }
+  $('rtPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
+  $('rtNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
+  load();
+})();
+</script>
+{% endblock %}

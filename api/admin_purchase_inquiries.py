@@ -88,6 +88,8 @@ def _row(r, full: bool) -> dict:
         # 기한이 지나면 메모에 옮겨 적힌 연락처도 가린다(2026-10-11 코덱스 검수 #124 · #126).
         "memo": r["memo"] if full and not gone else _mask_text(r["memo"]),
         "contact_purged": gone,
+        # 기한 경과(표시 제한)와 실제로 값을 비운 시각(api/retention_purge)은 다른 사실이다 — A05.
+        "purged_at": iso(r.get("contact_purged_at")),
         "visitor": ("u%d" % r["user_id"]) if r["user_id"] is not None else None,
         "quote_id": str(r["quote_id"]) if r["quote_id"] else None,
         "product_code": r["product_code"], "product_name": r["product_name"],

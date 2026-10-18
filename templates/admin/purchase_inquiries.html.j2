@@ -197,6 +197,7 @@
     }
     if (it.contact_purged){
       b.appendChild(el('p','pi-sub','보관 기한이 지나 연락처와 신청 내용을 표시하지 않습니다.'));
+      b.appendChild(el('span','pi-sub',it.purged_at?'파기 작업이 값을 비운 시각 '+when(it.purged_at):'실제 파기 여부 미확인 · 보관 기한 · 파기 이력 화면에서 실행 기록 확인'));
     } else if (it.registered){
       var rg=it.registered, rc=el('div','pi-card'+(rg.differs?' warn':''));
       rc.appendChild(el('h3',null,'현재 등록 연락처 (견적 보관 때 받은 연락처)'));
