@@ -14,6 +14,9 @@ GET /api/admin/engine-rules(auth_middleware가 지키는 경로, viewer 이상)�
 - docs/design/req/req-compat-rules.md ④ 참조). 그래서 이 화면은 조회 전용이다: 편집
 UI는 "여는 것을 전제로" 만들되 저장 버튼은 실제 disabled다(decision-log UX-28).
 
+파워 기준 상자(A07)는 읽기 전용이다 — 고객 안내 기준(권장 파워 + 여유)과 조립 판정 기준
+(소비전력 + ref_offset)이 다른 축이라는 것을 나란히 보인다. 고치는 버튼은 없다.
+
 로드 스킵(ref_slot이 slot보다 탐색 순서상 뒤라 조용히 건너뛰는 것 - api/recommend.py
 load_compat_rules 89번째 줄 부근 `SLOTS.index(ref_slot) >= SLOTS.index(slot)`)은 지금
 GET /api/admin/engine-rules가 알려주지 않는다. 화면은 그 열을 "확인 불가"로만 표시한다
@@ -24,6 +27,7 @@ import json
 from fastapi import APIRouter, Request
 
 from .admin_ui_common import render
+from .power_rule import PSU_ADVICE_MARGIN_W, SYSTEM_POWER_OVERHEAD_W
 from .taxonomy import PART_LABELS, SLOT_LABELS
 
 router = APIRouter(prefix="/admin2")
@@ -37,4 +41,9 @@ def compat_rules_page(request: Request):
         crumb_group="상품사양관리", crumb_now="조립 호환 규칙",
         # 영문 자리·부품 코드를 한글로 보여 주는 이름표 — 부품 어휘 단일 원천(taxonomy)을 그대로 싣는다
         labels_json=json.dumps({"slots": SLOT_LABELS, "parts": PART_LABELS}, ensure_ascii=False),
+        # 파워 기준 보기(2026-10-18 관리자 정리 기획 A07) — 코드 상수 두 개. 조립 판정에 실제로 쓰는
+        # 값은 규칙의 ref_offset(DB)이고 화면은 그것을 engine-rules 응답에서 읽는다. 둘은 숫자일 뿐이라
+        # 셸에 실어도 «열람은 아무나» 문제가 없다.
+        power_json=json.dumps({"advice_margin_w": PSU_ADVICE_MARGIN_W,
+                               "fallback_offset_w": SYSTEM_POWER_OVERHEAD_W}),
     )

@@ -29,6 +29,8 @@
       <aside class="sr-detail" id="srDetail" aria-label="선택한 제품의 최신 근거" aria-live="polite"><div class="sr-message">제품을 선택하면 최신 근거를 확인합니다.</div></aside>
     </div>
     <p class="sr-note" id="srNote">확인된 근거 기준이며 주문·결제 가능 여부와는 별도입니다.</p>
+    {# 2026-10-18 관리자 정리 기획 A06 — 고객 화면 「선택 보류」를 여기서 어떻게 보는가. 과거 노출은 기록이 없다. #}
+    <p class="sr-note" id="srHoldNote">고객 견적 화면의 「선택 보류」(가격 차이를 확인할 수 없어 고를 수 없게 한 부품)는 이 화면에서 지금 상태로 진단합니다. 판매가 · 사양 검수 · 판매 상태 · 재고를 나눠 보고, 부품끼리 맞는지는 조립 호환 규칙 화면에서 봅니다. 과거에 언제 보류로 보였는지와 그 화면을 본 고객 수는 기록하지 않습니다.</p>
   </div>
 </section>
 {% endblock %}

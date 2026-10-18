@@ -13,6 +13,7 @@ class _Res:
     def scalar_one(self): return self._s
     def mappings(self): return self
     def all(self): return self._rows
+    def one(self): return self._s
     def __iter__(self): return iter(self._pairs)
 
 
@@ -25,6 +26,8 @@ class _Conn:
         if "quote_type = 'mvp3'" in q and 'total_quoted' in q:
             return _Res(rows=[{'handoff_id': 7, 'total_quoted': 1000}, {'handoff_id': 8, 'total_quoted': None}])
         if 'FROM handoff_items' in q: return _Res(pairs=self.items)
+        # 2026-10-18 A09 — 같은 기간 구매 상담 신청 수(시험 자료 제외)
+        if 'FROM purchase_inquiries' in q: return _Res({'n': 2, 'quote_linked': 1, 'test_excluded': 0})
         raise AssertionError(q)
 
 

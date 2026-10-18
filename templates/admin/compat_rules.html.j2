@@ -264,6 +264,12 @@
     .cr-req-banner-cta{align-items:flex-start}
     .cr-tabsbar{padding:0 12px}
   }
+.cr-power{border:1px solid var(--rv-dim3);border-radius:10px;padding:12px 14px;margin:0 0 14px;background:var(--rv-card)}
+.cr-power-title{font-weight:600;margin-bottom:6px}
+.cr-power-list{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}
+.cr-power-list dt{color:var(--rv-muted)}
+.cr-power-list dd{margin:0}
+.cr-power-note{color:var(--rv-muted);font-size:12px;margin-top:8px}
 </style>
 <link rel="stylesheet" href="/shared/admin2/management-dialogs.css?v=20261002">
 {% endblock %}
@@ -333,6 +339,17 @@
       <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-pool" data-bind="tiers.pool_size">…</span></div>
       <div class="cr-kpi-note">재고&gt;0 기준 · 이 규칙들이 얹힙니다</div>
     </div>
+  </div>
+
+  <!-- 파워 기준 보기(2026-10-18 관리자 정리 기획 A07) — 읽기 전용. 고치는 버튼을 두지 않는다. -->
+  <div class="cr-power" id="cr-power" hidden>
+    <div class="cr-power-title">파워 기준</div>
+    <dl class="cr-power-list">
+      <dt>조립 판정</dt><dd id="cr-power-rule"></dd>
+      <dt>코드 기본값</dt><dd id="cr-power-fallback"></dd>
+      <dt>고객 안내</dt><dd id="cr-power-advice"></dd>
+    </dl>
+    <div class="cr-power-note" id="cr-power-note"></div>
   </div>
 
   <div class="cr-table-region">
@@ -576,6 +593,7 @@
   // 영문 코드 -> 한글 이름표(2026-10-10 전수 점검 L54·L75). 자리·부품은 서버가 부품 어휘
   // 단일 원천에서 실어 주고, 사양 이름은 상품 사양 정의(GET /api/admin/spec-fields)에서 받는다.
   var LABELS = {{ labels_json | safe }};
+  var POWER = {{ power_json | safe }};
   var FIELD_KO = {};
   var RULE_KO = {};   // 규칙 키 -> 규칙 이름(같은 응답의 compat.checks 에서 채운다)
   function slotKo(c){ return (LABELS.slots && LABELS.slots[c]) || (LABELS.parts && LABELS.parts[c]) || c; }
@@ -1108,6 +1126,26 @@
     });
   }
 
+  // 파워 기준 보기(A07) — 조립 판정(규칙 ref_offset, DB)과 고객 안내(권장 파워 + 여유, 코드)를 나눠 적는다.
+  function renderPower(checks){
+    var box = document.getElementById("cr-power");
+    var rule = checks.filter(function(c){ return c.key === "power"; })[0];
+    var off = rule && typeof rule.ref_offset === "number" ? rule.ref_offset : null;
+    document.getElementById("cr-power-rule").textContent = !rule
+      ? "파워 규칙 없음 · 운영값 미확인"
+      : (off === null ? "파워 정격 ≥ 그래픽카드 소비전력 + 여유(값 미확인)"
+                      : "파워 정격 ≥ 그래픽카드 소비전력 + " + fmtNum(off) + "W")
+        + (rule.active ? "" : " · 비활성") + (rule.blocking ? "" : " · 경고전용");
+    document.getElementById("cr-power-fallback").textContent = "+" + fmtNum(POWER.fallback_offset_w)
+      + "W — 규칙 값을 읽지 못할 때만 쓰는 값입니다";
+    document.getElementById("cr-power-advice").textContent = "그래픽카드 권장 파워 + " + fmtNum(POWER.advice_margin_w)
+      + "W — 상담 답과 상품 상세의 「넉넉한 파워」 안내에 쓰는 기준입니다";
+    var note = "조립 판정과 고객 안내는 서로 다른 기준입니다. 조립 판정 값은 이 서버가 읽은 규칙 값이며 운영 서버의 값은 확인하지 않았습니다.";
+    if (off !== null && off !== POWER.fallback_offset_w) note += " 규칙 값과 코드 기본값이 다릅니다.";
+    document.getElementById("cr-power-note").textContent = note;
+    box.hidden = false;
+  }
+
   function applyData(data){
     var compat = data.compat || {};
     var checks = Array.isArray(compat.checks) ? compat.checks : [];
@@ -1137,6 +1175,7 @@
     els.kpiPool.textContent = fmtNum(poolSize);
     renderLoadKpi(total, skipRows.length, unknownCount);
 
+    renderPower(checks);
     lastRows = checks.map(function(c, i){ return buildRow(c, i + 1, total); });
     renderRows(lastRows);
 

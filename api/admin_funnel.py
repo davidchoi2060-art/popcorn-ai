@@ -250,6 +250,12 @@ def _mvp3_block(conn, lo, hi) -> dict:
     보였다. 같은 코호트 원칙(판단한 것 ①)을 mvp3 에 맞게 옮긴다 — **보관 견적이 만들어진
     시각**으로 기간을 정하고, 그 견적 중 쇼핑몰로 넘어간 것을 센다. 인계 행 자신의 시각으로
     센 건수(`handoff_count`)와 라인별 가격 재확인도 함께 낸다. 조회만 한다.
+
+    2026-10-18 관리자 정리 기획 A09(3묶음) — 숫자마다 기준이 다르다는 것을 응답이 함께 말한다
+    (`basis`). 보관 견적 · 그중 인계는 «보관 시각» 코호트, 인계 건수 · 합계는 «인계 시각» 기준이라
+    두 수를 서로 나누지 않는다. 보관 견적에는 시험 자료 제외가 없고, 「찜」과 「인계용 보관」이 섞여
+    있다(보관 목적을 저장하지 않는다 — 새 저장 칸은 만들지 않는다). 합계는 우리 견적가 합이지 매출이
+    아니다. 같은 기간 구매 상담 신청(`inquiries`)은 시험 자료를 빼고 세며 구매 전환이 아니다.
     """
     params = {}
     if lo is not None:
@@ -285,7 +291,31 @@ def _mvp3_block(conn, lo, hi) -> dict:
         "lines": {**{k: {"n": v, "pct": _pct(v, line_total, 1)} for k, v in line_counts.items()},
                   "total": line_total},
         "low_sample": handed < LOW_SAMPLE_THRESHOLD,
+        "inquiries": _mvp3_inquiries(conn, lo, hi, params),
+        "basis": MVP3_BASIS,
     }
+
+
+# A09 — 화면이 숫자 옆에 그대로 적는 기준 문구. 화면이 따로 짓지 않는다.
+MVP3_BASIS = [
+    "보관 견적 · 그중 인계는 견적을 보관한 시각으로 기간을 정합니다. 인계 건수 · 합계는 인계한 시각 기준이라 서로 나누지 않습니다.",
+    "보관 견적에는 시험 자료 제외가 적용되지 않습니다. 찜으로 보관한 것과 인계하려고 보관한 것이 섞여 있습니다(보관 목적은 기록하지 않습니다).",
+    "합계는 우리 견적가의 합이며 매출이 아닙니다. 실제 결제는 쇼핑몰이 처리하고 여기에는 회신이 없습니다.",
+    "구매 상담 신청은 같은 기간에 접수된 신청을 시험 자료를 빼고 센 수이며, 구매 전환이 아닙니다.",
+]
+
+
+def _mvp3_inquiries(conn, lo, hi, params) -> dict:
+    """같은 기간(접수 시각) 구매 상담 신청 — 시험 자료 제외 · 그중 보관 견적과 이어진 것."""
+    from .admin_purchase_inquiries import IS_TEST, LINKS
+    r = conn.execute(text(
+        f"SELECT COUNT(*) AS n, COUNT(*) FILTER (WHERE {LINKS['quote']} AND NOT {IS_TEST}) AS quote_linked,"
+        f" COUNT(*) FILTER (WHERE {IS_TEST}) AS test_excluded"
+        " FROM purchase_inquiries i WHERE TRUE" + range_sql("i.created_at", lo, hi)),
+        params).mappings().one()
+    return {"n": int(r["n"]) - int(r["test_excluded"]),
+            "quote_linked": int(r["quote_linked"]),
+            "test_excluded": int(r["test_excluded"])}
 
 
 @router.get("/funnel-performance")
