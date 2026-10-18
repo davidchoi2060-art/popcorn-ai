@@ -14,6 +14,7 @@
 """
 from sqlalchemy import text
 
+from . import std_specs
 from .recommend import rule_verdict, rule_ref_value, _rule_applies
 
 RULES_SQL = 'SELECT * FROM compat_rules WHERE active ORDER BY sort_order, rule_id'
@@ -29,8 +30,9 @@ def load_specs(conn, product_codes):
     codes = sorted({int(c) for c in product_codes if c is not None})
     if not codes:
         return {}
-    return {r['product_code']: dict(r) for r in conn.execute(
-        text('SELECT * FROM product_specs WHERE product_code = ANY(:codes)'), dict(codes=codes)).mappings()}
+    rows = [dict(r) for r in conn.execute(
+        text('SELECT * FROM product_specs WHERE product_code = ANY(:codes)'), dict(codes=codes)).mappings()]
+    return {r['product_code']: r for r in std_specs.attach(conn, rows)}   # 케이스 지원 파워 규격(0161)
 
 
 def rule_checks(lines, specs, rules):

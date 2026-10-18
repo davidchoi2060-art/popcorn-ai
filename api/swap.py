@@ -36,6 +36,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 
 from . import access_gate   # 소유자 확인의 단일 원천 — 여기서 다시 만들지 않는다
 from . import visitor
+from . import std_specs as _std_specs   # 사양 표준(std) 값 — 케이스 지원 파워 규격(0161)
 from . import talk          # S3 자연어 교체 — 문장 파싱(«부품» 라벨)의 단일 원천, 다시 만들지 않는다
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -71,9 +72,7 @@ SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_powe
              # cpu_gpu(0100) — CPU 내장그래픽 유무. `_display_lost` 가 읽는다(GPU 없는
              # 구성에서 외장필수 CPU 로 바꾸면 화면이 안 나온다 — compat_rules 에 없는 축).
              " cpu_gpu,"
-             " form_factor, form_factor_list, tag_white, tag_silent,"
-             # psu_form_factor_list(0160) — 케이스-파워 규격 규칙(case_psu_form)이 읽는다.
-             " psu_form_factor_list")
+             " form_factor, form_factor_list, tag_white, tag_silent")
 
 
 class SwapQuery(BaseModel):
@@ -109,10 +108,12 @@ def _load_snapshot(conn, session_id: int, tier: str):
 def _specs_by_code(conn, codes):
     """직조인 — 품절·검수 전환 부품도 스펙 확보(렌더·검증용)."""
     cols = ", ".join("ps." + c.strip() for c in SPEC_COLS.split(","))
-    return {r["product_code"]: dict(r) for r in conn.execute(text(
+    rows = [dict(r) for r in conn.execute(text(
         f"SELECT p.product_code, p.sku, p.product_name, p.part_type, p.sale_price, {cols}"
         " FROM products p JOIN product_specs ps USING (product_code)"
-        " WHERE p.product_code = ANY(:c)"), {"c": list(codes)}).mappings().all()}
+        " WHERE p.product_code = ANY(:c)"), {"c": list(codes)}).mappings().all()]
+    # psu_form_factor_list(0160·0161) — 케이스-파워 규격 규칙(case_psu_form)이 읽는다. 표준 스키마 값이다.
+    return {r["product_code"]: r for r in _std_specs.attach(conn, rows)}
 
 
 def _chosen_from_parts(parts, specs):

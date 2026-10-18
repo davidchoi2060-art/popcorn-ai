@@ -44,6 +44,7 @@ from .auth import LOCAL_HOSTS   # localhost 판정 — dev-login과 같은 정�
 
 from . import spec_fields   # 부품 종류별 "설명에 쓸 사양"의 단일 원천(spec_field_defs)
 from . import usage_floors as UF
+from . import std_specs as _std_specs   # 사양 표준(std) 값 — 케이스 지원 파워 규격(0161)
 from . import usage_tier_rules as UTR   # 용도×예산 티어 겨냥(0085) — 하한 위의 목표, 조립 조건 아님
 from . import usage_alloc as UA         # 용도별 예산 배분(0086) — 상한은 후보 필터, 하한은 완성 조합 판정
 from . import part_cond_rules as PCR    # 이미 고른 부품이 조건인 겨냥(0101) — VRAM 8GB 카드면 RAM 32GB
@@ -189,7 +190,7 @@ def _load_pool(conn):
     # `brand`·`warranty_months`는 뺐다 — 후보 풀 3,059건 전수 확인 결과 **둘 다 0%
     # 채움**(products.brand·warranty_months가 전부 NULL)이라 실어도 null만 나간다.
     # "제조사"가 필요한 자리는 100% 채워진 `maker`로 대신한다(brand가 아니라 maker다).
-    return [dict(r) for r in conn.execute(text(
+    pool = [dict(r) for r in conn.execute(text(
         "SELECT product_code, sku, product_name, part_type, sale_price, stock_qty,"
         " maker, chipset, socket, socket_list, mem_type, clock_mhz, tdp_watt, rated_watt,"
         " required_power_watt, pcie_gen, interface,"
@@ -205,14 +206,14 @@ def _load_pool(conn):
         # cpu_gpu(0100) — CPU 내장그래픽 유무의 **1순위 원천**(백필 완료). 여기 안 실으면
         # `cpu_has_igpu`가 상품명 폴백으로만 판정한다 — 그 폴백이 옛 결함의 진원지였다.
         " cpu_gpu,"
-        # psu_form_factor_list(0160) — 규칙 case_psu_form 이 읽는 케이스 지원 파워 규격.
-        " psu_form_factor_list,"
         " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
         # 조용히 결과가 줄어드는 게 아니라 화면이 통째로 죽는 자리라 이중으로 막는다.
         " FROM v_recommendation_candidates"
         " WHERE stock_qty > 0 AND sale_price IS NOT NULL")).mappings().all()]
+    # psu_form_factor_list(0160·0161) — 규칙 case_psu_form 이 읽는 케이스 지원 파워 규격. 표준 스키마에서 붙인다.
+    return _std_specs.attach(conn, pool)
 
 
 # ---- 스펙 하한 필터 (A-135 격자 재설계 최종 단계 — 2026-09-16) ----
