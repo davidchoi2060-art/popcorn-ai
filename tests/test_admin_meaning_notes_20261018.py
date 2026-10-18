@@ -55,14 +55,38 @@ class FunnelMvp3(unittest.TestCase):
 
 
 class PowerBox(unittest.TestCase):
-    def test_rule_offset_is_sent_as_a_value(self):
-        self.assertIn('"ref_offset": off', read("api/admin_engine_rules.py"))
+    def test_api_reads_the_power_rule_and_writes_nothing(self):
+        from api import admin_power_basis as P
 
-    def test_page_carries_code_constants(self):
-        src = read("api/admin_ui_compat_rules.py")
-        self.assertIn("PSU_ADVICE_MARGIN_W", src)
-        self.assertIn("SYSTEM_POWER_OVERHEAD_W", src)
-        self.assertNotEqual(power_rule.PSU_ADVICE_MARGIN_W, power_rule.SYSTEM_POWER_OVERHEAD_W)
+        class R:
+            def __init__(self, v): self.v = v
+            def mappings(self): return self
+            def first(self): return self.v
+
+        class C:
+            def __init__(self, row): self.row, self.sql = row, []
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def execute(self, sql, p=None):
+                self.sql.append(str(sql)); return R(self.row)
+
+        class E:
+            def __init__(self, row): self.c = C(row)
+            def connect(self): return self.c
+
+        from unittest.mock import patch
+        e = E({"ref_offset": 200, "active": True, "blocking": True, "null_ref_mode": "skip"})
+        with patch.object(P, "engine", e):
+            out = P.power_basis()
+        self.assertIn("rule_key = 'power'", e.c.sql[0])
+        self.assertEqual(out["rule"]["ref_offset"], 200)
+        self.assertEqual((out["fallback_offset_w"], out["advice_margin_w"]),
+                         (power_rule.SYSTEM_POWER_OVERHEAD_W, power_rule.PSU_ADVICE_MARGIN_W))
+        with patch.object(P, "engine", E(None)):
+            self.assertIsNone(P.power_basis()["rule"])     # 규칙이 없으면 기본값으로 메우지 않는다
+        src = read("api/admin_power_basis.py")
+        for word in ("@router.post", "@router.put", "UPDATE ", "INSERT", "DELETE"):
+            self.assertNotIn(word, src)
 
     def test_box_is_read_only_and_separates_the_two_bases(self):
         src = read("templates/admin/compat_rules.html.j2")
@@ -71,10 +95,11 @@ class PowerBox(unittest.TestCase):
         self.assertNotIn("<input", box)
         fn = src.split("function renderPower", 1)[1].split("function applyData", 1)[0]
         self.assertNotIn("innerHTML", fn)
-        self.assertIn('c.key === "power"', fn)
+        self.assertIn("/api/admin/power-basis", fn)
+        self.assertNotIn("method:", fn)
         self.assertIn("운영값 미확인", fn)
         self.assertIn("서로 다른 기준", fn)
-        self.assertIn("renderPower(checks)", src)
+        self.assertIn("loadPower();", src)
 
 
 class Notes(unittest.TestCase):
