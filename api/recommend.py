@@ -205,6 +205,8 @@ def _load_pool(conn):
         # cpu_gpu(0100) — CPU 내장그래픽 유무의 **1순위 원천**(백필 완료). 여기 안 실으면
         # `cpu_has_igpu`가 상품명 폴백으로만 판정한다 — 그 폴백이 옛 결함의 진원지였다.
         " cpu_gpu,"
+        # psu_form_factor_list(0160) — 규칙 case_psu_form 이 읽는 케이스 지원 파워 규격.
+        " psu_form_factor_list,"
         " spec_sources, data_origin, market_price"
         # 가격 게이트는 뷰가 건다(0017). 여기서도 한 번 더 막는 이유: 값이 없는 부품이
         # 들어오면 예산 비교가 TypeError로 **견적 API 전체를 500**으로 만든다.
@@ -384,7 +386,23 @@ def _cmp(op: str, v, r) -> bool:
         # 다중값 필드(쿨러 socket_list) — 상대 값이 목록에 있는가. 빈 목록은 불통과.
         # 실측 근거: 쿨러는 소켓을 평균 5~6개 지원해 단일값 비교로는 표현할 수 없다(슬라이스 39).
         return bool(v) and r in v
+    if op == "in":
+        # 짝 방향 목록 비교(0160 케이스 파워 규격) — 대상 값이 상대 목록에 있는가. 규격 표기를 맞춰 본다.
+        return bool(r) and psu_form_key(v) in {psu_form_key(x) for x in r}
     return False   # 미지의 연산자 — 불통과(조용히 통과시키지 않는다)
+
+
+# 파워 규격 표기 맞추기 — 케이스 쪽은 사양 표준(std_parse.PSU_FF: ATX · SFX-L · FLEX · M-ATX),
+# 파워 쪽은 적재 파서(catalog_map._b_form: ATX · SFX · TFX · Flex-ATX · m-ATX)가 적는다.
+PSU_FORMS = {"ATX": "ATX", "SFX": "SFX", "SFXL": "SFX-L", "TFX": "TFX", "FLEX": "FLEX",
+             "FLEXATX": "FLEX", "MATX": "M-ATX"}
+
+
+def psu_form_key(v):
+    """파워 규격 표기를 하나로 — 파워 규격이 아닌 값(보드 규격이 잘못 들어간 것 등)은 None."""
+    if not isinstance(v, str):
+        return None
+    return PSU_FORMS.get(v.upper().replace("-", "").replace(" ", ""))
 
 
 def _power_offset(rules: dict) -> int:
@@ -435,8 +453,13 @@ def rule_verdict(rule, v, r):
     대상값(v — 여기선 POWER.rated_watt)이 NULL 인 것은 다른 문제다: 정격을 모르는 파워를
     "판정 불가"로 통과시키면 조립 안전장치가 그 파워에서 통째로 꺼진다. 그건 계속 불통과다.
     """
-    if r is None and rule.get("null_ref_mode") == "skip":
+    mode = rule.get("null_ref_mode")
+    if r is None and mode in ("skip", "skip_any"):
         return None
+    if mode == "skip_any":
+        # 'skip_any'(0160) — 대상 값도 모르면 판정 불가. 규격 표기가 아니면(psu_form_key=None) 모르는 것으로 본다.
+        if v is None or (rule["op"] == "in" and psu_form_key(v) is None) or r == []:
+            return None
     return _cmp(rule["op"], v, rule_ref_value(rule, r))
 
 
@@ -612,7 +635,7 @@ def _fwd_ok(slot, p, idx):
         rv = p.get(rule["ref_field"])
         if rv is None:
             # 'skip' 규칙은 상대값이 없으면 **판정 자체를 안 한다** — 자를 근거도 없다.
-            if rule.get("null_ref_mode") == "skip":
+            if rule.get("null_ref_mode") in ("skip", "skip_any"):
                 continue
             return False                  # 상대 값이 없으면 대상 슬롯이 전부 불통과
         rv = rule_ref_value(rule, rv)

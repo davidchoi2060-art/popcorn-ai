@@ -458,6 +458,8 @@ def _partial_compat(chosen: dict, rules: dict) -> dict:
             v, r = a.get(rule["field"]), b.get(rule["ref_field"])
             ok = rule_verdict(rule, v, r)
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            if ok is None and rule.get("null_ref_mode") == "skip_any":
+                continue   # 어느 쪽 값이든 모르면 판정하지 않는다(0160 케이스-파워 규격) — build_check 와 같다
             if ok is None:
                 # 'skip' 규칙 · 값 없음 = 판정 불가(0094). 불통과가 아니다.
                 checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": None,

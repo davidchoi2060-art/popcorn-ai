@@ -175,9 +175,13 @@ def settled(check, rules_by_key):
     if check['state'] == 'unknown' and rule is not None and 'missing_slots' in check:
         # 비교 쪽 줄이 아예 없을 때도 skip 규칙은 엔진처럼 넘긴다(예: 그래픽카드 없는 PC 의 파워 규칙).
         # 대상 쪽 줄이 없으면(예: 보드 없는 구성의 소켓 규칙) 판정하지 못한 것이다.
-        return rule.get('null_ref_mode') == 'skip' and check['missing_slots'] == [rule['ref_slot']]
-    return (check['state'] == 'unknown' and rule is not None and rule.get('null_ref_mode') == 'skip'
-            and check.get('missing_fields') == [rule['ref_field']])
+        return rule.get('null_ref_mode') in ('skip', 'skip_any') and check['missing_slots'] == [rule['ref_slot']]
+    if check['state'] != 'unknown' or rule is None:
+        return False
+    if rule.get('null_ref_mode') == 'skip_any':
+        # 어느 쪽 값이든 모르면 엔진도 넘긴다(0160 케이스-파워 규격). 대상 줄이 없는 것만 판정하지 못한 것이다.
+        return 'missing_slots' not in check
+    return rule.get('null_ref_mode') == 'skip' and check.get('missing_fields') == [rule['ref_field']]
 
 
 # 구성표에 이 슬롯 줄이 없거나 가상 줄(「기본 쿨러」 등)뿐이면, 그 슬롯이 걸린 규칙의 미판정은 거절하지 않고

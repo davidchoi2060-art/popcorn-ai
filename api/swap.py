@@ -71,7 +71,9 @@ SPEC_COLS = ("socket, socket_list, mem_type, tdp_watt, rated_watt, required_powe
              # cpu_gpu(0100) — CPU 내장그래픽 유무. `_display_lost` 가 읽는다(GPU 없는
              # 구성에서 외장필수 CPU 로 바꾸면 화면이 안 나온다 — compat_rules 에 없는 축).
              " cpu_gpu,"
-             " form_factor, form_factor_list, tag_white, tag_silent")
+             " form_factor, form_factor_list, tag_white, tag_silent,"
+             # psu_form_factor_list(0160) — 케이스-파워 규격 규칙(case_psu_form)이 읽는다.
+             " psu_form_factor_list")
 
 
 class SwapQuery(BaseModel):
@@ -160,6 +162,8 @@ def _partial_compat(chosen: dict, rules: dict) -> dict:
             v, r = p.get(rule["field"]), ref.get(rule["ref_field"])
             ok = rule_verdict(rule, v, r)
             fmt = rule["detail_fmt"] or "{v} / {r}"
+            if ok is None and rule.get("null_ref_mode") == "skip_any":
+                continue   # 어느 쪽 값이든 모르면 판정하지 않는다(0160 케이스-파워 규격) — build_check 와 같다
             if ok is None:
                 # 'skip' 규칙 · 값 없음 = 판정 불가(0094). 불통과가 아니다.
                 checks.append({"key": rule["rule_key"], "label": rule["label"], "pass": None,
