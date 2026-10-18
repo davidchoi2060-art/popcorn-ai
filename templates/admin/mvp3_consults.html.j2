@@ -112,7 +112,7 @@
   const contactHtml=c=>!c?'':'<div class="mc-ev card"><div class="mc-at">등록 연락처</div>'+
     (c.target_note?'<div><b>'+esc(c.target_note)+'</b></div>':'')+
     (!c.has_contact?'<div class="mc-muted">견적 보관 때 받은 연락처가 없습니다.</div>':
-      '<div>'+(c.expired?'기한 지남 · 개인정보 표시 제한'+(c.purged?'':' · 실제 파기 여부 미확인'):esc(c.masked_phone||'—'))+'</div>'+
+      '<div>'+(c.expired?'기한 지남 · 개인정보 표시 제한'+(c.purged?' · 파기 작업이 값을 비운 시각 '+esc(day(c.purged_at)):' · 실제 파기 여부 미확인'):esc(c.masked_phone||'—'))+'</div>'+
       '<span class="mc-sub">동의 '+esc(day(c.consent_at))+' · 최종 등록·변경 '+esc(day(c.updated_at))+' · 파기 예정일 '+esc(day(c.purge_at))+'</span>')+'</div>';
   const when=s=>s?new Date(s).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
   const chips=a=>(a&&a.length)?a.map(t=>'<span class="mc-chip">'+esc(t)+'</span>').join(''):'<span class="mc-muted">읽은 조건 없음</span>';

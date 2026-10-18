@@ -253,7 +253,8 @@ def _contact_card(row, has_inquiry: bool) -> dict:
             "masked_phone": None if gone or row["contact_phone"] is None else _mask_phone(row["contact_phone"]),
             "consent_at": iso(row["consent_at"]), "registered_at": iso(row["created_at"]),
             "updated_at": iso(row["updated_at"]), "purge_at": iso(row["purge_at"]),
-            "expired": gone, "purged": row["contact_purged_at"] is not None}
+            "expired": gone, "purged": row["contact_purged_at"] is not None,
+            "purged_at": iso(row["contact_purged_at"])}
 
 
 @router.get("/mvp3-consults/{visitor}")
