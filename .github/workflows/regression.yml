@@ -46,4 +46,10 @@ jobs:
             tail -n 30 "$log"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # 실패 줄과 마지막 요약을 주석(annotation)으로도 남긴다 -- 로그를 못 받는 클라우드 세션도 API 로 읽게.
+          fails=$(grep -A2 '\[FAIL\]' "$log" | head -c 2800 || true)
+          if [ -n "$fails" ]; then
+            echo "::notice title=regression fails::$(printf '%s' "$fails" | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
+          fi
+          echo "::notice title=regression tail::$(tail -n 8 "$log" | head -c 1500 | sed ':a;N;$!ba;s/%/%25/g;s/\r//g;s/\n/%0A/g')"
           exit "$rc"
