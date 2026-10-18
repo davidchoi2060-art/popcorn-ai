@@ -58,12 +58,16 @@ def rule_checks(lines, specs, rules):
                 key = f"{rule['rule_key']}:{p['key']}:{q['key']}"
                 ref = specs.get(q['spec_key'], {})
                 v, r = s.get(rule['field']), ref.get(rule['ref_field'])
+                if rule.get('null_ref_mode') == 'skip_any' and rule_verdict(rule, v, r) is None:
+                    continue    # 어느 쪽 값이든 모르면 엔진처럼 판정하지 않는다(0160) — 「확인 필요」를 새로 만들지 않는다
                 state = 'unknown'
                 detail = f"{p['label']} {rule['field']}={v}; {q['label']} {rule['ref_field']}={r}"
-                if v is not None and r is not None and s.get('part_type') and rule['op'] in ('eq', 'gte', 'lte', 'contains'):
+                if v is not None and r is not None and s.get('part_type') and rule['op'] in ('eq', 'gte', 'lte', 'contains', 'in'):
                     try:
                         state = 'pass' if rule_verdict(rule, v, r) else 'fail'
                         detail = (rule.get('detail_fmt') or '{v} / {r}').replace('{v}', str(v)).replace('{r}', str(rule_ref_value(rule, r)))
+                        if state == 'fail' and rule['op'] == 'in':
+                            detail = f"파워 규격 {v} / 케이스 지원 {r} · 목록에 없음"
                         if state == 'fail' and rule['op'] == 'contains':
                             detail = f"등록 지원 목록 {v} / 대상 {r} · 목록에 없음"
                         if rule['rule_key'] == 'power':

@@ -82,3 +82,36 @@ class PartsEditRejectsIncompatibleSave(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CasePowerForm(unittest.TestCase):
+    """케이스-파워 규격(0160): 둘 다 알 때만 판정하고, 표기가 달라도 같은 규격이면 통과한다."""
+    RULE = dict(rule_id=9, rule_key='case_psu_form', slot='POWER', field='form_factor', op='in', ref_slot='CASE',
+                ref_field='psu_form_factor_list', label='파워 규격 수용', detail_fmt='{v} 파워 · 케이스 지원 {r}',
+                part_types=[], ref_offset=0, null_ref_mode='skip_any')
+
+    def judge(self, power, case):
+        specs = {1: dict(part_type='CASE', psu_form_factor_list=case), 2: dict(part_type='POWER', form_factor=power)}
+        out = bc.evaluate([dict(key=0, slot='CASE', spec_key=1, label='케이스'),
+                           dict(key=1, slot='POWER', spec_key=2, label='파워')], specs, [self.RULE], display=False)
+        return [c['state'] for c in out['checks']]
+
+    def test_slim_power_in_atx_case_fails(self):
+        self.assertEqual(self.judge('TFX', ['ATX']), ['fail'])
+
+    def test_same_form_with_other_spelling_passes(self):
+        self.assertEqual(self.judge('ATX', ['ATX']), ['pass'])
+        self.assertEqual(self.judge('Flex-ATX', ['FLEX']), ['pass'])
+
+    def test_unknown_either_side_is_not_judged(self):
+        self.assertEqual(self.judge(None, ['ATX']), [])
+        self.assertEqual(self.judge('TFX', None), [])
+        self.assertEqual(self.judge('TFX', []), [])
+        self.assertEqual(self.judge('mini-ITX', ['ATX']), [])    # 파워 규격이 아닌 값
+
+    def test_engine_verdict_matches(self):
+        from api.recommend import rule_verdict
+        self.assertFalse(rule_verdict(self.RULE, 'TFX', ['ATX']))
+        self.assertTrue(rule_verdict(self.RULE, 'SFX', ['ATX', 'SFX']))
+        self.assertIsNone(rule_verdict(self.RULE, None, ['ATX']))
+        self.assertIsNone(rule_verdict(self.RULE, 'ATX', None))

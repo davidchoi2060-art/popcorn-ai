@@ -63,9 +63,10 @@ def required_fields(rules, slot, part_type, conditional=False):
     """
     fields = []
     for r in rules:
-        if not conditional and r['slot'] == slot and _rule_applies(r, {'part_type': part_type}):
+        if (not conditional and r['slot'] == slot and r.get('null_ref_mode') != 'skip_any'
+                and _rule_applies(r, {'part_type': part_type})):
             fields.append(r['field'])
-        if r['ref_slot'] == slot and r.get('null_ref_mode') != 'skip' and bool(r.get('part_types')) == conditional:
+        if r['ref_slot'] == slot and r.get('null_ref_mode') not in ('skip', 'skip_any') and bool(r.get('part_types')) == conditional:
             fields.append(r['ref_field'])
     return list(dict.fromkeys(f for f in fields if f))
 
