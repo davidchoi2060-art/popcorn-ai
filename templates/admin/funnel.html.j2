@@ -159,6 +159,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
   border:1px dashed var(--rv-dim3);border-radius:20px;padding:5px 10px;white-space:nowrap}
 .fn-denom-note{font:400 11.5px/1.7 var(--rv-font);color:var(--rv-muted);border-top:1px solid rgba(0,0,0,.08);
   margin-top:13px;padding-top:11px}
+.fn-denom-note.fn-basis{margin:0;padding:6px 0 0 18px;border-top:0}
 
 /* ── ④ 3단 카드 ── */
 .fn-cards{display:grid;grid-template-columns:repeat(3,minmax(230px,1fr));gap:12px}
@@ -292,6 +293,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       <div class="fn-funnel" id="fnMvp3"></div>
       <div class="fn-pricechips" id="fnMvp3Price"></div>
       <div class="fn-denom-note" id="fnMvp3Note"></div>
+      <ul class="fn-denom-note fn-basis" id="fnMvp3Basis"></ul>
     </section>
 
     <!-- ④ 3단 카드 -->
@@ -491,7 +493,7 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
   // ── ③-2 mvp3 경로 — 비율은 서버가 계산해 보낸다 ─────────────────
   function renderMvp3(d) {
     var m = d.mvp3;
-    if (!m) { $('fnMvp3').innerHTML = ''; $('fnMvp3Price').innerHTML = ''; $('fnMvp3Note').textContent = ''; return; }
+    if (!m) { $('fnMvp3').innerHTML = ''; $('fnMvp3Price').innerHTML = ''; $('fnMvp3Note').textContent = ''; $('fnMvp3Basis').textContent = ''; return; }
     $('fnMvp3').innerHTML = ''
       + '<div class="fn-stage"><div class="fn-stage-lbl">보관 견적</div><div class="fn-stage-val num">' + fmt(m.saved) + '</div><div class="fn-stage-sub">이 기간에 만든 견적</div></div>'
       + '<div class="fn-conn"><span class="fn-conn-pct num">' + pctText(m.pct_of_saved) + '</span><span class="fn-conn-arrow">→</span></div>'
@@ -508,7 +510,13 @@ button{font-family:inherit;appearance:none;-webkit-appearance:none;-moz-appearan
       + '이 기간에 쇼핑몰로 넘어간 인계는 ' + fmt(m.handoff_count) + '건, 우리 견적가 합계 ' + won(m.amount_sum) + '입니다.';
     if (L.total) note += ' 위 칸은 그 인계의 쇼핑몰 가격 재확인 결과입니다.';
     if (m.low_sample) note += ' 표본이 작아 비율의 신뢰도가 낮습니다.';
+    var q = m.inquiries;
+    if (q) note += ' 같은 기간 구매 상담 신청은 ' + fmt(q.n) + '건(시험 자료 ' + fmt(q.test_excluded) + '건 제외), 그중 보관 견적과 이어진 것 '
+      + fmt(q.quote_linked) + '건입니다. 구매 전환이 아닙니다.';
     $('fnMvp3Note').textContent = note;
+    var ul = $('fnMvp3Basis');
+    ul.textContent = '';
+    (m.basis || []).forEach(function (t) { var li = document.createElement('li'); li.textContent = t; ul.appendChild(li); });
   }
 
   // ── ④㉮ 티어 분포 ────────────────────────────────────────────────

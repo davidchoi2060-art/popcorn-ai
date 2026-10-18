@@ -264,6 +264,12 @@
     .cr-req-banner-cta{align-items:flex-start}
     .cr-tabsbar{padding:0 12px}
   }
+.cr-power{border:1px solid var(--rv-dim3);border-radius:10px;padding:12px 14px;margin:0 0 14px;background:var(--rv-card)}
+.cr-power-title{font-weight:600;margin-bottom:6px}
+.cr-power-list{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0}
+.cr-power-list dt{color:var(--rv-muted)}
+.cr-power-list dd{margin:0}
+.cr-power-note{color:var(--rv-muted);font-size:12px;margin-top:8px}
 </style>
 <link rel="stylesheet" href="/shared/admin2/management-dialogs.css?v=20261002">
 {% endblock %}
@@ -333,6 +339,17 @@
       <div class="cr-kpi-row"><span class="cr-kpi-val" id="cr-kpi-pool" data-bind="tiers.pool_size">…</span></div>
       <div class="cr-kpi-note">재고&gt;0 기준 · 이 규칙들이 얹힙니다</div>
     </div>
+  </div>
+
+  <!-- 파워 기준 보기(2026-10-18 관리자 정리 기획 A07) — 읽기 전용. 고치는 버튼을 두지 않는다. -->
+  <div class="cr-power" id="cr-power" hidden>
+    <div class="cr-power-title">파워 기준</div>
+    <dl class="cr-power-list">
+      <dt>조립 판정</dt><dd id="cr-power-rule"></dd>
+      <dt>코드 기본값</dt><dd id="cr-power-fallback"></dd>
+      <dt>고객 안내</dt><dd id="cr-power-advice"></dd>
+    </dl>
+    <div class="cr-power-note" id="cr-power-note"></div>
   </div>
 
   <div class="cr-table-region">
@@ -1108,6 +1125,31 @@
     });
   }
 
+  // 파워 기준 보기(A07) — 조립 판정(규칙 ref_offset, DB)과 고객 안내(권장 파워 + 여유, 코드)를 나눠 적는다.
+  // 규칙 표와 따로 읽는다(/api/admin/power-basis). 실패하면 상자를 숨긴다 — 규칙 표 조회에는 영향이 없다.
+  function renderPower(p){
+    var rule = p.rule, off = rule && typeof rule.ref_offset === "number" ? rule.ref_offset : null;
+    document.getElementById("cr-power-rule").textContent = !rule
+      ? "파워 규칙 없음 · 운영값 미확인"
+      : (off === null ? "파워 정격 ≥ 그래픽카드 소비전력 + 여유(값 미확인)"
+                      : "파워 정격 ≥ 그래픽카드 소비전력 + " + fmtNum(off) + "W")
+        + (rule.active ? "" : " · 비활성") + (rule.blocking ? "" : " · 경고전용");
+    document.getElementById("cr-power-fallback").textContent = "+" + fmtNum(p.fallback_offset_w)
+      + "W — 규칙 값을 읽지 못할 때만 쓰는 값입니다";
+    document.getElementById("cr-power-advice").textContent = "그래픽카드 권장 파워 + " + fmtNum(p.advice_margin_w)
+      + "W — 상담 답과 상품 상세의 「넉넉한 파워」 안내에 쓰는 기준입니다";
+    var note = "조립 판정과 고객 안내는 서로 다른 기준입니다. " + (p.note || "");
+    if (off !== null && off !== p.fallback_offset_w) note += " 규칙 값과 코드 기본값이 다릅니다.";
+    document.getElementById("cr-power-note").textContent = note;
+    document.getElementById("cr-power").hidden = false;
+  }
+  function loadPower(){
+    fetch("/api/admin/power-basis", {credentials: "same-origin"})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(p){ if (p) renderPower(p); else document.getElementById("cr-power").hidden = true; })
+      .catch(function(){ document.getElementById("cr-power").hidden = true; });
+  }
+
   function applyData(data){
     var compat = data.compat || {};
     var checks = Array.isArray(compat.checks) ? compat.checks : [];
@@ -1137,6 +1179,7 @@
     els.kpiPool.textContent = fmtNum(poolSize);
     renderLoadKpi(total, skipRows.length, unknownCount);
 
+    loadPower();
     lastRows = checks.map(function(c, i){ return buildRow(c, i + 1, total); });
     renderRows(lastRows);
 
