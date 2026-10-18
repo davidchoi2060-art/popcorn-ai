@@ -31,15 +31,21 @@
 ■ 시각 — `talk_intent_hits.created_at` 은 naive UTC, `saved_at` 은 timestamptz 다.
   둘을 한 줄로 비교하려고 `saved_at AT TIME ZONE 'UTC'`(naive UTC)로 맞춘다.
   「오늘」은 KST 달력일(`kst_day_range`) — 대시보드 「오늘 상담」과 같은 규약.
+
+■ 방문자 상세의 연결 (2026-10-18 관리자 정리 기획 1묶음 · 규칙 = api/admin_mvp3_links)
+  보관 견적마다 구성 유형 · 대수 · 바꾼 부품 차액 · 걸린 상담 신청 · 팝콘PC 이동을 잇고,
+  팝콘PC 이동(handoffs, quote_type='mvp3')을 시간 순서에 함께 넣는다. 등록 연락처는
+  가린 번호만 싣는다. 상담 신청이 없는 방문자는 「연락 대상 아님」을 먼저 말한다.
 """
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
+from . import admin_mvp3_links as L
 from . import talk_rules as TR
 from . import talk_exceptions as TX
-from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST
+from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST, _mask_phone
 from .admin_raw_text import NOTICE as RAW_NOTICE, expired, raw_view
 from .db import engine
 from .timeutil import iso, KST, kst_day_range
@@ -64,7 +70,7 @@ HIT_IS_TEST = "(data_origin <> 'real' OR COALESCE(raw_text, '') ILIKE 'QA-%')"
 
 
 # 방문자 상세 한 번에 싣는 최대 건수(최근 것부터). 넘으면 `truncated` 로 알린다.
-DETAIL_LIMITS = {"hits": 500, "saved": 200, "inquiries": 100}
+DETAIL_LIMITS = {"hits": 500, "saved": 200, "inquiries": 100, "handoffs": 100}
 
 
 # 예외 입력 문의(api/talk_exceptions -- 이상한 말·욕·외국어·사람 상담 요청 등). 상담 기록에
@@ -236,6 +242,20 @@ def list_visitors(offset: int = 0, include_test: bool = False, only_exceptions: 
     }
 
 
+def _contact_card(row, has_inquiry: bool) -> dict:
+    """등록 연락처 카드(2026-10-18 관리자 정리 기획 A02). 보관만 한 고객은 연락 대상이 아니다 —
+    상담 신청이 없으면 그 사실을 먼저 말한다. 기한 경과와 실제 파기(값 비움)는 따로 적는다."""
+    target = None if has_inquiry else "연락 대상 아님 · 고객이 상담을 신청하기 전에는 먼저 연락하지 않습니다."
+    if row is None:
+        return {"has_contact": False, "target_note": target}
+    gone = expired(row["purge_at"])
+    return {"has_contact": True, "target_note": target,
+            "masked_phone": None if gone or row["contact_phone"] is None else _mask_phone(row["contact_phone"]),
+            "consent_at": iso(row["consent_at"]), "registered_at": iso(row["created_at"]),
+            "updated_at": iso(row["updated_at"]), "purge_at": iso(row["purge_at"]),
+            "expired": gone, "purged": row["contact_purged_at"] is not None}
+
+
 @router.get("/mvp3-consults/{visitor}")
 def visitor_detail(visitor: str, include_test: bool = False):
     """방문자 한 명의 문의와 보관 견적을 시간 순서로. 예외 입력 문의는 `exception: true`."""
@@ -258,11 +278,22 @@ def visitor_detail(visitor: str, include_test: bool = False):
                 {"u": uid, "n": DETAIL_LIMITS["saved"] + 1}).mappings().all()
             # 구매 상담 신청(0139) — 연락처는 싣지 않는다. 처리는 「구매 상담 신청」 화면에서 한다.
             inquiries = conn.execute(text(f"""
-                SELECT i.inquiry_no, i.created_at, i.topic, i.status
+                SELECT i.inquiry_no, i.created_at, i.topic, i.status, i.quote_id
                   FROM purchase_inquiries i
                  WHERE i.user_id = :u AND ({'TRUE' if include_test else 'NOT ' + INQUIRY_IS_TEST})
                  ORDER BY i.created_at DESC, i.inquiry_id DESC LIMIT :n"""),
                 {"u": uid, "n": DETAIL_LIMITS["inquiries"] + 1}).mappings().all()
+            # 팝콘PC 이동(인계, api/mvp3_handoff) — 견적과는 note 의 견적 번호로만 잇는다.
+            # 인계 원장에는 시험 표식이 없어 시험 제외를 걸지 않는다(화면이 그 사실을 적는다).
+            handoffs = conn.execute(text("""
+                SELECT handoff_no, created_at, total_quoted, note FROM handoffs
+                 WHERE user_id = :u AND quote_type = 'mvp3'
+                 ORDER BY created_at DESC, handoff_id DESC LIMIT :n"""),
+                {"u": uid, "n": DETAIL_LIMITS["handoffs"] + 1}).mappings().all()
+            # 등록 연락처(0158) — 이 화면은 조회 전용이라 권한과 무관하게 가린 번호만 싣는다.
+            contact = conn.execute(text("""
+                SELECT contact_phone, consent_at, created_at, updated_at, purge_at, contact_purged_at
+                  FROM mvp3_visitor_contacts WHERE user_id = :u"""), {"u": uid}).mappings().first()
         else:
             hits = conn.execute(text(f"""
                 SELECT h.hit_id, h.created_at, matched_terms, unmatched_n, answer_kind, llm_called,
@@ -272,15 +303,26 @@ def visitor_detail(visitor: str, include_test: bool = False):
                  WHERE h.hit_id = :h AND {hit_origin}"""), {"h": hit_id}).mappings().all()
             quotes = []
             inquiries = []
-    if not hits and not quotes and not inquiries:
+            handoffs = []
+            contact = None
+    if not hits and not quotes and not inquiries and not handoffs:
         raise HTTPException(404, "이 방문자의 기록이 없습니다")
     # 상한을 넘는 방문자는 «최근» 것만 싣고 잘린 사실을 함께 알린다 — 예전에는 오래된 것부터 읽어
     # 최신 내역이 말없이 빠졌다(2026-10-11 코덱스 검수 #81 지적 반영).
     truncated = {"hits": len(hits) > DETAIL_LIMITS["hits"], "saved": len(quotes) > DETAIL_LIMITS["saved"],
-                 "inquiries": len(inquiries) > DETAIL_LIMITS["inquiries"]}
+                 "inquiries": len(inquiries) > DETAIL_LIMITS["inquiries"],
+                 "handoffs": len(handoffs) > DETAIL_LIMITS["handoffs"]}
     hits = hits[:DETAIL_LIMITS["hits"]]
     quotes = quotes[:DETAIL_LIMITS["saved"]]
     inquiries = inquiries[:DETAIL_LIMITS["inquiries"]]
+    handoffs = handoffs[:DETAIL_LIMITS["handoffs"]]
+    ho_notes = [(h, L.handoff_note(h["note"])) for h in handoffs]
+    # 견적 번호로 잇는다 — 명시 연결만(같은 번호 · 이름 · 비슷한 시각으로 합치지 않는다).
+    pi_by_quote = {str(i["quote_id"]): i["inquiry_no"] for i in inquiries if i["quote_id"]}
+    ho_by_quote = {}
+    for h, n in ho_notes:
+        if n and n["quote_id"]:
+            ho_by_quote.setdefault(n["quote_id"], h["handoff_no"])
 
     timeline = [{
         "kind": "hit", "at": iso(h["created_at"]),
@@ -298,6 +340,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
     } for h in hits]
     for q in quotes:
         p = q["product_snapshot"] or {}
+        view = L.quote_view(p) or {}
         timeline.append({
             "kind": "saved", "at": iso(q["saved_at"]), "quote_id": str(q["quote_id"]),
             "product": {"name": p.get("name"), "price": p.get("price"),
@@ -306,13 +349,26 @@ def visitor_detail(visitor: str, include_test: bool = False):
                         "price_src": p.get("price_src"),
                         "reasons": [x for x in (p.get("reasons") or []) if isinstance(x, str)][:5]},
             "conditions": conditions(q["talk_state"]),
+            "kind_label": L.kind(p)[1], "sets": view.get("sets", 1), "total": view.get("total"),
+            "changes": view.get("changes", []), "delta_sum": view.get("delta_sum", 0),
+            "purpose": L.NO_PURPOSE,
+            "inquiry_no": pi_by_quote.get(str(q["quote_id"])),
+            "handoff_no": ho_by_quote.get(str(q["quote_id"])),
         })
     for i in inquiries:
         timeline.append({"kind": "inquiry", "at": iso(i["created_at"]),
-                         "inquiry_no": i["inquiry_no"], "topic": i["topic"], "status": i["status"]})
+                         "inquiry_no": i["inquiry_no"], "topic": i["topic"], "status": i["status"],
+                         "quote_id": str(i["quote_id"]) if i["quote_id"] else None})
+    for h, n in ho_notes:
+        timeline.append({"kind": "handoff", "at": iso(h["created_at"]), "handoff_no": h["handoff_no"],
+                         "total": h["total_quoted"], "quote_id": (n or {}).get("quote_id"),
+                         "sets": (n or {}).get("sets", 1), "changes": (n or {}).get("changes", []),
+                         "delta_sum": (n or {}).get("delta_sum", 0),
+                         "reason": L.NO_REASON, "result": L.NO_RESULT})
     timeline.sort(key=lambda e: e["at"] or "")
     return {"visitor": visitor, "visitor_known": uid is not None,
             "visitor_label": ("방문자 " + str(uid)) if uid is not None else "방문자 미확인",
-            "hits": len(hits), "saved": len(quotes), "inquiries": len(inquiries),
+            "hits": len(hits), "saved": len(quotes), "inquiries": len(inquiries), "handoffs": len(handoffs),
+            "contact": _contact_card(contact, bool(inquiries)) if uid is not None else None,
             "truncated": truncated, "limits": DETAIL_LIMITS,
             "raw_notice": RAW_NOTICE, "timeline": timeline}

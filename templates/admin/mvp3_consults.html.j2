@@ -46,6 +46,9 @@
 .mc-ev .mc-at{font-size:12px;color:var(--rv-muted);margin-bottom:4px}
 .mc-ev h3{font-size:14px;margin:2px 0 4px}
 .mc-ev ul{margin:4px 0 0 18px;padding:0;color:var(--rv-ink-soft)}
+.mc-ev.ho{border-color:var(--rv-dim3);background:var(--rv-panel)}
+.mc-ev.card{border-style:dashed}
+.mc-sub{display:block;font-size:12px;color:var(--rv-muted)}
 .mc-reply{margin-top:6px;padding-top:6px;border-top:1px dashed var(--rv-dim4);color:var(--rv-ink-soft)}
 @media (max-width:768px){
   .mc-wrap{padding:12px 16px 24px}
@@ -101,6 +104,16 @@
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const num=n=>(typeof n==='number')?n.toLocaleString('ko-KR'):'—';
   const won=n=>(typeof n==='number')?n.toLocaleString('ko-KR')+'원':'가격 없음';
+  const signed=n=>(n>0?'+':n<0?'−':'')+Math.abs(n).toLocaleString('ko-KR')+'원';
+  const day=s=>s?new Date(s).toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}):'—';
+  const changesHtml=e=>e.changes&&e.changes.length?'<div>바꾼 부품 '+num(e.changes.length)+'개 · 차액 '+esc(signed(e.delta_sum))+'</div><ul>'+
+    e.changes.map(c=>'<li>'+esc(c.label||'부품')+' '+esc(c.before||'—')+' → '+esc(c.after||'—')+' ('+esc(signed(c.delta))+')</li>').join('')+'</ul>':'';
+  // 등록 연락처 카드(2026-10-18 관리자 정리 기획 A02) — 가린 번호만. 보관만 한 고객은 연락 대상이 아니다.
+  const contactHtml=c=>!c?'':'<div class="mc-ev card"><div class="mc-at">등록 연락처</div>'+
+    (c.target_note?'<div><b>'+esc(c.target_note)+'</b></div>':'')+
+    (!c.has_contact?'<div class="mc-muted">견적 보관 때 받은 연락처가 없습니다.</div>':
+      '<div>'+(c.expired?'기한 지남 · 개인정보 표시 제한'+(c.purged?'':' · 실제 파기 여부 미확인'):esc(c.masked_phone||'—'))+'</div>'+
+      '<span class="mc-sub">동의 '+esc(day(c.consent_at))+' · 최종 등록·변경 '+esc(day(c.updated_at))+' · 파기 예정일 '+esc(day(c.purge_at))+'</span>')+'</div>';
   const when=s=>s?new Date(s).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
   const chips=a=>(a&&a.length)?a.map(t=>'<span class="mc-chip">'+esc(t)+'</span>').join(''):'<span class="mc-muted">읽은 조건 없음</span>';
   let offset=0,limit=50,lastLen=0,selected=null;
@@ -148,18 +161,25 @@
     let d;
     try{d=await getJSON('/api/admin/mvp3-consults/'+encodeURIComponent(v)+'?'+q());}
     catch(e){$('mcDrawerBody').innerHTML='<p>'+esc(e.message)+'</p>';return;}
-    $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved)+(d.inquiries?' · 구매 상담 '+num(d.inquiries):'');
+    $('mcDrawerTitle').textContent=d.visitor_label+' · 문의 '+num(d.hits)+' · 보관 '+num(d.saved)+(d.inquiries?' · 구매 상담 '+num(d.inquiries):'')+(d.handoffs?' · 팝콘PC 이동 '+num(d.handoffs):'');
     const cut=d.truncated||{},lim=d.limits||{};
-    const cutNote=[cut.hits?'문의 최근 '+num(lim.hits)+'건':'',cut.saved?'보관 최근 '+num(lim.saved)+'건':'',cut.inquiries?'구매 상담 최근 '+num(lim.inquiries)+'건':''].filter(Boolean);
+    const cutNote=[cut.hits?'문의 최근 '+num(lim.hits)+'건':'',cut.saved?'보관 최근 '+num(lim.saved)+'건':'',cut.inquiries?'구매 상담 최근 '+num(lim.inquiries)+'건':'',cut.handoffs?'팝콘PC 이동 최근 '+num(lim.handoffs)+'건':''].filter(Boolean);
     $('mcDrawerBody').innerHTML=RawText.notice(d.raw_notice)+
       (cutNote.length?'<p class="mc-muted">기록이 많아 '+esc(cutNote.join(' · '))+'만 표시합니다. 그 이전 기록은 표시하지 않습니다.</p>':'')+
-      (d.timeline||[]).map(e=>e.kind==='inquiry'?
+      contactHtml(d.contact)+
+      (d.timeline||[]).map(e=>e.kind==='handoff'?
+        '<div class="mc-ev ho"><div class="mc-at">'+esc(when(e.at))+' · 팝콘PC 이동</div>'+
+        '<div>'+esc(e.handoff_no)+' · '+esc(won(e.total))+(e.sets>1?' ('+num(e.sets)+'대)':'')+' · <a href="/admin2/handoff-log">인계 기록 보기</a></div>'+
+        changesHtml(e)+'<span class="mc-sub">'+esc(e.reason)+' · '+esc(e.result)+(e.quote_id?'':' · 연결 견적 없음')+' · 인계 원장은 시험 표식이 없어 시험 제외를 적용하지 않습니다</span></div>'
+        :e.kind==='inquiry'?
         '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청</div>'+
         '<div>'+esc(e.inquiry_no)+' · '+esc(e.topic)+' · '+esc(e.status)+
         ' · <a href="/admin2/purchase-inquiries#'+esc(d.visitor)+'">연락처 · 처리 보기</a></div></div>'
         :e.kind==='saved'?
-        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관</div>'+
+        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관 · '+esc(e.kind_label)+' · '+esc(e.purpose)+'</div>'+
         '<h3>'+esc(e.product.name||'상품명 없음')+'</h3>'+
+        (e.sets>1?'<div class="num">'+esc(num(e.sets))+'대 합계 '+esc(won(e.total))+'</div>':'')+changesHtml(e)+
+        '<span class="mc-sub">'+(e.inquiry_no?'상담 신청 '+esc(e.inquiry_no):'상담 신청 없음')+(e.handoff_no?' · 팝콘PC 이동 '+esc(e.handoff_no):'')+'</span>'+
         '<div class="num">'+esc(won(e.product.price))+(e.product.role?' · '+esc(e.product.role):'')+(e.product.product_code?' · 상품 '+esc(e.product.product_code):'')+'</div>'+
         (e.conditions.length?'<div>조건: '+chips(e.conditions)+'</div>':'')+
         (e.product.reasons.length?'<ul>'+e.product.reasons.map(r=>'<li>'+esc(r)+'</li>').join('')+'</ul>':'')+'</div>'

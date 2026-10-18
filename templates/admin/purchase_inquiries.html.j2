@@ -9,6 +9,9 @@
   ■ 머리말은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
   ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. 외부 자원 0.
   ■ 서버가 준 문자열은 textContent 로만 넣는다(innerHTML 금지).
+  ■ 2026-10-18 관리자 정리 기획 A01·A01D(대표 승인): 구성 유형 · 연결 견적 · 팝콘PC 이동 기록 ·
+    현재 등록 연락처를 신청 당시 연락처와 따로 보인다. 남기지 않은 것(접수 경로 · 보관 목적 ·
+    이동 이유 · 구매 결과)은 「미기록」 「미확인」으로 적고 추정하지 않는다(api/admin_mvp3_links).
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
@@ -56,6 +59,11 @@
 .pi-same{border:1px solid var(--rv-dim4);border-radius:8px;padding:8px 10px}
 .pi-msg{color:var(--rv-muted)}
 .pi-msg.err{color:var(--rv-red)}
+.pi-sub{display:block;font-size:12px;color:var(--rv-muted)}
+.pi-card{border:1px solid var(--rv-dim4);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.pi-card.warn{border-color:var(--rv-amber-line);background:var(--rv-amber-bg)}
+.pi-card h3{font-size:13px;margin:0;color:var(--rv-ink-soft)}
+.pi-card p{margin:0;white-space:pre-wrap}
 @media (max-width:768px){
   .pi-wrap{padding:12px 16px 24px}
   .pi-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -76,6 +84,8 @@
   <p class="pi-note" id="piVisitor" aria-live="polite"></p>
   <div class="pi-bar">
     <label>상태 <select id="piStatus"><option value="">전체</option><option>대기</option><option>처리 중</option><option>완료</option></select></label>
+    <label>연결 <select id="piLink"><option value="">전체</option><option value="quote">보관 견적</option><option value="config">새로 구성된 PC</option><option value="none">연결 자료 없음</option></select></label>
+    <label>보관 기한 <select id="piDue"><option value="">전체</option><option value="soon">곧 지남</option><option value="expired">지남</option></select></label>
     <label><input type="checkbox" id="piTest"> 시험 신청 포함</label>
     <span class="pi-muted" id="piTestNote"></span>
   </div>
@@ -83,9 +93,9 @@
     <table>
       <thead><tr>
         <th scope="col">신청 시각</th><th scope="col">번호</th><th scope="col">주제</th>
-        <th scope="col">연락처</th><th scope="col">상품</th><th scope="col">상태</th>
+        <th scope="col">연락처</th><th scope="col">상품 · 구성</th><th scope="col">상태</th><th scope="col">보관 기한</th>
       </tr></thead>
-      <tbody id="piRows"><tr><td colspan="6" class="pi-empty">불러오는 중입니다.</td></tr></tbody>
+      <tbody id="piRows"><tr><td colspan="7" class="pi-empty">불러오는 중입니다.</td></tr></tbody>
     </table>
   </div>
   <div class="pi-pager">
@@ -105,16 +115,21 @@
             visitor: /^#u\d{1,12}$/.test(location.hash) ? location.hash.slice(1) : null};
   var $ = function(id){ return document.getElementById(id); };
   function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function won(n){ return n==null ? '—' : Number(n).toLocaleString('ko-KR')+'원'; }
+  function signed(n){ return (n>0?'+':n<0?'−':'')+Number(Math.abs(n)).toLocaleString('ko-KR')+'원'; }
+  function day(s){ return s ? new Date(s).toLocaleDateString('ko-KR',{year:'numeric',month:'2-digit',day:'2-digit'}) : '—'; }
   function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
   function contact(it){ if (it.contact_purged) return '보관 기간 지남'; return [it.name, it.phone, it.email].filter(Boolean).join(' · ') || '—'; }
   function qs(){
     var p=['offset='+st.offset];
     if ($('piStatus').value) p.push('status='+encodeURIComponent($('piStatus').value));
+    if ($('piLink').value) p.push('link='+encodeURIComponent($('piLink').value));
+    if ($('piDue').value) p.push('due='+encodeURIComponent($('piDue').value));
     if ($('piTest').checked) p.push('include_test=true');
     if (st.visitor) p.push('visitor='+encodeURIComponent(st.visitor));
     return '?'+p.join('&');
   }
-  function emptyRow(msg){ var b=$('piRows'); b.textContent=''; var tr=el('tr'); var td=el('td','pi-empty',msg); td.colSpan=6; tr.appendChild(td); b.appendChild(tr); }
+  function emptyRow(msg){ var b=$('piRows'); b.textContent=''; var tr=el('tr'); var td=el('td','pi-empty',msg); td.colSpan=7; tr.appendChild(td); b.appendChild(tr); }
   function load(){
     fetch(API+qs()).then(function(r){ if(!r.ok) throw new Error('신청 목록을 불러오지 못했습니다'); return r.json(); })
     .then(function(d){
@@ -140,8 +155,11 @@
           tr.appendChild(el('td',null,it.inquiry_no+(it.test?' (시험)':'')));
           tr.appendChild(el('td',null,it.topic));
           tr.appendChild(el('td',null,contact(it)));
-          tr.appendChild(el('td',it.product_name||it.product_code?null:'pi-muted',it.product_name||(it.product_code?'상품 '+it.product_code:'없음')));
+          var pc=el('td',it.product_name||it.product_code?null:'pi-muted',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));
+          pc.appendChild(el('span','pi-sub',it.kind_label+(it.handoff_no?' · 팝콘PC 이동 '+it.handoff_no:'')));
+          tr.appendChild(pc);
           tr.appendChild(el('td',null,it.status+(it.assignee?' · '+it.assignee:'')));
+          tr.appendChild(el('td','pi-at',it.contact_purged?'지남':day(it.purge_at)));
           tr.addEventListener('click',function(){ open(it); });
           b.appendChild(tr);
         });
@@ -158,9 +176,35 @@
     $('piDTitle').textContent=it.inquiry_no+' · '+it.topic;
     var b=$('piDBody'); b.textContent='';
     line(b,'신청 시각',when(it.at));
-    line(b,'연락처',contact(it));
+    line(b,'연락처 (신청 당시)',contact(it));
     line(b,'문의 내용',it.message||(it.contact_purged?'보관 기간 지남':'적지 않음'));
-    line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음')+(it.quote_id?' (보관 견적)':''));
+    line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));
+    line(b,'구성 · 연결',it.kind_label+'\n'+it.link_label);
+    if (it.quote){
+      var q=it.quote, qt=el('div','pi-card');
+      qt.appendChild(el('h3',null,'연결된 보관 견적'));
+      qt.appendChild(el('p',null,'PC 한 대 '+won(q.price)+(q.sets>1?' × '+q.sets+'대 = '+won(q.total):'')+
+        (q.changes.length?'\n바꾼 부품 '+q.changes.length+'개 · 차액 '+signed(q.delta_sum):'')+
+        q.changes.map(function(c){ return '\n· '+(c.label||'부품')+' '+(c.before||'—')+' → '+(c.after||'—')+(c.quantity>1?' × '+c.quantity:'')+' ('+signed(c.delta)+')'; }).join('')));
+      qt.appendChild(el('span','pi-sub',q.price_note+' · 보관 '+q.purpose));
+      b.appendChild(qt);
+    }
+    if (it.handoff_no){
+      var ho=el('div','pi-card'); ho.appendChild(el('h3',null,'팝콘PC 이동 기록'));
+      var ha=el('a',null,it.handoff_no+' · '+when(it.handoff_at)); ha.href='/admin2/handoff-log'; ho.appendChild(ha);
+      ho.appendChild(el('span','pi-sub','이동 이유 미기록 · 구매 결과 미확인'));
+      b.appendChild(ho);
+    }
+    if (it.contact_purged){
+      b.appendChild(el('p','pi-sub','보관 기한이 지나 연락처와 신청 내용을 표시하지 않습니다.'));
+    } else if (it.registered){
+      var rg=it.registered, rc=el('div','pi-card'+(rg.differs?' warn':''));
+      rc.appendChild(el('h3',null,'현재 등록 연락처 (견적 보관 때 받은 연락처)'));
+      rc.appendChild(el('p',null,[rg.name,rg.phone,rg.email].filter(Boolean).join(' · ')||'—'));
+      rc.appendChild(el('span','pi-sub',rg.differs?'현재 등록 연락처와 다릅니다. 이 신청에 남긴 연락처를 확인해 주세요.':'이 신청에 남긴 연락처와 같습니다.'));
+      rc.appendChild(el('span','pi-sub','등록 연락처 파기 예정일 '+day(rg.purge_at)));
+      b.appendChild(rc);
+    }
     if (it.free_build && it.free_build.parts){
       var fb=it.free_build;
       line(b,'고객이 고른 부품',fb.parts.map(function(p){ return p.slot+' '+p.name+(p.quantity>1?' × '+p.quantity:'')+' · '+Number(p.sale_price*p.quantity).toLocaleString('ko-KR')+'원'; }).join('\n')
@@ -168,7 +212,7 @@
         +((fb.empty||[]).length?'\n비운 자리: '+fb.empty.join(', '):''));
     }
     if (it.visitor){ var a=el('a',null,'이 방문자의 문의 · 보관 견적 보기'); a.href='/admin2/mvp3-consults#'+it.visitor; b.appendChild(a); }
-    b.appendChild(el('span','pi-lbl','연락처 보관 기한 '+when(it.purge_at)));
+    b.appendChild(el('span','pi-lbl','이 신청의 파기 예정일 '+day(it.purge_at)+(it.contact_purged?' · 기한 지남 · 개인정보 표시 제한':'')));
     b.appendChild(el('span','pi-lbl','처리'));
     var row=el('div','pi-status');
     ['대기','처리 중','완료'].forEach(function(s){
@@ -198,7 +242,7 @@
   // 「운영 현황」 카드처럼 주소에 status= 가 오면 같은 조건으로 연다(목록에 있는 값만 받는다).
   (function(){ var v=new URLSearchParams(location.search).get('status'); var sel=$('piStatus');
     if (v && Array.prototype.some.call(sel.options,function(o){ return o.value===v; })) sel.value=v; })();
-  ['piStatus','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  ['piStatus','piLink','piDue','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
   $('piPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
   $('piNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
   load();

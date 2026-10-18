@@ -13,11 +13,19 @@
   보관 기한이 지난 신청은 연락처 · 문의 내용을 내보내지 않는다(`contact_purged`).
   행을 지우지 않는다 — 상태로 처리한다. 보관 기한(`purge_at`)은 응답에 함께 싣는다.
   시험 신청(회귀 표식 · 「QA-」로 시작하는 이름이나 내용)은 기본으로 뺀다.
+
+■ 연결 읽기 (2026-10-18 관리자 정리 기획 1묶음 · 규칙 = api/admin_mvp3_links)
+  신청에 걸린 보관 견적(PC 한 대 가격 × 대수 · 바꾼 부품 차액) · 새로 구성된 PC ·
+  그 견적의 팝콘PC 이동(인계 note 의 견적 번호)을 함께 싣는다. 명시 번호로만 잇는다.
+  접수 경로 · 보관 목적 · 이동 이유 · 구매 결과는 저장하지 않으므로 「미기록」으로 밝힌다.
+  신청서의 연락처(신청 당시)와 이 방문자의 «현재» 등록 연락처(0158)를 따로 보이고,
+  다르면 알린다. 신청 기한이 지나면 현재 연락처로 빈칸을 채우지 않는다.
 """
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import text
 
+from . import admin_mvp3_links as L
 from .auth import current_operator
 from .admin_raw_text import NOTICE as RAW_NOTICE, expired
 from .db import engine
@@ -27,6 +35,13 @@ router = APIRouter(prefix="/api/admin", tags=["admin-purchase-inquiries"])
 
 LIMIT = 50
 STATUSES = ("대기", "처리 중", "완료")
+# 목록 조건(2026-10-18 관리자 정리 기획 A01) — 연결 종류 · 보관 기한. 「곧」은 작업 편의용 표시일 뿐
+# 보유 기간과 무관하다(보유 기간 자체는 대표 미확정 — api/mvp3_contact.KEEP_DAYS).
+LINKS = {"quote": "i.quote_id IS NOT NULL", "config": "i.quote_id IS NULL AND i.configuration_id IS NOT NULL",
+         "none": "i.quote_id IS NULL AND i.configuration_id IS NULL"}
+DUE_SOON_DAYS = 14
+DUES = {"soon": "i.purge_at > now() AND i.purge_at <= now() + make_interval(days => %d)" % DUE_SOON_DAYS,
+        "expired": "i.purge_at <= now()"}
 MEMO_MAX = 1000
 IS_TEST = ("(i.data_origin <> 'real' OR COALESCE(i.contact_name, '') ILIKE 'QA-%'"
            " OR COALESCE(i.message, '') ILIKE 'QA-%')")
@@ -62,6 +77,7 @@ def _mask_text(s):
 def _row(r, full: bool) -> dict:
     # 보관 기한(신청 후 180일)이 지난 연락처 · 문의 내용은 내보내지 않는다 — 고객 동의 문구의 약속이다.
     gone = expired(r["purge_at"])
+    kind_key, kind_label = L.kind(r.get("quote_snapshot"), r.get("configuration_id"), r.get("free_build"))
     return {
         "inquiry_id": r["inquiry_id"], "inquiry_no": r["inquiry_no"], "at": iso(r["created_at"]),
         "topic": r["topic"], "status": r["status"],
@@ -81,31 +97,63 @@ def _row(r, full: bool) -> dict:
         "assignee": r["assignee_name"], "assignee_id": r["assignee_id"],
         "updated_at": iso(r["updated_at"]), "purge_at": iso(r["purge_at"]),
         "test": bool(r["is_test"]),
+        # 연결 읽기(2026-10-18 관리자 정리 기획 A01·A01D) — 규칙은 api/admin_mvp3_links 한 곳.
+        "kind": kind_key, "kind_label": kind_label,
+        "link_label": L.link_label(r["quote_id"], r.get("configuration_id")),
+        "quote": L.quote_view(r.get("quote_snapshot")),
+        "handoff_no": r.get("ho_no"), "handoff_at": iso(r.get("ho_at")),
+        "registered": None if gone else _registered(r, full),
     }
+
+
+def _registered(r, full: bool):
+    """이 방문자의 «현재» 등록 연락처(0158) — 신청서에 복사된 접수 당시 연락처와 따로 보인다.
+    신청 기한이 지나면 내보내지 않는다(빈칸을 최신 연락처로 채우지 않는다). 둘이 다르면 알린다."""
+    if r.get("reg_phone") is None:
+        return None
+    differs = bool(r["contact_phone"]) and L.digits(r["contact_phone"]) != L.digits(r["reg_phone"])
+    return {"name": r["reg_name"],
+            "phone": r["reg_phone"] if full else _mask_phone(r["reg_phone"]),
+            "email": r["reg_email"] if full else _mask_email(r["reg_email"]),
+            "purge_at": iso(r["reg_purge_at"]), "differs": differs}
 
 
 _SELECT = f"""
     SELECT i.*, {IS_TEST} AS is_test,
            COALESCE(s.product_snapshot->>'name', '새로 구성된 PC · ' || (pc.content->>'title')) AS product_name,
-           o.name AS assignee_name
+           o.name AS assignee_name, s.product_snapshot AS quote_snapshot,
+           ho.handoff_no AS ho_no, ho.created_at AS ho_at,
+           vc.contact_name AS reg_name, vc.contact_phone AS reg_phone, vc.contact_email AS reg_email,
+           vc.purge_at AS reg_purge_at
       FROM purchase_inquiries i
       LEFT JOIN mvp3_saved_recommendations s ON s.quote_id = i.quote_id
       LEFT JOIN pc_configurations pc ON pc.configuration_id = i.configuration_id
       LEFT JOIN admin_operators o ON o.operator_id = i.assignee_id
+      LEFT JOIN LATERAL ({L.ho_for_quote_sql("i.quote_id")}) ho ON TRUE
+      LEFT JOIN mvp3_visitor_contacts vc ON vc.user_id = i.user_id AND vc.contact_purged_at IS NULL
+                                        AND vc.contact_phone IS NOT NULL AND vc.purge_at > now()
 """
 
 
 @router.get("/purchase-inquiries")
 def list_inquiries(offset: int = 0, status: str | None = None, include_test: bool = False,
-                   visitor: str | None = None):
+                   visitor: str | None = None, link: str | None = None, due: str | None = None):
     me = current_operator()
     offset = max(0, offset)
     if status is not None and status not in STATUSES:
         raise HTTPException(400, "알 수 없는 상태입니다")
+    if link is not None and link not in LINKS:
+        raise HTTPException(400, "알 수 없는 연결 조건입니다")
+    if due is not None and due not in DUES:
+        raise HTTPException(400, "알 수 없는 기한 조건입니다")
     where = ["TRUE" if include_test else f"NOT {IS_TEST}"]
     params: dict = {"lim": LIMIT, "off": offset}
     if status:
         where.append("i.status = :st"); params["st"] = status
+    if link:
+        where.append(LINKS[link])
+    if due:
+        where.append(DUES[due])
     if visitor:
         if not (visitor.startswith("u") and visitor[1:].isdigit()):
             raise HTTPException(400, "방문자 표시가 올바르지 않습니다")
@@ -126,7 +174,8 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
             "offset": offset, "limit": LIMIT,
             "counts": {s: int(counts.get(s, 0)) for s in STATUSES},
             "test_excluded": int(excluded), "include_test": include_test,
-            "contact_masked": not full, "can_write": full, "raw_notice": RAW_NOTICE}
+            "contact_masked": not full, "can_write": full, "raw_notice": RAW_NOTICE,
+            "link": link, "due": due, "due_soon_days": DUE_SOON_DAYS}
 
 
 class UpdateBody(BaseModel):
