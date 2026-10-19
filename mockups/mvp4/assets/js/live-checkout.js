@@ -61,13 +61,12 @@
     return '<aside class="ds-panel ds-sticky">' + P.designProductSummary(p) + '<div class="ds-price-line"><span>PC 본체 1대</span><b>' + h(P.catalogMoney(p)) + '</b></div><div class="ds-price-line"><span>수량</span><b>' + n + '대</b></div><div class="ds-price-line"><span>배송·추가 서비스</span><span>상담 시 확인</span></div><div class="ds-price-line total"><b>PC 금액</b><strong>' + h(total) + '</strong></div>' + (p.priceBasis ? '<p class="ds-muted">' + h(p.priceBasis) + '</p>' : '') + (extra || '') + '</aside>';
   }
   function loading(title, copy) { return '<div role="status" aria-busy="true"><h2>' + h(title) + '</h2><p class="ds-muted">' + h(copy) + '</p><div class="ds-skeleton"></div><div class="ds-skeleton"></div></div>'; }
-  // 견적·보관 전에 확인할 것 — 판매 여부·가격·공개 구성. 없으면 문의로 안내한다(지어내지 않는다).
+  // 견적·보관 전에 확인할 것 — 판매 여부·가격. 구성은 막는 조건이 아니다(상담사가 조정, 2026-10-20 대표).
   function issue(p) {
     if (!p) return '상품을 다시 선택해 주세요.';
     if (p.isSelling !== true) return '현재 판매 여부를 확인해야 합니다.';
     if (!(typeof p.price === 'number' && p.price > 0)) return '현재 상품 가격을 확인해야 합니다.';
     if (p.liveDetail === 'error') return '상품 구성 정보를 지금 불러오지 못했어요. 잠시 후 다시 확인해 주세요.';
-    if (!Array.isArray(p.specs) || !p.specs.length) return '이 상품의 정확한 부품 구성표를 확인해야 합니다.';
     return '';
   }
   function blocked(p) { return P.designNotice('상품 정보를 먼저 확인해 주세요', issue(p), 'bad') + P.designProductSummary(p) + '<div class="ds-actions">' + link('상품 상세 보기', 'product', p, 'btn-outline') + P.designLink('AI에게 질문하기', 'chat', 'product', { id: p.id }, 'btn-outline') + link('상품·구성 문의', 'consult', p) + '</div>'; }
