@@ -94,3 +94,12 @@
  .hm-ai,.hm-gaming{width:100%;border-radius:0;padding:22px 42px}.hm-ai-card{grid-template-columns:44% 1fr;gap:11px 18px}.hm-ai-copy{display:contents}.hm-ai-copy>a{grid-column:1/-1;grid-row:1}.hm-ai-copy h3{font-size:28px;margin-bottom:0}.hm-ai-product{grid-column:1;grid-row:2/4}.hm-ai-product img{height:170px}.hm-ai-features{grid-column:2;grid-row:2}.hm-ai-includes{grid-column:2;grid-row:3;margin-top:0}.hm-ai-actions{gap:8px}.hm-ai-actions .btn{min-height:44px;padding:10px}.hm-package-links{gap:7px}
  .hm-business-scene,.hm-gaming-scene{height:220px}.hm-gaming-product{padding:15px 14px}.hm-gaming-image>img{height:170px}.hm-gaming-copy .hm-product-type{font-size:24px}.hm-gaming-copy .hm-price{font-size:29px}.hm-gaming-actions{margin-top:10px}.hm-other{padding-inline:0}
 }
+
+/* v14: dedicated category campaign scenes; no carousel or product image changes. */
+.hm-categories.hm-category-scenes>a{padding:0;overflow:hidden;border:1px solid #edf0f5;background:#fff;transition:box-shadow .18s ease,transform .18s ease}
+.hm-categories.hm-category-scenes>a:hover{background:#fff;box-shadow:0 7px 24px rgba(41,37,65,.09);transform:translateY(-2px)}
+.hm-categories.hm-category-scenes>a:focus-visible{outline:3px solid #7453ff;outline-offset:3px}
+.hm-categories.hm-category-scenes>a>img{display:block;width:100%;height:auto;aspect-ratio:1.7;object-fit:cover;object-position:center;mix-blend-mode:normal}
+.hm-categories.hm-category-scenes>a>span{width:100%;min-height:48px;padding:7px 10px;background:#fff}
+@media(max-width:600px){.hm-categories.hm-category-scenes>a>img{aspect-ratio:1.28}.hm-categories.hm-category-scenes>a>span{min-height:38px;padding:4px 2px;gap:4px}.hm-categories.hm-category-scenes>a:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.hm-categories.hm-category-scenes>a{transition:none}.hm-categories.hm-category-scenes>a:hover{transform:none}}
