@@ -76,7 +76,7 @@ class InquiryBody(BaseModel):
     free_build: list[FreePick] | None = Field(default=None, min_length=1, max_length=8)
     # 화면이 신청마다 만든 키(/mvp4 AI 패키지 문의, 0163). 같은 방문자·같은 키는 한 번만 접수하고 같은 번호를 돌려준다.
     client_key: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{6,64}$')
-    # /mvp4 AI 슈퍼컴퓨터 문의(0165). product_code 가 고정 완제품 두 번호 중 하나여야 한다.
+    # /mvp4 AI 슈퍼컴퓨터 문의(0165). product_code 가 AI 슈퍼컴퓨터 카테고리에 분류된 상품이어야 한다(0166).
     fixed: FixedPick | None = None
 
 
@@ -84,7 +84,8 @@ def _clean(body: InquiryBody):
     if body.fixed is not None:
         if body.topic != FIXED_TOPICS[body.fixed.intent]:
             raise HTTPException(422, '문의 주제를 확인해 주세요.')
-        if body.product_code not in customer_supercomputer.CODES:
+        # 상품이 AI 슈퍼컴퓨터 카테고리에 분류돼 있는지는 접수 트랜잭션에서 본다(customer_supercomputer.load, 0166).
+        if body.product_code is None:
             raise HTTPException(422, 'AI 슈퍼컴퓨터 모델을 다시 선택해 주세요.')
         if body.quote_id is not None or body.configuration_id is not None or body.free_build is not None:
             raise HTTPException(422, '슈퍼컴퓨터 문의에는 다른 견적을 함께 보낼 수 없어요.')

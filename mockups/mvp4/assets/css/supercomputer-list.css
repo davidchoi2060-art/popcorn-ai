@@ -1,0 +1,47 @@
+/* AI 슈퍼컴퓨터 카테고리 목록 (2026-10-20). v15 sc-* 색·둥근 구획과 v12 B 카드의 큰 글자·간결한 사양 표현을 잇는다. */
+.scl-page{padding-bottom:40px}
+.scl-head{margin:0 0 26px}.scl-head h1{margin:6px 0 10px}.scl-head>p:not(.sc-eyebrow){margin:0;color:#687081;font-size:18px;line-height:1.6;word-break:keep-all}
+.scl-head .scl-count{margin-top:14px;font-size:15px;font-weight:750;color:#3c3550}
+.scl-layout{display:flex;flex-direction:column;gap:18px}
+.scl-filters{border:1px solid #e8e4ef;border-radius:16px;background:#faf8ff}
+.scl-filters>summary{display:flex;align-items:center;gap:9px;padding:15px 20px;font-size:16px;font-weight:800;cursor:pointer;list-style:none}
+.scl-filters>summary::-webkit-details-marker{display:none}.scl-filters>summary .icon{width:19px;height:19px}.scl-filters>summary .icon:last-child{margin-left:auto;transition:transform .15s}
+.scl-filters[open]>summary .icon:last-child{transform:rotate(180deg)}.scl-filters>summary b{display:inline-flex;min-width:22px;height:22px;align-items:center;justify-content:center;border-radius:99px;background:#7652da;color:#fff;font-size:13px}
+.scl-filter-groups{display:flex;flex-wrap:wrap;gap:16px 28px;padding:0 20px 18px;align-items:flex-end}
+.scl-filter-groups fieldset{border:0;margin:0;padding:0;min-width:0}.scl-filter-groups legend{font-size:14px;font-weight:750;color:#5c5670;margin-bottom:8px}
+.scl-filter-groups fieldset>div{display:flex;flex-wrap:wrap;gap:8px}
+.scl-filter-groups button[data-scl-filter]{min-height:42px;padding:0 16px;border:1px solid #ddd6ec;border-radius:99px;background:#fff;font-size:15px;font-weight:700;color:#2a2438;cursor:pointer}
+.scl-filter-groups button[aria-pressed=true]{background:#efe9ff;border-color:#7652da;color:#4b2fb0}
+.scl-clear{min-height:42px;border:0;background:none;color:#6444c4;font-size:15px;font-weight:750;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.scl-tools{display:flex;justify-content:flex-end}.scl-sort{display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:700;color:#4c475c}
+.scl-sort select{min-height:42px;border:1px solid #ddd6ec;border-radius:10px;padding:0 12px;font:inherit;background:#fff}
+.scl-grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.scl-card>a{display:flex;flex-direction:column;height:100%;border:1px solid #e6e3ee;border-radius:20px;background:#fff;overflow:hidden;color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s}
+.scl-card>a:hover{border-color:#cdbff3;box-shadow:0 10px 28px rgba(76,52,160,.08)}.scl-card>a:focus-visible{outline:3px solid #7652da;outline-offset:3px}
+.scl-photo{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;background:#f1f6fb;padding:20px}
+.scl-photo img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+.scl-photo-none{display:flex;flex-direction:column;align-items:center;gap:8px;color:#7b7790;font-size:15px}.scl-photo-none .icon{width:30px;height:30px;opacity:.6}
+.scl-badge{position:absolute;left:14px;top:14px;padding:5px 11px;border-radius:99px;font-size:13px;font-weight:800;background:#fff;border:1px solid #e3dcf0}
+.scl-badge.is-check{color:#8a5a00;border-color:#f0dfb3;background:#fff8e6}.scl-badge.is-stopped{color:#6b6f7c;background:#f1f2f5}
+.scl-body{display:flex;flex-direction:column;flex:1;padding:20px 22px 18px}
+.scl-maker{margin:0 0 4px;font-size:14px;font-weight:750;color:#7652da}
+.scl-body h2{margin:0 0 14px;font-size:24px;line-height:1.3;letter-spacing:-.04em;font-weight:850;word-break:keep-all;overflow-wrap:anywhere}
+.scl-specs{display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;margin:0 0 18px}
+.scl-specs div{min-width:0}.scl-specs dt{font-size:13px;color:#7d7a8c}.scl-specs dd{margin:2px 0 0;font-size:16px;font-weight:750;color:#1d1a27;word-break:keep-all;overflow-wrap:anywhere}
+.scl-specs dd.is-missing{color:#9a96a8;font-weight:600}
+.scl-foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:10px;border-top:1px solid #efedf3;padding-top:14px}
+.scl-foot strong{font-size:23px;font-weight:850;letter-spacing:-.03em}.scl-foot strong.is-quiet{font-size:18px;color:#6b6780}
+.scl-go{display:inline-flex;align-items:center;gap:5px;font-size:15px;font-weight:750;white-space:nowrap}.scl-go .icon{width:17px;height:17px}
+.scl-id{margin:8px 0 0;font-size:12px;color:#9a97a6}
+.scl-more{display:flex;justify-content:center;margin-top:6px}
+.scl-empty h2{font-size:28px;margin:15px 0 6px;letter-spacing:-.04em}
+.scl-note{margin:30px 0 0;font-size:15px;color:#77738a;text-align:center;word-break:keep-all}.scl-note a{color:#5a3cc0;text-decoration:underline;text-underline-offset:4px}
+@media(min-width:900px){.scl-layout{display:grid;grid-template-columns:1fr;}}
+@media(max-width:1080px){.scl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:640px){
+  .scl-head>p:not(.sc-eyebrow){font-size:16px}
+  .scl-grid{grid-template-columns:1fr;gap:16px}
+  .scl-body h2{font-size:22px}.scl-foot strong{font-size:21px}
+  .scl-filter-groups{padding:0 16px 16px}.scl-filters>summary{padding:14px 16px}
+  .scl-tools{justify-content:stretch}.scl-sort{width:100%;justify-content:space-between}.scl-sort select{flex:1}
+}

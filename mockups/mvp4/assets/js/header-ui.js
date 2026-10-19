@@ -9,6 +9,8 @@
     ['작업용 PC', '디자인·영상', 'video-camera', '디자인부터 영상 편집까지'],
     ['미니 PC', '미니 PC', 'computer-tower', '작은 공간에 필요한 성능'],
     ['고성능 PC', 'AI·고성능 PC', 'cpu', '큰 작업을 위한 구성'],
+    // AI 전용 장비 카테고리(2026-10-20) — PC 목록 필터가 아니라 전용 목록(supercomputers.html)으로 간다.
+    ['AI 슈퍼컴퓨터', null, 'cpu', 'AI 전용 장비', 'supercomputers.html', 'supercomputers'],
     ['주변기기', null, 'headset', '모니터와 주변기기']
   ];
   function route(screen, params) {
@@ -21,6 +23,7 @@
     var s = q.toString();
     return './' + (s ? '?' + s : '');
   }
+  function catHref(c) { return c[4] || (c[1] ? catalog(c[1]) : 'peripherals.html'); }
   function catalog(category) { return route('catalog', category ? { category: category } : {}) + (category ? '#catalog-products' : ''); }
   function menuButton(className, text) {
     return '<button class="' + className + '" type="button" data-open-dialog="site-menu" aria-label="전체 카테고리 열기" aria-haspopup="dialog" aria-controls="site-menu">' + icon('list') + '<span>' + text + '</span></button>';
@@ -37,13 +40,13 @@
       navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>', route('chat'), 'chat', 'nh-primary-link nh-primary-ai') + '</div>' +
       '<div class="nh-purpose-group">' + menuButton('nh-category-button nh-category-compact', '전체 카테고리') +
       '<div class="nh-purpose-tabs" role="group" aria-label="용도별 PC와 주변기기">' + categories.map(function (c) {
-        return navLink(c[0], c[1] ? catalog(c[1]) : 'peripherals.html', c[1] || 'peripherals', 'nh-purpose-tab');
+        return navLink(c[0], catHref(c), c[5] || c[1] || 'peripherals', 'nh-purpose-tab');
       }).join('') + '</div></div></nav></div></header>';
 
   }
   function menu() {
     return '<dialog class="site-dialog menu-dialog nh-menu" id="site-menu" aria-labelledby="menu-dialog-title"><div class="nh-menu-content"><div class="nh-menu-heading"><div><p>POPCORN AI</p><h2 id="menu-dialog-title">어떤 PC를 찾으세요?</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="전체 카테고리 닫기">' + icon('x') + '</button></div>' +
-      '<div class="nh-menu-layout"><section class="nh-menu-pcs" aria-labelledby="nh-pc-menu-title"><div class="nh-group-heading"><h3 id="nh-pc-menu-title">PC 쇼핑</h3><a href="' + h(catalog()) + '">전체 PC 보기 ' + icon('arrow-right') + '</a></div><div class="nh-category-grid">' + categories.map(function (c) { return '<a href="' + h(c[1] ? catalog(c[1]) : 'peripherals.html') + '"><span class="nh-category-icon">' + icon(c[2]) + '</span><span><strong>' + h(c[0]) + '</strong><small>' + h(c[3]) + '</small></span>' + icon('caret-right') + '</a>'; }).join('') + '</div><a class="nh-menu-finder" href="' + h(route('chat')) + '">' + icon('chat-circle') + '<span><strong>AI로 PC 찾기</strong><small>용도와 예산을 말하면, 함께 찾아드려요.</small></span>' + icon('arrow-right') + '</a></section>' +
+      '<div class="nh-menu-layout"><section class="nh-menu-pcs" aria-labelledby="nh-pc-menu-title"><div class="nh-group-heading"><h3 id="nh-pc-menu-title">PC 쇼핑</h3><a href="' + h(catalog()) + '">전체 PC 보기 ' + icon('arrow-right') + '</a></div><div class="nh-category-grid">' + categories.map(function (c) { return '<a href="' + h(catHref(c)) + '"><span class="nh-category-icon">' + icon(c[2]) + '</span><span><strong>' + h(c[0]) + '</strong><small>' + h(c[3]) + '</small></span>' + icon('caret-right') + '</a>'; }).join('') + '</div><a class="nh-menu-finder" href="' + h(route('chat')) + '">' + icon('chat-circle') + '<span><strong>AI로 PC 찾기</strong><small>용도와 예산을 말하면, 함께 찾아드려요.</small></span>' + icon('arrow-right') + '</a></section>' +
       '<section class="nh-menu-ai" aria-labelledby="nh-ai-menu-title"><div class="nh-group-heading"><h3 id="nh-ai-menu-title">AI 패키지</h3><a href="ai-packages.html">비교하기 ' + icon('arrow-right') + '</a></div><p class="nh-group-copy">내 일에 필요한 AI를 PC와 함께.</p><div class="nh-package-list">' + [['basic', '기본형', '내 자료 AI 비서', 'file-text-duotone'], ['business', '업무형', '업무형 로컬 AI', 'users-three-duotone'], ['advanced', '고급형', '전문 제작 AI', 'code-duotone']].map(function (p) { return '<a href="ai-detail.html?package=' + p[0] + '">' + icon(p[3]) + '<span><small>' + p[1] + '</small><strong>' + p[2] + '</strong></span>' + icon('caret-right') + '</a>'; }).join('') + '</div><a class="nh-consult-link" href="ai-consult.html?package=business&amp;intent=adoption">AI 도입 상담 ' + icon('arrow-right') + '</a></section></div>' +
       '<nav class="nh-menu-support" aria-label="견적 및 고객지원"><a href="' + h(route('saved')) + '">' + icon('clipboard-text') + '내 견적</a><a href="' + h(route('compare')) + '">' + icon('squares-four') + 'PC 비교</a><a href="support.html">' + icon('headset') + '고객지원</a><a href="support.html#sales-policy">' + icon('package') + '배송 · A/S 안내</a></nav></div></dialog>';
   }

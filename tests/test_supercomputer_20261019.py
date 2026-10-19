@@ -22,31 +22,48 @@ MVP4 = ROOT / 'mockups/mvp4'
 
 
 def row(**kw):
+    """customer_supercomputer 의 조회 한 행(카테고리 분류 + ai_device_profiles). 기본은 프로필 없는 상품."""
     base = {'product_code': 129615, 'product_name': 'DELL Pro Max GB10 (128GB, M.2 2TB)', 'sale_price': 12052100,
-            'status': '판매중', 'is_visible': True}
+            'status': '판매중', 'display_name': None, 'maker': None, 'model_name': None, 'accelerator': None,
+            'processor': None, 'memory': None, 'storage': None, 'os': None, 'architecture': None, 'model_group': None,
+            'model_label': None, 'featured_rank': None, 'images': None, 'detail': None, 'has_explained_photo': False}
     base.update(kw)
     return base
 
 
 class Catalog(unittest.TestCase):
-    def test_on_sale_item_is_allowlisted(self):
-        it = SC._item(row())
-        self.assertEqual(set(it), {'product_code', 'name', 'official_name', 'storage', 'memory', 'price', 'sale_state'})
-        self.assertEqual((it['storage'], it['price'], it['sale_state']), ('2TB', 12052100, 'on_sale'))
-        self.assertEqual(SC._item(row(product_name='DELL Pro Max GB10 (128GB, M.2 4TB)'))['storage'], '4TB')
+    def test_item_is_allowlisted_and_has_no_cost_fields(self):
+        it = SC.item(row())
+        self.assertEqual((it['price'], it['sale_state']), (12052100, 'on_sale'))
+        for k in ('purchase_price', 'supplier', 'stock_qty', 'margin', 'detail'):
+            self.assertNotIn(k, it)
+        self.assertIn('detail', SC.item(row(), with_detail=True))
 
-    def test_check_states_hide_price(self):
-        for kw in ({'status': '품절'}, {'is_visible': False}, {'sale_price': 0}, {'sale_price': None},
-                   {'product_name': '다른 상품 (M.2 2TB)'}, {'product_name': 'DELL Pro Max GB10 (128GB)'}):
+    def test_states(self):
+        for kw, want in (({'status': '품절'}, (None, 'stopped')), ({'status': '단종'}, (None, 'stopped')),
+                         ({'sale_price': 0}, (None, 'check')), ({'sale_price': None}, (None, 'check'))):
             with self.subTest(kw=kw):
-                it = SC._item(row(**kw))
-                self.assertEqual((it['price'], it['sale_state']), (None, 'check'))
+                it = SC.item(row(**kw))
+                self.assertEqual((it['price'], it['sale_state']), want)
 
-    def test_only_two_codes(self):
-        self.assertEqual(SC.CODES, (129615, 129614))
-        with self.assertRaises(HTTPException) as c:
-            SC.supercomputer(100866, SC.Response())
-        self.assertEqual(c.exception.status_code, 404)
+    def test_missing_profile_values_stay_empty_not_gb10(self):
+        it = SC.item(row(product_code=200001, product_name='<b>새 AI 장비</b> X1'))
+        self.assertEqual(it['name'], '새 AI 장비 X1')
+        for k in ('maker', 'accelerator', 'processor', 'memory', 'storage', 'os', 'architecture'):
+            self.assertIsNone(it[k])
+        self.assertEqual(it['images'], [])
+
+    def test_images_only_safe_paths_and_explained_photo_fallback(self):
+        it = SC.item(row(images=[{'src': 'assets/images/supercomputer/gb10-product.jpg'}, {'src': 'https://evil.example/x.png'},
+                                 {'src': 'javascript:alert(1)'}, {'src': '/api/product-images/12/detail'}]))
+        self.assertEqual([i['src'] for i in it['images']], ['assets/images/supercomputer/gb10-product.jpg', '/api/product-images/12/detail'])
+        self.assertEqual(SC.item(row(product_code=7, has_explained_photo=True))['images'][0]['src'], '/api/product-images/7/detail')
+
+    def test_list_is_queried_by_category_key_not_codes(self):
+        src = (ROOT / 'api/customer_supercomputer.py').read_text(encoding='utf-8')
+        self.assertIn("public_key = :key", src)
+        self.assertNotRegex(src, r'1296(14|15)')
+        self.assertFalse(hasattr(SC, 'CODES'))
 
 
 def body(**kw):
@@ -70,7 +87,7 @@ class Inquiry(unittest.TestCase):
         self.assertNotIn('AI 슈퍼컴퓨터 견적', PI.TOPICS)
 
     def test_product_and_combinations(self):
-        for kw in ({'product_code': 100866}, {'product_code': None},
+        for kw in ({'product_code': None},
                    {'configuration_id': 'A0123456789ABCDEF'}, {'quote_id': '00000000-0000-0000-0000-000000000001'}):
             with self.subTest(kw=kw), self.assertRaises(HTTPException):
                 PI._clean(body(**kw))
@@ -148,6 +165,50 @@ class CustomerScreens(unittest.TestCase):
         self.assertEqual(set(re.findall(r'href="([a-z-]+\.html)', src)), {'supercomputer.html'})
         index = (MVP4 / 'index.html').read_text(encoding='utf-8')
         self.assertLess(index.index('supercomputer-home.js'), index.index('design-boot.js'))
+
+
+class Category(unittest.TestCase):
+    """카테고리 확장(2026-10-20): 상품번호를 화면 코드에 적지 않고, 새 상품은 분류·표시 정보만으로 들어온다."""
+    SCREENS = ('assets/js/live-supercomputer.js', 'assets/js/supercomputer-home.js', 'assets/js/supercomputer-detail.js',
+               'assets/js/supercomputer-inquiry.js', 'assets/js/supercomputer-list.js', 'supercomputers.html')
+
+    def test_no_product_codes_in_screens(self):
+        for f in self.SCREENS:
+            with self.subTest(f=f):
+                self.assertNotRegex((MVP4 / f).read_text(encoding='utf-8'), r'1296(14|15)')
+
+    def test_gb10_content_lives_in_product_data(self):
+        detail = (MVP4 / 'assets/js/supercomputer-detail.js').read_text(encoding='utf-8')
+        code = re.sub(r'/\*.*?\*/', '', detail, flags=re.S)
+        for gb10 in ('DGX', 'ConnectX', 'gb10-', '2TB와 4TB', 'Grace Blackwell'):
+            self.assertNotIn(gb10, code)
+        mig = (ROOT / 'db/migrations/versions/0166_ai_supercomputer_category.py').read_text(encoding='utf-8')
+        for gb10 in ('DGX OS', 'ConnectX-7', 'gb10-rear-1600.webp', '2TB와 4TB'):
+            self.assertIn(gb10, mig)
+
+    def test_list_back_links_and_install_intent(self):
+        detail = (MVP4 / 'assets/js/supercomputer-detail.js').read_text(encoding='utf-8')
+        self.assertIn('AI 슈퍼컴퓨터 목록', detail)
+        self.assertIn("route('adoption')", detail)
+        self.assertNotIn('package=business', re.sub(r'/\*.*?\*/', '', detail, flags=re.S))
+        header = (MVP4 / 'assets/js/header-ui.js').read_text(encoding='utf-8')
+        self.assertIn("['AI 슈퍼컴퓨터', null, 'cpu', 'AI 전용 장비', 'supercomputers.html', 'supercomputers']", header)
+        home = (MVP4 / 'assets/js/supercomputer-home.js').read_text(encoding='utf-8')
+        self.assertIn('전체 AI 슈퍼컴퓨터 보기', home)
+
+    def test_migration_0166_chain_and_key(self):
+        path = ROOT / 'db/migrations/versions/0166_ai_supercomputer_category.py'
+        spec = importlib.util.spec_from_file_location('m0166', path)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        self.assertEqual((mod.revision, mod.down_revision, mod.KEY), ('0166', '0165', SC.KEY))
+
+    def test_admin_profile_paths(self):
+        from api import admin_ai_device_profiles as A
+        ok = A.ProfileBody(images=[{'src': 'assets/images/x/a.webp'}, {'src': '/api/product-images/9/detail'}])
+        A.clean(ok)
+        for bad in ('https://cdn.example/a.png', '../secret.png', 'assets/images/a.svg'):
+            with self.subTest(bad=bad), self.assertRaises(HTTPException):
+                A.clean(A.ProfileBody(images=[{'src': bad}]))
 
 
 if __name__ == '__main__':
