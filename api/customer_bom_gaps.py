@@ -23,6 +23,8 @@
 ■ 근거의 유효 기간 -- EVIDENCE_DAYS
   공개 페이지 확인·운영자 확정은 그 시점의 사실이다. 판매가가 바뀌면(값 불일치) 바로 무효이고, 같아도 EVIDENCE_DAYS 가 지나면
   다시 확인해야 한다. 가장 최근 bom-gap 기록 하나만 본다 -- 뒤에 「품절」로 다시 읽혔으면 앞의 확인은 쓰지 않는다.
+  예외: 그 기록에 valid_until 이 있으면 EVIDENCE_DAYS 대신 그 시각까지 유효하다(대표 지시로만 적는다 -- 0164).
+  판매가가 바뀌면 valid_until 이 남아 있어도 바로 무효인 것은 같다.
 
 ■ 고객 화면은 미확인을 그대로 보인다 -- 근거가 없으면 「가격 확인 중」(mockups/mvp3/app.js otherRow·partLinePrice).
 """
@@ -48,11 +50,12 @@ MAX_CHECK = 60                       # 한 번에 공개 페이지를 읽는 부
 SOURCE_URL = "https://popcornpc.co.kr/shop/product_detail.html?pd_no=%s"
 
 # 가장 최근 bom-gap 기록이 «지금 판매가로 판매중»을 말하고 유효 기간 안이면 참. customer_pc_offer 가 같은 조각을 쓴다.
-EVIDENCE_SQL = f"""EXISTS (SELECT 1 FROM (SELECT c.outcome, c.mall_price, c.checked_at FROM mall_price_checks c
+# valid_until 이 적힌 기록은 그 시각까지 유효하다(대표가 정한 예외 -- 2026-10-19 메모리 2개 12/31, 0164).
+EVIDENCE_SQL = f"""EXISTS (SELECT 1 FROM (SELECT c.outcome, c.mall_price, c.checked_at, c.valid_until FROM mall_price_checks c
      WHERE c.product_code = p.product_code AND c.note LIKE '{NOTE_PREFIX}%'
      ORDER BY c.checked_at DESC, c.check_id DESC LIMIT 1) last
    WHERE last.outcome = 'same' AND last.mall_price = p.sale_price
-     AND last.checked_at > now() - interval '{EVIDENCE_DAYS} days')"""
+     AND COALESCE(last.valid_until, last.checked_at + interval '{EVIDENCE_DAYS} days') > now())"""
 
 # 고객 추천에 나오는 판매중 완제품 PC(평가 제외 아님)의 구성표 부품 중, 고객 화면이 가격을 숨기는 부품 -- 부품 단위로 묶는다
 # (부품 하나를 고치면 그 부품을 쓰는 PC 가 한꺼번에 풀린다). 숨김 판정은 customer_pc_offer 와 같다.

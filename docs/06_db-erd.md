@@ -1976,3 +1976,7 @@ CHECK: `contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL`. 기한이 �
 ### 38. 고객 화면 출처 `surface` (2026-10-19, 0162)
 
 `purchase_inquiries.surface` · `mvp3_saved_recommendations.surface`(TEXT, NULL 허용, CHECK `surface IN ('mvp3','mvp4')`)는 그 신청·보관이 어느 고객 화면에서 왔는지 적는다. 서버와 관리자단은 한 벌이고 고객 화면만 /mvp3 와 /mvp4 로 나뉜다(2026-10-19 사장님 확정). 값은 각 화면의 요청 함수가 싣는 `X-Popcorn-Surface` 머리글에서 받는다(`api/customer_surface`) — Referer 는 nginx 의 `Referrer-Policy: no-referrer` 때문에 오지 않는다. 표시용이며 판정·권한에 쓰지 않는다. 0162 이전 행과 머리글 없는 요청은 NULL(관리자 화면 「알 수 없음」)로 둔다. downgrade 는 두 컬럼을 지운다.
+
+### 39. 가격 확인 기록 유효 종료일 `mall_price_checks.valid_until` (2026-10-19, 0164)
+
+`mall_price_checks.valid_until`(TIMESTAMP, NULL 허용). NULL 이면 지금처럼 확인 후 `EVIDENCE_DAYS`(7일)까지 근거로 쓴다. 값이 있으면 그 시각까지 쓴다(`api/customer_bom_gaps.EVIDENCE_SQL`). 판매가가 바뀌면 그 전에도 바로 무효다. 대표 결정(2026-10-19 「이 두 개만」)으로 109547·127555 두 메모리만 2026-12-31 23:59:59 까지로 연장했다 — 표가 추가만 하므로 기존 행을 고치지 않고 새 확인 행을 하나 쌓는다(가장 최근 bom-gap 기록이 'same' 이고 그 가격이 지금 판매가와 같을 때만). downgrade 는 `valid_until` 이 있는 행이 하나라도 있으면 거부한다.
