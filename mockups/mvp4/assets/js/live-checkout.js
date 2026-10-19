@@ -235,6 +235,16 @@
           });
         });
       }
+      function unknownGeneral(body) {
+        show(P.designNotice('접수 결과를 확인하지 못했어요', '연결이 끊겨 접수 여부를 아직 몰라요. 아래 버튼은 같은 신청의 접수 여부만 확인하므로 두 번 접수되지 않아요.', 'bad') + '<div class="ds-actions"><button class="btn btn-primary" type="button" data-ds-check>접수 결과 확인</button><a class="btn btn-outline" href="support.html">고객지원</a></div>', true);
+        box.querySelector('[data-ds-check]').addEventListener('click', function () {
+          show(loading('접수 결과를 확인하고 있어요', '같은 신청의 접수 여부만 확인합니다.'));
+          call('GET', '/api/mvp3/purchase-inquiries/by-key/' + encodeURIComponent(body.client_key)).then(function (r) {
+            if (r.found) success(r.inquiry_no, null, false);
+            else generalForm(P.designNotice('신청이 접수되지 않았어요', '이 신청은 접수되지 않은 것으로 확인됐어요. 내용을 확인한 뒤 다시 보내 주세요.', 'bad'));
+          }, function () { unknownGeneral(body); });
+        });
+      }
       function generalForm(note) {
         show((note || '') + '<form id="ds-consult-form" class="ds-form" novalidate><p id="ds-form-errors" class="ds-form-error" role="alert" tabindex="-1" hidden></p><fieldset class="ds-form-fields">' + topics() +
           '<label for="ds-name">이름 <span class="ds-muted">선택</span></label><input id="ds-name" name="name" maxlength="30" autocomplete="name"><label for="ds-phone">전화번호</label><input id="ds-phone" name="phone" type="tel" maxlength="20" placeholder="010-1234-5678" autocomplete="tel"><label for="ds-email">이메일</label><input id="ds-email" name="email" type="email" maxlength="120" autocomplete="email"><p class="ds-muted">전화번호나 이메일 중 하나는 적어 주세요.</p>' +
@@ -246,11 +256,12 @@
           var c = readContact(f), el = f.querySelector('#ds-form-errors');
           if (!c.phone && !c.email) { el.textContent = '전화번호나 이메일 중 하나는 적어 주세요.'; el.hidden = false; el.focus(); return; }
           if (!c.consent) { el.textContent = '개인정보 수집에 동의해 주세요.'; el.hidden = false; el.focus(); return; }
-          var body = { topic: f.topic.value, name: c.name, phone: c.phone, email: c.email, message: f.message.value.trim() || null, consent: true };
+          // 같은 신청은 한 번만 접수된다(client_key, 0163). 응답을 못 받으면 같은 키로만 결과를 확인한다.
+          var body = { topic: f.topic.value, name: c.name, phone: c.phone, email: c.email, message: f.message.value.trim() || null, consent: true, client_key: 'pi-' + uuid() };
           if (p && Number.isSafeInteger(Number(p.id))) body.product_code = Number(p.id);
           show(loading('상담 신청을 접수하고 있어요', '접수 번호를 확인합니다.'));
           call('POST', '/api/mvp3/purchase-inquiries', body, false).then(function (r) { success(r.inquiry_no, null, false); }, function (e2) {
-            if (e2.kind === 'unknown') return show(P.designNotice('접수 결과를 확인하지 못했어요', '연결이 끊겨 접수 여부를 아직 몰라요. 같은 내용을 바로 다시 보내면 두 번 접수될 수 있어요. 잠시 뒤 연락을 기다리시거나 고객지원으로 확인해 주세요.', 'bad') + '<div class="ds-actions"><a class="btn btn-outline" href="support.html">고객지원</a></div>', true);
+            if (e2.kind === 'unknown') return unknownGeneral(body);
             generalForm(P.designNotice('상담 신청을 접수하지 못했어요', message(e2, '입력 내용과 연결 상태를 확인한 뒤 다시 시도해 주세요.'), 'bad'));
           });
         });

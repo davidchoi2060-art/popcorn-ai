@@ -57,7 +57,8 @@
     return 'normal';
   }
 
-  var early = { catalog: 'loading', product: 'loading', component: 'loading' }[screen];
+  // 목록·상세는 불러오는 중 화면을, 메인은 상품 줄 없이 먼저 그린다(빈 화면으로 기다리지 않게).
+  var early = { catalog: 'loading', product: 'loading', component: 'loading', home: 'normal' }[screen];
   if (early) paint(early);
   P.live.loadCatalog().catch(function () { /* 상태는 stateAfterLoad 가 알린다 */ }).then(function () {
     return Promise.all(productIds().map(function (id) { return P.live.loadDetail(id); }));

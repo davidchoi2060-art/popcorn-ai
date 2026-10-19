@@ -32,7 +32,7 @@
   var MALL = 'https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=';
   var contact = HAS ? { has_contact: true, masked_phone: '010-****-0000', name: '예시' } : { has_contact: false, masked_phone: null, name: null };
   var CONSENT = '[예시 문구] 견적 보관과 고객님이 신청한 구매 상담 연락을 위해 전화번호(필수)와 이름·이메일(선택)을 받습니다. 상담을 신청하기 전에는 먼저 연락드리지 않습니다.';
-  var quotes = [], saveTries = 0, consultTries = 0, inquirySeq = 1000;
+  var quotes = [], saveTries = 0, consultTries = 0, inquirySeq = 1000, keys = {};
 
   // has=1 이면 이미 보관한 예시 견적 하나가 있다(다른 견적 재사용·내 견적·견적 상담 확인용).
   if (HAS) quotes.push({ id: '00000000-0000-4000-8000-000000000001', request_id: 'seed', product: { product_code: 900002, name: '예시 사무용 PC [14100/16G/500GB/UHD 730]', price: 880300, mall_url: MALL + 900002 }, saved_at: '2026-10-19T01:00:00Z' });
@@ -72,11 +72,16 @@
       return reply(200, { ok: true, quote: existing, contact: contact });
     }
     if (path === '/api/mvp3/purchase-inquiries/form') return reply(200, { ok: true, topics: ['여러 대 구매', '할인', '세금계산서·영수증', '주문 희망', '기타'], consent_text: '[예시 문구] 구매 상담 연락을 위해 이름·연락처·문의 내용을 받습니다.' });
+    var bk = path.match(/^\/api\/mvp3\/purchase-inquiries\/by-key\/([A-Za-z0-9_-]{6,64})$/);
+    if (bk) return reply(200, { ok: true, found: !!keys[bk[1]], inquiry_no: keys[bk[1]] || null });
     if (path === '/api/mvp3/purchase-inquiries/from-quote' || path === '/api/mvp3/purchase-inquiries') {
       consultTries++;
+      if (body && body.client_key && keys[body.client_key]) return reply(200, { ok: true, already: true, inquiry_no: keys[body.client_key] });
       if (CONSULT === 'fail') return reply(422, { detail: '[예시] 문의 주제를 골라 주세요.' });
-      if (CONSULT === 'unknown' && consultTries === 1) return reply(503, null);
+      // unknown = 첫 요청은 서버에 접수됐는데 응답을 잃은 경우(결과 확인 → 접수됨).
+      if (CONSULT === 'unknown' && consultTries === 1) { if (body && body.client_key) keys[body.client_key] = 'PI-' + (inquirySeq + 1); return reply(503, null); }
       if (path.slice(-10) === 'from-quote' && !contact.has_contact) return reply(409, { detail: { error: 'contact_required', detail: '상담 연락을 받을 전화번호를 먼저 등록해 주세요.' } });
+      if (body && body.client_key) keys[body.client_key] = 'PI-' + (inquirySeq + 1);
       return reply(200, { ok: true, already: CONSULT === 'already' || (CONSULT === 'unknown' && consultTries > 1), inquiry_no: 'PI-' + (inquirySeq + 1), quote_id: body.quote_id, masked_phone: contact.masked_phone, note: '예시' });
     }
     return reply(503, { detail: 'review fixture: blocked' });

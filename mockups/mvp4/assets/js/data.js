@@ -321,7 +321,7 @@ window.POPCORN_DATA = {
           "text": "답변 초안을 검토한 뒤 직접 보냅니다."
         }
       ],
-      "detailModel": "model-ai-advisor.png",
+      "detailModel": "model-ai-advisor-v2.png",
       "modelAlt": "업무용 PC를 소개하는 모습"
     },
     "basic": {

@@ -4,6 +4,8 @@ DB 없이 확인하는 것: 입력 검사 · 연락처 가리기 · 화면 등�
 DB 를 거치는 저장·권한은 로컬 Postgres 로 따로 확인했다(PR 본문).
 """
 import importlib.util
+from contextlib import contextmanager
+from unittest.mock import patch
 import pathlib
 import unittest
 
@@ -54,7 +56,15 @@ class CustomerInput(unittest.TestCase):
             body(message='가' * 501)
 
     def test_form_meta_comes_from_server(self):
-        m = PI.form_meta()
+        from contextlib import contextmanager
+        from unittest.mock import patch
+        @contextmanager
+        def begin():
+            yield object()
+        # 방문자 연결(쿠키)을 맺는다 -- 신청 전에 맺어야 응답 불명 신청을 같은 브라우저로 확인할 수 있다(by-key).
+        with patch.object(PI.engine, 'begin', begin), patch.object(PI.visitor, 'resolve', return_value=7) as resolve:
+            m = PI.form_meta(object(), PI.Response())
+        self.assertEqual(resolve.call_count, 1)
         self.assertEqual(m['topics'], list(PI.TOPICS))
         self.assertIn('%d일' % PI.KEEP_DAYS, m['consent_text'])
 
@@ -111,3 +121,49 @@ class Migration(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ClientKey(unittest.TestCase):
+    """같은 요청 키는 한 번만 접수하고, 응답을 못 받은 화면은 같은 키로 결과를 확인한다(0163 · /mvp4 v11)."""
+
+    def test_key_format(self):
+        self.assertEqual(body(client_key='iq-abc123-1').client_key, 'iq-abc123-1')
+        for bad in ('short', 'has space x', 'x' * 65, '한글키입니다요'):
+            with self.subTest(bad=bad), self.assertRaises(ValidationError):
+                body(client_key=bad)
+
+    def conn(self, found):
+        class Conn:
+            def execute(self, *a, **k):
+                class R:
+                    def scalar(self_inner):
+                        return found
+                return R()
+        @contextmanager
+        def ctx():
+            yield Conn()
+        return ctx
+
+    def test_replay_returns_same_number_without_new_insert(self):
+        req = type('Req', (), {'headers': {'origin': 'https://popcornai.co.kr', 'host': 'popcornai.co.kr'}})()
+        with patch.object(PI, 'same_origin', lambda r: None),              patch.object(PI.engine, 'begin', self.conn('PI-1234')),              patch.object(PI.visitor, 'resolve', return_value=7),              patch.object(PI.access_gate, 'check_rate', side_effect=AssertionError('rate limit must not run on replay')):
+            out = PI.create_inquiry(body(client_key='iq-abc123-1'), req, PI.Response())
+        self.assertEqual((out['inquiry_no'], out['already']), ('PI-1234', True))
+
+    def test_lookup_found_and_not_found(self):
+        for found in ('PI-1234', None):
+            with self.subTest(found=found), patch.object(PI.engine, 'connect', self.conn(found)),                  patch.object(PI.visitor, 'resolve', return_value=7):
+                out = PI.inquiry_by_key('iq-abc123-1', object(), PI.Response())
+            self.assertEqual(out['found'], found is not None)
+
+    def test_lookup_without_visitor_is_not_a_no(self):
+        with patch.object(PI.engine, 'connect', self.conn(None)), patch.object(PI.visitor, 'resolve', return_value=None):
+            with self.assertRaises(HTTPException) as c:
+                PI.inquiry_by_key('iq-abc123-1', object(), PI.Response())
+        self.assertEqual(c.exception.status_code, 403)
+
+    def test_migration_0163_chain(self):
+        path = ROOT / 'db/migrations/versions/0163_purchase_inquiry_client_key.py'
+        spec = importlib.util.spec_from_file_location('m0163', path)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        self.assertEqual((mod.revision, mod.down_revision), ('0163', '0162'))

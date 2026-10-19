@@ -1,0 +1,68 @@
+/* v10 main carousel. Keeps the approved v8 home sections and v9 packages intact. */
+.hc-carousel{margin-bottom:14px;--hc-ink:#141414;color:var(--hc-ink)}
+.hc-stage{height:470px;position:relative;border-radius:16px;overflow:hidden;background:#fff9e9;touch-action:pan-y}
+.hc-slide{position:absolute;inset:0;overflow:hidden;background:#fff9e9}
+.hc-slide[hidden]{display:none!important}
+.hc-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;user-select:none}
+.hc-copy{position:relative;z-index:1;width:40%;padding:37px 0 28px 38px}
+.hc-kicker{font-size:11px;font-weight:800;letter-spacing:.13em;color:#645d46;margin-bottom:14px}
+.hc-copy h2{font-size:clamp(37px,3.7vw,52px);font-weight:900;letter-spacing:-.055em;line-height:1.09;margin:0}
+.hc-description{font-size:16px;line-height:1.5;letter-spacing:-.025em;max-width:305px;margin-top:16px;word-break:keep-all}
+.hc-actions{display:grid;gap:9px;max-width:252px;margin-top:23px}
+.hm-home .hc-actions .btn{min-height:46px;padding:10px 14px;font-size:15px;gap:10px}
+.hc-gaming{background:#e4f3ff}.hc-ai{background:#f0eaff}.hc-people{background:#fff8df}
+.hc-gaming .hc-kicker{color:#164ba6}.hc-gaming .btn-primary{background:#0759ff;border-color:#0759ff}.hc-gaming .btn-primary .icon{filter:invert(1)}
+.hc-ai .hc-kicker{color:#6e46d7}.hc-ai .btn-primary{background:#6b43d5;border-color:#6b43d5}
+.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{padding-top:65px;width:39%}
+.hc-gaming .hc-copy h2,.hc-ai .hc-copy h2,.hc-people .hc-copy h2{font-size:42px}
+.hc-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:8px 2px 0;min-height:57px}
+.hc-selectors{display:flex;align-items:center;gap:6px}
+.hc-selectors button{display:flex;align-items:center;gap:7px;min-height:44px;border:0;background:transparent;border-radius:7px;padding:0 12px;color:#5d6270;cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;line-height:1.3}
+.hc-selectors button[aria-pressed=true]{background:#f4f3f0;color:#111;font-weight:800}
+.hc-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+.hc-controls{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.hc-controls button{border:1px solid #e5e7eb;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;width:40px;height:40px;cursor:pointer}
+.hc-controls .icon{width:17px;height:17px}
+.hc-counter{font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;margin-right:10px;color:#7b7b82}
+.hc-counter b{color:#171717;font-weight:800}.hc-controls .hc-play{width:46px;font-size:11px;font-weight:700;border-radius:8px;margin-left:3px}
+.hc-carousel button:focus-visible,.hc-carousel a:focus-visible{outline:3px solid #7453ff;outline-offset:3px}
+.hc-chat{display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;font-size:13px;background:#f7f7f9;border-radius:9px;margin-top:6px}
+.hc-chat .icon{width:18px;height:18px}.hc-chat strong{text-decoration:underline;text-underline-offset:3px}
+.hc-collection .hc-copy{width:100%;padding:23px 34px;display:grid;grid-template-columns:1fr 1fr}
+.hc-collection .hc-kicker{grid-column:1/-1;margin-bottom:7px}.hc-collection .hc-copy h2{font-size:34px}.hc-collection .hc-description{justify-self:end;align-self:end;margin:0}
+.hc-collection .hc-actions{display:none}
+.hc-collections{position:absolute;left:0;right:0;bottom:14px;display:grid;grid-template-columns:44.7% 22.3% 33%}
+.hc-collections a{margin:auto;display:flex;align-items:center;justify-content:center;gap:12px;min-height:44px;padding:7px 20px;background:#fffffff2;border:1px solid #ececf1;border-radius:7px;font-size:15px;font-weight:800;box-shadow:0 2px 7px #0000000a}
+.hc-collections .icon{width:18px;height:18px}
+.hc-tile-image{display:none}
+@media(min-width:801px) and (max-width:1100px){
+.hc-stage{height:430px}.hc-copy{padding:31px 0 20px 26px;width:43%}.hc-copy h2{font-size:43px}.hc-description{font-size:14px;max-width:270px}.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{width:41%;padding-top:53px}.hc-gaming .hc-copy h2,.hc-ai .hc-copy h2,.hc-people .hc-copy h2{font-size:35px}.hc-actions{max-width:230px}.hc-selectors button{padding:0 6px;font-size:12px}.hc-collection .hc-copy h2{font-size:31px}
+}
+@media(max-width:800px){
+.hc-carousel{width:100%;margin-bottom:10px}.hc-stage{height:520px;border-radius:0}
+.hc-image{inset:auto 0 0;height:245px;object-fit:cover;object-position:right bottom}
+.hc-copy,.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{width:100%;padding:24px 24px 0}
+.hc-copy h2,.hc-gaming .hc-copy h2,.hc-ai .hc-copy h2,.hc-people .hc-copy h2{font-size:37px;line-height:1.08}
+.hc-showcase .hc-copy h2 br:nth-of-type(2){display:none}
+.hc-kicker{font-size:10px;margin-bottom:10px}
+.hc-description{font-size:14px;margin-top:12px;max-width:100%}
+.hc-actions{display:flex;max-width:100%;gap:8px;margin-top:16px}
+.hm-home .hc-actions .btn{min-height:44px;font-size:13px;gap:6px;padding:8px 11px}
+.hc-actions .icon{width:16px!important;height:16px!important}
+.hc-toolbar{padding:6px 14px 0;gap:8px;min-height:52px}
+.hc-label{display:none}.hc-selectors{gap:2px}.hc-selectors button{padding:0;width:24px;height:44px;justify-content:center;min-height:44px}
+.hc-selectors button[aria-pressed=true]{background:transparent}.hc-dot{width:6px;height:6px;background:#c2c5cd}.hc-selectors button[aria-pressed=true] .hc-dot{width:18px;border-radius:5px;background:#171717}
+.hc-controls button{width:36px;height:36px}.hc-counter{margin-right:4px;font-size:11px}.hc-controls .hc-play{width:40px}
+.hc-chat{margin:5px 14px 0;gap:6px;font-size:12px;padding:8px 13px;flex-wrap:wrap;line-height:1.4}.hc-chat>.icon:first-child{display:none}
+.hc-collection .hc-copy{display:block;padding:24px}.hc-collection .hc-copy h2{font-size:34px}.hc-collection .hc-description{margin-top:12px}
+.hc-collection .hc-image{display:none}
+.hc-collection .hc-description{text-align:left}
+.hc-collections{bottom:20px;left:24px;right:24px;grid-template-columns:1fr;gap:8px}
+.hc-collections a{width:100%;margin:0;justify-content:flex-start;padding:7px 16px;gap:20px;font-size:16px;min-height:82px;background:#edf5ff;border:0;box-shadow:none}
+.hc-collections a:nth-child(2){background:#fff0c5}.hc-collections a:nth-child(3){background:#f1e9ff}
+.hc-tile-image{display:block;width:75px;height:70px;object-fit:contain;mix-blend-mode:multiply}.hc-collections .icon{width:18px;height:18px;margin-left:auto}
+}
+@media(min-width:601px) and (max-width:800px){.hc-stage{height:535px}.hc-image{height:290px;object-position:center}.hc-copy,.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{padding-left:40px}.hc-collection .hc-image{height:360px}.hc-collection .hc-copy h2{font-size:36px}.hc-collection .hc-description{display:none}}
+@media(max-width:370px){.hc-copy,.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{padding-inline:19px}.hc-copy h2,.hc-gaming .hc-copy h2,.hc-ai .hc-copy h2,.hc-people .hc-copy h2{font-size:33px}.hc-stage{height:500px}.hc-image{height:235px}.hm-home .hc-actions .btn{font-size:12px;padding:8px 9px}.hc-selectors button{width:21px}.hc-counter{margin-right:1px}.hc-controls{gap:3px}.hc-collection .hc-copy h2{font-size:31px}}
+@media(prefers-reduced-motion:no-preference){.hc-slide:not([hidden]) .hc-copy{animation:hc-enter .35s ease-out}@keyframes hc-enter{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}}
+
