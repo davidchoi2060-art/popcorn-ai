@@ -74,7 +74,7 @@ def sources():
                          rule_verdict=recommend.rule_verdict,rule_ref_value=recommend.rule_ref_value,
                          _rule_applies=recommend._rule_applies))
     review = selected('pc_configuration_review','api/pc_configuration_review.py',
-                      ('basis_hash','assess','load_review'), assignments=('MANUAL',), namespace=dict(
+                      ('basis_hash','added_rules_basis','assess','load_review'), assignments=('MANUAL',), namespace=dict(
                           text=text,HTTPException=HTTPException,digest=copy.digest,
                           part_needs_review=copy.part_needs_review,description_complete=description.description_complete,
                           cooling_plan=cooling.cooling_plan,POLICY_VERSION=policy.POLICY_VERSION,
