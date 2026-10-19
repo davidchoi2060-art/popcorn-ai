@@ -101,8 +101,10 @@
     if (screen && screen !== 'home') q.set('screen', screen);
     if (screen === 'chat' && state && state !== 'welcome') q.set('state', state);
     Object.keys(params || {}).forEach(function (k) { if (params[k] != null && params[k] !== '' && k !== 'dataset' && k !== 'state') q.set(k, String(params[k])); });
+    // 검수용 예시 화면(review-flows.html)은 자기 주소와 예시 조건을 유지한다. 고객 화면은 ./ 하나.
+    (P.routeKeep || []).forEach(function (k) { var v = P.qs.get(k); if (v && !q.has(k)) q.set(k, v); });
     var s = q.toString();
-    return './' + (s ? '?' + s : '');
+    return (P.routeBase || './') + (s ? '?' + s : '');
   };
 
   P.getCatalogProduct = function (id) {

@@ -234,7 +234,7 @@ def built_product(state_raw, body):
 
 
 def recommended_product(state, body):
-    if not state.usages:
+    if not state.model_dump().get('usages'):
         # 상담 없이 상품 목록(/mvp4)에서 직접 고른 PC -- 판매중 추천 풀 상품을 지금 판매가로만 받는다(2026-10-19).
         item = customer_pc_catalog.sold_item(body.product_code)
         return selected_product({'card_sets': [{'kind': 'sold', 'items': [item] if item else []}]},
