@@ -1,0 +1,60 @@
+{
+ "note": "v15 AI supercomputer images. Rights are NOT confirmed for any of these files; display on the dev server only until confirmed.",
+ "images": [
+  {
+   "caption": "View rear-facing Dell Pro Max Micro Desktop",
+   "sha256": "950606bd8c064bba5007e77ab59fd24e0c17e5af1abb1e28bdf983558f51b5e9",
+   "source_page": "https://www.dell.com/en-us/shop/laptop-computers/spd/dellpromaxwithgb10fcm1253",
+   "file": "assets/images/supercomputer/gb10-rear.png",
+   "download": "original Dell data-full-img URL without modification",
+   "model": "FCM1253",
+   "format": "PNG",
+   "bytes": 4793688,
+   "source_url": "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/desktops/dell-pro-max/fcm1253/media-gallery/desktop-dell-pro-max-fcm1253-micro-bk-gallery-2.psd?fmt=png-alpha&pscan=auto&scl=1&wid=3344&hei=1174&qlt=100,0&resMode=sharp2&size=3344,1174",
+   "commercial_reuse_rights": "Unverified; official source does not alone establish storefront redistribution permission"
+  },
+  {
+   "caption": "View forward-facing Dell Pro Max Micro Desktop",
+   "sha256": "3a1d9b216c4082d7125dcdad38fbcba2109f7ac93354169ff6be6a56775da485",
+   "source_page": "https://www.dell.com/en-us/shop/laptop-computers/spd/dellpromaxwithgb10fcm1253",
+   "file": "assets/images/supercomputer/gb10-front.png",
+   "download": "original Dell data-full-img URL without modification",
+   "model": "FCM1253",
+   "format": "PNG",
+   "bytes": 4972695,
+   "source_url": "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/desktops/dell-pro-max/fcm1253/media-gallery/desktop-dell-pro-max-fcm1253-micro-bk-gallery-4.psd?fmt=png-alpha&pscan=auto&scl=1&wid=3347&hei=1175&qlt=100,0&resMode=sharp2&size=3347,1175",
+   "commercial_reuse_rights": "Unverified; official source does not alone establish storefront redistribution permission"
+  },
+  {
+   "file": "assets/images/supercomputer/gb10-product.jpg",
+   "sha256": "0c69a131963b9f24230bfa8224b88ed931f8241fbdc47bd57a89ffa488836bc8",
+   "bytes": 136761,
+   "format": "JPEG",
+   "size": [
+    600,
+    600
+   ],
+   "source_page": null,
+   "source_url": null,
+   "commercial_reuse_rights": "Unverified; source and rights not recorded in the v15 handoff (2026-10-19). Confirm supplier/mall asset terms before production launch."
+  }
+ ],
+ "derived": [
+  {
+   "file": "assets/images/supercomputer/gb10-front-1600.webp",
+   "derived_from": "assets/images/supercomputer/gb10-front.png",
+   "width": 1600,
+   "bytes": 85874,
+   "sha256": "a589cf3ca607b669915d153a294a74031e3a960dc66975aa8ec7999694b56791",
+   "note": "resized for display (Pillow LANCZOS, WebP q85); original PNG kept byte-identical"
+  },
+  {
+   "file": "assets/images/supercomputer/gb10-rear-1600.webp",
+   "derived_from": "assets/images/supercomputer/gb10-rear.png",
+   "width": 1600,
+   "bytes": 63526,
+   "sha256": "492f16197907d1d8bff00e81da1064a769195ad8b2e274abbe75de37fc1a619f",
+   "note": "resized for display (Pillow LANCZOS, WebP q85); original PNG kept byte-identical"
+  }
+ ]
+}

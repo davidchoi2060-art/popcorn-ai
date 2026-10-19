@@ -69,8 +69,10 @@ def quote_view(snapshot):
             'price_note': QUOTE_PRICE_NOTE, 'purpose': NO_PURPOSE}
 
 
-def kind(snapshot=None, configuration_id=None, free_build=None):
+def kind(snapshot=None, configuration_id=None, free_build=None, fixed_product=None):
     """구성 유형 — 서버가 저장한 표시만 읽는다. (key, 라벨)."""
+    if isinstance(fixed_product, dict):     # /mvp4 AI 슈퍼컴퓨터 고정 완제품 문의(0165)
+        return 'fixed_product', 'AI 슈퍼컴퓨터 완제품'
     if free_build:
         return 'free_build', '부품 직접 고르기'
     if isinstance(snapshot, dict):

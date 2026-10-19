@@ -17,13 +17,14 @@ import json
 import logging
 import re
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_surface, visitor
+from . import access_gate, customer_supercomputer, customer_surface, visitor
 from .db import engine
 from .mvp3_contact import EMAIL_RE, KEEP_DAYS, PHONE_RE   # 정규식·보관 기한은 한 곳(mvp3_contact)
 from .mvp3_saved_quotes import same_origin
@@ -42,8 +43,22 @@ LIMIT_MESSAGES = {
     'minute': '잠시 동안 신청이 많았습니다. {retry_after_sec}초 후 다시 시도해 주세요.',
     'day': '오늘 남길 수 있는 구매 상담 신청 수에 도달했습니다. 내일 다시 시도해 주세요.',
 }
+# /mvp4 AI 슈퍼컴퓨터(고정 완제품) 문의의 주제 — 일반 상담 주제 목록(TOPICS)에는 넣지 않는다(0165).
+FIXED_TOPICS = {'quote': 'AI 슈퍼컴퓨터 견적', 'adoption': 'AI 도입 상담'}
+PURPOSES = {'local-llm': '로컬 AI 모델 실행', 'documents': '사내 문서 검색·업무 활용',
+            'development': 'AI 개발·연구', 'other': '그 밖의 용도·아직 미정'}
 CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다. '
                 '동의하지 않으셔도 되지만, 이 경우 상담 신청은 할 수 없습니다.' % KEEP_DAYS)
+
+
+class FixedPick(BaseModel):
+    """AI 슈퍼컴퓨터 상세에서 고른 모델의 수량·문의 목적. 상품번호는 InquiryBody.product_code 로 온다."""
+    model_config = ConfigDict(extra='forbid')
+    intent: Literal['quote', 'adoption']
+    quantity: StrictInt = Field(ge=1, le=10)
+    purpose: Literal['local-llm', 'documents', 'development', 'other'] | None = None
+    # 고객이 화면에서 본 1대 가격. 지금 판매가와 다르면 접수하지 않고 409(price_changed) — 바뀐 가격을 보고 다시 보낸다.
+    seen_unit_price: StrictInt | None = Field(default=None, ge=0)
 
 
 class InquiryBody(BaseModel):
@@ -61,10 +76,19 @@ class InquiryBody(BaseModel):
     free_build: list[FreePick] | None = Field(default=None, min_length=1, max_length=8)
     # 화면이 신청마다 만든 키(/mvp4 AI 패키지 문의, 0163). 같은 방문자·같은 키는 한 번만 접수하고 같은 번호를 돌려준다.
     client_key: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{6,64}$')
+    # /mvp4 AI 슈퍼컴퓨터 문의(0165). product_code 가 고정 완제품 두 번호 중 하나여야 한다.
+    fixed: FixedPick | None = None
 
 
 def _clean(body: InquiryBody):
-    if body.topic not in TOPICS:
+    if body.fixed is not None:
+        if body.topic != FIXED_TOPICS[body.fixed.intent]:
+            raise HTTPException(422, '문의 주제를 확인해 주세요.')
+        if body.product_code not in customer_supercomputer.CODES:
+            raise HTTPException(422, 'AI 슈퍼컴퓨터 모델을 다시 선택해 주세요.')
+        if body.quote_id is not None or body.configuration_id is not None or body.free_build is not None:
+            raise HTTPException(422, '슈퍼컴퓨터 문의에는 다른 견적을 함께 보낼 수 없어요.')
+    elif body.topic not in TOPICS:
         raise HTTPException(422, '문의 주제를 골라 주세요.')
     if body.consent is not True:
         raise HTTPException(422, '연락처를 받으려면 개인정보 수집에 동의해 주세요.')
@@ -168,16 +192,33 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
                                'assembly_fee': ASSEMBLY_FEE, 'total': built['total'],
                                'warnings': built['warnings'], 'priced_at': datetime.now(timezone.utc).isoformat()},
                               ensure_ascii=False)
+        fixed = None
+        if body.fixed is not None:
+            # 지금 판매가로 다시 센다. 화면이 본 가격과 다르면 접수하지 않는다(고객이 바뀐 가격을 보고 다시 보낸다).
+            item = customer_supercomputer.load(conn, (body.product_code,)).get(body.product_code)
+            if item is None:
+                raise HTTPException(409, {'error': 'product_missing', 'detail': '상품 정보를 찾을 수 없어요. 상품을 다시 선택해 주세요.'})
+            price = item['price']
+            if body.fixed.seen_unit_price is not None and body.fixed.seen_unit_price != price:
+                raise HTTPException(409, {'error': 'price_changed', 'price': price, 'sale_state': item['sale_state'],
+                                          'detail': '상품 가격이나 판매 상태가 바뀌었어요. 바뀐 내용을 확인한 뒤 다시 보내 주세요.'})
+            fixed = json.dumps({'product_code': item['product_code'], 'name': item['official_name'],
+                                'storage': item['storage'], 'intent': body.fixed.intent,
+                                'quantity': body.fixed.quantity,
+                                'purpose': PURPOSES.get(body.fixed.purpose) if body.fixed.purpose else None,
+                                'unit_price': price, 'total': price * body.fixed.quantity if price is not None else None,
+                                'sale_state': item['sale_state'],
+                                'priced_at': datetime.now(timezone.utc).isoformat()}, ensure_ascii=False)
         no = _no(conn)
         now = datetime.now(timezone.utc)
         conn.execute(text("""
             INSERT INTO purchase_inquiries
                 (inquiry_no, user_id, quote_id, product_code, topic, contact_name, contact_phone,
                  contact_email, message, consent_at, data_origin, purge_at, surface, client_key""" + (', configuration_id' if cfg else '')
-            + (', free_build' if free else '') + """)
+            + (', free_build' if free else '') + (', fixed_product' if fixed else '') + """)
             VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge, :surface, :ck""" + (', :cfg' if cfg else '')
-            + (', CAST(:free AS jsonb)' if free else '') + """)
-        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 'free': free, 't': body.topic, 'n': name,
+            + (', CAST(:free AS jsonb)' if free else '') + (', CAST(:fixed AS jsonb)' if fixed else '') + """)
+        """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 'free': free, 'fixed': fixed, 't': body.topic, 'n': name,
                'p': phone, 'e': email, 'm': message, 'now': now,
                'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS),
                'surface': customer_surface.surface_of(request), 'ck': body.client_key})
