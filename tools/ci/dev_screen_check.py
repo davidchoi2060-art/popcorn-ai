@@ -285,10 +285,19 @@ def main():
 
 
 if __name__ == '__main__':
-    try:
-        rc = main()
-    except Exception as e:  # 실패도 요약에 남긴다
-        print(f'- 실패: {type(e).__name__}: {e}')
-        rc = 1
-    probes()
+    import contextlib, io
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        try:
+            rc = main()
+        except Exception as e:  # 실패도 요약에 남긴다
+            print(f'- 실패: {type(e).__name__}: {e}')
+            rc = 1
+        probes()
+    out = buf.getvalue()
+    print(out)
+    if not TEXT.startswith('FREE:'):
+        for i in range(0, min(len(out), 9 * 3000), 3000):
+            chunk = out[i:i + 3000].replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+            print(f'::notice title=screen-check {i // 3000 + 1}::{chunk}')
     sys.exit(rc)
