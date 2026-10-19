@@ -42,8 +42,8 @@ LIMIT_MESSAGES = {
     'minute': '잠시 동안 신청이 많았습니다. {retry_after_sec}초 후 다시 시도해 주세요.',
     'day': '오늘 남길 수 있는 구매 상담 신청 수에 도달했습니다. 내일 다시 시도해 주세요.',
 }
-CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다.'
-                % KEEP_DAYS)
+CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다. '
+                '동의하지 않으셔도 되지만, 이 경우 상담 신청은 할 수 없습니다.' % KEEP_DAYS)
 
 
 class InquiryBody(BaseModel):
