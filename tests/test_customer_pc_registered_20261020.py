@@ -41,7 +41,9 @@ IDX = _index(("CPU", "AMD 라이젠5-6세대 9600X (그래니트 릿지)(정품)
              ("CASE", "마이크로닉스 Master M60 MESH 블랙", True),
              ("HDD", "Seagate BarraCuda HDD ST4000DM004 (4TB)", True),
              ("MB", "ASRock Z890 Pro RS WiFi 대원씨티에스", True),
-             ("MB", "ASRock Z890 Pro RS WiFi 화이트 대원씨티에스", True))
+             ("MB", "ASRock Z890 Pro RS WiFi 화이트 대원씨티에스", True),
+             ("CASE", "마이크로닉스 Master M60 MESH", True),
+             ("CPU", "인텔 코어 울트라5 시리즈2 225F (애로우레이크)(정품)", True))
 
 
 class ByName(unittest.TestCase):
@@ -56,9 +58,14 @@ class ByName(unittest.TestCase):
         self.assertEqual(R.by_name(IDX, "SSD", "[마이크론] Crucial T500 M.2 NVMe 1TB HIT"), 1003)
 
     def test_colour(self):
-        self.assertEqual(R.by_name(IDX, "CASE", "[마이크로닉스] Master M60 MESH 블랙 HIT"), 1005)
+        self.assertEqual(R.by_name(IDX, "CASE", "[마이크로닉스] Master M60 MESH 블랙 HIT"), 1009)  # 색 없는 이름(검정 기본)이 더 짧다
+        self.assertNotEqual(R.by_name(IDX, "CASE", "[마이크로닉스] Master M60 MESH 블랙"), 1004)
         self.assertEqual(R.by_name(IDX, "MB", "[ASRock] Z890 Pro RS WiFi 화이트"), 1008)
         self.assertEqual(R.by_name(IDX, "MB", "[ASRock] Z890 Pro RS WiFi"), 1007)
+
+    def test_generation_words_differ(self):
+        self.assertEqual(R.by_name(IDX, "CPU", "[인텔] 15세대 코어 울트라5 225F [Turbo 4.9GHz, 10코어(6+4), VGA 미탑재]"), 1010)
+        self.assertEqual(R.by_name(IDX, "SSD", "[마이크론] Crucial T500 1TB"), 1003)
 
     def test_model_code_alone(self):
         self.assertEqual(R.by_name(IDX, "HDD", "Seagate 4TB Barracuda ST4000DM004 (SATA3/5400/256M) HIT"), 1006)
