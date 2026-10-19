@@ -21,7 +21,7 @@
     var s = q.toString();
     return './' + (s ? '?' + s : '');
   }
-  function catalog(category) { return route('catalog', category ? { category: category } : {}); }
+  function catalog(category) { return route('catalog', category ? { category: category } : {}) + (category ? '#catalog-products' : ''); }
   function menuButton(className, text) {
     return '<button class="' + className + '" type="button" data-open-dialog="site-menu" aria-label="전체 카테고리 열기" aria-haspopup="dialog" aria-controls="site-menu">' + icon('list') + '<span>' + text + '</span></button>';
   }
@@ -47,6 +47,100 @@
       '<section class="nh-menu-ai" aria-labelledby="nh-ai-menu-title"><div class="nh-group-heading"><h3 id="nh-ai-menu-title">AI 패키지</h3><a href="ai-packages.html">비교하기 ' + icon('arrow-right') + '</a></div><p class="nh-group-copy">내 일에 필요한 AI를 PC와 함께.</p><div class="nh-package-list">' + [['basic', '기본형', '내 자료 AI 비서', 'file-text-duotone'], ['business', '업무형', '업무형 로컬 AI', 'users-three-duotone'], ['advanced', '고급형', '전문 제작 AI', 'code-duotone']].map(function (p) { return '<a href="ai-detail.html?package=' + p[0] + '">' + icon(p[3]) + '<span><small>' + p[1] + '</small><strong>' + p[2] + '</strong></span>' + icon('caret-right') + '</a>'; }).join('') + '</div><a class="nh-consult-link" href="ai-consult.html?package=business&amp;intent=adoption">AI 도입 상담 ' + icon('arrow-right') + '</a></section></div>' +
       '<nav class="nh-menu-support" aria-label="견적 및 고객지원"><a href="' + h(route('saved')) + '">' + icon('clipboard-text') + '내 견적</a><a href="' + h(route('compare')) + '">' + icon('squares-four') + 'PC 비교</a><a href="support.html">' + icon('headset') + '고객지원</a><a href="support.html#sales-policy">' + icon('package') + '배송 · A/S 안내</a></nav></div></dialog>';
   }
+  function syncSelection(category) {
+    var page = document.body.dataset.page || 'home';
+    var active = page === 'pcs' ? category || 'catalog' : page.indexOf('ai-') === 0 ? 'ai' : page === 'pc-finder' ? 'chat' : page;
+    var pcSection = page === 'pcs' || page === 'peripherals' || page === 'pc-detail';
+    document.querySelectorAll('[data-nh-nav]').forEach(function (link) {
+      var primary = !!link.closest('.nh-primary-links');
+      var selected = primary ? (link.dataset.nhNav === 'catalog' && pcSection) || link.dataset.nhNav === active : link.dataset.nhNav === active;
+      link.removeAttribute('aria-current');
+      if (selected) link.setAttribute('aria-current', primary && pcSection ? 'true' : 'page');
+    });
+    window.requestAnimationFrame(function () {
+      var selectedTab = document.querySelector('.nh-purpose-tabs [aria-current]');
+      if (!selectedTab) return;
+      var tabs = selectedTab.parentElement;
+      if (tabs.scrollWidth > tabs.clientWidth) tabs.scrollLeft += selectedTab.getBoundingClientRect().left - tabs.getBoundingClientRect().left - (tabs.clientWidth - selectedTab.offsetWidth) / 2;
+    });
+  }
+  function bindCategoryNavigation() {
+    var form = document.querySelector('[data-dp-filter-form]');
+    // Keep real links for new tabs and for pages without a mounted catalogue.
+    document.querySelectorAll('a[href]').forEach(function (link) {
+      var url = new URL(link.href, document.baseURI);
+      if (url.origin !== location.origin || url.searchParams.get('screen') !== 'catalog' || !url.searchParams.has('category')) return;
+      link.dataset.nhCategory = url.searchParams.get('category');
+      url.hash = 'catalog-products'; link.href = url.href;
+    });
+    if (!form || form.dataset.nhCategoryBound) return;
+    form.dataset.nhCategoryBound = 'true'; form.id = 'catalog-products'; form.tabIndex = -1;
+    function alignSearch(focus, smooth) {
+      window.requestAnimationFrame(function () {
+        var scope = form.closest('[data-dp-catalog]');
+        // Short/empty result sets must also have room to align the search row.
+        if (scope) scope.style.minHeight = Math.ceil(form.getBoundingClientRect().top - scope.getBoundingClientRect().top + window.innerHeight) + 'px';
+        if (focus) form.focus({ preventScroll: true });
+        window.scrollTo({ top: Math.max(0, window.scrollY + form.getBoundingClientRect().top), behavior: smooth && !window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'smooth' : 'instant' });
+      });
+    }
+    function filterUrl() {
+      var url = new URL(location.href);
+      ['q', 'category', 'sort', 'sale'].forEach(function (name) {
+        var value = form.elements[name].value;
+        if (value && !(name === 'sort' && value === 'default') && !(name === 'sale' && value === 'selling')) url.searchParams.set(name, value);
+        else url.searchParams.delete(name);
+      });
+      url.searchParams.delete('purpose');
+      return url;
+    }
+    var restoring = false;
+    function syncFilters() {
+      syncSelection(form.elements.category.value);
+      if (!restoring) history.replaceState(history.state, '', filterUrl());
+    }
+    form.addEventListener('input', syncFilters);
+    form.addEventListener('change', syncFilters);
+    form.addEventListener('submit', syncFilters);
+    // Reset buttons can also live in an empty-results panel.
+    form.closest('[data-dp-catalog]').addEventListener('click', function (event) {
+      if (event.target.closest('[data-dp-reset]')) window.queueMicrotask(syncFilters);
+    });
+    document.addEventListener('click', function (event) {
+      var link = event.target.closest('a[data-nh-category]');
+      if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || link.target === '_blank') return;
+      var value = link.dataset.nhCategory;
+      if (!Array.from(form.elements.category.options).some(function (option) { return option.value === value; })) return;
+      event.preventDefault();
+      var previous = form.elements.category.value;
+      history.replaceState(history.state, '', filterUrl());
+      form.elements.category.value = value;
+      var next = filterUrl(); next.hash = 'catalog-products';
+      if (previous !== value) history.pushState(history.state, '', next);
+      else history.replaceState(history.state, '', next);
+      form.elements.category.dispatchEvent(new Event('change', { bubbles: true }));
+      var dialog = link.closest('dialog[open]');
+      if (dialog) {
+        var nativeClose = typeof dialog.close === 'function';
+        if (nativeClose) dialog.addEventListener('close', function () { alignSearch(true, true); }, { once: true });
+        var close = dialog.querySelector('[data-close-dialog]');
+        if (close) close.click();
+        if (!nativeClose) alignSearch(true, true);
+      } else alignSearch(true, true);
+    });
+    window.addEventListener('popstate', function () {
+      var q = new URLSearchParams(location.search);
+      restoring = true;
+      form.elements.q.value = q.get('q') || '';
+      form.elements.category.value = q.get('category') || q.get('purpose') || '';
+      form.elements.sort.value = q.get('sort') || 'default';
+      form.elements.sale.value = q.get('sale') || 'selling';
+      form.elements.category.dispatchEvent(new Event('change', { bubbles: true }));
+      restoring = false;
+      alignSearch(false, false);
+    });
+    if (location.hash === '#catalog-products') alignSearch(false, false);
+  }
   P.headerUi = { route: route };
   P.shell = function (content) {
     var html = originalShell.call(P, content);
@@ -71,20 +165,7 @@
       });
       input.addEventListener('input', function () { if (input.value.trim()) { input.removeAttribute('aria-invalid'); error.hidden = true; } });
     });
-    var page = document.body.dataset.page || 'home', category = P.qs && P.qs.get('category');
-    var active = page === 'pcs' ? category || 'catalog' : page.indexOf('ai-') === 0 ? 'ai' : page === 'pc-finder' ? 'chat' : page;
-    var pcSection = page === 'pcs' || page === 'peripherals' || page === 'pc-detail';
-    document.querySelectorAll('[data-nh-nav]').forEach(function (link) {
-      var primary = !!link.closest('.nh-primary-links');
-      var selected = primary ? (link.dataset.nhNav === 'catalog' && pcSection) || link.dataset.nhNav === active : link.dataset.nhNav === active;
-      link.removeAttribute('aria-current');
-      if (selected) link.setAttribute('aria-current', primary && pcSection ? 'true' : 'page');
-    });
-    window.requestAnimationFrame(function () {
-      var selectedTab = document.querySelector('.nh-purpose-tabs [aria-current]');
-      if (!selectedTab) return;
-      var tabs = selectedTab.parentElement;
-      if (tabs.scrollWidth > tabs.clientWidth) tabs.scrollLeft += selectedTab.getBoundingClientRect().left - tabs.getBoundingClientRect().left - (tabs.clientWidth - selectedTab.offsetWidth) / 2;
-    });
+    syncSelection(new URLSearchParams(location.search).get('category'));
+    bindCategoryNavigation();
   };
 }());
