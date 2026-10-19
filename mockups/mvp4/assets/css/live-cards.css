@@ -9,3 +9,4 @@
 .cf-more-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 8px; }
 .cf-more-actions .btn { min-height: 44px; }
 @media (max-width: 760px) { .cf-more-actions .btn { width: 100%; justify-content: center; } }
+.cf-photo-notice { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted, #6b6577); }

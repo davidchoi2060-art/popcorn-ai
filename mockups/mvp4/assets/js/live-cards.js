@@ -138,6 +138,8 @@
     // 소개·구매 전 확인·AI 상담/옵션 변경을 부품 구성 아래(「다른 PC 살펴보기」 앞)에 둔다.
     var extra = intro(p) + checks(p) + more(p);
     html = html.replace('<a class="cf-back"', extra + '<a class="cf-back"');
+    // 대표 사진 고지(서버 문장 · /mvp3 와 같은 「AI 조립 예시」 안내)를 사진 바로 아래에 둔다.
+    if (p.photoNotice && p.image) html = html.replace('</details></div></section><section class="cf-components"', '</details></div></section><p class="cf-photo-notice">' + h(p.photoNotice) + '</p><section class="cf-components"');
     document.title = P.cardTitleV12(p) + ' · PC 구성 | 팝콘AI';
     return { html: html, mount: function () { var root = document.querySelector('.cf-page'); if (root && !(ctx.state === 'price-unavailable')) C.mount(root, p, q); } };
   };
