@@ -59,6 +59,8 @@ class InquiryBody(BaseModel):
     configuration_id: str | None = Field(default=None, pattern=r'^A[0-9A-F]{16}$')
     # 「부품 직접 고르기」 구성(api/mvp3_free_build). 화면이 보낸 값은 부품 번호·수량만 믿고 금액·호환은 다시 센다.
     free_build: list[FreePick] | None = Field(default=None, min_length=1, max_length=8)
+    # 화면이 신청마다 만든 키(/mvp4 AI 패키지 문의, 0163). 같은 방문자·같은 키는 한 번만 접수하고 같은 번호를 돌려준다.
+    client_key: str | None = Field(default=None, pattern=r'^[A-Za-z0-9_-]{6,64}$')
 
 
 def _clean(body: InquiryBody):
@@ -86,9 +88,39 @@ def _no(conn) -> str:
 
 
 @router.get('/purchase-inquiries/form')
-def form_meta():
-    """신청 칸이 쓰는 선택지와 동의 문구 — 화면이 다시 적지 않게 서버가 준다."""
+def form_meta(request: Request, response: Response):
+    """신청 칸이 쓰는 선택지와 동의 문구 — 화면이 다시 적지 않게 서버가 준다.
+
+    방문자 연결(쿠키)도 여기서 맺는다 — 신청 전에 맺어 두어야, 응답을 못 받은 화면이 같은 브라우저로
+    결과를 확인할 수 있다(by-key). 개인정보는 받지 않는다.
+    """
+    with engine.begin() as conn:
+        visitor.resolve(conn, request, response)
+    response.headers['Cache-Control'] = 'no-store'
     return {'ok': True, 'topics': list(TOPICS), 'consent_text': CONSENT_TEXT}
+
+
+def _by_key(conn, uid, key):
+    return conn.execute(text(
+        "SELECT inquiry_no FROM purchase_inquiries WHERE user_id = :u AND client_key = :k"),
+        {'u': uid, 'k': key}).scalar()
+
+
+@router.get('/purchase-inquiries/by-key/{key}')
+def inquiry_by_key(key: str, request: Request, response: Response):
+    """같은 브라우저가 보낸 그 키의 신청이 접수됐는가. 연락처·내용은 돌려주지 않는다(번호만).
+
+    방문자 쿠키가 없으면 403 — 이 브라우저의 신청인지 알 수 없다(«접수 안 됨»으로 답하지 않는다).
+    """
+    if not re.fullmatch(r'[A-Za-z0-9_-]{6,64}', key):
+        raise HTTPException(422, '요청 키 형식이 올바르지 않습니다.')
+    response.headers['Cache-Control'] = 'no-store'
+    with engine.connect() as conn:
+        uid = visitor.resolve(conn, request)
+        if uid is None:
+            raise HTTPException(403, '이 브라우저의 신청을 확인할 수 없습니다.')
+        no = _by_key(conn, uid, key)
+    return {'ok': True, 'found': no is not None, 'inquiry_no': no}
 
 
 @router.post('/purchase-inquiries')
@@ -98,6 +130,11 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
     phone, email, name, message = _clean(body)
     with engine.begin() as conn:
         uid = visitor.resolve(conn, request, response)
+        if body.client_key is not None and uid is not None:
+            done = _by_key(conn, uid, body.client_key)
+            if done is not None:                 # 같은 요청의 재전송 — 새로 접수하지 않고 같은 번호
+                return {'ok': True, 'inquiry_no': done, 'already': True,
+                        'note': '이미 접수된 신청이에요. 같은 신청을 두 번 받지 않았어요.'}
         access_gate.check_rate(conn, request, what='mvp3.purchase_inquiry', policy_key=POLICY_KEY,
                                default_per_minute=PER_MINUTE, default_per_day=PER_DAY,
                                messages=LIMIT_MESSAGES)
@@ -136,14 +173,14 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
         conn.execute(text("""
             INSERT INTO purchase_inquiries
                 (inquiry_no, user_id, quote_id, product_code, topic, contact_name, contact_phone,
-                 contact_email, message, consent_at, data_origin, purge_at, surface""" + (', configuration_id' if cfg else '')
+                 contact_email, message, consent_at, data_origin, purge_at, surface, client_key""" + (', configuration_id' if cfg else '')
             + (', free_build' if free else '') + """)
-            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge, :surface""" + (', :cfg' if cfg else '')
+            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge, :surface, :ck""" + (', :cfg' if cfg else '')
             + (', CAST(:free AS jsonb)' if free else '') + """)
         """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 'free': free, 't': body.topic, 'n': name,
                'p': phone, 'e': email, 'm': message, 'now': now,
                'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS),
-               'surface': customer_surface.surface_of(request)})
+               'surface': customer_surface.surface_of(request), 'ck': body.client_key})
     log.info('[purchase-inquiry] %s topic_ok=%s quote=%s', no, True, qid is not None)
     return {'ok': True, 'inquiry_no': no,
             'note': '구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요.'}
