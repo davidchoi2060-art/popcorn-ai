@@ -52,7 +52,11 @@ jobs:
         shell: bash
         env:
           BASE: https://popcornai.co.kr
-        run: python3 tools/ci/part_photo_gaps.py | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          python3 tools/ci/part_photo_gaps.py > /tmp/gaps.md
+          cat /tmp/gaps.md >> "$GITHUB_STEP_SUMMARY"
+          # 요약 페이지를 못 여는 작업 세션도 읽게 주석으로도 낸다(조각당 3,500자, 최대 10개)
+          python3 -c "import sys;t=open('/tmp/gaps.md').read();[print('::notice title=gaps '+str(i)+'::'+t[j:j+3500].replace('%','%25').replace('\r','').replace('\n','%0A')) for i,j in enumerate(range(0,min(len(t),35000),3500))]"
       - name: 일괄 작업 로그 요약 (읽을 수 있을 때만)
         shell: bash
         run: |
