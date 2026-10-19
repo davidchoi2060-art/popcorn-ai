@@ -64,5 +64,6 @@
 }
 @media(min-width:601px) and (max-width:800px){.hc-stage{height:535px}.hc-image{height:290px;object-position:center}.hc-copy,.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{padding-left:40px}.hc-collection .hc-image{height:360px}.hc-collection .hc-copy h2{font-size:36px}.hc-collection .hc-description{display:none}}
 @media(max-width:370px){.hc-copy,.hc-gaming .hc-copy,.hc-ai .hc-copy,.hc-people .hc-copy{padding-inline:19px}.hc-copy h2,.hc-gaming .hc-copy h2,.hc-ai .hc-copy h2,.hc-people .hc-copy h2{font-size:33px}.hc-stage{height:500px}.hc-image{height:235px}.hm-home .hc-actions .btn{font-size:12px;padding:8px 9px}.hc-selectors button{width:21px}.hc-counter{margin-right:1px}.hc-controls{gap:3px}.hc-collection .hc-copy h2{font-size:31px}}
-@media(prefers-reduced-motion:no-preference){.hc-slide:not([hidden]) .hc-copy{animation:hc-enter .35s ease-out}@keyframes hc-enter{from{opacity:.5;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}}
+/* The entire banner moves together; copy does not pop in separately. */
+.hc-carousel[data-transitioning=true] .hc-slide:not([hidden]){will-change:transform}
 

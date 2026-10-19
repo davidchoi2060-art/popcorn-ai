@@ -99,10 +99,98 @@
     }).filter(Boolean);
     return (rows.length ? '<p class="dp-spec-origin">' + (actual.length ? sourceModels(p) ? '등록된 모델 정보 · 최종 구성 확인 필요' : '등록된 구성 정보' : '상품명 기준 요약') + '</p><dl class="dp-card-specs">' + rows.join('') + '</dl>' : p.summary ? '<p class="dp-card-summary">' + h(p.summary) + '</p>' : '<p class="dp-inline-note">상세 구성을 확인하고 있어요.</p>');
   }
-  function productCard(p, selected) {
-    var id = String(p.id), status = stateOf(p, 'normal');
-    return '<article class="dp-card" data-dp-card="' + h(id) + '"><a class="dp-card-photo" href="' + h(href('product', 'normal', { id: id })) + '" aria-label="' + h(p.name || id) + ' 상품 자세히 보기">' + image(p) + '</a><div class="dp-card-content"><div class="dp-card-meta">' + (p.category ? '<span class="dp-category">' + h(categoryLabel(String(p.category))) + '</span>' : '<span></span>') + '<label class="dp-compare-check"><input type="checkbox" data-dp-compare value="' + h(id) + '"' + (selected.indexOf(id) >= 0 ? ' checked' : '') + '><span>비교<span class="visually-hidden"> ' + h(p.name || id) + '</span></span></label></div><h2><a href="' + h(href('product', 'normal', { id: id })) + '">' + h(p.name || id) + '</a></h2>' + compactSpecs(p) + '<div class="dp-card-price"><strong>' + h(money(p)) + '</strong><div class="dp-status-row">' + badges(p, status) + '</div></div><a class="btn btn-outline dp-card-link" href="' + h(href('product', 'normal', { id: id })) + '">' + (needsReview(p) ? '상품 상세 확인하기' : '상품 자세히 보기') + icon('arrow-right') + '</a></div></article>';
+  // Catalog-only presentation. Keep full names and BOM text in the detail renderers.
+  function catalogCardName(p) {
+    var full = String(p.name || ''), series = full.match(/^([^\[\]]{1,24}?)\s+NO\.?\s*(\d{1,3})[.\s]+(\d{4,8}[A-Z]*)\b/i);
+    return series ? series[1].trim() + ' NO.' + series[2] + ' · ' + series[3] : String(p.category || '조립 PC') + ' · ' + String(p.id);
   }
+  function cardSlot(p, slot) {
+    return specs(p).filter(function (s) { return String(s.slot || '').trim().toUpperCase() === slot; });
+  }
+  function cardCpuModel(text) {
+    var raw = String(text || ''), head = raw.split(/\[\s*Turbo\b/i)[0];
+    if (!/(?:AMD|Intel|인텔|코어|Core|라이젠|Ryzen|스레드리퍼|Threadripper|EPYC|Xeon|제온|\bi[3579]\b)/i.test(head)) return null;
+    var matches = head.match(/\b\d{3,5}(?:X3D|WX|GT|GE|KF|KS|HX|HS|F|K|X|G|T|U|H|P)?(?:\s+Plus)?(?![A-Za-z0-9])/gi) || [];
+    var models = Array.from(new Set(matches.map(function (value) { return value.trim().replace(/\s+/g, ' '); })));
+    return models.length === 1 ? [models[0]] : null;
+  }
+  function cardGpuModel(text) {
+    var raw = String(text || ''), match;
+    // Never use the precomputed GPU facts: some source facts contain truncated models.
+    match = raw.match(/\bRTX\s+PRO\s+(\d{3,4})\s+(Blackwell)(?:\s+(MAX-Q))?(?![A-Za-z0-9])/i);
+    if (match) return ['RTX PRO', match[1], match[2] + (match[3] ? ' ' + match[3] : '')];
+    match = raw.match(/\b(RTX|GTX)\s*(\d{3,4})((?:\s*(?:Ti|SUPER)){0,2})(?![A-Za-z0-9])/i);
+    if (match) return [match[1].toUpperCase(), match[2] + match[3].replace(/Ti/ig, ' Ti').replace(/SUPER/ig, ' SUPER').replace(/\s+/g, ' ').trimEnd()];
+    match = raw.match(/\b(RX)\s*(\d{3,4})(?:\s*(XTX|XT|GRE))?(?![A-Za-z0-9])/i);
+    if (match) return ['RX', match[2] + (match[3] ? ' ' + match[3].toUpperCase() : '')];
+    match = raw.match(/\bRTX\s*(A\d{3,4})(?![A-Za-z0-9])/i);
+    if (match) return ['RTX', match[1].toUpperCase()];
+    match = raw.match(/\bArc\s+([AB]\d{3})(?![A-Za-z0-9])/i);
+    if (match) return ['Arc', match[1].toUpperCase()];
+    match = raw.match(/\bUHD(?:\s+Graphics)?\s*(\d{3})(?![A-Za-z0-9])/i);
+    if (match) return ['UHD', match[1]];
+    if (/\bUHD\s+Graphics\b/i.test(raw)) return ['UHD', 'Graphics'];
+    if (/\bRadeon\s+Graphics\b/i.test(raw)) return ['Radeon', 'Graphics'];
+    return null;
+  }
+  function cardCapacity(s, isRam) {
+    // quantity describes the registered item count. Do not infer it from a name or multiply kits into a total.
+    if (!Number.isInteger(s.quantity) || s.quantity <= 0) return null;
+    var raw = String(s.value || ''), quantities = raw.match(/\b\d+(?:\.\d+)?\s*(?:TB|GB|G)(?![A-Za-z0-9])/ig) || [];
+    if (!quantities.length) return null;
+    var first = quantities[0].replace(/\s+/g, '').toUpperCase().replace(/G$/, 'GB');
+    // A later smaller capacity is accepted only in an explicit kit expression (16GB [8G x 2]).
+    var trailing = raw.slice(raw.indexOf(quantities[0]) + quantities[0].length);
+    var other = quantities.slice(1);
+    if (other.length && !/^\s*[)\]]?\s*(?:PC\d[-\d]*\s*)?\[\s*\d+(?:\.\d+)?\s*(?:G|GB|TB)\s*[x×]\s*\d+\s*\]/i.test(trailing)) return null;
+    if (/[x×]\s*\d+/i.test(trailing)) {
+      var suffix = trailing.match(/[x×]\s*(\d+)\s*$/i);
+      if (suffix && Number(suffix[1]) !== s.quantity) return null;
+    }
+    var capacity = first + (s.quantity > 1 ? ' × ' + s.quantity : '');
+    if (!isRam) return [capacity];
+    var ddr = raw.match(/\b(?:LP)?DDR[3-6]X?(?![A-Za-z0-9])/i);
+    return ddr ? [ddr[0].toUpperCase(), capacity] : null;
+  }
+  function cardQuickCell(p, slot) {
+    if (p.bomStatus === 'mismatch') return { lines: ['구성 확인'], pending: true };
+    var rows = cardSlot(p, slot), lines = null;
+    if (rows.length === 1) {
+      if (slot === 'CPU') lines = cardCpuModel(rows[0].value);
+      else if (slot === 'GPU') lines = cardGpuModel(rows[0].value);
+      else lines = cardCapacity(rows[0], slot === 'RAM');
+    }
+    return { lines: lines || ['상세 확인'], pending: !lines };
+  }
+  function catalogQuickSpecData(p) {
+    return [['CPU', 'CPU'], ['그래픽', 'GPU'], ['메모리', 'RAM'], ['SSD', 'SSD']].map(function (pair) {
+      var cell = cardQuickCell(p, pair[1]);
+      return { label: pair[0], slot: pair[1], lines: cell.lines.slice(), pending: cell.pending };
+    });
+  }
+  function catalogQuickSpecs(p) {
+    return '<dl class="dp-quick-specs" aria-label="핵심 구성 요약">' + catalogQuickSpecData(p).map(function (cell) {
+      return '<div' + (cell.pending ? ' class="is-pending"' : '') + '><dt>' + cell.label + '</dt><dd>' + cell.lines.map(function (line) { return '<span>' + h(line) + '</span>'; }).join('') + '</dd></div>';
+    }).join('') + '</dl>' + (sourceModels(p) && p.bomStatus !== 'mismatch' ? '<p class="dp-card-source-note">등록 모델 요약 · 최종 구성 확인 필요</p>' : '');
+  }
+  function productCard(p, selected) {
+    selected = Array.isArray(selected) ? selected : [];
+    var id = String(p.id), status = stateOf(p, 'normal');
+    return '<article class="dp-card dp-card-v12" data-dp-card="' + h(id) + '"><a class="dp-card-photo" href="' + h(href('product', 'normal', { id: id })) + '" aria-label="' + h(p.name || id) + ' 상품 자세히 보기">' + image(p) + '</a><div class="dp-card-content"><div class="dp-card-meta">' + (p.category ? '<span class="dp-category">' + h(categoryLabel(String(p.category))) + '</span>' : '<span></span>') + '<label class="dp-compare-check"><input type="checkbox" data-dp-compare value="' + h(id) + '"' + (selected.indexOf(id) >= 0 ? ' checked' : '') + '><span>비교<span class="visually-hidden"> ' + h(p.name || id) + '</span></span></label></div><h2><a href="' + h(href('product', 'normal', { id: id })) + '" title="' + h(p.name || id) + '" aria-label="' + h(p.name || id) + '">' + h(catalogCardName(p)) + '</a></h2>' + catalogQuickSpecs(p) + '<div class="dp-card-price"><strong>' + h(money(p)) + '</strong><div class="dp-status-row">' + badges(p, status) + '</div></div><a class="btn btn-outline dp-card-link" href="' + h(href('product', 'normal', { id: id })) + '">' + (needsReview(p) ? '상품 상세 확인하기' : '상품 자세히 보기') + icon('arrow-right') + '</a></div></article>';
+  }
+  // /mvp4: 승인 카드(B)는 P.catalogCardRenderer · P.catalogGridClass 로 실제 목록에 끼운다(live-cards.js). 없으면 기존 카드.
+  // Local concept previews reuse this presentation contract without changing catalog data.
+  P.cardTitleV12 = catalogCardName;
+  P.cardQuickSpecsV12 = catalogQuickSpecs;
+  P.cardQuickSpecDataV12 = catalogQuickSpecData;
+  P.catalogCardV12 = productCard;
+  P.catalogCardDataV12 = function (p) {
+    var id = String(p.id), state = stateOf(p, 'normal');
+    return { id: id, fullName: String(p.name || id), shortName: catalogCardName(p), category: categoryLabel(String(p.category || '조립 PC')),
+      priceLabel: money(p), photoUrl: photo(p), detailHref: href('product', 'normal', { id: id }), chatHref: href('chat', 'product', { id: id }),
+      saleLabel: saleLabel(p, state), needsReview: needsReview(p), specs: catalogQuickSpecData(p),
+      sourceNote: sourceModels(p) && p.bomStatus !== 'mismatch' ? '등록 모델 요약 · 최종 구성 확인 필요' : '' };
+  };
   P.designScreens.catalog = function (ctx) {
     ctx = ctx || {};
     var state = catalogStates.indexOf(ctx.state) >= 0 ? ctx.state : 'normal';
@@ -135,7 +223,7 @@
       if (state === 'empty' || !all.length) return empty('상품을 확인하고 있어요', '상품 정보가 준비되면 이곳에서 확인할 수 있어요.', '<a class="btn btn-soft" href="' + h(href('chat', 'welcome')) + '">AI와 필요한 PC 상담하기' + icon('arrow-right') + '</a>');
       var shown = state === 'no-results' ? [] : filtered();
       var visible = shown.slice(0, visibleCount), remaining = shown.length - visible.length;
-      return (state === 'partial' ? notice('일부 상품 정보를 불러오지 못했어요', '확인된 상품부터 살펴보세요. 목록을 다시 확인할 수도 있어요.') + '<button class="dp-text-button" data-dp-retry type="button">목록 다시 보기</button>' : '') + '<div class="dp-results-heading"><h2>상품 목록 <span>' + shown.length + '개</span></h2><p>' + (saleFilter === 'selling' ? '판매 중인 상품' : '품절 상품 포함') + '</p></div>' + (shown.length ? '<div class="dp-grid" id="dp-product-grid">' + visible.map(function (p) { return productCard(p, selected); }).join('') + '</div><div class="dp-pagination"><p>' + shown.length + '개 중 <strong>' + visible.length + '개</strong>를 보고 있어요.</p>' + (remaining > 0 ? '<button class="btn btn-outline" type="button" data-dp-more aria-controls="dp-product-grid">상품 ' + Math.min(pageSize, remaining) + '개 더 보기' + icon('caret-down') + '</button>' : '<span class="dp-all-loaded">마지막 상품까지 확인했어요.</span>') + '</div>' : empty('조건에 맞는 상품이 없어요', '검색어를 바꾸거나 판매 상태를 포함한 조건을 조정해 보세요.', '<button class="btn btn-primary" type="button" data-dp-reset>조건 초기화</button>'));
+      return (state === 'partial' ? notice('일부 상품 정보를 불러오지 못했어요', '확인된 상품부터 살펴보세요. 목록을 다시 확인할 수도 있어요.') + '<button class="dp-text-button" data-dp-retry type="button">목록 다시 보기</button>' : '') + '<div class="dp-results-heading"><h2>상품 목록 <span>' + shown.length + '개</span></h2><p>' + (saleFilter === 'selling' ? '판매 중인 상품' : '품절 상품 포함') + '</p></div>' + (shown.length ? '<div class="' + (P.catalogGridClass || 'dp-grid') + '" id="dp-product-grid">' + visible.map(function (p) { return (P.catalogCardRenderer || productCard)(p, selected); }).join('') + '</div><div class="dp-pagination"><p>' + shown.length + '개 중 <strong>' + visible.length + '개</strong>를 보고 있어요.</p>' + (remaining > 0 ? '<button class="btn btn-outline" type="button" data-dp-more aria-controls="dp-product-grid">상품 ' + Math.min(pageSize, remaining) + '개 더 보기' + icon('caret-down') + '</button>' : '<span class="dp-all-loaded">마지막 상품까지 확인했어요.</span>') + '</div>' : empty('조건에 맞는 상품이 없어요', '검색어를 바꾸거나 판매 상태를 포함한 조건을 조정해 보세요.', '<button class="btn btn-primary" type="button" data-dp-reset>조건 초기화</button>'));
     }
     function compareBar() {
       selected = selected.filter(function (id) { return all.some(function (p) { return String(p.id) === id; }); });

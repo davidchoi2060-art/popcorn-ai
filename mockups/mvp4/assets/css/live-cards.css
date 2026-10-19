@@ -1,0 +1,11 @@
+/* /mvp4 구성 상세에 더한 기존 /mvp3 정보(소개 · 구매 전 확인 · AI 상담/옵션 변경). configuration-concept.css 의 cf- 토큰을 따른다. */
+.cf-benefits { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.cf-benefits li { padding: 14px 16px; border: 1px solid var(--line, #e7e3ef); border-radius: 14px; background: #fff; }
+.cf-benefits strong { display: block; font-size: 16px; }
+.cf-benefits p { margin: 6px 0 0; font-size: 15px; line-height: 1.6; }
+.cf-checks { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.cf-checks li { display: flex; gap: 8px; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+.cf-checks .icon { width: 18px; height: 18px; flex: 0 0 auto; margin-top: 3px; }
+.cf-more-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 8px; }
+.cf-more-actions .btn { min-height: 44px; }
+@media (max-width: 760px) { .cf-more-actions .btn { width: 100%; justify-content: center; } }
