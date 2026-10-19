@@ -37,6 +37,17 @@
    "source_page": null,
    "source_url": null,
    "commercial_reuse_rights": "Unverified; source and rights not recorded in the v15 handoff (2026-10-19). Confirm supplier/mall asset terms before production launch."
+  },
+  {
+   "file": "assets/images/supercomputer/gb10-ai-lab-v16-option1.png",
+   "sha256": "fdf1121ba38df6374c463f8cace1bac06bad164d658509f4607451471e3959ac",
+   "bytes": 1934204,
+   "size": [
+    1586,
+    992
+   ],
+   "source": "v16 option1 design handoff (2026-10-20, approved display order 1) — generated advertising scene with text removed; approved reference approved-desktop-design.png sha256 6d485b4e9730c70f421c825158dd77326835f817c48afd34442690437ad7ad7f",
+   "commercial_reuse_rights": "Unverified for the depicted Dell product/logo in a generated scene; main-page advertising background only, not a product photo."
   }
  ],
  "derived": [
@@ -55,6 +66,20 @@
    "bytes": 63526,
    "sha256": "492f16197907d1d8bff00e81da1064a769195ad8b2e274abbe75de37fc1a619f",
    "note": "resized for display (Pillow LANCZOS, WebP q85); original PNG kept byte-identical"
+  },
+  {
+   "file": "assets/images/supercomputer/gb10-ai-lab-v16-option1-900.webp",
+   "derived_from": "assets/images/supercomputer/gb10-ai-lab-v16-option1.png",
+   "width": 900,
+   "bytes": 61290,
+   "sha256": "312a5c02e4f9755e3f412244e5ea1bceaf7845f91b451280aad6fb2c0aa877bf"
+  },
+  {
+   "file": "assets/images/supercomputer/gb10-ai-lab-v16-option1-1586.webp",
+   "derived_from": "assets/images/supercomputer/gb10-ai-lab-v16-option1.png",
+   "width": 1586,
+   "bytes": 132968,
+   "sha256": "b0c50855e0d2e287d8eea52a865f388bb67d8d09c65d321c9e0c1de3578f3168"
   }
  ]
 }

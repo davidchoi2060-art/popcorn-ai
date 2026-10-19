@@ -194,7 +194,11 @@ class Category(unittest.TestCase):
         header = (MVP4 / 'assets/js/header-ui.js').read_text(encoding='utf-8')
         self.assertIn("['AI 슈퍼컴퓨터', null, 'cpu', 'AI 전용 장비', 'supercomputers.html', 'supercomputers']", header)
         home = (MVP4 / 'assets/js/supercomputer-home.js').read_text(encoding='utf-8')
-        self.assertIn('전체 AI 슈퍼컴퓨터 보기', home)
+        self.assertIn('AI 슈퍼컴퓨터 전체 보기', home)
+        for claim in ('FP4 로컬 추론', 'CPU·GPU 통합 메모리', 'FP4 · 희소성 적용 기준', 'AI 설치·교육은 별도 상담'):
+            self.assertIn(claim, home)
+        for bad in ('VRAM', '대분', '학습까지'):
+            self.assertNotIn(bad, home)
 
     def test_migration_0166_chain_and_key(self):
         path = ROOT / 'db/migrations/versions/0166_ai_supercomputer_category.py'
