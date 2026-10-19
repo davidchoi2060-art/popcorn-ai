@@ -1,0 +1,16 @@
+/* F04(2026-10-20): 조립PC 검색 결과 위 «AI 슈퍼컴퓨터 n개» 묶음. 목록(dp-*)과 같은 밝은 카드 톤. */
+.cad-results{margin:0 0 22px;padding:20px 22px;border:1px solid #e6e1f3;border-radius:16px;background:#faf8ff}
+.cad-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cad-head h2{margin:0;font-size:20px;font-weight:850;letter-spacing:-.03em}.cad-head h2 span{color:#7652da}
+.cad-head a{display:inline-flex;align-items:center;gap:6px;font-size:15px;font-weight:750;color:#3c2f78}.cad-head a .icon{width:16px;height:16px}
+.cad-note{margin:6px 0 14px;font-size:15px;color:#6b6780;word-break:keep-all}
+.cad-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.cad-list a{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid #e6e3ee;border-radius:12px;background:#fff;color:inherit;text-decoration:none;min-height:96px}
+.cad-list a:hover{border-color:#cdbff3}.cad-list a:focus-visible{outline:3px solid #7652da;outline-offset:2px}
+.cad-photo{flex:0 0 72px;height:72px;display:flex;align-items:center;justify-content:center;background:#f1f6fb;border-radius:10px;overflow:hidden}
+.cad-photo img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}.cad-photo .icon{width:28px;height:28px;opacity:.6}
+.cad-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.cad-body small{font-size:13px;color:#7652da;font-weight:700}.cad-body strong{font-size:17px;font-weight:850;line-height:1.3;word-break:keep-all}
+.cad-body span{font-size:14px;color:#5f5b70;word-break:keep-all}
+.cad-price{flex:0 0 auto;font-size:17px;font-weight:850;white-space:nowrap}
+@media(max-width:800px){.cad-list{grid-template-columns:1fr}.cad-results{padding:16px}.cad-list a{flex-wrap:wrap}.cad-price{width:100%;padding-left:86px;font-size:16px}}
