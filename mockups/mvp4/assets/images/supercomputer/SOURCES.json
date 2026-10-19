@@ -1,5 +1,5 @@
 {
- "note": "v15/v16 AI supercomputer images. Usage covered by the supplier agreement the owner confirmed on 2026-10-20; agreement document kept outside this repository.",
+ "note": "v15/v16 AI supercomputer images. Popcorn is the seller of these Dell products; supplier product images and specs are used as the seller. No open rights item.",
  "images": [
   {
    "caption": "View rear-facing Dell Pro Max Micro Desktop",
@@ -11,8 +11,7 @@
    "format": "PNG",
    "bytes": 4793688,
    "source_url": "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/desktops/dell-pro-max/fcm1253/media-gallery/desktop-dell-pro-max-fcm1253-micro-bk-gallery-2.psd?fmt=png-alpha&pscan=auto&scl=1&wid=3344&hei=1174&qlt=100,0&resMode=sharp2&size=3344,1174",
-   "commercial_reuse_rights": "Supplier agreement (owner-confirmed 2026-10-20)",
-   "rights_basis": "Owner-confirmed 2026-10-20 (KST): supplier agreement completed for use of the Dell GB10 product photos and the Dell product/logo in the v16 scene (owner message in the project thread, 2026-10-19T17:07:51Z). The agreement document itself is not stored in this repository."
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
   },
   {
    "caption": "View forward-facing Dell Pro Max Micro Desktop",
@@ -24,8 +23,7 @@
    "format": "PNG",
    "bytes": 4972695,
    "source_url": "https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/desktops/dell-pro-max/fcm1253/media-gallery/desktop-dell-pro-max-fcm1253-micro-bk-gallery-4.psd?fmt=png-alpha&pscan=auto&scl=1&wid=3347&hei=1175&qlt=100,0&resMode=sharp2&size=3347,1175",
-   "commercial_reuse_rights": "Supplier agreement (owner-confirmed 2026-10-20)",
-   "rights_basis": "Owner-confirmed 2026-10-20 (KST): supplier agreement completed for use of the Dell GB10 product photos and the Dell product/logo in the v16 scene (owner message in the project thread, 2026-10-19T17:07:51Z). The agreement document itself is not stored in this repository."
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
   },
   {
    "file": "assets/images/supercomputer/gb10-product.jpg",
@@ -38,8 +36,7 @@
    ],
    "source_page": null,
    "source_url": null,
-   "commercial_reuse_rights": "Supplier agreement (owner-confirmed 2026-10-20)",
-   "rights_basis": "Owner-confirmed 2026-10-20 (KST): supplier agreement completed for use of the Dell GB10 product photos and the Dell product/logo in the v16 scene (owner message in the project thread, 2026-10-19T17:07:51Z). The agreement document itself is not stored in this repository."
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
   },
   {
    "file": "assets/images/supercomputer/gb10-ai-lab-v16-option1.png",
@@ -50,8 +47,7 @@
     992
    ],
    "source": "v16 option1 design handoff (2026-10-20, approved display order 1) — generated advertising scene with text removed; approved reference approved-desktop-design.png sha256 6d485b4e9730c70f421c825158dd77326835f817c48afd34442690437ad7ad7f",
-   "commercial_reuse_rights": "Supplier agreement (owner-confirmed 2026-10-20)",
-   "rights_basis": "Owner-confirmed 2026-10-20 (KST): supplier agreement completed for use of the Dell GB10 product photos and the Dell product/logo in the v16 scene (owner message in the project thread, 2026-10-19T17:07:51Z). The agreement document itself is not stored in this repository."
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
   }
  ],
  "derived": [
