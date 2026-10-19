@@ -10,10 +10,16 @@
   if (!P || !P.designScreens || !P.designScreens.home || !P.aiDevices) return;
   var original = P.designScreens.home, scrolled = false, D = P.aiDevices, SCENE = 'assets/images/supercomputer/gb10-ai-lab-v16-option1';
   function priceText(p) { return p.saleState === 'stopped' ? '판매 중지' : p.saleState === 'on_sale' && p.price ? P.money(p.price) : '가격 확인 필요'; }
+  // X01(2026-10-20): 이 구획은 Dell Pro Max GB10 광고다(장면·이름·성능 수치가 GB10 것). 모델 줄과 대표 버튼은 같은 제품군
+  // (상품 표시 정보의 model_group 'dell-pro-max-gb10')의 판매 가능한 모델로만 잇는다 — 다른 장비가 추가되거나 대표 순위가
+  // 앞서도 그 가격·버튼을 이 광고에 끼우지 않는다. 제품군이 없으면 모델 줄은 목록 안내로, 대표 버튼은 감춘다.
+  var AD_GROUP = 'dell-pro-max-gb10';
   function featured(items) {
-    var f = items.filter(function (p) { return p.featuredRank !== null; }).sort(function (a, b) { return a.featuredRank - b.featuredRank; });
-    return (f.length ? f : items).slice(0, 2);
+    return items.filter(function (p) { return p.modelGroup === AD_GROUP && p.saleState !== 'stopped'; })
+      .sort(function (a, b) { return (a.featuredRank === null ? 99 : a.featuredRank) - (b.featuredRank === null ? 99 : b.featuredRank) || (parseFloat(a.modelLabel || a.storage) || 0) - (parseFloat(b.modelLabel || b.storage) || 0) || Number(a.id) - Number(b.id); })
+      .slice(0, 3);
   }
+  D.adFamily = featured;
   function label(p) { return p.memory && p.storage ? p.memory + ' · SSD ' + p.storage : p.modelLabel || p.name; }
   function models(list) {
     if (list === null) return '<div class="gb-home-model is-loading"><div><span class="gb-model-label">AI 슈퍼컴퓨터</span><strong>가격 확인 중</strong></div></div>';
@@ -28,8 +34,11 @@
     var list = data ? featured(data.items) : [];
     box.innerHTML = models(list);
     box.classList.toggle('is-single', list.length < 2);
-    // 대표 소개(사진·사양·가격 보기)는 대표 상품 1순위로 간다. 데이터가 없으면 목록으로 둔다.
-    if (list.length) document.querySelectorAll('[data-gb-home-lead]').forEach(function (a) { a.href = 'supercomputer.html?id=' + encodeURIComponent(list[0].id); });
+    // 대표 소개(사진·사양·가격 보기)는 이 광고 제품군의 첫 모델로 간다. 제품군이 없으면 버튼은 감추고 사진은 목록으로.
+    document.querySelectorAll('[data-gb-home-lead]').forEach(function (a) {
+      a.href = list.length ? 'supercomputer.html?id=' + encodeURIComponent(list[0].id) : D.listUrl;
+      if (a.classList.contains('btn')) a.hidden = !list.length;
+    });
   }
   function jump() {
     if (scrolled || location.hash !== '#home-supercomputer') return;

@@ -32,7 +32,7 @@
     var search = document.querySelector('[data-search-form]');
     if (search) { var clone = search.cloneNode(true); search.replaceWith(clone); clone.addEventListener('submit', function (e) { e.preventDefault(); location.href = P.designHref('catalog', 'normal', { q: clone.querySelector('input').value }); }); }
     document.querySelectorAll('img').forEach(function (img) {
-      img.addEventListener('error', function () { if (img.classList.contains('icon') || img.hasAttribute('data-dp-photo')) return; img.hidden = true; var msg = document.createElement('span'); msg.className = 'ds-muted'; msg.textContent = '사진을 불러오지 못했어요'; img.parentNode.appendChild(msg); }, { once: true });
+      img.addEventListener('error', function () { if (img.classList.contains('icon') || img.hasAttribute('data-dp-photo') || !img.parentNode) return; img.hidden = true; var msg = document.createElement('span'); msg.className = 'ds-muted'; msg.textContent = '사진을 불러오지 못했어요'; img.parentNode.appendChild(msg); }, { once: true });
     });
   }
 

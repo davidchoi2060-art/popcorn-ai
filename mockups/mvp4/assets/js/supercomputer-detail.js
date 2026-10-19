@@ -141,9 +141,35 @@
   // 모델을 바꿀 때는 화면을 비우지 않고 새 상품을 읽은 뒤 그린다.
   function load(keep) {
     if (!keep) { phase = 'loading'; render(false); }
-    D.detail(id).then(function (p) { product = p; phase = 'ready'; render(!!keep); },
+    D.detail(id).then(function (p) { product = p; phase = 'ready'; render(!!keep); if (!keep && toHash()) [150, 600].forEach(function (ms) { setTimeout(toHash, ms); }); },
       function (e) { product = null; phase = e && e.status === 404 ? 'missing' : 'error'; render(false); });
   }
-  window.addEventListener('popstate', function () { query = new URLSearchParams(window.location.search); id = query.get('id') || ''; q = quantity(query.get('quantity')); load(false); });
+  // F05(2026-10-20): 상세 메뉴(#sc-specs 등)를 누르면 브라우저가 popstate 를 낸다 — 같은 상품·같은 수량이면 다시 읽거나
+  // 다시 그리지 않고 그 구획으로만 옮긴다(선택한 사진·모델·수량 유지). 상품이나 수량이 바뀐 이력 이동만 다시 읽는다.
+  // 고정 머리글 아래로 구획 제목이 오게 직접 계산한다(브라우저 기본 앵커 이동·scroll-padding 차이에 기대지 않는다).
+  function scrollToSection(target) {
+    var head = document.querySelector('.site-header'), cover = 0;
+    if (head) { var hr = head.getBoundingClientRect(), pos = getComputedStyle(head).position; if (pos === 'sticky' || pos === 'fixed') cover = Math.max(0, hr.bottom); }
+    window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - cover - 16));
+  }
+  function toHash() {
+    var target = location.hash && location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+    if (target) scrollToSection(target);
+    return !!target;
+  }
+  window.addEventListener('popstate', function () {
+    var next = new URLSearchParams(window.location.search), nextId = next.get('id') || '', nextQ = quantity(next.get('quantity'));
+    if (product && nextId === id && nextQ === q) { toHash(); return; }
+    query = next; id = nextId; q = nextQ; load(false);
+  });
+  app.addEventListener('click', function (e) {
+    var a = e.target.closest('.sc-section-nav a, a[href^="#sc-"]');
+    if (!a) return;
+    var target = document.getElementById(a.getAttribute('href').slice(1));
+    if (!target) return;
+    e.preventDefault();
+    history.pushState(null, '', location.pathname + location.search + a.getAttribute('href'));
+    scrollToSection(target);
+  });
   load(false);
 }());
