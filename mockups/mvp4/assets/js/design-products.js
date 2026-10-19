@@ -248,7 +248,7 @@
           if (resetButton) reset();
           if (retry) { all = products(); selected = selected.filter(function (id) { return all.some(function (p) { return String(p.id) === id; }); }); visibleCount = pageSize; state = 'normal'; redraw(); message.textContent = '확인 가능한 상품 목록을 표시했습니다.'; }
           if (remove) { selected = selected.filter(function (id) { return id !== remove.getAttribute('data-dp-remove'); }); redraw(); message.textContent = '비교 선택에서 제외했습니다.'; }
-          if (more) { var before = Math.min(visibleCount, filtered().length); visibleCount += pageSize; redraw(); var cards = results.querySelectorAll('[data-dp-card]'); var firstNew = cards[before] && cards[before].querySelector('a'); if (firstNew) firstNew.focus(); message.textContent = '상품 ' + Math.max(0, cards.length - before) + '개를 더 표시했어요. 총 ' + cards.length + '개를 보고 있어요.'; }
+          if (more) { var before = Math.min(visibleCount, filtered().length); visibleCount += pageSize; redraw(); var cards = results.querySelectorAll('[data-dp-card], [data-card-product]'); var firstNew = cards[before] && cards[before].querySelector('a'); if (firstNew) firstNew.focus(); message.textContent = '상품 ' + Math.max(0, cards.length - before) + '개를 더 표시했어요. 총 ' + cards.length + '개를 보고 있어요.'; }
         });
         scope.addEventListener('change', function (e) {
           var check = e.target; if (!check.matches('[data-dp-compare]')) return;
