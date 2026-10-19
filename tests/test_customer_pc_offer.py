@@ -143,12 +143,11 @@ class CustomerPcOfferTest(unittest.TestCase):
         self.assertEqual(parts[1]["specs"], [])
         self.assertTrue(any("e.source_snapshot->>'spec'" in q and "rule_key = 'power'" in q for q in self.conn.sql))
 
-    def test_part_price_without_available_supplier_is_withheld(self):
-        # 2026-10-12 사장님 「처음부터 가격 이상한 내용이 오류로 나오고」: 공급처 근거가 없으면 판매가를 내지 않는다.
-        self.assertTrue(any("product_supplier_prices" in q and "supply_state = '가능'" in q for q in (self.get("/99413") and self.conn.sql)))
-        for basis in (False, None):
+    def test_part_price_is_shown_without_supplier_evidence(self):
+        # 2026-10-20 대표: 공급 근거로 판매가를 가리지 않는다 — 그대로 보이고, 금액이 바뀌면 상담사가 협의한다.
+        for basis in (True, False, None):
             self.conn.has_supply = basis
-            self.assertIsNone(self.get("/99413").json()["public_configuration"]["parts"][0]["price"])
+            self.assertEqual(self.get("/99413").json()["public_configuration"]["parts"][0]["price"], 250000)
 
     def test_snapshot_is_repeatable_read_read_only_and_rolled_back(self):
         self.get("/99413")

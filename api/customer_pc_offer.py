@@ -164,7 +164,10 @@ def _public_offer(conn, product_code):
         " LEFT JOIN product_specs s ON s.product_code = p.product_code"
         " WHERE pp.configuration_id=:id AND NOT pp.pseudo"), {"id": identity}).mappings())
     codes = {r["ordinal"]: r["explanation_code"] for r in rows}
-    prices = {r["ordinal"]: r.get("sale_price") if r.get("has_supply") is True else None for r in rows}
+    # 2026-10-20 대표 「그냥 잘 보여주고 잘 접수하면 된다 — 금액이 바뀌면 상담사가 전화해 고객과 협의한다」:
+    # 공급 근거(has_supply · 공개 페이지 확인 7일)로 부품 판매가를 가리지 않는다. 판매가가 있으면(>0) 그대로 보인다.
+    # has_supply 는 관리자 근거 화면(api/customer_bom_gaps)이 계속 쓰도록 조회에 남겨 둔다.
+    prices = {r["ordinal"]: r.get("sale_price") for r in rows}
     # 조립 전용 부품(팝콘PC 「단품판매불가」 · 판매 상품 행이 없다)은 개별 판매가가 원래 없다 -- 「가격 확인 중」이 아니라
     # 그 사실을 말한다(2026-10-14 사장님). 가격은 지어내지 않고 null 그대로다.
     assembly = {r["ordinal"] for r in rows if r.get("assembly_only") is True}
