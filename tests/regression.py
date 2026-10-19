@@ -10614,6 +10614,27 @@ def test_sold_game_floor():
     check("[65] 예산을 넘는 상품은 참고(reference)로만 나온다", not over, [], over)
 
 
+def _publication_reason(product_code):
+    """[66] 진단: 고객 응답이 닫힌 구성의 발행 판정 사유(읽기 전용 스냅샷, 끝나면 되돌린다)."""
+    try:
+        from api import customer_pc_offer as _cpo
+        from api.pc_customer_publication import read_current
+        cid = db_all("SELECT configuration_id AS id FROM pc_configuration_offers WHERE offer_id = :o",
+                     o=f"P{product_code}")
+        if not cid:
+            return "구성 없음"
+        with _engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
+            try:
+                conn.begin()
+                conn.execute(text("SET TRANSACTION READ ONLY"))
+                cur = read_current(conn, cid[0]["id"], source_reader=_cpo._source_reader())
+                return f"{cur.get('state')}:{cur.get('reason')}"
+            finally:
+                conn.rollback()
+    except Exception as e:  # noqa: BLE001 - 진단은 검사 결과를 바꾸지 않는다
+        return f"사유 읽기 실패 {type(e).__name__}: {str(e)[:160]}"
+
+
 def test_part_photos_open():
     """[66] 승인된 완제품 구성이 있으면 고객 응답에 부품 사진이 실제로 실린다 (2026-10-09 실사고).
 
@@ -10664,6 +10685,9 @@ def test_part_photos_open():
                 and (x.get("photo") or {}).get("state") == "approved")
         opened.append(code)
         photos += n
+    if why:
+        # 404 는 사유를 숨긴다(고객 응답 계약) -- 회귀 출력에는 발행 판정 사유를 함께 남겨 원인을 바로 보게 한다.
+        why = [(c, st, _publication_reason(c)) for c, st in why]
     check("[66] 승인 구성 중 하나 이상이 고객 응답으로 열린다",
           bool(opened), f"{len(codes)}건 중 1건 이상", why)
     check("[66] 열린 구성의 부품 사진이 비어 있지 않다", photos > 0, "1장 이상", photos)

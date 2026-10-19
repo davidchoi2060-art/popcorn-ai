@@ -34,6 +34,48 @@ class ReviewTests(unittest.TestCase):
         self.config['content']['_review']=dict(state='approved',basis=self.assess()['basis'],findings={})
         self.config['status']='approved'
 
+    def _psu_rule(self):
+        return dict(rule_id=2,rule_key='case_psu_form',label='파워 규격 수용',slot='MB',ref_slot='CPU',
+                    field='form',ref_field='forms',op='in',part_types=[],ref_offset=0,null_ref_mode='skip_any')
+
+    def test_added_rule_that_does_not_judge_keeps_approval(self):
+        # 2026-10-18: 규칙 하나 추가로 모든 PC 검토 승인이 풀려 고객 사진이 전부 사라졌다.
+        self.rules[0]['rule_id']=1
+        self.approve_fixture()
+        saved=self.config['content']['_review']['basis']
+        self.rules.append(self._psu_rule())                  # 값이 없어 판정하지 않는 새 규칙
+        r=self.assess()
+        self.assertTrue(r['eligible'])
+        self.assertEqual(r['basis'],saved)
+
+    def test_added_rule_that_passes_keeps_and_fail_revokes(self):
+        self.rules[0]['rule_id']=1
+        for forms,ok in ((['ATX'],True),(['SFX'],False)):
+            with self.subTest(forms=forms):
+                self.specs[2]['form']='ATX';self.specs[1]['forms']=forms   # 승인 때부터 있던 값
+                self.rules=self.rules[:1]
+                self.approve_fixture()
+                self.rules.append(self._psu_rule())
+                self.assertEqual(self.assess()['eligible'],ok)
+
+    def test_changed_or_removed_rule_still_needs_reapproval(self):
+        self.rules[0]['rule_id']=1
+        self.rules.append(self._psu_rule())
+        self.approve_fixture()
+        self.rules[0]['label']='CPU 소켓(수정)'
+        self.assertFalse(self.assess()['eligible'])
+        self.rules[0]['label']='CPU 소켓'
+        self.assertTrue(self.assess()['eligible'])
+        self.rules.pop()                                    # 규칙이 빠지면 앞쪽 근거로도 못 맞춘다
+        self.assertFalse(self.assess()['eligible'])
+
+    def test_added_rule_does_not_hide_other_changes(self):
+        self.rules[0]['rule_id']=1
+        self.approve_fixture()
+        self.rules.append(self._psu_rule())
+        self.offers[0]['price_snapshot']=200000
+        self.assertFalse(self.assess()['eligible'])
+
     def test_unchanged_fixture_basis_equals_origin_main(self):
         self.assertEqual(self.assess()['basis'],'34b492e1ff5806f4938590ede567a2fc15931ef06707e0ce67025b994bac1f2c')
 

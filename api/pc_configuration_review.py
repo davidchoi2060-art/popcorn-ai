@@ -56,6 +56,30 @@ def basis_hash(config, parts, offers, rows, specs, rules):
         rules=sorted((dict(r) for r in rules),key=lambda r:(r.get('rule_id',0),r['rule_key']))))
 
 
+def added_rules_basis(config, parts, offers, rows, specs, rules, checks, saved_basis):
+    """승인 뒤 호환 규칙이 «새로 추가만» 됐고, 그 새 규칙이 이 구성에서 하나도 막지 않으면 승인 근거를 그대로 둔다.
+
+    2026-10-18 규칙 `case_psu_form`(0160) 하나가 추가되자 근거값(rules 전체 포함)이 모든 구성에서 바뀌어
+    추천 검토 승인이 전부 「근거 변경」이 됐고, 고객 공개가 닫혀 PC·부품 사진이 화면에서 모두 사라졌다
+    (사장님 「지금 왜 컴퓨터 사진이 하나도 안나오지?」). 새 규칙이 이 BOM을 판정하지도 않았는데 승인이 풀린 것이다.
+
+    인정하는 경우는 하나다: rule_id 순으로 앞쪽 규칙만으로 다시 계산한 근거가 저장된 승인 근거와 바이트 단위로 같고
+    (= 승인 때의 규칙·부품·가격·설명이 그대로이고 뒤에 규칙만 붙었다), 붙은 규칙의 판정이 이 구성에서 전부 pass 이거나
+    판정 대상이 아닐 때. 기존 규칙을 고치거나 끄거나 지우면 앞쪽 근거가 달라져 지금처럼 다시 승인해야 한다.
+    붙은 규칙이 fail·unknown(확인 필요)을 하나라도 내면 인정하지 않는다. 돌려주는 값은 저장된 승인 근거다.
+    """
+    ordered = sorted((dict(r) for r in rules), key=lambda r: (r.get('rule_id', 0), r['rule_key']))
+    if not ordered or any(type(r.get('rule_id')) is not int for r in ordered):
+        return None
+    for k in range(len(ordered) - 1, 0, -1):
+        if basis_hash(config, parts, offers, rows, specs, ordered[:k]) != saved_basis:
+            continue
+        added = {r['rule_key'] for r in ordered[k:]}
+        mine = [x for x in checks if str(x.get('key', '')).split(':', 1)[0] in added]
+        return saved_basis if all(x.get('state') == 'pass' for x in mine) else None
+    return None
+
+
 def assess(config, parts, offers, rows, specs, rules):
     blockers = []
     assembly_checks = []
@@ -117,6 +141,10 @@ def assess(config, parts, offers, rows, specs, rules):
     basis = basis_hash(config,parts,offers,rows,specs,rules)
     saved = content.get('_review',{})
     current = saved.get('basis') == basis
+    if not current and saved.get('basis'):
+        kept = added_rules_basis(config,parts,offers,rows,specs,rules,checks,saved['basis'])
+        if kept:
+            basis, current = kept, True
     approved = config['status'] == 'approved' and saved.get('state') == 'approved' and current and recommendation != 'hold'
     findings = saved.get('findings',{}) if current else {}
     return dict(configuration_id=config['configuration_id'],revision=config['revision'],basis=basis,
