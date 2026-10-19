@@ -70,5 +70,41 @@ class ByName(unittest.TestCase):
         self.assertFalse(R._BUILT_IN["GPU"].search("[NVIDIA] 테슬라 H100 NVL 188GB 제조사OEM"))
 
 
+
+class Endpoint(unittest.TestCase):
+    """응답 전체 경로 — 2026-10-20 names() 가 빠져 몰 등록 구성 대부분이 500 이던 회귀를 막는다."""
+
+    def test_registered_runs_end_to_end(self):
+        from unittest import mock
+        sst = ("프로세서(CPU)@@[AMD] 라이젠5 그래니트 릿지 9600 [Turbo] ,@@그래픽(VGA)@@[AMD] Radeon Graphics ,"
+               "@@초고속(SSD)@@[마이크론] Crucial T500 M.2 NVMe 2TB ,@@")
+
+        class Res(list):
+            def mappings(self): return self
+            def first(self): return self[0] if self else None
+            def all(self): return list(self)
+
+        class Conn:
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def execute(self, q, p=None):
+                q = str(q)
+                if "PC_COMPLETE" in q:
+                    return Res([{"product_code": 1, "status": "판매중", "spec_source_text": sst}])
+                if "part_type = ANY" in q:
+                    return Res([(5, "AMD 라이젠5-6세대 9600 (그래니트 릿지)", "CPU", "판매중"),
+                                (6, "마이크론 Crucial T500 M.2 NVMe (2TB)", "SSD", "판매중")])
+                return Res([])
+
+        R._cache.update(at=0.0, lex={}, names={})
+        with mock.patch.object(R, "engine") as e:
+            e.connect.return_value = Conn()
+            body = R.registered(1, mock.Mock(headers={}))
+        photos = {p["slot"]: p["photo"] for p in body["parts"]}
+        self.assertEqual(photos["CPU"], R.MALL_IMG.format(d=0, c=5))
+        self.assertEqual(photos["GPU"], photos["CPU"])
+        self.assertEqual(photos["SSD"], R.MALL_IMG.format(d=0, c=6))
+
+
 if __name__ == '__main__':
     unittest.main()
