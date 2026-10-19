@@ -124,12 +124,16 @@ def sold_item(code) -> dict | None:
 
     판매중이고 가격이 있는 추천 풀 상품만 받는다(관리자 행·임의 코드는 None). 용도 수준 판정은 하지 않는다 —
     고객이 상담 없이 상품을 직접 골랐기 때문이다. 가격은 지금 판매가 그대로다.
+    공개 승인된 구성이 있는 상품만 받는다(v7 계약: 구성이 확인되지 않은 PC 는 보관 대신 문의). 화면이 문의로
+    돌리는 것만으로는 API 를 직접 부르는 요청을 막지 못한다. 공개 목록을 읽지 못하면 보관을 받지 않는다.
     """
     if type(code) is not int:
         return None
     _levels, products = load()
     p = products.get(code)
     if p is None or p.get("status") != "판매중" or _price(p.get("price")) is None:
+        return None
+    if code not in public_codes():
         return None
     from .sold_reco import ROLE_OF, TAG_CHOSEN
     url = p.get("url")
