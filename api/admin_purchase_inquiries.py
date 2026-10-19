@@ -78,7 +78,8 @@ def _mask_text(s):
 def _row(r, full: bool) -> dict:
     # 보관 기한(신청 후 180일)이 지난 연락처 · 문의 내용은 내보내지 않는다 — 고객 동의 문구의 약속이다.
     gone = expired(r["purge_at"])
-    kind_key, kind_label = L.kind(r.get("quote_snapshot"), r.get("configuration_id"), r.get("free_build"))
+    kind_key, kind_label = L.kind(r.get("quote_snapshot"), r.get("configuration_id"), r.get("free_build"),
+                                r.get("fixed_product"))
     return {
         "inquiry_id": r["inquiry_id"], "inquiry_no": r["inquiry_no"], "at": iso(r["created_at"]),
         "topic": r["topic"], "status": r["status"],
@@ -97,6 +98,8 @@ def _row(r, full: bool) -> dict:
         "configuration_id": r.get("configuration_id"),
         # 고객이 부품을 직접 고른 구성(api/mvp3_free_build) — 신청 순간 다시 계산한 부품·판매가·총액
         "free_build": r.get("free_build"),
+        # AI 슈퍼컴퓨터 문의(0165) — 모델·수량·문의 목적·신청 순간 판매가로 다시 센 금액
+        "fixed_product": r.get("fixed_product"),
         "assignee": r["assignee_name"], "assignee_id": r["assignee_id"],
         "updated_at": iso(r["updated_at"]), "purge_at": iso(r["purge_at"]),
         "test": bool(r["is_test"]),
@@ -125,7 +128,8 @@ def _registered(r, full: bool):
 
 _SELECT = f"""
     SELECT i.*, {IS_TEST} AS is_test,
-           COALESCE(s.product_snapshot->>'name', '새로 구성된 PC · ' || (pc.content->>'title')) AS product_name,
+           COALESCE(s.product_snapshot->>'name', '새로 구성된 PC · ' || (pc.content->>'title'),
+                    i.fixed_product->>'name') AS product_name,
            o.name AS assignee_name, s.product_snapshot AS quote_snapshot,
            ho.handoff_no AS ho_no, ho.created_at AS ho_at,
            vc.contact_name AS reg_name, vc.contact_phone AS reg_phone, vc.contact_email AS reg_email,
