@@ -39,7 +39,7 @@
     var toggle=root.querySelector('[data-hc-toggle]'), status=root.querySelector('[data-hc-status]');
     var motion=window.matchMedia('(prefers-reduced-motion: reduce)');
     var index=0, timer=null, manualPaused=motion.matches, hover=false, inView=true, touch=null, blockClickUntil=0;
-    var interval=7000;
+    var interval=3000;
     function clear(){window.clearTimeout(timer);timer=null;}
     function blocked(){return manualPaused||hover||document.hidden||!inView||root.contains(document.activeElement);}
     function schedule(){clear();if(!blocked())timer=window.setTimeout(function(){show(index+1,false);},interval);}
