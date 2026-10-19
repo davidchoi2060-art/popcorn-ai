@@ -10,3 +10,6 @@
 .cf-more-actions .btn { min-height: 44px; }
 @media (max-width: 760px) { .cf-more-actions .btn { width: 100%; justify-content: center; } }
 .cf-photo-notice { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted, #6b6577); }
+/* 부품 상세(component) 화면의 부품 사진 — 서버 공개 승인 사진이 있을 때만 */
+.dcp-part-symbol:has(.dcp-part-photo) { flex-basis: 132px; width: 132px; height: 132px; background: #fff; border: 1px solid var(--line, #e2e6ed); overflow: hidden; }
+.dcp-part-photo { width: 100%; height: 100%; object-fit: contain; }
