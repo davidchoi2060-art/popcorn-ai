@@ -103,3 +103,6 @@
 .hm-categories.hm-category-scenes>a>span{width:100%;min-height:48px;padding:7px 10px;background:#fff}
 @media(max-width:600px){.hm-categories.hm-category-scenes>a>img{aspect-ratio:1.28}.hm-categories.hm-category-scenes>a>span{min-height:38px;padding:4px 2px;gap:4px}.hm-categories.hm-category-scenes>a:hover{transform:none}}
 @media(prefers-reduced-motion:reduce){.hm-categories.hm-category-scenes>a{transition:none}.hm-categories.hm-category-scenes>a:hover{transform:none}}
+
+/* v15.1: clarify package scope without changing the approved composition. */
+.hm-ai-scope-note{grid-column:1/-1;margin:0;text-align:center;font-size:14px;line-height:1.65;color:#687081;word-break:keep-all}
