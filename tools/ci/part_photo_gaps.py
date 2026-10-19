@@ -36,6 +36,19 @@ def head(url):
         return type(e).__name__, 0
 
 
+def page_imgs(code):
+    import re
+    req = urllib.request.Request(f'https://www.popcornpc.co.kr/shop/system_detail.html?pd_no={code}',
+                                 headers={'User-Agent': 'Mozilla/5.0'})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as r:
+            html = r.read().decode('euc-kr', 'replace')
+    except Exception as e:
+        return [type(e).__name__]
+    found = re.findall(r'(?:og:image"[^>]*content="([^"]+)")|(/data/pimg/[^"\' >]+)', html)
+    return list(dict.fromkeys(a or b for a, b in found))[:6]
+
+
 def offer_parts(body):
     conf = (body or {}).get('public_configuration') or {}
     for x in conf.get('parts') or []:
@@ -81,6 +94,10 @@ def main():
     print('\n#### 몰 사진 없는 PC\n```')
     for row in no_mall:
         print('\t'.join(map(str, row)))
+        c = row[0]
+        for x in (get(f'/api/customer/pc-registered/{c}').get('parts') or []):
+            print(f"  {x.get('slot')}\t{'O' if x.get('photo') else '-'}\t{x.get('name')}")
+        print('  page-imgs: ' + ' '.join(page_imgs(c)))
     print('```')
 
 
