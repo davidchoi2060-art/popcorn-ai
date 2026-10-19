@@ -43,6 +43,7 @@ from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
 
 from . import admin_mvp3_links as L
+from . import customer_surface
 from . import talk_rules as TR
 from . import talk_exceptions as TX
 from .admin_purchase_inquiries import IS_TEST as INQUIRY_IS_TEST, _mask_phone
@@ -273,13 +274,13 @@ def visitor_detail(visitor: str, include_test: bool = False):
                  ORDER BY h.created_at DESC, h.hit_id DESC LIMIT :n"""),
                 {"k": str(uid), "n": DETAIL_LIMITS["hits"] + 1}).mappings().all()
             quotes = conn.execute(text(f"""
-                SELECT quote_id, product_snapshot, talk_state, saved_at
+                SELECT quote_id, product_snapshot, talk_state, saved_at, surface
                   FROM mvp3_saved_recommendations s WHERE user_id = :u AND {_saved_origin(include_test)}
                  ORDER BY saved_at DESC, quote_id DESC LIMIT :n"""),
                 {"u": uid, "n": DETAIL_LIMITS["saved"] + 1}).mappings().all()
             # 구매 상담 신청(0139) — 연락처는 싣지 않는다. 처리는 「구매 상담 신청」 화면에서 한다.
             inquiries = conn.execute(text(f"""
-                SELECT i.inquiry_no, i.created_at, i.topic, i.status, i.quote_id
+                SELECT i.inquiry_no, i.created_at, i.topic, i.status, i.quote_id, i.surface
                   FROM purchase_inquiries i
                  WHERE i.user_id = :u AND ({'TRUE' if include_test else 'NOT ' + INQUIRY_IS_TEST})
                  ORDER BY i.created_at DESC, i.inquiry_id DESC LIMIT :n"""),
@@ -350,7 +351,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
                         "price_src": p.get("price_src"),
                         "reasons": [x for x in (p.get("reasons") or []) if isinstance(x, str)][:5]},
             "conditions": conditions(q["talk_state"]),
-            "kind_label": L.kind(p)[1], "sets": view.get("sets", 1), "total": view.get("total"),
+            "kind_label": L.kind(p)[1], "surface_label": customer_surface.label(q["surface"]), "sets": view.get("sets", 1), "total": view.get("total"),
             "changes": view.get("changes", []), "delta_sum": view.get("delta_sum", 0),
             "purpose": L.NO_PURPOSE,
             "inquiry_no": pi_by_quote.get(str(q["quote_id"])),
@@ -359,6 +360,7 @@ def visitor_detail(visitor: str, include_test: bool = False):
     for i in inquiries:
         timeline.append({"kind": "inquiry", "at": iso(i["created_at"]),
                          "inquiry_no": i["inquiry_no"], "topic": i["topic"], "status": i["status"],
+                         "surface_label": customer_surface.label(i["surface"]),
                          "quote_id": str(i["quote_id"]) if i["quote_id"] else None})
     for h, n in ho_notes:
         timeline.append({"kind": "handoff", "at": iso(h["created_at"]), "handoff_no": h["handoff_no"],

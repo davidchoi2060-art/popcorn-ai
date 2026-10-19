@@ -156,7 +156,7 @@
           tr.appendChild(el('td',null,it.topic));
           tr.appendChild(el('td',null,contact(it)));
           var pc=el('td',it.product_name||it.product_code?null:'pi-muted',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));
-          pc.appendChild(el('span','pi-sub',it.kind_label+(it.handoff_no?' · 팝콘PC 이동 '+it.handoff_no:'')));
+          pc.appendChild(el('span','pi-sub',it.surface_label+' · '+it.kind_label+(it.handoff_no?' · 팝콘PC 이동 '+it.handoff_no:'')));
           tr.appendChild(pc);
           tr.appendChild(el('td',null,it.status+(it.assignee?' · '+it.assignee:'')));
           tr.appendChild(el('td','pi-at',it.contact_purged?'지남':day(it.purge_at)));
@@ -176,6 +176,7 @@
     $('piDTitle').textContent=it.inquiry_no+' · '+it.topic;
     var b=$('piDBody'); b.textContent='';
     line(b,'신청 시각',when(it.at));
+    line(b,'신청 화면',it.surface_label);
     line(b,'연락처 (신청 당시)',contact(it));
     line(b,'문의 내용',it.message||(it.contact_purged?'보관 기간 지남':'적지 않음'));
     line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));

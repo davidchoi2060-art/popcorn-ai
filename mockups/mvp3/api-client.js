@@ -58,7 +58,7 @@
       if(signal?.aborted)controller.abort();
       let timedOut=false;const timer=setTimeout(()=>{timedOut=true;controller.abort();},options.timeoutMs||60000);
       try{
-        const headers=body?{'Content-Type':'application/json'}:{};
+        const headers=body?{'Content-Type':'application/json','X-Popcorn-Surface':'mvp3'}:{'X-Popcorn-Surface':'mvp3'};
         // 보관 견적·연락처·견적으로 상담 신청 접수는 같은 보관 키로 이 브라우저의 것임을 서버가 확인한다.
         if(path.startsWith('/api/mvp3/saved-quotes')||path==='/api/mvp3/contact'||path==='/api/mvp3/purchase-inquiries/from-quote')headers['X-Access-Key']=guestKey(options.existingKeyOnly===true);
         const response=await fetchImpl(path,{method,headers,credentials:'same-origin',cache:'no-store',signal:controller.signal,...(body?{body:JSON.stringify(body)}:{})});

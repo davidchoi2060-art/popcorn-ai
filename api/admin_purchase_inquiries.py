@@ -26,6 +26,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 
 from . import admin_mvp3_links as L
+from . import customer_surface
 from .auth import current_operator
 from .admin_raw_text import NOTICE as RAW_NOTICE, expired
 from .db import engine
@@ -101,6 +102,8 @@ def _row(r, full: bool) -> dict:
         "test": bool(r["is_test"]),
         # 연결 읽기(2026-10-18 관리자 정리 기획 A01·A01D) — 규칙은 api/admin_mvp3_links 한 곳.
         "kind": kind_key, "kind_label": kind_label,
+        # 어느 고객 화면에서 왔나(0162 · api/customer_surface) — 0162 이전 행은 「알 수 없음」
+        "surface": r.get("surface"), "surface_label": customer_surface.label(r.get("surface")),
         "link_label": L.link_label(r["quote_id"], r.get("configuration_id")),
         "quote": L.quote_view(r.get("quote_snapshot")),
         "handoff_no": r.get("ho_no"), "handoff_at": iso(r.get("ho_at")),

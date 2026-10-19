@@ -26,7 +26,7 @@
     } catch (e) { return null; }
   }
   function call(method, path, body, withKey) {
-    var headers = { Accept: 'application/json' };
+    var headers = { Accept: 'application/json', 'X-Popcorn-Surface': 'mvp4' };
     if (body !== undefined) headers['Content-Type'] = 'application/json';
     if (withKey) { var k = accessKey(); if (!k) return Promise.reject(err('storage', 0, '이 브라우저에 견적 보관 키를 저장할 수 없어요. 브라우저 설정을 확인해 주세요.')); headers['X-Access-Key'] = k; }
     var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 30000);

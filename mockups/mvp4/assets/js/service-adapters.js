@@ -15,7 +15,7 @@
 
   function call(method, path, body) {
     var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 30000);
-    return fetch(path, { method: method, credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json', Accept: 'application/json' } : { Accept: 'application/json' }, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal })
+    return fetch(path, { method: method, credentials: 'same-origin', cache: 'no-store', headers: body ? { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Popcorn-Surface': 'mvp4' } : { Accept: 'application/json', 'X-Popcorn-Surface': 'mvp4' }, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal })
       .then(function (r) { clearTimeout(timer); return r.json().catch(function () { return null; }).then(function (d) { if (r.ok && d && d.ok === true) return d; var e = new Error('http'); e.status = r.status; e.detail = d && d.detail; throw e; }); },
         function () { clearTimeout(timer); var e = new Error('network'); e.status = 0; throw e; });
   }

@@ -10,7 +10,7 @@ const KEY_SLOTS=['CPU','GPU','RAM','SSD'];
 let items=[],form=null,openId=null,sending=false,result={},loading=false;
 const detailsOpen=new Set(),drafts={};
 async function call(method,url,body){
-  const r=await fetch(url,{method,credentials:'same-origin',headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+  const r=await fetch(url,{method,credentials:'same-origin',headers:body?{'Content-Type':'application/json','X-Popcorn-Surface':'mvp3'}:{'X-Popcorn-Surface':'mvp3'},body:body?JSON.stringify(body):undefined});
   let d={};try{d=await r.json();}catch{}
   if(!r.ok)throw Error(typeof d.detail==='string'?d.detail:r.status===422?'입력한 내용을 확인해 주세요.':'잠시 후 다시 시도해 주세요.');
   return d;
