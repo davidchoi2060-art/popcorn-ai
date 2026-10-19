@@ -25,5 +25,50 @@ class Rows(unittest.TestCase):
         self.assertEqual(R.rows('그냥 문장'), ([], None))
 
 
+
+def _index(*rows):
+    out = {}
+    for i, (slot, name, selling) in enumerate(rows):
+        out.setdefault(slot, []).append((1000 + i, R.norm(name), selling, R.toks(name)))
+    return out
+
+
+IDX = _index(("CPU", "AMD 라이젠5-6세대 9600X (그래니트 릿지)(정품)", True),
+             ("CPU", "AMD 라이젠5-6세대 9600 (그래니트 릿지)(멀티팩(정품))", True),
+             ("SSD", "마이크론 Crucial T500 M.2 NVMe 대원씨티에스 (2TB)", True),
+             ("SSD", "마이크론 Crucial T500 M.2 NVMe 대원씨티에스 (1TB)", True),
+             ("CASE", "마이크로닉스 Master M60 MESH 화이트", True),
+             ("CASE", "마이크로닉스 Master M60 MESH 블랙", True),
+             ("HDD", "Seagate BarraCuda HDD ST4000DM004 (4TB)", True),
+             ("MB", "ASRock Z890 Pro RS WiFi 대원씨티에스", True),
+             ("MB", "ASRock Z890 Pro RS WiFi 화이트 대원씨티에스", True))
+
+
+class ByName(unittest.TestCase):
+    """2026-10-20 실서버 집계에서 사진이 비던 문구 — 같은 모델·용량·색만 붙는다."""
+
+    def test_model_token_must_match_exactly(self):
+        self.assertEqual(R.by_name(IDX, "CPU", "[AMD] 라이젠5 그래니트 릿지 9600 [Turbo 5.2GHz, 6코어/12쓰레드]"), 1001)
+        self.assertIsNone(R.by_name(IDX, "CPU", "[AMD] 라이젠7 그래니트 릿지 9700X [Turbo 5.5GHz]"))
+
+    def test_capacity_and_sale_tags(self):
+        self.assertEqual(R.by_name(IDX, "SSD", "[마이크론] Crucial T500 M.2 NVMe 2TB"), 1002)
+        self.assertEqual(R.by_name(IDX, "SSD", "[마이크론] Crucial T500 M.2 NVMe 1TB HIT"), 1003)
+
+    def test_colour(self):
+        self.assertEqual(R.by_name(IDX, "CASE", "[마이크로닉스] Master M60 MESH 블랙 HIT"), 1005)
+        self.assertEqual(R.by_name(IDX, "MB", "[ASRock] Z890 Pro RS WiFi 화이트"), 1008)
+        self.assertEqual(R.by_name(IDX, "MB", "[ASRock] Z890 Pro RS WiFi"), 1007)
+
+    def test_model_code_alone(self):
+        self.assertEqual(R.by_name(IDX, "HDD", "Seagate 4TB Barracuda ST4000DM004 (SATA3/5400/256M) HIT"), 1006)
+
+    def test_built_in_parts(self):
+        for slot, name in (("GPU", "[AMD] Radeon Graphics"), ("GPU", "[인텔] UHD Graphics"),
+                           ("COOLER", "[AMD] 라이젠 프로세서에 포함"), ("COOLER", "인텔/AMD 정품 쿨러")):
+            self.assertTrue(R._BUILT_IN[slot].search(name), name)
+        self.assertFalse(R._BUILT_IN["GPU"].search("[NVIDIA] 테슬라 H100 NVL 188GB 제조사OEM"))
+
+
 if __name__ == '__main__':
     unittest.main()
