@@ -17,6 +17,10 @@ on:
       probes:
         description: '추가 GET 확인(경로:횟수, 쉼표 구분)'
         default: '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1'
+      gaps:
+        description: '판매 PC 부품 사진 빈칸 집계도 낸다'
+        type: boolean
+        default: false
   workflow_run:
     workflows: ['배포']
     types: [completed]
@@ -43,6 +47,12 @@ jobs:
           TEXT: ${{ inputs.text || '배그와 롤, 150만원으로 추천해줘' }}
           PROBES: ${{ inputs.probes || '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1' }}
         run: python3 tools/ci/dev_screen_check.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: 부품 사진 빈칸 집계
+        if: inputs.gaps
+        shell: bash
+        env:
+          BASE: https://popcornai.co.kr
+        run: python3 tools/ci/part_photo_gaps.py | tee -a "$GITHUB_STEP_SUMMARY"
       - name: 일괄 작업 로그 요약 (읽을 수 있을 때만)
         shell: bash
         run: |
