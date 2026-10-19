@@ -26,7 +26,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import text
 
-from . import access_gate, mvp3_contact, visitor
+from . import access_gate, customer_surface, mvp3_contact, visitor
 from .db import engine
 from .mvp3_purchase_inquiry import TOPICS, _no
 from .mvp3_saved_quotes import owner_hash, same_origin
@@ -137,12 +137,13 @@ def inquiry_from_quote(body: FromQuoteBody, request: Request, response: Response
         no = _no(conn)
         conn.execute(text(
             'INSERT INTO purchase_inquiries (inquiry_no, user_id, quote_id, product_code, topic, contact_name,'
-            ' contact_phone, contact_email, message, consent_at, data_origin, purge_at)'
-            ' VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :consent, :origin, :purge)'),
+            ' contact_phone, contact_email, message, consent_at, data_origin, purge_at, surface)'
+            ' VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :consent, :origin, :purge, :surface)'),
             {'no': no, 'u': uid, 'q': qid, 'c': code, 't': topic, 'n': contact['contact_name'],
              'p': contact['contact_phone'], 'e': contact['contact_email'],
              'm': (body.message or '').strip() or None, 'consent': contact['consent_at'],
-             'origin': _resolve_data_origin(request), 'purge': contact['purge_at']})
+             'origin': _resolve_data_origin(request), 'purge': contact['purge_at'],
+             'surface': customer_surface.surface_of(request)})
     log.info('[quote-consult] %s accepted', no)
     return {'ok': True, 'already': False, 'inquiry_no': no, 'quote_id': qid,
             'masked_phone': mvp3_contact.mask_phone(contact['contact_phone'])}

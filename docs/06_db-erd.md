@@ -1972,3 +1972,7 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 | contact_purged_at | TIMESTAMPTZ | 연락처를 비운 시각 |
 
 CHECK: `contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL`. 기한이 지난 줄은 「없는 것」으로 읽는다(`purge_at > now() AND contact_purged_at IS NULL`일 때만 유효). 일일 지우기 작업(`api/retention_purge.py`)이 `visitor_contact` 대상으로 기한 지난 줄의 값을 비우고 `contact_purged_at` 을 채운다 — 줄은 지우지 않는다. 기한 180일은 `purchase_inquiries` 와 같은 값(`api/mvp3_contact.KEEP_DAYS`)이며, 새 보관 연락처 전체에 이 기한과 동의 문구를 적용해도 되는지는 운영 정책 확인이 필요하다. downgrade 는 줄이 하나라도 있으면 거부한다.
+
+### 38. 고객 화면 출처 `surface` (2026-10-19, 0162)
+
+`purchase_inquiries.surface` · `mvp3_saved_recommendations.surface`(TEXT, NULL 허용, CHECK `surface IN ('mvp3','mvp4')`)는 그 신청·보관이 어느 고객 화면에서 왔는지 적는다. 서버와 관리자단은 한 벌이고 고객 화면만 /mvp3 와 /mvp4 로 나뉜다(2026-10-19 사장님 확정). 값은 각 화면의 요청 함수가 싣는 `X-Popcorn-Surface` 머리글에서 받는다(`api/customer_surface`) — Referer 는 nginx 의 `Referrer-Policy: no-referrer` 때문에 오지 않는다. 표시용이며 판정·권한에 쓰지 않는다. 0162 이전 행과 머리글 없는 요청은 NULL(관리자 화면 「알 수 없음」)로 둔다. downgrade 는 두 컬럼을 지운다.

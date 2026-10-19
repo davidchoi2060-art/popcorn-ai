@@ -122,6 +122,12 @@ class SavedQuotesTest(unittest.TestCase):
         app.include_router(m.router)
         return TestClient(app, base_url='https://example.invalid')
 
+    def test_surface_is_stored_from_screen_header(self):
+        m.save_quote(body(), request([(b'x-popcorn-surface', b'mvp4')]), Response())
+        m.save_quote(body(request_id=UUID(int=2)), request(), Response())
+        inserts = [p for sql, p in self.store.executed if 'INSERT INTO mvp3_saved_recommendations' in sql]
+        self.assertEqual([p['surface'] for p in inserts], ['mvp4', None])
+
     def test_http_roundtrip_and_no_store(self):
         with self.client() as client:
             headers = {'X-Access-Key': 'a' * 64, 'Origin': 'https://example.invalid'}

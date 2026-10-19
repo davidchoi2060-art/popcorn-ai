@@ -23,7 +23,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, visitor
+from . import access_gate, customer_surface, visitor
 from .db import engine
 from .mvp3_contact import EMAIL_RE, KEEP_DAYS, PHONE_RE   # 정규식·보관 기한은 한 곳(mvp3_contact)
 from .mvp3_saved_quotes import same_origin
@@ -136,13 +136,14 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
         conn.execute(text("""
             INSERT INTO purchase_inquiries
                 (inquiry_no, user_id, quote_id, product_code, topic, contact_name, contact_phone,
-                 contact_email, message, consent_at, data_origin, purge_at""" + (', configuration_id' if cfg else '')
+                 contact_email, message, consent_at, data_origin, purge_at, surface""" + (', configuration_id' if cfg else '')
             + (', free_build' if free else '') + """)
-            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge""" + (', :cfg' if cfg else '')
+            VALUES (:no, :u, :q, :c, :t, :n, :p, :e, :m, :now, :origin, :purge, :surface""" + (', :cfg' if cfg else '')
             + (', CAST(:free AS jsonb)' if free else '') + """)
         """), {'no': no, 'u': uid, 'q': qid, 'c': code, 'cfg': cfg, 'free': free, 't': body.topic, 'n': name,
                'p': phone, 'e': email, 'm': message, 'now': now,
-               'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS)})
+               'origin': _resolve_data_origin(request), 'purge': now + timedelta(days=KEEP_DAYS),
+               'surface': customer_surface.surface_of(request)})
     log.info('[purchase-inquiry] %s topic_ok=%s quote=%s', no, True, qid is not None)
     return {'ok': True, 'inquiry_no': no,
             'note': '구매 상담 신청을 받았어요. 팝콘PC 담당자가 신청을 확인한 뒤 남겨 주신 연락처로 연락드려요.'}

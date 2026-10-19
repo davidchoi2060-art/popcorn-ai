@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_catalog, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_contact, mvp3_quantity, visitor
+from . import access_gate, customer_pc_catalog, customer_pc_offer, customer_surface, grid_public, mall_price_live, mvp3_build, mvp3_contact, mvp3_quantity, visitor
 from .sold_reco import public_spec
 from .db import engine
 from .recommend import _resolve_data_origin
@@ -197,7 +197,8 @@ def save_quote(body: SaveBody, request: Request, response: Response):
         product['sets'] = body.sets
     params = {'id': quote_id, 'u': uid, 'owner': owner, 'r': str(body.request_id), 'basis': basis,
               'product': json.dumps(product, ensure_ascii=False),
-              'state': json.dumps(state.model_dump(), ensure_ascii=False)}
+              'state': json.dumps(state.model_dump(), ensure_ascii=False),
+              'surface': customer_surface.surface_of(request)}
     with engine.begin() as conn:
         # Recheck the opaque owner cookie in the insertion transaction.
         if visitor.resolve(conn, request) != uid:
@@ -210,8 +211,8 @@ def save_quote(body: SaveBody, request: Request, response: Response):
                 raise mvp3_contact.required_error()          # 그 사이 기한이 지난 경우
             contact_row = mvp3_contact.current(conn, uid)
         conn.execute(text('''INSERT INTO mvp3_saved_recommendations
-          (quote_id,user_id,owner_key_hash,request_id,request_basis,product_snapshot,talk_state)
-          VALUES (:id,:u,:owner,:r,:basis,CAST(:product AS jsonb),CAST(:state AS jsonb))
+          (quote_id,user_id,owner_key_hash,request_id,request_basis,product_snapshot,talk_state,surface)
+          VALUES (:id,:u,:owner,:r,:basis,CAST(:product AS jsonb),CAST(:state AS jsonb),:surface)
           ON CONFLICT (user_id,owner_key_hash,request_id) DO NOTHING'''), params)
         row = conn.execute(text('''SELECT quote_id,product_snapshot,talk_state,saved_at,request_basis
           FROM mvp3_saved_recommendations WHERE user_id=:u AND owner_key_hash=:owner AND request_id=:r'''), params).mappings().one()

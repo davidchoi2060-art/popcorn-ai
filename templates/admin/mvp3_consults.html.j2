@@ -172,11 +172,11 @@
         '<div>'+esc(e.handoff_no)+' · '+esc(won(e.total))+(e.sets>1?' ('+num(e.sets)+'대)':'')+' · <a href="/admin2/handoff-log">인계 기록 보기</a></div>'+
         changesHtml(e)+'<span class="mc-sub">'+esc(e.reason)+' · '+esc(e.result)+(e.quote_id?'':' · 연결 견적 없음')+' · 인계 원장은 시험 표식이 없어 시험 제외를 적용하지 않습니다</span></div>'
         :e.kind==='inquiry'?
-        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청</div>'+
+        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 구매 상담 신청 · '+esc(e.surface_label)+'</div>'+
         '<div>'+esc(e.inquiry_no)+' · '+esc(e.topic)+' · '+esc(e.status)+
         ' · <a href="/admin2/purchase-inquiries#'+esc(d.visitor)+'">연락처 · 처리 보기</a></div></div>'
         :e.kind==='saved'?
-        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관 · '+esc(e.kind_label)+' · '+esc(e.purpose)+'</div>'+
+        '<div class="mc-ev saved"><div class="mc-at">'+esc(when(e.at))+' · 견적 보관 · '+esc(e.surface_label)+' · '+esc(e.kind_label)+' · '+esc(e.purpose)+'</div>'+
         '<h3>'+esc(e.product.name||'상품명 없음')+'</h3>'+
         (e.sets>1?'<div class="num">'+esc(num(e.sets))+'대 합계 '+esc(won(e.total))+'</div>':'')+changesHtml(e)+
         '<span class="mc-sub">'+(e.inquiry_no?'상담 신청 '+esc(e.inquiry_no):'상담 신청 없음')+(e.handoff_no?' · 팝콘PC 이동 '+esc(e.handoff_no):'')+'</span>'+
