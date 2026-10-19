@@ -185,7 +185,8 @@
       // AI 슈퍼컴퓨터 고정 완제품 문의(0165) — 금액은 신청 순간 판매가로 서버가 다시 센 값
       var fp=it.fixed_product, won=function(n){return Number(n).toLocaleString('ko-KR')+'원';};
       line(b,'모델 · 수량',(fp.storage||'')+' · '+fp.quantity+'대 · '+(fp.intent==='adoption'?'AI 도입 상담':'견적 문의')+(fp.purpose?' · '+fp.purpose:'')+
-        '\n'+(fp.total!=null?'신청 시점 합계 '+won(fp.total)+' (1대 '+won(fp.unit_price)+')':'신청 시점 판매 확인 필요 · 가격 없음'));
+        '\n'+(fp.total!=null?'신청 시점 합계 '+won(fp.total)+' (1대 '+won(fp.unit_price)+')':'신청 시점 판매 확인 필요 · 가격 없음')+
+        (fp.price_differs?'\n고객이 본 1대 가격 '+(fp.seen_unit_price!=null?won(fp.seen_unit_price):'없음')+' — 상담 때 금액 조정':''));
     }
     if (it.quote){
       var q=it.quote, qt=el('div','pi-card');

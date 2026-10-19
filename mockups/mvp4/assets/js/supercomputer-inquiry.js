@@ -5,7 +5,7 @@
  *   - 접수는 POST /api/mvp3/purchase-inquiries (fixed = 모델·수량·목적, 0165). «접수 완료»는 서버가 접수 번호를 준 뒤에만 그린다.
  *     시안의 미리보기 전용 성공 처리(미리보기 틀 안에서만 동작)는 싣지 않았다.
  *   - 같은 신청은 한 번만 접수된다(client_key, 0163). 버튼은 보내는 동안 잠긴다. 응답을 못 받으면 같은 키로 접수 여부만 확인한다.
- *   - 실패하면 입력은 그대로 두고 다시 보낼 수 있다. 가격·판매 상태가 바뀌었으면(409 price_changed) 바뀐 금액을 보여 주고 다시 확인받는다.
+ *   - 실패하면 입력은 그대로 두고 다시 보낼 수 있다. 가격·판매 상태가 바뀌어도 접수는 막지 않는다(상담사가 전화로 조정, 2026-10-20 대표).
  *   - 연락 요청 확인(시안)과 개인정보 수집·이용 동의(서버가 주는 최신 문구, 보관 180일)는 둘 다 필수다.
  * 이 문의는 고객이 직접 연락을 요청하는 화면이다. 견적 보관은 연락 요청이 아니다 — 보관만 한 고객에게 먼저 연락하지 않는다.
  */
@@ -122,11 +122,6 @@
       receipt = r.inquiry_no; clientKey = null; phase = 'success'; render(true);
     }, function (e) {
       if (e.unknown) { phase = 'unknown'; render(true); return; }
-      if (e.code === 'price_changed' || e.code === 'product_missing') {
-        // 바뀐 가격·판매 상태를 다시 읽어 보여 주고, 고객이 확인한 뒤 다시 보낸다(입력은 그대로).
-        return P.aiDevices.detail(id).then(function (p) { product = p; seenPrice = p.price; }, function (e2) { if (e2 && e2.status === 404) product = null; })
-          .then(function () { notice = e.sentence || '상품 가격이나 판매 상태가 바뀌었어요. 바뀐 내용을 확인한 뒤 다시 보내 주세요.'; phase = product ? 'form' : 'load-error'; render(true); });
-      }
       notice = e.status === 429 ? '요청이 잠시 많아요. 잠시 후 다시 시도해 주세요.' : e.sentence && e.sentence.length <= 200 ? e.sentence : '입력한 내용은 유지되어 있어요. 내용을 확인한 뒤 다시 시도해 주세요.';
       phase = 'error'; render(true);
     });

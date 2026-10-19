@@ -4,6 +4,7 @@ DB 없이 확인하는 것: 조회 allowlist·판매 확인 상태 · 문의 입
 가격이 바뀌면 접수하지 않음 · 마이그레이션 사슬 · 고객 화면 소스에 외부 몰·로컬·시안 경로·관찰 가격이 없음.
 """
 import importlib.util
+import json
 import pathlib
 import re
 import unittest
@@ -113,9 +114,11 @@ class Inquiry(unittest.TestCase):
             with self.subTest(fixed=fixed), self.assertRaises(ValidationError):
                 body(fixed=fixed)
 
-    def conn(self, item):
+    def conn(self, item, inserts):
         class Conn:
-            def execute(self, *a, **k):
+            def execute(self, sql, params=None):
+                if 'INSERT INTO purchase_inquiries' in str(sql):
+                    inserts.append(params)
                 class R:
                     def scalar(self_inner):
                         return None
@@ -127,16 +130,23 @@ class Inquiry(unittest.TestCase):
             yield Conn()
         return ctx
 
-    def test_price_change_is_not_received(self):
+    def receive(self, item):
+        inserts = []
         req = type('Req', (), {'headers': {}})()
-        with patch.object(PI, 'same_origin', lambda r: None), \
-             patch.object(PI.engine, 'begin', self.conn(row(product_code=129614, product_name='DELL Pro Max GB10 (128GB, M.2 4TB)', sale_price=14300000))), \
-             patch.object(PI.visitor, 'resolve', return_value=7), patch.object(PI.access_gate, 'check_rate', return_value=None), \
-             patch.object(PI, '_no', side_effect=AssertionError('must not number a changed-price inquiry')):
-            with self.assertRaises(HTTPException) as c:
-                PI.create_inquiry(body(client_key='sc-abc123'), req, PI.Response())
-        self.assertEqual(c.exception.status_code, 409)
-        self.assertEqual((c.exception.detail['error'], c.exception.detail['price']), ('price_changed', 14300000))
+        with patch.object(PI, 'same_origin', lambda r: None), patch.object(PI.engine, 'begin', self.conn(item, inserts)),              patch.object(PI.visitor, 'resolve', return_value=7), patch.object(PI.access_gate, 'check_rate', return_value=None),              patch.object(PI, '_no', return_value='PI-9999'), patch.object(PI, '_resolve_data_origin', return_value='test'):
+            out = PI.create_inquiry(body(client_key='sc-abc123'), req, PI.Response())
+        return out, json.loads(inserts[0]['fixed'])
+
+    def test_price_change_is_received_and_flagged_for_counselor(self):
+        # 2026-10-20 대표: 금액·사양이 안 맞으면 상담사가 전화로 조정해 판매한다 — 접수를 막지 않는다.
+        out, fixed = self.receive(row(product_code=129614, product_name='DELL Pro Max GB10 (128GB, M.2 4TB)', sale_price=14300000))
+        self.assertEqual(out['inquiry_no'], 'PI-9999')
+        self.assertEqual((fixed['unit_price'], fixed['seen_unit_price'], fixed['price_differs'], fixed['total']),
+                         (14300000, 14209400, True, 28600000))
+
+    def test_product_out_of_category_is_still_received(self):
+        out, fixed = self.receive(None)
+        self.assertEqual((out['inquiry_no'], fixed['product_code'], fixed['unit_price'], fixed['sale_state']), ('PI-9999', 129614, None, 'unknown'))
 
     def test_admin_kind(self):
         self.assertEqual(L.kind(None, None, None, {'product_code': 129614}), ('fixed_product', 'AI 슈퍼컴퓨터 완제품'))
