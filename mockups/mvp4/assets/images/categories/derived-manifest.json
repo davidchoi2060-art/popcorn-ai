@@ -1,0 +1,145 @@
+{
+ "images": [
+  {
+   "original": "assets/images/categories/category-gaming-v14.png",
+   "original_bytes": 2284686,
+   "original_sha256": "088dbce58f8cb794c9484bfe040ff25e833d10f3708d9dc38b38f72bdc381fe4",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-gaming-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 70200
+    },
+    {
+     "file": "assets/images/categories/category-gaming-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 204124
+    }
+   ]
+  },
+  {
+   "original": "assets/images/categories/category-office-v14.png",
+   "original_bytes": 1862805,
+   "original_sha256": "4f76930c9558f9b4c316d78eaa6135b4bb891fe08e51b2d4b194f427061665c5",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-office-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 44968
+    },
+    {
+     "file": "assets/images/categories/category-office-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 128214
+    }
+   ]
+  },
+  {
+   "original": "assets/images/categories/category-creator-v14.png",
+   "original_bytes": 1908064,
+   "original_sha256": "5526f24a2b9e30f6fc9515d58cb1b46ac9e5e14308a65b18f1e990231c3cce6f",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-creator-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 48362
+    },
+    {
+     "file": "assets/images/categories/category-creator-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 126684
+    }
+   ]
+  },
+  {
+   "original": "assets/images/categories/category-mini-v14.png",
+   "original_bytes": 1851683,
+   "original_sha256": "62e9080f2802c49d6511a3b74762d6e0dcae5852579665a2f22394e346cc9e82",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-mini-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 26934
+    },
+    {
+     "file": "assets/images/categories/category-mini-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 67508
+    }
+   ]
+  },
+  {
+   "original": "assets/images/categories/category-performance-v14.png",
+   "original_bytes": 1952578,
+   "original_sha256": "dfd1af056b93843540827d06aae5163ecd682a1445377152040392f12210ea90",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-performance-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 37954
+    },
+    {
+     "file": "assets/images/categories/category-performance-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 95136
+    }
+   ]
+  },
+  {
+   "original": "assets/images/categories/category-peripherals-v14.png",
+   "original_bytes": 1848418,
+   "original_sha256": "18881f3a4ee300e08653f7ed68c338d2a35dd5c1e8e629b1f08f2d89debb8028",
+   "size": [
+    1536,
+    1024
+   ],
+   "derived": [
+    {
+     "file": "assets/images/categories/category-peripherals-v14-768.webp",
+     "width": 768,
+     "height": 512,
+     "bytes": 40816
+    },
+    {
+     "file": "assets/images/categories/category-peripherals-v14-1536.webp",
+     "width": 1536,
+     "height": 1024,
+     "bytes": 101496
+    }
+   ]
+  }
+ ],
+ "total_original_png_bytes": 11708234,
+ "total_webp_768_bytes": 269234,
+ "total_webp_1536_bytes": 723162
+}
