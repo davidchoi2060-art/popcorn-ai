@@ -17,6 +17,10 @@ on:
       probes:
         description: '추가 GET 확인(경로:횟수, 쉼표 구분)'
         default: '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1'
+      gaps:
+        description: '판매 PC 부품 사진 빈칸 집계도 낸다'
+        type: boolean
+        default: false
   workflow_run:
     workflows: ['배포']
     types: [completed]
@@ -43,6 +47,16 @@ jobs:
           TEXT: ${{ inputs.text || '배그와 롤, 150만원으로 추천해줘' }}
           PROBES: ${{ inputs.probes || '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1' }}
         run: python3 tools/ci/dev_screen_check.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: 부품 사진 빈칸 집계
+        if: inputs.gaps
+        shell: bash
+        env:
+          BASE: https://popcornai.co.kr
+        run: |
+          python3 tools/ci/part_photo_gaps.py > /tmp/gaps.md
+          cat /tmp/gaps.md >> "$GITHUB_STEP_SUMMARY"
+          # 요약 페이지를 못 여는 작업 세션도 읽게 주석으로도 낸다(조각당 3,500자, 최대 10개)
+          python3 -c "import sys;t=open('/tmp/gaps.md').read();[print('::notice title=gaps '+str(i)+'::'+t[j:j+3500].replace('%','%25').replace('\r','').replace('\n','%0A')) for i,j in enumerate(range(0,min(len(t),35000),3500))]"
       - name: 일괄 작업 로그 요약 (읽을 수 있을 때만)
         shell: bash
         run: |

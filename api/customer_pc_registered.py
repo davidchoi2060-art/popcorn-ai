@@ -90,29 +90,62 @@ def norm(s: str) -> str:
     return re.sub(r"[^0-9a-z가-힣]", "", re.sub(r"\[[^\]]*\]", " ", (s or "").lower()))
 
 
-def names(conn) -> dict:
-    """{슬롯: [(상품번호, 비교 이름, 판매중 여부)]} — 부품 상품. 10분 동안 재사용한다."""
-    with _lock:
-        if time.time() - _cache["at"] < _TTL and _cache["names"]:
-            return _cache["names"]
-    out = {}
-    for code, name, pt, status in conn.execute(text(
-            "SELECT product_code, product_name, part_type, status FROM products WHERE part_type = ANY(:t)"),
-            {"t": sum(PART_TYPES.values(), [])}):
-        slot = next(s for s, ts in PART_TYPES.items() if pt in ts)
-        out.setdefault(slot, []).append((code, norm(name), status == "판매중"))
-    with _lock:
-        _cache["names"] = out
-    return out
+# 몰 옵션 문구에 붙는 판매 표기 — 부품 이름이 아니다(「HIT」「할인 -3000」「제조사OEM」).
+_NOISE = re.compile(r"\bhit\b|할인\s*-?\d[\d,]*|제조사\s*oem|\boem\b|\(?정품\)?|\(?벌크\)?", re.I)
+_COLORS = {"화이트": ("화이트", "white"), "블랙": ("블랙", "black"), "실버": ("실버", "silver"), "핑크": ("핑크", "pink")}
+
+
+def toks(s: str) -> set:
+    """비교 토큰 — 영문·숫자 덩어리(9600 과 9600X 는 다르다)와 한글 덩어리를 나눈다."""
+    return set(re.findall(r"[0-9a-z]+|[가-힣]+", (s or "").lower()))
+
+
+def need(name: str) -> tuple[set, set]:
+    """옵션 문구에서 맞아야 하는 영문·숫자 모델 표기(대괄호·괄호 안 사양 표기는 뺀다)와 색상."""
+    low = (name or "").lower()
+    core = _NOISE.sub(" ", re.sub(r"\[[^\]]*\]|\([^)]*\)", " ", low))
+    return set(re.findall(r"[0-9a-z]+", core)), {c for c in _COLORS if c in low}
+
+
+def _color_ok(t: set, colors: set) -> bool:
+    """색상이 같아야 한다 — 문구에 없는 흰색 제품은 붙이지 않는다(검정이 기본)."""
+    for c, ws in _COLORS.items():
+        has = any(w in tok for tok in t for w in ws)
+        if (c in colors and not has) or (c not in colors and has and c != "블랙"):
+            return False
+    return True
 
 
 def by_name(index: dict, slot: str, name: str):
-    """옵션 문구의 핵심 모델 이름을 포함하는 부품 상품 — 판매중·짧은 이름을 먼저. 못 찾으면 None."""
+    """옵션 문구의 부품 상품 — 판매중·짧은 이름을 먼저. 못 찾으면 None.
+
+    ① 문구 전체가 상품 이름에 들어 있으면 그 상품(처음 규칙).
+    ② 아니면 대괄호·괄호 밖 영문·숫자 모델 표기가 «전부» 같은 토큰으로 있고(9600 ≠ 9600X) 색상이 같은 상품.
+    ③ 그래도 없으면 숫자가 든 표기만 — 단 영문+숫자 모델 코드(4글자 이상, 예 ST4000DM004·T500)가 있을 때만.
+    다른 모델·다른 색은 붙이지 않는다."""
     core = norm(name)
-    if len(core) < 5:
+    if len(core) >= 5:
+        cands = [x for x in index.get(slot, []) if core in x[1]]
+        if cands:
+            return min(cands, key=lambda x: (not x[2], len(x[1])))[0]
+    latin, colors = need(name)
+    digits = {t for t in latin if re.search(r"\d", t)}
+    if not digits or len("".join(latin)) < 4:
         return None
-    cands = [x for x in index.get(slot, []) if core in x[1]]
-    return min(cands, key=lambda x: (not x[2], len(x[1])))[0] if cands else None
+    passes = [latin]
+    if any(len(t) >= 4 and re.search(r"[a-z]", t) for t in digits):
+        passes.append(digits)
+    for req in passes:
+        cands = [x for x in index.get(slot, []) if req <= x[3] and _color_ok(x[3], colors)]
+        if cands:
+            return min(cands, key=lambda x: (not x[2], len(x[3]), len(x[1])))[0]
+    return None
+
+
+# CPU 에 들어 있는 것(내장 그래픽·기본 쿨러)은 따로 파는 부품이 아니다 — 그 PC 의 CPU 사진을 쓴다.
+_BUILT_IN = {"GPU": re.compile(r"^\W*(\[[^\]]*\]\s*)?(radeon|uhd|iris|intel)?\s*(graphics|그래픽)\s*$|내장", re.I),
+             "COOLER": re.compile(r"프로세서에\s*포함|정품\s*쿨러|기본\s*쿨러", re.I)}
+_BUILT_IN_ROLE = {"GPU": "CPU 에 들어 있는 내장 그래픽입니다.", "COOLER": "CPU 에 함께 들어 있는 기본 쿨러입니다."}
 
 
 def lexicon(conn) -> dict:
@@ -160,8 +193,6 @@ def registered(code: int, response: Response):
         parts, service = rows(p["spec_source_text"])
         lex = lexicon(conn)
         codes = [lex.get((x["slot"], x["key"])) for x in parts]
-        index = names(conn) if not all(codes) else {}
-        mall = [None if c else by_name(index, x["slot"], x["name"]) for x, c in zip(parts, codes)]
         info = {}
         if any(codes):
             for r in conn.execute(text(
@@ -170,6 +201,10 @@ def registered(code: int, response: Response):
                     " FROM product_explanations WHERE source_product_code = ANY(:c)"),
                     {"c": [c for c in codes if c]}).mappings():
                 info[r["code"]] = r
+        # 승인 사진이 없는 부품은(설명 코드가 있어도) 상품 DB 의 같은 부품을 이름으로 찾아 몰 사진을 쓴다.
+        lacking = [not (c and info.get(c) and info[c]["photo"]) for c in codes]
+        index = names(conn) if any(lacking) else {}
+        mall = [by_name(index, x["slot"], x["name"]) if miss else None for x, miss in zip(parts, lacking)]
     out = []
     for x, c, m in zip(parts, codes, mall):
         e = info.get(c) if c else None
@@ -178,5 +213,11 @@ def registered(code: int, response: Response):
             photo = MALL_IMG.format(d=m // 1000, c=m)
         out.append({"slot": x["slot"], "name": x["name"], "quantity": x["quantity"], "photo": photo,
                     "role": (e["role"] or e["summary"]) if e else None})
+    cpu = next((o for o in out if o["slot"] == "CPU" and o["photo"]), None)
+    for o in out:
+        rx = _BUILT_IN.get(o["slot"])
+        if o["photo"] is None and cpu and rx and rx.search(o["name"]):
+            o["photo"] = cpu["photo"]
+            o["role"] = o["role"] or _BUILT_IN_ROLE[o["slot"]]
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "product_code": code, "basis": "mall-registered", "service": service, "parts": out}

@@ -16,6 +16,17 @@
   var REGISTERED = '/api/customer/pc-registered/';
   // 승인 대표 사진이 없으면 팝콘PC 몰에 올린 그 상품의 대표 사진을 쓴다(2026-10-20 대표 「이미지도 만들어」).
   function mallImage(code) { var n = Number(code); return Number.isSafeInteger(n) && n > 0 ? 'https://www.popcornpc.co.kr/data/pimg/' + Math.floor(n / 1000) + '/' + n + '_600.jpg' : null; }
+  // 몰은 일부 상품 대표 사진을 .gif 로만 둔다(2026-10-20 실측 122081·122083·121112·121114·121115 — _600.jpg 404, _600.gif 있음).
+  // 다른 사진 대체(아이콘·「사진 준비 중」)보다 먼저 받아 .gif 로 한 번 더 읽는다. .gif 도 없으면 원래 대체가 그대로 돈다.
+  window.addEventListener('error', function (event) {
+    var img = event.target;
+    if (!img || img.tagName !== 'IMG' || img.dataset.mallGif) return;
+    var m = /^(https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600)\.jpg$/.exec(img.getAttribute('src') || '');
+    if (!m) return;
+    img.dataset.mallGif = '1';
+    event.stopImmediatePropagation();
+    img.src = m[1] + '.gif';
+  }, true);
   var SLOT = { CPU: 'CPU', GPU: '그래픽카드', RAM: '메모리', SSD: '저장장치', HDD: '저장장치', MB: '메인보드', POWER: '파워', PSU: '파워', CASE: '케이스', COOLER: 'CPU 쿨러', OS: '운영체제' };
 
   function get(url) {
