@@ -13,7 +13,7 @@
   'use strict';
   var P = window.PAI, h = P.h, icon = P.icon, qs = new URLSearchParams(location.search);
   var TOPIC = { quote: 'AI 슈퍼컴퓨터 견적', adoption: 'AI 도입 상담' };
-  var id = qs.has('id') ? qs.get('id') : '129615';
+  var id = qs.get('id') || '';
   var product = null, meta = null;
   var rawQuantity = Number(qs.get('quantity') || 1);
   var quantity = Number.isInteger(rawQuantity) ? Math.min(10, Math.max(1, rawQuantity)) : 1;
@@ -23,7 +23,10 @@
   var draft = { method: 'phone', phone: '', email: '', name: '', purpose: '', message: '', contactRequested: false, consent: false };
   var errors = {};
   var app = document.getElementById('app');
-  function noun() { return intent === 'adoption' ? 'GB10 AI 설치 상담' : 'AI 전용 장비 견적 문의'; }
+  function shortName() { return product && product.detail && typeof product.detail.short_name === 'string' ? product.detail.short_name : ''; }
+  function noun() { return intent === 'adoption' ? (shortName() ? shortName() + ' ' : '') + 'AI 설치 상담' : 'AI 전용 장비 견적 문의'; }
+  function listUrl() { try { var u = sessionStorage.getItem('pai-sc-list-url'); if (u && /^supercomputers\.html(\?[^#]*)?$/.test(u)) return u; } catch (e) { /* 첫 화면 */ } return P.aiDevices.listUrl; }
+  function spec(p) { return [p.memory, p.storage ? 'SSD ' + p.storage : null].filter(Boolean).join(' · ') || '사양 확인 필요'; }
   function detailUrl() { return 'supercomputer.html?id=' + encodeURIComponent(id) + '&quantity=' + quantity; }
   function money(value) { return typeof value === 'number' && isFinite(value) && value > 0 ? P.money(value) : '금액 확인 필요'; }
   function total() { return product && typeof product.price === 'number' ? product.price * quantity : null; }
@@ -51,12 +54,12 @@
       }, function () { clearTimeout(timer); var e = new Error('network'); e.unknown = true; throw e; });
   }
   function crumb() {
-    return '<nav class="breadcrumb" aria-label="현재 위치"><a href="index.html">홈</a>' + icon('caret-right') + '<a href="' + h(detailUrl()) + '">AI 슈퍼컴퓨터</a>' + icon('caret-right') + '<span>' + noun() + '</span></nav>';
+    return '<nav class="breadcrumb" aria-label="현재 위치"><a href="index.html">홈</a>' + icon('caret-right') + '<a href="' + h(listUrl()) + '">AI 슈퍼컴퓨터</a>' + icon('caret-right') + '<span>' + noun() + '</span></nav>';
   }
   function summary() {
     var p = product;
-    return '<aside class="sci-summary"><div class="sci-product-visual"><img src="' + h(p.image) + '" alt="Dell Pro Max GB10 제품"></div>' +
-      '<div class="sci-summary-body"><span class="eyebrow">선택한 완제품</span><h2>' + h(p.name) + '</h2><p class="sci-model">128GB · SSD ' + h(p.storage || '확인 필요') + '</p>' +
+    return '<aside class="sci-summary"><div class="sci-product-visual">' + (p.image ? '<img src="' + h(p.image) + '" alt="' + h(p.name) + ' 제품">' : '<span class="sci-image-fallback">' + icon('cpu') + '제품 이미지</span>') + '</div>' +
+      '<div class="sci-summary-body"><span class="eyebrow">선택한 완제품</span><h2>' + h(p.name) + '</h2><p class="sci-model">' + h(spec(p)) + '</p>' +
       '<dl><div><dt>상품번호</dt><dd>' + h(p.id) + '</dd></div><div><dt>상품 금액</dt><dd>' + money(p.price) + '</dd></div><div><dt>수량</dt><dd>' + quantity + '대</dd></div>' +
       '<div class="sci-total"><dt>하드웨어 합계</dt><dd>' + money(total()) + '</dd></div></dl>' +
       (p.saleState !== 'on_sale' ? '<p class="sci-note">현재 판매 여부를 확인하고 있어요. 문의하시면 공급 일정과 구매 가능 여부를 안내해 드립니다.</p>' : '') +
@@ -87,7 +90,7 @@
     return '<section class="sci-result" aria-live="polite"><div class="sci-result-icon ' + (success ? 'is-success' : 'is-error') + '">' + icon(success ? 'check-circle' : 'warning-circle') + '</div>' +
       '<span class="eyebrow">' + (success ? '접수 완료' : unknown ? '접수 확인 필요' : '접수 미완료') + '</span><h1 id="sci-result-title" tabindex="-1">' + (success ? '문의가 접수되었습니다.' : unknown ? '접수 결과를 확인하지 못했어요.' : '문의를 접수하지 못했어요.') + '</h1><p>' +
       (success ? '요청 내용을 확인한 뒤 선택한 방법으로 안내드립니다.' : unknown ? '연결이 끊겨 접수 여부를 아직 몰라요. 아래 버튼은 같은 문의의 접수 여부만 확인하므로 두 번 접수되지 않아요.' : h(notice || '입력한 내용은 유지되어 있어요. 내용을 확인한 뒤 다시 시도해 주세요.')) + '</p>' +
-      '<dl class="sci-result-summary">' + (success && receipt ? '<div><dt>접수 번호</dt><dd>' + h(receipt) + '</dd></div>' : '') + '<div><dt>문의 유형</dt><dd>' + noun() + '</dd></div><div><dt>선택한 상품</dt><dd>' + h(product.name) + ' · ' + h(product.storage || '') + '</dd></div><div><dt>수량</dt><dd>' + quantity + '대</dd></div><div><dt>하드웨어 합계</dt><dd>' + money(total()) + '</dd></div></dl>' +
+      '<dl class="sci-result-summary">' + (success && receipt ? '<div><dt>접수 번호</dt><dd>' + h(receipt) + '</dd></div>' : '') + '<div><dt>문의 유형</dt><dd>' + noun() + '</dd></div><div><dt>선택한 상품</dt><dd>' + h(product.name) + (product.modelLabel ? ' · ' + h(product.modelLabel) : '') + '</dd></div><div><dt>수량</dt><dd>' + quantity + '대</dd></div><div><dt>하드웨어 합계</dt><dd>' + money(total()) + '</dd></div></dl>' +
       '<div class="sci-result-actions">' + (unknown ? '<button type="button" class="btn btn-primary" data-sci-check>접수 결과 확인 ' + icon('arrow-right') + '</button>' : '') + (!success && !unknown ? '<button type="button" class="btn btn-primary" data-sci-edit>입력 내용 다시 확인 ' + icon('arrow-right') + '</button>' : '') + '<a href="' + h(detailUrl()) + '" class="btn ' + (success ? 'btn-primary' : 'btn-outline') + '">상품 상세로 돌아가기</a></div>' +
       (success ? '<div class="sci-next"><span>' + icon('file-text') + '문의 내용 확인</span><span>' + icon('chat-circle') + '구매·도입 범위 안내</span></div>' : '') + '</section>';
   }
@@ -121,7 +124,7 @@
       if (e.unknown) { phase = 'unknown'; render(true); return; }
       if (e.code === 'price_changed' || e.code === 'product_missing') {
         // 바뀐 가격·판매 상태를 다시 읽어 보여 주고, 고객이 확인한 뒤 다시 보낸다(입력은 그대로).
-        return P.gb10.load(true).then(function (data) { product = data.products[id] || null; seenPrice = product ? product.price : null; }, function () {})
+        return P.aiDevices.detail(id).then(function (p) { product = p; seenPrice = p.price; }, function (e2) { if (e2 && e2.status === 404) product = null; })
           .then(function () { notice = e.sentence || '상품 가격이나 판매 상태가 바뀌었어요. 바뀐 내용을 확인한 뒤 다시 보내 주세요.'; phase = product ? 'form' : 'load-error'; render(true); });
       }
       notice = e.status === 429 ? '요청이 잠시 많아요. 잠시 후 다시 시도해 주세요.' : e.sentence && e.sentence.length <= 200 ? e.sentence : '입력한 내용은 유지되어 있어요. 내용을 확인한 뒤 다시 시도해 주세요.';
@@ -131,7 +134,7 @@
   function render(focus) {
     var content;
     if (phase === 'loading') content = '<section class="sci-result" aria-busy="true"><h1>문의 화면을 준비하고 있어요.</h1><p>선택한 상품의 현재 가격과 판매 상태를 확인합니다.</p></section>';
-    else if (phase === 'load-error') content = '<section class="sci-result"><div class="sci-result-icon is-error">' + icon('warning-circle') + '</div><h1>' + (product === null && notice === 'missing' ? '선택한 상품을 찾을 수 없어요.' : '문의 화면을 불러오지 못했어요.') + '</h1><p>' + (notice === 'missing' ? '상품을 다시 선택한 뒤 문의해 주세요.' : '연결 상태를 확인한 뒤 다시 시도해 주세요.') + '</p><div class="sci-result-actions">' + (notice === 'missing' ? '' : '<button type="button" class="btn btn-primary" data-sci-reload>다시 불러오기</button>') + '<a class="btn btn-outline" href="index.html#home-supercomputer">AI 슈퍼컴퓨터 보기</a></div></section>';
+    else if (phase === 'load-error') content = '<section class="sci-result"><div class="sci-result-icon is-error">' + icon('warning-circle') + '</div><h1>' + (product === null && notice === 'missing' ? '선택한 상품을 찾을 수 없어요.' : '문의 화면을 불러오지 못했어요.') + '</h1><p>' + (notice === 'missing' ? '상품을 다시 선택한 뒤 문의해 주세요.' : '연결 상태를 확인한 뒤 다시 시도해 주세요.') + '</p><div class="sci-result-actions">' + (notice === 'missing' ? '' : '<button type="button" class="btn btn-primary" data-sci-reload>다시 불러오기</button>') + '<a class="btn btn-outline" href="' + h(listUrl()) + '">AI 슈퍼컴퓨터 목록</a></div></section>';
     else content = crumb() + (phase === 'form' || phase === 'sending' ? form() : result());
     app.innerHTML = P.shell('<div class="container sci-page">' + content + '</div>');
     P.bindShell(); document.title = noun() + ' | 팝콘AI';
@@ -171,9 +174,11 @@
   function start() {
     phase = 'loading'; notice = ''; render(false);
     // 동의 문구는 서버가 준다(보관 기간 포함). 이 호출이 방문자 연결도 맺어, 응답을 못 받았을 때 접수 여부를 확인할 수 있다.
-    Promise.all([P.gb10.load(true), call('GET', '/api/mvp3/purchase-inquiries/form')]).then(function (r) {
-      meta = r[1]; product = r[0].products[id] || null;
-      if (!product || P.gb10.ids.indexOf(id) < 0) { product = null; notice = 'missing'; phase = 'load-error'; render(false); return; }
+    // 상품은 카테고리에 분류된 상품만 온다(없는 상품·분류에서 빠진 상품은 404 → «찾을 수 없어요»).
+    var item = P.aiDevices.detail(id).then(function (p) { return p; }, function (e) { if (e && e.status === 404) return null; throw e; });
+    Promise.all([item, call('GET', '/api/mvp3/purchase-inquiries/form')]).then(function (r) {
+      meta = r[1]; product = r[0];
+      if (!product) { notice = 'missing'; phase = 'load-error'; render(false); return; }
       seenPrice = product.price; phase = 'form'; render(false);
     }, function () { phase = 'load-error'; render(false); });
   }
