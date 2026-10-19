@@ -14,10 +14,12 @@
   function route(screen, params) {
     var state = screen === 'chat' ? 'welcome' : 'normal';
     if (typeof P.designHref === 'function') return P.designHref(screen, state, params || {});
-    var q = new URLSearchParams({ screen: screen, state: state });
+    // /mvp4 운영: design-common 이 없는 화면(AI 패키지·상담·지원)도 실제 라우터로 간다(검토용 경로를 내지 않는다).
+    var q = new URLSearchParams(screen && screen !== 'home' ? { screen: screen } : {});
+    if (screen === 'chat' && state && state !== 'welcome') q.set('state', state);
     Object.keys(params || {}).forEach(function (key) { if (params[key] !== null && params[key] !== undefined && params[key] !== '') q.set(key, params[key]); });
-    if (P.qs && P.qs.get('dataset') && !q.has('dataset')) q.set('dataset', P.qs.get('dataset'));
-    return 'design-only/design-screen.html?' + q.toString();
+    var s = q.toString();
+    return './' + (s ? '?' + s : '');
   }
   function catalog(category) { return route('catalog', category ? { category: category } : {}); }
   function menuButton(className, text) {
@@ -28,12 +30,16 @@
   }
   function header(brand) {
     return '<header class="site-header nh-header"><div class="container nh-top">' + brand +
-      '<form class="nh-search" data-nh-search role="search" action="design-only/design-screen.html" method="get"><label class="visually-hidden" for="nh-search-input">상품명, CPU 또는 그래픽카드 검색</label><div class="nh-search-field"><input id="nh-search-input" name="q" type="search" placeholder="상품명, CPU, 그래픽카드 검색" autocomplete="off" maxlength="120" aria-describedby="nh-search-error"><button type="submit" aria-label="상품 검색">' + icon('magnifying-glass') + '</button></div><p class="nh-search-error" id="nh-search-error" role="alert" hidden>검색어를 입력해 주세요.</p></form>' +
+      '<form class="nh-search" data-nh-search role="search" action="./" method="get"><label class="visually-hidden" for="nh-search-input">상품명, CPU 또는 그래픽카드 검색</label><div class="nh-search-field"><input id="nh-search-input" name="q" type="search" placeholder="상품명, CPU, 그래픽카드 검색" autocomplete="off" maxlength="120" aria-describedby="nh-search-error"><button type="submit" aria-label="상품 검색">' + icon('magnifying-glass') + '</button></div><p class="nh-search-error" id="nh-search-error" role="alert" hidden>검색어를 입력해 주세요.</p></form>' +
       '<div class="nh-tools"><a class="nh-tool" href="' + h(route('saved')) + '" data-nh-nav="saved">' + icon('clipboard-text') + '<span>내 견적</span></a><a class="nh-tool nh-support-tool" href="support.html" data-nh-nav="support">' + icon('headset') + '<span>고객지원</span></a>' + menuButton('nh-mobile-menu', '전체 메뉴') + '</div></div>' +
-      '<div class="nh-menu-bar"><nav class="container nh-desktop-nav" aria-label="주요 메뉴">' + menuButton('nh-category-button', '전체 카테고리') + '<div class="nh-main-links">' +
-      navLink('PC 쇼핑', catalog(), 'catalog') + navLink('게이밍 PC', catalog('게이밍 PC'), '게이밍 PC') + navLink('사무용 PC', catalog('사무·업무용'), '사무·업무용') + navLink('작업용 PC', catalog('디자인·영상'), '디자인·영상') + navLink('미니 PC', catalog('미니 PC'), '미니 PC') + navLink('AI 패키지', 'ai-packages.html', 'ai') + '</div>' +
-      navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>' + icon('arrow-right'), route('chat'), 'chat', 'nh-ai-entry') + '</nav>' +
-      '<nav class="container nh-mobile-nav" aria-label="주요 메뉴">' + navLink('PC 쇼핑', catalog(), 'catalog') + navLink('AI 패키지', 'ai-packages.html', 'ai') + navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>', route('chat'), 'chat', 'nh-mobile-ai') + '</nav></div></header>';
+      '<div class="nh-menu-bar"><nav class="container nh-service-nav" aria-label="주요 메뉴"><div class="nh-primary-links">' +
+      navLink('PC 쇼핑', catalog(), 'catalog', 'nh-primary-link') + navLink('AI 패키지', 'ai-packages.html', 'ai', 'nh-primary-link') +
+      navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>', route('chat'), 'chat', 'nh-primary-link nh-primary-ai') + '</div>' +
+      '<div class="nh-purpose-group">' + menuButton('nh-category-button nh-category-compact', '전체 카테고리') +
+      '<div class="nh-purpose-tabs" role="group" aria-label="용도별 PC와 주변기기">' + categories.map(function (c) {
+        return navLink(c[0], c[1] ? catalog(c[1]) : 'peripherals.html', c[1] || 'peripherals', 'nh-purpose-tab');
+      }).join('') + '</div></div></nav></div></header>';
+
   }
   function menu() {
     return '<dialog class="site-dialog menu-dialog nh-menu" id="site-menu" aria-labelledby="menu-dialog-title"><div class="nh-menu-content"><div class="nh-menu-heading"><div><p>POPCORN AI</p><h2 id="menu-dialog-title">어떤 PC를 찾으세요?</h2></div><button class="icon-button" type="button" data-close-dialog aria-label="전체 카테고리 닫기">' + icon('x') + '</button></div>' +
@@ -67,8 +73,18 @@
     });
     var page = document.body.dataset.page || 'home', category = P.qs && P.qs.get('category');
     var active = page === 'pcs' ? category || 'catalog' : page.indexOf('ai-') === 0 ? 'ai' : page === 'pc-finder' ? 'chat' : page;
+    var pcSection = page === 'pcs' || page === 'peripherals' || page === 'pc-detail';
     document.querySelectorAll('[data-nh-nav]').forEach(function (link) {
-      if (link.dataset.nhNav === active || (link.dataset.nhNav === 'catalog' && page === 'pcs' && link.closest('.nh-mobile-nav'))) link.setAttribute('aria-current', 'page');
+      var primary = !!link.closest('.nh-primary-links');
+      var selected = primary ? (link.dataset.nhNav === 'catalog' && pcSection) || link.dataset.nhNav === active : link.dataset.nhNav === active;
+      link.removeAttribute('aria-current');
+      if (selected) link.setAttribute('aria-current', primary && pcSection ? 'true' : 'page');
+    });
+    window.requestAnimationFrame(function () {
+      var selectedTab = document.querySelector('.nh-purpose-tabs [aria-current]');
+      if (!selectedTab) return;
+      var tabs = selectedTab.parentElement;
+      if (tabs.scrollWidth > tabs.clientWidth) tabs.scrollLeft += selectedTab.getBoundingClientRect().left - tabs.getBoundingClientRect().left - (tabs.clientWidth - selectedTab.offsetWidth) / 2;
     });
   };
 }());
