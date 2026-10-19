@@ -10,20 +10,19 @@
   function parts(p) {
     if (!p || !Array.isArray(p.specs) || p.bomStatus === 'missing') return [];
     if (p.source && p.source.kind === 'current-admin-observation' && !p.configurationId && p.source.bomBasis !== 'registered-admin-spec-source-text') return [];
-    return p.specs.filter(function (s) { return s && String(s.value || s.modelText || '').trim() && (sourceModel(s) || s.partId !== undefined && s.partId !== null); });
+    return p.specs.filter(function (s) { return s && String(s.value || s.modelText || '').trim() && (s.registered === true || sourceModel(s) || s.partId !== undefined && s.partId !== null); });
   }
   function pending(p) {
     if (p.source && p.source.kind === 'historical') return '현재 판매 여부와 구성을 확인해 주세요.';
     if (p.isSelling !== true || p.statusKey === 'oos' || p.stockQty === 0 || /품절|판매\s*종료|단종/.test(p.saleStatus || '')) return '현재 판매 여부를 확인해야 합니다.';
     if (!validPrice(p)) return '현재 상품 가격을 확인해야 합니다.';
-    if (p.reviewRequired || p.bomStatus === 'mismatch') return '상품 정보와 부품 구성을 확인해야 합니다.';
-    if (p.bomStatus === 'registered-source' || p.configurationCompleteness === 'registered-core-unselected' || p.purchasable === false || p.source && p.source.bomBasis === 'registered-admin-spec-source-text') return '최종 부품 구성과 수량을 확인해야 합니다.';
-    if (!p.configurationId || !parts(p).length) return '정확한 부품 구성표를 확인해야 합니다.';
+    // 구성 확인은 막는 조건이 아니다 — 금액·사양이 다르면 상담사가 전화로 조정해 판매한다(2026-10-20 대표).
     return '';
   }
   function route(screen, p, q) { return P.designHref(screen, 'normal', { id: p.id, quantity: quantity(q) }); }
   function partRoute(p, s) {
     var params = { id: p.id };
+    if (s.registered) return '';
     if (sourceModel(s)) params.sourceOrdinal = s.sourceOrdinal;
     else if (s.partId !== undefined && s.partId !== null) params.partId = s.partId;
     else return '';
@@ -55,6 +54,7 @@
   }
   function sourceNotice(p) {
     var issue = pending(p);
+    if (!issue && p.bomStatus === 'registered') return '<p class="cf-source">' + P.icon('info') + '<span>팝콘PC 몰에 등록된 구성입니다. 최종 구성과 금액은 상담 시 확정합니다.' + (p.service ? ' · ' + h(p.service) : '') + '</span></p>';
     if (issue) return '<p class="cf-source cf-source-warning">' + P.icon('info') + '<span>' + h(issue) + '</span></p>';
     if (p.configurationCompleteness === 'unverified' || p.bomStatus === 'configuration-only') return '<p class="cf-source">' + P.icon('info') + '<span>상품에 연결된 부품 구성입니다. 최종 구성과 수급은 상담 시 확인해 주세요.</span></p>';
     return '';

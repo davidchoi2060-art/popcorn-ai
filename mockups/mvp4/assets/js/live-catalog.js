@@ -13,6 +13,9 @@
   var P = window.PAI = window.PAI || {};
   var CATALOG = '/api/customer/pc-catalog';
   var OFFER = '/api/customer/pc-offers/';
+  var REGISTERED = '/api/customer/pc-registered/';
+  // 승인 대표 사진이 없으면 팝콘PC 몰에 올린 그 상품의 대표 사진을 쓴다(2026-10-20 대표 「이미지도 만들어」).
+  function mallImage(code) { var n = Number(code); return Number.isSafeInteger(n) && n > 0 ? 'https://www.popcornpc.co.kr/data/pimg/' + Math.floor(n / 1000) + '/' + n + '_600.jpg' : null; }
   var SLOT = { CPU: 'CPU', GPU: '그래픽카드', RAM: '메모리', SSD: '저장장치', HDD: '저장장치', MB: '메인보드', POWER: '파워', PSU: '파워', CASE: '케이스', COOLER: 'CPU 쿨러', OS: '운영체제' };
 
   function get(url) {
@@ -42,7 +45,7 @@
     return {
       id: String(it.product_code), productCode: it.product_code, name: it.name, officialName: typeof it.official_name === 'string' && it.official_name.trim() ? it.official_name.trim() : it.name,
       price: typeof it.price === 'number' && it.price > 0 ? it.price : null, priceBasis: it.price_basis || '',
-      image: it.photo_hint ? it.image_url : null, mediaStatus: it.photo_hint ? 'ready' : 'missing',
+      image: it.photo_hint ? it.image_url : mallImage(it.product_code), mediaStatus: it.photo_hint ? 'ready' : 'mall',
       summary: summary.map(function (s) { return s.value; }).join(' · '), summarySpecs: summary,
       specs: [], status: it.sale_status, saleStatus: it.sale_status, isSelling: it.sale_status === '판매중',
       recommendable: it.sale_status === '판매중', reviewRequired: false, purchasable: it.sale_status === '판매중',
@@ -74,8 +77,23 @@
     var photo = body && body.photo;
     if (photo && photo.state === 'available' && typeof photo.url === 'string' && photo.url.indexOf('/api/customer/products/' + p.id + '/') === 0) {
       p.image = photo.url; p.mediaStatus = 'ready'; p.photoNotice = photo.notice || '';
-    } else { p.image = null; p.mediaStatus = 'missing'; }
+    } else { p.image = mallImage(p.id); p.mediaStatus = 'mall'; }
     p.liveDetail = 'public';
+  }
+
+  // 승인 구성이 없는 판매 PC: 몰에 등록된 구성으로 부품 표를 채운다(2026-10-20 대표 「부품표도 채워서 넣어」).
+  // 같은 몰 옵션 문구로 승인 구성에서 확인된 부품이면 그 사진·역할 설명이 붙는다. 최종 구성은 상담 시 확정.
+  function applyRegistered(p, body) {
+    var parts = body && Array.isArray(body.parts) ? body.parts : [];
+    p.specs = parts.filter(function (x) { return x && x.name; }).map(function (x, i) {
+      var slot = String(x.slot || '').toUpperCase();
+      return { label: SLOT[slot] || slot || '부품', value: String(x.name).replace(/^\[([^\]]{1,20})\]\s*/, '$1 '), slot: slot, registered: true, ordinal: i,
+        quantity: Number.isInteger(x.quantity) && x.quantity > 0 ? x.quantity : 1, role: x.role || '', facts: [],
+        image: typeof x.photo === 'string' && /^\/api\/product-images\/\d+\/detail$/.test(x.photo) ? x.photo : '' };
+    });
+    p.service = body && typeof body.service === 'string' ? body.service : '';
+    p.bomStatus = p.specs.length ? 'registered' : 'missing';
+    p.liveDetail = 'registered';
   }
 
   P.live = {
@@ -93,7 +111,10 @@
       if (!p) return Promise.resolve(null);
       return get(OFFER + encodeURIComponent(p.id)).then(function (res) {
         if (res.status === 200 && res.body && res.body.ok) applyOffer(p, res.body);
-        else if (res.status === 404) { p.specs = []; p.bomStatus = 'missing'; p.liveDetail = 'not_public'; }
+        else if (res.status === 404) {
+          p.specs = []; p.bomStatus = 'missing'; p.liveDetail = 'not_public';
+          return get(REGISTERED + encodeURIComponent(p.id)).then(function (r2) { if (r2.status === 200 && r2.body && r2.body.ok) applyRegistered(p, r2.body); return p; }, function () { return p; });
+        }
         else { p.liveDetail = 'error'; }
         return p;
       }, function () { p.liveDetail = 'error'; return p; });
@@ -115,9 +136,9 @@
   P.getCatalogProduct = function (id) {
     return (P.catalogProducts || []).find(function (p) { return String(p.id) === String(id); }) || null;
   };
-  // 사진은 상대 자산이나 이 상품의 고객 공개 사진 경로만 받는다.
+  // 사진은 상대 자산 · 이 상품의 고객 공개 사진 · 팝콘PC 몰에 올린 이 상품의 대표 사진만 받는다.
   P.catalogImage = function (p) {
     if (!p || !p.image) return null;
-    return /^assets\//.test(p.image) || p.image.indexOf('/api/customer/products/' + p.id + '/representative-image') === 0 ? p.image : null;
+    return /^assets\//.test(p.image) || p.image.indexOf('/api/customer/products/' + p.id + '/representative-image') === 0 || p.image === mallImage(p.id) ? p.image : null;
   };
 }());

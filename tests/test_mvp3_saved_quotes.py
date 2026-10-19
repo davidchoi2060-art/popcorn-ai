@@ -225,10 +225,11 @@ class SavedQuotesTest(unittest.TestCase):
         with self.assertRaises(HTTPException) as ex: m.save_quote(changed, request(), Response())
         self.assertEqual(ex.exception.status_code, 409)
 
-    def test_stale_price_cannot_insert(self):
+    def test_stale_price_is_saved_at_current_price(self):
+        # 2026-10-20 대표: 가격이 바뀌어도 보관을 막지 않는다 — 지금 판매가로 보관하고 상담사가 조정한다.
         changed = body(); changed.expected_price = 1
-        with self.assertRaises(HTTPException): m.save_quote(changed, request(), Response())
-        self.assertEqual(self.store.rows, [])
+        m.save_quote(changed, request(), Response())
+        self.assertEqual(len(self.store.rows), 1)
 
     def test_unrecommended_product_cannot_insert(self):
         changed = body(); changed.product_code = 999

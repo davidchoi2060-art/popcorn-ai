@@ -111,8 +111,8 @@ def selected_product(recommendation, code, expected_price):
     if found is None:
         raise HTTPException(409, '현재 상담 조건의 추천 상품이 아닙니다. 다시 조회해 주세요.')
     product = public_product(found)
-    if product['price'] != expected_price:
-        raise HTTPException(409, '상품 가격이 변경되었습니다. 다시 조회한 가격을 확인해 주세요.')
+    # 화면이 본 가격과 지금 판매가가 달라도 보관을 막지 않는다 — 지금 판매가로 보관하고, 구매 상담에서 상담사가 조정한다
+    # (2026-10-20 대표 「판매를 사전에 차단하지 마」). expected_price 는 비교에만 쓰고 저장하지 않는다.
     return product
 
 

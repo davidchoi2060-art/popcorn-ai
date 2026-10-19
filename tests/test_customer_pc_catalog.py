@@ -68,12 +68,10 @@ class SoldItemTest(unittest.TestCase):
             self.assertIsNone(C.sold_item(2)); self.assertIsNone(C.sold_item(3)); self.assertIsNone(C.sold_item(99))
             self.assertIsNone(C.sold_item("1"))
 
-    def test_sold_item_needs_public_configuration(self):
-        # v7: 구성이 공개 승인되지 않은 판매 PC 는 보관 대신 문의. 화면 우회(API 직접 호출)도 막는다.
+    def test_sold_item_does_not_need_public_configuration(self):
+        # 2026-10-20 대표: 구성 공개 승인 여부로 보관을 막지 않는다(몰 등록 구성 기준 · 상담사가 조정).
         with patch.object(C, "load", return_value=([], {1: product(1, 게임=2)})):
             with patch.object(C, "public_codes", return_value=frozenset()):
-                self.assertIsNone(C.sold_item(1))
-            with patch.object(C, "public_codes", return_value=frozenset({1})):
                 self.assertEqual(C.sold_item(1)["product_code"], 1)
 
     def body(self, **kw):
@@ -89,23 +87,17 @@ class SoldItemTest(unittest.TestCase):
         self.assertEqual(out["price"], 1000000)
         self.assertFalse(out["ai_composed"])
 
-    def test_saved_quote_without_usages_rejects_unsold_or_changed_price(self):
+    def test_saved_quote_without_usages_rejects_unsold_but_not_changed_price(self):
         state = SimpleNamespace(model_dump=lambda: {"usages": []})
         with patch.object(C, "load", return_value=([], {1: product(1, status="품절")})), \
              patch.object(C, "public_codes", return_value=frozenset({1})):
             with self.assertRaises(HTTPException) as e:
                 S.recommended_product(state, self.body())
             self.assertEqual(e.exception.status_code, 409)
+        # 가격이 바뀌었어도 지금 판매가로 보관한다 · 구성 공개 여부로 막지 않는다(상담사가 조정, 2026-10-20 대표).
         with patch.object(C, "load", return_value=([], {1: product(1, price=1100000)})), \
-             patch.object(C, "public_codes", return_value=frozenset({1})):
-            with self.assertRaises(HTTPException) as e:
-                S.recommended_product(state, self.body())
-            self.assertEqual(e.exception.status_code, 409)
-        with patch.object(C, "load", return_value=([], {1: product(1, 게임=2)})), \
              patch.object(C, "public_codes", return_value=frozenset()):
-            with self.assertRaises(HTTPException) as e:
-                S.recommended_product(state, self.body())
-            self.assertEqual(e.exception.status_code, 409)
+            self.assertEqual(S.recommended_product(state, self.body())["price"], 1100000)
 
 
 if __name__ == "__main__":
