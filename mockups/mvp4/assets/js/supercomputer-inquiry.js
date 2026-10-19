@@ -23,7 +23,7 @@
   var draft = { method: 'phone', phone: '', email: '', name: '', purpose: '', message: '', contactRequested: false, consent: false };
   var errors = {};
   var app = document.getElementById('app');
-  function noun() { return intent === 'adoption' ? 'AI 도입 상담' : '슈퍼컴퓨터 견적 문의'; }
+  function noun() { return intent === 'adoption' ? 'GB10 AI 설치 상담' : 'AI 전용 장비 견적 문의'; }
   function detailUrl() { return 'supercomputer.html?id=' + encodeURIComponent(id) + '&quantity=' + quantity; }
   function money(value) { return typeof value === 'number' && isFinite(value) && value > 0 ? P.money(value) : '금액 확인 필요'; }
   function total() { return product && typeof product.price === 'number' ? product.price * quantity : null; }
@@ -60,12 +60,12 @@
       '<dl><div><dt>상품번호</dt><dd>' + h(p.id) + '</dd></div><div><dt>상품 금액</dt><dd>' + money(p.price) + '</dd></div><div><dt>수량</dt><dd>' + quantity + '대</dd></div>' +
       '<div class="sci-total"><dt>하드웨어 합계</dt><dd>' + money(total()) + '</dd></div></dl>' +
       (p.saleState !== 'on_sale' ? '<p class="sci-note">현재 판매 여부를 확인하고 있어요. 문의하시면 공급 일정과 구매 가능 여부를 안내해 드립니다.</p>' : '') +
-      '<p class="sci-note">AI 설치·교육은 필요한 범위에 따라 별도로 상담합니다.</p><a class="sci-back" href="' + h(detailUrl()) + '">선택한 상품 다시 보기 ' + icon('arrow-right') + '</a></div></aside>';
+      '<p class="sci-note">장비 구매와 별도로, AI 설치·교육 범위와 지원 가능 여부를 상담에서 확인합니다.</p><a class="sci-back" href="' + h(detailUrl()) + '">선택한 상품 다시 보기 ' + icon('arrow-right') + '</a></div></aside>';
   }
   function errorFor(k) { return '<p class="sci-error" id="sci-' + k + '-error"' + (errors[k] ? '' : ' hidden') + '>' + h(errors[k] || '') + '</p>'; }
   function form() {
     var phone = draft.method === 'phone', sending = phase === 'sending';
-    return '<div class="sci-heading"><span class="eyebrow">AI SUPERCOMPUTER</span><h1>' + noun() + '</h1><p>' + (intent === 'adoption' ? '활용하고 싶은 AI 업무를 알려주세요.' : '선택한 제품의 구매 조건을 함께 확인해 보세요.') + '</p></div>' +
+    return '<div class="sci-heading"><span class="eyebrow">AI SUPERCOMPUTER</span><h1>' + noun() + '</h1><p>' + (intent === 'adoption' ? '사용할 모델·프로그램과 필요한 설치 범위를 알려주세요.' : '선택한 제품의 구매 조건을 함께 확인해 보세요.') + '</p></div>' +
       '<div class="sci-layout"><form class="sci-form" novalidate' + (sending ? ' aria-busy="true"' : '') + '>' +
       (Object.keys(errors).length ? '<div class="sci-error-summary" role="alert">' + (errors.contact ? '연락처' : '') + (errors.contact && (errors.consent || errors.privacy) ? '와 ' : '') + (errors.consent || errors.privacy ? '확인란' : '') + '을 확인해 주세요.</div>' : '') +
       (notice ? '<div class="sci-error-summary" role="alert">' + h(notice) + '</div>' : '') +
@@ -80,7 +80,7 @@
       '</select></div><div class="sci-field"><label for="sci-message">문의 내용 <small>선택</small></label><textarea id="sci-message" name="message" rows="4" maxlength="500" placeholder="필요한 수량, 활용할 업무 또는 궁금한 점을 남겨주세요.">' + h(draft.message) + '</textarea></div></section>' +
       '<div class="sci-consent"><label><input type="checkbox" name="contactRequested"' + (draft.contactRequested ? ' checked' : '') + ' aria-invalid="' + !!errors.consent + '" aria-describedby="sci-consent-error"><span>이 문의에 대한 안내를 받기 위해 연락을 요청합니다. <b>필수</b></span></label>' + errorFor('consent') + '<p>요청한 문의에 대해 선택한 방법으로 연락드립니다.</p></div>' +
       '<div class="sci-consent"><label><input type="checkbox" name="consent"' + (draft.consent ? ' checked' : '') + ' aria-invalid="' + !!errors.privacy + '" aria-describedby="sci-privacy-error"><span>' + h(meta.consent_text) + ' <b>필수</b></span></label>' + errorFor('privacy') + '</div>' +
-      '<button class="btn btn-primary sci-submit" type="submit"' + (sending ? ' disabled' : '') + '>' + (sending ? '접수하고 있어요…' : (intent === 'adoption' ? 'AI 도입 상담 신청하기' : '견적 문의 보내기') + icon('arrow-right')) + '</button><p class="sci-submit-note">문의 내용과 선택한 상품을 함께 확인합니다.</p></form>' + summary() + '</div>';
+      '<button class="btn btn-primary sci-submit" type="submit"' + (sending ? ' disabled' : '') + '>' + (sending ? '접수하고 있어요…' : (intent === 'adoption' ? 'AI 설치 상담 신청하기' : '장비 견적 문의 보내기') + icon('arrow-right')) + '</button><p class="sci-submit-note">문의 내용과 선택한 상품을 함께 확인합니다.</p></form>' + summary() + '</div>';
   }
   function result() {
     var success = phase === 'success', unknown = phase === 'unknown';

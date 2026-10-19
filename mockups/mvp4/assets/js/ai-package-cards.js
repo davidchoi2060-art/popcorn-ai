@@ -3,7 +3,7 @@
   var P=window.PAI,h=P.h,i=P.icon;
   var scenes={
     basic:{src:'basic-ai-hero-v3.png',alt:'밝은 학습 공간에서 PC와 노트로 자료를 정리하는 모습',tag:'배우고, 읽고, 정리하는 일'},
-    business:{src:'model-business.png',alt:'밝은 사무실에서 문서와 PC로 업무를 살펴보는 모습',tag:'우리 팀의 반복되는 업무'},
+    business:{src:'model-business.png',alt:'밝은 사무실에서 문서와 PC로 업무를 살펴보는 모습',tag:'업무 도입 패키지'},
     advanced:{src:'model-creator-promo.png',alt:'제작 스튜디오에서 PC와 작업 도구를 소개하는 모습',tag:'아이디어를 결과물로 만드는 일'}
   };
   function consult(id,intent){var args=new URLSearchParams({package:id,intent:intent});return (P.inquiryPreviewRoute||'ai-consult.html')+'?'+args;}
