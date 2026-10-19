@@ -37,7 +37,11 @@ _UNSELECTED = re.compile(r"선택하세요|선택안함|선택 안함|해당없�
 _QTY = re.compile(r"\*\s*(\d+)\s*개")
 _TRADEMARK = re.compile(r"[™®]")
 _TTL = 600
-_cache = {"at": 0.0, "lex": {}}
+_cache = {"at": 0.0, "lex": {}, "names": {}}
+# 사진을 아직 못 붙인 옵션은 상품 DB 의 같은 부품 상품을 이름으로 찾아 팝콘PC 몰의 그 부품 사진을 쓴다(2026-10-20 대표 「부품 이미지도 만들어」).
+PART_TYPES = {"CPU": ["CPU"], "COOLER": ["COOLER_CPU_AIR", "COOLER_CPU_AIO"], "RAM": ["RAM"], "MB": ["MB"], "GPU": ["GPU"],
+              "SSD": ["SSD"], "HDD": ["HDD"], "CASE": ["CASE"], "POWER": ["POWER"]}
+MALL_IMG = "https://www.popcornpc.co.kr/data/pimg/{d}/{c}_600.jpg"
 _lock = threading.Lock()
 
 
@@ -79,6 +83,36 @@ def rows(spec_source_text):
         parts.append({"slot": pt, "name": name, "quantity": int(m.group(1)) if m else 1, "key": key(_QTY.sub(" ", val))})
     parts.sort(key=lambda p: ORDER.index(p["slot"]) if p["slot"] in ORDER else 99)
     return parts, service
+
+
+def norm(s: str) -> str:
+    """이름 비교용 — 대괄호(제조사·사양 표기)와 기호를 뺀 소문자 글자만."""
+    return re.sub(r"[^0-9a-z가-힣]", "", re.sub(r"\[[^\]]*\]", " ", (s or "").lower()))
+
+
+def names(conn) -> dict:
+    """{슬롯: [(상품번호, 비교 이름, 판매중 여부)]} — 부품 상품. 10분 동안 재사용한다."""
+    with _lock:
+        if time.time() - _cache["at"] < _TTL and _cache["names"]:
+            return _cache["names"]
+    out = {}
+    for code, name, pt, status in conn.execute(text(
+            "SELECT product_code, product_name, part_type, status FROM products WHERE part_type = ANY(:t)"),
+            {"t": sum(PART_TYPES.values(), [])}):
+        slot = next(s for s, ts in PART_TYPES.items() if pt in ts)
+        out.setdefault(slot, []).append((code, norm(name), status == "판매중"))
+    with _lock:
+        _cache["names"] = out
+    return out
+
+
+def by_name(index: dict, slot: str, name: str):
+    """옵션 문구의 핵심 모델 이름을 포함하는 부품 상품 — 판매중·짧은 이름을 먼저. 못 찾으면 None."""
+    core = norm(name)
+    if len(core) < 5:
+        return None
+    cands = [x for x in index.get(slot, []) if core in x[1]]
+    return min(cands, key=lambda x: (not x[2], len(x[1])))[0] if cands else None
 
 
 def lexicon(conn) -> dict:
@@ -126,6 +160,8 @@ def registered(code: int, response: Response):
         parts, service = rows(p["spec_source_text"])
         lex = lexicon(conn)
         codes = [lex.get((x["slot"], x["key"])) for x in parts]
+        index = names(conn) if not all(codes) else {}
+        mall = [None if c else by_name(index, x["slot"], x["name"]) for x, c in zip(parts, codes)]
         info = {}
         if any(codes):
             for r in conn.execute(text(
@@ -135,10 +171,12 @@ def registered(code: int, response: Response):
                     {"c": [c for c in codes if c]}).mappings():
                 info[r["code"]] = r
     out = []
-    for x, c in zip(parts, codes):
+    for x, c, m in zip(parts, codes, mall):
         e = info.get(c) if c else None
-        out.append({"slot": x["slot"], "name": x["name"], "quantity": x["quantity"],
-                    "photo": f"/api/product-images/{c}/detail" if e and e["photo"] else None,
+        photo = f"/api/product-images/{c}/detail" if e and e["photo"] else None
+        if photo is None and m:
+            photo = MALL_IMG.format(d=m // 1000, c=m)
+        out.append({"slot": x["slot"], "name": x["name"], "quantity": x["quantity"], "photo": photo,
                     "role": (e["role"] or e["summary"]) if e else None})
     response.headers["Cache-Control"] = "no-store"
     return {"ok": True, "product_code": code, "basis": "mall-registered", "service": service, "parts": out}

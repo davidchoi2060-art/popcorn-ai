@@ -89,7 +89,7 @@
       var slot = String(x.slot || '').toUpperCase();
       return { label: SLOT[slot] || slot || '부품', value: String(x.name).replace(/^\[([^\]]{1,20})\]\s*/, '$1 '), slot: slot, registered: true, ordinal: i,
         quantity: Number.isInteger(x.quantity) && x.quantity > 0 ? x.quantity : 1, role: x.role || '', facts: [],
-        image: typeof x.photo === 'string' && /^\/api\/product-images\/\d+\/detail$/.test(x.photo) ? x.photo : '' };
+        image: typeof x.photo === 'string' && (/^\/api\/product-images\/\d+\/detail$/.test(x.photo) || /^https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600\.jpg$/.test(x.photo)) ? x.photo : '' };
     });
     p.service = body && typeof body.service === 'string' ? body.service : '';
     p.bomStatus = p.specs.length ? 'registered' : 'missing';
