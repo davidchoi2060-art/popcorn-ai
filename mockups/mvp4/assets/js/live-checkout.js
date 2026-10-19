@@ -77,7 +77,7 @@
 
   // ── 견적 확인 ────────────────────────────────────────────────────────
   P.designScreens.quote = function (ctx) {
-    var p = current(ctx), n = sets(qp(ctx, 'sets')), body;
+    var p = current(ctx), n = sets(qp(ctx, 'sets') || qp(ctx, 'quantity')), body;
     if (!p) body = P.designEmpty('아직 선택한 PC가 없어요', '상품을 고르거나 AI와 대화한 뒤 견적을 이어가세요.');
     else if (issue(p)) body = '<section class="ds-panel">' + blocked(p) + '</section>';
     else body = '<div class="ds-two-col"><div><section class="ds-panel"><h2>선택한 PC</h2>' + P.designProductSummary(p) + P.designSpecTable(p) + '<div class="ds-actions">' + link('상품 상세', 'product', p, 'btn-outline') + link('구성 살펴보기', 'options', p, 'btn-outline') + '</div></section>' + P.designNotice('견적 보관과 구매 상담은 별개예요', '견적만 보관한 경우에는 먼저 연락하지 않습니다. 상담을 원할 때 별도로 신청해 주세요.') + '</div>' +
@@ -107,7 +107,7 @@
 
   // ── 견적 보관 ────────────────────────────────────────────────────────
   P.designScreens.save = function (ctx) {
-    var p = current(ctx), n = sets(qp(ctx, 'sets'));
+    var p = current(ctx), n = sets(qp(ctx, 'sets') || qp(ctx, 'quantity'));
     if (!p) return { html: P.designWrap('견적 보관', '보관할 PC를 확인해 주세요.', P.designEmpty('보관할 PC를 찾을 수 없어요', '상품 목록에서 다시 선택해 주세요.')) };
     if (issue(p)) return { html: P.designWrap('견적 보관', '보관하기 전에 상품을 확인해 주세요.', steps(2) + '<section class="ds-panel">' + blocked(p) + '</section>') };
     var req = { id: uuid(), expected: p.price, phase: 'idle', contact: null };

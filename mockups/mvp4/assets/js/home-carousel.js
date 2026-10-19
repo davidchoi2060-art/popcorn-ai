@@ -39,7 +39,10 @@
     var toggle=root.querySelector('[data-hc-toggle]'), status=root.querySelector('[data-hc-status]');
     var motion=window.matchMedia('(prefers-reduced-motion: reduce)');
     var index=0, timer=null, manualPaused=motion.matches, hover=false, inView=true, touch=null, blockClickUntil=0;
-    var interval=3000;
+    var interval=3000, transitionMs=600, activeAnimations=[], settleTransition=null;
+    root.dataset.interval=String(interval);
+    root.dataset.transitionMs=String(transitionMs);
+    root.dataset.transitionStyle='slide';
     function clear(){window.clearTimeout(timer);timer=null;}
     function blocked(){return manualPaused||hover||document.hidden||!inView||root.contains(document.activeElement);}
     function schedule(){clear();if(!blocked())timer=window.setTimeout(function(){show(index+1,false);},interval);}
@@ -48,9 +51,37 @@
       toggle.setAttribute('aria-label',manualPaused?'배너 자동 넘김 재생':'배너 자동 넘김 정지');
       root.dataset.autoplay=manualPaused?'paused':'enabled';
     }
+    function finishTransition(){
+      if(settleTransition){var finish=settleTransition;settleTransition=null;finish();}
+      activeAnimations.forEach(function(animation){animation.cancel();});
+      activeAnimations=[];
+    }
     function show(next,manual){
+      var previous=index, direction=next<index?-1:1;
+      finishTransition();
       index=(next+panels.length)%panels.length;
-      panels.forEach(function(panel,i){panel.hidden=i!==index;panel.inert=i!==index;});
+      var outgoing=panels[previous], incoming=panels[index];
+      var animate=previous!==index&&!motion.matches&&typeof incoming.animate==='function';
+      panels.forEach(function(panel,i){
+        panel.hidden=i!==index&&!(animate&&i===previous);
+        panel.inert=i!==index;
+        panel.setAttribute('aria-hidden',String(i!==index));
+      });
+      if(animate){
+        root.dataset.transitioning='true';
+        var options={duration:transitionMs,easing:'cubic-bezier(.22,.68,.2,1)',fill:'both'};
+        var leave=outgoing.animate([{transform:'translateX(0)'},{transform:'translateX('+(-direction*100)+'%)'}],options);
+        var enter=incoming.animate([{transform:'translateX('+(direction*100)+'%)'},{transform:'translateX(0)'}],options);
+        activeAnimations=[leave,enter];
+        settleTransition=function(){
+          panels.forEach(function(panel,i){panel.hidden=i!==index;});
+          root.dataset.transitioning='false';
+        };
+        enter.onfinish=finishTransition;
+      }else{root.dataset.transitioning='false';}
+      // Prepare the next image while the current banner is being read.
+      var nextImage=panels[(index+1)%panels.length].querySelector('.hc-image');
+      if(nextImage)nextImage.loading='eager';
       selectors.forEach(function(button,i){button.setAttribute('aria-pressed',String(i===index));});
       root.querySelector('[data-hc-current]').textContent=String(index+1).padStart(2,'0');
       root.dataset.activeSlide=String(index+1);
@@ -82,7 +113,7 @@
     document.addEventListener('visibilitychange',schedule);
     window.addEventListener('pagehide',clear);
     window.addEventListener('pageshow',schedule);
-    motion.addEventListener('change',function(){if(motion.matches){manualPaused=true;paintToggle();}schedule();});
+    motion.addEventListener('change',function(){if(motion.matches){finishTransition();manualPaused=true;paintToggle();}schedule();});
     if('IntersectionObserver' in window){new IntersectionObserver(function(entries){inView=entries[0].isIntersecting;schedule();},{threshold:0.15}).observe(root);}
     show(0,false);
   }

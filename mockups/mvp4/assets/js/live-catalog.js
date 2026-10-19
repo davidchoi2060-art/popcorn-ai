@@ -40,7 +40,7 @@
     var spec = it.spec && typeof it.spec === 'object' ? it.spec : {};
     var summary = summarySpecs(spec);
     return {
-      id: String(it.product_code), productCode: it.product_code, name: it.name,
+      id: String(it.product_code), productCode: it.product_code, name: it.name, officialName: typeof it.official_name === 'string' && it.official_name.trim() ? it.official_name.trim() : it.name,
       price: typeof it.price === 'number' && it.price > 0 ? it.price : null, priceBasis: it.price_basis || '',
       image: it.photo_hint ? it.image_url : null, mediaStatus: it.photo_hint ? 'ready' : 'missing',
       summary: summary.map(function (s) { return s.value; }).join(' · '), summarySpecs: summary,
@@ -63,8 +63,13 @@
       return { label: SLOT[String(x.slot || '').toUpperCase()] || String(x.slot || '부품'), value: x.name, slot: String(x.slot || '').toUpperCase(),
         quantity: Number.isInteger(x.quantity) && x.quantity > 0 ? x.quantity : null, partId: x.ordinal, partIdKind: 'ordinal',
         role: x.description || '', facts: facts, detail: facts.map(function (f) { return f.label + ': ' + f.value; }).join(' · '),
-        assemblyOnly: x.assembly_only === true };
+        assemblyOnly: x.assembly_only === true,
+        // 부품 사진: 서버가 이 부품 설명 코드로 공개 승인한 사진만(parts[].photo, state=approved). 이름으로 찾지 않는다.
+        image: x.photo && x.photo.state === 'approved' && typeof x.photo.url === 'string' && /^\/api\/product-images\/\d+\/detail$/.test(x.photo.url) ? x.photo.url : '' };
     });
+    // 기존 /mvp3 상세가 보여 주던 소개·구매 전 확인 사항도 함께 둔다(빠뜨리지 않게).
+    p.description = conf && conf.description && typeof conf.description === 'object' ? conf.description : null;
+    p.customerConditions = conf && conf.customer_conditions && typeof conf.customer_conditions === 'object' ? conf.customer_conditions : null;
     p.bomStatus = p.specs.length ? 'configuration-only' : 'missing';
     var photo = body && body.photo;
     if (photo && photo.state === 'available' && typeof photo.url === 'string' && photo.url.indexOf('/api/customer/products/' + p.id + '/') === 0) {

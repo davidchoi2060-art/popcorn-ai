@@ -98,6 +98,8 @@ def item_of(p, public, media) -> dict:
     return {
         "product_code": code,
         "name": match_storage_shorthand(card_name(p["name"]), p.get("spec")),
+        # official name as listed by the mall (crawl_name). Shown as the full product name; "name" is the short card name.
+        "official_name": p["name"] if isinstance(p.get("name"), str) else None,
         "price": _price(p.get("price")),
         "price_basis": p.get("price_src"),
         "sale_status": p.get("status"),

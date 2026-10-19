@@ -42,7 +42,7 @@ class CatalogTest(unittest.TestCase):
         items = self.run_catalog({1: product(1, 게임=2), 2: product(2, status="품절", 게임=2)}, public={1}, media={1})
         self.assertEqual([i["product_code"] for i in items], [1])
         it = items[0]
-        self.assertEqual(set(it), {"product_code", "name", "price", "price_basis", "sale_status", "mall_url", "spec", "fit",
+        self.assertEqual(set(it), {"product_code", "name", "official_name", "price", "price_basis", "sale_status", "mall_url", "spec", "fit",
                                    "category", "configuration_public", "photo_hint", "image_url"})
         # 평가 내부 지수는 고객에게 내지 않는다(card_spec 의 public_spec).
         self.assertNotIn("cpu_mt", it["spec"]); self.assertNotIn("gpu_idx", it["spec"])

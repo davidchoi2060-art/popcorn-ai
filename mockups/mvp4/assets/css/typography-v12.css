@@ -1,0 +1,306 @@
+/* v12 readability layer: load after the page styles and before catalog-cards-v12.css.
+   Font family, colors, hero titles and catalog-card presentation stay in their owners.
+   Only text roles and the space required by those roles are adjusted here. */
+
+/* Shared controls, forms and supporting copy. */
+/* The approved rolling banner is excluded, including shared button changes. */
+.btn:not(:where(.hc-carousel .btn)),
+.btn-small:not(:where(.hc-carousel .btn-small)) { font-size:16px; min-height:48px; line-height:1.5; }
+.formfield label, .field-label { font-size:16px; }
+.formfield input, .formfield select, .formfield textarea { font-size:16px; }
+.formfield small, .field-hint, .error, .notice, .eyebrow, .breadcrumb, .chip { font-size:14px; }
+.notice, .field-hint, .formfield small { line-height:1.7; }
+body .site-footer .footer-links,
+body[data-page=home] .site-footer .footer-links { font-size:14px; gap:8px 20px; flex-wrap:wrap; }
+body .site-footer .footer-links a { display:inline-flex; align-items:center; min-height:44px; }
+body .site-footer .footer-caption,
+body[data-page=home] .site-footer .footer-caption { font-size:14px; line-height:1.8; }
+
+/* Search and the complete navigation menu. */
+.nh-search-field input { font-size:16px; }
+.nh-search-error, .nh-tool { font-size:14px; }
+.nh-category-button, .nh-main-links>a, .nh-ai-entry { font-size:16px; min-height:44px; }
+.nh-desktop-nav { height:auto; min-height:52px; }
+.nh-category-button { min-height:52px; }
+.nh-menu-heading p, .nh-category-grid small, .nh-menu-finder small,
+.nh-group-copy, .nh-package-list small { font-size:14px; line-height:1.5; }
+.nh-category-grid strong, .nh-menu-finder strong, .nh-package-list strong,
+.nh-group-heading>a, .nh-consult-link, .nh-menu-support>a { font-size:16px; line-height:1.5; }
+.nh-group-heading>a, .nh-consult-link, .nh-menu-support>a { min-height:44px; }
+.nh-category-grid>a, .nh-package-list>a { min-width:0; }
+.nh-category-grid>a>span:not(.nh-category-icon), .nh-package-list>a>span { min-width:0; }
+.nh-category-grid strong, .nh-package-list strong, .nh-menu-finder strong { word-break:keep-all; overflow-wrap:anywhere; }
+.nh-menu-finder small { margin-top:6px; }
+.nh-menu-support { gap:10px; }
+
+/* Product introductions below the unchanged rolling banner. */
+.hm-hero-chat { font-size:14px; }
+.hm-home .hm-ai-actions .btn, .hm-home .hm-gaming-actions .btn,
+.hm-home .hm-product-row>.btn, .hm-home .hm-finder .btn,
+.hm-home .hm-hero-actions .btn { font-size:16px; min-height:48px; line-height:1.5; }
+.hm-ai-features a { font-size:16px; line-height:1.5; min-height:40px; }
+.hm-package-links small { font-size:14px; }
+.hm-gaming-copy h3, .hm-row-copy h3 { font-size:18px; line-height:1.6; overflow-wrap:anywhere; }
+.hm-spec, .hm-mini-row .hm-spec { font-size:15px; line-height:1.7; }
+.hm-text-link, .hm-gaming-actions .hm-text-link { font-size:16px; min-height:44px; line-height:1.5; }
+.hm-other-heading .hm-text-link { font-size:14px; }
+.hm-finder h2+p, .hm-finder label, .hm-finder textarea { font-size:16px; line-height:1.6; }
+.hm-services strong { font-size:18px; }
+.hm-services small { font-size:14px; line-height:1.6; }
+.cb-kicker, .cb-support { font-size:14px; line-height:1.5; }
+.cb-description, .cb-ai-button { font-size:16px; line-height:1.6; }
+.cb-ai-button { min-height:48px; }
+
+/* Catalog controls; the separate card stylesheet owns every new catalog card. */
+.dp-page .eyebrow { font-size:14px; }
+.dp-catalog-heading>div>p:last-child, .dp-ai-entry strong, .dp-ai-entry span span { font-size:16px; }
+.dp-search>input, .dp-search>input::placeholder,
+.dp-search>.btn, .dp-filter-row>label, .dp-filter-row select,
+.dp-reset-button, .dp-text-button { font-size:16px; }
+.dp-filter-row select, .dp-search>.btn { min-height:48px; }
+.dp-reset-button, .dp-text-button { min-height:44px; }
+.dp-live-message, .dp-results-heading p, .dp-notice p,
+.dp-pagination p, .dp-all-loaded { font-size:14px; line-height:1.7; }
+.dp-results-heading h2 span, .dp-notice strong, .dp-empty p { font-size:16px; }
+.dp-empty .btn, .dp-pagination .btn, .dp-compare-bar>.btn { font-size:16px; min-height:48px; }
+.dp-compare-intro strong { font-size:16px; }
+.dp-compare-intro strong span, .dp-compare-intro p, .dp-compare-items li>span { font-size:14px; line-height:1.5; }
+.dp-compare-items button { flex-basis:44px; width:44px; height:44px; }
+.dp-compare-items li { min-width:0; }
+
+/* Product detail: whole model names remain visible, without clamping or shortening. */
+.dp-back, .dp-product-chat, .dp-alternative-link { font-size:16px; min-height:44px; line-height:1.6; }
+.dp-product-code, .dp-product-price>span, .dp-product-badges .dp-category,
+.dp-product-badges .dp-status, .dp-product-info>.dp-spec-origin,
+.dp-photo-surface figcaption, .dp-gallery-thumbs>span { font-size:14px; line-height:1.6; }
+.dp-product-summary, .dp-price-confirm { font-size:16px; line-height:1.8; }
+.dp-product-info>.dp-card-specs>div { grid-template-columns:64px minmax(0,1fr); font-size:16px; line-height:1.7; }
+.dp-product-info>.dp-card-specs dt { font-size:15px; }
+.dp-product-info>.dp-card-specs dd { word-break:keep-all; overflow-wrap:anywhere; }
+.dp-product-actions>.btn { font-size:16px; min-height:52px; }
+.dp-action-note, .dp-inline-note, .dp-section-heading>div>p:last-child,
+.dp-product-specs .dp-spec-origin, .dp-name-summary>p,
+.dp-quantity-note, .dp-part-review-note { font-size:14px; line-height:1.7; }
+.dp-spec-group>summary>strong { font-size:16px; }
+.dp-spec-group>summary>span { font-size:14px; }
+.dp-spec-group table { width:100%; table-layout:fixed; }
+.dp-spec-group th, .dp-spec-group td { word-break:keep-all; overflow-wrap:anywhere; line-height:1.8; }
+.dp-spec-group th { width:180px; font-size:15px; }
+.dp-spec-group td { font-size:16px; }
+.dp-part-detail-link { font-size:16px; min-height:44px; line-height:1.6; }
+.dp-name-summary dt { font-size:15px; }
+.dp-name-summary dd { font-size:16px; line-height:1.8; word-break:keep-all; overflow-wrap:anywhere; }
+.dp-image-dialog h2 { font-size:18px; }
+
+/* Component information and the parent PC summary. */
+.dcp-part-category, .dcp-owner>.eyebrow, .dcp-owner-photo>span,
+.dcp-code, .dcp-owner-price span, .dcp-help p,
+.dcp-source-note p, .dcp-original-label, .dcp-code-help,
+.dcp-comparison-note .dcp-comparison-help { font-size:14px; line-height:1.7; }
+.dcp-part-facts dt, .dcp-spec-facts dt, .dcp-reference-code dt,
+.dcp-original-value h3 { font-size:15px; }
+.dcp-part-facts dd, .dcp-original-value p, .dcp-detail-text,
+.dcp-spec-facts dd, .dcp-reference-code dd, .dcp-status p,
+.dcp-status .dcp-status-part, .dcp-comparison-note p { font-size:16px; line-height:1.8; }
+.dcp-help strong, .dcp-source-note strong { font-size:16px; }
+.dcp-owner h2 { font-size:18px; line-height:1.6; }
+.dcp-owner-product p { font-size:15px; line-height:1.7; }
+.dcp-help a, .dcp-owner-actions .btn, .dcp-status-actions .btn,
+.dcp-part-link { font-size:16px; min-height:44px; line-height:1.6; }
+.dcp-owner-actions .btn, .dcp-status-actions .btn { min-height:48px; }
+
+/* Options, quotes, saved estimates and the consultation handoff. */
+.ds-crumb, .ds-step, .ds-product-summary small, .ds-item small,
+.ds-item-photo, .ds-option span, .ds-form-error { font-size:14px; line-height:1.6; }
+.ds-product-summary h3, .ds-item h3 { font-size:18px; line-height:1.6; }
+.ds-product-summary p, .ds-item p { font-size:15px; line-height:1.7; }
+.ds-specs dt, .ds-option-table th { font-size:15px; }
+.ds-specs dd, .ds-option-table td { font-size:16px; line-height:1.8; word-break:keep-all; overflow-wrap:anywhere; }
+.ds-price-line { font-size:16px; line-height:1.6; }
+.ds-price-line.total strong { font-size:32px; }
+.ds-form label, .ds-form input:not([type=checkbox]), .ds-form select,
+.ds-form textarea { font-size:16px; }
+.ds-card-actions .btn, .ds-section-heading>a, .ds-home-categories a { font-size:16px; min-height:44px; line-height:1.6; }
+.ds-card-actions .btn { min-height:48px; }
+
+/* Conversation and recommendations. */
+.dc-heading .eyebrow, .dc-heading>div>p:last-child:not(.eyebrow),
+.dc-message>span, .dc-state-box p, .dc-local-notice, .dc-composer small,
+.dc-chat-note, .dc-photo-placeholder>small, .dc-empty p,
+.dc-tabs button>span { font-size:14px; line-height:1.7; }
+.dc-message>p, .dc-welcome>p, .dc-state-box strong, .dc-empty h3 { font-size:16px; line-height:1.8; }
+.dc-new, .dc-welcome-prompts>button, .dc-draft-chip,
+.dc-state-box button, .dc-inline-actions .btn, .dc-composer .btn,
+.dc-empty .btn, .dc-candidates-heading>a, .dc-tabs>button { font-size:16px; min-height:44px; line-height:1.5; }
+.dc-inline-actions .btn, .dc-composer .btn, .dc-empty .btn { min-height:48px; }
+.dc-composer textarea { font-size:16px; }
+.dc-composer>div { flex-wrap:wrap; }
+.dc-composer .btn { margin-left:auto; }
+.dc-chat-main { min-height:480px; }
+.dc-conditions label { grid-template-columns:80px minmax(0,1fr); }
+.dc-conditions label>span, .dc-conditions input { font-size:16px; }
+.dc-conditions input { min-height:44px; }
+.dc-product-content h3, .dc-chosen-top strong { font-size:18px; line-height:1.6; word-break:keep-all; overflow-wrap:anywhere; }
+.dc-product-content>p { font-size:15px; line-height:1.7; }
+.dc-product-actions { flex-wrap:wrap; }
+.dc-product-actions .btn, .dc-product-actions>a, .dc-chosen-links .btn { font-size:16px; min-height:44px; line-height:1.5; }
+.dc-product-actions .btn, .dc-chosen-links .btn { min-height:48px; white-space:normal; text-align:center; }
+
+/* Product comparison uses the same legible labels and values. */
+.dc-compare-toolbar { font-size:16px; flex-wrap:wrap; }
+.dc-compare-notice>p, .dc-compare-remove, .dc-unavailable-label,
+.dc-compare-footnote, .dc-slide-nav>span { font-size:14px; line-height:1.7; }
+.dc-compare-remove { min-height:44px; }
+.dc-compare-notice .btn, .dc-compare-actions .btn,
+.dc-compare .dc-heading>.btn { font-size:16px; min-height:48px; line-height:1.5; }
+.dc-compare-table thead>tr>th:first-child, .dc-compare-table tbody th,
+.dc-compare-table tfoot th, .dc-compare-mobile-card dt { font-size:15px; }
+.dc-compare-table td, .dc-compare-mobile-card dd { font-size:16px; line-height:1.8; }
+.dc-compare-product h2 { font-size:19px; line-height:1.6; }
+.dc-slide-nav .icon-button { width:44px; height:44px; }
+/* The previous empty-difference row has a font-size !important. Match only that row. */
+.dc-compare .dc-no-difference { font-size:14px!important; }
+
+/* AI package comparison and detail. */
+.ap-description, .ap-device strong, .ap-uses li { font-size:16px; line-height:1.6; }
+.ap-device p, .ap-note, .ap-kicker, .ap-type { font-size:14px; line-height:1.6; }
+.ap-actions>.btn, .ap-actions>div a { font-size:16px; min-height:48px; line-height:1.5; }
+.ap-actions>div a { flex-wrap:wrap; gap:5px; padding-block:8px; text-align:center; }
+.ai-intro>p, .ap-page .ai-intro p, .ai-hero-copy>p, .ai-use p,
+.compact .ai-use h3, .ai-scope>div>p, .ai-scope-grid p,
+.ai-process p, .ai-faq summary, .ai-faq details>p,
+.ai-bottom-cta span, .support-grid p, .policy-section p { font-size:16px; line-height:1.7; }
+.ai-footnote, .ai-help-panel p, .ai-process small, .ai-demo>small,
+.demo-query, .demo-paper strong, .demo-paper>p { font-size:14px; line-height:1.7; }
+.ai-tabs a { font-size:16px; min-height:48px; line-height:1.5; }
+.ai-tabs { flex-wrap:wrap; }
+.ai-intro>p, .ap-page .ai-intro p { font-size:18px; }
+.ai-hero-copy>.text-link, .consult-context .text-link { font-size:16px; min-height:44px; line-height:1.5; }
+.ai-scope-grid h3, .ai-check-list li, .ai-package-card>p.muted,
+.consult-context p, .consult-form legend, .use-options label,
+.contact-method label, .consent-box>label, .ai-result>p { font-size:16px; line-height:1.7; }
+.consent-box details, .bridge-page>small, .consult-form .required,
+.result-summary small { font-size:14px; line-height:1.7; }
+.result-summary dt { font-size:15px; }
+.result-summary dd { font-size:16px; overflow-wrap:anywhere; }
+
+/* Inquiry and adoption forms retain the compact mobile package summary. */
+.iq-section legend, .iq-field>label, .iq-option, .iq-consent,
+.iq-consent>label, .iq-field>input, .iq-field>select,
+.iq-field>textarea { font-size:16px; line-height:1.6; }
+.iq-field>label span, .iq-option small, .iq-field>small, .iq-hint,
+.iq-error, .iq-consent>p, .iq-consent>.iq-error, .iq-page .required,
+.iq-section>header p, .iq-help p, .iq-help li, .iq-progress,
+.iq-review>p, .iq-status-note { font-size:14px; line-height:1.7; }
+.iq-intro>p, .iq-result>p, .iq-package-body p,
+.iq-review dd, .iq-result-summary dd, .iq-features { font-size:16px; line-height:1.7; }
+.iq-intro>p { font-size:17px; }
+.iq-features>span { font-size:16px; line-height:1.5; }
+.iq-package-body .eyebrow { font-size:14px; }
+.iq-review dt, .iq-result-summary dt { font-size:15px; }
+.iq-purpose button, .iq-purpose a, .iq-submit.btn,
+.iq-actions .text-link, .iq-package-body>.text-link,
+.iq-help a { font-size:16px; min-height:44px; line-height:1.5; }
+.iq-purpose button, .iq-purpose a, .iq-submit.btn { min-height:48px; }
+.iq-submit.btn { font-size:17px; }
+.iq-progress h2, .iq-progress h3, .iq-progress strong { font-size:16px; }
+
+/* Peripheral listings and the existing purchase handoff. */
+.pc-btn, .pc-back-link, .pc-section-tabs a { font-size:16px; min-height:48px; line-height:1.5; }
+.pc-muted, .pc-action-help, .pc-photo-note, .pc-price-note,
+.pc-handoff-product small { font-size:14px; line-height:1.7; }
+.pc-peripheral-grid p, .pc-handoff-intro, .pc-handoff-notes,
+.pc-faq-grid details p, .pc-faq-grid summary { font-size:16px; line-height:1.7; }
+.pc-handoff-product p { font-size:15px; line-height:1.7; }
+.pc-spec-section th { font-size:15px; }
+.pc-spec-section td { font-size:16px; }
+.pc-detail-bottom .pc-btn { font-size:16px; }
+
+@media(min-width:901px) and (max-width:1150px) {
+  .nh-desktop-nav, .nh-main-links { gap:14px; }
+  .nh-category-button { min-width:146px; padding-inline:13px; }
+  .nh-ai-entry { padding-inline:10px; }
+  .nh-header .nh-top { gap:20px; }
+  .nh-tools { gap:12px; }
+}
+@media(max-width:900px) {
+  .nh-tool { min-height:44px; }
+  .nh-mobile-menu { width:44px; height:44px; }
+  .nh-mobile-nav { min-height:52px; gap:8px; }
+  .nh-mobile-nav>a, .nh-mobile-nav .nh-mobile-ai { font-size:15px; min-height:44px; }
+  .nh-package-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .nh-package-list>a { flex-direction:row; align-items:center; padding:14px; }
+  .nh-package-list>a>.icon:last-child { display:block; }
+}
+@media(max-width:800px) {
+  .hm-package-links strong, .hm-package-links b { font-size:16px; line-height:1.5; }
+  .hm-ai-includes { font-size:16px; line-height:1.6; }
+  .hm-ai-actions .btn, .hm-gaming-actions .btn { white-space:normal; text-align:center; }
+  .hm-gaming-actions { flex-wrap:wrap; gap:10px; }
+  .hm-categories span { font-size:16px; line-height:1.4; min-height:44px; }
+  .hm-product-row>.btn { max-width:100%; white-space:normal; text-align:center; }
+  .dc-heading { flex-wrap:wrap; }
+  .dc-new { margin-left:auto; }
+  .dc-chat-main { min-height:460px; }
+  .dc-chosen-links { grid-template-columns:1fr; }
+  .dc-compare-mobile-card .dc-compare-actions { grid-template-columns:1fr; }
+  .dc-compare-notice>p { min-width:0; }
+  .dc-product-content h3 { font-size:18px; }
+  .ai-intro>p, .ap-page .ai-intro p, .iq-intro>p, .iq-submit.btn { font-size:16px; }
+  .iq-review dl>div, .iq-result-summary>div { grid-template-columns:84px minmax(0,1fr); gap:12px; }
+}
+@media(max-width:680px) {
+  .dp-results-heading { align-items:flex-start; flex-wrap:wrap; }
+  .dp-results-heading p { flex-basis:100%; }
+  .dp-filter-row>label { gap:8px; }
+  .dp-filter-row select { padding-right:27px; }
+  .dp-compare-intro { align-items:flex-start; flex-wrap:wrap; }
+  .dp-compare-items { flex-wrap:wrap; }
+  .dp-compare-items li { flex:1 1 100%; justify-content:space-between; }
+  .dp-compare-items li>span { white-space:normal; overflow-wrap:anywhere; }
+  .dp-product-price>strong { font-size:32px; }
+  .dp-section-heading { align-items:flex-start; flex-wrap:wrap; }
+  .dp-section-heading>.dp-text-button { font-size:16px; }
+  .dp-spec-group>summary { align-items:flex-start; }
+  .dp-spec-group>summary>span { white-space:normal; text-align:right; flex-shrink:0; }
+  .dp-spec-group th { width:25%; }
+  .dp-spec-group td { width:75%; }
+  .dp-spec-group th, .dp-spec-group td { padding:16px 10px; box-sizing:border-box; }
+  .dp-name-summary dl>div { grid-template-columns:68px minmax(0,1fr); gap:12px; }
+  .dp-part-detail-link { align-items:flex-start; gap:5px; }
+  .dp-part-detail-link .icon { flex-shrink:0; margin-top:6px; }
+}
+@media(max-width:600px) {
+  .nh-category-grid, .nh-package-list { grid-template-columns:1fr; }
+  .nh-category-grid>a { padding:13px; min-height:80px; gap:12px; }
+  .nh-category-icon { width:30px; flex-basis:30px; }
+  .nh-category-grid>a>.icon { width:16px; height:16px; }
+  .nh-menu-support>a { font-size:14px; min-height:44px; }
+  .nh-group-heading { flex-wrap:wrap; }
+  .hm-gaming-product { grid-template-columns:25% minmax(0,1fr); }
+  .hm-gaming-actions .hm-text-link { width:100%; }
+  .hm-product-row { grid-template-columns:84px minmax(0,1fr); gap:12px; }
+  .hm-row-image img { max-width:100%; }
+  .hm-package-links>a { flex-wrap:wrap; }
+  .ds-specs>div { grid-template-columns:80px minmax(0,1fr); gap:12px; }
+  .ds-price-line.total { align-items:flex-start; flex-wrap:wrap; }
+  .ds-option-table th { width:25%; }
+  .ds-option-table td { width:75%; }
+  .ds-card-actions { flex-wrap:wrap; }
+  .ds-card-actions .btn { flex-basis:100%; }
+  .ai-use-grid.compact, .ai-scope-grid, .ai-process { grid-template-columns:1fr; }
+  .ai-tabs { gap:8px; }
+  .ai-tabs a { white-space:normal; text-align:center; }
+  .dc-candidates-heading { flex-wrap:wrap; }
+  .dc-conditions label { grid-template-columns:72px minmax(0,1fr); }
+  .dc-product-card { gap:12px; }
+  .dc-product-actions { gap:6px; }
+  .dc-product-actions .btn { width:100%; }
+  .dc-product-actions>a { padding-block:6px; }
+}
+@media(max-width:370px) {
+  .nh-mobile-nav>a, .nh-mobile-nav .nh-mobile-ai { font-size:14px; }
+  .nh-tools { gap:6px; }
+  .hm-categories span { font-size:15px; }
+  .iq-section { padding-inline:16px; }
+}
