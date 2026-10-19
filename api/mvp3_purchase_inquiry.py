@@ -57,7 +57,7 @@ class FixedPick(BaseModel):
     intent: Literal['quote', 'adoption']
     quantity: StrictInt = Field(ge=1, le=10)
     purpose: Literal['local-llm', 'documents', 'development', 'other'] | None = None
-    # 고객이 화면에서 본 1대 가격. 지금 판매가와 다르면 접수하지 않고 409(price_changed) — 바뀐 가격을 보고 다시 보낸다.
+    # 고객이 화면에서 본 1대 가격. 지금 판매가와 달라도 접수한다 — 두 값을 함께 남기고 상담사가 전화로 조정한다(2026-10-20 대표).
     seen_unit_price: StrictInt | None = Field(default=None, ge=0)
 
 
@@ -195,15 +195,14 @@ def create_inquiry(body: InquiryBody, request: Request, response: Response):
                               ensure_ascii=False)
         fixed = None
         if body.fixed is not None:
-            # 지금 판매가로 다시 센다. 화면이 본 가격과 다르면 접수하지 않는다(고객이 바뀐 가격을 보고 다시 보낸다).
-            item = customer_supercomputer.load(conn, (body.product_code,)).get(body.product_code)
-            if item is None:
-                raise HTTPException(409, {'error': 'product_missing', 'detail': '상품 정보를 찾을 수 없어요. 상품을 다시 선택해 주세요.'})
+            # 접수를 막지 않는다(2026-10-20 대표: 금액·사양이 안 맞으면 전문 상담사가 전화로 조정해 판매한다).
+            # 신청 순간의 판매가와 고객이 본 가격을 함께 남겨 상담사가 본다. 카테고리에서 빠진 상품도 번호 그대로 받는다.
+            item = customer_supercomputer.load(conn, (body.product_code,)).get(body.product_code) or {
+                'product_code': body.product_code, 'official_name': None, 'storage': None, 'price': None, 'sale_state': 'unknown'}
             price = item['price']
-            if body.fixed.seen_unit_price is not None and body.fixed.seen_unit_price != price:
-                raise HTTPException(409, {'error': 'price_changed', 'price': price, 'sale_state': item['sale_state'],
-                                          'detail': '상품 가격이나 판매 상태가 바뀌었어요. 바뀐 내용을 확인한 뒤 다시 보내 주세요.'})
             fixed = json.dumps({'product_code': item['product_code'], 'name': item['official_name'],
+                                'seen_unit_price': body.fixed.seen_unit_price,
+                                'price_differs': body.fixed.seen_unit_price is not None and body.fixed.seen_unit_price != price,
                                 'storage': item['storage'], 'intent': body.fixed.intent,
                                 'quantity': body.fixed.quantity,
                                 'purpose': PURPOSES.get(body.fixed.purpose) if body.fixed.purpose else None,

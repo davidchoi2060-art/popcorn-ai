@@ -19,7 +19,7 @@
 .scl-card>a{display:flex;flex-direction:column;height:100%;border:1px solid #e6e3ee;border-radius:20px;background:#fff;overflow:hidden;color:inherit;text-decoration:none;transition:border-color .15s,box-shadow .15s}
 .scl-card>a:hover{border-color:#cdbff3;box-shadow:0 10px 28px rgba(76,52,160,.08)}.scl-card>a:focus-visible{outline:3px solid #7652da;outline-offset:3px}
 .scl-photo{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/3;background:#f1f6fb;padding:20px}
-.scl-photo img{width:100%;height:100%;object-fit:contain;mix-blend-mode:multiply}
+.scl-photo{overflow:hidden}.scl-photo img{position:absolute;inset:20px;width:calc(100% - 40px);height:calc(100% - 40px);object-fit:contain;mix-blend-mode:multiply}
 .scl-photo-none{display:flex;flex-direction:column;align-items:center;gap:8px;color:#7b7790;font-size:15px}.scl-photo-none .icon{width:30px;height:30px;opacity:.6}
 .scl-badge{position:absolute;left:14px;top:14px;padding:5px 11px;border-radius:99px;font-size:13px;font-weight:800;background:#fff;border:1px solid #e3dcf0}
 .scl-badge.is-check{color:#8a5a00;border-color:#f0dfb3;background:#fff8e6}.scl-badge.is-stopped{color:#6b6f7c;background:#f1f2f5}

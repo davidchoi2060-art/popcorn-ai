@@ -42,7 +42,7 @@ _NODES = """
     )
 """
 _COLS = """
-    p.product_code, p.product_name, p.sale_price, p.status,
+    p.product_code, p.product_name, p.maker AS p_maker, p.sale_price, p.status,
     d.display_name, d.maker, d.model_name, d.accelerator, d.processor, d.memory, d.storage, d.os, d.architecture,
     d.model_group, d.model_label, d.featured_rank, d.images, d.detail,
     EXISTS (SELECT 1 FROM product_explanations e WHERE e.source_product_code = p.product_code
@@ -58,6 +58,26 @@ _FROM = """
 def _clean_name(s):
     s = _TAG.sub(' ', s or '')
     return re.sub(r'\s+', ' ', s).strip() or None
+
+
+# 표시 정보를 아직 적지 않은 상품은 몰 상품명·제조사에서 읽을 수 있는 값으로 채운다(2026-10-20 대표 「사용자에게 반복 일을 시키지 마라」).
+# 상품명에 GB10/DGX Spark 가 있으면 GB10 플랫폼 공통 사양(가속기·CPU·OS·아키텍처)을 쓴다. 읽지 못한 값은 비워 둔다(«확인 필요»).
+_TB = re.compile(r'(?:M\.2\s*|/)\s*(\d+)\s*TB', re.I)
+_GB = re.compile(r'[(\[/]\s*(\d{2,4})\s*G(?:B)?(?![A-Za-z])', re.I)
+_GB10 = re.compile(r'GB10|DGX\s*Spark|Grace\s*Blackwell', re.I)
+
+
+def derive(name, maker):
+    name = name or ''
+    out = {'maker': (maker or '').strip() or None}
+    m = _TB.search(name)
+    out['storage'] = m.group(1) + 'TB' if m else None
+    m = _GB.search(name)
+    out['memory'] = m.group(1) + 'GB' if m else None
+    if _GB10.search(name):
+        out.update(accelerator='NVIDIA GB10', processor='20코어 ARM 기반 CPU', os='DGX OS', architecture='ARM',
+                   memory=out['memory'] or '128GB')
+    return out
 
 
 def _images(r):
@@ -79,18 +99,20 @@ def _state(r):
 
 def item(r, with_detail=False) -> dict:
     price, state = _state(r)
+    auto = derive(r['product_name'], r.get('p_maker')) if r['display_name'] is None else {}
+    v = lambda k: r[k] or auto.get(k) or None
     out = {
         'product_code': r['product_code'],
         'name': r['display_name'] or _clean_name(r['product_name']),
         'official_name': _clean_name(r['product_name']),
-        'maker': r['maker'] or None,
+        'maker': v('maker'),
         'model_name': r['model_name'] or None,
-        'accelerator': r['accelerator'] or None,
-        'processor': r['processor'] or None,
-        'memory': r['memory'] or None,
-        'storage': r['storage'] or None,
-        'os': r['os'] or None,
-        'architecture': r['architecture'] or None,
+        'accelerator': v('accelerator'),
+        'processor': v('processor'),
+        'memory': v('memory'),
+        'storage': v('storage'),
+        'os': v('os'),
+        'architecture': v('architecture'),
         'model_group': r['model_group'] or None,
         'model_label': r['model_label'] or None,
         'featured_rank': r['featured_rank'],
