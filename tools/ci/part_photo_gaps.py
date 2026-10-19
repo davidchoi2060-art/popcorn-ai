@@ -80,12 +80,14 @@ def main():
                     reg_gap[(x.get('slot'), x.get('name'))] += 1
         if not it.get('photo_hint'):
             st, size = head(MALL.format(d=c // 1000, c=c))
+            if st != 200 or size < 2000:      # 화면은 .jpg 가 없으면 .gif 로 다시 읽는다(live-catalog.js)
+                st, size = head(MALL.format(d=c // 1000, c=c)[:-4] + '.gif')
             if st != 200 or size < 2000:
                 no_mall.append((c, it.get('name'), st, size))
     print(f'### 판매 PC {len(items)}대')
     print(f'- 몰 등록 구성: 부품 {reg_n}개 중 사진 {reg_ph}개, 빈칸 {reg_n - reg_ph}개(문구 {len(reg_gap)}종)')
     print(f'- 승인 구성: 부품 {off_n}개 중 사진 {off_ph}개, 빈칸 {off_n - off_ph}개(문구 {len(off_gap)}종)')
-    print(f'- 공개 사진 없고 몰 대표 사진도 없는 PC: {len(no_mall)}대')
+    print(f'- 공개 사진 없고 몰 대표 사진(.jpg·.gif)도 없는 PC: {len(no_mall)}대')
     for title, gap in (('몰 등록 구성 빈칸', reg_gap), ('승인 구성 빈칸', off_gap)):
         print(f'\n#### {title}\n```')
         for (slot, name), n in sorted(gap.items(), key=lambda kv: (str(kv[0][0]), -kv[1])):

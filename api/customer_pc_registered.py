@@ -95,6 +95,9 @@ _NOISE = re.compile(r"\bhit\b|할인\s*-?\d[\d,]*|제조사\s*oem|\boem\b|\(?정
 _COLORS = {"화이트": ("화이트", "white"), "블랙": ("블랙", "black"), "실버": ("실버", "silver"), "핑크": ("핑크", "pink")}
 
 
+_CAPACITY = re.compile(r"\d+(tb|gb|g|w)")
+
+
 def toks(s: str) -> set:
     """비교 토큰 — 영문·숫자 덩어리(9600 과 9600X 는 다르다)와 한글 덩어리를 나눈다."""
     return set(re.findall(r"[0-9a-z]+|[가-힣]+", (s or "").lower()))
@@ -108,10 +111,10 @@ def need(name: str) -> tuple[set, set]:
 
 
 def _color_ok(t: set, colors: set) -> bool:
-    """색상이 같아야 한다 — 문구에 없는 흰색 제품은 붙이지 않는다(검정이 기본)."""
+    """색상이 같아야 한다 — 문구에 없는 흰색 제품은 붙이지 않는다. 검정은 기본색이라 이름에 안 적힌 상품도 같은 것으로 본다."""
     for c, ws in _COLORS.items():
         has = any(w in tok for tok in t for w in ws)
-        if (c in colors and not has) or (c not in colors and has and c != "블랙"):
+        if (c in colors and not has and c != "블랙") or (c not in colors and has and c != "블랙"):
             return False
     return True
 
@@ -137,7 +140,7 @@ def by_name(index: dict, slot: str, name: str):
 
     ① 문구 전체가 상품 이름에 들어 있으면 그 상품(처음 규칙).
     ② 아니면 대괄호·괄호 밖 영문·숫자 모델 표기가 «전부» 같은 토큰으로 있고(9600 ≠ 9600X) 색상이 같은 상품.
-    ③ 그래도 없으면 숫자가 든 표기만 — 단 영문+숫자 모델 코드(4글자 이상, 예 ST4000DM004·T500)가 있을 때만.
+    ③ 그래도 없으면 영문+숫자 모델 코드(4글자 이상, 예 ST4000DM004·T500·225F)와 용량 표기만.
     다른 모델·다른 색은 붙이지 않는다."""
     core = norm(name)
     if len(core) >= 5:
@@ -149,8 +152,9 @@ def by_name(index: dict, slot: str, name: str):
     if not digits or len("".join(latin)) < 4:
         return None
     passes = [latin]
-    if any(len(t) >= 4 and re.search(r"[a-z]", t) for t in digits):
-        passes.append(digits)
+    codes = {t for t in digits if len(t) >= 4 and re.search(r"[a-z]", t) and not _CAPACITY.fullmatch(t)}
+    if codes:                                   # 모델 코드 + 용량만(세대·시리즈 표기는 이름마다 다르다)
+        passes.append(codes | {t for t in digits if _CAPACITY.fullmatch(t)})
     for req in passes:
         cands = [x for x in index.get(slot, []) if req <= x[3] and _color_ok(x[3], colors)]
         if cands:
