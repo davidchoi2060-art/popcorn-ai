@@ -11,6 +11,7 @@
      talk     ok(기본) | fail | slow
      catalog  ok(기본) | fail | empty
      fill     1                 보관·상담 칸에 예시 연락처를 채운다
+     ask      문장              대화 화면이 이 문장을 바로 보낸다(메인 입력 전달과 같은 경로)
 */
 (function () {
   'use strict';
@@ -21,6 +22,8 @@
   function memStore() { var m = new Map(); return { getItem: function (k) { return m.has(k) ? m.get(k) : null; }, setItem: function (k, v) { m.set(k, String(v)); }, removeItem: function (k) { m.delete(k); }, clear: function () { m.clear(); }, key: function (i) { return Array.from(m.keys())[i] || null; }, get length() { return m.size; } }; }
   ['localStorage', 'sessionStorage'].forEach(function (name) { try { Object.defineProperty(window, name, { value: memStore(), configurable: true }); } catch (e) { /* 막히면 실제 보관함 — 예시 키만 쓴다 */ } });
 
+  // ask=문장 이면 메인 입력에서 넘어온 것처럼 대화 화면이 그 문장을 바로 보낸다(예시 응답).
+  if (q.get('ask')) try { window.sessionStorage.setItem('pai-design-question', q.get('ask')); } catch (e) { /* 메모리 보관함 */ }
   var PRODUCTS = [
     { product_code: 900001, name: '예시 게이밍 PC [14400F/16G/1TB/RTX5060]', price: 1917300, cat: '게이밍 PC', spec: { cpu: 'i5-14400F', gpu: 'RTX 5060', ram_gb: 16, ssd_gb: 1000 } },
     { product_code: 900002, name: '예시 사무용 PC [14100/16G/500GB/UHD 730]', price: 880300, cat: '사무·업무용', spec: { cpu: 'i3-14100', gpu: '인텔 UHD(내장)', ram_gb: 16, ssd_gb: 500 } },
