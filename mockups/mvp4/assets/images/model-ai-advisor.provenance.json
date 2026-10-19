@@ -1,0 +1,27 @@
+{
+  "file": "model-ai-advisor.png",
+  "createdAt": "2026-10-18T02:32:46.530Z",
+  "tool": "built-in image_gen.imagegen",
+  "useCase": "ads-marketing",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a37-c970-7ee2-9848-7986341344b5/exec-8ae78b49-bc31-4e9e-a5f4-0889a7d4215c.png",
+  "sha256": "6c1d63eff80d54d67a51f6e46b1faea7c506bf06705d2f01fde149afd42814af",
+  "bytes": 1713784,
+  "format": "PNG",
+  "width": 1536,
+  "height": 1024,
+  "aspectRatio": "3:2",
+  "transparentBackground": false,
+  "references": [],
+  "prompt": "Use case: ads-marketing. Asset type: photorealistic product-introduction photograph for a bright Korean AI PC website. Create a new fictional adult Korean career woman, about 35 years old, with a distinct elegant angular face, short dark brown hair that does not extend below the shoulders, and a light lavender blazer. She faces the camera with confident warm eye contact and a gentle smile. Waist-up composition in a bright clean white photography studio. Beside her on a plain white surface is a compact black desktop tower PC, clearly visible with realistic coherent panels and subtle front ports. She introduces the black PC with one anatomically natural open-hand presentation gesture, while keeping her eyes toward the customer/camera. This is an advertisement showing a model and product, not a woman looking at a monitor or working at a screen. The woman is on the right half and the tower is near center, with some clean open space at left. Bright soft studio lighting, restrained lavender tint, realistic skin and tailoring, premium approachable commercial photography, 3:2 landscape, high resolution. Distinct face and hairstyle from the short-bob cream-blouse mini-PC model and other campaign models. No text, letters, labels, brand marks, logo, watermark, or extra people. Single photograph, not a webpage.",
+  "content": "AI-generated fictional advertising model and illustrative PC; no identity of a real model or verified retail SKU is asserted.",
+  "visualReview": {
+    "method": "Direct view_image inspection of the saved local file",
+    "cameraEyeContact": true,
+    "productVisible": true,
+    "noMajorHandOrLimbDefectObserved": true,
+    "noOverlayTextOrWatermarkObserved": true,
+    "notes": [],
+    "status": "reviewed"
+  },
+  "customerCodeChanged": false
+}

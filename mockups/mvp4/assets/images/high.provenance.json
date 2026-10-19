@@ -1,0 +1,38 @@
+{
+  "asset": "high.png",
+  "date": "2026-10-18",
+  "purpose": "Professional black tower product asset for business AI, detail and high-performance PC mockup pages",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/01-business.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-bea59a6b-11a0-414e-be09-47a6e4cfbc32.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/high.png",
+  "original_preserved": true,
+  "requested_dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "dimensions_note": "Generator returned1254x1254 square; copied without resizing.",
+  "bytes": 1580512,
+  "sha256": "91AE7289D0B7A1EAEB63D9FBE5554ED1E9D227F1F30AFA569C1EC16E5CFDC897",
+  "prompt": "Create ONE single-product photorealistic ecommerce catalog photograph, square1024x1024, on pure WHITE seamless studio background. The attached approved PopcornAI business AI page is only a reference for the serious black professional desktop computer category and bright clean product-photo quality. Do NOT reproduce webpage UI, text, monitor or human.\nSUBJECT exactly ONE refined BLACK PROFESSIONAL DESKTOP TOWER suited visually to an office workstation or local-AI setup. A serious rectangular mid-tower with clean matte charcoal-black metal, broad CLOSED OPAQUE left side panel, subtle seam and no side window. FRONT intake should feature MANY closely spaced fine VERTICAL BLACK SLATS / VERTICAL FINS, straight tidy repeated lines from near top to near bottom. Realistic ventilation, not excessive sci-fi radiator. No RGB, no coloured lighting, no transparent glass, no visible internals, no exposed spinning fans. Minimal unlabelled small power button and2 subtle front USB ports permitted along one narrow edge, otherwise restrained. Small plain black feet.\nCamera front-left THREE-QUARTER view, broad closed left side and vertically slatted front both clearly visible, a little top visible. Full product centered upright, approximately70-75% square image height and55-60% width, ample white safety margins on every side. Top, feet and all corners completely inside frame. Soft natural contact shadow below. Bright neutral studio softbox lighting, gentle edge highlights on black metal so form is readable, crisp premium photography, realistic understated design.\nABSOLUTELY NO logos, text, brand symbols, letters, numbers, labels, slogans, performance claims, price, captions, watermarks, frame or webpage. No other computer, no monitor/keyboard/mouse, no person/hands, no desk scenery, cables or extra props. No gaming RGB or glass. Only one serious professional black tower against white.1024x1024 square reusable product asset.",
+  "qa": {
+    "method": "Direct visual inspection against approved business reference; file dimensions/hash verified",
+    "observed": [
+      "Single serious black professional desktop tower",
+      "Closed opaque broad side panel and closely spaced vertical front intake slats",
+      "Front-left three-quarter view, product and feet fully visible",
+      "White studio background with subtle contact shadow",
+      "No RGB/glass/visible internals, text, logo, performance claims or props",
+      "Existing high.webp retained separately at observed212248-byte length"
+    ],
+    "limitations": [
+      "Generated illustrative product, no verified SKU or performance claim",
+      "Actual dimensions1254 square rather than1024 requested"
+    ]
+  },
+  "scope": "high.png and provenance JSON only; existing high.webp not overwritten; no code/service/DB/deploy changes"
+}

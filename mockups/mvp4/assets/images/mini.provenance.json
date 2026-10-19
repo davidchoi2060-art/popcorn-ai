@@ -1,0 +1,38 @@
+{
+  "asset": "mini.png",
+  "date": "2026-10-18",
+  "purpose": "Single silver mini-PC ecommerce catalog asset for HTML mockup",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/06-mini.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-67808259-7d5b-4f65-8993-adce2386d42a.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/mini.png",
+  "original_preserved": true,
+  "requested_dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "dimensions_note": "Generated square image copied as-is; no resizing.",
+  "bytes": 1424363,
+  "sha256": "CFB5B4E954AAC99D9D7A3810DBC6EE06CB26A1FE0259C5E7782D7C68A3B34931",
+  "prompt": "Create ONE single-object photorealistic shopping-catalog product image asset, square1024x1024, white seamless studio background. Use the attached approved mini-PC category design ONLY as a visual reference for the low silver box mini desktop computer in its first product card. Do not reproduce any webpage UI.\nSUBJECT: exactly ONE beautiful compact low rectangular SILVER MINI DESKTOP COMPUTER, brushed aluminum finish, softly rounded corners, flat clean top, box-shaped body, small subtle black feet. Front-left three-quarter view at slightly elevated camera angle so top, front and left side are visible. Match the reference's refined silver mini PC appearance and clean friendly proportions. Three small blue-interior USB ports and a small unlabelled dark power/connection detail can be visible on the front; realistic fine hardware details without words or symbols. No conspicuous brand styling.\nComposition: complete product centered, occupying about66-70% width and42-50% height of square. Generous even white space on all sides, fully uncropped, no extra objects. Gentle soft contact shadow below, pale natural reflections, bright neutral softbox lighting. Seamless pure white background with no horizon, room, desk props or scenery. Crisp premium ecommerce photography matching bright white PopcornAI product cards.\nABSOLUTELY NO TEXT, logo, letters, numbers, labels, performance specifications, brand mark, price, webpage sections, border, frame, icons, monitor, keyboard, cables, additional computers, person, hand or props. One silver mini PC only. Do not generate a screenshot or design board. Output a polished reusable catalog asset on opaque white background in1024x1024 square.",
+  "qa": {
+    "method": "Direct visual inspection and file dimensions/hash verification",
+    "observed": [
+      "One silver box-shaped mini desktop PC",
+      "Left-front three-quarter angle with top/front/side visible",
+      "Small USB ports and no product text/logo/performance claims",
+      "White background, soft contact shadow",
+      "Entire product and feet visible, no crop",
+      "No UI, people, additional products or props"
+    ],
+    "limitations": [
+      "Generated illustrative computer, not a verified actual sale item",
+      "Tool output1254x1254 rather than requested1024x1024; square ratio retained"
+    ]
+  },
+  "scope": "Image asset and provenance JSON only; no code/service/DB/deploy change"
+}

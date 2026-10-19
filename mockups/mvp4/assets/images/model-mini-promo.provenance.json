@@ -1,0 +1,27 @@
+{
+  "file": "model-mini-promo.png",
+  "createdAt": "2026-10-18T02:32:46.511Z",
+  "tool": "built-in image_gen.imagegen",
+  "useCase": "ads-marketing",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a37-c970-7ee2-9848-7986341344b5/exec-d328f110-ca54-48a9-b8cc-c4be8cbcce4a.png",
+  "sha256": "97e5dc3fce8850f41b9a593dfc99b71d7853d76dbb2d7689ecfaaa2048d62573",
+  "bytes": 1717156,
+  "format": "PNG",
+  "width": 1536,
+  "height": 1024,
+  "aspectRatio": "3:2",
+  "transparentBackground": false,
+  "references": [],
+  "prompt": "Use case: ads-marketing. Asset type: a photorealistic product-presentation photograph for a bright Korean PC store website. Create a new fictional adult Korean woman, about 30 years old, with a distinctive friendly softly rounded face, neat short black bob haircut and cream blouse. Waist-up portrait, looking directly into the camera with a cheerful natural smile. She is positioned on the right side, leaving clean generous empty space on the left for HTML copy. With both hands open and palms underneath, she securely holds a small silver rectangular mini PC just below her chest. The computer is approximately 13cm wide x 13cm deep x 5cm high; it must look truly small relative to her hands, with coherent straight metal edges and the front USB ports clearly facing the camera. Hands and fingers anatomically natural, both hands support the bottom rather than floating or gripping through the object. Warm off-white studio background, bright soft high-key advertising photography, realistic skin and fabric texture, healthy approachable style, crisp product. Wide 3:2 landscape, high resolution. Completely different fictional face from the other campaign models. No additional people, no monitor, no text, no letters, no logo, no watermark. This is a single photographic asset, not a webpage or montage.",
+  "content": "AI-generated fictional advertising model and illustrative PC; no identity of a real model or verified retail SKU is asserted.",
+  "visualReview": {
+    "method": "Direct view_image inspection of the saved local file",
+    "cameraEyeContact": true,
+    "productVisible": true,
+    "noMajorHandOrLimbDefectObserved": true,
+    "noOverlayTextOrWatermarkObserved": true,
+    "notes": [],
+    "status": "reviewed"
+  },
+  "customerCodeChanged": false
+}

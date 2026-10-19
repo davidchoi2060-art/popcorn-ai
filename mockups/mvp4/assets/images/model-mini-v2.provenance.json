@@ -1,0 +1,33 @@
+{
+  "asset": "model-mini-v2.png",
+  "date": "2026-10-18",
+  "use_case": "photorealistic-natural",
+  "generation_tool": "built-in image_gen.imagegen",
+  "mode": "new generation",
+  "attempts": 1,
+  "originals_preserved": true,
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a3a-ef86-7d73-81c3-6872a9617433/exec-ca9f5e65-afa6-4337-8005-e60ddfd71e24.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/model-mini-v2.png",
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 2280050,
+  "sha256": "e2509247e7e14d7821681e336d31838d6c3de5b7119c85eb760f98cf64765196",
+  "prompt": "Use case: photorealistic-natural. Asset type: commercial lifestyle photograph for a bright Korean mini-PC shopping category; image only. Generate ONE landscape photograph, requested1536x1024 pixels, exact3:2 ratio.\nScene: a compact, realistic home office in warm neutral colors. A SMALL light natural-wood desk sits beside a bright window with soft daylight. Show the whole tabletop and a clear sense of the desk's modest footprint, plus the seated person. A clearly visible SMALL SILVER BOX-SHAPED MINI DESKTOP PC sits beside a slim clean monitor; it must be recognizable as a low rectangular brushed-metal mini computer, not a laptop or a full-sized tower. Include a compact keyboard and mouse, a low potted plant that does not hide the mini PC, and an uncluttered warm-white home background. Screen has only abstract pale work shapes without readable letters or numbers.\nSubject: one fictional Korean adult woman in her THIRTIES with a short neat chin-length bob haircut, wearing a relaxed soft GREEN knitted sweater. Natural adult proportions and real skin texture, calm friendly focused expression, looking at her monitor while working. Hands rest naturally on the keyboard and mouse. She is distinct from a long-haired businesswoman in a dark blazer. Not wearing a jacket, not a gamer, no headset.\nFraming: medium-wide lifestyle shot that shows the woman, the entire small desktop setup, and the full tabletop edges comfortably within frame. The tiny silver PC remains visibly on top of the desk. Keep head, hands, monitor and mini PC inside the central safe area with breathing room for object-fit cover crops. Balanced person-plus-workspace composition, authentic compact home atmosphere rather than a corporate office. No extra people.\nStyle: premium photorealistic commercial photography, high-key window daylight, light warm-white and natural oak palette with a soft green clothing accent. Natural soft contact shadows, realistic materials, not glossy CGI or glamour portrait. No laptop, no RGB tower. No text, readable lettering/numbers, logo, brand, watermark, captions, labels, UI overlays, frame or website chrome. Deliver only the photograph.",
+  "qa": {
+    "method": "Generated image and local view_image visually inspected; PNG IHDR/CRC/decompression and original-copy equality verified.",
+    "observed": [
+      "Adult woman with short bob and green knit, compact oak desk, silver mini PC, monitor, daylight and low plant.",
+      "Whole tabletop visible in a slightly elevated three-quarter workspace view; distinct person and home setting from office asset.",
+      "Hands and product scale appear plausible."
+    ],
+    "minor_issue": "A faint tiny glyph/mark is visible at the center of the lower monitor bezel. It is not treated as a verified real brand. No correction call was made under the one-generation-per-asset instruction.",
+    "scope": "Fictional generated person and illustrative workspace; not verified retail product photography."
+  },
+  "code_or_data_changed": false
+}

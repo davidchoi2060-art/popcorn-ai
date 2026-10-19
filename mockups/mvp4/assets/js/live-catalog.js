@@ -1,0 +1,116 @@
+/* /mvp4 실제 상품 원천 (2026-10-19). catalog-snapshot.js(10/18 관찰 자료)를 대신한다.
+ *
+ * 목록   GET /api/customer/pc-catalog              판매 중인 완제품 PC 전체(추천과 같은 원천)
+ * 상세   GET /api/customer/pc-offers/{code}         공개 승인된 부품 구성 + 대표 사진(404 = 공개 아님)
+ * 사진   /api/customer/products/{code}/representative-image[?size=card]  (404 이면 사진 없음으로)
+ *
+ * 화면 모듈(design-*.js)이 읽는 상품 모양으로 바꿔 PAI.catalogProducts 에 넣는다. 서버가 주지 않은 값은
+ * 지어내지 않는다 — 가격이 없으면 null, 구성이 공개되지 않았으면 부품 표가 비고 「구성 확인 필요」로 보인다.
+ * 부품 개별 단가는 받지 않는다(공개 구성의 price 는 버린다).
+ */
+(function () {
+  'use strict';
+  var P = window.PAI = window.PAI || {};
+  var CATALOG = '/api/customer/pc-catalog';
+  var OFFER = '/api/customer/pc-offers/';
+  var SLOT = { CPU: 'CPU', GPU: '그래픽카드', RAM: '메모리', SSD: '저장장치', HDD: '저장장치', MB: '메인보드', POWER: '파워', PSU: '파워', CASE: '케이스', COOLER: 'CPU 쿨러', OS: '운영체제' };
+
+  function get(url) {
+    var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, 20000) : null;
+    return fetch(url, { credentials: 'same-origin', cache: 'no-store', headers: { Accept: 'application/json' }, signal: ctrl ? ctrl.signal : undefined })
+      .then(function (r) {
+        if (timer) clearTimeout(timer);
+        return r.json().catch(function () { return null; }).then(function (body) { return { status: r.status, body: body }; });
+      }, function (err) { if (timer) clearTimeout(timer); throw err; });
+  }
+
+  function gb(v) { return typeof v === 'number' && v > 0 ? (v >= 1000 && v % 1000 === 0 ? v / 1000 + 'TB' : v + (v >= 1000 ? 'GB' : 'GB')) : ''; }
+
+  function summarySpecs(spec) {
+    var rows = [];
+    if (spec.cpu) rows.push({ label: 'CPU', value: spec.cpu, slot: 'CPU' });
+    if (spec.ram_gb) rows.push({ label: '메모리', value: gb(spec.ram_gb), slot: 'RAM' });
+    if (spec.ssd_gb) rows.push({ label: '저장장치', value: gb(spec.ssd_gb), slot: 'SSD' });
+    if (spec.gpu) rows.push({ label: '그래픽카드', value: spec.gpu, slot: 'GPU' });
+    return rows;
+  }
+
+  function toProduct(it) {
+    var spec = it.spec && typeof it.spec === 'object' ? it.spec : {};
+    var summary = summarySpecs(spec);
+    return {
+      id: String(it.product_code), productCode: it.product_code, name: it.name,
+      price: typeof it.price === 'number' && it.price > 0 ? it.price : null, priceBasis: it.price_basis || '',
+      image: it.photo_hint ? it.image_url : null, mediaStatus: it.photo_hint ? 'ready' : 'missing',
+      summary: summary.map(function (s) { return s.value; }).join(' · '), summarySpecs: summary,
+      specs: [], status: it.sale_status, saleStatus: it.sale_status, isSelling: it.sale_status === '판매중',
+      recommendable: it.sale_status === '판매중', reviewRequired: false, purchasable: it.sale_status === '판매중',
+      category: it.category || '', fit: it.fit || {}, mallUrl: it.mall_url || null,
+      configurationPublic: it.configuration_public === true,
+      configurationId: null, bomStatus: it.configuration_public ? 'unloaded' : 'missing',
+      source: { kind: 'live', bomBasis: 'customer-public-configuration' }, optionGroups: [], liveDetail: 'pending'
+    };
+  }
+
+  // 상세 = 공개 구성. 404 not_public 은 «상품 없음»이 아니라 «구성 비공개»다.
+  function applyOffer(p, body) {
+    var conf = body && body.public_configuration;
+    var parts = conf && Array.isArray(conf.parts) ? conf.parts : [];
+    p.configurationId = conf && conf.configuration_id || null;
+    p.specs = parts.filter(function (x) { return x && !x.pseudo && x.name; }).map(function (x) {
+      var facts = (Array.isArray(x.specs) ? x.specs : []).filter(function (f) { return f && f.label && f.value; }).map(function (f) { return { label: String(f.label), value: String(f.value) }; });
+      return { label: SLOT[String(x.slot || '').toUpperCase()] || String(x.slot || '부품'), value: x.name, slot: String(x.slot || '').toUpperCase(),
+        quantity: Number.isInteger(x.quantity) && x.quantity > 0 ? x.quantity : null, partId: x.ordinal, partIdKind: 'ordinal',
+        role: x.description || '', facts: facts, detail: facts.map(function (f) { return f.label + ': ' + f.value; }).join(' · '),
+        assemblyOnly: x.assembly_only === true };
+    });
+    p.bomStatus = p.specs.length ? 'configuration-only' : 'missing';
+    var photo = body && body.photo;
+    if (photo && photo.state === 'available' && typeof photo.url === 'string' && photo.url.indexOf('/api/customer/products/' + p.id + '/') === 0) {
+      p.image = photo.url; p.mediaStatus = 'ready'; p.photoNotice = photo.notice || '';
+    } else { p.image = null; p.mediaStatus = 'missing'; }
+    p.liveDetail = 'public';
+  }
+
+  P.live = {
+    state: 'loading', error: null,
+    loadCatalog: function () {
+      return get(CATALOG).then(function (res) {
+        if (res.status !== 200 || !res.body || !Array.isArray(res.body.items)) throw new Error('catalog_' + res.status);
+        P.catalogProducts = res.body.items.map(toProduct);
+        P.live.state = P.catalogProducts.length ? 'ready' : 'empty';
+        return P.catalogProducts;
+      }).catch(function (err) { P.catalogProducts = []; P.live.state = 'error'; P.live.error = err; throw err; });
+    },
+    loadDetail: function (id) {
+      var p = P.getCatalogProduct(id);
+      if (!p) return Promise.resolve(null);
+      return get(OFFER + encodeURIComponent(p.id)).then(function (res) {
+        if (res.status === 200 && res.body && res.body.ok) applyOffer(p, res.body);
+        else if (res.status === 404) { p.specs = []; p.bomStatus = 'missing'; p.liveDetail = 'not_public'; }
+        else { p.liveDetail = 'error'; }
+        return p;
+      }, function () { p.liveDetail = 'error'; return p; });
+    }
+  };
+
+  // 실제 라우트: /mvp4/?screen=…  (상태는 응답이 정하므로 대화 시작 방식만 싣는다)
+  P.designHref = function (screen, state, params) {
+    var q = new URLSearchParams();
+    if (screen && screen !== 'home') q.set('screen', screen);
+    if (screen === 'chat' && state && state !== 'welcome') q.set('state', state);
+    Object.keys(params || {}).forEach(function (k) { if (params[k] != null && params[k] !== '' && k !== 'dataset' && k !== 'state') q.set(k, String(params[k])); });
+    var s = q.toString();
+    return './' + (s ? '?' + s : '');
+  };
+
+  P.getCatalogProduct = function (id) {
+    return (P.catalogProducts || []).find(function (p) { return String(p.id) === String(id); }) || null;
+  };
+  // 사진은 상대 자산이나 이 상품의 고객 공개 사진 경로만 받는다.
+  P.catalogImage = function (p) {
+    if (!p || !p.image) return null;
+    return /^assets\//.test(p.image) || p.image.indexOf('/api/customer/products/' + p.id + '/representative-image') === 0 ? p.image : null;
+  };
+}());

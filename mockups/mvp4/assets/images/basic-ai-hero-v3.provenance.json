@@ -1,0 +1,35 @@
+{
+  "asset": "basic-ai-hero-v3.png",
+  "date": "2026-10-18",
+  "use_case": "ads-marketing",
+  "generation_tool": "built-in image_gen.imagegen",
+  "mode": "new generation",
+  "attempts": 1,
+  "originals_preserved": true,
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a3a-ef86-7d73-81c3-6872a9617433/exec-ee135a3e-59f3-4b77-be93-8fc422be35da.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/basic-ai-hero-v3.png",
+  "requested_dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "bytes": 1824962,
+  "sha256": "99079b958d2456afc9785960d4aae63f608ba5fed070f6b70fe1f466dd926bcf",
+  "prompt": "Use case: ads-marketing, photorealistic. Asset type: a SINGLE coherent advertising photograph for the hero of a basic personal AI learning-assistant product page. Generate ONE square1024x1024 image. The image itself must already contain both person and computer naturally in one photographed space; no graphic assembly or inset.\nScene: a bright warm-white and pale-cream studio study room with softly blurred light shelves. One real light wood or warm-white desk. A clean WHITE DESKTOP PC TOWER sits physically ON this desk at lower-left/left-center, with visible contact shadow and a complete believable outline. A matching desktop monitor sits naturally beside it toward the middle, sharing the same desk plane, camera perspective and light. The monitor screen has only a subtle abstract pastel wallpaper, no text. A small open notebook with blank pages and one pen are on the same desk. This is a desktop tower, NOT a laptop, and no separate floating product cutout.\nSubject: one fictional Korean ADULT woman in her LATE TWENTIES, calm and approachable, neat dark hair tied back simply, wearing a tidy light ivory blouse. She sits at the desk in a NORMAL relaxed front/three-quarter shoulder position, torso facing diagonally toward the camera rather than twisting backward. Her face is naturally three-quarter, and she looks toward the camera with a comfortable small smile. One hand lightly holds a pen above the notebook; the other rests naturally on the desk. Show both hands with natural anatomy. No contorted shoulders, no looking over a sharply twisted shoulder.\nComposition: PC at LEFT-LOWER/LEFT-CENTER, person at RIGHT-CENTER, monitor in between. Leave breathing room around the top and sides. Important face, hands and computer stay within the central safe area, roughly the middle75% width and middle65% height, so a moderate mobile landscape crop can still show them together. Keep her entire head comfortably away from the top edge. Tower must be substantial and recognizable but realistically scaled on the desk. Products and person must not overlap implausibly. Show enough of the real tabletop to make every object clearly grounded. A unified, natural slightly oblique camera view, not a collage.\nLook: high-end commercial photorealistic photography, soft bright daylight, airy white/cream brand palette, subtle natural skin and fabric texture, real soft shadows, welcoming study atmosphere. No other people. No text, readable numbers, captions, logos, brand names, watermark, graphic overlays, page UI, borders or white rectangular product panel anywhere. In particular the PC surfaces and monitor's lower bezel are completely plain and unbranded with NO tiny glyph at their center. No floating objects, no cut-and-paste appearance, no product inset. Output only the finished square photograph.",
+  "purpose": "Replacement single photographic hero for basic AI detail; removes need for separate floating white PC overlay. Existing image assets preserved.",
+  "qa": {
+    "method": "Generated output and copied local image inspected via view_image; PNG CRC/decompression, dimensions, hash and original-copy equality verified.",
+    "observed": [
+      "One coherent bright cream study photograph with adult female learner, white PC tower and monitor grounded on one desk.",
+      "Camera-facing relaxed smile, natural three-quarter shoulders, pen and notebook, plausible visible hands.",
+      "No separate white product panel, floating object or collage; consistent contact shadows and perspective.",
+      "No visible logo, watermark or readable text at full-image inspection."
+    ],
+    "crop_note": "Original is square. A 4:3 crop should better preserve face, notebook and hands than a very wide crop; actual site crop requires browser QA. Tower meets the left image edge, but remains clearly grounded on the desk.",
+    "scope": "Generated fictional person and illustrative hardware scene. No customer testimony or verified retail SKU photography."
+  },
+  "code_or_data_changed": false
+}

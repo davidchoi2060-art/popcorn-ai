@@ -1,0 +1,34 @@
+{
+  "asset": "model-creator-promo.png",
+  "date": "2026-10-18",
+  "use_case": "ads-marketing",
+  "generation_tool": "built-in image_gen.imagegen",
+  "mode": "new generation",
+  "attempts": 1,
+  "originals_preserved": true,
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a3a-ef86-7d73-81c3-6872a9617433/exec-b20fd10c-f4e8-46ee-a862-6d3db54a2563.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/model-creator-promo.png",
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 1993393,
+  "sha256": "42f05918d37b79f3625c12cf842381de04f1c17eb77e0491a9fc59eadb451311",
+  "prompt": "Use case: ads-marketing, photorealistic. Asset type: professional lifestyle product-promotion photograph for a bright Korean creative-PC website. Create ONE image-only landscape photograph, requested1536x1024 pixels, exact3:2 ratio. No webpage or graphical layout.\nScene: a bright modern creative studio in warm cream and white. Beside the person is a premium BLACK desktop computer tower with clean opaque sides and a large desktop display, both clearly visible as a complete believable workstation. Monitor screen contains only attractive abstract colored visual-art shapes, NO readable text, numbers, labels, software branding or glyphs. Every bezel and PC surface is completely plain and unbranded, especially the center of the lower monitor bezel.\nSubject: one fictional KOREAN ADULT MALE DESIGNER in his THIRTIES, short neatly styled hair, tasteful contemporary eyeglasses, and a well-fitted BEIGE jacket over a simple light top. He is standing or comfortably poised beside the workstation, shown from the waist up. His body is turned in a three-quarter diagonal pose while his FACE AND EYES MAKE DIRECT EYE CONTACT WITH THE CAMERA. A natural confident friendly smile, warm professional presence, an approachable product advertisement rather than a working-at-desk candid. One hand holds a thin digital stylus naturally and visibly; the other hand makes a relaxed open-palm presentation gesture toward the nearby black PC and large display. Realistic fingers and anatomically correct hands, no exaggerated pointing. Do not hold or lift the tower.\nCamera and framing: a slightly low camera angle, modestly below chest/eye level, medium-wide professional advertising photography with subtle perspective and depth. Person occupies the right portion while the whole black PC and large display remain visible on the left/center. Keep the head, waist-up body, both hands, stylus and workstation comfortably in frame with margins. Body three-quarter, face toward viewer. Product should feel substantial and premium but realistically scaled, not enormous. Do not crop the top of the head, fingertips or tower. Distinct advertising pose and angle compared with ordinary office/mini-PC working scenes.\nStyle: premium commercial photorealism, high-key soft light, warm neutral cream-white studio, subtle natural skin and fabric textures, elegant soft shadows, polished but believable. No dark moody lighting, no RGB gaming setup, no extra people, no headphones. No written text, logo, brand mark, watermark, captions, labels, visible letterforms anywhere, UI overlays, border or screenshot. Output just the finished photograph.",
+  "qa": {
+    "method": "Generated image and local view_image visually inspected; PNG IHDR/CRC/decompression and original-copy equality verified.",
+    "observed": [
+      "Adult male designer with short hair, eyeglasses, beige jacket and direct camera eye contact.",
+      "Natural smile, three-quarter body, stylus in one hand and open presentation gesture toward black tower and large display.",
+      "Bright cream-white studio and advertising pose distinguish this from office/mini work scenes.",
+      "No visible brand, watermark or readable text at generated-image inspection."
+    ],
+    "crop_note": "Use the original 3:2 frame or a modest crop; extreme panoramic crops cannot preserve both face near top and presentation hands near lower portion.",
+    "scope": "Fictional generated person and illustrative workstation; no real customer endorsement or verified product photograph."
+  },
+  "code_or_data_changed": false
+}

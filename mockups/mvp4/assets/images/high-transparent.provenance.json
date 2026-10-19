@@ -1,0 +1,68 @@
+{
+  "asset": "high-transparent.png",
+  "date": "2026-10-18",
+  "purpose": "Transparent black professional tower cutout for overlay on HTML model photograph",
+  "generation_tool": "built-in image_gen.imagegen edit",
+  "transparent_background": true,
+  "reference": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/high.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-7849e15d-09e5-4044-b054-3e585822a639.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/high-transparent.png",
+  "original_high_preserved": true,
+  "original_high_sha256": "91AE7289D0B7A1EAEB63D9FBE5554ED1E9D227F1F30AFA569C1EC16E5CFDC897",
+  "actual_dimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "pixel_format": "Format32bppArgb",
+  "bytes": 1169584,
+  "sha256": "1BECE794B05BE3846941897B269B200DDBCAEFC8B28B3E4FDE2F246C4C0C2125",
+  "attempts": [
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-7849e15d-09e5-4044-b054-3e585822a639.png",
+      "prompt": "Edit the ATTACHED SINGLE BLACK PROFESSIONAL PC TOWER image. BACKGROUND REMOVAL ONLY. Output a true transparent-background PNG cutout with an alpha channel.\nPreserve the EXACT same product appearance, deep opaque charcoal-black color, lighting highlights, front-left three-quarter camera view, closed solid side panel, dense vertical front intake slats, power button/ports, feet, scale, proportions and composition. Do not redesign, relight, recolor or make the tower lighter. Keep the entire product fully inside image with the same square canvas and safe margins.\nRemove only the surrounding white studio background and its white floor. Background outside the product must be fully TRANSPARENT (alpha0), not white, not black, not a checkerboard painted into pixels. Edges should be clean with natural anti-aliasing, no white halo. Remove diffuse ground shadow if it causes a white/gray matte.\nCRITICAL OPACITY: The WHOLE product itself must remain SOLID FULLY OPAQUE (alpha255), including broad black side panel, dark spaces between front slats, feet, and all black details. Do not use multiply-like transparency on dark or gray product surfaces. A photograph placed behind this cutout must NOT show through the computer body. Front ventilation is visually dark but NOT a transparent hole to the background.\nNo logo, text, extra assets, people, border, or other changes. Produce one true transparent PNG cutout of exactly the attached tower.",
+      "selected": true,
+      "reason": "First cutout retained product shape closely; second edit did not improve interior alpha."
+    },
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-750e8fcc-3133-425a-86fa-8c0f435d42a2.png",
+      "prompt": "Refine the FIRST attached transparent PNG cutout ONLY. SECOND attached white-background original is a product-color/shape reference. Preserve exact tower silhouette, viewpoint, scale, deep black-gray material, closed side, vertical vents and product details. Keep background truly transparent and remove white matte.\n\nThe first transparent cutout has tiny unintended semitransparency inside the computer: sampled alpha252-254 on the large side panel/front. Correct this by making ALL INTERIOR PRODUCT PIXELS FULLY OPAQUE alpha255. The side panel, front grille dark recesses, feet and every interior black/gray area must be a solid opaque object, not see-through. Transparency/partial alpha should exist ONLY outside the silhouette and along the few anti-aliased boundary pixels. No texture-dependent alpha; maintain all texture with RGB color, not alpha variation. No background may be visible through the solid computer. Background alpha0.\n\nDo not add or remove any product detail, do not recolor, don't alter brightness/contrast from original. Output true transparent RGBA PNG, square same1254x1254 canvas. No text, logos, frame or extra object.",
+      "selected": false,
+      "qa": "Corner alpha0; side samples7440 min252 and all below255; front samples9300 min253 and all below255. No alpha improvement."
+    }
+  ],
+  "qa": {
+    "method": "Generated edit directly visually inspected against original; local view_image invoked; actual RGBA values sampled with read-only System.Drawing; source/output hashes checked.",
+    "observed": [
+      "Product remains deep black/gray with closed side and vertical front",
+      "Entire product inside canvas with no white background",
+      "All four corner alpha values0, confirming real transparent background",
+      "Original high.png hash unchanged"
+    ],
+    "alpha_check": {
+      "corner_alpha": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "side_panel": {
+        "sample_count": 7440,
+        "min_alpha": 252,
+        "region": "x240..549,y300..899 step5"
+      },
+      "front": {
+        "sample_count": 9300,
+        "min_alpha": 253,
+        "region": "x680..989,y250..999 step5"
+      }
+    },
+    "strict_opaque_body_requirement_met": false,
+    "limitations": [
+      "Imagegen retained tiny interior translucency (sample alpha minima252/253 rather than255) despite second explicit alpha-hardening edit.",
+      "This is nearly opaque, not mathematically fully opaque. Parent was informed; do not claim strict255 opacity.",
+      "No deterministic pixel correction performed because task requested image_gen editing.",
+      "Generated image not exact pixel preservation, although visual form/material remain close to original."
+    ]
+  },
+  "scope": "Only transparent image and provenance added. high.png/high.webp preserved; no HTML/CSS/JS/service/DB/deployment change."
+}

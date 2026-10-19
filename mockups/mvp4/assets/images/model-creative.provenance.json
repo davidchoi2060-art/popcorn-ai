@@ -1,0 +1,49 @@
+{
+  "asset": "model-creative.png",
+  "date": "2026-10-18",
+  "purpose": "Reusable designer-at-work lifestyle photo for HTML mockup",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/07-creative.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-cc185d81-bfeb-4afd-bbba-daef585b132e.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/model-creative.png",
+  "originals_preserved": true,
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 1876044,
+  "sha256": "A1EF2787AE7712EBE0E81C3D0A7956398B84EC55B25DBD9C452C14EEA4410195",
+  "attempts": [
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-ba28132d-682b-4eea-ab2f-e3fc7cc839a4.png",
+      "prompt": "Create ONE photorealistic lifestyle product image asset, landscape1536x1024,3:2 aspect ratio. The attached approved PopcornAI creative-PC page is the visual source for its small male designer/studio scene and professional black tower. Generate only the clean photograph, NOT any webpage, UI board, screenshot or text overlay.\nSCENE: attractive yet natural clearly ADULT Korean male designer in his LATE TWENTIES, black subtle rectangular eyeglasses, neatly styled slightly wavy dark hair, muted olive-green casual button-up shirt over a simple neutral inner shirt. He is fully clothed, seated at a light warm-wood desk in an airy bright modern creative office. Calm focused expression, eyes looking toward the monitor, authentic work posture, not looking at camera, no exaggerated smile, no testimonial or celebrity feel. Right hand naturally rests on a mouse and left hand near keyboard; anatomically realistic hands. Not a laptop. This is a fictional AI-created person, but no disclosure embedded in pixels because HTML will provide that separately.\nCOMPOSITION: person occupies the RIGHT approximately45% of image, full head with margin, shoulders and upper torso/hands visible. On LEFT approximately55%, a realistic BLACK PROFESSIONAL DESKTOP TOWER and a large widescreen desktop monitor are the focus of a believable workstation. Tower is clean professional charcoal-black, opaque side panel, elegant vertical vents, no RGB lighting, no glass internals, no logo; all four edges visible on desk. Monitor positioned beside tower, facing the designer while screen also visible to viewer. Black keyboard and mouse on desk. Products scaled plausibly, not oversized. Keep tower and monitor fully inside frame, with comfortable outer margins.\nMonitor shows an abstract generic video/graphic editing workspace: one colorful scenic image preview, simple blocks of colored timeline tracks and small color-wheel graphics. NO legible letters, numbers, menu words, names or brand software logos anywhere on the screen. UI is visual shapes only. No floating UI, no software-window overlay outside monitor.\nBright soft daylight from left, subtle warm-white office palette, clean cream walls, softly blurred shelves and small plant in background, premium realistic photography, natural skin textures and fabric, soft contact shadows, no theatrical advertising effects. Similar luminosity, believable atmosphere and product quality as attached approved reference. Keep background uncluttered.\nABSOLUTELY NO written text, Korean words, logo, brand markings, captions, AI-disclosure labels, prices, buttons, performance claims, slogans, borders, watermarks, browser frames or website elements. Only a natural designer working at the desktop computer in a bright office. Deliver one reusable photo asset in3:2 landscape1536x1024.",
+      "reason_for_cleanup": "Tiny bezel glyph and pseudo-text in editing controls."
+    },
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-cc185d81-bfeb-4afd-bbba-daef585b132e.png",
+      "prompt": "Make a precise cleanup edit to the FIRST attached1536x1024 photograph, preserving the exact composition, fictional adult Korean male designer with glasses and olive shirt, bright office, black professional PC left, monitor, natural hands, lighting and all product proportions. SECOND image is approved style reference only. Do not create a webpage.\nRemove the tiny logo/glyph at the center of the monitor's bottom black bezel: make that bezel uniformly clean matte black with ABSOLUTELY NO MARK, logo, brand, letters or symbols. Remove all tiny letters/numbers/menu labels from inside the monitor screen: retain the scenic image preview, color-wheel shapes and colored timeline rectangles, but control labels and timeline markings must be blank neutral shapes only, with no readable or pseudo-text glyphs. No text anywhere else in image. Keep existing natural photographic look, do not add any caption, disclosure, watermark or frame. Output one1536x1024 landscape photo, same composition.",
+      "selected": true
+    }
+  ],
+  "qa": {
+    "method": "Direct visual inspection against approved creative page and file dimensions/hash verification",
+    "observed": [
+      "Clearly adult fictional Korean male designer, glasses and olive shirt",
+      "Person on right; black professional desktop tower and editing monitor on left",
+      "Natural focused pose with hands on mouse/keyboard",
+      "Bright office, photographic lighting, no exaggerated advertising expression",
+      "Complete monitor/tower and model head visible",
+      "Monitor bezel logo removed, editing controls reduced to visual shapes",
+      "No caption, disclosure text, brand wordmark, visible readable UI words, frame or website UI"
+    ],
+    "limitations": [
+      "AI-generated fictional model and illustrative product scene; not employee/testimonial/actual product proof",
+      "HTML layer must separately display AI-created-model disclosure as instructed"
+    ]
+  },
+  "scope": "Image plus provenance JSON only; code/service/DB/deploy changes0"
+}

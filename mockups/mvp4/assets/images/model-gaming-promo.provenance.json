@@ -1,0 +1,29 @@
+{
+  "file": "model-gaming-promo.png",
+  "createdAt": "2026-10-18T02:32:46.538Z",
+  "tool": "built-in image_gen.imagegen",
+  "useCase": "ads-marketing",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a37-c970-7ee2-9848-7986341344b5/exec-1d1d7000-c78b-4ac8-8fab-fbfe0d110fd3.png",
+  "sha256": "6f11d6f57bb6ca446526e0653007f35c2f3bc005ad7aa8d1a4489e6f21de18a0",
+  "bytes": 2092916,
+  "format": "PNG",
+  "width": 1536,
+  "height": 1024,
+  "aspectRatio": "3:2",
+  "transparentBackground": false,
+  "references": [],
+  "prompt": "Use case: ads-marketing. Asset type: photorealistic product-presentation photograph for a bright Korean gaming-PC store website. A new fictional adult Korean man about 24 years old, with a distinctive youthful friendly face, neat textured short dark hair, blue casual clothing and gaming headphones resting around his neck. He looks directly into the camera with a natural cheerful smile. He holds one small unbranded game controller naturally in one hand and presents a white desktop gaming tower beside him with the other open hand. The white PC stands on a plain white surface, with a glass side panel and tasteful soft RGB fan lighting; preserve realistic case construction. Waist-up commercial portrait. Bright white studio background with subtle pale blue ambience, healthy accessible advertising style, realistic skin, natural hands and fingers, crisp PC product detail. Wide 3:2 landscape, high resolution. The person and product are both clearly visible with some breathing room, no monitor, no second person. Face clearly distinct from all other campaign models. No text, no letters, no logos or brand marks, no watermarks, no webpage UI, no collage.",
+  "content": "AI-generated fictional advertising model and illustrative PC; no identity of a real model or verified retail SKU is asserted.",
+  "visualReview": {
+    "method": "Direct view_image inspection of the saved local file",
+    "cameraEyeContact": true,
+    "productVisible": true,
+    "noMajorHandOrLimbDefectObserved": true,
+    "noOverlayTextOrWatermarkObserved": true,
+    "notes": [
+      "Small controller button glyphs and faint unbranded hardware emblems remain as product detail. No advertising text or obvious brand name."
+    ],
+    "status": "reviewed"
+  },
+  "customerCodeChanged": false
+}
