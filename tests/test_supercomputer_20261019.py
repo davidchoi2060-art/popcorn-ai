@@ -59,6 +59,20 @@ class Catalog(unittest.TestCase):
         self.assertEqual([i['src'] for i in it['images']], ['assets/images/supercomputer/gb10-product.jpg', '/api/product-images/12/detail'])
         self.assertEqual(SC.item(row(product_code=7, has_explained_photo=True))['images'][0]['src'], '/api/product-images/7/detail')
 
+    def test_unprofiled_product_is_filled_from_its_own_name(self):
+        it = SC.item(row(product_code=300001, product_name='[ACER] Veriton GN100 [128GB/4TB NVME/AS 2Y] NVIDIA DGX Spark기반', p_maker='ACER'))
+        self.assertEqual((it['maker'], it['memory'], it['storage'], it['accelerator'], it['os']), ('ACER', '128GB', '4TB', 'NVIDIA GB10', 'DGX OS'))
+        ws = SC.item(row(product_code=300002, product_name='워크스테이션 [14900K/64G/2TB+4TB/RTX5090]', p_maker='팝콘'))
+        self.assertEqual((ws['memory'], ws['storage'], ws['accelerator'], ws['os']), ('64GB', '2TB', None, None))   # GB10 사양을 물려주지 않는다
+
+    def test_migration_0167_chain(self):
+        path = ROOT / 'db/migrations/versions/0167_ai_supercomputer_products.py'
+        spec = importlib.util.spec_from_file_location('m0167', path)
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        self.assertEqual((mod.revision, mod.down_revision), ('0167', '0166'))
+        for p in mod.PRODUCTS:
+            self.assertTrue(p[8] is None or (MVP4 / 'assets/images/supercomputer' / p[8]).exists(), p)
+
     def test_list_is_queried_by_category_key_not_codes(self):
         src = (ROOT / 'api/customer_supercomputer.py').read_text(encoding='utf-8')
         self.assertIn("public_key = :key", src)
