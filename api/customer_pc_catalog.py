@@ -119,6 +119,27 @@ def catalog() -> list[dict]:
     return items
 
 
+def sold_item(code) -> dict | None:
+    """상담 조건 없이 목록에서 고른 PC 를 견적 보관할 때(api/mvp3_saved_quotes) 쓰는 항목 — 추천 항목과 같은 모양.
+
+    판매중이고 가격이 있는 추천 풀 상품만 받는다(관리자 행·임의 코드는 None). 용도 수준 판정은 하지 않는다 —
+    고객이 상담 없이 상품을 직접 골랐기 때문이다. 가격은 지금 판매가 그대로다.
+    """
+    if type(code) is not int:
+        return None
+    _levels, products = load()
+    p = products.get(code)
+    if p is None or p.get("status") != "판매중" or _price(p.get("price")) is None:
+        return None
+    from .sold_reco import ROLE_OF, TAG_CHOSEN
+    url = p.get("url")
+    return {"product_code": code, "name": match_storage_shorthand(card_name(p["name"]), p.get("spec")),
+            "price": p["price"], "price_src": p.get("price_src"),
+            "mall_url": url if isinstance(url, str) and url.startswith("https://") else None,
+            "spec": card_spec(p), "level": None, "tag": TAG_CHOSEN, "role": ROLE_OF[TAG_CHOSEN],
+            "over_budget": False, "reasons": []}
+
+
 @router.get(CATALOG_PATH)
 def read_catalog(response: Response):
     response.headers["Cache-Control"] = "no-store"
