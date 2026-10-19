@@ -37,7 +37,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin-purchase-inquiries"])
 LIMIT = 50
 STATUSES = ("대기", "처리 중", "완료")
 # 목록 조건(2026-10-18 관리자 정리 기획 A01) — 연결 종류 · 보관 기한. 「곧」은 작업 편의용 표시일 뿐
-# 보유 기간과 무관하다(보유 기간 자체는 대표 미확정 — api/mvp3_contact.KEEP_DAYS).
+# 보유 기간과 무관하다(보유 기간 180일은 2026-10-19 대표 확정 — api/mvp3_contact.KEEP_DAYS).
 LINKS = {"quote": "i.quote_id IS NOT NULL", "config": "i.quote_id IS NULL AND i.configuration_id IS NOT NULL",
          "none": "i.quote_id IS NULL AND i.configuration_id IS NULL"}
 DUE_SOON_DAYS = 14
