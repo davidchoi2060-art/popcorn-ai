@@ -116,6 +116,22 @@ def _color_ok(t: set, colors: set) -> bool:
     return True
 
 
+def names(conn) -> dict:
+    """{슬롯: [(상품번호, 비교 이름, 판매중 여부, 비교 토큰)]} — 부품 상품. 10분 동안 재사용한다."""
+    with _lock:
+        if time.time() - _cache["at"] < _TTL and _cache["names"]:
+            return _cache["names"]
+    out = {}
+    for code, name, pt, status in conn.execute(text(
+            "SELECT product_code, product_name, part_type, status FROM products WHERE part_type = ANY(:t)"),
+            {"t": sum(PART_TYPES.values(), [])}):
+        slot = next(s for s, ts in PART_TYPES.items() if pt in ts)
+        out.setdefault(slot, []).append((code, norm(name), status == "판매중", toks(_TRADEMARK.sub("", name or ""))))
+    with _lock:
+        _cache["names"] = out
+    return out
+
+
 def by_name(index: dict, slot: str, name: str):
     """옵션 문구의 부품 상품 — 판매중·짧은 이름을 먼저. 못 찾으면 None.
 
