@@ -1,0 +1,9 @@
+/* Final viewport review adjustments. */
+.dc-chat-main{height:calc(100dvh - 240px);min-height:330px}
+.dc-chat-log{overflow:auto;min-height:0;flex:1;padding-right:6px}
+.dc-composer{position:static;flex-shrink:0;margin-top:14px}
+.dc-chat-note{flex-shrink:0}
+.dc-chat-side.has-selected>.dc-selected-panel{order:-1}
+.dc-chat-side:not(.has-selected)>.dc-candidates{order:-1}
+.dp-product-info h1{overflow-wrap:anywhere}
+@media(max-width:800px){.dc-chat-main{height:calc(100dvh - 295px);min-height:340px}.dc-composer textarea{min-height:70px}.dc-chat-log{padding-bottom:12px}.dc-heading{margin-bottom:18px}}

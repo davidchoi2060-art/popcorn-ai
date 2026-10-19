@@ -1,0 +1,122 @@
+{
+  "asset_set": "Phosphor regular finder icons v4",
+  "variant": "regular",
+  "verified_at_utc": "2026-10-18T03:27:48.465258+00:00",
+  "official_repository": "https://github.com/phosphor-icons/core",
+  "official_website": "https://phosphoricons.com/",
+  "source_commit": "2b75f3ad12b420c9504ef05df8d2564a28f8500e",
+  "source_commit_date": "2026-01-06T21:28:48Z",
+  "package_version": "2.1.1",
+  "official_tree_url": "https://api.github.com/repos/phosphor-icons/core/git/trees/2b75f3ad12b420c9504ef05df8d2564a28f8500e?recursive=1",
+  "license": {
+    "name": "MIT",
+    "copyright": "Copyright (c) 2023 Phosphor Icons",
+    "source_url": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/LICENSE",
+    "display_url": "https://github.com/phosphor-icons/core/blob/2b75f3ad12b420c9504ef05df8d2564a28f8500e/LICENSE",
+    "local_path": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/icons/LICENSE-phosphor-duotone.txt",
+    "sha256": "b5b1f1da112d18ea2147decfd48ddc1bf2b5aeb6c265381579340e95b15a2bb2",
+    "bytes": 1071,
+    "requirement": "Retain the copyright and permission notice when redistributing."
+  },
+  "scope": "Verify three existing regular SVGs against the pinned official original files. Existing SVGs and historical icon-audit.json are preserved unchanged.",
+  "source_history": "All three existing local SVGs also match the MVP3 icon library documented at D:/DEV/popcorn-ai/mockups/mvp3/assets/README.md:19; none appeared in the historical icon-audit.json used-icon list.",
+  "historical_icon_audit_sha256": "00d8e7d2162d05b86424908df43a9b897c4da3afe3f1c4ce9709c3a7a0d34f1b",
+  "files": [
+    {
+      "filename": "game-controller.svg",
+      "variant": "regular",
+      "local_path": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/icons/game-controller.svg",
+      "source_url": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/game-controller.svg",
+      "official_git_blob_sha": "0fe3a3d5e5a27aceb58311c8d35fa14dc46243fd",
+      "verified_git_blob_sha": "0fe3a3d5e5a27aceb58311c8d35fa14dc46243fd",
+      "sha256": "e4d7cff86ba6774845d3ef92628fd8ae95d817cc5cc0277306a057f493d6dca3",
+      "bytes": 789,
+      "original_unmodified": true,
+      "viewBox": "0 0 256 256",
+      "fill": "currentColor",
+      "existing_library_provenance": {
+        "file": "D:/DEV/popcorn-ai/mockups/mvp3/assets/icons/game-controller.svg",
+        "sha256": "e4d7cff86ba6774845d3ef92628fd8ae95d817cc5cc0277306a057f493d6dca3",
+        "library_readme": "D:/DEV/popcorn-ai/mockups/mvp3/assets/README.md:19",
+        "bytes_identical": true
+      },
+      "checks": {
+        "valid_svg_xml": true,
+        "approved_viewbox": true,
+        "current_color_preserved": true,
+        "official_bytes_identical": true,
+        "official_git_blob_matches": true,
+        "no_scripts": true,
+        "no_foreign_object": true,
+        "no_event_attributes": true,
+        "no_nonlocal_href": true,
+        "no_external_css_urls": true,
+        "no_doctype_or_entities": true
+      }
+    },
+    {
+      "filename": "video-camera.svg",
+      "variant": "regular",
+      "local_path": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/icons/video-camera.svg",
+      "source_url": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/video-camera.svg",
+      "official_git_blob_sha": "de861f35c8d77607563c729e40539bb994966dc5",
+      "verified_git_blob_sha": "de861f35c8d77607563c729e40539bb994966dc5",
+      "sha256": "3c9eaa197d77d45496d35be0a750095b643cf7a3685e3b067049b587368acce2",
+      "bytes": 352,
+      "original_unmodified": true,
+      "viewBox": "0 0 256 256",
+      "fill": "currentColor",
+      "existing_library_provenance": {
+        "file": "D:/DEV/popcorn-ai/mockups/mvp3/assets/icons/video-camera.svg",
+        "sha256": "3c9eaa197d77d45496d35be0a750095b643cf7a3685e3b067049b587368acce2",
+        "library_readme": "D:/DEV/popcorn-ai/mockups/mvp3/assets/README.md:19",
+        "bytes_identical": true
+      },
+      "checks": {
+        "valid_svg_xml": true,
+        "approved_viewbox": true,
+        "current_color_preserved": true,
+        "official_bytes_identical": true,
+        "official_git_blob_matches": true,
+        "no_scripts": true,
+        "no_foreign_object": true,
+        "no_event_attributes": true,
+        "no_nonlocal_href": true,
+        "no_external_css_urls": true,
+        "no_doctype_or_entities": true
+      }
+    },
+    {
+      "filename": "paper-plane-tilt.svg",
+      "variant": "regular",
+      "local_path": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/icons/paper-plane-tilt.svg",
+      "source_url": "https://raw.githubusercontent.com/phosphor-icons/core/2b75f3ad12b420c9504ef05df8d2564a28f8500e/assets/regular/paper-plane-tilt.svg",
+      "official_git_blob_sha": "9ed1562da7a3b4a315c316841d85b73ca9e546b9",
+      "verified_git_blob_sha": "9ed1562da7a3b4a315c316841d85b73ca9e546b9",
+      "sha256": "0dbff2ada31c963dfd95bfe2ab2cb39a90fe7100eb7c1724577444a1d8a7c26d",
+      "bytes": 429,
+      "original_unmodified": true,
+      "viewBox": "0 0 256 256",
+      "fill": "currentColor",
+      "existing_library_provenance": {
+        "file": "D:/DEV/popcorn-ai/mockups/mvp3/assets/icons/paper-plane-tilt.svg",
+        "sha256": "0dbff2ada31c963dfd95bfe2ab2cb39a90fe7100eb7c1724577444a1d8a7c26d",
+        "library_readme": "D:/DEV/popcorn-ai/mockups/mvp3/assets/README.md:19",
+        "bytes_identical": true
+      },
+      "checks": {
+        "valid_svg_xml": true,
+        "approved_viewbox": true,
+        "current_color_preserved": true,
+        "official_bytes_identical": true,
+        "official_git_blob_matches": true,
+        "no_scripts": true,
+        "no_foreign_object": true,
+        "no_event_attributes": true,
+        "no_nonlocal_href": true,
+        "no_external_css_urls": true,
+        "no_doctype_or_entities": true
+      }
+    }
+  ]
+}

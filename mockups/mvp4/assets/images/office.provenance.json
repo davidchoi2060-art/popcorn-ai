@@ -1,0 +1,38 @@
+{
+  "asset": "office.png",
+  "date": "2026-10-18",
+  "purpose": "Single opaque white office desktop tower catalog asset",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/03-office.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-f93ea6b6-b96f-456c-b442-fab3e81f86af.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/office.png",
+  "original_preserved": true,
+  "requested_dimensions": {
+    "width": 1024,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1254,
+    "height": 1254
+  },
+  "dimensions_note": "Generator returned1254x1254 square; copied without resizing.",
+  "bytes": 1356977,
+  "sha256": "41500B75E8F34F73688C81FE31D2263412E7513E89E23F932E884DCE753A9247",
+  "prompt": "Create ONE photorealistic ecommerce catalog asset: a single elegant WHITE OFFICE DESKTOP TOWER on a pure white seamless studio background. Square1024x1024. Attached approved office-PC design is only a reference for clean white compact tower proportions and bright photography, NOT for any webpage UI. Important deliberate variation: unlike the reference's perforated front, this requested tower has SOLID OPAQUE WHITE PANELS ONLY, absolutely NO MESH, NO PERFORATED FRONT, NO GLASS.\nProduct: neat compact mid-sized office computer tower, minimalist matte satin white enclosure, flat opaque closed side panel, flat solid white front, subtle panel seams, small plain unlabelled circular power button and2 small USB ports near upper front edge. Maybe a narrow discreet rear-edge ventilation gap but no visible mesh or dotted perforation. No transparent windows, no visible internals, no fans on display, no RGB or lighting. Small black/gray understated feet. Realistic restrained office hardware, premium simple materials.\nCamera front-left THREE-QUARTER view so front and broad closed left side are both visible, slightly elevated showing a little top. Entire product centered, vertically upright, about68-72% image height and50-58% width, with generous white safety margins all around. No clipping of top, feet or corners. Soft realistic contact shadow directly beneath, bright neutral softbox lighting that separates white product from white background through delicate edge shading, crisp material detail.\nNo monitor, keyboard, mouse, cables, props, room, desk scenery, person or second computer. ABSOLUTELY NO TEXT, brand logo, symbol, letters, numbers, printed labels, specs, price, caption, watermark, frame or website elements. No mesh/perforation pattern anywhere on the visible front or side. Output one beautiful single tower catalog photograph on opaque white background,1024x1024 square.",
+  "qa": {
+    "method": "Direct visual inspection against approved office reference, file dimensions/hash validation",
+    "observed": [
+      "Single matte white compact office desktop tower",
+      "Opaque closed side/front panels, no mesh/RGB/glass or visible internals",
+      "Front-left three-quarter view, subtle power button and two small unlabelled USB ports",
+      "Product and all visible feet fully inside image with white safety margins",
+      "No logo, text, price/specification, person or other product",
+      "Existing office.webp retained separately, same observed200892-byte length"
+    ],
+    "limitations": [
+      "Generated illustrative tower, not an actual verified sale SKU",
+      "Actual square output larger than requested1024x1024"
+    ]
+  },
+  "scope": "office.png and provenance only; existing office.webp not overwritten; code/service/DB/deploy unchanged"
+}

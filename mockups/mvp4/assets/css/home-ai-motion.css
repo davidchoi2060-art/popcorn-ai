@@ -1,0 +1,50 @@
+/* v5 hero only. Product photography and generated raster art are the visual
+   assets. Animation changes transform/opacity; no drawn lines or CSS artwork. */
+.home-hero.home-hero-ai{display:grid;grid-template-columns:40% minmax(0,60%);align-items:stretch;min-height:430px;height:430px;background:#fff5d7;background-image:none}
+.home-hero-ai .hero-copy{align-self:center;width:auto;padding:35px 0 36px 38px;z-index:2}
+.home-hero-ai .hero-copy h1{font-size:clamp(39px,4.1vw,56px);line-height:1.1}
+.home-hero-ai .hero-copy p{font-size:17px;max-width:360px;line-height:1.6}
+.home-hero-ai .hero-actions{gap:9px;margin-top:25px}
+.home-hero-ai .hero-actions .btn{font-size:13px;padding-inline:16px;min-height:46px}
+.home-ai-scene{position:relative;isolation:isolate;min-width:0;height:100%;overflow:hidden;background:#fff5d7}
+.home-ai-scene-product{position:absolute;z-index:0;inset:0;width:100%;height:100%;display:block;object-fit:cover;object-position:right bottom}
+.home-ai-core{position:absolute;z-index:1;top:22px;left:12px;width:205px;height:205px;object-fit:contain;display:block;animation:home-ai-float 6.6s ease-in-out infinite;transform-origin:center}
+.home-ai-scene-caption{position:absolute;z-index:2;top:235px;left:26px;max-width:205px}
+.home-ai-scene-caption>span{display:block;font-size:10px;font-weight:650;letter-spacing:.015em;color:#93856b;line-height:1.6}
+.home-ai-scene-caption>strong{display:block;font-size:15px;font-weight:750;letter-spacing:-.035em;line-height:1.45;color:#4b402d;margin-top:3px;word-break:keep-all}
+.home-ai-keywords{position:absolute;z-index:2;left:25px;top:294px;list-style:none;display:grid;gap:7px;max-width:165px}
+.home-ai-keyword{display:flex;align-items:center;gap:8px;min-width:112px;min-height:31px;padding:6px 13px 6px 10px;background:rgb(255 255 255 / .9);border:1px solid #e6d9b3;border-radius:9px;font-size:12px;font-weight:700;color:#514535;opacity:.59;transform:translateX(0);transition:transform .4s ease,opacity .4s ease}
+.home-ai-keyword .icon{width:18px;height:18px}
+.home-ai-keyword.is-active{opacity:1;transform:translateX(5px);background:#ffe68a;border-color:#eac966;color:#33280f}
+.home-ai-motion-control{position:absolute;z-index:3;right:18px;top:18px;min-height:34px;padding:7px 11px;border:1px solid rgb(185 169 129 / .45);border-radius:8px;background:rgb(255 255 255 / .83);color:#75674f;font-size:10px;font-weight:650;line-height:1.4;white-space:nowrap}
+.home-ai-motion-control:hover{background:#fff;color:#2d2618}
+.home-ai-motion-control:disabled{opacity:.8;cursor:default}
+.home-ai-scene.is-paused .home-ai-core{animation-play-state:paused}
+.home-ai-scene.is-reduced .home-ai-core{animation:none;transform:none;opacity:1}
+.home-ai-scene.is-reduced .home-ai-keyword{transition:none;transform:none;opacity:1}
+@keyframes home-ai-float{0%,100%{transform:translateY(0) scale(1);opacity:1}35%{transform:translateY(-8px) scale(1.025);opacity:.96}67%{transform:translateY(2px) scale(.99);opacity:1}}
+@media(min-width:1440px){.home-hero.home-hero-ai{height:445px;min-height:445px}.home-hero-ai .hero-copy{padding-left:40px}.home-hero-ai .hero-copy h1{font-size:58px}.home-ai-core{top:22px;left:22px;width:215px;height:215px}.home-ai-scene-caption{left:36px;top:245px}.home-ai-keywords{left:35px;top:302px}}
+@media(min-width:801px) and (max-width:1100px){.home-hero.home-hero-ai{height:410px;min-height:410px;grid-template-columns:43% minmax(0,57%)}.home-hero-ai .hero-copy{padding-left:27px}.home-hero-ai .hero-copy h1{font-size:42px}.home-hero-ai .hero-copy p{font-size:15px}.home-hero-ai .hero-actions .btn{padding-inline:13px;font-size:12px}.home-ai-core{width:175px;height:175px;left:0;top:32px}.home-ai-scene-caption{left:15px;top:224px;max-width:170px}.home-ai-scene-caption>strong{font-size:13px}.home-ai-keywords{left:14px;top:280px}.home-ai-keyword{min-width:103px;font-size:11px;padding:5px 10px;min-height:30px}.home-ai-scene-product{inset:auto 0 0;height:250px;object-position:right bottom}.home-ai-motion-control{right:12px;top:12px}}
+@media(max-width:800px){
+  .home-hero.home-hero-ai{display:block;height:auto;min-height:0;background:#fff5d7}
+  .home-hero-ai .hero-copy{width:100%;padding:24px 23px 12px}
+  .home-hero-ai .hero-copy h1{font-size:38px;line-height:1.09}
+  .home-hero-ai .hero-copy p{font-size:14px;margin-top:12px}
+  .home-hero-ai .hero-actions{gap:8px;margin-top:17px}
+  .home-hero-ai .hero-actions .btn{min-height:42px;font-size:12px;padding:10px 13px}
+  .home-ai-scene{height:260px;width:100%}
+  .home-ai-scene-product{inset:auto 0 0;height:auto;width:100%;aspect-ratio:2/1;object-fit:contain;object-position:right bottom}
+  .home-ai-core{left:13px;top:0;width:135px;height:135px}
+  .home-ai-scene-caption{left:17px;top:131px;max-width:150px}
+  .home-ai-scene-caption>span{font-size:8px;line-height:1.4}
+  .home-ai-scene-caption>strong{font-size:11px;margin-top:2px;line-height:1.4}
+  .home-ai-keywords{left:16px;top:173px;gap:5px;max-width:120px}
+  .home-ai-keyword{min-width:93px;min-height:24px;padding:4px 9px 4px 7px;gap:6px;border-radius:7px;font-size:10px}
+  .home-ai-keyword .icon{width:15px;height:15px}
+  .home-ai-keyword.is-active{transform:translateX(3px)}
+  .home-ai-motion-control{top:7px;right:12px;min-height:32px;font-size:9px;padding:6px 9px}
+  .home-ai-scene.is-reduced .home-ai-keyword{transform:none}
+}
+@media(min-width:501px) and (max-width:800px){.home-ai-scene{height:270px}.home-ai-scene-product{height:270px;width:100%;object-fit:cover;object-position:right bottom}.home-ai-core{width:155px;height:155px;top:0;left:25px}.home-ai-scene-caption{left:31px;top:151px}.home-ai-keywords{left:30px;top:191px}}
+@media(max-width:370px){.home-hero-ai .hero-copy{padding-inline:18px}.home-hero-ai .hero-copy h1{font-size:34px}.home-hero-ai .hero-copy p{font-size:13px}.home-hero-ai .hero-actions .btn{padding-inline:10px;font-size:11px}.home-ai-scene{height:245px}.home-ai-core{left:7px;width:125px;height:125px}.home-ai-scene-caption{left:12px;top:124px}.home-ai-keywords{left:11px;top:164px;gap:4px}.home-ai-keyword{min-height:23px;font-size:9px;min-width:87px}}
+@media(prefers-reduced-motion:reduce){.home-ai-core{animation:none!important;transform:none!important;opacity:1}.home-ai-keyword{transition:none!important;transform:none!important;opacity:1}}

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from sqlalchemy import text
 
-from . import access_gate, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_contact, mvp3_quantity, visitor
+from . import access_gate, customer_pc_catalog, customer_pc_offer, grid_public, mall_price_live, mvp3_build, mvp3_contact, mvp3_quantity, visitor
 from .sold_reco import public_spec
 from .db import engine
 from .recommend import _resolve_data_origin
@@ -234,6 +234,11 @@ def built_product(state_raw, body):
 
 
 def recommended_product(state, body):
+    if not state.model_dump().get('usages'):
+        # 상담 없이 상품 목록(/mvp4)에서 직접 고른 PC -- 판매중 추천 풀 상품을 지금 판매가로만 받는다(2026-10-19).
+        item = customer_pc_catalog.sold_item(body.product_code)
+        return selected_product({'card_sets': [{'kind': 'sold', 'items': [item] if item else []}]},
+                                body.product_code, body.expected_price)
     public = grid_public.recommend(grid_public.RecommendBody(state=state.model_dump()))
     if not in_recommendation(public, body.product_code):
         # 「더 싸게」·「더 좋게」·추가 조건으로 본 카드는 조건만으로 다시 조회한 목록에 없을 수 있다.

@@ -1,0 +1,49 @@
+{
+  "asset": "hero-pc.png",
+  "date": "2026-10-18",
+  "purpose": "Reusable image-only HTML hero background",
+  "generation_tool": "built-in image_gen.imagegen",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/hero-pc.png",
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 768
+  },
+  "actual_dimensions": {
+    "width": 1774,
+    "height": 887
+  },
+  "aspect_ratio": "2:1",
+  "bytes": 1593488,
+  "sha256": "63570C75718D923DA37D358DEDF65B4F2D60CE1B04A2B08ECA8206495DEB4CAA",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-60965e53-1e8c-4f00-8eab-cb1a24227748.png",
+  "approved_reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/home.png",
+  "originals_preserved": true,
+  "attempts": [
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-df266581-ddd0-4581-8fbe-651214d5f2d7.png",
+      "prompt": "Create a SINGLE high-end photorealistic e-commerce HERO BACKGROUND IMAGE ASSET, landscape 1536x768 pixels, EXACT 2:1 aspect ratio. This will be used directly behind real HTML text. The attached approved PopcornAI homepage image is only an art-direction reference: reproduce the beautiful bright creamy product photograph from its TOP HERO, not the website UI. Output only the photograph, not a webpage, mockup, layout board or screenshot.\n\nCOMPOSITION IS CRITICAL:\n- Left45% of the entire image is completely empty smooth very pale warm cream background, softly lit and near solid, ideal for black headline overlay. No objects, no lettering, no visual clutter on the left. A subtle seamless horizontal desk surface at the very bottom is okay.\n- Right55% contains one harmonious cluster of FOUR actual physical products on a bright creamy desk: a widescreen desktop monitor toward the back/left of that cluster; a low box-shaped brushed SILVER MINI DESKTOP COMPUTER foreground; a clean WHITE CLOSED-SIDED TOWER computer midground center; and a BLACK PROFESSIONAL TOWER with elegant vertical ventilation fins far right. White tower must have opaque closed side panel, no glass, no exposed internals. Silver mini PC is unmistakably a small low rectangular metal box with subtle ports. Black tower is professional, understated, not gaming RGB.\n- All four products fully inside frame with safe margins at right/top/bottom, grounded on desk with realistic soft contact shadows. Do not crop the black tower. Products realistically scaled relative to one another; mini PC clearly smallest. Keep cluster entirely to the right of x45%, monitor can begin around x48%.\n- Monitor screen: abstract elegant pastel lavender/soft blue/cream curved wallpaper only, no software windows, no words, no UI. Slim black monitor frame, physically plausible stand partially visible.\nLighting/style: premium studio product photography, airy warm daylight, crisp realistic materials, clean polished subtle textures, gentle highlights, creamy off-white wall and tabletop. Match warmth, beauty, camera perspective and product treatment of the attached homepage top hero. Background may have faint out-of-focus sunlit architectural depth ONLY on far right, but mostly seamless cream.\nABSOLUTELY NO text, letters, Korean words, logo, brand mark, caption, price, buttons, UI, browser chrome, website sections, frames around artwork, people, hands, faces, laptops, plants crossing the empty left space, or extra products. Only four products and a clean desk/background.\nThis is a reusable image-only production design asset. Preserve the left45% blank overlay-safe zone. Output one photograph in 2:1 landscape.",
+      "reason_for_refinement": "Mini PC extended to approximately41% image width and an extra gray rear sliver needed removal."
+    },
+    {
+      "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-60965e53-1e8c-4f00-8eab-cb1a24227748.png",
+      "prompt": "Refine the FIRST attached hero photograph only; preserve its beautiful bright cream lighting, realistic physical products, opaque white tower, black professional tower, silver mini PC and pastel monitor, no text or logos. SECOND attachment is the approved homepage style reference only. Output ONE final image-only HTML hero background, 2:1 landscape, requested1536x768.\nCritical precise composition correction: the entire LEFT45% of image must remain completely empty cream wall/desk with absolutely NO product overlapping this zone at any height. In the first attached image the silver mini PC begins too far left at about41%; shift the COMPLETE four-product cluster to the right and reduce its total footprint slightly so its leftmost pixel starts at x47%. Four products only: monitor, low silver box miniPC, white opaque closed-sided tower, black vertical-fin tower. Everything fully visible with about4% safe margin at the right. Maintain realistic arrangement and gentle contact shadows. Keep products dominant on RIGHT53%; black tower largest and far right, white tower front center, miniPC front left of cluster, monitor behind. Remove any extra gray slab/object behind the black tower that could resemble a fifth computer.\nKeep left empty region visually near-solid pale cream, no plants, text, design labels, logos, website UI, captions, browser frames, people or hands. No additional objects. Preserve overall warmth and elegant photographic realism. This is only a product photo background, not a website screenshot.",
+      "selected": true
+    }
+  ],
+  "qa": {
+    "method": "Direct visual inspection of generated asset and approved reference; file dimensions/hash verified.",
+    "observed": [
+      "Four main products: monitor, silver mini box PC, opaque closed white tower, black professional tower",
+      "Warm pale cream desk/background, bright photographic style",
+      "No text, logos, browser/UI frame or people",
+      "All products fully within image; safe margin on right",
+      "Left headline region approximately45% remains unobstructed above lower product baseline"
+    ],
+    "limitations": [
+      "Full-height product-free region visually approximately43%, because mini PC begins slightly before45% at lower right of intended text zone; keep HTML copy within about42% width or above product baseline.",
+      "Generator output is1774x887, not requested1536x768; same2:1 aspect, copied without resizing.",
+      "Image is generated illustrative product artwork, not an actual selected sale item."
+    ]
+  },
+  "scope": "Image asset and provenance JSON only. No HTML/CSS/JavaScript, service, DB or public deployment modified."
+}

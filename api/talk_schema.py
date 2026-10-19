@@ -80,7 +80,8 @@ class DisplayContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     screen: Literal["welcome", "results", "detail", "final", "saved"]
-    source: Literal["recommendation", "saved_quote", "new_pcs", "custom_build"]
+    # catalog = /mvp4 상품 목록·상세에서 고른 판매 PC(2026-10-19). 추천 결과로 위장하지 않는다.
+    source: Literal["recommendation", "saved_quote", "new_pcs", "custom_build", "catalog"]
     cards: list[DisplayCard] = Field(default_factory=list, max_length=6)
     selected: DisplayCard | None = None
     cards_truncated: Annotated[bool, Field(strict=True)] = False

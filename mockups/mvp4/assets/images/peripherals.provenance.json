@@ -1,0 +1,37 @@
+{
+  "asset": "peripherals.png",
+  "date": "2026-10-18",
+  "purpose": "Monitor-dominant monitor/keyboard/mouse/headset catalog bundle for HTML category tiles",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference": "D:/WORK/PopcornAI/outputs/product-next-pages-20261018/10-peripherals.png",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-81d22edf-9e7c-4d0d-9879-e6a986150f4b.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/peripherals.png",
+  "original_preserved": true,
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 1718415,
+  "sha256": "AE721FCEDA1E126D962EC3C9DAFC5313E6C8A431F441902B241BFE201F467EE3",
+  "prompt": "Create ONE premium photorealistic ecommerce catalog image asset, landscape1536x1024,3:2 aspect ratio. Use the attached approved PopcornAI monitor/peripherals page ONLY as an art direction reference for elegant black electronics and bright clean product photography. Do not reproduce any website layout, text or human.\nSUBJECT exactly one coherent bundle of FOUR products: ONE large modern widescreen desktop MONITOR, ONE refined black keyboard, ONE ergonomic black mouse, and ONE black over-ear headset on a minimal dark stand. The monitor is the dominant centerpiece so this image also works in a monitor-category tile. Do not add a second monitor, a computer tower, webcam or other equipment.\nArrangement: monitor centered slightly left/back, its complete slim black frame and stand visible. Keyboard in front of monitor across lower left; mouse immediately to its right; headset upright on stand to the right of monitor. Products separated enough to read clearly, minimal overlapping. Every product completely inside image with at least7% outer margin, nothing clipped. Bundle occupies approximately80% width and72% height, centered with generous white breathing room.\nMonitor screen displays a beautiful soft lavender/blue/pale peach mountain-and-lake wallpaper similar to the reference, but no software windows or UI, no labels, no words. Monitor frame is plain matte black with NO logo, symbol, text or brand on the bezel. Keyboard has clean BLANK keycaps with NO letters/numbers/text, elegant subtle key spacing, no garish RGB. Mouse and headset entirely unbranded, no printed labels or logos. Realistic materials: matte black metal/plastic, soft ear padding, premium restrained finish.\nBright WHITE SEAMLESS STUDIO BACKGROUND and white surface, soft contact shadows and very gentle highlights, no visible horizon, room, plants, furniture, people or clutter. Front slight three-quarter product-photo viewpoint, natural physical proportions, crisp beautiful catalog photography matching a clean white shopping page.\nABSOLUTELY NO text, numbers, logos, brand marks, captions, price/spec labels, marketing badges, watermark, border/frame, browser chrome, website elements, people, hands, cables crossing foreground or extra props. Only the four-product monitor/keyboard/mouse/headset set. Output1536x1024 landscape image-only reusable asset.",
+  "qa": {
+    "method": "Direct visual inspection of generated image and reference; dimensions and hash verified.",
+    "observed": [
+      "One dominant monitor, one keyboard, one mouse, one headset on stand",
+      "All products fully visible inside frame, no clipping",
+      "White studio background and restrained soft shadows",
+      "Monitor displays scenic wallpaper, no UI text",
+      "Blank keyboard keycaps and unbranded products; no visible words/logos",
+      "No person, website UI, captions or additional product"
+    ],
+    "limitations": [
+      "Generated illustrative product bundle, not a verified sale SKU or specification",
+      "At narrow monitor-only crop, accessories may be omitted by HTML; full image itself includes all four"
+    ]
+  },
+  "scope": "Asset/provenance only; no code/service/DB/deploy change"
+}

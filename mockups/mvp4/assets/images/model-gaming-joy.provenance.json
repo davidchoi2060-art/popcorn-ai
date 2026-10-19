@@ -1,0 +1,29 @@
+{
+  "file": "model-gaming-joy.png",
+  "createdAt": "2026-10-18T02:32:46.545Z",
+  "tool": "built-in image_gen.imagegen",
+  "useCase": "ads-marketing",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a37-c970-7ee2-9848-7986341344b5/exec-2d46812c-939c-4100-9049-8191bc8c5245.png",
+  "sha256": "90c010224c44a3fa339b799ea1d9adf0ab3396fbeee73ad28edde6f872c20317",
+  "bytes": 2158191,
+  "format": "PNG",
+  "width": 1536,
+  "height": 1024,
+  "aspectRatio": "3:2",
+  "transparentBackground": false,
+  "references": [],
+  "prompt": "Use case: ads-marketing. Asset type: wholesome photorealistic gaming-PC advertising photograph for a bright Korean PC store. A fictional Korean boy, 17 years old, with an unmistakably high-school-student appearance, neat casual blue hoodie and healthy cheerful expression. He stands behind a tidy desk in a bright home study/gaming room, looking toward the camera with delighted excitement. On the desk is a complete coordinated gaming setup: a white RGB desktop tower, monitor, keyboard and mouse. He extends both arms widely out to his sides in an open welcoming arc as if he is so happy he wants to embrace the entire PC set; the hands stay visibly separated and are not touching, crossing or gripping the equipment. Show natural shoulders, two arms and anatomically correct hands/fingers, an easy spontaneous joyful pose. A wide frontal commercial camera position just slightly below normal eye level makes the whole desktop set feel impressive while showing the student's upper body, both extended arms and complete product set. Avoid tight portrait framing; leave enough breathing room for hands and desk edges. Bright clean room, tasteful pale blue accents, soft daylight and gentle commercial lighting, realistic skin and materials, crisp PC details, appealing energetic yet wholesome advertisement. Wide 3:2 landscape, high resolution. Monitor displays an abstract colorful light pattern with no text and no recognizable game. No logos, no words, no watermark, no additional people, no distorted wide-angle limbs, no UI webpage or collage. Single polished photograph.",
+  "content": "AI-generated fictional advertising model and illustrative PC; no identity of a real model or verified retail SKU is asserted.",
+  "visualReview": {
+    "method": "Direct view_image inspection of the saved local file",
+    "cameraEyeContact": true,
+    "productVisible": true,
+    "noMajorHandOrLimbDefectObserved": true,
+    "noOverlayTextOrWatermarkObserved": true,
+    "notes": [
+      "The monitor bezel and internal PC hardware contain very small letter-like generated marks; no headline or watermark. Exact no-text/no-logo compliance is not fully met. Root reviewer notified."
+    ],
+    "status": "usable_with_review_note"
+  },
+  "customerCodeChanged": false
+}

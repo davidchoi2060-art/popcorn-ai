@@ -1,0 +1,38 @@
+{
+  "asset": "model-study-v2.png",
+  "date": "2026-10-18",
+  "purpose": "Distinct study/knowledge-work lifestyle photograph for the basic AI package",
+  "generation_tool": "built-in image_gen.imagegen",
+  "reference_images": [],
+  "generation_mode": "new image; no reference image supplied",
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a35-c869-7810-8295-f46eba45ca5c/exec-e41dce60-bf03-43b9-8190-233215e9feb3.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/model-study-v2.png",
+  "original_preserved": true,
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 2094870,
+  "sha256": "F72C0C88FD1D1C15889A015A7139DBD74934D2B34890BC1C4CC0DE956326F8CA",
+  "prompt": "Create ONE new photorealistic premium lifestyle advertising photograph, landscape1536x1024,3:2 aspect ratio, clean bright white-warm natural daylight. Not a webpage or mockup. No reference-image imitation.\nSUBJECT: a clearly ADULT Korean man in his LATE TWENTIES, a graduate student or thoughtful knowledge worker. Distinct mature calm appearance: short neatly cropped dark hair with tidy side part, thin round metal eyeglasses, gentle angular oval face, clean shaven, understated off-white/ivory knitted sweater. Fully clothed. He must look like an adult professional graduate student, not a teenage gaming model, no youthful fluffy gaming hairstyle, no headphones, no exaggerated grin.\nACTION: he studies material on a desktop monitor and writes thoughtful notes with a pen in an open notebook. One hand naturally holds the pen to paper while the other gently steadies the notebook; anatomically plausible fingers/hands. Calm absorbed expression, gaze alternates toward notebook/monitor, not directly at camera. A few tasteful unlabelled books and a small note sheet, no clutter.\nCAMERA AND COMPOSITION: a fresh bright OVER-THE-SHOULDER-INSPIRED THREE-QUARTER composition, camera placed slightly behind his left shoulder and offset out toward the side, enough angle that his three-quarter face, round glasses and focused eyes remain visible as he turns a little toward his notes. Person centered toward RIGHT side. Avoid a flat frontal portrait and avoid a pure90-degree profile. Include a soft near-foreground shoulder/desk edge for depth, but do not obscure his face. Desktop monitor occupies LEFT side at a believable angle and notebook/pen are visible lower center. Full head with comfortable margin, waist-up seated figure, natural shoulders, face remains a clear secondary focal point alongside the work scene.\nENVIRONMENT: airy modern home-study or bright reading-room corner, white shelves with a few simple books, warm pale-wood desk, diffused large-window daylight and subtle sunlit highlights. Warm white/cream palette, restrained elegant advertising atmosphere, candid believable concentration. Medium-wide editorial photography, realistic skin/fabric textures, gentle background blur, no dramatic lighting or exaggerated effects.\nMONITOR: simple generic document-review appearance using only unlabelled gray lines and soft panels, perhaps a muted abstract diagram; NO legible words, letters, numbers, logos or recognisable software branding. Notebook shows a few abstract pen strokes rather than readable text; books have plain blank spines.\nABSOLUTELY NO captions, Korean words, readable UI text, logos, brand marks, price/spec labels, watermark, AI-model notice, border/frame, website elements or promotional slogans. HTML will add any needed disclosure separately. Only the photo of this fictional adult studying with monitor and handwritten notes. New distinct face, no real-person likeness requested. One image,1536x1024 landscape.",
+  "qa": {
+    "method": "Generated image directly inspected, copied output opened with view_image, dimensions and SHA256 verified",
+    "observed": [
+      "Clearly adult fictional Korean male, thin round glasses and off-white knitwear",
+      "Over-the-shoulder-inspired three-quarter composition with visible face",
+      "Monitor left, person central-right, notebook/pen and natural hand positions visible",
+      "Warm bright daylight, simple study setting, small set of books",
+      "No camera-facing smile; focused study gaze and distinct clothing/angle from earlier work/gaming scenes",
+      "No logo, watermark, readable monitor text or caption"
+    ],
+    "limitations": [
+      "Generated fictional person, not employee/student testimonial or real-person record",
+      "Handwritten notebook contains abstract small strokes, not verified readable content"
+    ]
+  },
+  "scope": "New image and provenance only; data.js mapping left to root; no additional code edits after ai.js handoff"
+}

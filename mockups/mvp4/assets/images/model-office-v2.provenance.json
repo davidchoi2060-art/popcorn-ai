@@ -1,0 +1,33 @@
+{
+  "asset": "model-office-v2.png",
+  "date": "2026-10-18",
+  "use_case": "photorealistic-natural",
+  "generation_tool": "built-in image_gen.imagegen",
+  "mode": "new generation",
+  "attempts": 1,
+  "originals_preserved": true,
+  "source": "C:/Users/leon2/.codex/generated_images/01a14a3a-ef86-7d73-81c3-6872a9617433/exec-0e845614-a4ee-4a7c-91f0-b53d7eab96ef.png",
+  "output": "D:/WORK/PopcornAI/outputs/popcorn-store-html-20261018/store-v2/assets/images/model-office-v2.png",
+  "requested_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "actual_dimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "bytes": 1880571,
+  "sha256": "723a2ac719bc1e5b823fcbdbdb8292b5fd774b3020df07609245a5a6b0a5aaaf",
+  "prompt": "Use case: photorealistic-natural. Asset type: commercial lifestyle photograph for a bright Korean PC-shopping website; image only, no webpage. Create ONE landscape photograph, requested 1536x1024 pixels, exact 3:2 composition.\nScene: a realistic small professional office that feels bright and spacious, with warm-white walls, broad daylight, pale natural wood and white office furniture, subtle out-of-focus office depth. A white desktop PC tower with an opaque closed side panel and a clean desktop monitor are on the desk at the left/center. The equipment has plausible proportions and no RGB gamer lighting. The screen shows only faint abstract blocks suggesting ordinary office work, with no readable text.\nSubject: one fictional Korean adult man in his FORTIES, a dependable experienced office professional. He has naturally mature facial features, neatly trimmed short dark hair, and wears a light sky-blue button-up shirt. He is seated to the RIGHT of the composition, focused calmly on the monitor, not posing for a testimonial and not looking into the camera. His upper body and both natural hands are visible; one hand rests on the mouse and the other near the keyboard. Clearly middle-aged, not a young male student. No headphones, no suit jacket.\nFraming: medium-wide, three-quarter workspace view, with the man centered around the right third, the white PC and monitor clearly readable at left/center, and a comfortable amount of real office space around them. Entire head and hands safely inside frame with margins; all important subjects in the central safe area for object-fit cover crops. Product and human scale are realistic. This must look distinctly different from a young gaming man or a long-haired woman in a black blazer.\nStyle: high-end commercial photorealism, natural skin texture, high-key soft daylight, warm neutral whites, understated genuine work atmosphere, crisp but not overprocessed. No exaggerated smile or glamour portrait. No extra people. No laptop. No text, lettering, readable numbers, logos, brand marks, watermark, captions, labels, graphic overlays, borders or UI chrome anywhere.",
+  "qa": {
+    "method": "Generated image visually inspected; local view_image invoked; PNG IHDR/CRC/decompression and exact copy equality verified.",
+    "observed": [
+      "Mature adult male, sky-blue shirt, white PC and monitor, naturally positioned hands, spacious bright office.",
+      "Subject on right; clearly different age and setting from existing gaming image.",
+      "No visible logo, watermark or legible text at full generated-image view."
+    ],
+    "crop_note": "PC tower is near left edge; use a landscape crop to preserve both person and computer.",
+    "scope": "Fictional generated person and illustrative workplace; not verified retail product photography."
+  },
+  "code_or_data_changed": false
+}
