@@ -75,6 +75,17 @@ class DisplayCard(BaseModel):
         return ("product_code", self.product_code) if self.product_code is not None else ("configuration_id", self.configuration_id)
 
 
+class AnswerSet(BaseModel):
+    """한 답변 본문이 순서대로 소개한 PC 묶음(2026-10-20 대표 승인 「대화가 이어지는 부분」).
+
+    「위 2번째 상품」은 화면 오른쪽 목록이 아니라 «직전 답변 본문»의 2번째다 -- 두 목록은 순서가 다를 수 있다.
+    화면이 답변마다 붙여 둔 묶음 번호와 상품번호만 받는다(이름·가격은 서버가 판매 원천에서 다시 읽는다)."""
+    model_config = ConfigDict(extra="forbid")
+
+    set_id: Annotated[str, Field(strict=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]*$")]
+    cards: list[DisplayCard] = Field(default_factory=list, max_length=6)
+
+
 class DisplayContext(BaseModel):
     """실제 카드 순서와 선택 PC를 분리한다. 가격·연락처·설명문은 받지 않는다."""
     model_config = ConfigDict(extra="forbid")
@@ -85,6 +96,8 @@ class DisplayContext(BaseModel):
     cards: list[DisplayCard] = Field(default_factory=list, max_length=6)
     selected: DisplayCard | None = None
     cards_truncated: Annotated[bool, Field(strict=True)] = False
+    # 최근 답변 본문의 PC 묶음(오래된 것 -> 최근 것). 마지막이 「위 N번째」의 기준이다.
+    answer_sets: list[AnswerSet] = Field(default_factory=list, max_length=3)
 
 # missing 좌표 이름 — talk.py · grid_public.py · 화면이 같은 문자열을 본다.
 MISSING_USAGES = "usages"

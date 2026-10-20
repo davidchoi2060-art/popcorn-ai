@@ -113,10 +113,24 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 「가장 싸고 가장 빠르고 가장 작은」처럼 함께 이룰 수 없는 조건은 서로 맞바꿔야 한다고 솔직히 말하고, 무엇이 먼저인지 고를 수 있게 갈래를 구체적으로 든다.
 - 손님이 추천을 원하지 않거나 거절하면 show_pcs 를 부르지 않고, 물은 것(고를 기준 등)에만 답한다.
 - 시스템 글에 [현재 화면과 이전 조건 자료]가 있으면 손님 화면에 지금 그 PC들이 보이고 있다(서버가 확인한 사실이다). 「저 PC」「오른쪽 PC들」「이 중에」「지금 보는 거」「가장 비싼 GPU로 바꿔줘」는 그 PC를 가리킨다. 화면이 안 보인다·어떤 PC인지 모르겠다·보여 드린 PC가 없다고 되묻지 않는다. 부품을 바꿔 달라면 손님이 보고 있는 PC(selected, 없으면 첫 카드)의 ref 로 other_pcs_by_part 를 불러 원하는 것(가장 비싼·가장 좋은·더 싼)을 골라 show_pcs 로 보여 준다. 「이 중 성능이 가장 좋은 것」「차이가 뭐야」는 카드의 사양·부품으로 비교해 답하고(필요하면 pc_detail), 고른 PC를 show_pcs 로 보여 준다. 「오른쪽 PC는 뭐야」는 카드 순서대로 이름·지금 판매가·핵심 사양을 하나씩 설명한다. 화면 PC가 모두 예산을 넘으면 find_pcs 로 예산 안 대안도 찾아 함께 보여 준다.
+- 시스템 글에 referenced_pc 가 있으면 손님이 이번 문장에서 「N번째」「선택한 상품」으로 가리킨 PC를 서버가 이미 확인한 것이다. source=last_answer 는 직전 답변 본문의 N번째, right_list 는 화면 오른쪽 목록의 N번째, selected 는 선택 PC다. 그 ref 의 PC로 이번 질문(게임·작업·호환·비교 등)에 바로 답한다. 예산·주용도·사용 환경은 손님이 바꾸지 않았으면 그대로 두고, 이번 질문의 목적(예: 그 PC로 오버워치도 되는지)과 나눠서 답한다. 새 추천을 다시 시작하거나 앞의 용도 안내만 되풀이하지 않는다. 성능을 자료로 확인할 수 없으면 확인되지 않았다고 말하고 그 PC의 실제 부품(pc_detail)을 근거로 가능한 범위를 말한다. status=missing 이면 그 순번의 PC가 없었다고 짧게 말하고 어느 PC인지 이름으로 확인한다. not_on_sale 이면 그 PC가 지금 판매 목록에서 확인되지 않는다고 말하고 다른 PC로 바꿔 말하지 않는다.
+- 시스템 글의 last_answer_pcs 는 직전 답변 본문이 소개한 순서다. 화면 오른쪽 목록과 순서가 다를 수 있으니, 손님이 「오른쪽」「목록」이라고 하지 않은 「N번째」는 이 순서를 따른다.
 - 앞에서 보여 드린 PC는 대화 기록의 「보여 드린 PC:」 줄에 순서대로 적혀 있다. 「아까 두 번째 PC」처럼 앞의 PC를 다시 보여 달라고 하면 그 이름으로 find_pc_by_name 을 불러 같은 이름의 PC를 찾아 show_pcs 로 보여 준다. 기록에 그 순서의 PC가 없으면 없었다고 말하고, 그 이름이 지금 판매 목록에 없으면 결과대로 말한다.
 - 손님이 PC를 이름·사양 표기(예: 골드 [14400F/16G/1TB/RTX5060])·몰 상품번호(NO.04.○○○○○○)로 가리키면 용도 조건으로 다시 찾지 말고 find_pc_by_name 으로 그 PC를 찾는다. 시스템 글의 named_pcs 에 이미 있으면 그 PC가 손님이 말한 바로 그 판매 PC이니 그 ref 로 show_pcs 한다. 짧은 이름과 몰의 전체 이름(광고 문구·NO.번호가 붙은 이름)은 같은 상품이다.
 - find_pc_by_name 결과가 match=spec 이면 사양 표기만 같은 다른 이름의 PC라고 밝힌다. not_on_sale 이면 그 PC가 지금 판매 목록에 없다는 사실과 판매 상태를 말하고, empty 면 지금 판매 목록에서 찾지 못했다고 말한다. 그때만 find_pcs 로 대안을 찾아 「다른 PC」라고 구분해 보여 준다. 다른 사양(CPU·저장공간)의 PC를 손님이 말한 PC처럼 말하지 않는다.
 """
+
+
+# /mvp4 답변 화면(형광펜 노트, 2026-10-20 대표 승인)만 요청한다 -- 다른 화면·채널은 표시 기호를 그대로 보이게 되므로 보내지 않는다.
+# 같은 답변 한 번 안에서 표시하게 하고, 서식을 위해 AI 를 두 번 부르지 않는다.
+MARK_RULE = ("\n\n[핵심어 표시]\n- 답의 판단에 가장 중요한 짧은 어구 1~3개만 ==어구== 처럼 감싼다(예: ==VRAM과 메모리==). "
+             "상품 이름·가격·문장 전체·숫자만 따로 감싸지 않는다. 감쌀 것이 없으면 쓰지 않는다. 다른 마크다운 기호는 쓰지 않는다.")
+_MARK = re.compile(r"==([^=\n]{1,80})==")
+
+
+def strip_marks(text_: str) -> str:
+    """핵심어 표시(==어구==)를 걷은 원문 -- 대화 기록·검증·다른 화면은 표시 없는 글을 본다."""
+    return _MARK.sub(r"\1", text_ or "")
 
 
 def enabled() -> bool:
@@ -574,7 +588,7 @@ def _history(turns: list[Turn]) -> tuple[list[dict], bool]:
     for t in turns[-HISTORY_TURNS:]:
         if t.role not in ("user", "assistant") or not t.text.strip():
             continue
-        txt, masked = mask(t.text[:HISTORY_CHARS])
+        txt, masked = mask(strip_marks(t.text)[:HISTORY_CHARS])
         masked_any |= masked
         msgs.append({"role": t.role, "text": txt})
     # 공급자 규칙: 첫 말은 손님(user) 이어야 한다 -- 앞쪽 상담원 말은 버린다.
@@ -602,7 +616,7 @@ def said_units(texts: list[str]) -> int | None:
 
 def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, *,
              prev_state: dict | None = None, display_context: TS.DisplayContext | None = None,
-             request_text: str | None = None) -> dict:
+             request_text: str | None = None, marks: bool = False) -> dict:
     """한 턴을 끝까지 돈다. DB 한도 확인(access_gate)은 라우터가 먼저 한다 -- 이 함수는 시험에서 바로 부른다."""
     t0 = time.monotonic()
     text_masked, masked = mask(text_in)
@@ -635,11 +649,19 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         context["display"] = facts
     # 손님이 이번 문장에 판매 PC 이름·몰 상품번호를 그대로 적었으면 서버가 먼저 찾아 둔다(2026-10-20 대표 신고 -- 추천한
     # 「골드 [14400F/16G/1TB/RTX5060]」을 보여 달라는 말에 AI 가 조건으로 다시 찾아 12400F/500GB 를 내밀었다).
+    # 직전 답변 본문의 PC 묶음과, 이번 문장의 「N번째」가 가리키는 PC -- 화면 오른쪽 목록과 따로 둔다(2026-10-20 대표 승인).
+    last_set = TT.answer_set_facts(display_context, prev_state, book)
+    if last_set:
+        context["last_answer_pcs"] = last_set
+    referenced = TT.resolve_reference(source_text, display_context, prev_state, book)
+    if referenced:
+        context["referenced_pc"] = {**referenced, "scope": "손님이 이번 문장에서 가리킨 PC다(서버가 화면 묶음의 상품번호로 확인). "
+                                    "이 PC 로 이번 질문에 답한다. 예산·주용도는 손님이 바꾸지 않았으면 그대로다."}
     named = TT.named_pcs(source_text, book)
     if named:
         context["named_pcs"] = {"items": named, "scope": "손님이 이번 문장에 적은 이름·상품번호와 같은 지금 판매 중인 PC다"
                                 "(서버가 판매 목록에서 확인). 손님이 말한 그 PC이며 ref 로 show_pcs·pc_detail 을 바로 쓴다."}
-    system = SYSTEM
+    system = SYSTEM + (MARK_RULE if marks else "")
     if context:
         # 고객 자유 문장·연락처를 이 블록에 넣지 않는다. 공개 제목/사양도 명령이 아닌 자료다.
         safe_context, _ = mask(json.dumps(context, ensure_ascii=False))
@@ -739,7 +761,10 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
             # 여러 대 구매면 화면이 추천을 다시 물을 때 wants.units 로 함께 보낸다 -- 한 대 예산으로 견준다(C10).
             "units": (book.units or said_units([m["text"] for m in msgs if m.get("role") == "user"]))
             if status != "failed" and book.shown else None,
-            "anchor_code": book.anchor_code, "dropped_sentences": dropped, "meta": meta}
+            "anchor_code": book.anchor_code, "dropped_sentences": dropped, "meta": meta,
+            # 이번 문장의 「N번째」를 서버가 어디서 찾았나(직전 답변 묶음·오른쪽 목록·선택 PC) -- 검수 근거로 응답에 남긴다.
+            "reference": ({k: referenced.get(k) for k in ("source", "ordinal", "set_id", "status", "product_code")}
+                          if referenced else None)}
 
 
 def _account(meta: dict, turn: "llm.ToolTurn") -> None:
@@ -768,7 +793,8 @@ CHAT_MAX = 2000   # ChatBody.text 한도와 같다 -- 더 긴 글은 지금 경�
 
 
 def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict | None, *,
-             display_context: TS.DisplayContext | None = None, request_text: str | None = None) -> dict | None:
+             display_context: TS.DisplayContext | None = None, request_text: str | None = None,
+             marks: bool = False) -> dict | None:
     """/api/talk/parse 가 스위치가 켜져 있을 때 부른다(2026-10-14 중헌 님 「고객 상담을 LLM 중심으로 해」).
 
     고객 화면은 바뀌지 않은 채 같은 경로를 부르고, 응답 모양도 /parse 계약을 따른다 -- `agent: true` 로
@@ -778,7 +804,7 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
     방문자 한도 확인은 /parse 가 먼저 한다.
     """
     turns = [Turn(role=getattr(t, "role", ""), text=(getattr(t, "text", "") or "")[:4000]) for t in history or []]
-    r = run_turn(text, turns, prev_state=prev_state, display_context=display_context,
+    r = run_turn(text, turns, prev_state=prev_state, display_context=display_context, marks=marks,
                  **({"request_text": request_text} if request_text is not None else {}))
     if not r.get("ok") or r.get("status") == "failed":
         return None
@@ -804,7 +830,7 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
             "agent_cards": [{k: c.get(k) for k in AGENT_CARD_KEYS} for c in cards] if state is not None else [],
             "chat_flow": chat_flow, "exceptions": [r["kind"]] if r.get("kind") else [],
             "agent_meta": {"status": r.get("status"), "snapshot": r.get("snapshot"),
-                           "cards": [c.get("product_code") for c in cards]}}
+                           "cards": [c.get("product_code") for c in cards], "reference": r.get("reference")}}
 
 
 @router.post("/chat")

@@ -308,6 +308,89 @@ def register_display(facts: dict | None, state_raw: dict | None, book: FactBook)
                       if k in ("usages", "budget_won", "budget_bound", "platform", "prefs", "game")}
 
 
+# ── 앞 답변의 「N번째」 (2026-10-20 대표 승인 「대화가 이어지는 부분」) ─────────────────────────────
+# 「위 2번째 상품으로 오버워치 게임도가능한가요?」에 두 번째 PC도 오버워치도 아닌 영상편집 정형문이 나갔다. 순번은 AI 가
+# 대화 기록 글에서 짐작하지 않고 서버가 화면이 보낸 묶음(상품번호)에서 먼저 정한다 -- 기록 글은 길이 제한으로 잘린다.
+_ORD_WORDS = {"첫": 1, "한": 1, "두": 2, "둘": 2, "세": 3, "셋": 3, "네": 4, "넷": 4, "다섯": 5, "여섯": 6}
+_ORDINAL = re.compile(r"(?:(?<!\d)(?P<num>[1-6])\s*(?:번째|번\s*째|번(?=\s*(?:상품|제품|pc|PC|피씨|컴퓨터|거|것|모델|구성|꺼|은|는|이|가|도|으로|로|요|\?|$)))"
+                      r"|(?P<word>다섯|여섯|첫|한|두|둘|세|셋|네|넷)\s*(?:번째|번\s*째|째))")
+_RIGHT = re.compile(r"(오른쪽|우측|옆\s*(?:목록|화면|카드)|추천\s*PC\s*목록|살펴볼\s*PC|목록)\s*(?:에서|의|에)?\s*$")
+_SELECTED = re.compile(r"(선택한|선택된|고른|골라\s*둔)\s*(?:상품|제품|PC|pc|피씨|컴퓨터|거|것)")
+
+
+def ordinal_reference(text: str) -> dict | None:
+    """이번 문장이 가리키는 PC -- {kind: answer|right|selected, ordinal}. 못 찾으면 None. 규칙만 본다(AI 아님)."""
+    t = text or ""
+    m = _ORDINAL.search(t)
+    if m:
+        n = int(m.group("num")) if m.group("num") else _ORD_WORDS[m.group("word")]
+        before = t[max(0, m.start() - 16):m.start()]
+        return {"kind": "right" if _RIGHT.search(before) else "answer", "ordinal": n}
+    if _SELECTED.search(t):
+        return {"kind": "selected", "ordinal": None}
+    return None
+
+
+def resolve_reference(text: str, context, state_raw: dict | None, book: FactBook) -> dict | None:
+    """「위 2번째」는 직전 답변 묶음, 「오른쪽 2번째」는 화면 목록, 「선택한 상품」은 선택 PC 다.
+    찾으면 그 PC 를 이 턴 번호(ref)로 올리고 지금 판매가·사양을 붙인다. 없는 순번은 지어내지 않고 missing 으로 돌려준다."""
+    ref = ordinal_reference(text)
+    if ref is None or context is None:
+        return None
+    sets = list(getattr(context, "answer_sets", None) or [])
+    if ref["kind"] == "selected":
+        source, items, set_id = "selected", ([context.selected] if context.selected is not None else []), None
+        n = 1
+    elif ref["kind"] == "right":
+        source, items, set_id, n = "right_list", list(context.cards), None, ref["ordinal"]
+    elif sets:
+        source, items, set_id, n = "last_answer", list(sets[-1].cards), sets[-1].set_id, ref["ordinal"]
+    else:
+        # 답변 묶음이 없으면(예전 화면) 화면 목록을 쓰되 그 사실을 밝힌다.
+        source, items, set_id, n = "right_list_fallback", list(context.cards), None, ref["ordinal"]
+    out = {"source": source, "ordinal": n, "set_id": set_id, "count": len(items)}
+    if not 1 <= n <= len(items):
+        return {**out, "status": "missing"}
+    card = items[n - 1]
+    if card.product_code is None:
+        return {**out, "status": "unknown"}
+    try:
+        it = _screen_item(state_raw, card.product_code)
+    except Exception:  # noqa: BLE001 -- 확인이 실패하면 번호 없이 둔다(상담은 계속한다)
+        log.warning("[talk_tools] reference check failed code=%s", card.product_code, exc_info=True)
+        it = None
+    if it is None:
+        # 판매 원천에서 지금 확인되지 않는다 -- 다른 PC 로 바꾸지 않고 확인 불가로 둔다.
+        return {**out, "status": "not_on_sale", "product_code": card.product_code}
+    return {**out, "status": "ok", "product_code": card.product_code, "ref": book.add_item(it),
+            "name": it.get("name"), "price_now": it.get("price"), "spec": it.get("spec")}
+
+
+def answer_set_facts(context, state_raw: dict | None, book: FactBook) -> dict | None:
+    """직전 답변 본문이 소개한 PC 묶음 -- 순번·ref·지금 판매가. 화면 목록(cards)과 섞지 않는다."""
+    sets = list(getattr(context, "answer_sets", None) or []) if context is not None else []
+    if not sets:
+        return None
+    last = sets[-1]
+    items = []
+    for i, card in enumerate(last.cards, 1):
+        row = {"ordinal": i, "product_code": card.product_code}
+        if card.product_code is not None:
+            try:
+                it = _screen_item(state_raw, card.product_code)
+            except Exception:  # noqa: BLE001
+                log.warning("[talk_tools] answer set check failed code=%s", card.product_code, exc_info=True)
+                it = None
+            if it is None:
+                row["status"] = "not_on_sale"
+            else:
+                row.update(status="ok", ref=book.add_item(it), name=it.get("name"), price_now=it.get("price"))
+        items.append(row)
+    return {"set_id": last.set_id, "items": items,
+            "scope": "직전 답변 본문이 소개한 순서다. 화면 오른쪽 목록(display.cards)과 순서가 다를 수 있다. "
+                     "not_on_sale 인 순번은 지금 판매 목록에서 확인되지 않는 PC 이며 다른 PC 로 바꾸지 않는다."}
+
+
 def _relaxations(raw: dict, needs: list[str]) -> list[tuple[str, object]]:
     """0장일 때 풀어 볼 조건 -- 앞에서부터 하나씩 «누적해서» 푼다. (손님에게 밝힐 말, 바꾸는 함수).
 
