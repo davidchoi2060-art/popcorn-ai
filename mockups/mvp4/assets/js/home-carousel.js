@@ -30,7 +30,22 @@
       '<div class="hc-selectors" role="group" aria-label="배너 선택">'+items.map(function(s,i){return '<button type="button" data-hc-go="'+i+'" aria-controls="hc-slide-'+i+'" aria-pressed="'+(!i)+'" aria-label="'+(i+1)+'번 배너: '+s.label+'"><span class="hc-dot"></span><span class="hc-label">'+s.label+'</span></button>';}).join('')+'</div>'+
       '<div class="hc-controls"><span class="hc-counter" aria-hidden="true"><b data-hc-current>01</b><span> / '+String(items.length).padStart(2,'0')+'</span></span><button type="button" data-hc-prev aria-label="이전 배너">'+P.icon('arrow-left')+'</button><button type="button" data-hc-next aria-label="다음 배너">'+P.icon('arrow-right')+'</button><button type="button" class="hc-play" data-hc-toggle aria-label="배너 자동 넘김 정지">정지</button></div></div>'+
       '<p class="visually-hidden" data-hc-status role="status" aria-live="polite" aria-atomic="true"></p>'+
-      '<a class="hc-chat" href="'+h(P.designHref('chat','welcome'))+'">'+P.icon('chat-circle')+'어떤 PC를 고를지 고민되나요? <strong>AI와 대화로 PC 찾기</strong>'+P.icon('arrow-right')+'</a></section>';
+      finder()+'</section>';
+  }
+  // 2026-10-20 승인 「AI 찾기 CTA 3번 + 움직이는 말풍선」 -- 기존 .hc-chat 자리만 바꾼다. 바깥은 링크가 아닌 영역이고
+  // 실제 링크는 버튼 하나(중첩 링크 없음 · 같은 탭 이동). PC·리본은 고정, 말풍선 두 장만 움직이는 장식이다(aria-hidden).
+  function finder() {
+    var img = function (f, cls) { return '<img class="'+cls+'" src="assets/images/finder-cta/'+f+'" alt="" loading="lazy" decoding="async" draggable="false">'; };
+    var arrow = P.icon('arrow-right');
+    return '<section class="hc-chat hc-finder" aria-labelledby="hc-finder-title"><div class="hc-finder-copy">'+
+      '<p class="hc-finder-eyebrow">어떤 PC를 고를지 고민되나요?</p>'+
+      '<h2 id="hc-finder-title">AI와 <span>대화</span>로<br>PC 찾기</h2>'+
+      '<p class="hc-finder-description">용도와 예산을 편하게 이야기해 주세요.</p>'+
+      '<a class="hc-finder-cta" href="'+h(P.designHref('chat','welcome'))+'">AI와 대화로 PC 찾기'+arrow+'</a></div>'+
+      '<div class="hc-finder-visual"><div class="hc-finder-scene" aria-hidden="true">'+img('pc-ribbon.png','hc-finder-pc')+
+      '<div class="hc-finder-bubble hc-finder-purple">'+img('bubble-purple.png','')+'</div>'+
+      '<div class="hc-finder-bubble hc-finder-white">'+img('bubble-white.png','')+'</div></div>'+
+      '<ol class="hc-finder-journey" aria-label="AI PC 찾기 과정"><li>대화</li><li aria-hidden="true">'+arrow+'</li><li>추천</li><li aria-hidden="true">'+arrow+'</li><li>비교</li></ol></div></section>';
   }
   function mount() {
     var root=document.querySelector('[data-home-carousel]');
