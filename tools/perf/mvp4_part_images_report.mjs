@@ -17,7 +17,7 @@ for (const profile of profiles) {
     const runs = (d.runs[v][profile] || []).map((r) => r[step]).filter(Boolean);
     if (!runs.length) continue;
     const col = (fn) => med(runs.map(fn));
-    out.push(`| ${step} | ${v} | ${runs.length} | ${col((s) => k(s, 'offer', 'requests') + k(s, 'registered', 'requests'))} | ${col((s) => k(s, 'part-image', 's200'))} | ${col((s) => k(s, 'part-image', 's304'))} | ${col((s) => k(s, 'part-image', 'cache'))} | ${col((s) => k(s, 'part-image', 'unique'))} | ${col((s) => k(s, 'part-image', 'netDuplicateUrls'))} | ${kb(col((s) => k(s, 'part-image', 'bytes')))} | ${col((s) => s.firstPartPhotoMs.median) ?? '-'} | ${col((s) => (s.dom ? s.dom.partIconsInDom : null)) ?? '-'} |`);
+    out.push(`| ${step} | ${v} | ${runs.length} | ${col((s) => k(s, 'offer', 'requests') + k(s, 'registered', 'requests'))} | ${col((s) => k(s, 'part-image', 's200'))} | ${col((s) => k(s, 'part-image', 's304'))} | ${col((s) => k(s, 'part-image', 'cache'))} | ${col((s) => k(s, 'part-image', 'unique'))} | ${col((s) => k(s, 'part-image', 'netDuplicateUrls'))} | ${kb(col((s) => k(s, 'part-image', 'bytes')))} | ${col((s) => s.firstPartPhotoMs.median) ?? '-'} | ${col((s) => (s.dom ? s.dom.partIconsInDom : null)) ?? '-'} |${runs.some((s) => s.error) ? ' 오류 ' + runs.filter((s) => s.error).length + '건: ' + runs.find((s) => s.error).error.replace(/[|\n]/g, ' ').slice(0, 120) : ''}`);
   }
   out.push('');
 }

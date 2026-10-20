@@ -152,10 +152,12 @@ async function runSample(browser, profile, slow, failFirstImages, variant) {
   if (slow) await cdp.send('Network.emulateNetworkConditions', SLOW);
   const step = async (name, fn) => {
     log.length = 0; await page.evaluate(() => { if (window.__pm) { for (const k of Object.keys(window.__pm.firstPart)) delete window.__pm.firstPart[k]; for (const k of Object.keys(window.__pm.firstPhoto)) delete window.__pm.firstPhoto[k]; window.__pm.nodes.part = 0; window.__pm.nodes.photo = 0; window.__pm.t0 = performance.now(); } }).catch(() => {});
-    const t0 = Date.now(); await fn(); await settle(page);
+    // 한 단계가 실패해도(화면 변경·시간 초과) 나머지 단계와 기록은 남긴다 — 실패는 결과에 그대로 적는다.
+    const t0 = Date.now(); let error;
+    try { await fn(); await settle(page); } catch (e) { error = String((e && e.message) || e).slice(0, 400); process.stderr.write(`  ${name} 실패: ${error}\n`); }
     const pm = await page.evaluate(() => window.__pm).catch(() => null);
     const extra = await page.evaluate(() => ({ partImgsInDom: document.querySelectorAll('img[data-cc-part-photo]').length, partIconsInDom: document.querySelectorAll('.cc-part-media > .icon, .cc-part-media > svg').length, uniquePartSrc: new Set(Array.from(document.querySelectorAll('img[data-cc-part-photo]')).map((i) => i.getAttribute('src'))).size, cards: document.querySelectorAll('[data-card-product]').length, busy: document.querySelectorAll('.cc-parts[aria-busy="true"]').length })).catch(() => null);
-    steps[name] = { wallMs: Date.now() - t0, ...summarize([...log], pm), dom: extra, rawRequests: [...log].filter((r) => r.kind !== 'other').map((r) => ({ k: r.kind, url: r.url.replace(/^https?:\/\/[^/]+/, ''), st: r.status, c: r.cache, b: r.bytes, ms: r.t1 && r.t0 ? Math.round((r.t1 - r.t0) * 1000) : null, cond: r.cond, f: r.failed || undefined })) };
+    steps[name] = { error, wallMs: Date.now() - t0, ...summarize([...log], pm), dom: extra, rawRequests: [...log].filter((r) => r.kind !== 'other').map((r) => ({ k: r.kind, url: r.url.replace(/^https?:\/\/[^/]+/, ''), st: r.status, c: r.cache, b: r.bytes, ms: r.t1 && r.t0 ? Math.round((r.t1 - r.t0) * 1000) : null, cond: r.cond, f: r.failed || undefined })) };
   };
   const catalogUrl = new URL('./?screen=catalog', BASE).toString();
   await step('1-first-load-cold', async () => { await page.goto(catalogUrl, { waitUntil: 'domcontentloaded' }); await settle(page); await scrollAll(page); });
@@ -205,7 +207,7 @@ for (const profile of (args.profiles ? args.profiles.split(',') : Object.keys(PR
   }
 }
 for (const variant of VARIANTS) { process.stderr.write(`${variant} fail-retry\n`); put(variant, 'pc1440-fail-first-image', await runSample(browser, 'pc1440', false, true, variant)); }
-const first = result.runs[VARIANTS[0]].pc1440[0]['1-first-load-cold'].rawRequests;
+const first = (((result.runs[VARIANTS[0]].pc1440 || [])[0] || {})['1-first-load-cold'] || {}).rawRequests || [];
 const codes = [...new Set(first.filter((r) => r.k === 'part-image').map((r) => r.url.match(/product-images\/(\d+)\//)[1]))].slice(0, 12);
 result.variantSizes = await variantSizes(browser, codes);
 await browser.close();
