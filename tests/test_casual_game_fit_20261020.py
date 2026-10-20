@@ -235,6 +235,42 @@ class Shortage(unittest.TestCase):
                 self.assertTrue(all(c in PUBLIC for c, _, _ in chosen(cs)), (raw, budget))
 
 
+class StaticReview361(unittest.TestCase):
+    """2026-10-20 #361 병합 직후 독립 정적 검토(P2 셋)의 회귀."""
+
+    def test_empty_or_unreadable_public_set_is_closed(self):
+        # 1) 승인 집합이 비거나(조회 실패도 빈 집합) -> 비공개 상품으로 대신하지 않고 비운다
+        for raw in INPUTS:
+            for budget in (None, 3500000):
+                for text in ('', '더 저렴하게'):
+                    cs, notes = run(state_of(raw, budget, '이하' if budget else None), text=text, public=frozenset())
+                    self.assertEqual(chosen(cs), [], (raw, budget, text))
+                    self.assertEqual(cs['empty_reason'], '공개 구성 상품 없음', (raw, budget, text))
+        cs, notes = run(state_of('한게임 포커용'), public=frozenset())
+        trace('공개 승인 집합 비어 있음/조회 실패', '한게임 포커용', cs, notes, frozenset())
+
+    def test_portal_name_alone_is_not_a_light_game(self):
+        # 2) 포털 이름만으로 사무용 수준에 고정하지 않는다 -- 장르 낱말이 있어야 한다
+        def ok(names):
+            return S.game_names_ok(TalkState(usages=['캐주얼 게임'], game=GameState(names=names)), VOCAB)
+        for portal in (['한게임'], ['피망'], ['피망 서든어택'], ['한게임 로스트아크']):
+            self.assertFalse(ok(portal), portal)
+            self.assertFalse(S.light_game_state(TalkState(usages=['캐주얼 게임'], game=GameState(names=portal)), VOCAB))
+        self.assertTrue(ok(['한게임 포커']))
+        self.assertTrue(ok(['피망 뉴맞고']))
+
+    def test_high_refresh_with_budget_picks_needed_level_not_top(self):
+        # 3) 발로란트 + 144Hz + 예산 상한: 필요한 수준(FHD 게임)의 알맞은 가격 한 장 -- 예산 안 최고 수준·자동 상위 카드 없음
+        for budget in (3500000, 2000000):
+            cs, notes = run(state_of('발로란트 게임용', budget, '이하'), text='발로란트 144Hz로 하고 싶어요')
+            trace(f'144Hz + 예산 상한 {budget // 10000}만', '발로란트 게임용', cs, notes, PUBLIC, '발로란트 144Hz로 하고 싶어요')
+            self.assertEqual(chosen(cs), [(905, 'recommended', 1625800)], budget)
+        # 고객이 「더 좋게」를 말하면 그때는 위 사양을 보인다
+        cs, _ = run(state_of('발로란트 게임용', 3500000, '이하'),
+                    explore={'wants': {'high_fps': True}, 'nav': X.BETTER, 'anchor_code': 905})
+        self.assertTrue(all(p > 1625800 for _, _, p in chosen(cs)))
+
+
 def tearDownModule():
     path = os.environ.get('G01_TRACE')
     if path:

@@ -90,8 +90,10 @@ MAX_UPGRADE_HINTS = 2
 # (games·game_load_grades)에 없어 등급을 모르고, 예전에는 이름을 버린 뒤 FHD 게임 수준(외장 그래픽)으로 찾았다.
 # 브라우저·가벼운 클라이언트로 도는 장르라 게임 그래픽 기준이 아니라 사무용 기본(문서·웹 수준) 기준으로 찾는다.
 # 장르 낱말만 본다 -- 게임 목록에 있는 이름(match_game 이 찾는 것)은 여기서 판단하지 않는다.
+# 포털 이름(한게임·피망)은 넣지 않는다 -- 그 안에 사양이 다른 게임이 섞여 있어, 장르 낱말 없이 포털만 말하면
+# 예전처럼 «등급 모르는 게임»으로 보류한다(2026-10-20 #361 정적 검토 2).
 LIGHT_GAME = re.compile(r"포커|홀덤|고스톱|맞고|섯다|바둑|장기|체스|오목|카드\s*게임|보드\s*게임|웹\s*게임|"
-                        r"플래시\s*게임|브라우저\s*게임|애니팡|솔리테어|지뢰\s*찾기|테트리스|한게임|피망")
+                        r"플래시\s*게임|브라우저\s*게임|애니팡|솔리테어|지뢰\s*찾기|테트리스")
 LIGHT_GAME_USAGE, LIGHT_GAME_RANK = "사무용", 1
 # 수요 근거 -- 무엇을 기준으로 찾았는지 상담(AI)과 화면이 같은 문장으로 말한다(지어내지 않게 서버가 준다).
 DEMAND_LIGHT = "웹보드·가벼운 게임은 내장 그래픽으로도 돌아가는 사무용 기본 사양을 기준으로 찾았어요."
@@ -283,7 +285,7 @@ def _light_pick(cands, usage, min_rank, levels_by, budget_won, bound, preferred)
     # 「딱 맞는」 수준은 게임 쪽도 캐주얼(1) 이하일 때만이다 -- 웹보드 게임은 사무용 기준이라, 외장 그래픽 게임 PC(게임 수준 2↑)도
     # 사무용 수준은 1로 같아 그대로 두면 「알맞은 수준」으로 보인다(G01 F).
     exact = [p for p in cands if p["fit"][usage]["rank"] == min_rank
-             and (p["fit"].get("게임") or {}).get("rank", 0) <= 1]
+             and (usage != LIGHT_GAME_USAGE or (p["fit"].get("게임") or {}).get("rank", 0) <= 1)]
     chosen = _prefer(exact or cands, preferred)
     out = {"items": [_item(chosen, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
     if not exact:
@@ -301,16 +303,16 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
                  if p["price"] is not None and p["fit"].get(usage, {}).get("rank", 0) >= min_rank),
                 key=lambda p: p["price"])
     rank = lambda p: p["fit"][usage]["rank"]  # noqa: E731
-    if not ok:
-        return {"items": [], "empty_reason": "보유 상품 없음",
-                "empty_note": "이 작업 수준을 충족하는 판매 상품이 아직 없습니다."}
-    if light and preferred:
-        # 가벼운 수요의 «싼 쪽» 카드는 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품을 끼워 넣지 않는다).
-        # 승인 목록을 읽지 못했으면(빈 집합) 예전 규칙 그대로다.
+    if light:
+        # 필요 수준 기준 한 장(가벼운 수요·고주사율)은 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품을
+        # 끼워 넣지 않는다). 승인 목록이 비었거나 읽지 못했어도 닫는다 -- 비공개 상품으로 대신하지 않는다(#361 검토 1).
         ok = [p for p in ok if p["code"] in preferred]
         if not ok:
             return {"items": [], "empty_reason": "공개 구성 상품 없음",
                     "empty_note": "이 조건을 충족하는 공개 구성 PC가 지금 없습니다. 조건을 바꾸거나 입고를 기다려 주세요."}
+    if not ok:
+        return {"items": [], "empty_reason": "보유 상품 없음",
+                "empty_note": "이 작업 수준을 충족하는 판매 상품이 아직 없습니다."}
 
     if budget_won is None or bound == "이상":
         pool = [p for p in ok if budget_won is None or p["price"] >= budget_won] or ok
@@ -423,14 +425,18 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=F
     min_ok = lambda p: p["price"] is not None and p["fit"].get(fu, {}).get("rank", 0) >= r  # noqa: E731
     kept, applied, unmet = X.apply_filters(list(products.values()), filters, min_ok)
     prods = {p["code"]: p for p in kept}
-    if light and preferred:
-        # 가벼운 수요는 «더 싸게»·«가장 싸게»까지 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품 금지).
+    if light:
+        # 필요 수준 기준 한 장은 «더 싸게»·«가장 싸게»까지 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품 금지).
+        # 승인 목록이 비면 후보도 비운다(닫힌 처리 -- #361 검토 1).
         prods = {c: p for c, p in prods.items() if c in preferred}
     budget, bound = state.budget_won, state.budget_bound
     anchor = products.get(ex.get("anchor_code")) if ex.get("anchor_code") is not None else None
     nav, nav_note = ex.get("nav"), None
     res = None
-    if nav == X.CHEAPER and (ex.get("cheapest") or anchor is None):
+    if light and not any(min_ok(p) for p in prods.values()):
+        # 공개 승인 후보가 없으면 «더 싸게»·«더 좋게»도 비공개로 넘어가지 않고 같은 닫힌 안내를 낸다(#361 검토 1).
+        res = pick(fu, r, budget, bound, levels, prods, preferred, light=True)
+    elif nav == X.CHEAPER and (ex.get("cheapest") or anchor is None):
         # 「가장 싸게」(또는 기준 카드 없는 「싸게」) -- 앞 추천 카드와 상관없이 조건 안의 실제 최저가 한 장.
         # 공개 승인 구성은 같은 가격일 때만 앞에 둔다(코덱스 #155 검수 P2-1·P2-2: 승인 우선이 최저가를
         # 밀어내 「가장 싼 쪽」 안내와 카드가 어긋났다). 후보 범위(판매·적합 수준·조건)는 바꾸지 않는다.
@@ -774,10 +780,13 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
             r = _heavy_rank(levels, fu, r, ex["wants"].get("heavy"))
         light_game = fu == LIGHT_GAME_USAGE and r == LIGHT_GAME_RANK and label in game_usages
         demand = []
-        if fu == "게임" and r == 1 and ex["wants"].get("high_fps"):
+        high_fps_up = fu == "게임" and r == 1 and bool(ex["wants"].get("high_fps"))
+        if high_fps_up:
             r = 2                               # 144Hz 이상 목표 -> FHD 게임 수준(G01 E)
             demand.append(DEMAND_HIGH_FPS)
         light = light_game or (fu == "게임" and r == 1)
+        # 고주사율로 한 단계 올린 경우도 «필요 수준 기준 한 장»이다 -- 예산 최고 수준·자동 상위 카드로 돌아가지 않는다(#361 검토 3).
+        need_based = light or high_fps_up
         if light_game:
             demand.append(DEMAND_LIGHT)
         elif fu == "게임" and r == 1:
@@ -788,7 +797,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
         if (fu, r) in seen:
             continue
         seen.add((fu, r))
-        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=light)
+        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=need_based)
         if res.get("demand_note"):
             demand.append(res["demand_note"])
         lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
