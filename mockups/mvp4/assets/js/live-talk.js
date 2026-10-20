@@ -1,6 +1,6 @@
 /* /mvp4 AI 상담 연결 (2026-10-19). mvp3 와 같은 서버 계약을 쓴다.
  *
- *   POST /api/talk/parse      {text, state, chat_flow, history[-6], display_context?}
+ *   POST /api/talk/parse      {text, state, chat_flow, history[-6], display_context?, reply_format}
  *   POST /api/grid/recommend  {state, text?, wants?, nav?}   (조건이 다 모였을 때만)
  *
  * 서버는 대화를 저장하지 않는다 — 조건(state)·흐름(chat_flow)·최근 대화(history)는 이 화면이 들고 있다가
@@ -45,43 +45,54 @@
     return out;
   }
 
-  // 상담 AI 가 고른 PC(이름으로 찾은 PC·부품 바꾸기로 옮긴 PC)가 조건 추천에 없으면 앞에 둔다 -- mvp3 live-flow agentCards 와 같다.
-  // 2026-10-20 「골드 [14400F/16G/1TB/RTX5060] 보여줘」에 AI 가 찾은 그 PC가 화면 카드에 빠지지 않게.
-  function withAgentCards(products, agentCards) {
+  // 상담 AI 가 보여 준 PC(서버가 확인한 상품번호). 목록(/api/customer/pc-catalog)에 없는 번호는 오른쪽 카드에 내지 않는다
+  // -- 본문은 그 상품을 「확인할 수 없음」으로 표시한다(chat-answer.js).
+  function agentPicks(agentCards) {
     var picked = [], seen = Object.create(null);
     (Array.isArray(agentCards) ? agentCards : []).forEach(function (c) {
       var code = c && c.product_code; if (!Number.isSafeInteger(code) || seen[code]) return;
       seen[code] = true; if (P.getCatalogProduct(String(code))) picked.push({ id: String(code), overBudget: c.over_budget === true });
     });
-    var have = Object.create(null); products.forEach(function (p) { have[p.id] = true; });
-    if (!picked.length || picked.every(function (p) { return have[p.id]; })) return products;
-    return picked.concat(products.filter(function (p) { return !seen[p.id]; }));
+    return picked;
   }
 
+  function strip(s) { return P.chatAnswer ? P.chatAnswer.strip(s) : s; }
+
   P.liveTalk = {
-    /* convo: {talk, chatFlow, history:[{role,text}], pendingText} — 이 함수가 갱신한다. */
+    /* convo: {talk, chatFlow, history:[{role,text}], pendingText}.
+     * 2026-10-20: 이 함수는 convo 를 바로 바꾸지 않는다. 결과의 commit() 을 화면이 «답을 실제로 그린 뒤에만» 부른다 --
+     * 늦게 온 답·중단된 답·추천 조회가 실패한 답이 다음 질문의 이력이 되지 않게(C08·C09). */
     send: function (convo, userText, displayContext, signal) {
-      var body = { text: userText, state: convo.talk || null, chat_flow: convo.chatFlow || null, history: (convo.history || []).slice(-6), defer_answer: false };
+      var body = { text: userText, state: convo.talk || null, chat_flow: convo.chatFlow || null, history: (convo.history || []).slice(-6), defer_answer: false, reply_format: 'marked' };
       if (displayContext) body.display_context = displayContext;
       return post('/api/talk/parse', body, signal).then(function (res) {
         if (!res.state || typeof res.state !== 'object') { var e = new Error('shape'); e.kind = 'error'; throw e; }
         var before = JSON.stringify(convo.talk || null);
-        convo.talk = res.state; convo.chatFlow = res.chat_flow && typeof res.chat_flow === 'object' ? res.chat_flow : null;
-        convo.history = (convo.history || []).concat([{ role: 'user', text: userText.slice(0, 1000) }]);
-        var reply = [text(res.answer), text(res.reply)].filter(Boolean).join('\n\n');
-        if (reply) convo.history.push({ role: 'assistant', text: reply.slice(0, 300) });
-        if (res.agent === true && text(res.shown_note)) convo.history.push({ role: 'assistant', text: res.shown_note.slice(0, 300) });
-        convo.history = convo.history.slice(-6);
+        var answer = text(res.answer), said = text(res.reply);
+        var reply = [answer, said !== answer ? said : ''].filter(Boolean).join('\n\n');
+        // 이력은 표시한 답 그대로(강조 표시만 뺀다). 앞 300자만 남기던 것을 600자로 -- 상품 참조는 이력 글이 아니라 답변 묶음(answer_sets)이 맡는다.
+        var history = (convo.history || []).concat([{ role: 'user', text: userText.slice(0, 1000) }]);
+        if (reply) history.push({ role: 'assistant', text: strip(reply).slice(0, 600) });
+        if (res.agent === true && text(res.shown_note)) history.push({ role: 'assistant', text: res.shown_note.slice(0, 600) });
+        var next = { talk: res.state, chatFlow: res.chat_flow && typeof res.chat_flow === 'object' ? res.chat_flow : null, history: history.slice(-6), pendingText: convo.pendingText || '' };
         var missing = Array.isArray(res.missing) ? res.missing : [];
-        var out = { reply: res.silent ? '' : reply, missing: missing, products: null, handoff: res.handoff_offer === true };
+        var out = { reply: res.silent ? '' : reply, missing: missing, products: null, handoff: res.handoff_offer === true, agentCards: res.agent === true ? res.agent_cards : null,
+          commit: function () { convo.talk = next.talk; convo.chatFlow = next.chatFlow; convo.history = next.history; convo.pendingText = next.pendingText; } };
         var keep = res.pc_related === false || res.fallback || res.explain_only === true || res.silent;
-        if (keep || missing.length) { if (!keep && missing.length) convo.pendingText = ((convo.pendingText ? convo.pendingText + ' / ' : '') + userText).slice(-300); return out; }
+        if (keep || missing.length) { if (!keep && missing.length) next.pendingText = ((next.pendingText ? next.pendingText + ' / ' : '') + userText).slice(-300); return out; }
+        // 2026-10-20 대표 신고(P1 「답변과 추천 상품이 달라」): AI 가 PC 를 보여 준 턴은 그 PC 들이 곧 이 답변의 추천 묶음이다.
+        // 예전에는 조건으로 추천을 다시 받아 AI 의 PC 가 그 안에 다 있으면 조건 추천 순서를 그대로 썼고, 화면이 앞 3대만 보여
+        // 본문 2·3번과 오른쪽 2·3번이 다른 상품이 됐다. 이제 본문·오른쪽 카드·상세·비교·「위 N번째」가 같은 상품번호 목록을 쓴다.
+        var picks = res.agent === true ? agentPicks(res.agent_cards) : [];
+        if (picks.length || (res.agent === true && Array.isArray(res.agent_cards) && res.agent_cards.length)) {
+          next.pendingText = ''; out.products = picks; out.changed = JSON.stringify(res.state) !== before; return out;
+        }
         var recBody = { state: res.state };
         if (res.agent === true) { if (res.wants && typeof res.wants === 'object') recBody.wants = res.wants; if (res.nav === 'cheaper' || res.nav === 'better') recBody.nav = res.nav; }
-        else recBody.text = ((convo.pendingText ? convo.pendingText + ' / ' : '') + userText).slice(-300);
-        convo.pendingText = '';
+        else recBody.text = ((next.pendingText ? next.pendingText + ' / ' : '') + userText).slice(-300);
+        next.pendingText = '';
         return post('/api/grid/recommend', recBody, signal).then(function (rec) {
-          out.products = withAgentCards(soldCodes(rec), res.agent === true ? res.agent_cards : null);
+          out.products = soldCodes(rec);
           out.changed = JSON.stringify(res.state) !== before;
           return out;
         });

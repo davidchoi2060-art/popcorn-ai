@@ -1,0 +1,47 @@
+/* AI 대화 답변 -- 2026-10-20 대표 승인 「형광펜 노트 + 카드 브리핑」(approved-hybrid.css 를 대화 화면에 옮김).
+   밝은 화면·보라 브랜드 유지. 핵심 어구만 연노랑(mark 배경을 투명하게 만들지 않는다), 상품은 연보라 카드. */
+.dc-chat{--pa-paper:#fff;--pa-ink:#201d27;--pa-muted:#706879;--pa-line:#e7e1ef;--pa-purple:#6842d9;--pa-soft:#f6f2ff;--pa-mark:#fff0a6;--pa-warning:#fff5e6;--pa-warning-ink:#805016}
+.dc-chat .pa-formatted{background:var(--pa-paper);border:1px solid var(--pa-line);border-radius:16px;padding:20px;font-size:16px;line-height:1.75;color:var(--pa-ink);word-break:keep-all;overflow-wrap:anywhere;min-width:0}
+.dc-chat .pa-formatted p{margin:0}
+.dc-chat .pa-sentence{white-space:pre-wrap}
+.dc-chat .pa-sentence+.pa-sentence{margin-top:8px}
+.dc-chat .pa-formatted mark{background:var(--pa-mark);color:var(--pa-ink);font-weight:650;padding:0 .12em;border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.dc-chat .pa-heading{display:block;font-size:12px;color:var(--pa-purple);font-weight:700;margin-bottom:7px}
+.dc-chat .pa-intro{margin-bottom:23px}
+.dc-chat .pa-list{display:grid;gap:14px}
+.dc-chat .pa-product{min-width:0;background:var(--pa-soft);padding:16px;border-radius:12px}
+.dc-chat .pa-product-head{border-bottom:1px solid var(--pa-line);padding-bottom:12px;margin-bottom:10px}
+.dc-chat .pa-count{display:block;font-size:12px;line-height:1.4;color:var(--pa-purple);font-weight:750;margin-bottom:5px}
+.dc-chat .pa-product h3{font-size:16px;line-height:1.65;font-weight:700;margin:0 0 5px;color:var(--pa-ink)}
+.dc-chat .pa-product h3 a{color:inherit;text-decoration:underline;text-decoration-color:#cfc5df;text-underline-offset:4px}
+.dc-chat .pa-product h3 a:hover,.dc-chat .pa-product h3 a:focus-visible{color:var(--pa-purple)}
+.dc-chat .pa-price{display:block;font-size:20px;font-weight:750;letter-spacing:-.03em;color:var(--pa-ink)}
+.dc-chat .pa-price-none{font-size:15px;color:var(--pa-warning-ink)}
+.dc-chat .pa-price-src,.dc-chat .pa-price-now{display:block;font-size:12px;line-height:1.6;color:var(--pa-muted);margin-top:2px}
+.dc-chat .pa-price-now{color:var(--pa-warning-ink)}
+.dc-chat .pa-fit{color:var(--pa-muted)}
+.dc-chat .pa-check,.dc-chat .pa-issue{margin-top:12px;background:var(--pa-warning);color:var(--pa-warning-ink);padding:12px;border-radius:8px;font-size:13px;line-height:1.65}
+.dc-chat .pa-check strong{display:block;margin-bottom:3px;font-size:12px}
+.dc-chat .pa-product-actions{margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.dc-chat .pa-product-actions a{color:var(--pa-purple);font-size:13px;font-weight:650;text-underline-offset:4px;min-height:34px;display:inline-flex;align-items:center}
+.dc-chat .pa-compare-note{font-size:12px;color:var(--pa-muted)}
+.dc-chat .pa-between{margin:4px 0}
+.dc-chat .pa-choice{border-top:1px solid var(--pa-line);margin-top:25px;padding-top:18px}
+.dc-chat .pa-next{margin-top:15px;padding:14px;background:var(--pa-soft);border-radius:10px}
+.dc-chat .pa-copy{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--pa-line);border-radius:8px;background:var(--pa-paper);color:var(--pa-muted);padding:7px 10px;font:inherit;font-size:12px;font-weight:500;line-height:1.4;min-height:34px;white-space:nowrap;cursor:pointer}
+.dc-chat .pa-copy:hover,.dc-chat .pa-copy:focus-visible{color:var(--pa-purple);border-color:var(--pa-purple)}
+.dc-chat .pa-copy[aria-pressed=true]{color:var(--pa-purple);background:var(--pa-soft);border-color:var(--pa-purple)}
+.dc-chat .pa-line-copy{display:inline-flex;margin-inline-start:8px;vertical-align:middle;font-size:12px;padding:4px 7px;min-height:34px}
+.dc-chat .pa-copy-footer{margin-top:15px;display:flex;flex-wrap:wrap;gap:8px}
+.dc-chat .pa-status{min-height:20px;font-size:12px;line-height:1.6;color:var(--pa-purple);margin-top:10px}
+.dc-chat .pa-status:empty{min-height:0;margin:0}
+.dc-chat .pa-fallback{display:block;width:100%;min-height:100px;margin-top:8px;font:inherit;font-size:16px;line-height:1.6;color:var(--pa-ink);background:var(--pa-paper);border:1px solid var(--pa-line);border-radius:8px;padding:10px}
+.dc-chat .pa-interest ul{margin:10px 0 0;list-style:none;padding:0}
+.dc-chat .pa-interest li{border-top:1px solid var(--pa-line);padding:10px 0;display:flex;gap:8px;align-items:flex-start}
+.dc-chat .pa-interest li a{font-size:13px;line-height:1.6;color:var(--pa-purple);flex:1;min-width:0;overflow-wrap:anywhere}
+.dc-chat .pa-interest li button{flex-shrink:0}
+.dc-chat .pa-interest-empty{margin:8px 0 0;color:var(--pa-muted);font-size:13px;line-height:1.6}
+.dc-chat .pa-open-compare{display:inline-flex;align-items:center;min-height:34px;margin-top:6px;font-size:13px;color:var(--pa-purple);font-weight:700}
+@media(max-width:650px){.dc-chat .pa-formatted{padding:18px}}
+@media(max-width:400px){.dc-chat .pa-formatted{padding:16px 14px}.dc-chat .pa-product{padding:14px 12px}}
+@media(pointer:coarse){.dc-chat .pa-copy,.dc-chat .pa-line-copy,.dc-chat .pa-product-actions a,.dc-chat .pa-open-compare{min-height:44px}}

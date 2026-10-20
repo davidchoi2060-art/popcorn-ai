@@ -79,13 +79,15 @@
     var selectedId = ctx.productId || param(ctx, 'id');
     var selected = selectedId ? product(selectedId) : null;
     var model = { state: entry === 'product' && selected ? 'product' : 'welcome', question: '', draft: '', outgoing: null, selected: selected, log: [], ids: [], mobile: 'chat', notice: '', handoff: false,
-      conditions: { purpose: '', budget: '', environment: '' }, dirty: {}, convo: { talk: null, chatFlow: null, history: [], pendingText: '' } };
-    var controller = null, root = null;
+      conditions: { purpose: '', budget: '', environment: '' }, dirty: {}, convo: { talk: null, chatFlow: null, history: [], pendingText: '' }, compare: [] };
+    var controller = null, root = null, lastPick = null, A = P.chatAnswer;
+    var COMPARE_MAX = 3;
     function candidates() { return model.ids.map(function (x) { return product(x.id); }).filter(Boolean).slice(0, 3); }
     function messages() {
       var list = model.log.slice();
       if (model.state === 'product' && model.selected && !list.length) list.push({ role: 'assistant', text: '이 PC의 구성과 필요한 작업을 함께 살펴볼게요. 하려는 작업이나 사용하는 프로그램을 알려 주세요.' });
-      return list.map(function (m) { return '<article class="dc-message dc-message-' + m.role + '"><span>' + (m.role === 'user' ? '나' : '팝콘AI') + '</span><p>' + h(m.text) + '</p></article>'; }).join('');
+      var opts = { pcHref: function (id) { return url('product', 'normal', { id: id }); }, issue: purchaseIssue, money: money, inCompare: inCompare };
+      return list.map(function (m) { return '<article class="dc-message dc-message-' + m.role + '"><span>' + (m.role === 'user' ? '나' : '팝콘AI') + '</span>' + (m.answer && A ? A.render(m, opts) : '<p>' + h(m.text) + '</p>') + '</article>'; }).join('');
     }
     function stateNotice() {
       // 응답 대기(2026-10-20 대표 「마지막 시안을 작게 해서 애니메이션」): 실제 요청 중에만 그려지고 답·오류·중단이면 다시 그려지며 사라진다.
@@ -102,6 +104,14 @@
       var p = model.selected, blocked = purchaseIssue(p);
       return '<div class="dc-chosen"><div class="dc-chosen-top">' + photograph(p) + '<div><strong>' + h(p.name) + '</strong><p>' + h(money(p)) + '</p></div></div>' + (blocked ? '<p class="dc-unavailable-label" role="status">' + h(blocked) + '</p>' : '') + '<div class="dc-chosen-links">' + buttonLink('선택 PC 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + (blocked ? buttonLink('상품·구성 문의', 'consult', 'normal', { id: p.id }, 'btn-small btn-outline') : buttonLink('선택 상품 견적 확인', 'quote', 'normal', { id: p.id }, 'btn-small btn-primary')) + '</div></div>';
     }
+    function inCompare(id) { return model.compare.some(function (c) { return c.id === String(id); }); }
+    // 관심·비교상품(2026-10-20 대표 승인): 답변 카드의 「비교에 담기」가 여기에 쌓인다. 저장하지 않는다(새 대화·새로고침이면 비운다).
+    function compareTray() {
+      var items = model.compare.map(function (c) { var p = product(c.id); return p ? { c: c, p: p } : null; }).filter(Boolean);
+      return '<section class="dc-side-panel pa-interest" aria-label="관심·비교상품"><h2>' + icon('list') + '관심·비교상품 <span data-pa-count>' + items.length + '</span></h2>' +
+        (items.length ? '<ul>' + items.map(function (x) { return '<li><a href="' + h(url('product', 'normal', { id: x.p.id })) + '" target="_blank" rel="noopener">' + h(x.p.name) + '</a><button type="button" class="pa-copy" data-pa-remove="' + h(x.p.id) + '" aria-label="' + h(x.p.name) + ' 비교에서 빼기">빼기</button></li>'; }).join('') + '</ul>' : '<p class="pa-interest-empty">추천 답변에서 비교할 상품을 담아보세요.</p>') +
+        (items.length >= 2 ? '<a class="pa-open-compare" href="' + h(url('compare', 'normal', { ids: items.map(function (x) { return x.p.id; }).join(',') })) + '" target="_blank" rel="noopener">선택 상품 비교하기 ↗</a>' : '') + '</section>';
+    }
     function markup() {
       var cards = candidates(), isLoading = model.state === 'loading';
       return '<header class="dc-heading"><div><p class="eyebrow">AI PC FINDER</p><h1>내게 맞는 PC를 함께 찾아요.</h1></div><button type="button" class="dc-new" data-dc-action="new">' + icon('arrow-counter-clockwise') + '새 대화</button></header>' +
@@ -111,7 +121,7 @@
         stateNotice() + (model.notice ? '<p class="dc-local-notice" role="status">' + h(model.notice) + '</p>' : '') + '</div>' +
         '<form class="dc-composer" data-dc-form><label class="visually-hidden" for="dc-question">PC에 대해 질문하기</label><textarea id="dc-question" rows="3" placeholder="용도와 예산을 편하게 알려주세요."' + (isLoading ? ' readonly' : '') + '>' + h(model.draft) + '</textarea><div><small><span data-dc-count>' + model.draft.length.toLocaleString('ko-KR') + '</span> / 10,000자 · Shift+Enter 줄바꿈</small><button class="btn btn-primary" type="submit"' + (isLoading ? ' disabled' : '') + '>보내기' + icon('paper-plane-tilt') + '</button></div></form><p class="dc-chat-note">모르는 사양은 비워 두셔도 괜찮아요. 구매 전 상세 구성과 가격을 확인해 주세요.</p></section>' +
         '<aside class="dc-chat-side' + (model.selected ? ' has-selected' : '') + '" id="dc-chat-side" aria-label="추천 조건과 PC"><section class="dc-side-panel"><h2>' + icon('clipboard-text') + '내 추천 조건</h2><div class="dc-conditions">' + [['purpose', '용도', '어떤 작업을 하시나요?'], ['budget', '예산', '아직 정하지 않아도 괜찮아요'], ['environment', '사용 환경', '모니터나 프로그램 등']].map(function (f) { return '<label><span>' + f[1] + '</span><input data-dc-condition="' + f[0] + '" value="' + h(model.conditions[f[0]]) + '" placeholder="' + h(f[2]) + '" maxlength="200"' + (isLoading ? ' disabled' : '') + '></label>'; }).join('') + '</div></section>' +
-        '<section class="dc-side-panel dc-selected-panel"><h2>' + icon('check-circle') + '선택한 PC</h2>' + selection() + '</section>' +
+        '<section class="dc-side-panel dc-selected-panel"><h2>' + icon('check-circle') + '선택한 PC</h2>' + selection() + '</section>' + compareTray() +
         '<section class="dc-candidates"><div class="dc-candidates-heading"><h2>살펴볼 PC</h2>' + (cards.length > 1 ? '<a href="' + h(url('compare', 'normal', { ids: cards.map(function (p) { return p.id; }).join(',') })) + '">비교하기 ' + icon('caret-right') + '</a>' : '') + '</div>' +
         (cards.length ? cards.map(function (p) { return card(p, !!model.selected && String(model.selected.id) === String(p.id)); }).join('') : empty(isLoading ? '구성을 살펴보고 있어요.' : '아직 보여드릴 PC가 없어요.', isLoading ? '확인하는 동안 대화를 계속 읽을 수 있어요.' : '원하는 조건을 알려주거나 상품을 먼저 둘러보세요.', isLoading ? '' : buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline'))) + '</section></aside></div>';
     }
@@ -131,9 +141,14 @@
     function displayContext() {
       var cards = candidates().map(function (p) { return { product_code: Number(p.id) }; }).filter(function (c) { return Number.isSafeInteger(c.product_code) && c.product_code > 0; });
       var sel = model.selected && Number.isSafeInteger(Number(model.selected.id)) ? { product_code: Number(model.selected.id) } : null;
-      if (!cards.length && !sel) return null;
+      // 답변 본문이 소개한 PC 묶음(최근 3개, 오래된 것 -> 최근 것). 「위 N번째」는 마지막 묶음, 「오른쪽 N번째」는 cards 를 본다.
+      var sets = model.log.filter(function (m) { return m.answer && m.answer.setId && m.answer.set.length; }).slice(-3).map(function (m) {
+        return { set_id: m.answer.setId, cards: m.answer.set.map(function (x) { return { product_code: x.product_code }; }) };
+      });
+      if (!cards.length && !sel && !sets.length) return null;
       var out = { screen: sel && !cards.length ? 'detail' : 'results', source: 'catalog', cards: cards.slice(0, 6) };
       if (sel) out.selected = sel;
+      if (sets.length) out.answer_sets = sets;
       return out;
     }
     // 고객이 조건 칸에 직접 적은 것만 덧붙인다(원문은 그대로 앞에 둔다).
@@ -147,6 +162,40 @@
       if (Array.isArray(t.usages) && t.usages.length && !model.dirty.purpose) model.conditions.purpose = t.usages.join(' · ');
       var b = P.liveTalk.budgetText(t); if (b && !model.dirty.budget) model.conditions.budget = b;
     }
+    function entryOf(turn) { return model.log.find(function (m) { return m.answer && m.answer.turnId === turn; }) || null; }
+    function setCopy(entry, status, fallback) {
+      entry.answer.copy = { status: status, fallback: fallback || '' }; render();
+      var ta = fallback && root.querySelector('[data-pa-fallback="' + entry.answer.turnId + '"]');
+      if (ta) { try { ta.focus({ preventScroll: true }); } catch (e) { ta.focus(); } ta.select(); }
+    }
+    // 복사: 본문 글자만. 클립보드가 받아 준 뒤에만 「복사했어요」. 막히면 고를 수 있는 글로 내민다.
+    function copy(node) {
+      var entry = entryOf(node.dataset.paTurn), kind = node.dataset.paCopy, text = '';
+      if (!entry || !A) return;
+      if (kind === 'all') text = A.strip(entry.answer.raw).trim();
+      else if (kind === 'line') text = (entry.sentences || [])[Number(node.dataset.paI)] || '';
+      else {
+        var box = root.querySelector('[data-pa-answer="' + entry.answer.turnId + '"]');
+        text = A.selectionText(window.getSelection(), box) || (lastPick && lastPick.turn === entry.answer.turnId ? lastPick.text : '');
+        if (!text) { setCopy(entry, '복사할 문장을 먼저 길게 눌러 선택해 주세요.'); return; }
+      }
+      if (!text) return;
+      A.writeClipboard(text).then(function (ok) {
+        if (!entryOf(entry.answer.turnId)) return;
+        if (ok) setCopy(entry, kind === 'all' ? '답변 전체를 복사했어요.' : '문장을 복사했어요.');
+        else setCopy(entry, '자동 복사가 되지 않았어요. 아래 글을 길게 눌러 선택해 복사해 주세요.', text);
+      });
+    }
+    // 비교에 담기·빼기: 예산·용도·대화는 건드리지 않는다. 담은 순서는 답변의 순번을 바꾸지 않는다(묶음은 답변이 들고 있다).
+    function toggleCompare(id, turn) {
+      id = String(id); var p = product(id), entry = turn ? entryOf(turn) : null, msg;
+      if (inCompare(id)) { model.compare = model.compare.filter(function (c) { return c.id !== id; }); msg = '비교에서 뺐어요.'; }
+      else if (!p) msg = '지금 목록에서 확인할 수 없는 상품이라 담지 못했어요.';
+      else if (model.compare.length >= COMPARE_MAX) msg = '비교는 세 대까지 담을 수 있어요. 하나를 뺀 뒤 담아 주세요.';
+      else { model.compare.push({ id: id, turn: turn || null }); msg = '비교에 담았어요. 지금 ' + model.compare.length + '대' + (window.matchMedia('(max-width: 800px)').matches ? ' · 추천 PC 탭에서 볼 수 있어요.' : ' · 오른쪽 관심·비교상품에서 볼 수 있어요.'); }
+      if (entry) entry.answer.copy = { status: msg, fallback: '' };
+      render();
+    }
     function send(retry) {
       var text = retry ? model.question : model.draft;
       if (!text || !text.trim()) { model.notice = '찾고 싶은 PC나 궁금한 내용을 적어주세요.'; render(); var ta = root.querySelector('textarea'); if (ta) ta.focus(); return; }
@@ -159,7 +208,11 @@
       stop(); controller = typeof AbortController === 'function' ? new AbortController() : null; var mine = controller;
       P.liveTalk.send(model.convo, outgoing, displayContext(), mine ? mine.signal : undefined).then(function (res) {
         if (mine !== controller) return; controller = null;
-        if (res.reply) model.log.push({ role: 'assistant', text: res.reply });
+        var built = res.reply && A ? A.build(res.reply, res.agentCards, res.products) : null;
+        if (res.reply) model.log.push({ role: 'assistant', text: A ? A.strip(res.reply) : res.reply, answer: built });
+        // 오른쪽 카드도 이 답변의 묶음 순서를 따른다(본문 1·2·3번 = 오른쪽 1·2·3번).
+        if (res.products && built && built.set.length) { var byId = Object.create(null); res.products.forEach(function (x) { byId[x.id] = x; }); res.products = built.set.map(function (x) { return byId[String(x.product_code)]; }).filter(Boolean); }
+        if (typeof res.commit === 'function') res.commit();   // 그린 답만 다음 질문의 이력이 된다
         model.handoff = res.handoff; syncConditions();
         if (res.products) { model.ids = res.products; model.state = res.products.length ? 'results' : 'no-results'; }
         else model.state = res.missing.length ? 'clarify' : model.ids.length ? 'results' : model.selected ? 'product' : 'clarify';
@@ -189,13 +242,22 @@
       });
       root.addEventListener('click', function (event) {
         var node = event.target.closest('button'); if (!node || node.disabled) return;
+        if (node.hasAttribute('data-pa-copy')) { copy(node); return; }
+        if (node.hasAttribute('data-pa-add')) { toggleCompare(node.dataset.paAdd, node.dataset.paTurn); return; }
+        if (node.hasAttribute('data-pa-remove')) { toggleCompare(node.dataset.paRemove, null); return; }
         if (node.hasAttribute('data-dc-tab')) { model.mobile = node.dataset.dcTab; render(); return; }
         if (node.hasAttribute('data-dc-draft')) { model.draft = model.draft ? model.draft + '\n' + node.dataset.dcDraft : node.dataset.dcDraft; render(); root.querySelector('textarea').focus(); return; }
         if (node.hasAttribute('data-dc-select')) { var p = product(node.dataset.dcSelect); if (p) { model.selected = p; model.notice = p.name + '을 선택했어요. 상세 구성과 견적을 이어서 확인해보세요.'; render(); if (p.liveDetail === 'pending' && P.live) P.live.loadDetail(p.id).then(render); } return; }
         var action = node.dataset.dcAction;
-        if (action === 'new') { stop(); model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.mobile = 'chat'; render(); }
+        if (action === 'new') { stop(); model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.compare = []; lastPick = null; model.mobile = 'chat'; render(); }
         if (action === 'retry') send(true);
         if (action === 'conditions') { model.state = 'clarify'; model.mobile = 'products'; render(); var b = root.querySelector('[data-dc-condition="budget"]'); if (b) b.focus(); }
+      });
+      // 모바일은 「선택한 문장 복사」를 누르는 순간 선택이 풀린다 -- 답변 안에서 마지막으로 고른 글을 기억해 둔다.
+      document.addEventListener('selectionchange', function () {
+        if (!A || !root) return;
+        var sel = window.getSelection(), node = sel && sel.anchorNode, el = node && (node.nodeType === 1 ? node : node.parentElement), box = el && el.closest ? el.closest('[data-pa-answer]') : null;
+        if (box && root.contains(box)) { var t = A.selectionText(sel, box); if (t) lastPick = { turn: box.dataset.paAnswer, text: t }; }
       });
       window.addEventListener('pagehide', stop, { once: true });
     } };

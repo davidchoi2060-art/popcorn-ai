@@ -279,7 +279,7 @@
       var unselected = (p.unselectedComponentSlots || []).filter(function (s) { return ['CPU','RAM','GPU','SSD'].indexOf(s.slot) >= 0; }).map(function (s) { return s.label || s.slot; });
       guidance += notice('완성 구성을 확인해야 하는 상품입니다', '등록 정보에서 ' + unselected.join('·') + ' 항목이 미선택으로 표시되어 있어요. 현재 상태를 완성된 PC 구성으로 안내하기 어려우니 필요한 부품을 먼저 확인해 주세요.', 'warning');
     }
-    return guidance + '<div class="dp-spec-groups">' + groups.filter(function (g) { return g.rows.length; }).map(function (g, i) { return '<details class="dp-spec-group"' + (i === 0 ? ' open' : '') + '><summary><strong>' + g.title + '</strong><span>' + g.rows.length + '개 항목 ' + icon('caret-down') + '</span></summary><table><caption class="visually-hidden">' + g.title + ' 상품 구성</caption><tbody>' + g.rows.map(function (s) {
+    return guidance + '<div class="dp-spec-groups">' + groups.filter(function (g) { return g.rows.length; }).map(function (g, i) { return '<details class="dp-spec-group"><summary><strong>' + g.title + '</strong><span>' + g.rows.length + '개 항목 ' + icon('caret-down') + '</span></summary><table><caption class="visually-hidden">' + g.title + ' 상품 구성</caption><tbody>' + g.rows.map(function (s) {
       var localSource = s.basis === 'registered-spec-source-text' && Number.isInteger(s.sourceOrdinal) && s.sourceOrdinal >= 0;
       var params = s.partId ? {id:p.id,partId:s.partId} : localSource ? {id:p.id,sourceOrdinal:s.sourceOrdinal} : null;
       var partReview = conflicts.some(function (c) { return c.slot === s.slot; });

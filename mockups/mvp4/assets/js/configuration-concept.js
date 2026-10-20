@@ -49,7 +49,8 @@
     // Future component API contract: spec.image must be an approved local assets/ or HTTPS URL
     // for this exact part. Never substitute an unrelated PC/product photo as a component image.
     var photo = safeImage(s.image);
-    return '<details class="cf-part"' + (i === 0 ? ' open' : '') + '><summary><span class="cf-part-type">' + P.icon(icon) + '<span>' + h(label) + '</span></span><span class="cf-part-name">' + h(name) + (mismatch ? '<span class="cf-part-warning">모델 정보 확인 필요</span>' : '') + '</span><span class="cf-part-count">' + h(count) + '</span>' + P.icon('caret-down') + '</summary>' +
+    // 2026-10-20 대표 「CPU도 처음엔 닫힌 상태로, 누르면 펼쳐지게」 -- 모든 부품 행은 닫힌 채로 시작한다(실제 open 속성).
+    return '<details class="cf-part"><summary><span class="cf-part-type">' + P.icon(icon) + '<span>' + h(label) + '</span></span><span class="cf-part-name">' + h(name) + (mismatch ? '<span class="cf-part-warning">모델 정보 확인 필요</span>' : '') + '</span><span class="cf-part-count">' + h(count) + '</span>' + P.icon('caret-down') + '</summary>' +
       '<div class="cf-part-expanded">' + media(photo, icon, name + ' 부품 사진', 'cf-component-media') + '<section class="cf-facts"><h3>상세 사양</h3>' + (fs.length ? '<dl>' + fs.map(function (f) { return '<div><dt>' + h(f.label) + '</dt><dd>' + h(f.value) + '</dd></div>'; }).join('') + '</dl>' : '<p class="cf-muted">등록된 모델명 외 상세 사양은 확인이 필요합니다.</p>') + '</section><section class="cf-role"><h3>어떤 역할을 하나요?</h3><p>' + h(s.role || '등록된 부품의 역할 설명을 확인하고 있습니다.') + '</p>' + (link ? '<a class="cf-text-link" href="' + h(link) + '">부품 정보 자세히' + P.icon('arrow-right') + '</a>' : '') + '</section></div></details>';
   }
   function sourceNotice(p) {
