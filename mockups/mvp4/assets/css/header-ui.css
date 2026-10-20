@@ -52,3 +52,9 @@
 /* 2026-10-20 공통 띠 메뉴 4개(PC 쇼핑 → AI 패키지 → AI 슈퍼컴퓨터 → AI로 PC 찾기) — 모바일에서도 한 줄 */
 @media(max-width:900px){.nh-header .nh-primary-links{grid-template-columns:auto auto auto minmax(0,1fr);gap:14px}.nh-header .nh-primary-links>a{font-size:15px}.nh-header .nh-primary-links>.nh-primary-ai{font-size:14px;padding:8px 6px}}
 @media(max-width:400px){.nh-header .nh-primary-links{gap:9px}.nh-header .nh-primary-links>a{font-size:14px;letter-spacing:-.05em}.nh-header .nh-primary-links>.nh-primary-ai{font-size:13px;gap:3px;padding:8px 4px}.nh-header .nh-primary-ai .icon{width:15px;height:15px}}
+/* 2026-10-20 대표 승인 헤더 로고(가로형 심볼+워드마크) -- 원본 비율 그대로, 높이만 정하고 너비는 비율로 */
+.site-brand.site-brand-logo{gap:0;flex-shrink:0;line-height:0}
+.site-brand-logo .brand-logo,.nh-header .site-brand-logo .brand-logo{display:block;height:46px;width:auto;aspect-ratio:420/153;max-width:100%;object-fit:contain}
+@media(min-width:901px) and (max-width:1150px){.nh-header .site-brand-logo .brand-logo{height:42px}}
+@media(max-width:900px){.site-brand-logo .brand-logo,.nh-header .site-brand-logo .brand-logo{height:40px}}
+@media(max-width:370px){.site-brand-logo .brand-logo,.nh-header .site-brand-logo .brand-logo{height:34px}}

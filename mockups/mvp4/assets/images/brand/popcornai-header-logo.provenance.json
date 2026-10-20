@@ -1,0 +1,16 @@
+{
+  "file": "assets/images/brand/popcornai-header-logo.png",
+  "kind": "header logo (approved 2026-10-20), resized only from approved master",
+  "master": "assets/images/brand/popcornai-header-logo-approved.png",
+  "master_sha256": "67a588ee7cb9ed612168b65cf7396b07e849d7582501de62c34a2cf98823fa51",
+  "master_dimensions": [
+    2079,
+    756
+  ],
+  "dimensions": [
+    420,
+    153
+  ],
+  "sha256": "6503fe1ab5d33707213434b57705585f3c85025ca253bb31d46f1859a8ad40c9",
+  "note": "Same artwork as the approved master; only scaled down for the header. Footer and favicon keep logo.png."
+}
