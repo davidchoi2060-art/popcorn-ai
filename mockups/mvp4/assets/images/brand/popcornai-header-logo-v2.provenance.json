@@ -1,0 +1,11 @@
+{
+  "file": "assets/images/brand/popcornai-header-logo-v2.png",
+  "kind": "header logo v2 (approved 2026-10-20, \"이 이미지로 로고만 교체해줘\") -- byte-for-byte copy of the approved original, no resize or edit",
+  "source_package": "popcornai-header-logo-v2-20261020-approved.zip (SHA256 89f3e756a815cadca1ba3c9cd351f1df1d999f3359e65a040f9aa1e0847d7ea4)",
+  "source_file": "popcornai-header-logo-v2-approved.png",
+  "dimensions": [1824, 669],
+  "bytes": 203730,
+  "sha256": "f58181a879354da5c5bfef2c5eedea28c87b1441072f144088a854ad69014833",
+  "replaces": "assets/images/brand/popcornai-header-logo.png (67a588ee... master) in the header only",
+  "note": "Footer and favicon keep logo.png. Link class, DOM and header-ui extraction are unchanged."
+}
