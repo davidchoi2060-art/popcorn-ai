@@ -1,0 +1,8 @@
+{
+ "file": "assets/images/pc-finder-core-v3.webp",
+ "sha256": "a5ff444cfaad1054570f3f7b51c63fa0fe65e030299b221a76f69c08eb635135",
+ "size": [618, 496],
+ "source": "approved-option-3-screen.png (sha256 491fcefbf6189acb0b208d12c8db5cca7d076ec6c8d1239a644c6a22f382c514), owner approval 2026-10-20 「3번이 좋네.. 기존 문구랑 입력창은 그대로 두고」",
+ "derivation": "crop (600,296)-(1218,792) of the approved screen = right-side illustration only (no text/buttons/borders), 36px alpha edge fade, WebP q88",
+ "use": "/mvp4/?screen=chat welcome — decorative (alt=\"\", aria-hidden, pointer-events:none); hidden at <=800px"
+}
