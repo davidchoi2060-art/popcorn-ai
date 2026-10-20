@@ -8,12 +8,12 @@
   function slides() {
     var catalog = P.designHref('catalog','normal'), chat = P.designHref('chat','welcome');
     return [
-      {key:'showcase', label:'PC & AI', kicker:'GOOD PC, USEFUL AI', title:'좋은 PC에서,<br>쓸모 있는 <br>AI까지.', text:'PC 쇼핑과 업무용 AI 패키지를 한곳에서.', file:'hero-tv-commercial-clean.png', alt:'햇빛이 가득한 쇼룸에 전시된 모니터와 다양한 PC', actions:action('PC 둘러보기',catalog)+action('AI 패키지 보기','ai-packages.html',true)},
-      {key:'gaming', label:'게이밍 PC', kicker:'PLAY YOUR WAY', title:'좋아하는 게임,<br>나답게 즐기다.', text:'나의 게임과 예산에 맞는 PC를 만나보세요.', file:'gaming-blue-clean.png', alt:'밝은 블루톤 공간에서 게이밍 PC와 함께하는 모습', actions:action('게이밍 PC 보기',P.designHref('catalog','normal',{category:'게이밍 PC'}))+action('AI와 게임 PC 찾기',chat,true)},
-      {key:'ai', label:'AI 패키지', kicker:'AI FOR YOUR WORK', title:'일에 집중하도록,<br>AI는 당신 곁에.', text:'내 자료 정리부터 우리 팀의 업무까지.', file:'ai-lavender-clean.png', alt:'밝은 사무 공간에서 업무형 PC를 소개하는 모델', actions:action('AI 패키지 보기','ai-packages.html')+action('우리 업무로 도입 상담','ai-consult.html?package=business&intent=adoption',true)},
-      {key:'people', label:'당신의 PC', kicker:'FIND YOUR EVERYDAY PC', title:'당신의 하루에,<br>딱 맞는 PC.', text:'작은 공간의 미니 PC부터 든든한 작업용 PC까지.', file:'model-showroom-clean.png', alt:'미니 PC와 화이트 PC를 소개하는 두 모델', actions:action('나에게 맞는 PC 찾기',chat)+action('모든 PC 둘러보기',catalog,true)},
-      {key:'collection', label:'용도별 쇼핑', kicker:'PC COLLECTION', title:'게임도, 일도.<br>필요한 PC를 한곳에서.', text:'쓰임에 맞게 골라보세요.', file:'category-display-clean.png', alt:'게이밍 PC, 미니 PC, 업무형 AI PC의 세 가지 전시 공간', actions:''},
-      {key:'supercomputer', label:'AI 슈퍼컴퓨터', kicker:'AI SUPERCOMPUTER', title:'큰 AI를 다루는,<br>나만의 슈퍼컴퓨터.', text:'다양한 AI 전용 장비를 한곳에서. <br>목적에 맞는 제품을 찾아보세요.', note:'성능과 지원 환경은 제품별로 다릅니다.<br>AI 설치·교육은 별도 상담입니다.', file:'ai-supercomputer-showroom-clean.png', alt:'밝은 AI 쇼룸의 전시대에 놓인 여러 제조사의 AI 전용 장비', actions:action('AI 슈퍼컴퓨터 전체 보기','supercomputers.html')}
+      {key:'showcase', edge:['#FEFBF4','#EEE3D6'], label:'PC & AI', kicker:'GOOD PC, USEFUL AI', title:'좋은 PC에서,<br>쓸모 있는 <br>AI까지.', text:'PC 쇼핑과 업무용 AI 패키지를 한곳에서.', file:'hero-tv-commercial-clean.png', alt:'햇빛이 가득한 쇼룸에 전시된 모니터와 다양한 PC', actions:action('PC 둘러보기',catalog)+action('AI 패키지 보기','ai-packages.html',true)},
+      {key:'gaming', edge:['#E1F1FD','#A9C6E8'], label:'게이밍 PC', kicker:'PLAY YOUR WAY', title:'좋아하는 게임,<br>나답게 즐기다.', text:'나의 게임과 예산에 맞는 PC를 만나보세요.', file:'gaming-blue-clean.png', alt:'밝은 블루톤 공간에서 게이밍 PC와 함께하는 모습', actions:action('게이밍 PC 보기',P.designHref('catalog','normal',{category:'게이밍 PC'}))+action('AI와 게임 PC 찾기',chat,true)},
+      {key:'ai', edge:['#ECE5FD','#E7E4F7'], label:'AI 패키지', kicker:'AI FOR YOUR WORK', title:'일에 집중하도록,<br>AI는 당신 곁에.', text:'내 자료 정리부터 우리 팀의 업무까지.', file:'ai-lavender-clean.png', alt:'밝은 사무 공간에서 업무형 PC를 소개하는 모델', actions:action('AI 패키지 보기','ai-packages.html')+action('우리 업무로 도입 상담','ai-consult.html?package=business&intent=adoption',true)},
+      {key:'people', edge:['#FEF7DF','#F3F4EF'], label:'당신의 PC', kicker:'FIND YOUR EVERYDAY PC', title:'당신의 하루에,<br>딱 맞는 PC.', text:'작은 공간의 미니 PC부터 든든한 작업용 PC까지.', file:'model-showroom-clean.png', alt:'미니 PC와 화이트 PC를 소개하는 두 모델', actions:action('나에게 맞는 PC 찾기',chat)+action('모든 PC 둘러보기',catalog,true)},
+      {key:'collection', edge:['#FCF7EC','#F3E6FA'], label:'용도별 쇼핑', kicker:'PC COLLECTION', title:'게임도, 일도.<br>필요한 PC를 한곳에서.', text:'쓰임에 맞게 골라보세요.', file:'category-display-clean.png', alt:'게이밍 PC, 미니 PC, 업무형 AI PC의 세 가지 전시 공간', actions:''},
+      {key:'supercomputer', edge:['#FBF8F6','#E4EDF8'], label:'AI 슈퍼컴퓨터', kicker:'AI SUPERCOMPUTER', title:'큰 AI를 다루는,<br>나만의 슈퍼컴퓨터.', text:'다양한 AI 전용 장비를 한곳에서. <br>목적에 맞는 제품을 찾아보세요.', note:'성능과 지원 환경은 제품별로 다릅니다.<br>AI 설치·교육은 별도 상담입니다.', file:'ai-supercomputer-showroom-clean.png', alt:'밝은 AI 쇼룸의 전시대에 놓인 여러 제조사의 AI 전용 장비', actions:action('AI 슈퍼컴퓨터 전체 보기','supercomputers.html')}
     ];
   }
   function render() {
@@ -26,11 +26,16 @@
         '<div class="hc-copy"><p class="hc-kicker">'+s.kicker+'</p><h2>'+s.title+'</h2><p class="hc-description">'+s.text+'</p><div class="hc-actions">'+s.actions+'</div>'+(s.note?'<p class="hc-note">'+s.note+'</p>':'')+'</div>'+collection+'</article>';
     }).join('');
     return '<section class="hc-carousel hm-container" aria-label="팝콘AI 추천 기획전" aria-roledescription="캐러셀" data-home-carousel><h1 class="visually-hidden">팝콘AI · 좋은 PC에서 쓸모 있는 AI까지</h1>'+
-      '<div class="hc-stage">'+slideHTML+'</div><div class="hc-toolbar">'+
+      edges(items)+'<div class="hc-stage">'+slideHTML+'</div><div class="hc-toolbar">'+
       '<div class="hc-selectors" role="group" aria-label="배너 선택">'+items.map(function(s,i){return '<button type="button" data-hc-go="'+i+'" aria-controls="hc-slide-'+i+'" aria-pressed="'+(!i)+'" aria-label="'+(i+1)+'번 배너: '+s.label+'"><span class="hc-dot"></span><span class="hc-label">'+s.label+'</span></button>';}).join('')+'</div>'+
       '<div class="hc-controls"><span class="hc-counter" aria-hidden="true"><b data-hc-current>01</b><span> / '+String(items.length).padStart(2,'0')+'</span></span><button type="button" data-hc-prev aria-label="이전 배너">'+P.icon('arrow-left')+'</button><button type="button" data-hc-next aria-label="다음 배너">'+P.icon('arrow-right')+'</button><button type="button" class="hc-play" data-hc-toggle aria-label="배너 자동 넘김 정지">정지</button></div></div>'+
       '<p class="visually-hidden" data-hc-status role="status" aria-live="polite" aria-atomic="true"></p>'+
       finder()+'</section>';
+  }
+  // 2026-10-20 승인 「배너 양옆 배경 확장」 -- 장식 층만 더한다. 색은 슬라이드 key 에 붙어 있고 별도 타이머 없이
+  // show() 가 바꾸는 활성 슬라이드를 따른다. 폭은 스크롤바를 뺀 clientWidth 로 맞춰 가로 넘침을 만들지 않는다.
+  function edges(items) {
+    return '<div class="hc-edge" aria-hidden="true">'+items.map(function(s,i){return '<span class="hc-edge-tone" data-hc-edge="'+s.key+'"'+(i?'':' data-active="true"')+' style="background:linear-gradient(90deg,'+s.edge[0]+','+s.edge[1]+')"></span>';}).join('')+'</div>';
   }
   // 2026-10-20 승인 「AI 찾기 CTA 3번 + 움직이는 말풍선」 -- 기존 .hc-chat 자리만 바꾼다. 바깥은 링크가 아닌 영역이고
   // 실제 링크는 버튼 하나(중첩 링크 없음 · 같은 탭 이동). PC·리본은 고정, 말풍선 두 장만 움직이는 장식이다(aria-hidden).
@@ -53,6 +58,7 @@
     root.dataset.mounted='true';
     var panels=Array.from(root.querySelectorAll('.hc-slide')), selectors=Array.from(root.querySelectorAll('[data-hc-go]'));
     var toggle=root.querySelector('[data-hc-toggle]'), status=root.querySelector('[data-hc-status]');
+    var edge=root.querySelector('.hc-edge'), tones=Array.from(root.querySelectorAll('.hc-edge-tone'));
     var motion=window.matchMedia('(prefers-reduced-motion: reduce)');
     var index=0, timer=null, manualPaused=motion.matches, hover=false, inView=true, touch=null, blockClickUntil=0;
     var interval=3000, transitionMs=600, activeAnimations=[], settleTransition=null;
@@ -101,6 +107,7 @@
       selectors.forEach(function(button,i){button.setAttribute('aria-pressed',String(i===index));});
       root.querySelector('[data-hc-current]').textContent=String(index+1).padStart(2,'0');
       root.dataset.activeSlide=String(index+1);
+      tones.forEach(function(tone,i){tone.toggleAttribute('data-active',i===index);});
       if(manual){manualPaused=true;status.textContent=panels[index].getAttribute('aria-label');}
       paintToggle();schedule();
     }
@@ -118,6 +125,16 @@
       show(next,true);selectors[index].focus();
     });
     var stage=root.querySelector('.hc-stage');
+    function placeEdge(){
+      var box=root.getBoundingClientRect();
+      edge.style.left=(-box.left-window.scrollX)+'px';
+      edge.style.width=document.documentElement.clientWidth+'px';
+      edge.style.top=stage.offsetTop+'px';
+      edge.style.height=stage.offsetHeight+'px';
+    }
+    placeEdge();
+    window.addEventListener('resize',placeEdge);
+    if('ResizeObserver' in window){new ResizeObserver(placeEdge).observe(document.documentElement);}
     stage.addEventListener('touchstart',function(e){if(e.touches.length===1){touch={x:e.touches[0].clientX,y:e.touches[0].clientY};clear();}else{touch=null;}},{passive:true});
     stage.addEventListener('touchend',function(e){
       if(!touch){if(!e.touches.length)schedule();return;}
