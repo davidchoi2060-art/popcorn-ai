@@ -45,6 +45,19 @@
     return out;
   }
 
+  // 상담 AI 가 고른 PC(이름으로 찾은 PC·부품 바꾸기로 옮긴 PC)가 조건 추천에 없으면 앞에 둔다 -- mvp3 live-flow agentCards 와 같다.
+  // 2026-10-20 「골드 [14400F/16G/1TB/RTX5060] 보여줘」에 AI 가 찾은 그 PC가 화면 카드에 빠지지 않게.
+  function withAgentCards(products, agentCards) {
+    var picked = [], seen = Object.create(null);
+    (Array.isArray(agentCards) ? agentCards : []).forEach(function (c) {
+      var code = c && c.product_code; if (!Number.isSafeInteger(code) || seen[code]) return;
+      seen[code] = true; if (P.getCatalogProduct(String(code))) picked.push({ id: String(code), overBudget: c.over_budget === true });
+    });
+    var have = Object.create(null); products.forEach(function (p) { have[p.id] = true; });
+    if (!picked.length || picked.every(function (p) { return have[p.id]; })) return products;
+    return picked.concat(products.filter(function (p) { return !seen[p.id]; }));
+  }
+
   P.liveTalk = {
     /* convo: {talk, chatFlow, history:[{role,text}], pendingText} — 이 함수가 갱신한다. */
     send: function (convo, userText, displayContext, signal) {
@@ -68,7 +81,7 @@
         else recBody.text = ((convo.pendingText ? convo.pendingText + ' / ' : '') + userText).slice(-300);
         convo.pendingText = '';
         return post('/api/grid/recommend', recBody, signal).then(function (rec) {
-          out.products = soldCodes(rec);
+          out.products = withAgentCards(soldCodes(rec), res.agent === true ? res.agent_cards : null);
           out.changed = JSON.stringify(res.state) !== before;
           return out;
         });
