@@ -1,6 +1,7 @@
 /* /mvp4 메인 AI 슈퍼컴퓨터 진열 (v15/v15.1 · 카테고리 확장 · v16 1번 AI 연구소 대표 진열, 2026-10-20).
  * 자리: AI 패키지 아래 · 게이밍 PC 위. 위쪽은 v16 대표 진열(GB10 장면·제목·성능 수치·조건·버튼, 실제 HTML),
- * 아래 모델 줄은 카테고리 데이터(GET /api/customer/supercomputers)의 대표 상품(featured_rank 순, 없으면 앞에서부터 2개)으로 그린다.
+ * 아래 줄은 카테고리 데이터(GET /api/customer/supercomputers)에서 판매가가 확인되는 판매 중 상품을 낮은 가격순 2개로 그린다
+ * (2026-10-20 대표 「메인 아래쪽 2개 제품은 가장 저렴한 AI 슈퍼컴퓨터로」). 위 Dell 소개와 별도 구획이며 각 칸에 상품명·사양·가격을 밝힌다.
  * «AI 슈퍼컴퓨터 전체 보기»(v16 문구)는 카테고리 목록(supercomputers.html)으로 간다. 상품번호를 여기 적지 않는다.
  * 응답 전에는 «가격 확인 중», 실패·판매 확인 필요면 «가격 확인 필요». 링크는 /mvp4 내부 화면뿐이다.
  */
@@ -20,20 +21,28 @@
       .slice(0, 3);
   }
   D.adFamily = featured;
-  function label(p) { return p.memory && p.storage ? p.memory + ' · SSD ' + p.storage : p.modelLabel || p.name; }
+  // 하단 줄: 판매 중이고 판매가가 확인되는 상품만, 가격 오름차순(같은 가격은 상품번호 순) 2개. 가격 미확인 상품은 넣지 않는다.
+  function cheapest(items) {
+    return items.filter(function (p) { return p.saleState === 'on_sale' && typeof p.price === 'number' && p.price > 0; })
+      .sort(function (a, b) { return a.price - b.price || Number(a.id) - Number(b.id); })
+      .filter(function (p, i, a) { return !i || a[i - 1].id !== p.id; })
+      .slice(0, 2);
+  }
+  D.cheapest = cheapest;
+  function spec(p) { return [p.memory, p.storage ? 'SSD ' + p.storage : null].filter(Boolean).join(' · ') || '사양 확인 필요'; }
   function models(list) {
     if (list === null) return '<div class="gb-home-model is-loading"><div><span class="gb-model-label">AI 슈퍼컴퓨터</span><strong>가격 확인 중</strong></div></div>';
     if (!list.length) return '<a class="gb-home-model" href="' + D.listUrl + '"><div><span class="gb-model-label">AI 슈퍼컴퓨터</span><strong>제품 목록 보기</strong></div><span class="gb-model-go">목록 보기 ' + P.icon('arrow-right') + '</span></a>';
     return list.map(function (p) {
-      return '<a class="gb-home-model" href="supercomputer.html?id=' + P.h(p.id) + '"><div><span class="gb-model-label">' + P.h(label(p)) + '</span><strong>' + P.h(priceText(p)) + '</strong></div><span class="gb-model-go">모델 보기 ' + P.icon('arrow-right') + '</span></a>';
+      return '<a class="gb-home-model" href="supercomputer.html?id=' + P.h(p.id) + '" data-gb-home-model="' + P.h(p.id) + '"><div><span class="gb-model-name">' + P.h(p.name) + '</span><span class="gb-model-label">' + P.h(spec(p)) + '</span><strong>' + P.h(priceText(p)) + '</strong></div><span class="gb-model-go">모델 보기 ' + P.icon('arrow-right') + '</span></a>';
     }).join('');
   }
   function fill(data) {
     var box = document.querySelector('[data-gb-home-models]');
     if (!box) return;
-    var list = data ? featured(data.items) : [];
-    box.innerHTML = models(list);
-    box.classList.toggle('is-single', list.length < 2);
+    var low = data ? cheapest(data.items) : [], list = data ? featured(data.items) : [];
+    box.innerHTML = models(low);
+    box.classList.toggle('is-single', low.length < 2);
     // 대표 소개(사진·사양·가격 보기)는 이 광고 제품군의 첫 모델로 간다. 제품군이 없으면 버튼은 감추고 사진은 목록으로.
     document.querySelectorAll('[data-gb-home-lead]').forEach(function (a) {
       a.href = list.length ? 'supercomputer.html?id=' + encodeURIComponent(list[0].id) : D.listUrl;
@@ -58,7 +67,7 @@
       '<p class="gb16-device"><strong>NVIDIA GB10 Grace Blackwell</strong><span>128GB · SSD 2TB / 4TB</span></p>' +
       '<div class="gb-home-actions gb16-actions"><a class="btn btn-primary" data-gb-home-lead href="' + D.listUrl + '">제품 사양·가격 보기 ' + icon('arrow-right') + '</a><a class="gb16-all" href="' + D.listUrl + '">AI 슈퍼컴퓨터 전체 보기 ' + icon('arrow-right') + '</a></div>' +
       '<p class="gb16-notes">제조사 공개 사양 기준. 모델·정밀도·실행 환경에 따라 지원 범위와 성능이 달라집니다.<br>AI 설치·교육은 별도 상담입니다.</p></div></div>' +
-      '<div class="gb-home-bottom"><div class="gb-home-models" data-gb-home-models>' + models(cached ? featured(cached.items) : null) + '</div></div></section>';
+      '<div class="gb-home-bottom"><p class="gb-home-bottom-title" id="gb-home-low">판매 중 AI 슈퍼컴퓨터 · 낮은 가격순 <span>현재 판매가 기준</span></p><div class="gb-home-models" data-gb-home-models aria-labelledby="gb-home-low">' + models(cached ? cheapest(cached.items) : null) + '</div></div></section>';
     if (screen.html.indexOf('<section class="hm-gaming') >= 0) screen.html = screen.html.replace('<section class="hm-gaming', markup + '<section class="hm-gaming');
     screen.mount = function () {
       if (oldMount) oldMount.apply(this, arguments);

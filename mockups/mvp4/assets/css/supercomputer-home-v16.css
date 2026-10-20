@@ -46,3 +46,7 @@
   .gb16-notes{font-size:15px}
   .gb16 .gb-home-bottom{padding:16px 16px 18px}
 }
+/* 하단 «판매 중 AI 슈퍼컴퓨터 · 낮은 가격순»(2026-10-20 대표) — 위 Dell 소개와 다른 상품임을 구획 제목과 상품명으로 밝힌다 */
+.gb16 .gb-home-bottom-title{margin:0 0 12px;font-size:15px;font-weight:700;color:#1d2433}
+.gb16 .gb-home-bottom-title span{margin-left:6px;font-size:13px;font-weight:400;color:#6b7383}
+.gb16 .gb-model-name{display:block;margin-bottom:2px;font-size:15px;font-weight:700;color:#1d2433;overflow-wrap:anywhere}

@@ -101,9 +101,12 @@ for (const c of cases) {
   // 판정
   const e = c.expect, checks = [];
   const eq = (name, exp, act) => checks.push({ name, expect: exp, actual: act, pass: JSON.stringify(exp) === JSON.stringify(act) });
-  eq('ad_models', e.ad_models, adModels);
+  // 하단 줄은 2026-10-20 대표 지시로 «판매 중 · 판매가 확인 · 낮은 가격순 2개»다(위 Dell 소개 버튼 ad_cta 는 그대로 Dell 제품군).
+  const low = (c.list.items || []).filter(x => x.sale_state === 'on_sale' && x.price > 0)
+    .sort((a, b) => a.price - b.price || a.product_code - b.product_code).slice(0, 2).map(x => x.product_code);
+  eq('low_models', low, adModels);
   eq('ad_cta', e.ad_cta, adCta);
-  eq('ad_fallback_to_list', e.ad_models.length === 0, ad.models.length === 1 && /supercomputers\.html/.test(ad.models[0].href));
+  eq('low_fallback_to_list', low.length === 0, ad.models.length === 1 && /supercomputers\.html/.test(ad.models[0].href));
   eq('list_ids', [...e.list].sort(), [...list].sort());
   if (e.llm_badges) eq('llm_badges', [...e.llm_badges].sort(), [...llmBadges].sort());
   for (const [code, pr] of Object.entries(e.prices || {})) eq(`price_${code}`, pr, prices[code]);

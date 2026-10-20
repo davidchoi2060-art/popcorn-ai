@@ -67,6 +67,8 @@ def supercomputers():
     print('```')
     for x in items:
         img = (x.get('images') or [{}])[0].get('src') or '-'
+        if img != '-':
+            img += ' ' + '/'.join(map(str, head(BASE + ('' if img.startswith('/') else '/mvp4/') + img)))
         print(f"{x.get('product_code')}\t{x.get('sale_state')}\t{x.get('price')}\t{x.get('name')}\t{x.get('memory')}/{x.get('storage')}\t{img}")
     sale = sorted((x for x in items if x.get('sale_state') == 'on_sale' and isinstance(x.get('price'), int) and x['price'] > 0),
                   key=lambda x: (x['price'], x['product_code']))
