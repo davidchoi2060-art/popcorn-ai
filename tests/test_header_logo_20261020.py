@@ -34,3 +34,19 @@ def test_pages_bumped():
             assert "core.js?v=20261020-logo1" in t, p.name
         if "assets/css/header-ui.css" in t:
             assert "header-ui.css?v=20261020-logo1" in t, p.name
+
+
+def test_header_ui_finds_brand_with_extra_class():
+    """PR #358 회귀: core.js 가 site-brand 에 클래스를 더 붙이자 header-ui.js 의 정확 문자열 매칭이 실패해
+    최신 헤더(상시 검색·띠메뉴) 변환이 통째로 빠지고 옛 헤더가 운영에 나갔다. 클래스가 더 붙어도 찾아야 한다."""
+    js = (ROOT / "assets" / "js" / "header-ui.js").read_text(encoding="utf-8")
+    m = re.search(r"var brand = existing\[0\]\.match\(/(.+?)/\);", js)
+    assert m, "brand matcher not found"
+    pat = re.compile(m.group(1).replace("\\/", "/"))
+    core = (ROOT / "assets" / "js" / "core.js").read_text(encoding="utf-8")
+    assert "site-brand site-brand-logo" in core
+    for html in ['<a class="site-brand site-brand-logo" href="x" aria-label="y"><img></a>',
+                 '<a class="site-brand" href="x"><img><span>팝콘AI</span></a>',
+                 '<a class="x site-brand" href="x"><img></a>']:
+        assert pat.search(html), html
+    assert not pat.search('<a class="site-brand-logo" href="x"><img></a>')

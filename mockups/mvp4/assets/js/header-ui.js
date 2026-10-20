@@ -152,7 +152,8 @@
     var html = originalShell.call(P, content);
     var existing = html.match(/<header class="site-header">[\s\S]*?<\/header>/);
     if (!existing) return html;
-    var brand = existing[0].match(/<a class="site-brand"[\s\S]*?<\/a>/);
+    // 클래스가 더 붙거나 순서가 바뀌어도 브랜드 링크를 찾는다(2026-10-20 로고 교체 때 정확한 문자열 매칭이 깨져 헤더 변환이 통째로 빠졌다).
+    var brand = existing[0].match(/<a\b[^>]*\bclass="(?:[^"]*\s)?site-brand(?:\s[^"]*)?"[\s\S]*?<\/a>/);
     if (!brand) return html;
     return html.replace(existing[0], header(brand[0])).replace(/<dialog class="site-dialog menu-dialog" id="site-menu"[\s\S]*?<\/dialog>/, menu());
   };
