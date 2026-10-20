@@ -680,11 +680,30 @@ def psu_watts(sentence: str) -> list[int]:
     return unknown if len(unknown) == 1 and not other else []
 
 
+# 「지금 GTX 1660 쓰는데 RTX 5070으로 바꾸면 500W 파워로 될까요?」에 지금 카드(1660) 기준 「450W라 넉넉해요」가 맨 앞에
+# 붙고 AI 본문은 5070 기준 650W를 말해 앞뒤가 엇갈렸다(2026-10-20 외부 검증 M3). 칩이 둘 이상이면 「~으로/로」가 붙은
+# 바꿀 카드를 판정 대상으로 삼고, 그 표시가 없으면(「5070이랑 4070 중」) 하나로 정하지 않는다 -- 설명 AI 가 비교한다.
+_PSU_TO = re.compile(r"^\s*(?:으로|로)")
+
+
+def _psu_target_gpu(s: str):
+    found, keys = [], set()
+    for m in _PSU_GPU.finditer(s):
+        k = (m.group(1).upper(), m.group(2), (m.group(3) or "").upper())
+        if k not in keys:
+            keys.add(k)
+            found.append(m)
+    if len(found) <= 1:
+        return found[0] if found else None
+    targets = [m for m in found if _PSU_TO.match(s[m.end():m.end() + 4])]
+    return targets[-1] if targets else None
+
+
 def psu_question(sentence: str) -> tuple[str, int] | None:
     """문장이 «그래픽카드 + 파워 용량»을 묻는가 -> (칩셋 키 「RTX 5070」, 손님 파워 와트). 아니면 None.
     파워 후보가 둘 이상(「500W 또는 750W 중」)이면 하나를 손님 파워로 정하지 않는다 -- None(설명 AI 가 비교한다)."""
     s = sentence or ""
-    g = _PSU_GPU.search(s)
+    g = _psu_target_gpu(s)
     if not g or not re.search(r"파워|전원|psu|w\b|와트", s, re.I):
         return None
     watts = psu_watts(s)

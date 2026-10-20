@@ -60,6 +60,7 @@ class FactBook:
     items: dict[str, dict] = field(default_factory=dict)    # ref -> 서버가 낸 상품 값
     prices: set[int] = field(default_factory=set)           # 이 턴에 말해도 되는 금액(원)
     shown: list[str] = field(default_factory=list)          # show_pcs 로 고른 ref
+    found: list[str] = field(default_factory=list)          # find_pcs 가 이 턴에 찾은 ref(엔진 순서)
     calls: list[dict] = field(default_factory=list)         # [{name, status}] -- 응답 meta 용
     request_text: str | None = None                       # 이 턴 실제 고객 문장(개인정보 마스킹 후)
     screen_action: dict | None = None                     # 저장/주문이 아닌 화면 이동 안내
@@ -488,6 +489,8 @@ def find_pcs(args: dict, book: FactBook) -> dict:
             if type(it.get("product_code")) is not int:
                 continue
             ref = book.add_item(it)
+            if ref not in book.found:
+                book.found.append(ref)
             out.append({"ref": ref, **_compact_item(it)})
         sets.append({"usage": cs.get("usage"), "min_level": cs.get("min_level"),
                      "min_level_work": cs.get("min_level_work"), "items": out,

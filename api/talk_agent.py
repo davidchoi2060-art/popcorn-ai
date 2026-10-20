@@ -484,15 +484,18 @@ def _free_build_action_reply(reply: str) -> str:
     return "\n\n".join([*kept, REPLY_FREE_BUILD_BUTTON])
 
 
-def budget_note(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
+def budget_note(cards: list[dict], budget_won: int | None, reply: str, bound: str | None = None) -> str | None:
     """보여 준 카드가 예산을 넘는데 설명이 그 말을 안 하면, 서버가 사실 문장을 붙인다.
 
     금액은 카드 판매가 - 예산(둘 다 이 턴 묶음 값)이라 지어낸 수가 아니다.
     설명이 이미 예산을 넘는다고 말했으면(says_budget_over) 붙이지 않는다.
     """
-    if not budget_won:
+    if not budget_won or bound == "이상":
         return None
-    over = [c for c in cards if c.get("over_budget") and isinstance(c.get("price"), int) and c["price"] > budget_won]
+    # 초과 여부는 카드에 찍힌 over_budget 이 아니라 «이번 턴 예산»과 판매가로 직접 잰다. 화면 카드는 예산이 없던 지난
+    # 조건으로 먼저 등록돼 over_budget=False 로 남고(같은 상품은 처음 값을 유지), 새 예산 150만원에 1,625,800원이
+    # 초과로 안 세어져 「2대 중 1대 · 207,400원 초과」가 나갔다(2026-10-20 외부 검증 M2 -- 실제는 2대 모두 · 125,800원).
+    over = [c for c in cards if isinstance(c.get("price"), int) and c["price"] > budget_won]
     if not over or any(says_budget_over(x) for x in _sentences(reply)):
         return None
     gap = min(c["price"] for c in over) - budget_won
@@ -535,7 +538,7 @@ def _pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | N
     return out.strip(), line
 
 
-def budget_lead(cards: list[dict], budget_won: int | None, reply: str) -> str | None:
+def budget_lead(cards: list[dict], budget_won: int | None, reply: str, bound: str | None = None) -> str | None:
     """보여 준 카드가 «모두» 예산을 넘으면, 설명 맨 앞에서 그 사실을 먼저 말한다.
 
     2026-10-14 사장님 결정(고객단 끝까지 검수 K1 「솔직히 알림」): 게임 60~100만원에 1,624,400원 카드 한 장만 나오는데
@@ -544,10 +547,11 @@ def budget_lead(cards: list[dict], budget_won: int | None, reply: str) -> str | 
     말하는 범위는 «보여 드린 PC»까지다. AI 는 같은 검색에서 예산 안 PC를 두고 일부만 고를 수 있어, 「예산 안에는 판매 중인
     PC가 없다」「가장 싼 PC」는 증명되지 않은 말이다(2026-10-15 코덱스 P2 F2 · R04). 금액은 예산·카드 판매가·그 차액뿐이다.
     """
-    if not budget_won or not cards:
+    if not budget_won or not cards or bound == "이상":
         return None
     priced = [c for c in cards if isinstance(c.get("price"), int)]
-    if not priced or len(priced) != len(cards) or not all(c.get("over_budget") and c["price"] > budget_won for c in priced):
+    # over_budget 표시를 믿지 않는다 -- budget_note 와 같은 이유(지난 조건으로 등록된 화면 카드 · M2).
+    if not priced or len(priced) != len(cards) or not all(c["price"] > budget_won for c in priced):
         return None
     first = next(iter(_sentences(reply)), "")
     if says_budget_over(first):
@@ -724,6 +728,13 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     if status != "failed" and named_refs and not set(named_refs) & set(book.shown):
         # 손님이 이름으로 가리킨 판매 PC는 AI 가 카드를 빠뜨려도 화면에 맨 앞으로 보인다(다른 PC만 보이지 않게).
         book.shown = [*named_refs, *book.shown][:3]
+    if status == "ok" and not book.shown and book.found and book.screen_action is None:
+        # 조건 검색(find_pcs)으로 찾은 PC를 답에서 금액까지 말해 놓고 show_pcs 를 빠뜨리면, 바뀐 조건은 화면에 안 가고
+        # 오른쪽엔 지난 카드·조건 칩이 남았다(2026-10-20 외부 검증 M1: 답 「9600X/RTX5070 2,622,000원」, 카드 1,625,800원 ·
+        # 「게임 · 1080p」). 답에 판매가가 나온 PC는 서버가 카드로 올린다 -- 순서는 엔진 순서, 고르는 것은 AI 의 말이다.
+        said_refs = [r for r in book.found if type(book.items[r].get("price")) is int
+                     and f"{book.items[r]['price']:,}" in (reply or "")]
+        book.shown = said_refs[:3]
     if status == "ok" and book.screen_action is not None:
         # 모델 URL을 고객에게 넘기지 않는다. 금액/약속 등 기존 사실 검사는 아래에서 그대로 거친다.
         reply = _free_build_action_reply(reply)
@@ -737,8 +748,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         # (2026-10-15 코덱스 v2 Q50). 정해진 안내 대신 거래가 없다는 사실을 말한다.
         clean = REPLY_NO_TRANSACTION
     # 예산 안내는 AI 설명만 보고 정한다 -- 서버 파워 줄의 「권장 기준은 넘지만」을 예산 안내로 읽지 않는다(코덱스 P2 F1).
-    lead = budget_lead(cards, budget, clean) if status != "failed" and cards else None
-    note = budget_note(cards, budget, clean) if status != "failed" and cards and not lead else None
+    bound = (book.condition or {}).get("budget_bound")
+    lead = budget_lead(cards, budget, clean, bound) if status != "failed" and cards else None
+    note = budget_note(cards, budget, clean, bound) if status != "failed" and cards and not lead else None
     if not clean and reply.strip() and not any(d["reason"] in HARD_DROPS for d in dropped):
         # 걸러 낸 문장뿐이라 남은 답이 없으면 정해 둔 「잘 정리하지 못했어요」 대신 AI 답을 내보낸다
         # (2026-10-16 중헌 님 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」). 거래가 된 척하는 말·약속은
