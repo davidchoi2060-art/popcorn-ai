@@ -23,6 +23,9 @@
     return data;
   };
   var IMG_RE =/^(assets\/|https:\/\/)|^\/api\/(product-images\/\d+\/detail|customer\/products\/\d+\/representative-image(\?size=card)?)$/;
+  // 부품 타일은 48~54px 칸이다. 같은 승인 자산을 384px 로 줄여 둔 썸네일(WebP)을 쓰고, 상세 화면은 원본(detail)을 그대로 쓴다.
+  // 썸네일을 못 읽으면 원본으로 한 번 바꿔 읽는다(error 처리 아래). 주소가 부품 설명 코드 하나로 정해져 같은 부품은 같은 주소다.
+  function tileSrc(src) { return src.replace(/^(\/api\/product-images\/\d+)\/detail$/, '$1/thumbnail'); }
 
   // ── B 카드 (card-concepts.js cardB 와 같은 마크업) ─────────────────────
   function photo(data) {
@@ -49,7 +52,7 @@
       var link = partHref(product, spec);
       // 이 부품 행이 가진 사진만(서버 공개 승인). 없으면 아이콘.
       var src = typeof spec.image === 'string' && IMG_RE.test(spec.image) ? spec.image : null;
-      var media = src ? '<img data-cc-part-photo data-cc-part-icon="' + partIcon(spec) + '" src="' + h(src) + '" alt="' + h(spec.value) + '" loading="lazy">' : P.icon(partIcon(spec));
+      var media = src ? '<img data-cc-part-photo data-cc-part-icon="' + partIcon(spec) + '" data-cc-part-full="' + h(src) + '" src="' + h(tileSrc(src)) + '" alt="' + h(spec.value) + '" loading="lazy" decoding="async">' : P.icon(partIcon(spec));
       return '<li><' + (link ? 'a href="' + h(link) + '"' : 'span') + ' class="cc-part" title="' + h(spec.value) + '"' + (link ? ' aria-label="' + h(spec.label + ': ' + spec.value + ' 상세 보기') + '"' : '') + '><span class="cc-part-media">' + media + '</span><span>' + h(partLabel(spec)) + '</span></' + (link ? 'a' : 'span') + '></li>';
     }).join('') + '</ul></section>';
   }
@@ -75,10 +78,22 @@
   P.catalogGridClass = 'cc-grid cc-grid-b';
 
   // 보이는 카드의 공개 구성을 차례로(동시 3개) 읽어 그 카드만 다시 그린다.
+  // 차례는 지금 화면에 가까운 카드부터다(390px 에서는 첫 한두 장만 보인다). 화면 밖 카드도 빼지 않고 뒤에 읽는다.
   var queue = [], running = 0, seen = Object.create(null);
+  function distance(id) {
+    var el = document.querySelector('[data-card-product="' + id + '"]');
+    if (!el) return Infinity;
+    var r = el.getBoundingClientRect(), vh = window.innerHeight || 0;
+    return r.bottom < 0 ? -r.bottom : r.top > vh ? r.top - vh : 0;
+  }
+  function next() {
+    var best = 0, bestD = Infinity;
+    for (var i = 0; i < queue.length; i++) { var d = distance(queue[i]); if (d < bestD) { best = i; bestD = d; if (!d) break; } }
+    return queue.splice(best, 1)[0];
+  }
   function pump() {
     while (running < 3 && queue.length) {
-      var id = queue.shift(); running++;
+      var id = next(); running++;
       P.live.loadDetail(id).then(function (p) {
         running--; if (!p) return pump();
         if (p.liveDetail === 'pending') p.liveDetail = 'error';
@@ -100,7 +115,13 @@
   document.addEventListener('error', function (event) {
     var img = event.target;
     if (!img || !img.matches) return;
-    if (img.matches('img[data-cc-part-photo]')) { img.parentElement.innerHTML = P.icon(img.getAttribute('data-cc-part-icon') || 'package'); return; }
+    if (img.matches('img[data-cc-part-photo]')) {
+      // 썸네일 실패 -> 원본 한 번 -> 잠시 뒤 같은 주소 한 번 더(일시 오류) -> 아이콘.
+      var full = img.getAttribute('data-cc-part-full');
+      if (full && img.getAttribute('src') !== full) { img.setAttribute('src', full); return; }
+      if (!img.hasAttribute('data-cc-retried')) { img.setAttribute('data-cc-retried', ''); setTimeout(function () { if (img.isConnected) img.setAttribute('src', full || img.getAttribute('src')); }, 1500); return; }
+      img.parentElement.innerHTML = P.icon(img.getAttribute('data-cc-part-icon') || 'package'); return;
+    }
     if (img.matches('img[data-cc-photo]')) img.parentElement.innerHTML = '<span class="cc-no-photo">' + P.icon('computer-tower') + '<span>상품 사진을 확인하고 있어요.</span></span>';
   }, true);
 
