@@ -36,7 +36,8 @@
       '<form class="nh-search" data-nh-search role="search" action="./" method="get"><label class="visually-hidden" for="nh-search-input">상품명, CPU 또는 그래픽카드 검색</label><div class="nh-search-field"><input id="nh-search-input" name="q" type="search" placeholder="상품명, CPU, 그래픽카드 검색" autocomplete="off" maxlength="120" aria-describedby="nh-search-error"><button type="submit" aria-label="상품 검색">' + icon('magnifying-glass') + '</button></div><p class="nh-search-error" id="nh-search-error" role="alert" hidden>검색어를 입력해 주세요.</p></form>' +
       '<div class="nh-tools"><a class="nh-tool" href="' + h(route('saved')) + '" data-nh-nav="saved">' + icon('clipboard-text') + '<span>내 견적</span></a><a class="nh-tool nh-support-tool" href="support.html" data-nh-nav="support">' + icon('headset') + '<span>고객지원</span></a>' + menuButton('nh-mobile-menu', '전체 메뉴') + '</div></div>' +
       '<div class="nh-menu-bar"><nav class="container nh-service-nav" aria-label="주요 메뉴"><div class="nh-primary-links">' +
-      navLink('PC 쇼핑', catalog(), 'catalog', 'nh-primary-link') + navLink('AI 패키지', 'ai-packages.html', 'ai', 'nh-primary-link') +
+      // 순서(2026-10-20 대표 확정): PC 쇼핑 → AI 패키지 → AI 슈퍼컴퓨터 → AI로 PC 찾기
+      navLink('PC 쇼핑', catalog(), 'catalog', 'nh-primary-link') + navLink('AI 패키지', 'ai-packages.html', 'ai', 'nh-primary-link') + navLink('AI 슈퍼컴퓨터', 'supercomputers.html', 'supercomputers', 'nh-primary-link') +
       navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>', route('chat'), 'chat', 'nh-primary-link nh-primary-ai') + '</div>' +
       '<div class="nh-purpose-group">' + menuButton('nh-category-button nh-category-compact', '전체 카테고리') +
       '<div class="nh-purpose-tabs" role="group" aria-label="용도별 PC와 주변기기">' + categories.map(function (c) {
@@ -52,6 +53,8 @@
   }
   function syncSelection(category) {
     var page = document.body.dataset.page || 'home';
+    // AI 슈퍼컴퓨터 상세·문의는 PC 상세 화면 틀(data-page=pc-detail)을 쓰지만 메뉴에서는 AI 슈퍼컴퓨터로 표시한다.
+    if (/\/supercomputer(-inquiry)?\.html$/.test(location.pathname)) page = 'supercomputers';
     var active = page === 'pcs' ? category || 'catalog' : page.indexOf('ai-') === 0 ? 'ai' : page === 'pc-finder' ? 'chat' : page;
     var pcSection = page === 'pcs' || page === 'peripherals' || page === 'pc-detail';
     document.querySelectorAll('[data-nh-nav]').forEach(function (link) {

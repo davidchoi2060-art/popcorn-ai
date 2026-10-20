@@ -84,6 +84,7 @@ for (const c of cases) {
   await send('Page.navigate', { url: `${BASE}/mvp4/supercomputers.html` });
   await waitFor(`!!document.querySelector('.scl-card, .scl-empty h2:not(:empty)') && !/불러오고/.test(document.body.innerText)`);
   const list = await ev(`[...document.querySelectorAll('[data-scl-item]')].map(a=>Number(a.dataset.sclItem))`);
+  const llmBadges = await ev(`[...document.querySelectorAll('.scl-card')].filter(c=>c.querySelector('.llm-badges')).map(c=>Number(c.querySelector('[data-scl-item]').dataset.sclItem))`);
   const prices = await ev(`Object.fromEntries([...document.querySelectorAll('.scl-card')].map(c=>[c.querySelector('[data-scl-item]').dataset.sclItem,c.querySelector('.scl-foot strong').textContent]))`);
   // 타사 상세(기대값이 있는 상품만)
   const details = {};
@@ -94,7 +95,7 @@ for (const c of cases) {
       const spec=Object.fromEntries([...document.querySelectorAll('.sc-spec-table div')].map(d=>[d.querySelector('dt').textContent,d.querySelector('dd').textContent]));
       const txt=document.querySelector('.sc-page').innerText;
       return {facts,spec,derivedNote:!!document.querySelector('.sc-facts .sc-derived'),images:[...document.querySelectorAll('.sc-product-photo img, .sc-gallery-thumbs img')].filter(i=>i.src.indexOf('/assets/icons/')<0).length,models:document.querySelectorAll('[name=sc-model]').length,
-        faq:[...document.querySelectorAll('.sc-faq summary')].map(s=>s.textContent),connectivity:!!document.querySelector('.sc-connectivity'),
+        llmModels:/Llama|Qwen|gpt-oss/.test((document.querySelector('.llm-use-tabs')||{}).innerText||''),faq:[...document.querySelectorAll('.sc-faq summary')].map(s=>s.textContent),connectivity:!!document.querySelector('.sc-connectivity'),
         dellContent:/gb10-|DGX OS|ConnectX|2TB와 4TB|Dell/.test(txt+[...document.querySelectorAll('img')].map(i=>i.src).join(' '))}})()`);
   }
   // 판정
@@ -104,6 +105,7 @@ for (const c of cases) {
   eq('ad_cta', e.ad_cta, adCta);
   eq('ad_fallback_to_list', e.ad_models.length === 0, ad.models.length === 1 && /supercomputers\.html/.test(ad.models[0].href));
   eq('list_ids', [...e.list].sort(), [...list].sort());
+  if (e.llm_badges) eq('llm_badges', [...e.llm_badges].sort(), [...llmBadges].sort());
   for (const [code, pr] of Object.entries(e.prices || {})) eq(`price_${code}`, pr, prices[code]);
   for (const [code, d] of Object.entries(e.details || {})) {
     const a = details[code] || {};
@@ -116,6 +118,7 @@ for (const c of cases) {
     eq(`detail_${code}_images`, d.images, a.images);
     eq(`detail_${code}_models`, d.models, a.models);
     eq(`detail_${code}_dell_content`, d.dell_content, a.dellContent);
+    if ('llm_models' in d) eq(`detail_${code}_llm_models`, d.llm_models, a.llmModels);
     eq(`detail_${code}_faq_generic`, 3, (a.faq || []).length);
   }
   results.push({ case: c.case, purpose: c.purpose, input_list_ids: c.list.items.map(i => i.product_code), expect: e,

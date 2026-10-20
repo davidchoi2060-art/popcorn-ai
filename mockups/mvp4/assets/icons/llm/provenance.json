@@ -1,0 +1,10 @@
+{
+ "note": "LLM 로고 — 설치 가능 AI 예시(2026-10-20 대표 승인 2안). 생성 이미지에서 잘라 쓰지 않았다. Simple Icons 16.35.0(CC0 데이터, 각 상표는 소유자 것)의 원본 경로를 그대로 받고 브랜드 색만 fill 로 넣었다. 모델을 식별하는 용도로만 쓰고 제휴·보증·인증을 뜻하지 않는다.",
+ "files": {
+  "meta.svg": {"brand": "Meta (Llama)", "owner": "Meta Platforms", "from": "https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/meta.svg", "source": "https://www.meta.com", "guidelines": "https://www.facebook.com/brand/resources/meta/company-brand", "fill": "#0467DF"},
+  "qwen.svg": {"brand": "Qwen", "owner": "Alibaba Cloud", "from": "https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/qwen.svg", "source": "https://qwen.ai", "fill": "#6950EF"},
+  "ollama.svg": {"brand": "Ollama (실행 도구)", "owner": "Ollama", "from": "https://cdn.jsdelivr.net/npm/simple-icons@16.35.0/icons/ollama.svg", "source": "https://github.com/ollama/ollama/issues/2152#issuecomment-1905286922", "fill": "#000000"}
+ },
+ "not_included": {"openai": "gpt-oss 로고(OpenAI Blossom)는 OpenAI 마크 사용 약관 동의 후 https://openai.com/brand 에서 받아야 한다 — 동의는 대표 결정. 그 전까지 글자 표기만 쓴다."},
+ "model_evidence": {"url": "https://ollama.com/blog/nvidia-spark-performance", "checked": "2026-10-20", "summary": "NVIDIA DGX Spark(GB10 128GB)·Ollama v0.12.6 공개 시험: gpt-oss 20B/120B(MXFP4), llama3.1 8B(q4_K_M/q8_0), qwen3 32B(q4_K_M/q8_0). 공급 제품별 실측 아님."}
+}

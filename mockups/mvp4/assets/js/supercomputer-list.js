@@ -12,7 +12,8 @@
   var P = window.PAI, h = P.h, icon = P.icon, D = P.aiDevices;
   var app = document.getElementById('app'), PAGE = 12, KEY_URL = 'pai-sc-list-url', KEY_VIEW = 'pai-sc-list-view';
   var FILTERS = [['maker', '제조사'], ['memory', '메모리'], ['storage', '저장장치'], ['price', '가격대']];
-  var SORTS = [['featured', '추천순'], ['price-asc', '낮은 가격순'], ['price-desc', '높은 가격순']];
+  // 기본 정렬 = 낮은 가격순(2026-10-20 대표 확정, 가격 확인 필요는 뒤로). 손님이 고른 정렬은 주소(?sort=)에 남아 그대로 지킨다.
+  var SORTS = [['price-asc', '낮은 가격순'], ['price-desc', '높은 가격순'], ['featured', '추천순']], DEFAULT_SORT = 'price-asc';
   var BANDS = [['~10000000', '1,000만 원 이하', 0, 10000000], ['10000000~20000000', '1,000만~2,000만 원', 10000001, 20000000], ['20000000~', '2,000만 원 초과', 20000001, Infinity]];
   var state = 'loading', items = [], shown = PAGE, query = new URLSearchParams(location.search);
   // R03(2026-10-20): 필터를 직접 접거나 펼쳤으면 그 상태를 지킨다(다시 그려도·상세에서 돌아와도). null = 아직 손대지 않음(기본 규칙).
@@ -29,7 +30,7 @@
     return seen.sort(function (a, b) { return a.localeCompare(b, 'ko', { numeric: true }); }).map(function (v) { return [v, v]; });
   }
   function active() { var a = {}; FILTERS.forEach(function (f) { var v = query.get(f[0]); if (v) a[f[0]] = v; }); return a; }
-  function sort() { var s = query.get('sort'); return SORTS.some(function (x) { return x[0] === s; }) ? s : 'featured'; }
+  function sort() { var s = query.get('sort'); return SORTS.some(function (x) { return x[0] === s; }) ? s : DEFAULT_SORT; }
   function visible() {
     var a = active(), list = items.filter(function (p) { return Object.keys(a).every(function (k) { return valueOf(p, k) === a[k]; }); });
     var s = sort();
@@ -46,7 +47,7 @@
     var specs = D.specs(p);
     return '<li class="scl-card"><a href="supercomputer.html?id=' + h(p.id) + '" data-scl-item="' + h(p.id) + '"><div class="scl-photo">' + (p.image ? '<img src="' + h(p.image) + '" alt="" loading="lazy" width="320" height="240" data-scl-img>' : '<span class="scl-photo-none">' + icon('package') + '사진 준비 중</span>') + badge(p) + '</div>' +
       '<div class="scl-body"><p class="scl-maker">' + h(p.maker || '제조사 확인 필요') + (p.modelLabel && p.modelGroup ? ' · ' + h(p.modelLabel) + ' 모델' : '') + '</p><h2>' + h(p.name) + '</h2>' +
-      '<dl class="scl-specs">' + specs.map(function (s) { return '<div><dt>' + h(s[1]) + '</dt><dd' + (s[2] ? '' : ' class="is-missing"') + '>' + h(s[2] || '확인 필요') + '</dd></div>'; }).join('') + '</dl>' +
+      '<dl class="scl-specs">' + specs.map(function (s) { return '<div><dt>' + h(s[1]) + '</dt><dd' + (s[2] ? '' : ' class="is-missing"') + '>' + h(s[2] || '확인 필요') + '</dd></div>'; }).join('') + '</dl>' + (P.llmExamples ? P.llmExamples.badges(p) : '') +
       '<div class="scl-foot"><strong class="' + (p.saleState === 'on_sale' ? '' : 'is-quiet') + '">' + h(priceText(p)) + '</strong><span class="scl-go">자세히 보기 ' + icon('arrow-right') + '</span></div><p class="scl-id">상품번호 ' + h(p.id) + '</p></div></a></li>';
   }
   function filtersHtml() {
@@ -88,7 +89,7 @@
   function bind() {
     app.querySelectorAll('[data-scl-filter]').forEach(function (b) { b.addEventListener('click', function () { var n = new URLSearchParams(query); var k = b.dataset.sclFilter; if (n.get(k) === b.dataset.value) n.delete(k); else n.set(k, b.dataset.value); setQuery(n); }); });
     app.querySelectorAll('[data-scl-clear]').forEach(function (b) { b.addEventListener('click', function () { var n = new URLSearchParams(query); FILTERS.forEach(function (f) { n.delete(f[0]); }); setQuery(n); }); });
-    var s = app.querySelector('[data-scl-sort]'); if (s) s.addEventListener('change', function () { var n = new URLSearchParams(query); if (s.value === 'featured') n.delete('sort'); else n.set('sort', s.value); setQuery(n); });
+    var s = app.querySelector('[data-scl-sort]'); if (s) s.addEventListener('change', function () { var n = new URLSearchParams(query); if (s.value === DEFAULT_SORT) n.delete('sort'); else n.set('sort', s.value); setQuery(n); });
     var m = app.querySelector('[data-scl-more]'); if (m) m.addEventListener('click', function () { shown += PAGE; render(); });
     var r = app.querySelector('[data-scl-retry]'); if (r) r.addEventListener('click', start);
     var det = app.querySelector('.scl-filters'); if (det) det.addEventListener('toggle', function () { filterOpen = det.open; });

@@ -67,7 +67,9 @@ D14 = lambda rank=2, **kw: dell(129614, '4TB', 14209400, rank, **kw)
 #   ad_models  메인 GB10 광고 모델 줄의 상품번호(순서대로). [] = «제품 목록 보기» 안내
 #   ad_cta     대표 버튼 «제품 사양·가격 보기»의 상품번호. None = 버튼 숨김
 #   list       AI 슈퍼컴퓨터 목록에 보일 상품번호(순서 무관)
+#   llm_badges 목록에서 «설치 가능 AI 예시» 배지가 붙는 상품번호 — GB10·DGX Spark 만(Ollama 공개 시험 근거)
 #   details    {상품번호: 상세 기대} — dell_content: Dell 사진·DGX OS·포트·2TB/4TB FAQ 가 나오면 안 됨(False)
+#              llm_models: 활용 예시 탭에 모델 이름(Llama·Qwen·gpt-oss)이 나오는지 — 비GB10 은 False
 CASES = [
     ('C01-current', '지금과 같은 Dell 2종 + 표시 정보가 있는 타사 1종', [D15(), D14(), HP_PROFILE()],
      {'ad_models': [129615, 129614], 'ad_cta': 129615, 'list': [129615, 129614, 900004]}),
@@ -89,9 +91,10 @@ CASES = [
      {'ad_models': [129614], 'ad_cta': 129614, 'list': [129614, 900004]}),
     ('C10-missing-profile', '표시 정보·사진이 없는 타사 3종(GB10 이름 · DGX Spark 이름 · 비GB10)', [D15(), D14(), ASUS_GB10(), SPARK_OEM(), NON_GB10()],
      {'ad_models': [129615, 129614], 'ad_cta': 129615, 'list': [129615, 129614, 900001, 900002, 900003],
-      'details': {900001: {'accelerator': 'NVIDIA GB10', 'spec_accelerator': 'NVIDIA GB10 (상품명 기준)', 'derived_note': True, 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False},
-                  900002: {'accelerator': 'NVIDIA GB10', 'spec_accelerator': 'NVIDIA GB10 (상품명 기준)', 'derived_note': True, 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False},
-                  900003: {'accelerator': None, 'spec_accelerator': '확인 필요', 'derived_note': True, 'processor': '확인 필요', 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False}}}),
+      'llm_badges': [129615, 129614, 900001, 900002],
+      'details': {900001: {'accelerator': 'NVIDIA GB10', 'spec_accelerator': 'NVIDIA GB10 (상품명 기준)', 'derived_note': True, 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False, 'llm_models': True},
+                  900002: {'accelerator': 'NVIDIA GB10', 'spec_accelerator': 'NVIDIA GB10 (상품명 기준)', 'derived_note': True, 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False, 'llm_models': True},
+                  900003: {'accelerator': None, 'spec_accelerator': '확인 필요', 'derived_note': True, 'processor': '확인 필요', 'os': '확인 필요', 'images': 0, 'models': 0, 'dell_content': False, 'llm_models': False}}}),
     ('C11-price-unknown', 'Dell 2TB 판매가 없음 · 타사 판매가 없음', [D15(sale_price=None), D14(), ASUS_GB10(sale_price=None)],
      {'ad_models': [129615, 129614], 'ad_cta': 129615, 'list': [129615, 129614, 900001], 'prices': {129615: '가격 확인 필요', 900001: '가격 확인 필요'}}),
 ]

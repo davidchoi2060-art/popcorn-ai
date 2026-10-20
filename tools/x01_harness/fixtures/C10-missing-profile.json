@@ -14,6 +14,12 @@
    900002,
    900003
   ],
+  "llm_badges": [
+   129615,
+   129614,
+   900001,
+   900002
+  ],
   "details": {
    "900001": {
     "accelerator": "NVIDIA GB10",
@@ -22,7 +28,8 @@
     "os": "확인 필요",
     "images": 0,
     "models": 0,
-    "dell_content": false
+    "dell_content": false,
+    "llm_models": true
    },
    "900002": {
     "accelerator": "NVIDIA GB10",
@@ -31,7 +38,8 @@
     "os": "확인 필요",
     "images": 0,
     "models": 0,
-    "dell_content": false
+    "dell_content": false,
+    "llm_models": true
    },
    "900003": {
     "accelerator": null,
@@ -41,7 +49,8 @@
     "os": "확인 필요",
     "images": 0,
     "models": 0,
-    "dell_content": false
+    "dell_content": false,
+    "llm_models": false
    }
   }
  },
