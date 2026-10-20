@@ -32,7 +32,7 @@
       '<div class="apd-foot"><strong class="' + (price(p) ? '' : 'is-quiet') + '">' + h(priceText(p)) + '</strong><span>자세히 보기 ' + icon('arrow-right') + '</span></div></div></a></li>';
   }
   function html() {
-    var body = items === null ? (failed ? '<p class="apd-state">제품 목록을 불러오지 못했어요. <a href="supercomputers.html">AI 슈퍼컴퓨터 목록</a>에서 다시 확인해 주세요.</p>' : '<p class="apd-state" aria-busy="true">제품을 불러오고 있어요.</p>')
+    var body = items === null ? (failed ? '<p class="apd-state">제품 목록을 불러오지 못했어요. <a href="supercomputers.html">AI 슈퍼컴퓨터 목록</a>에서 다시 확인해 주세요.</p>' : (P.categoryLoading ? P.categoryLoading('package') : '<p class="apd-state" aria-busy="true">제품을 불러오고 있어요.</p>'))
       : !items.length ? '<p class="apd-state">아직 등록된 제품이 없어요.</p>'
       : '<ul class="apd-grid">' + sorted(items).map(card).join('') + '</ul>';
     return '<div class="apd-head"><div><span class="eyebrow">AI 슈퍼컴퓨터</span><h2 id="apd-title">AI를 직접 돌릴 장비도 있어요.</h2><p>지금 판매 중인 AI 전용 장비예요. 모델과 설치 구성은 전문상담사가 함께 맞춰드립니다.</p></div>' +

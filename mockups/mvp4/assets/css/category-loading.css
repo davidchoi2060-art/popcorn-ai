@@ -1,0 +1,43 @@
+/* /mvp4 카테고리별 진입 로딩(1안)과 AI 대화 응답 대기 — category-loading.js 짝. 흰 바탕 · 검정 글자 · 노랑 브랜드 · 연보라 AI */
+.cl-loading{padding:28px 0 8px}
+.cl-head{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px}
+.cl-art{display:flex;align-items:center;justify-content:center;height:120px}
+.cl-art img{width:auto;height:100%;max-width:100%;animation:cl-float 2.6s ease-in-out infinite}
+.cl-text{margin:0;font-size:17px;font-weight:700;color:#1d1b22;letter-spacing:-.02em}
+.cl-dots{display:inline-flex;gap:8px}
+.cl-dots i{width:9px;height:9px;border-radius:50%;background:#e4dcf6;animation:cl-dot 1.2s infinite}
+.cl-dots i:nth-child(2){animation-delay:.4s}.cl-dots i:nth-child(3){animation-delay:.8s}
+.cl-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:26px}
+.cl-card{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #ece8f3;border-radius:14px;background:#fff}
+.cl-sk{display:block;height:12px;width:80%;border-radius:6px;background:linear-gradient(90deg,#f1eff5 0%,#f8f6fb 45%,#f1eff5 90%);background-size:220% 100%;animation:cl-shimmer 1.6s linear infinite}
+.cl-sk-photo{height:96px;width:100%;border-radius:10px}.cl-sk-short{width:52%}
+/* AI 패키지 그림 — 타사 로고 대신 중립 도구(문서·대화·검색) */
+.cl-pkg{position:relative;display:block;width:150px;height:110px;animation:cl-float 2.6s ease-in-out infinite}
+.cl-pkg::before{content:"";position:absolute;inset:6px 0 0;border-radius:50%;background:radial-gradient(closest-side,#efe9fc,rgba(239,233,252,0))}
+.cl-pkg-tile{position:absolute;display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#f6f2ff;border:1px solid #e3d9fa;box-shadow:0 6px 14px rgba(108,76,180,.12);color:#6c4cb4}
+.cl-pkg-tile .icon{width:20px;height:20px}
+.cl-pkg-tile:nth-child(1){left:14px;top:30px;transform:rotate(-12deg)}.cl-pkg-tile:nth-child(2){left:56px;top:6px}.cl-pkg-tile:nth-child(3){right:14px;top:30px;transform:rotate(12deg)}
+.cl-pkg-base{position:absolute;left:30px;right:30px;bottom:6px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:linear-gradient(#e8defd,#d9cbf8)}
+.cl-pkg-base b{font-size:14px;font-weight:800;line-height:1;color:#fff;background:#4b3a8c;border-radius:6px;padding:4px 7px}
+.cl-chat-skel{display:flex;flex-direction:column;gap:12px;margin-top:26px}
+.cl-chat-skel .cl-sk{height:44px;border-radius:12px;width:62%}.cl-chat-skel .cl-sk:nth-child(2){align-self:flex-end;width:48%}
+.cl-page{padding-top:28px;padding-bottom:40px}
+@keyframes cl-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes cl-dot{0%,100%{background:#e4dcf6}33%{background:#f6c736}}
+@keyframes cl-shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
+@media(max-width:800px){.cl-art{height:96px}.cl-text{font-size:16px}.cl-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.cl-cards .cl-card:nth-child(3){display:none}.cl-sk-photo{height:80px}}
+
+/* AI 대화 응답 대기 — PC 96px · 모바일 72px. 실제 요청 중에만 그려지고 답이 오면 화면이 다시 그려지며 사라진다 */
+.dc-wait{align-items:center}
+.cw-art{position:relative;flex:0 0 96px;width:96px;height:96px}
+.cw-core{position:absolute;left:18%;top:18%;width:64%;height:64%;animation:cw-glow 2.4s ease-in-out infinite}
+.cw-lines{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.cw-lines ellipse{fill:none;stroke:#b9a6ee;stroke-width:1;stroke-dasharray:3 5;opacity:.75;animation:cw-link 2.4s linear infinite}
+.cw-art i{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px;border-radius:50%;background:#a58bf0;box-shadow:0 0 6px #c9b8ff;opacity:0;animation:cw-gather 2.4s ease-in infinite}
+.cw-art i:nth-of-type(1){--x:-44px;--y:-14px}.cw-art i:nth-of-type(2){--x:42px;--y:-24px;animation-delay:.6s}
+.cw-art i:nth-of-type(3){--x:38px;--y:26px;animation-delay:1.2s}.cw-art i:nth-of-type(4){--x:-36px;--y:28px;animation-delay:1.8s}
+@keyframes cw-glow{0%,100%{filter:brightness(1);transform:scale(1)}50%{filter:brightness(1.12);transform:scale(1.04)}}
+@keyframes cw-link{to{stroke-dashoffset:-32}}
+@keyframes cw-gather{0%{transform:translate(var(--x),var(--y));opacity:0}25%{opacity:1}80%{opacity:.9}100%{transform:translate(0,0) scale(.4);opacity:0}}
+@media(max-width:800px){.cw-art{flex-basis:72px;width:72px;height:72px}.cw-art i:nth-of-type(1){--x:-33px;--y:-10px}.cw-art i:nth-of-type(2){--x:31px;--y:-18px}.cw-art i:nth-of-type(3){--x:28px;--y:20px}.cw-art i:nth-of-type(4){--x:-27px;--y:21px}}
+@media(prefers-reduced-motion:reduce){.cl-art img,.cl-pkg,.cl-dots i,.cl-sk,.cw-core,.cw-lines ellipse,.cw-art i{animation:none}.cw-art i{opacity:0}.cl-dots i:first-child{background:#f6c736}}

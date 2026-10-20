@@ -88,7 +88,8 @@
       return list.map(function (m) { return '<article class="dc-message dc-message-' + m.role + '"><span>' + (m.role === 'user' ? '나' : '팝콘AI') + '</span><p>' + h(m.text) + '</p></article>'; }).join('');
     }
     function stateNotice() {
-      if (model.state === 'loading') return '<div class="dc-state-box dc-loading" role="status">' + icon('clock') + '<div><strong>조건과 구성을 살펴보고 있어요.</strong><p>조금만 기다려 주세요. 입력한 내용은 그대로 남아 있어요.</p><button type="button" data-dc-action="stop">기다리기 중단</button></div></div>';
+      // 응답 대기(2026-10-20 대표 「마지막 시안을 작게 해서 애니메이션」): 실제 요청 중에만 그려지고 답·오류·중단이면 다시 그려지며 사라진다.
+      if (model.state === 'loading') return '<div class="dc-state-box dc-loading dc-wait" role="status">' + (P.chatWaitArt ? P.chatWaitArt() : icon('clock')) + '<div><strong>답변을 준비하고 있어요</strong><p>잠시만 기다려 주세요.</p><button type="button" data-dc-action="stop">기다리기 중단</button></div></div>';
       var errors = { error: ['답변을 불러오지 못했어요.', '입력한 내용을 유지했어요. 다시 보내거나 내용을 고칠 수 있어요.'], offline: ['연결 상태를 확인해 주세요.', '대화를 이어가지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.'], timeout: ['답변이 예상보다 오래 걸리고 있어요.', '응답을 확인하지 못했어요. 입력한 내용을 보관한 채 다시 시도할 수 있어요.'], 'rate-limit': ['요청이 잠시 많아요.', '잠시 후 다시 보내 주세요. 입력한 내용은 그대로 남아 있어요.'], 'long-message': ['내용을 조금 나누어 보내주세요.', '한 번에 10,000자까지 입력할 수 있어요. 원문은 입력창에 그대로 두었어요.'] };
       if (errors[model.state]) { var item = errors[model.state]; return '<div class="dc-state-box dc-error" role="alert">' + icon('warning-circle') + '<div><strong>' + h(item[0]) + '</strong><p>' + h(item[1]) + '</p>' + (model.state !== 'long-message' ? '<button type="button" data-dc-action="retry">' + icon('arrow-counter-clockwise') + '다시 시도</button>' : '') + '</div></div>'; }
       if (model.state === 'clarify') return '<div class="dc-inline-actions"><button class="dc-draft-chip" type="button" data-dc-draft="예산은 아직 정하지 않았어요.">예산은 아직 몰라요</button><button class="dc-draft-chip" type="button" data-dc-draft="어떤 사양이 필요한지 잘 모르겠어요.">사양을 잘 몰라요</button></div>';
