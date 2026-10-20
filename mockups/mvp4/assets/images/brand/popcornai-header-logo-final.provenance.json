@@ -1,0 +1,13 @@
+{
+  "file": "assets/images/brand/popcornai-header-logo-final.png",
+  "kind": "header logo final (approved 2026-10-20, \"이게 정말 최종 로고임.. 이 이미지만 바꿔줘\") -- byte-for-byte copy of the approved original, no resize, crop or edit",
+  "source_package": "popcornai-header-logo-final-20261020-approved.zip (SHA256 801cac8cf36a3d217d1639f9b4d199d112a73ab1c6867533e87cdcf8e435db04)",
+  "source_file": "popcornai-header-logo-final.png",
+  "dimensions": [1824, 669],
+  "bytes": 204469,
+  "sha256": "25e86af8131998955cc2bd42b43a56db9de5cd30d86079e849c2562286ceff40",
+  "printed_url": "www.popcornai.co.kr",
+  "supersedes": "v2 PNG f58181a879354da5c5bfef2c5eedea28c87b1441072f144088a854ad69014833 (www.popcornpc.co.kr) -- never merged",
+  "replaces": "assets/images/brand/popcornai-header-logo.png (67a588ee... master) in the header only",
+  "note": "Footer and favicon keep logo.png. Link class, DOM and header-ui extraction are unchanged."
+}
