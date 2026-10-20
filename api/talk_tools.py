@@ -26,6 +26,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import unicodedata
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -119,6 +121,14 @@ def definitions(usage_labels: list[str], resolutions: list[str]) -> list[dict]:
           "description": "find_pcs 가 준 PC 번호(ref)의 공개 부품 구성. 부품별 판매가는 주지 않으며 PC 총액만 알려 준다.",
          "parameters": {"type": "object", "additionalProperties": False,
                         "properties": {"ref": {"type": "string"}}, "required": ["ref"]}},
+        {"name": "find_pc_by_name",
+         "description": ("손님이 PC를 이름·사양 표기(예: 골드 [14400F/16G/1TB/RTX5060])·몰 상품번호(NO.04.○○○○○○)로 가리키거나,"
+                         " 앞에서 보여 드린 PC를 이름으로 다시 찾을 때 부른다. 지금 판매 목록에서 그 이름의 PC를 찾아 번호(ref)를 준다."
+                         " match=exact 는 같은 이름, mall_no 는 같은 몰 상품번호, spec 은 사양 표기만 같은 PC다."
+                         " 판매 목록에 없으면 not_on_sale(판매 상태가 다름) 또는 empty 를 준다. 조건 검색(find_pcs)으로 대신 찾지 않는다."),
+         "parameters": {"type": "object", "additionalProperties": False, "properties": {
+             "name": {"type": "string", "description": "손님이 쓴 상품 이름·사양 표기·상품번호 원문"}},
+             "required": ["name"]}},
         {"name": "other_pcs_by_part",
          "description": ("고른 PC(ref)와 부품 하나(cpu·gpu·ram·ssd)만 다른, 지금 판매 중인 «다른 완성 PC» 목록과 가격 차이."
                          " 이 PC의 부품을 실제로 바꿔 주는 견적이 아니다."),
@@ -403,6 +413,151 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                 notes=res.get("talk_notes") or [], sets=sets)
 
 
+# ── 이름으로 판매 PC 찾기 (2026-10-20 대표 신고 「추천한 골드 상품이 팝콘PC 원상품과 연동이 안 된다」) ──────
+# 추천 카드 이름(card_name)은 몰 이름에서 광고 대괄호·내부 번호를 뗀 짧은 이름이다. 손님이 그 짧은 이름이나 몰의 전체
+# 이름으로 「이 제품 보여줘」라고 하면, 예전에는 AI 가 용도 조건으로 find_pcs 를 다시 돌려 3장 안에 같은 이름이 없으면
+# 「판매 목록에서 확인되지 않는다」고 답했다(실측: 골드 [14400F/16G/1TB/RTX5060] = 판매중 102112 인데 12400F/500GB 를 냄).
+# 이름 비교는 띄어쓰기·대소문자·GB/G·TB/T 표기만 맞춘다. 광고 문구·내부 번호는 card_name 이 떼고, 몰 이름은 원문 그대로
+# 함께 본다. 이름만 비슷한 다른 상품을 같은 상품으로 묶지 않는다(사양 표기만 같으면 match=spec 으로 따로 밝힌다).
+_SPEC_BRACKET = re.compile(r"\[([^\[\]]*/[^\[\]]*)\]")
+_MALL_NO = re.compile(r"NO\.\s*\d+\s*\.\s*(\d+)[A-Z]{0,3}", re.I)
+_PD_NO = re.compile(r"pd_no=(\d+)")
+_NAME_MIN = 8            # 이보다 짧은 이름 키는 같은 이름 판정에 쓰지 않는다(「골드」 한 단어가 모두에 걸리지 않게)
+NAMED_MAX = 3
+
+
+def name_key(s) -> str:
+    """이름 비교 키 -- 띄어쓰기·기호·대소문자를 지우고 용량 단위(GB→G · TB→T)만 맞춘다. 대괄호와 / 는 남긴다."""
+    if not isinstance(s, str):
+        return ""
+    s = unicodedata.normalize("NFKC", s).upper()
+    s = re.sub(r"(\d)\s*GB(?![A-Z])", r"\1G", s)
+    s = re.sub(r"(\d)\s*TB(?![A-Z])", r"\1T", s)
+    return re.sub(r"[^0-9A-Z가-힣\[\]/]", "", s)
+
+
+def _spec_keys(key: str) -> set[str]:
+    return {m for m in _SPEC_BRACKET.findall(key)}
+
+
+def _spec_in(q_key: str, spec: str) -> bool:
+    """상품 사양 표기의 칸(14400F · 16G · 1T · RTX5060)이 손님 문장에 모두 있나 -- 대괄호·빗금 없이 써도 찾는다."""
+    tokens = [t for t in spec.split("/") if t]
+    return len(tokens) >= 3 and all(t in q_key for t in tokens)
+
+
+def _has_name(key: str) -> bool:
+    """사양 대괄호 밖에 이름 글자가 있나 -- 대괄호뿐인 이름(「[14400F/32G/1TB/RTX5060Ti]」)은 같은 이름 판정에 쓰지 않는다."""
+    return len(re.sub(r"\[[^\[\]]*\]", "", key)) >= 2
+
+
+def _mall_nos(text_: str) -> set[str]:
+    return set(_MALL_NO.findall(text_ or "")) | set(_PD_NO.findall(text_ or ""))
+
+
+def names_in(text_) -> bool:
+    """문장에 상품을 가리키는 표기(사양 대괄호 · 몰 상품번호)가 있나 -- 매 턴 판매 목록을 읽지 않게 거른다."""
+    return bool(isinstance(text_, str) and (_SPEC_BRACKET.search(text_) or _mall_nos(text_)))
+
+
+def _name_match(q_key: str, q_nos: set[str], with_spec: bool, card: str, official: str, url) -> str | None:
+    card_k, off_k = name_key(card), name_key(official)
+    off_core = name_key(_MALL_NO.sub(" ", official or ""))
+    if any(len(k) >= _NAME_MIN and _has_name(k) and k in q_key for k in (card_k, off_k, off_core)):
+        return "exact"
+    nos = _mall_nos(official) | (set(_PD_NO.findall(url)) if isinstance(url, str) else set())
+    if q_nos and q_nos & nos:
+        return "mall_no"
+    if with_spec and any(_spec_in(q_key, sp) for sp in _spec_keys(card_k) | _spec_keys(off_k)):
+        return "spec"
+    return None
+
+
+def _not_on_sale(q_key, q_nos, live: set) -> list[dict]:
+    """판매 목록 밖(품절·단종·추천 제외)에서 같은 이름 -- 「없다」와 「판매 상태가 다르다」를 섞지 않는다."""
+    from sqlalchemy import text as sql
+    from .product_name import card_name
+    try:
+        with engine.connect() as conn:
+            rows = conn.execute(sql(
+                "SELECT f.product_code, f.crawl_name, f.mall_url, f.excluded, p.status"
+                "  FROM product_fit_products f LEFT JOIN products p ON p.product_code = f.product_code")).all()
+    except Exception:  # noqa: BLE001 -- 확인하지 못했으면 「확인하지 못함」으로 둔다
+        log.warning("[talk_tools] not-on-sale lookup failed", exc_info=True)
+        return []
+    out = []
+    for r in rows:
+        if r.product_code in live or not isinstance(r.crawl_name, str):
+            continue
+        m = _name_match(q_key, q_nos, False, card_name(r.crawl_name), r.crawl_name, r.mall_url)
+        if m in ("exact", "mall_no"):
+            out.append({"match": m, "name": card_name(r.crawl_name), "sale_status": r.status or "확인 안 됨",
+                        "excluded_from_recommendation": bool(r.excluded)})
+    return out[:NAMED_MAX]
+
+
+def lookup_by_name(query: str, book: FactBook, *, with_spec: bool = True, check_off: bool = True) -> dict:
+    """판매 목록(고객 상품 목록 /api/customer/pc-catalog 와 같은 원천 -- 추천 풀 중 판매중)에서 이름으로 찾는다."""
+    from . import sold_reco as SOLD
+    from .product_name import card_name, match_storage_shorthand
+
+    q_key, q_nos = name_key(query), _mall_nos(query)
+    _levels, products = SOLD.load()
+    live = {code for code, p in products.items() if p.get("status") == "판매중" and type(p.get("price")) is int}
+    found = []
+    for code in live:
+        p = products[code]
+        card = match_storage_shorthand(card_name(p["name"]), p.get("spec"))
+        m = _name_match(q_key, q_nos, with_spec, card, p["name"], p.get("url"))
+        if m:
+            found.append((("exact", "mall_no", "spec").index(m), p["price"], code, m, card))
+    found.sort()
+    best = found[0][0] if found else None
+    items = []
+    for rank, _price, code, m, card in found:
+        if rank != best or len(items) >= NAMED_MAX:     # 같은 이름이 있으면 사양만 같은 PC 는 섞지 않는다
+            continue
+        p = products[code]
+        url = p.get("url")
+        it = {"product_code": code, "name": card, "price": p["price"], "price_src": p.get("price_src"),
+              "mall_url": url if isinstance(url, str) and url.startswith("https://") else None,
+              "spec": SOLD.card_spec(p), "level": None, "over_budget": False, "reasons": []}
+        ref = book.add_item(it)
+        compact = {k: v for k, v in _compact_item(it).items() if k != "public_configuration"}   # 공개 구성 여부는 pc_detail 이 본다
+        items.append({"ref": ref, "match": m, **compact, "official_name": p["name"],
+                      "sale_status": p.get("status"), "mall_url": it["mall_url"]})
+    if items:
+        return _res("ok", snapshot_id=book.snapshot_id, as_of=book.as_of, items=items,
+                    note=("match=exact·mall_no 는 손님이 말한 바로 그 판매 PC다. show_pcs 로 보여 준다."
+                          if best < 2 else
+                          "match=spec 은 사양 표기만 같고 이름이 다른 PC다. 손님이 말한 PC와 같다고 단정하지 말고 그렇게 밝힌다."))
+    off = _not_on_sale(q_key, q_nos, live) if check_off else []
+    if off:
+        return _res("not_on_sale", items=off,
+                    note="같은 이름의 PC가 있지만 지금 판매 목록에 없다(sale_status). 그 상태를 밝히고, 대안은 find_pcs 로 따로 찾아 다른 PC라고 구분한다.")
+    return _res("empty", reason="지금 판매 목록에서 이 이름·상품번호의 PC를 찾지 못했다. 그렇게 밝히고, 대안은 다른 PC라고 구분해 보여 준다.")
+
+
+def find_pc_by_name(args: dict, book: FactBook) -> dict:
+    name = args.get("name")
+    if not isinstance(name, str) or not name.strip() or len(name) > 300:
+        return _invalid("name 은 300자 이하의 상품 이름 문자열이어야 한다")
+    return lookup_by_name(name, book)
+
+
+def named_pcs(text_, book: FactBook) -> list[dict]:
+    """손님 이번 문장에 판매 PC 이름·몰 상품번호가 그대로 있으면 그 PC(같은 이름·같은 번호만)를 이 턴 번호로 올린다.
+    AI 가 도구를 고르기 전에 서버가 확인한 사실로 준다 -- 「보여줘」에 다른 PC를 찾는 일을 막는다."""
+    if not names_in(text_):
+        return []
+    try:
+        res = lookup_by_name(text_, book, with_spec=False, check_off=False)
+    except Exception:  # noqa: BLE001 -- 확인하지 못하면 AI 가 도구로 다시 찾는다
+        log.warning("[talk_tools] named pc lookup failed", exc_info=True)
+        return []
+    return (res.get("items") or []) if res.get("status") == "ok" else []
+
+
 def pc_detail(args: dict, book: FactBook) -> dict:
     from . import customer_pc_offer as OFFER
 
@@ -563,7 +718,7 @@ def free_build_preview(args: dict, book: FactBook) -> dict:
                      "부품별 가격은 말하지 않는다.")
 
 
-EXECUTORS = {"find_pcs": find_pcs, "pc_detail": pc_detail, "other_pcs_by_part": other_pcs_by_part,
+EXECUTORS = {"find_pcs": find_pcs, "find_pc_by_name": find_pc_by_name, "pc_detail": pc_detail, "other_pcs_by_part": other_pcs_by_part,
              "game_facts": game_facts, "shop_policy": shop_policy, "show_pcs": show_pcs,
              "open_free_build": open_free_build, "free_build_preview": free_build_preview}
 

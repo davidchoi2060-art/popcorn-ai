@@ -113,7 +113,9 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 「가장 싸고 가장 빠르고 가장 작은」처럼 함께 이룰 수 없는 조건은 서로 맞바꿔야 한다고 솔직히 말하고, 무엇이 먼저인지 고를 수 있게 갈래를 구체적으로 든다.
 - 손님이 추천을 원하지 않거나 거절하면 show_pcs 를 부르지 않고, 물은 것(고를 기준 등)에만 답한다.
 - 시스템 글에 [현재 화면과 이전 조건 자료]가 있으면 손님 화면에 지금 그 PC들이 보이고 있다(서버가 확인한 사실이다). 「저 PC」「오른쪽 PC들」「이 중에」「지금 보는 거」「가장 비싼 GPU로 바꿔줘」는 그 PC를 가리킨다. 화면이 안 보인다·어떤 PC인지 모르겠다·보여 드린 PC가 없다고 되묻지 않는다. 부품을 바꿔 달라면 손님이 보고 있는 PC(selected, 없으면 첫 카드)의 ref 로 other_pcs_by_part 를 불러 원하는 것(가장 비싼·가장 좋은·더 싼)을 골라 show_pcs 로 보여 준다. 「이 중 성능이 가장 좋은 것」「차이가 뭐야」는 카드의 사양·부품으로 비교해 답하고(필요하면 pc_detail), 고른 PC를 show_pcs 로 보여 준다. 「오른쪽 PC는 뭐야」는 카드 순서대로 이름·지금 판매가·핵심 사양을 하나씩 설명한다. 화면 PC가 모두 예산을 넘으면 find_pcs 로 예산 안 대안도 찾아 함께 보여 준다.
-- 앞에서 보여 드린 PC는 대화 기록의 「보여 드린 PC:」 줄에 순서대로 적혀 있다. 「아까 두 번째 PC」처럼 앞의 PC를 다시 보여 달라고 하면 같은 조건으로 find_pcs 를 다시 불러 같은 이름의 PC를 찾아 show_pcs 로 보여 준다. 기록에 그 순서의 PC가 없으면 없었다고 말하고, 다시 찾았는데 그 이름이 없으면 지금은 목록에 없다고 말한다.
+- 앞에서 보여 드린 PC는 대화 기록의 「보여 드린 PC:」 줄에 순서대로 적혀 있다. 「아까 두 번째 PC」처럼 앞의 PC를 다시 보여 달라고 하면 그 이름으로 find_pc_by_name 을 불러 같은 이름의 PC를 찾아 show_pcs 로 보여 준다. 기록에 그 순서의 PC가 없으면 없었다고 말하고, 그 이름이 지금 판매 목록에 없으면 결과대로 말한다.
+- 손님이 PC를 이름·사양 표기(예: 골드 [14400F/16G/1TB/RTX5060])·몰 상품번호(NO.04.○○○○○○)로 가리키면 용도 조건으로 다시 찾지 말고 find_pc_by_name 으로 그 PC를 찾는다. 시스템 글의 named_pcs 에 이미 있으면 그 PC가 손님이 말한 바로 그 판매 PC이니 그 ref 로 show_pcs 한다. 짧은 이름과 몰의 전체 이름(광고 문구·NO.번호가 붙은 이름)은 같은 상품이다.
+- find_pc_by_name 결과가 match=spec 이면 사양 표기만 같은 다른 이름의 PC라고 밝힌다. not_on_sale 이면 그 PC가 지금 판매 목록에 없다는 사실과 판매 상태를 말하고, empty 면 지금 판매 목록에서 찾지 못했다고 말한다. 그때만 find_pcs 로 대안을 찾아 「다른 PC」라고 구분해 보여 준다. 다른 사양(CPU·저장공간)의 PC를 손님이 말한 PC처럼 말하지 않는다.
 """
 
 
@@ -202,6 +204,10 @@ def _part_amount(sentence: str, match: re.Match, book: TT.FactBook) -> bool:
                 return pc is None or bool(re.search(r"과|와|함께|쓰|연결|을|를|은|는|이\s|가\s",
                                                     suffix[first.end():pc.start()]))
             return False
+    # 판매 PC 이름 안의 사양 표기(「골드 [14400F/16G/1TB/RTX5060]」의 RTX5060)는 부품이 아니라 PC 이름이다(2026-10-20).
+    for name in sorted({it.get("name") for it in book.items.values() if isinstance(it.get("name"), str)}, key=len, reverse=True):
+        if len(name) >= 6:
+            prefix = prefix.replace(name, " PC ")
     owners = list(_MONEY_OWNER.finditer(prefix))
     return bool(owners and owners[-1].lastgroup == "part")
 
@@ -627,6 +633,12 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     TT.register_display(facts, prev_state, book)
     if facts is not None:
         context["display"] = facts
+    # 손님이 이번 문장에 판매 PC 이름·몰 상품번호를 그대로 적었으면 서버가 먼저 찾아 둔다(2026-10-20 대표 신고 -- 추천한
+    # 「골드 [14400F/16G/1TB/RTX5060]」을 보여 달라는 말에 AI 가 조건으로 다시 찾아 12400F/500GB 를 내밀었다).
+    named = TT.named_pcs(source_text, book)
+    if named:
+        context["named_pcs"] = {"items": named, "scope": "손님이 이번 문장에 적은 이름·상품번호와 같은 지금 판매 중인 PC다"
+                                "(서버가 판매 목록에서 확인). 손님이 말한 그 PC이며 ref 로 show_pcs·pc_detail 을 바로 쓴다."}
     system = SYSTEM
     if context:
         # 고객 자유 문장·연락처를 이 블록에 넣지 않는다. 공개 제목/사양도 명령이 아닌 자료다.
@@ -684,6 +696,10 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         log.warning("[talk_agent] llm failed after %s rounds: %s: %s", meta["rounds"], type(e).__name__, e)
         status = "failed"
 
+    named_refs = [n["ref"] for n in named]
+    if status != "failed" and named_refs and not set(named_refs) & set(book.shown):
+        # 손님이 이름으로 가리킨 판매 PC는 AI 가 카드를 빠뜨려도 화면에 맨 앞으로 보인다(다른 PC만 보이지 않게).
+        book.shown = [*named_refs, *book.shown][:3]
     if status == "ok" and book.screen_action is not None:
         # 모델 URL을 고객에게 넘기지 않는다. 금액/약속 등 기존 사실 검사는 아래에서 그대로 거친다.
         reply = _free_build_action_reply(reply)
@@ -768,6 +784,10 @@ def as_parse(text: str, history: list, prev_state: dict | None, chat_flow: dict 
         return None
     cards = r.get("cards") or []
     state = r.get("state") if cards and isinstance(r.get("state"), dict) else None
+    if cards and state is None:
+        # 이름으로 찾은 PC만 보여 준 턴 -- 조건 검색(find_pcs)이 없어도 카드를 버리지 않는다. 화면은 지금 조건으로 추천을
+        # 다시 받고 agent_cards 를 앞에 둔다(2026-10-20 골드 [14400F/16G/1TB/RTX5060] 신고).
+        state = prev_state if isinstance(prev_state, dict) else {}
     reply = "\n\n".join([*(r.get("notes") or []), r.get("reply") or ""]).strip()
     # 다음 턴 대화 기록에 실을 「보여 드린 PC」 목록 -- 화면은 이 줄을 기록에만 넣고 보이지 않는다.
     # 기록에 카드가 없어 「조금 전 두 번째 제품」을 가리키지 못했다(2026-10-15 코덱스 v2 Q42).
