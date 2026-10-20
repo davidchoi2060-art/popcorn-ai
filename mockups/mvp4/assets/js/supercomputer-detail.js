@@ -147,10 +147,14 @@
   var loadSeq = 0;
   // 맞춘 뒤 2초 동안 사진·로고·글꼴 등 늦은 배치 변화(ResizeObserver)마다 다시 맞춘다. 손님이 직접 스크롤(휠·터치·키·누름)하거나
   // 다른 모델을 다시 읽기 시작하면 멈춘다(2026-10-20 — 모바일에서 늦게 커진 위쪽 내용 때문에 구획이 밀리던 것).
-  function settle(align, seq) {
-    var stopped = false, ro = null, evs = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+  // 부드러운 스크롤이 진행 중일 때 같은 자리로 다시 부르면 움직임이 처음부터 다시 시작되므로, 대상 구획의 문서 위치가 실제로 바뀐 때만 다시 맞춘다.
+  function settle(target, seq) {
+    var stopped = false, ro = null, evs = ['wheel', 'touchstart', 'keydown', 'mousedown'], at = null;
+    function el() { return typeof target === 'function' ? target() : target; }
+    function docTop(t) { return Math.round(t.getBoundingClientRect().top + window.scrollY); }
+    function align() { var t = el(); if (!t) return; at = docTop(t); scrollToSection(t); }
     function stop() { if (stopped) return; stopped = true; if (ro) ro.disconnect(); evs.forEach(function (n) { window.removeEventListener(n, stop, true); }); }
-    function again() { if (stopped) return; if (seq !== loadSeq) { stop(); return; } align(); }
+    function again() { if (stopped) return; if (seq !== loadSeq) { stop(); return; } var t = el(); if (t && (at === null || Math.abs(docTop(t) - at) > 1)) align(); }
     evs.forEach(function (n) { window.addEventListener(n, stop, { capture: true, passive: true }); });
     align();
     if (window.ResizeObserver) { ro = new ResizeObserver(again); ro.observe(document.body); }
@@ -159,9 +163,9 @@
   }
   function afterModelChange(y, seq) {
     if (location.hash && location.hash.length > 1) {
-      if (toHash()) { settle(toHash, seq); return; }
+      if (hashTarget()) { settle(hashTarget, seq); return; }
       history.replaceState(null, '', location.pathname + location.search);
-      var hero = app.querySelector('.sc-product-hero'); if (hero) settle(function () { scrollToSection(hero); }, seq);
+      var hero = app.querySelector('.sc-product-hero'); if (hero) settle(hero, seq);
       return;
     }
     window.scrollTo(0, y);
@@ -173,7 +177,7 @@
       if (seq !== loadSeq || want !== id) return;
       product = p; phase = 'ready'; render(!!keep);
       if (keep) afterModelChange(y, seq);
-      else if (toHash()) settle(toHash, seq);
+      else if (hashTarget()) settle(hashTarget, seq);
     }, function (e) {
       if (seq !== loadSeq || want !== id) return;
       product = null; phase = e && e.status === 404 ? 'missing' : 'error'; render(false);
@@ -187,8 +191,9 @@
     if (head) { var hr = head.getBoundingClientRect(), pos = getComputedStyle(head).position; if (pos === 'sticky' || pos === 'fixed') cover = Math.max(0, hr.bottom); }
     window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - cover - 16));
   }
+  function hashTarget() { return location.hash && location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null; }
   function toHash() {
-    var target = location.hash && location.hash.length > 1 ? document.getElementById(decodeURIComponent(location.hash.slice(1))) : null;
+    var target = hashTarget();
     if (target) scrollToSection(target);
     return !!target;
   }
