@@ -31,7 +31,7 @@ class R02ModelChange(unittest.TestCase):
         self.assertIn('seq !== loadSeq', src)
         self.assertIn('afterModelChange', src)
         self.assertIn('.sc-product-hero', src)
-        self.assertIn('settle(toHash, seq)', src)   # 늦은 배치 변화에도 구획 유지(2026-10-20)
+        self.assertIn('settle(hashTarget, seq)', src)   # 늦은 배치 변화에도 구획 유지(2026-10-20)
 
 
 class R03ListReturn(unittest.TestCase):
