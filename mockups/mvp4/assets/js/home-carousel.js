@@ -12,7 +12,8 @@
       {key:'gaming', label:'게이밍 PC', kicker:'PLAY YOUR WAY', title:'좋아하는 게임,<br>나답게 즐기다.', text:'나의 게임과 예산에 맞는 PC를 만나보세요.', file:'gaming-blue-clean.png', alt:'밝은 블루톤 공간에서 게이밍 PC와 함께하는 모습', actions:action('게이밍 PC 보기',P.designHref('catalog','normal',{category:'게이밍 PC'}))+action('AI와 게임 PC 찾기',chat,true)},
       {key:'ai', label:'AI 패키지', kicker:'AI FOR YOUR WORK', title:'일에 집중하도록,<br>AI는 당신 곁에.', text:'내 자료 정리부터 우리 팀의 업무까지.', file:'ai-lavender-clean.png', alt:'밝은 사무 공간에서 업무형 PC를 소개하는 모델', actions:action('AI 패키지 보기','ai-packages.html')+action('우리 업무로 도입 상담','ai-consult.html?package=business&intent=adoption',true)},
       {key:'people', label:'당신의 PC', kicker:'FIND YOUR EVERYDAY PC', title:'당신의 하루에,<br>딱 맞는 PC.', text:'작은 공간의 미니 PC부터 든든한 작업용 PC까지.', file:'model-showroom-clean.png', alt:'미니 PC와 화이트 PC를 소개하는 두 모델', actions:action('나에게 맞는 PC 찾기',chat)+action('모든 PC 둘러보기',catalog,true)},
-      {key:'collection', label:'용도별 쇼핑', kicker:'PC COLLECTION', title:'게임도, 일도.<br>필요한 PC를 한곳에서.', text:'쓰임에 맞게 골라보세요.', file:'category-display-clean.png', alt:'게이밍 PC, 미니 PC, 업무형 AI PC의 세 가지 전시 공간', actions:''}
+      {key:'collection', label:'용도별 쇼핑', kicker:'PC COLLECTION', title:'게임도, 일도.<br>필요한 PC를 한곳에서.', text:'쓰임에 맞게 골라보세요.', file:'category-display-clean.png', alt:'게이밍 PC, 미니 PC, 업무형 AI PC의 세 가지 전시 공간', actions:''},
+      {key:'supercomputer', label:'AI 슈퍼컴퓨터', kicker:'AI SUPERCOMPUTER', title:'큰 AI를 다루는,<br>나만의 슈퍼컴퓨터.', text:'다양한 AI 전용 장비를 한곳에서. <br>목적에 맞는 제품을 찾아보세요.', note:'성능과 지원 환경은 제품별로 다릅니다.<br>AI 설치·교육은 별도 상담입니다.', file:'ai-supercomputer-showroom-clean.png', alt:'밝은 AI 쇼룸의 전시대에 놓인 여러 제조사의 AI 전용 장비', actions:action('AI 슈퍼컴퓨터 전체 보기','supercomputers.html')}
     ];
   }
   function render() {
@@ -22,12 +23,12 @@
         [['게이밍 PC',P.designHref('catalog','normal',{category:'게이밍 PC'}),'high.webp'],['미니 PC',P.designHref('catalog','normal',{category:'미니 PC'}),'mini.png'],['AI 패키지','ai-packages.html','high.png']].map(function(c){return '<a href="'+h(c[1])+'"><img class="hc-tile-image" src="assets/images/'+c[2]+'" alt="" loading="lazy"><span>'+c[0]+'</span>'+P.icon('arrow-right')+'</a>';}).join('')+'</div>' : '';
       return '<article class="hc-slide hc-'+s.key+'" id="hc-slide-'+i+'" role="group" aria-roledescription="슬라이드" aria-label="'+(i+1)+' / '+items.length+' · '+h(s.label)+'"'+(i?' hidden inert':'')+'>'+
         '<img class="hc-image" src="assets/images/carousel/'+s.file+'" alt="'+h(s.alt)+'" width="2006" height="784" '+(i?'loading="lazy"':'fetchpriority="high"')+' draggable="false">'+
-        '<div class="hc-copy"><p class="hc-kicker">'+s.kicker+'</p><h2>'+s.title+'</h2><p class="hc-description">'+s.text+'</p><div class="hc-actions">'+s.actions+'</div></div>'+collection+'</article>';
+        '<div class="hc-copy"><p class="hc-kicker">'+s.kicker+'</p><h2>'+s.title+'</h2><p class="hc-description">'+s.text+'</p><div class="hc-actions">'+s.actions+'</div>'+(s.note?'<p class="hc-note">'+s.note+'</p>':'')+'</div>'+collection+'</article>';
     }).join('');
     return '<section class="hc-carousel hm-container" aria-label="팝콘AI 추천 기획전" aria-roledescription="캐러셀" data-home-carousel><h1 class="visually-hidden">팝콘AI · 좋은 PC에서 쓸모 있는 AI까지</h1>'+
       '<div class="hc-stage">'+slideHTML+'</div><div class="hc-toolbar">'+
       '<div class="hc-selectors" role="group" aria-label="배너 선택">'+items.map(function(s,i){return '<button type="button" data-hc-go="'+i+'" aria-controls="hc-slide-'+i+'" aria-pressed="'+(!i)+'" aria-label="'+(i+1)+'번 배너: '+s.label+'"><span class="hc-dot"></span><span class="hc-label">'+s.label+'</span></button>';}).join('')+'</div>'+
-      '<div class="hc-controls"><span class="hc-counter" aria-hidden="true"><b data-hc-current>01</b><span> / 05</span></span><button type="button" data-hc-prev aria-label="이전 배너">'+P.icon('arrow-left')+'</button><button type="button" data-hc-next aria-label="다음 배너">'+P.icon('arrow-right')+'</button><button type="button" class="hc-play" data-hc-toggle aria-label="배너 자동 넘김 정지">정지</button></div></div>'+
+      '<div class="hc-controls"><span class="hc-counter" aria-hidden="true"><b data-hc-current>01</b><span> / '+String(items.length).padStart(2,'0')+'</span></span><button type="button" data-hc-prev aria-label="이전 배너">'+P.icon('arrow-left')+'</button><button type="button" data-hc-next aria-label="다음 배너">'+P.icon('arrow-right')+'</button><button type="button" class="hc-play" data-hc-toggle aria-label="배너 자동 넘김 정지">정지</button></div></div>'+
       '<p class="visually-hidden" data-hc-status role="status" aria-live="polite" aria-atomic="true"></p>'+
       '<a class="hc-chat" href="'+h(P.designHref('chat','welcome'))+'">'+P.icon('chat-circle')+'어떤 PC를 고를지 고민되나요? <strong>AI와 대화로 PC 찾기</strong>'+P.icon('arrow-right')+'</a></section>';
   }
