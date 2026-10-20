@@ -1,0 +1,61 @@
+{
+ "note": "2026-10-20 owner approval: 카테고리별 로딩은 1안으로, AI 대화는 마지막 시안을 작게 해서 애니메이션. AI 패키지 그림은 시안 속 타사 로고 대신 CSS 중립 도구 모양(category-loading.js).",
+ "images": [
+  {
+   "file": "assets/images/loading/loading-pc.webp",
+   "sha256": "b498c0ddf9233534df04e0646f6b95ec28cc419084be1c4181f87cfbfc15319a",
+   "bytes": 2888,
+   "source": "option-1.png",
+   "source_sha256": "0e2aaa75b8b8eb99b44cd1fa32763f7a5047d41f21b404f7b5c4937893be667a",
+   "crop": [
+    276,
+    82,
+    506,
+    232
+   ],
+   "derivation": "crop, edge alpha fade (core: circular feather), WebP q88"
+  },
+  {
+   "file": "assets/images/loading/loading-supercomputer.webp",
+   "sha256": "d692d9efff52c3f86ffe1bed115f30e78445bdbd5346b288a4298570a5cfa1ce",
+   "bytes": 4778,
+   "source": "option-1.png",
+   "source_sha256": "0e2aaa75b8b8eb99b44cd1fa32763f7a5047d41f21b404f7b5c4937893be667a",
+   "crop": [
+    256,
+    612,
+    540,
+    742
+   ],
+   "derivation": "crop, edge alpha fade (core: circular feather), WebP q88"
+  },
+  {
+   "file": "assets/images/loading/loading-chat.webp",
+   "sha256": "a47934c865d4dd6d461d12f470b3cfc2a4b2413d0e2aa74ad53b49280a255389",
+   "bytes": 2066,
+   "source": "option-1.png",
+   "source_sha256": "0e2aaa75b8b8eb99b44cd1fa32763f7a5047d41f21b404f7b5c4937893be667a",
+   "crop": [
+    980,
+    592,
+    1256,
+    752
+   ],
+   "derivation": "crop, edge alpha fade (core: circular feather), WebP q88"
+  },
+  {
+   "file": "assets/images/loading/chat-wait-core.webp",
+   "sha256": "6b988f7374d047acb0c00098ac63ee74f68e702a072ca013d7993f2e67318308",
+   "bytes": 5720,
+   "source": "ai-chat-motion-keyframe.png",
+   "source_sha256": "aa7523d844572eda09d9ebfe8f45fc3cfadf89ea30ee47495da59b724aaba60a",
+   "crop": [
+    395,
+    577,
+    585,
+    767
+   ],
+   "derivation": "crop, edge alpha fade (core: circular feather), WebP q88"
+  }
+ ]
+}
