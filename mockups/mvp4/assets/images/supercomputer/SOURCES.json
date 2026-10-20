@@ -48,6 +48,34 @@
    ],
    "source": "v16 option1 design handoff (2026-10-20, approved display order 1) — generated advertising scene with text removed; approved reference approved-desktop-design.png sha256 6d485b4e9730c70f421c825158dd77326835f817c48afd34442690437ad7ad7f",
    "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
+  },
+  {
+   "file": "assets/images/supercomputer/msi-edgexpert.png",
+   "sha256": "c7ecc8e567fed8382ed104a83a99797e091dd232d9cbf10aadc5bbf2194493f5",
+   "bytes": 362205,
+   "size": [
+    1024,
+    1024
+   ],
+   "source_page": "https://us-store.msi.com/MSI-EdgeXpert-Blackwell-AI-Supercomputer",
+   "source_url": "https://asset-us-store.msi.com/image/cache/catalog/Pd_page/Desktops/2025/EdgeXpert/EdgeXpert-1-1024x1024.png",
+   "model": "130451 MSI EdgeXpert 4TB — same product family, official single-unit photo",
+   "selected": "2026-10-20 owner photo-search handoff",
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
+  },
+  {
+   "file": "assets/images/supercomputer/acer-veriton-gn100.jpg",
+   "sha256": "d9a551f79f81fd42e0a794455c3b0bb65191101fd992cd136b9b8374c20509d2",
+   "bytes": 15190,
+   "size": [
+    500,
+    500
+   ],
+   "source_page": "https://store.acer.com/ja-jp/acer-gn100",
+   "source_url": "https://static-ecapac.acer.com/media/catalog/product/4/5/4515777666190_01_dt.r6lsj.001.jpg?optimize=high&bg-color=255,255,255&fit=bounds&height=500&width=500&canvas=500:500",
+   "model": "130452 Acer Veriton GN100 4TB — same product family, Acer Japan SKU photo (regional specs/support not carried over)",
+   "selected": "2026-10-20 owner photo-search handoff",
+   "commercial_reuse_rights": "Seller use of supplier product imagery (Popcorn sells this product)"
   }
  ],
  "derived": [

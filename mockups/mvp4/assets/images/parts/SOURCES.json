@@ -1,0 +1,18 @@
+{
+ "note": "Part representative photos used only when neither our DB nor the mall has a photo (owner 2026-10-20: similar photos allowed).",
+ "images": [
+  {
+   "file": "assets/images/parts/micronics-master-m60-black.jpg",
+   "sha256": "b9fc152b4515448366c6f9defea569d4e208232c17613afc4472e8e9ea47813c",
+   "bytes": 65718,
+   "size": [
+    600,
+    600
+   ],
+   "applies_to": "CASE [마이크로닉스] Master M60 MESH 블랙 HIT (PC 121561,121560,114085,114096,121275,90622,99218)",
+   "match": "same M60 MESH black product family; HIT/production-lot exterior match unconfirmed; assembled parts in the photo are an example, not included parts",
+   "source_page": "https://www.guidecom.co.kr/shop/detail.html?gid=293199",
+   "source_url": "https://img.guidecom.co.kr/goods/2020/01/30/ez1_fbbf56514420d202e2fbf0aac7186f87_1.JPG"
+  }
+ ]
+}

@@ -167,6 +167,13 @@ _BUILT_IN = {"GPU": re.compile(r"^\W*(\[[^\]]*\]\s*)?(radeon|uhd|iris|intel)?\s*
              "COOLER": re.compile(r"프로세서에\s*포함|정품\s*쿨러|기본\s*쿨러", re.I)}
 _BUILT_IN_ROLE = {"GPU": "CPU 에 들어 있는 내장 그래픽입니다.", "COOLER": "CPU 에 함께 들어 있는 기본 쿨러입니다."}
 
+# 상품 DB·몰 어디에도 사진이 없는 부품의 대표 사진(2026-10-20 대표 「사진 준비중인거 다 찾아서」 · 유사 사진 허용).
+# 같은 제품군 대표 이미지라 사진 속 조립 예시가 실제 포함 부품으로 읽히지 않게 역할 문구를 함께 낸다. 출처 = 같은 폴더 SOURCES.json.
+_STATIC_PHOTO = [
+    ("CASE", re.compile(r"master\s*m60\s*mesh.*블랙", re.I), "assets/images/parts/micronics-master-m60-black.jpg",
+     "제품군 대표 사진입니다. 사진 속 내부 부품은 포함 구성이 아닙니다."),
+]
+
 
 def lexicon(conn) -> dict:
     """{(슬롯, 비교 키): 부품 설명 코드} — 공개 승인된 구성의 오퍼 상품 원문과 구성 부품을 맞대어 만든다."""
@@ -229,10 +236,14 @@ def registered(code: int, response: Response):
     for x, c, m in zip(parts, codes, mall):
         e = info.get(c) if c else None
         photo = f"/api/product-images/{c}/detail" if e and e["photo"] else None
+        role = (e["role"] or e["summary"]) if e else None
         if photo is None and m:
             photo = MALL_IMG.format(d=m // 1000, c=m)
-        out.append({"slot": x["slot"], "name": x["name"], "quantity": x["quantity"], "photo": photo,
-                    "role": (e["role"] or e["summary"]) if e else None})
+        if photo is None:
+            hit = next((s for s in _STATIC_PHOTO if s[0] == x["slot"] and s[1].search(x["name"])), None)
+            if hit:
+                photo, role = hit[2], role or hit[3]
+        out.append({"slot": x["slot"], "name": x["name"], "quantity": x["quantity"], "photo": photo, "role": role})
     cpu = next((o for o in out if o["slot"] == "CPU" and o["photo"]), None)
     for o in out:
         rx = _BUILT_IN.get(o["slot"])

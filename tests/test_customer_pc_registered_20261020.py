@@ -1,4 +1,5 @@
 """부품표가 승인되지 않은 판매 PC 의 몰 등록 구성 읽기 (2026-10-20 대표 「부품표도 채워서 넣어」)."""
+import pathlib
 import unittest
 
 from api import customer_pc_registered as R
@@ -84,7 +85,7 @@ class Endpoint(unittest.TestCase):
     def test_registered_runs_end_to_end(self):
         from unittest import mock
         sst = ("프로세서(CPU)@@[AMD] 라이젠5 그래니트 릿지 9600 [Turbo] ,@@그래픽(VGA)@@[AMD] Radeon Graphics ,"
-               "@@초고속(SSD)@@[마이크론] Crucial T500 M.2 NVMe 2TB ,@@")
+               "@@초고속(SSD)@@[마이크론] Crucial T500 M.2 NVMe 2TB ,@@케이스@@[마이크로닉스] Master M60 MESH 블랙 HIT ,@@")
 
         class Res(list):
             def mappings(self): return self
@@ -111,6 +112,12 @@ class Endpoint(unittest.TestCase):
         self.assertEqual(photos["CPU"], R.MALL_IMG.format(d=0, c=5))
         self.assertEqual(photos["GPU"], photos["CPU"])
         self.assertEqual(photos["SSD"], R.MALL_IMG.format(d=0, c=6))
+        # DB·몰 어디에도 없는 케이스는 대표 사진 + 「내부 부품은 포함 구성이 아님」 안내
+        case = next(p for p in body["parts"] if p["slot"] == "CASE")
+        self.assertEqual(case["photo"], "assets/images/parts/micronics-master-m60-black.jpg")
+        self.assertIn("포함 구성이 아닙니다", case["role"])
+        root = pathlib.Path(__file__).resolve().parents[1] / "mockups" / "mvp4"
+        self.assertTrue((root / case["photo"]).is_file())
 
 
 if __name__ == '__main__':
