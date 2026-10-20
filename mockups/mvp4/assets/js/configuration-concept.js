@@ -122,6 +122,16 @@
       });
       var shift = summary.getBoundingClientRect().top - before;
       if (Math.abs(shift) > 1) window.scrollBy({ top: shift, behavior: 'instant' });
+      // 2026-10-21 사장님 「펼친 아코디언으로 포커스가 이동되도록」 -- 열린 행(머리+펼친 내용)이 화면 아래로 잘리면
+      // 그만큼만 올려 보여 준다. 행이 화면보다 길면 머리 행을 위 여백에 맞춘다(머리가 화면 밖으로 나가지 않는다).
+      var gap = 16, rect = part.getBoundingClientRect(), view = window.innerHeight;
+      var reveal = Math.min(Math.max(0, rect.bottom + gap - view), Math.max(0, rect.top - gap));
+      if (rect.top < gap) reveal = rect.top - gap;
+      if (Math.abs(reveal) > 1) {
+        var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        window.scrollBy({ top: reveal, behavior: calm ? 'instant' : 'smooth' });
+      }
+      if (document.activeElement !== summary) summary.focus({ preventScroll: true });
     }, true);
   }
   P.configurationConceptV12 = { render: render, mount: mount, quantity: quantity, parts: parts, facts: facts, pending: pending };
