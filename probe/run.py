@@ -41,3 +41,13 @@ for it in hits:
             print('MALL', code, s, url, '| title:', title.group(1).strip()[:200] if title else None, '| og:', og[:2], '| NO:', nm, '| soldout:', soldout)
         except Exception as e:
             print('MALL', code, 'ERR', url, e)
+# 배포 뒤 반영 확인 (2026-10-20 PR #356) — 공개 GET 만
+for page in ('/mvp4/index.html', '/mvp4/review-flows.html'):
+    s, h = get(BASE + page, raw=True); h = h.decode('utf-8', 'replace')
+    print('PAGE', page, s, re.findall(r'live-talk\.js\?v=[^"]+', h), re.findall(r'design-conversation\.js\?v=[^"]+', h))
+s, js = get(BASE + '/mvp4/assets/js/live-talk.js?v=20261020-name1', raw=True); js = js.decode('utf-8', 'replace')
+print('LIVETALK', s, len(js), 'withAgentCards' in js, 'agent_cards' in js)
+for path in ('/mvp3/', '/mvp4/'):
+    s, _ = get(BASE + path, raw=True); print('ALIVE', path, s)
+p = [it for it in items if str(it.get('product_code')) == '102112']
+print('CAT102112', json.dumps(p, ensure_ascii=False)[:600])
