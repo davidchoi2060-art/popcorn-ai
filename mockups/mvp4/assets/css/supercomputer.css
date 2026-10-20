@@ -20,3 +20,5 @@
 @media(max-width:800px){.sc-gallery-thumbs{width:100%;max-width:360px;margin-inline:auto}.sc-gallery-thumbs button{flex:1 1 0;width:auto;min-width:0;max-width:112px}}
 /* F05(2026-10-20): 상세 메뉴로 옮긴 구획 제목이 화면 위 끝에 붙지 않게. */
 #sc-usecases,#sc-specs,#sc-environment,#sc-faq{scroll-margin-top:20px}
+/* X01(2026-10-20): 표시 정보 없이 상품명에서 읽은 값 표시. */
+.sc-facts .sc-derived{display:block;font-size:12px;color:#8a86a0;font-weight:600}

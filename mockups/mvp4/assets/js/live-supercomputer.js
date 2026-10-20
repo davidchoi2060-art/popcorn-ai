@@ -21,6 +21,7 @@
       accelerator: str(x.accelerator), processor: str(x.processor), memory: str(x.memory), storage: str(x.storage), os: str(x.os), architecture: str(x.architecture),
       modelGroup: str(x.model_group), modelLabel: str(x.model_label), featuredRank: typeof x.featured_rank === 'number' ? x.featured_rank : null,
       images: images, image: images.length ? images[0].src : null, price: price, saleState: state,
+      derived: Array.isArray(x.derived) ? x.derived.filter(function (k) { return typeof k === 'string'; }) : [],
       detail: x.detail && typeof x.detail === 'object' ? x.detail : {},
       models: Array.isArray(x.models) ? x.models.map(function (m) { var mp = typeof m.price === 'number' && m.price > 0 ? m.price : null; return { id: String(m.product_code), label: str(m.model_label), price: mp, saleState: m.sale_state === 'on_sale' && mp !== null ? 'on_sale' : m.sale_state === 'stopped' ? 'stopped' : 'check' }; }) : [] };
   }
@@ -48,8 +49,13 @@
     return get('/api/customer/supercomputers/' + id).then(function (d) { return item(d.item); });
   }
   // 값이 없으면 «확인 필요». 사양 묶음은 화면마다 같은 순서로 쓴다.
+  // 상품명에서 읽은 값(표시 정보에 직접 적지 않은 값)에는 «상품명 기준»을 붙인다(X01 2026-10-20).
+  function mark(p, key, value) { return value && (p.derived || []).indexOf(key) >= 0 ? value + ' (상품명 기준)' : value; }
   function specs(p) {
-    return [['cpu', p.accelerator ? 'AI 가속기' : '프로세서', p.accelerator || p.processor], ['memory', '메모리', p.memory], ['hard-drive', '저장장치', p.storage], ['code', '운영체제', p.os]];
+    // [아이콘, 이름, 값, 상품명 기준 여부] — 값 칸에는 붙이지 않고 화면이 작은 줄로 따로 밝힌다(좁은 칸에서 값이 잘리지 않게).
+    var d = function (k) { return (p.derived || []).indexOf(k) >= 0; };
+    var c = p.accelerator ? 'accelerator' : 'processor';
+    return [['cpu', p.accelerator ? 'AI 가속기' : '프로세서', p[c], d(c)], ['memory', '메모리', p.memory, d('memory')], ['hard-drive', '저장장치', p.storage, d('storage')], ['code', '운영체제', p.os, false]];
   }
-  P.aiDevices = { data: null, list: list, detail: detail, specs: specs, listUrl: 'supercomputers.html' };
+  P.aiDevices = { data: null, list: list, detail: detail, specs: specs, mark: mark, listUrl: 'supercomputers.html' };
 }());

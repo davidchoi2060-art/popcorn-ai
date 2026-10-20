@@ -15,6 +15,10 @@
   var SORTS = [['featured', '추천순'], ['price-asc', '낮은 가격순'], ['price-desc', '높은 가격순']];
   var BANDS = [['~10000000', '1,000만 원 이하', 0, 10000000], ['10000000~20000000', '1,000만~2,000만 원', 10000001, 20000000], ['20000000~', '2,000만 원 초과', 20000001, Infinity]];
   var state = 'loading', items = [], shown = PAGE, query = new URLSearchParams(location.search);
+  // R03(2026-10-20): 필터를 직접 접거나 펼쳤으면 그 상태를 지킨다(다시 그려도·상세에서 돌아와도). null = 아직 손대지 않음(기본 규칙).
+  var filterOpen = null;
+  // 복원은 이 화면이 직접 한다(브라우저 자동 스크롤 복원이 뒤늦게 덮지 않게).
+  try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (e) { /* 무시 */ }
   function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } return null; }
   function band(p) { if (p.saleState !== 'on_sale' || !p.price) return null; var b = BANDS.find(function (x) { return p.price >= x[2] && p.price <= x[3]; }); return b ? b[0] : null; }
   function valueOf(p, key) { return key === 'price' ? band(p) : p[key]; }
@@ -50,7 +54,8 @@
     var sortHtml = '<label class="scl-sort"><span>정렬</span><select data-scl-sort>' + SORTS.map(function (s) { return '<option value="' + s[0] + '"' + (sort() === s[0] ? ' selected' : '') + '>' + s[1] + '</option>'; }).join('') + '</select></label>';
     if (!groups.length) return '<div class="scl-tools">' + sortHtml + '</div>';
     var count = Object.keys(a).length;
-    return '<details class="scl-filters"' + (count || window.matchMedia('(min-width: 900px)').matches ? ' open' : '') + '><summary>' + icon('squares-four') + '조건으로 찾기' + (count ? ' <b>' + count + '</b>' : '') + icon('caret-down') + '</summary><div class="scl-filter-groups">' +
+    var open = filterOpen !== null ? filterOpen : !!(count || window.matchMedia('(min-width: 900px)').matches);
+    return '<details class="scl-filters"' + (open ? ' open' : '') + '><summary>' + icon('squares-four') + '조건으로 찾기' + (count ? ' <b>' + count + '</b>' : '') + icon('caret-down') + '</summary><div class="scl-filter-groups">' +
       groups.map(function (g) { return '<fieldset><legend>' + h(g[0][1]) + '</legend><div>' + g[1].map(function (o) { var on = a[g[0][0]] === o[0]; return '<button type="button" data-scl-filter="' + h(g[0][0]) + '" data-value="' + h(o[0]) + '" aria-pressed="' + on + '">' + h(o[1]) + '</button>'; }).join('') + '</div></fieldset>'; }).join('') +
       (count ? '<button type="button" class="scl-clear" data-scl-clear>조건 지우기</button>' : '') + '</div></details><div class="scl-tools">' + sortHtml + '</div>';
   }
@@ -86,8 +91,13 @@
     var s = app.querySelector('[data-scl-sort]'); if (s) s.addEventListener('change', function () { var n = new URLSearchParams(query); if (s.value === 'featured') n.delete('sort'); else n.set('sort', s.value); setQuery(n); });
     var m = app.querySelector('[data-scl-more]'); if (m) m.addEventListener('click', function () { shown += PAGE; render(); });
     var r = app.querySelector('[data-scl-retry]'); if (r) r.addEventListener('click', start);
-    // 상세로 가기 직전 «더 보기» 수와 스크롤 위치를 남긴다(뒤로 오면 되살린다).
-    app.querySelectorAll('[data-scl-item]').forEach(function (a) { a.addEventListener('click', function () { store(KEY_VIEW, JSON.stringify({ url: location.search, shown: shown, y: Math.round(window.scrollY) })); }); });
+    var det = app.querySelector('.scl-filters'); if (det) det.addEventListener('toggle', function () { filterOpen = det.open; });
+    // 상세로 가기 직전 «더 보기» 수·필터 열림·누른 카드와 그 카드의 화면 안 위치를 남긴다(뒤로 오면 같은 카드를 같은 자리에 되살린다).
+    app.querySelectorAll('[data-scl-item]').forEach(function (a) { a.addEventListener('click', function () {
+      var d = app.querySelector('.scl-filters');
+      store(KEY_VIEW, JSON.stringify({ url: location.search, shown: shown, y: Math.round(window.scrollY), filterOpen: d ? d.open : null,
+        card: a.dataset.sclItem, cardTop: Math.round(a.getBoundingClientRect().top) }));
+    }); });
   }
   app.addEventListener('error', function (e) { var img = e.target; if (img && img.matches && img.matches('[data-scl-img]')) img.parentNode.replaceChild(Object.assign(document.createElement('span'), { className: 'scl-photo-none', innerHTML: icon('package') + '사진 준비 중' }), img); }, true);
   function start() {
@@ -95,11 +105,33 @@
     D.list(true).then(function (data) {
       items = data.items; state = 'ready';
       var saved = null; try { saved = JSON.parse(store(KEY_VIEW) || 'null'); } catch (e) { saved = null; }
-      if (saved && saved.url === location.search && saved.shown > PAGE) shown = saved.shown;
+      var same = saved && saved.url === location.search;
+      if (same && saved.shown > PAGE) shown = saved.shown;
+      if (same && typeof saved.filterOpen === 'boolean') filterOpen = saved.filterOpen;
       store(KEY_URL, 'supercomputers.html' + location.search);
       render();
-      if (saved && saved.url === location.search && saved.y > 0) window.scrollTo(0, saved.y);
+      if (same) restore(saved);
     }, function () { state = 'error'; render(); });
+  }
+  // 누른 카드가 여전히 목록에 있으면 그 카드를 떠날 때와 같은 화면 높이에 둔다. 결과가 바뀌어 카드가 없으면 남긴 스크롤 높이로,
+  // 그 높이가 목록보다 길면 목록 끝으로 간다(없는 카드를 지어내지 않는다).
+  function restoreOnce(saved) {
+    var card = saved.card ? app.querySelector('[data-scl-item="' + String(saved.card).replace(/[^0-9]/g, '') + '"]') : null;
+    if (card && typeof saved.cardTop === 'number') window.scrollTo(0, Math.max(0, card.getBoundingClientRect().top + window.scrollY - saved.cardTop));
+    else if (saved.y > 0) window.scrollTo(0, saved.y);
+    return Math.round(window.scrollY);
+  }
+  // 그린 직후 한 번, 그 뒤 2초 동안 머리글·글꼴·사진 자리 등 늦은 배치 변화가 있을 때마다 다시 맞춘다.
+  // 손님이 직접 스크롤(휠·터치·키·누름)하면 바로 멈춘다 — 브라우저의 자동 스크롤 보정은 손님 동작으로 치지 않는다.
+  function restore(saved) {
+    var stopped = false, ro = null, evs = ['wheel', 'touchstart', 'keydown', 'mousedown'];
+    function stop() { if (stopped) return; stopped = true; if (ro) ro.disconnect(); evs.forEach(function (n) { window.removeEventListener(n, stop, true); }); }
+    function again() { if (!stopped) restoreOnce(saved); }
+    evs.forEach(function (n) { window.addEventListener(n, stop, { capture: true, passive: true }); });
+    restoreOnce(saved);
+    if (window.ResizeObserver) { ro = new ResizeObserver(again); ro.observe(document.body); }
+    [120, 400, 900, 1500].forEach(function (ms) { setTimeout(again, ms); });
+    setTimeout(stop, 2000);
   }
   window.addEventListener('pageshow', function (e) { if (e.persisted) start(); });
   start();

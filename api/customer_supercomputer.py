@@ -75,7 +75,8 @@ def derive(name, maker):
     m = _GB.search(name)
     out['memory'] = m.group(1) + 'GB' if m else None
     if _GB10.search(name):
-        out.update(accelerator='NVIDIA GB10', processor='20코어 ARM 기반 CPU', os='DGX OS', architecture='ARM',
+        # 칩(GB10)이 정하는 값만 채운다. 운영체제·보증·지원 범위는 상품명으로 알 수 없어 비워 둔다(«확인 필요»).
+        out.update(accelerator='NVIDIA GB10', processor='20코어 ARM 기반 CPU', architecture='ARM',
                    memory=out['memory'] or '128GB')
     return out
 
@@ -101,6 +102,8 @@ def item(r, with_detail=False) -> dict:
     price, state = _state(r)
     auto = derive(r['product_name'], r.get('p_maker')) if r['display_name'] is None else {}
     v = lambda k: r[k] or auto.get(k) or None
+    # 상품명에서 읽어 채운 값(표시 정보에 직접 적은 값이 아님) — 화면은 «상품명 기준»으로 밝힌다(X01 2026-10-20).
+    derived = [k for k in ('accelerator', 'processor', 'memory', 'storage', 'architecture') if not r[k] and auto.get(k)]
     out = {
         'product_code': r['product_code'],
         'name': r['display_name'] or _clean_name(r['product_name']),
@@ -113,6 +116,7 @@ def item(r, with_detail=False) -> dict:
         'storage': v('storage'),
         'os': v('os'),
         'architecture': v('architecture'),
+        'derived': derived,
         'model_group': r['model_group'] or None,
         'model_label': r['model_label'] or None,
         'featured_rank': r['featured_rank'],
