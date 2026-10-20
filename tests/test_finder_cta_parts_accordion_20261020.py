@@ -60,7 +60,7 @@ def test_parts_rows_are_compact_and_open_one_at_a_time():
 def test_pages_load_new_versions():
     for page in ("index.html", "review-flows.html"):
         t = read(page)
-        for a in ("home-carousel.css?v=20261020-cta1", "home-carousel.js?v=20261020-cta1",
+        for a in ("home-carousel.css?v=20261020-edge1", "home-carousel.js?v=20261020-edge1",
                   "configuration-concept.css?v=20261020-acc1", "configuration-concept.js?v=20261020-acc1",
                   "core.js?v=20261020-logo3", "header-ui.js?v=20261020-logo2"):
             assert a in t, (page, a)

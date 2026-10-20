@@ -81,6 +81,13 @@
 @media(min-width:601px) and (max-width:800px){.hc-supercomputer .hc-copy{padding-left:40px}.hc-supercomputer .hc-image{object-position:center bottom}}
 @media(max-width:370px){.hc-supercomputer .hc-copy{padding-inline:19px}.hc-supercomputer .hc-copy h2{font-size:31px}}
 
+/* 2026-10-20 승인 「배너 양옆 배경 확장」 -- stage 높이만, 장식 층(클릭·포커스 통과). 모바일은 배너가 화면을 채우므로 없음. */
+.hc-carousel{position:relative}
+.hc-edge{position:absolute;top:0;left:0;width:100%;height:470px;pointer-events:none;overflow:hidden}
+.hc-edge-tone{position:absolute;inset:0;opacity:0;transition:opacity 600ms ease}
+.hc-edge-tone[data-active]{opacity:1}
+@media(prefers-reduced-motion:reduce){.hc-edge-tone{transition:none}}
+@media(max-width:800px){.hc-edge{display:none}}
 /* 2026-10-20 approved AI finder CTA (option 3 + moving bubbles). Replaces the small .hc-chat entry in place.
    Scoped to .hc-finder; PC/ribbon stay still, only the two bubbles pop and rise (6s loop, 3s apart). */
 .hc-chat.hc-finder{display:grid;grid-template-columns:45% 55%;align-items:center;gap:0;position:relative;margin-top:14px;min-height:356px;padding:34px 30px 32px 50px;background:#fcfbff;border:1px solid #e1d6ff;border-radius:18px;overflow:hidden;box-shadow:0 5px 25px #6b4ce408;font-size:16px;color:#141a2a;line-height:1.5}
