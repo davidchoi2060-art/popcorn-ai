@@ -82,8 +82,8 @@
     var faq = Array.isArray(info.faq) && info.faq.length ? info.faq : GENERIC_FAQ;
     var envHtml = env && env.text ? '<div class="sc-environment-copy"><span class="sc-eyebrow">BUILT FOR LOCAL AI</span><h2>' + (Array.isArray(env.title) ? env.title.map(h).join('<br>') : h(env.title || '사용 환경')) + '</h2><p>' + h(env.text) + '</p>' + (Array.isArray(env.chips) && env.chips.length ? '<div class="sc-os-chips">' + env.chips.map(function (c) { return '<span>' + h(c) + '</span>'; }).join('') + '</div>' : '') + '</div>'
       : '<div class="sc-environment-copy"><span class="sc-eyebrow">BEFORE YOU BUY</span><h2>사용할 프로그램부터<br>함께 확인해요.</h2><p>운영체제·아키텍처와 사용하려는 모델·프로그램의 지원 여부는 문의에서 먼저 확인해 주세요.</p></div>';
-    return '<nav class="sc-section-nav" aria-label="상품 상세 메뉴"><a href="#sc-usecases">활용 분야</a><a href="#sc-specs">제품 사양</a><a href="#sc-environment">사용 환경</a><a href="#sc-faq">자주 묻는 질문</a></nav>' +
-      '<section class="sc-usecases sc-section" id="sc-usecases"><div class="sc-section-heading"><span class="sc-eyebrow">YOUR AI, ON YOUR DESK</span><h2>AI를 직접 다루는 분을 위해.</h2></div><div class="sc-usecase-grid"><article><span class="sc-usecase-icon">' + icon('code') + '</span><span class="sc-usecase-number">01</span><h3>로컬 AI 실행</h3><p>내 장비에서 AI 모델을 실행하고 활용 환경을 살펴보세요.</p></article><article><span class="sc-usecase-icon">' + icon('cpu') + '</span><span class="sc-usecase-number">02</span><h3>AI 개발·실험</h3><p>모델과 개발 도구를 연결해 새로운 아이디어를 구현하세요.</p></article><article><span class="sc-usecase-icon">' + icon('file-text') + '</span><span class="sc-usecase-number">03</span><h3>업무 AI 도입 검토</h3><p>문서 검색과 지식 활용에 필요한 설치 환경을 함께 검토하세요.</p></article></div></section>' +
+    return '<nav class="sc-section-nav" aria-label="상품 상세 메뉴"><a href="#sc-usecases">활용 예시</a><a href="#sc-specs">제품 사양</a><a href="#sc-environment">사용 환경</a><a href="#sc-faq">자주 묻는 질문</a></nav>' +
+      (P.llmExamples ? P.llmExamples.section(p, route('adoption')) : '<section class="sc-usecases sc-section" id="sc-usecases"><div class="sc-section-heading"><span class="sc-eyebrow">YOUR AI, ON YOUR DESK</span><h2>AI를 직접 다루는 분을 위해.</h2></div><div class="sc-usecase-grid"><article><span class="sc-usecase-icon">' + icon('code') + '</span><span class="sc-usecase-number">01</span><h3>로컬 AI 실행</h3><p>내 장비에서 AI 모델을 실행하고 활용 환경을 살펴보세요.</p></article><article><span class="sc-usecase-icon">' + icon('cpu') + '</span><span class="sc-usecase-number">02</span><h3>AI 개발·실험</h3><p>모델과 개발 도구를 연결해 새로운 아이디어를 구현하세요.</p></article><article><span class="sc-usecase-icon">' + icon('file-text') + '</span><span class="sc-usecase-number">03</span><h3>업무 AI 도입 검토</h3><p>문서 검색과 지식 활용에 필요한 설치 환경을 함께 검토하세요.</p></article></div></section>') +
       '<section class="sc-section" id="sc-specs"><div class="sc-section-heading"><span class="sc-eyebrow">SPECIFICATIONS</span><h2>사양을 한눈에.</h2></div><details class="sc-spec-panel" open><summary><span>' + icon('cpu') + '<strong>' + h(model) + '제품 사양</strong></span><span class="sc-detail-caret">접기·펼치기 ' + icon('caret-down') + '</span></summary><dl class="sc-spec-table">' + specRows(p).map(function (r) { return '<div><dt>' + h(r[0]) + '</dt><dd>' + h(r[1]) + '</dd></div>'; }).join('') + '</dl></details></section>' +
       connections(p) +
       '<section class="sc-section sc-environment" id="sc-environment">' + envHtml + scope() + '</section>' +
@@ -105,6 +105,7 @@
     document.title = (p ? p.name + (p.modelLabel && p.models.length > 1 ? ' · ' + p.modelLabel : '') : 'AI 슈퍼컴퓨터') + ' | 팝콘AI';
     P.bindShell();
     if (fail) return;
+    if (P.llmExamples) P.llmExamples.bind(app);
     app.querySelectorAll('[name="sc-model"]').forEach(function (input) {
       input.addEventListener('change', function () {
         id = input.value;
