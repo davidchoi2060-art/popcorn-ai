@@ -93,7 +93,6 @@ from sqlalchemy import text
 from . import game_copy as GC
 from .db import engine
 from . import sold_reco as SOLD
-from . import talk_rules as TR
 from . import reco_explore as EXPLORE
 from . import customer_pc_offer as _PC_OFFER
 
@@ -773,9 +772,8 @@ def _sold_usages(state_raw: dict):
         vocab = load_vocab(conn)
         state, _ = validate_state(state_raw, vocab)
     game_usages = [u for u in state.usages if is_game_usage(u)]
-    named = bool(state.game and state.game.names)
     game_grade = state.game.grade if (game_usages and state.game) else None
-    sold_games = game_usages if (game_grade is not None or not named) else []
+    sold_games = game_usages if (game_grade is not None or SOLD.game_names_ok(state, vocab)) else []
     others = [u for u in state.usages if not is_game_usage(u)]
     return state, sold_games, others, vocab
 
@@ -808,8 +806,8 @@ def sold_card_items(state_raw: dict, text_raw: str | None = None) -> list[dict]:
     state, explore = _explore_input(RecommendBody(state=state_raw, text=(text_raw or "")[:300] or None), state, [])
     game_usages = [u for u in state.usages if is_game_usage(u)]
     game_grade = state.game.grade if (game_usages and state.game) else None
-    # recommend() 와 같은 나눔 -- 장르 통칭만 있으면 이름 없는 게임으로 본다(TR.unnamed_game).
-    sold_games = game_usages if (game_grade is not None or TR.unnamed_game(state)) else []
+    # recommend() 와 같은 나눔 -- 이름 없는 게임·캐주얼 낱말·웹보드 게임은 등급 없이도 추천한다(SOLD.game_names_ok).
+    sold_games = game_usages if (game_grade is not None or SOLD.game_names_ok(state, vocab)) else []
     others = [u for u in state.usages if not is_game_usage(u)]
     sets = SOLD.card_sets(state, sold_games, others, notes, vocab, explore)
     return [dict(it, usage_grid=cs.get("usage_grid")) for cs in sets if cs.get("kind") == "sold"
@@ -902,9 +900,9 @@ def recommend(body: RecommendBody):
             # needs 의 game.grade 는 어느 쪽이든 그대로.
             # 2026-10-11 상담 주고받기: 말한 조건 · 더 싸게/더 높게(api/reco_explore). state 는 바꾸지 않는다.
             state, explore = _explore_input(body, state, talk_notes)
-            # 장르 통칭(「스팀 인디(통칭)」)은 실제 게임 이름으로 세지 않는다 -- 상담(talk)과 같은 판정(TR.unnamed_game).
-            named = not TR.unnamed_game(state)
-            sold_games = game_usages if (game_grade is not None or not named) else []
+            # 장르 통칭(「스팀 인디(통칭)」)은 실제 게임 이름으로 세지 않는다 -- 상담(talk)과 같은 판정(talk_rules.unnamed_game).
+            # 「캐주얼 게임」처럼 부하만 말한 낱말·웹보드 게임도 등급 없이 추천한다(2026-10-20 G01 -- sold_reco.game_names_ok).
+            sold_games = game_usages if (game_grade is not None or SOLD.game_names_ok(state, vocab)) else []
             others = [u for u in state.usages if not is_game_usage(u)]
             card_sets.extend(SOLD.card_sets(state, sold_games, others, notes, vocab, explore))
             if sold_games:

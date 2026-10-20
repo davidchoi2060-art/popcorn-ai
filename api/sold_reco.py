@@ -16,8 +16,11 @@
               (수준이 낮거나, 다음 수준까지 못 채운 항목이 추천 구성보다 적지 않을 때). 없으면 추천 1장
               ※ 2026-10-10 조정: 예산 안 상품이 모두 같은 수준이면 예전 규칙은 가장 싼 1대만
                 남겼다(「영상 편집 300만원」→158만원 1장 · 「배그 200만원」도 같은 1장).
-  예산 없음   알뜰 구성 = 최소 수준을 충족하는 최저가
-              추천 구성 = 한 단계 위 수준의 최저가(없으면 앞의 1장이 추천 구성)
+  예산 없음   추천 구성 = 최소 수준을 충족하는 최저가(공개 승인 우선) 한 장. 「한 단계 위」·「더 높은 사양」을
+              스스로 채우지 않는다 -- 예산을 말하지 않은 것은 무제한 지출 의사가 아니다(2026-10-20 대표 신고 G01:
+              「캐주얼 게임용」에 162만·262만·322만원). 더 높은 사양은 고객이 「더 좋게」를 누르거나 말할 때만.
+  가벼운 수요  캐주얼 수준(게임 rank 1)·웹보드 게임은 예산이 있어도 상한을 채우지 않는다 -- 예산 안에서 최소 수준을
+              충족하는 최저가 한 장(공개 승인 우선). 「더 높은 사양」을 붙이지 않는다(같은 G01).
   예산 안에 없음  추천 카드 없이 「예산 안 상품 없음」 + 조건을 충족하는 최저가 상품 1개를 참고로
               (over_budget=true) — 고객이 얼마부터 되는지 알 수 있게
   고객 공개 승인 우선 (2026-10-09 조정 결정): 위 규칙이 정한 후보 안에서만, 고객 공개 승인된
@@ -50,6 +53,7 @@ from .db import engine
 from .product_name import card_name, match_storage_shorthand   # 카드 이름에서 광고 문구를 뗀다(원천은 그대로)
 from . import reco_explore as X
 from .talk_schema import match_game
+from .talk_rules import unnamed_game
 
 log = logging.getLogger("sold_reco")
 
@@ -81,6 +85,42 @@ PREMIUM_STEP = 1.10
 # 예산이 있으면 그 안에서 가장 높은 사양을, 없으면 예산의 이 배까지에서 가장 싼 높은 사양을 보여 준다.
 PREMIUM_OVER_X = 1.3
 MAX_UPGRADE_HINTS = 2
+
+# 웹보드·가벼운 캐주얼(2026-10-20 대표 신고 G01 「한게임 포커용」에 RTX 5060 162만원). 이런 게임은 우리 게임 목록
+# (games·game_load_grades)에 없어 등급을 모르고, 예전에는 이름을 버린 뒤 FHD 게임 수준(외장 그래픽)으로 찾았다.
+# 브라우저·가벼운 클라이언트로 도는 장르라 게임 그래픽 기준이 아니라 사무용 기본(문서·웹 수준) 기준으로 찾는다.
+# 장르 낱말만 본다 -- 게임 목록에 있는 이름(match_game 이 찾는 것)은 여기서 판단하지 않는다.
+LIGHT_GAME = re.compile(r"포커|홀덤|고스톱|맞고|섯다|바둑|장기|체스|오목|카드\s*게임|보드\s*게임|웹\s*게임|"
+                        r"플래시\s*게임|브라우저\s*게임|애니팡|솔리테어|지뢰\s*찾기|테트리스|한게임|피망")
+LIGHT_GAME_USAGE, LIGHT_GAME_RANK = "사무용", 1
+# 수요 근거 -- 무엇을 기준으로 찾았는지 상담(AI)과 화면이 같은 문장으로 말한다(지어내지 않게 서버가 준다).
+DEMAND_LIGHT = "웹보드·가벼운 게임은 내장 그래픽으로도 돌아가는 사무용 기본 사양을 기준으로 찾았어요."
+DEMAND_CASUAL = "캐주얼 게임 수준(롤·발로란트 같은 가벼운 게임 FHD 60fps 안팎)을 기준으로 가장 알맞은 가격부터 찾았어요."
+DEMAND_CASUAL_ASK = ("어떤 게임인지 알려 주시면 더 정확히 맞출게요. 지금은 가벼운 캐주얼 게임 기준으로 찾았어요.")
+DEMAND_HIGH_FPS = "144Hz 이상 고주사율 목표라 캐주얼 수준보다 한 단계 위(FHD 게임 수준)를 기준으로 찾았어요."
+DEMAND_NO_BUDGET = "예산을 말씀하지 않으셔서 조건을 충족하는 가장 알맞은 가격의 PC부터 보여 드려요. 더 높은 사양은 요청하실 때 따로 보여 드려요."
+
+
+def light_game_names(names, vocab) -> bool:
+    """고객이 말한 게임이 «전부» 웹보드·가벼운 장르이고, 우리 게임 목록에 없는 이름인가."""
+    names = [n for n in (names or []) if isinstance(n, str) and n.strip()]
+    if not names:
+        return False
+    return all(LIGHT_GAME.search(n) and (vocab is None or match_game(n, vocab) is None) for n in names)
+
+
+def game_names_ok(state, vocab=None) -> bool:
+    """등급이 없어도 판매 추천을 낼 수 있는 게임 이름인가 -- 이름이 없거나(장르 통칭 포함), 「캐주얼 게임」처럼
+    부하만 말했거나, 전부 웹보드·가벼운 장르일 때(G01). 그 밖의 «목록 밖 게임 이름»은 예전처럼 보류한다."""
+    g = getattr(state, "game", None)
+    names = list(g.names) if g else []
+    return unnamed_game(state) or casual_unnamed(names, None) or light_game_state(state, vocab)
+
+
+def light_game_state(state, vocab=None) -> bool:
+    """게임 용도이고 말한 게임이 전부 웹보드·가벼운 장르인가 -- grid_public 이 «등급 없는 이름»이라도 추천을 막지 않게."""
+    g = getattr(state, "game", None)
+    return bool(g and light_game_names(g.names, vocab))
 
 # 「다음 수준」 안내 — 고객 문구는 Codex 확정본 그대로(PR #2 댓글 6057234341, 2026-10-08).
 # blocked 원문은 tools/product_fit.check() 가 COND_KO 의 고정 틀로만 만든다. 그 틀 전체와
@@ -233,9 +273,29 @@ def _prefer(cands, preferred):
     return min(cands, key=lambda p: (p["code"] not in preferred, p["price"]))
 
 
+LIGHT_ABOVE_NOTE = ("이 수준에 딱 맞는 공개 구성 PC가 지금 없어, 한 단계 위 사양 중 가장 알맞은 가격의 PC를 보여 드려요. "
+                    "필요한 사양보다 높은 구성입니다.")
+
+
+def _light_pick(cands, usage, min_rank, levels_by, budget_won, bound, preferred) -> dict:
+    """가벼운 수요 한 장 -- 최소 수준과 «같은» 수준에서 가장 알맞은 가격(공개 승인 우선). 그 수준이 없을 때만 위 수준 중
+    가장 싼 것을 보이고, 그 사실을 숨기지 않는다(G01 F -- 저사양으로 충분하다며 고가 PC를 조용히 끼워 넣지 않는다)."""
+    # 「딱 맞는」 수준은 게임 쪽도 캐주얼(1) 이하일 때만이다 -- 웹보드 게임은 사무용 기준이라, 외장 그래픽 게임 PC(게임 수준 2↑)도
+    # 사무용 수준은 1로 같아 그대로 두면 「알맞은 수준」으로 보인다(G01 F).
+    exact = [p for p in cands if p["fit"][usage]["rank"] == min_rank
+             and (p["fit"].get("게임") or {}).get("rank", 0) <= 1]
+    chosen = _prefer(exact or cands, preferred)
+    out = {"items": [_item(chosen, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
+    if not exact:
+        out["demand_note"] = LIGHT_ABOVE_NOTE
+    return out
+
+
 def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
-         levels, products, preferred=frozenset()) -> dict:
-    """한 용도 -> {items[≤2], empty_reason, empty_note}."""
+         levels, products, preferred=frozenset(), light: bool = False) -> dict:
+    """한 용도 -> {items[≤2], empty_reason, empty_note}.
+
+    light(가벼운 수요) 이거나 예산이 없으면 최소 수준을 충족하는 가장 알맞은 가격 한 장만 -- 위 수준을 스스로 얹지 않는다."""
     levels_by = {(l["usage"], l["level"]): l for l in levels}
     ok = sorted((p for p in products.values()
                  if p["price"] is not None and p["fit"].get(usage, {}).get("rank", 0) >= min_rank),
@@ -244,13 +304,22 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
     if not ok:
         return {"items": [], "empty_reason": "보유 상품 없음",
                 "empty_note": "이 작업 수준을 충족하는 판매 상품이 아직 없습니다."}
+    if light and preferred:
+        # 가벼운 수요의 «싼 쪽» 카드는 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품을 끼워 넣지 않는다).
+        # 승인 목록을 읽지 못했으면(빈 집합) 예전 규칙 그대로다.
+        ok = [p for p in ok if p["code"] in preferred]
+        if not ok:
+            return {"items": [], "empty_reason": "공개 구성 상품 없음",
+                    "empty_note": "이 조건을 충족하는 공개 구성 PC가 지금 없습니다. 조건을 바꾸거나 입고를 기다려 주세요."}
 
     if budget_won is None or bound == "이상":
         pool = [p for p in ok if budget_won is None or p["price"] >= budget_won] or ok
         base = rank(pool[0])
         first = _prefer([p for p in pool if rank(p) == base], preferred)
         up = [p for p in pool if rank(p) > base]
-        if not up:
+        if light:
+            return _light_pick(pool, usage, min_rank, levels_by, budget_won, bound, preferred)
+        if not up or budget_won is None:
             return {"items": [_item(first, usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
         return {"items": [_item(first, usage, levels_by, TAG_VALUE, budget_won, bound),
                           _item(_prefer(up, preferred), usage, levels_by, TAG_RECOMMENDED, budget_won, bound)]}
@@ -263,6 +332,9 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
         return {"items": [_item(ok[0], usage, levels_by, TAG_REFERENCE, budget_won, bound)],
                 "empty_reason": "예산 안 상품 없음",
                 "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
+    if light:
+        # 가벼운 수요는 예산을 채우지 않는다 -- 예산 안에서 최소 수준을 충족하는 가장 알맞은 가격(공개 승인 우선).
+        return _light_pick(within, usage, min_rank, levels_by, budget_won, bound, preferred)
     top = max(rank(p) for p in within)
     gap = lambda p: len(p["fit"][usage].get("blocked") or [])  # noqa: E731 - 다음 수준까지 못 채운 조건 수
     best = min((p for p in within if rank(p) == top),
@@ -346,11 +418,14 @@ def _cheapest(usage, min_rank, levels, products, preferred, min_ok) -> dict:
     return {"items": [_item(first, usage, levels_by, TAG_VALUE if more else TAG_RECOMMENDED, None, None)]}
 
 
-def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
+def _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=False):
     """한 용도의 카드 — 고객 추가 조건(wants)과 「더 싸게/더 좋게」(nav)를 반영한다."""
     min_ok = lambda p: p["price"] is not None and p["fit"].get(fu, {}).get("rank", 0) >= r  # noqa: E731
     kept, applied, unmet = X.apply_filters(list(products.values()), filters, min_ok)
     prods = {p["code"]: p for p in kept}
+    if light and preferred:
+        # 가벼운 수요는 «더 싸게»·«가장 싸게»까지 고객 공개 승인 구성 안에서만 고른다(G01 -- 미검증 저가 상품 금지).
+        prods = {c: p for c, p in prods.items() if c in preferred}
     budget, bound = state.budget_won, state.budget_bound
     anchor = products.get(ex.get("anchor_code")) if ex.get("anchor_code") is not None else None
     nav, nav_note = ex.get("nav"), None
@@ -393,8 +468,10 @@ def _explore_set(fu, r, state, levels, products, preferred, ex, filters):
         else:
             nav_note = X.NOTE_BETTER_NONE
     if res is None:
-        res = pick(fu, r, budget, bound, levels, prods, preferred)
-    if nav != X.CHEAPER:
+        res = pick(fu, r, budget, bound, levels, prods, preferred, light=light)
+    # 「더 높은 사양」은 고객이 「더 좋게」를 말했을 때, 또는 예산을 말한 무거운 용도에서만 붙인다(G01 -- 예산 없음·
+    # 가벼운 수요에 고가 카드를 스스로 얹지 않는다). 다음 선택지(has_better)는 그대로 열어 둔다.
+    if nav != X.CHEAPER and (nav == X.BETTER or (budget is not None and not light)):
         extra = premium_item(res, fu, r, budget if nav != X.BETTER else None,
                              bound if nav != X.BETTER else None, levels, prods, preferred)
         if extra is not None:
@@ -556,7 +633,11 @@ def _targets(state, game_usages, other_usages, levels, vocab, notes):
     # 사라졌다). 게임은 용도 중 가장 높은 사양을 요구하므로 첫 카드·안내 문장은 게임 기준으로 정한다.
     targets = []
     if game_usages:
-        targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes)))
+        if light_game_state(state, vocab):
+            notes.append(f"sold: light games {list(state.game.names)!r} -> {LIGHT_GAME_USAGE} rank {LIGHT_GAME_RANK}")
+            targets.append((game_usages[0], LIGHT_GAME_USAGE, LIGHT_GAME_RANK))
+        else:
+            targets.append((game_usages[0], "게임", game_min_rank(state.game, levels, vocab, notes, game_usages[0])))
     for u in other_usages:
         fu = fit_usage(u)
         if fu is None:
@@ -588,7 +669,19 @@ def _casual_games(levels, vocab, notes) -> set[str]:
     return out
 
 
-def game_min_rank(g, levels, vocab, notes) -> int:
+# 「캐주얼 게임」·「가벼운 게임」처럼 게임 이름이 아니라 부하만 말한 낱말(G01). 이름 칸에 들어와도 게임 이름으로 세지 않는다.
+CASUAL_WORDS = re.compile(r"^\s*(캐주얼|가벼운|저사양|라이트)\s*(한\s*)?(게임|겜)?\s*(용)?\s*$")
+
+
+def casual_unnamed(names, label: str | None) -> bool:
+    """게임 이름 없이 캐주얼(가벼운) 게임이라고만 했는가 -- 용도 라벨이나 이름 칸의 부하 낱말로 판단한다."""
+    real = [n for n in names or [] if isinstance(n, str) and n.strip()
+            and not CASUAL_WORDS.match(n) and "(통칭)" not in n]
+    said = bool(label and "캐주얼" in label) or any(isinstance(n, str) and CASUAL_WORDS.match(n) for n in names or [])
+    return not real and said
+
+
+def game_min_rank(g, levels, vocab, notes, label: str | None = None) -> int:
     """게임 최소 수준 rank — 고객이 말한 게임 중 가장 까다로운 쪽이 정한다.
 
     캐주얼(1)은 게임명이 하나 이상 있고 «전부» 캐주얼 대상 게임이며 해상도가 1080p 일 때만.
@@ -597,6 +690,9 @@ def game_min_rank(g, levels, vocab, notes) -> int:
     res = (g.resolution if g else None) or "1080p"
     r = GAME_RES_RANK.get(res, 2)
     names = list(g.names) if g else []
+    if res == "1080p" and casual_unnamed(names, label):
+        # 「캐주얼 게임용」처럼 게임 이름 없이 캐주얼이라고만 했으면 캐주얼 수준(G01 -- 예전에는 FHD 대작 수준이었다).
+        return 1
     if not names or res != "1080p":
         return r
     casual = _casual_games(levels, vocab, notes)
@@ -676,15 +772,33 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
             r = _uhd_rank(levels, fu, r)
         if fu != "게임":
             r = _heavy_rank(levels, fu, r, ex["wants"].get("heavy"))
+        light_game = fu == LIGHT_GAME_USAGE and r == LIGHT_GAME_RANK and label in game_usages
+        demand = []
+        if fu == "게임" and r == 1 and ex["wants"].get("high_fps"):
+            r = 2                               # 144Hz 이상 목표 -> FHD 게임 수준(G01 E)
+            demand.append(DEMAND_HIGH_FPS)
+        light = light_game or (fu == "게임" and r == 1)
+        if light_game:
+            demand.append(DEMAND_LIGHT)
+        elif fu == "게임" and r == 1:
+            names = list(state.game.names) if state.game else []
+            demand.append(DEMAND_CASUAL_ASK if casual_unnamed(names, label) or unnamed_game(state) else DEMAND_CASUAL)
+        if state.budget_won is None and ex.get("nav") != X.BETTER:
+            demand.append(DEMAND_NO_BUDGET)
         if (fu, r) in seen:
             continue
         seen.add((fu, r))
-        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters)
+        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=light)
+        if res.get("demand_note"):
+            demand.append(res["demand_note"])
         lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
         out.append({
             "usage": label, "usage_grid": fu, "kind": "sold",
             "min_level": lv["level"] if lv else None,
-            "min_level_work": lv["work"] if lv else None,
+            "min_level_work": ("웹보드·가벼운 게임(사무용 기본 사양 · 내장 그래픽 가능)" if light_game
+                               else lv["work"] if lv else None),
+            # 무엇을 기준으로 찾았는지(G01) -- 상담 AI 와 화면이 지어내지 않고 이 문장을 쓴다.
+            "demand": {"light": light, "notes": demand},
             "items": res["items"],
             "empty_reason": res.get("empty_reason"), "empty_note": res.get("empty_note"),
             "explore": res["explore"],

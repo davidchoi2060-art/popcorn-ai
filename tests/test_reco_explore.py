@@ -138,11 +138,15 @@ class SpectrumTest(unittest.TestCase):
                   products={c: PRODUCTS[c] for c in (2, 5)})[0]
         self.assertEqual(codes(cs), [(2, 'recommended')])
 
-    def test_no_budget_steps_up(self):
+    def test_no_budget_does_not_step_up_by_itself(self):
+        # 2026-10-20 대표 신고 G01: 예산을 말하지 않은 것은 무제한 지출 의사가 아니다. 예전에는 한 단계 위(263만)와
+        # 더 높은 사양(320만)을 스스로 얹었다. 이제 최소 수준을 충족하는 가장 알맞은 가격 한 장이고, 「더 좋게」는 열어 둔다.
         cs = sets(TalkState(**GAME))[0]
-        self.assertEqual(codes(cs), [(2, 'value'), (5, 'recommended'), (6, 'premium')])
-        prices = [i['price'] for i in cs['items']]
-        self.assertEqual(prices, sorted(prices))
+        self.assertEqual(codes(cs), [(2, 'recommended')])
+        self.assertTrue(cs['explore']['has_better'])
+        # 고객이 「더 좋게」를 말하면 그때 위 사양을 보여 준다.
+        cs = sets(TalkState(**GAME), explore={'wants': {}, 'nav': X.BETTER, 'anchor_code': 2})[0]
+        self.assertTrue(all(i['price'] > 1300000 for i in cs['items']))
 
     def test_higher_card_prefers_a_public_pc_with_photo(self):
         # 2026-10-11 개발 서버: 사진·소개 없는 PC가 「더 높은 사양」에 올랐다 — pick 과 같은 공개 승인 우선(#50).

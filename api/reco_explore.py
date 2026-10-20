@@ -27,7 +27,8 @@ from .talk_rules import _CPU as _CPU_MODEL, drop_current_pc, drop_monitor_count,
 log = logging.getLogger("reco_explore")
 
 CHEAPER, BETTER = "cheaper", "better"
-WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors", "units")
+WANT_KEYS = ("min_ram_gb", "min_ssd_gb", "gpu_model", "white", "silent", "monitor", "uhd", "heavy", "monitors", "units",
+             "high_fps")
 MAX_TEXT = 300
 
 # ── 고객 문장 읽기 ──────────────────────────────────────────────────────
@@ -56,6 +57,8 @@ _MULTI = re.compile(r"(\d{1,3})\s*대")
 _AGE_TAIL = re.compile(r"\s*(초반|중반|후반)")      # 「30대 후반」은 나이다
 _MULTI_WORD = re.compile(r"여러\s*대|대량|단체")
 _UHD = re.compile(r"4\s*k|uhd|4천", re.I)
+# 144Hz 이상 고주사율·고프레임 목표(2026-10-20 대표 신고 G01) -- 캐주얼 게임도 이 목표면 캐주얼 수준(60fps 기준)을 넘는다.
+_HIGH_FPS = re.compile(r"(?<!\d)(1[4-9]\d|[23]\d\d)\s*(hz|헤르츠|fps|프레임)|고주사율|고프레임|프레임\s*(최대|높게|많이)", re.I)
 # 고객이 «한 단계 위 작업»을 직접 말했으면 그 용도의 추천 기준표(product_fit_levels) 그 단계부터 고른다
 # (2026-10-11 사장님 비교 R25 「엑셀 대용량 파일 돌리는 회계 사무실 PC」: 설명은 램 32GB 를 말했는데 카드는
 # 램 8GB 1단계 PC 가 먼저 나왔다). 낱말은 기준표의 작업 설명(tools/product_fit.py)에 적힌 것만 쓴다 --
@@ -201,6 +204,8 @@ def extract(raw: str | None) -> dict:
         out["monitors"] = mons
     if _UHD.search(s):
         out["uhd"] = True
+    if _HIGH_FPS.search(s):
+        out["high_fps"] = True
     heavy = heavy_levels(s)
     if heavy:
         out["heavy"] = heavy
@@ -219,7 +224,7 @@ def clean_wants(raw) -> dict:
     g = raw.get("gpu_model")
     if isinstance(g, str) and re.fullmatch(r"(RTX|GTX|RX) \d{4}( Ti| SUPER| XT)?", g):
         out["gpu_model"] = g
-    for k in ("white", "silent", "monitor", "uhd"):
+    for k in ("white", "silent", "monitor", "uhd", "high_fps"):
         if raw.get(k) is True:
             out[k] = True
     n = raw.get("units")

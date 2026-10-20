@@ -228,9 +228,10 @@ class PickRuleTest(unittest.TestCase):
         self.assertEqual(res['empty_reason'], '예산 안 상품 없음')
         self.assertIs(res['items'][0]['over_budget'], True)
 
-    def test_no_budget_value_then_one_level_up(self):
+    def test_no_budget_does_not_add_one_level_up(self):
+        # 2026-10-20 대표 신고 G01: 예산 없음은 무제한이 아니다 -- 한 단계 위를 스스로 얹지 않는다.
         res = self.pick([self.p(1, 900000, 1), self.p(2, 1000000, 1), self.p(3, 1300000, 2)], None)
-        self.assertEqual(self.roles(res), [(1, '알뜰 구성', 'value'), (3, '추천 구성', 'recommended')])
+        self.assertEqual(self.roles(res), [(1, '추천 구성', 'recommended')])
 
     def test_no_budget_single_is_recommended(self):
         res = self.pick([self.p(1, 900000, 1), self.p(2, 1000000, 1)], None)
@@ -325,9 +326,10 @@ class PublicPreferenceTest(unittest.TestCase):
         self.assertEqual(self.roles(res), [(2, 'value'), (4, 'recommended')])
         self.assertLess(res['items'][0]['price'], res['items'][1]['price'])
 
-    def test_no_budget_prefers_public_at_each_card(self):
+    def test_no_budget_prefers_public_at_the_minimum_level(self):
+        # 예산 없음은 최소 수준 한 장(G01) -- 그 안에서는 여전히 공개 승인 구성을 먼저 고른다.
         res = self.pick(self.items(), None, preferred=frozenset({2, 4}))
-        self.assertEqual(self.roles(res), [(2, 'value'), (4, 'recommended')])
+        self.assertEqual(self.roles(res), [(2, 'recommended')])
 
     def test_reference_stays_cheapest_over_budget(self):
         res = self.pick(self.items(), 800000, preferred=frozenset({3}))

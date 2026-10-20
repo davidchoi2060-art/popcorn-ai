@@ -29,6 +29,10 @@
       "kind": "sold",
       "min_level": "FHD",
       "min_level_work": "FHD 게임",
+      "demand": {
+        "light": false,
+        "notes": []
+      },
       "items": [
         {
           "product_code": 1,
@@ -120,6 +124,10 @@
       "kind": "sold",
       "min_level": "기본",
       "min_level_work": "FHD 편집",
+      "demand": {
+        "light": false,
+        "notes": []
+      },
       "items": [
         {
           "product_code": 1,
