@@ -58,7 +58,26 @@ def offer_parts(body):
         yield x.get('slot'), x.get('name'), ph.get('state') == 'approved'
 
 
+def supercomputers():
+    """AI 슈퍼컴퓨터 목록 — 사진 유무와 판매가, 메인 하단 «낮은 가격순 2개» 선정 근거."""
+    import datetime
+    d = get('/api/customer/supercomputers')
+    items = d.get('items') or []
+    print(f"### AI 슈퍼컴퓨터 {len(items)}종 (조회 {datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')}, checked_at {d.get('checked_at')})")
+    print('```')
+    for x in items:
+        img = (x.get('images') or [{}])[0].get('src') or '-'
+        if img != '-':
+            img += ' ' + '/'.join(map(str, head(BASE + ('' if img.startswith('/') else '/mvp4/') + img)))
+        print(f"{x.get('product_code')}\t{x.get('sale_state')}\t{x.get('price')}\t{x.get('name')}\t{x.get('memory')}/{x.get('storage')}\t{img}")
+    sale = sorted((x for x in items if x.get('sale_state') == 'on_sale' and isinstance(x.get('price'), int) and x['price'] > 0),
+                  key=lambda x: (x['price'], x['product_code']))
+    print('cheapest2: ' + ' | '.join(f"{x['product_code']} {x['name']} {x['price']}" for x in sale[:2]))
+    print('```\n')
+
+
 def main():
+    supercomputers()
     items = get('/api/customer/pc-catalog').get('items') or []
     reg_gap, off_gap = collections.Counter(), collections.Counter()
     reg_n = reg_ph = off_n = off_ph = 0
