@@ -60,6 +60,11 @@
   // 목록·상세는 불러오는 중 화면을, 메인은 상품 줄 없이 먼저 그린다(빈 화면으로 기다리지 않게).
   var early = { catalog: 'loading', product: 'loading', component: 'loading', home: 'normal' }[screen];
   if (early) paint(early);
+  // AI로 PC 찾기는 상품 자료를 받은 뒤 그린다 — 그동안 빈 화면 대신 카테고리 로딩 1안(대화 그림·문구, 2026-10-20 대표).
+  else if (screen === 'chat' && P.categoryLoading) {
+    document.getElementById('app').innerHTML = P.shell('<div class="container cl-page">' + P.categoryLoading('chat', { skeleton: '<div class="cl-chat-skel" aria-hidden="true"><span class="cl-sk"></span><span class="cl-sk"></span></div>' }) + '</div>');
+    P.bindShell();
+  }
   P.live.loadCatalog().catch(function () { /* 상태는 stateAfterLoad 가 알린다 */ }).then(function () {
     return Promise.all(productIds().map(function (id) { return P.live.loadDetail(id); }));
   }).then(function () { paint(stateAfterLoad()); }, function () { paint(stateAfterLoad()); });

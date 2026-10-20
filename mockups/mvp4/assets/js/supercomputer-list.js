@@ -71,7 +71,8 @@
   }
   function render() {
     var body;
-    if (state !== 'ready') body = head(null) + message(state);
+    if (state === 'loading' && P.categoryLoading) body = head(null) + P.categoryLoading('supercomputer');   // 카테고리 로딩 1안(2026-10-20)
+    else if (state !== 'ready') body = head(null) + message(state);
     else if (!items.length) body = head(0) + message('none');
     else {
       var list = visible();
