@@ -1,0 +1,13 @@
+{
+ "C01-current.json": "693fcb5989cbb17a5ed8f92d892ee11d7a5506f4a0f44840082eb4544f026d83",
+ "C02-other-ranked-first.json": "1a44b24e1d8482149434876c22d3accce41109d7d7996993a9a5cee3d0ede57e",
+ "C03-no-ranks.json": "e29055d5bbdb91ad99f2991f267084df60f776193f6e8b6c1b8d57cb7f90076d",
+ "C04-same-ranks.json": "debb4bb9ebff36cf0ed24268efdcc79f3ebc691ce56cb701cb51d07b46608906",
+ "C05-no-dell.json": "6bd0ef084d76efa6b807eca486db495a0a4d4d10393649ae9957b893fa586b98",
+ "C06-dell-hidden.json": "86360844cb69e50cf28032a960a5c5fe0f8868f627b7a53cc0d1f002934f504b",
+ "C07-dell-stopped.json": "4fe7250acd8db5f470141ad06b9975d02d378e3605b6913bb76891f305a6d409",
+ "C08-empty.json": "a45a9b8f22cbae0ac3998eb409a3c066a23be8eee4a689772b3628846022fb18",
+ "C09-one-dell.json": "f370f43cf544179dee1610bbb15171582402715ed09dfcef2cb464765e34cfb1",
+ "C10-missing-profile.json": "49ee9a60739fc1c9c069336e9ffb7f81d8d5c3e43eb4de78368a78b0eae843a2",
+ "C11-price-unknown.json": "c7f0a79b18c7b2b7a9a7278415afcde5fce506f18aa0a87e822e54dc13b16f4c"
+}

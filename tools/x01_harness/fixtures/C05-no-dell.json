@@ -1,0 +1,179 @@
+{
+ "case": "C05-no-dell",
+ "purpose": "Dell GB10 이 카테고리에 없음(같은 GB10 칩 타사 + 비GB10 타사만)",
+ "expect": {
+  "ad_models": [],
+  "ad_cta": null,
+  "list": [
+   900001,
+   900003
+  ]
+ },
+ "input_rows": [
+  {
+   "product_code": 900001,
+   "product_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+   "p_maker": "ASUS",
+   "sale_price": 9000000,
+   "status": "판매중",
+   "display_name": null,
+   "maker": null,
+   "model_name": null,
+   "accelerator": null,
+   "processor": null,
+   "memory": null,
+   "storage": null,
+   "os": null,
+   "architecture": null,
+   "model_group": null,
+   "model_label": null,
+   "featured_rank": null,
+   "images": null,
+   "detail": null,
+   "has_explained_photo": false,
+   "visible": true
+  },
+  {
+   "product_code": 900003,
+   "product_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+   "p_maker": "팝콘",
+   "sale_price": 15000000,
+   "status": "판매중",
+   "display_name": null,
+   "maker": null,
+   "model_name": null,
+   "accelerator": null,
+   "processor": null,
+   "memory": null,
+   "storage": null,
+   "os": null,
+   "architecture": null,
+   "model_group": null,
+   "model_label": null,
+   "featured_rank": null,
+   "images": null,
+   "detail": null,
+   "has_explained_photo": false,
+   "visible": true
+  }
+ ],
+ "list": {
+  "ok": true,
+  "category": {
+   "key": "ai-supercomputer",
+   "name": "AI 슈퍼컴퓨터"
+  },
+  "items": [
+   {
+    "product_code": 900003,
+    "name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "official_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "maker": "팝콘",
+    "model_name": null,
+    "accelerator": null,
+    "processor": null,
+    "memory": "64GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": null,
+    "derived": [
+     "memory",
+     "storage"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 15000000,
+    "sale_state": "on_sale"
+   },
+   {
+    "product_code": 900001,
+    "name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "official_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "maker": "ASUS",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 9000000,
+    "sale_state": "on_sale"
+   }
+  ]
+ },
+ "detail": {
+  "900003": {
+   "ok": true,
+   "item": {
+    "product_code": 900003,
+    "name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "official_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "maker": "팝콘",
+    "model_name": null,
+    "accelerator": null,
+    "processor": null,
+    "memory": "64GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": null,
+    "derived": [
+     "memory",
+     "storage"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 15000000,
+    "sale_state": "on_sale",
+    "detail": {},
+    "models": []
+   }
+  },
+  "900001": {
+   "ok": true,
+   "item": {
+    "product_code": 900001,
+    "name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "official_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "maker": "ASUS",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 9000000,
+    "sale_state": "on_sale",
+    "detail": {},
+    "models": []
+   }
+  }
+ }
+}

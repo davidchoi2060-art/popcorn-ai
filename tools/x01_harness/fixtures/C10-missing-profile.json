@@ -1,0 +1,1013 @@
+{
+ "case": "C10-missing-profile",
+ "purpose": "표시 정보·사진이 없는 타사 3종(GB10 이름 · DGX Spark 이름 · 비GB10)",
+ "expect": {
+  "ad_models": [
+   129615,
+   129614
+  ],
+  "ad_cta": 129615,
+  "list": [
+   129615,
+   129614,
+   900001,
+   900002,
+   900003
+  ],
+  "details": {
+   "900001": {
+    "accelerator": "NVIDIA GB10",
+    "spec_accelerator": "NVIDIA GB10 (상품명 기준)",
+    "derived_note": true,
+    "os": "확인 필요",
+    "images": 0,
+    "models": 0,
+    "dell_content": false
+   },
+   "900002": {
+    "accelerator": "NVIDIA GB10",
+    "spec_accelerator": "NVIDIA GB10 (상품명 기준)",
+    "derived_note": true,
+    "os": "확인 필요",
+    "images": 0,
+    "models": 0,
+    "dell_content": false
+   },
+   "900003": {
+    "accelerator": null,
+    "spec_accelerator": "확인 필요",
+    "derived_note": true,
+    "processor": "확인 필요",
+    "os": "확인 필요",
+    "images": 0,
+    "models": 0,
+    "dell_content": false
+   }
+  }
+ },
+ "input_rows": [
+  {
+   "product_code": 129615,
+   "product_name": "DELL Pro Max GB10 (128GB, M.2 2TB)",
+   "p_maker": "DELL",
+   "sale_price": 12052100,
+   "status": "판매중",
+   "display_name": "Dell Pro Max GB10",
+   "maker": "Dell",
+   "model_name": "Pro Max GB10",
+   "accelerator": "NVIDIA GB10",
+   "processor": "20코어 ARM 기반 CPU",
+   "memory": "128GB",
+   "storage": "2TB",
+   "os": "DGX OS",
+   "architecture": "ARM",
+   "model_group": "dell-pro-max-gb10",
+   "model_label": "2TB",
+   "featured_rank": 1,
+   "images": [
+    {
+     "src": "assets/images/supercomputer/gb10-product.jpg",
+     "label": "전체 모습",
+     "alt": "Dell Pro Max GB10 본체"
+    },
+    {
+     "src": "assets/images/supercomputer/gb10-front-1600.webp",
+     "label": "전면",
+     "alt": "Dell Pro Max GB10 전면"
+    },
+    {
+     "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+     "label": "후면·연결 단자",
+     "alt": "Dell Pro Max GB10 후면 연결 단자"
+    }
+   ],
+   "detail": {
+    "brand_label": "DELL",
+    "short_name": "GB10",
+    "eyebrow": "DESKTOP AI SUPERCOMPUTER",
+    "lead": "AI 모델 실행·개발을 위한 완제품.",
+    "gallery_caption": [
+     "작은 공간에서 시작하는",
+     "나만의 AI 개발 환경."
+    ],
+    "model_note": "128GB 통합 메모리",
+    "facts": [
+     [
+      "cpu",
+      "AI 프로세서",
+      "NVIDIA GB10"
+     ],
+     [
+      "memory",
+      "통합 메모리",
+      "128GB"
+     ],
+     [
+      "hard-drive",
+      "SSD",
+      "2TB"
+     ],
+     [
+      "code",
+      "운영체제",
+      "DGX OS"
+     ]
+    ],
+    "spec_rows": [
+     [
+      "제품명",
+      "Dell Pro Max GB10"
+     ],
+     [
+      "AI 프로세서",
+      "NVIDIA GB10 Grace Blackwell"
+     ],
+     [
+      "CPU",
+      "20코어 ARM 기반 CPU"
+     ],
+     [
+      "메모리",
+      "128GB LPDDR5x 통합 메모리"
+     ],
+     [
+      "저장장치",
+      "M.2 NVMe SSD 2TB"
+     ],
+     [
+      "운영체제",
+      "NVIDIA DGX OS · Ubuntu 기반 Linux"
+     ],
+     [
+      "네트워크",
+      "10GbE · NVIDIA ConnectX-7"
+     ],
+     [
+      "판매 구성",
+      "선택한 사양의 완제품"
+     ]
+    ],
+    "connectivity": {
+     "title": "연결까지, 한눈에.",
+     "text": "제품 뒷면의 실제 연결 단자를 확인하세요.",
+     "labels": [
+      "10GbE",
+      "ConnectX-7"
+     ],
+     "image": {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "alt": "Dell GB10 후면, 네트워크 및 연결 단자",
+      "width": 1600,
+      "height": 562,
+      "caption": "Dell GB10 후면"
+     }
+    },
+    "environment": {
+     "title": [
+      "사용할 프로그램부터",
+      "함께 확인해요."
+     ],
+     "text": "DGX OS와 ARM 기반으로 작동하는 AI 전용 환경입니다. 사용하려는 모델과 프로그램의 지원 여부를 먼저 확인해 주세요.",
+     "chips": [
+      "Linux",
+      "ARM",
+      "NVIDIA DGX OS"
+     ]
+    },
+    "faq": [
+     [
+      "2TB와 4TB는 어떻게 선택하나요?",
+      "저장공간이 다른 두 완제품 모델입니다. 위에서 원하는 모델을 선택하면 해당 상품의 가격과 사양을 확인할 수 있습니다."
+     ],
+     [
+      "Windows 프로그램도 사용할 수 있나요?",
+      "이 제품은 Ubuntu 기반 DGX OS를 사용합니다. 일반 Windows 프로그램의 실행을 전제로 구매하지 마시고, 필요한 프로그램이 Linux와 ARM 환경을 지원하는지 먼저 확인해 주세요."
+     ],
+     [
+      "사내 문서 검색도 바로 제공되나요?",
+      "제품 구매는 하드웨어 기준입니다. 업무형 로컬 AI 패키지가 기본 포함되는 것은 아닙니다. 문서 검색 등 필요한 기능, 데이터 연결, 설치·교육 범위와 지원 가능 여부는 별도 상담에서 확인합니다."
+     ],
+     [
+      "어떤 AI 모델까지 사용할 수 있나요?",
+      "모델 종류와 정밀도, 문맥 길이, 동시 사용 인원에 따라 실행 조건과 응답 성능이 달라집니다. 도입 상담에 사용하려는 모델과 업무를 알려주시면 검토 범위를 안내합니다."
+     ],
+     [
+      "배송과 보증 조건은 어디서 확인하나요?",
+      "실제 공급 일정, 국내 공급 모델과 보증 조건은 견적 문의에서 확인할 수 있습니다."
+     ]
+    ]
+   },
+   "has_explained_photo": false,
+   "visible": true
+  },
+  {
+   "product_code": 129614,
+   "product_name": "DELL Pro Max GB10 (128GB, M.2 4TB)",
+   "p_maker": "DELL",
+   "sale_price": 14209400,
+   "status": "판매중",
+   "display_name": "Dell Pro Max GB10",
+   "maker": "Dell",
+   "model_name": "Pro Max GB10",
+   "accelerator": "NVIDIA GB10",
+   "processor": "20코어 ARM 기반 CPU",
+   "memory": "128GB",
+   "storage": "4TB",
+   "os": "DGX OS",
+   "architecture": "ARM",
+   "model_group": "dell-pro-max-gb10",
+   "model_label": "4TB",
+   "featured_rank": 2,
+   "images": [
+    {
+     "src": "assets/images/supercomputer/gb10-product.jpg",
+     "label": "전체 모습",
+     "alt": "Dell Pro Max GB10 본체"
+    },
+    {
+     "src": "assets/images/supercomputer/gb10-front-1600.webp",
+     "label": "전면",
+     "alt": "Dell Pro Max GB10 전면"
+    },
+    {
+     "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+     "label": "후면·연결 단자",
+     "alt": "Dell Pro Max GB10 후면 연결 단자"
+    }
+   ],
+   "detail": {
+    "brand_label": "DELL",
+    "short_name": "GB10",
+    "eyebrow": "DESKTOP AI SUPERCOMPUTER",
+    "lead": "AI 모델 실행·개발을 위한 완제품.",
+    "gallery_caption": [
+     "작은 공간에서 시작하는",
+     "나만의 AI 개발 환경."
+    ],
+    "model_note": "128GB 통합 메모리",
+    "facts": [
+     [
+      "cpu",
+      "AI 프로세서",
+      "NVIDIA GB10"
+     ],
+     [
+      "memory",
+      "통합 메모리",
+      "128GB"
+     ],
+     [
+      "hard-drive",
+      "SSD",
+      "4TB"
+     ],
+     [
+      "code",
+      "운영체제",
+      "DGX OS"
+     ]
+    ],
+    "spec_rows": [
+     [
+      "제품명",
+      "Dell Pro Max GB10"
+     ],
+     [
+      "AI 프로세서",
+      "NVIDIA GB10 Grace Blackwell"
+     ],
+     [
+      "CPU",
+      "20코어 ARM 기반 CPU"
+     ],
+     [
+      "메모리",
+      "128GB LPDDR5x 통합 메모리"
+     ],
+     [
+      "저장장치",
+      "M.2 NVMe SSD 4TB"
+     ],
+     [
+      "운영체제",
+      "NVIDIA DGX OS · Ubuntu 기반 Linux"
+     ],
+     [
+      "네트워크",
+      "10GbE · NVIDIA ConnectX-7"
+     ],
+     [
+      "판매 구성",
+      "선택한 사양의 완제품"
+     ]
+    ],
+    "connectivity": {
+     "title": "연결까지, 한눈에.",
+     "text": "제품 뒷면의 실제 연결 단자를 확인하세요.",
+     "labels": [
+      "10GbE",
+      "ConnectX-7"
+     ],
+     "image": {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "alt": "Dell GB10 후면, 네트워크 및 연결 단자",
+      "width": 1600,
+      "height": 562,
+      "caption": "Dell GB10 후면"
+     }
+    },
+    "environment": {
+     "title": [
+      "사용할 프로그램부터",
+      "함께 확인해요."
+     ],
+     "text": "DGX OS와 ARM 기반으로 작동하는 AI 전용 환경입니다. 사용하려는 모델과 프로그램의 지원 여부를 먼저 확인해 주세요.",
+     "chips": [
+      "Linux",
+      "ARM",
+      "NVIDIA DGX OS"
+     ]
+    },
+    "faq": [
+     [
+      "2TB와 4TB는 어떻게 선택하나요?",
+      "저장공간이 다른 두 완제품 모델입니다. 위에서 원하는 모델을 선택하면 해당 상품의 가격과 사양을 확인할 수 있습니다."
+     ],
+     [
+      "Windows 프로그램도 사용할 수 있나요?",
+      "이 제품은 Ubuntu 기반 DGX OS를 사용합니다. 일반 Windows 프로그램의 실행을 전제로 구매하지 마시고, 필요한 프로그램이 Linux와 ARM 환경을 지원하는지 먼저 확인해 주세요."
+     ],
+     [
+      "사내 문서 검색도 바로 제공되나요?",
+      "제품 구매는 하드웨어 기준입니다. 업무형 로컬 AI 패키지가 기본 포함되는 것은 아닙니다. 문서 검색 등 필요한 기능, 데이터 연결, 설치·교육 범위와 지원 가능 여부는 별도 상담에서 확인합니다."
+     ],
+     [
+      "어떤 AI 모델까지 사용할 수 있나요?",
+      "모델 종류와 정밀도, 문맥 길이, 동시 사용 인원에 따라 실행 조건과 응답 성능이 달라집니다. 도입 상담에 사용하려는 모델과 업무를 알려주시면 검토 범위를 안내합니다."
+     ],
+     [
+      "배송과 보증 조건은 어디서 확인하나요?",
+      "실제 공급 일정, 국내 공급 모델과 보증 조건은 견적 문의에서 확인할 수 있습니다."
+     ]
+    ]
+   },
+   "has_explained_photo": false,
+   "visible": true
+  },
+  {
+   "product_code": 900001,
+   "product_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+   "p_maker": "ASUS",
+   "sale_price": 9000000,
+   "status": "판매중",
+   "display_name": null,
+   "maker": null,
+   "model_name": null,
+   "accelerator": null,
+   "processor": null,
+   "memory": null,
+   "storage": null,
+   "os": null,
+   "architecture": null,
+   "model_group": null,
+   "model_label": null,
+   "featured_rank": null,
+   "images": null,
+   "detail": null,
+   "has_explained_photo": false,
+   "visible": true
+  },
+  {
+   "product_code": 900002,
+   "product_name": "[테스트] 미니 AI PC [128GB/2TB NVMe] NVIDIA DGX Spark기반",
+   "p_maker": "TESTMAKER",
+   "sale_price": 8000000,
+   "status": "판매중",
+   "display_name": null,
+   "maker": null,
+   "model_name": null,
+   "accelerator": null,
+   "processor": null,
+   "memory": null,
+   "storage": null,
+   "os": null,
+   "architecture": null,
+   "model_group": null,
+   "model_label": null,
+   "featured_rank": null,
+   "images": null,
+   "detail": null,
+   "has_explained_photo": false,
+   "visible": true
+  },
+  {
+   "product_code": 900003,
+   "product_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+   "p_maker": "팝콘",
+   "sale_price": 15000000,
+   "status": "판매중",
+   "display_name": null,
+   "maker": null,
+   "model_name": null,
+   "accelerator": null,
+   "processor": null,
+   "memory": null,
+   "storage": null,
+   "os": null,
+   "architecture": null,
+   "model_group": null,
+   "model_label": null,
+   "featured_rank": null,
+   "images": null,
+   "detail": null,
+   "has_explained_photo": false,
+   "visible": true
+  }
+ ],
+ "list": {
+  "ok": true,
+  "category": {
+   "key": "ai-supercomputer",
+   "name": "AI 슈퍼컴퓨터"
+  },
+  "items": [
+   {
+    "product_code": 129615,
+    "name": "Dell Pro Max GB10",
+    "official_name": "DELL Pro Max GB10 (128GB, M.2 2TB)",
+    "maker": "Dell",
+    "model_name": "Pro Max GB10",
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "2TB",
+    "os": "DGX OS",
+    "architecture": "ARM",
+    "derived": [],
+    "model_group": "dell-pro-max-gb10",
+    "model_label": "2TB",
+    "featured_rank": 1,
+    "images": [
+     {
+      "src": "assets/images/supercomputer/gb10-product.jpg",
+      "label": "전체 모습",
+      "alt": "Dell Pro Max GB10 본체"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-front-1600.webp",
+      "label": "전면",
+      "alt": "Dell Pro Max GB10 전면"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "label": "후면·연결 단자",
+      "alt": "Dell Pro Max GB10 후면 연결 단자"
+     }
+    ],
+    "price": 12052100,
+    "sale_state": "on_sale"
+   },
+   {
+    "product_code": 129614,
+    "name": "Dell Pro Max GB10",
+    "official_name": "DELL Pro Max GB10 (128GB, M.2 4TB)",
+    "maker": "Dell",
+    "model_name": "Pro Max GB10",
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": "DGX OS",
+    "architecture": "ARM",
+    "derived": [],
+    "model_group": "dell-pro-max-gb10",
+    "model_label": "4TB",
+    "featured_rank": 2,
+    "images": [
+     {
+      "src": "assets/images/supercomputer/gb10-product.jpg",
+      "label": "전체 모습",
+      "alt": "Dell Pro Max GB10 본체"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-front-1600.webp",
+      "label": "전면",
+      "alt": "Dell Pro Max GB10 전면"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "label": "후면·연결 단자",
+      "alt": "Dell Pro Max GB10 후면 연결 단자"
+     }
+    ],
+    "price": 14209400,
+    "sale_state": "on_sale"
+   },
+   {
+    "product_code": 900003,
+    "name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "official_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "maker": "팝콘",
+    "model_name": null,
+    "accelerator": null,
+    "processor": null,
+    "memory": "64GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": null,
+    "derived": [
+     "memory",
+     "storage"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 15000000,
+    "sale_state": "on_sale"
+   },
+   {
+    "product_code": 900002,
+    "name": "[테스트] 미니 AI PC [128GB/2TB NVMe] NVIDIA DGX Spark기반",
+    "official_name": "[테스트] 미니 AI PC [128GB/2TB NVMe] NVIDIA DGX Spark기반",
+    "maker": "TESTMAKER",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 8000000,
+    "sale_state": "on_sale"
+   },
+   {
+    "product_code": 900001,
+    "name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "official_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "maker": "ASUS",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 9000000,
+    "sale_state": "on_sale"
+   }
+  ]
+ },
+ "detail": {
+  "129615": {
+   "ok": true,
+   "item": {
+    "product_code": 129615,
+    "name": "Dell Pro Max GB10",
+    "official_name": "DELL Pro Max GB10 (128GB, M.2 2TB)",
+    "maker": "Dell",
+    "model_name": "Pro Max GB10",
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "2TB",
+    "os": "DGX OS",
+    "architecture": "ARM",
+    "derived": [],
+    "model_group": "dell-pro-max-gb10",
+    "model_label": "2TB",
+    "featured_rank": 1,
+    "images": [
+     {
+      "src": "assets/images/supercomputer/gb10-product.jpg",
+      "label": "전체 모습",
+      "alt": "Dell Pro Max GB10 본체"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-front-1600.webp",
+      "label": "전면",
+      "alt": "Dell Pro Max GB10 전면"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "label": "후면·연결 단자",
+      "alt": "Dell Pro Max GB10 후면 연결 단자"
+     }
+    ],
+    "price": 12052100,
+    "sale_state": "on_sale",
+    "detail": {
+     "brand_label": "DELL",
+     "short_name": "GB10",
+     "eyebrow": "DESKTOP AI SUPERCOMPUTER",
+     "lead": "AI 모델 실행·개발을 위한 완제품.",
+     "gallery_caption": [
+      "작은 공간에서 시작하는",
+      "나만의 AI 개발 환경."
+     ],
+     "model_note": "128GB 통합 메모리",
+     "facts": [
+      [
+       "cpu",
+       "AI 프로세서",
+       "NVIDIA GB10"
+      ],
+      [
+       "memory",
+       "통합 메모리",
+       "128GB"
+      ],
+      [
+       "hard-drive",
+       "SSD",
+       "2TB"
+      ],
+      [
+       "code",
+       "운영체제",
+       "DGX OS"
+      ]
+     ],
+     "spec_rows": [
+      [
+       "제품명",
+       "Dell Pro Max GB10"
+      ],
+      [
+       "AI 프로세서",
+       "NVIDIA GB10 Grace Blackwell"
+      ],
+      [
+       "CPU",
+       "20코어 ARM 기반 CPU"
+      ],
+      [
+       "메모리",
+       "128GB LPDDR5x 통합 메모리"
+      ],
+      [
+       "저장장치",
+       "M.2 NVMe SSD 2TB"
+      ],
+      [
+       "운영체제",
+       "NVIDIA DGX OS · Ubuntu 기반 Linux"
+      ],
+      [
+       "네트워크",
+       "10GbE · NVIDIA ConnectX-7"
+      ],
+      [
+       "판매 구성",
+       "선택한 사양의 완제품"
+      ]
+     ],
+     "connectivity": {
+      "title": "연결까지, 한눈에.",
+      "text": "제품 뒷면의 실제 연결 단자를 확인하세요.",
+      "labels": [
+       "10GbE",
+       "ConnectX-7"
+      ],
+      "image": {
+       "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+       "alt": "Dell GB10 후면, 네트워크 및 연결 단자",
+       "width": 1600,
+       "height": 562,
+       "caption": "Dell GB10 후면"
+      }
+     },
+     "environment": {
+      "title": [
+       "사용할 프로그램부터",
+       "함께 확인해요."
+      ],
+      "text": "DGX OS와 ARM 기반으로 작동하는 AI 전용 환경입니다. 사용하려는 모델과 프로그램의 지원 여부를 먼저 확인해 주세요.",
+      "chips": [
+       "Linux",
+       "ARM",
+       "NVIDIA DGX OS"
+      ]
+     },
+     "faq": [
+      [
+       "2TB와 4TB는 어떻게 선택하나요?",
+       "저장공간이 다른 두 완제품 모델입니다. 위에서 원하는 모델을 선택하면 해당 상품의 가격과 사양을 확인할 수 있습니다."
+      ],
+      [
+       "Windows 프로그램도 사용할 수 있나요?",
+       "이 제품은 Ubuntu 기반 DGX OS를 사용합니다. 일반 Windows 프로그램의 실행을 전제로 구매하지 마시고, 필요한 프로그램이 Linux와 ARM 환경을 지원하는지 먼저 확인해 주세요."
+      ],
+      [
+       "사내 문서 검색도 바로 제공되나요?",
+       "제품 구매는 하드웨어 기준입니다. 업무형 로컬 AI 패키지가 기본 포함되는 것은 아닙니다. 문서 검색 등 필요한 기능, 데이터 연결, 설치·교육 범위와 지원 가능 여부는 별도 상담에서 확인합니다."
+      ],
+      [
+       "어떤 AI 모델까지 사용할 수 있나요?",
+       "모델 종류와 정밀도, 문맥 길이, 동시 사용 인원에 따라 실행 조건과 응답 성능이 달라집니다. 도입 상담에 사용하려는 모델과 업무를 알려주시면 검토 범위를 안내합니다."
+      ],
+      [
+       "배송과 보증 조건은 어디서 확인하나요?",
+       "실제 공급 일정, 국내 공급 모델과 보증 조건은 견적 문의에서 확인할 수 있습니다."
+      ]
+     ]
+    },
+    "models": [
+     {
+      "product_code": 129615,
+      "model_label": "2TB",
+      "price": 12052100,
+      "sale_state": "on_sale"
+     },
+     {
+      "product_code": 129614,
+      "model_label": "4TB",
+      "price": 14209400,
+      "sale_state": "on_sale"
+     }
+    ]
+   }
+  },
+  "129614": {
+   "ok": true,
+   "item": {
+    "product_code": 129614,
+    "name": "Dell Pro Max GB10",
+    "official_name": "DELL Pro Max GB10 (128GB, M.2 4TB)",
+    "maker": "Dell",
+    "model_name": "Pro Max GB10",
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": "DGX OS",
+    "architecture": "ARM",
+    "derived": [],
+    "model_group": "dell-pro-max-gb10",
+    "model_label": "4TB",
+    "featured_rank": 2,
+    "images": [
+     {
+      "src": "assets/images/supercomputer/gb10-product.jpg",
+      "label": "전체 모습",
+      "alt": "Dell Pro Max GB10 본체"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-front-1600.webp",
+      "label": "전면",
+      "alt": "Dell Pro Max GB10 전면"
+     },
+     {
+      "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+      "label": "후면·연결 단자",
+      "alt": "Dell Pro Max GB10 후면 연결 단자"
+     }
+    ],
+    "price": 14209400,
+    "sale_state": "on_sale",
+    "detail": {
+     "brand_label": "DELL",
+     "short_name": "GB10",
+     "eyebrow": "DESKTOP AI SUPERCOMPUTER",
+     "lead": "AI 모델 실행·개발을 위한 완제품.",
+     "gallery_caption": [
+      "작은 공간에서 시작하는",
+      "나만의 AI 개발 환경."
+     ],
+     "model_note": "128GB 통합 메모리",
+     "facts": [
+      [
+       "cpu",
+       "AI 프로세서",
+       "NVIDIA GB10"
+      ],
+      [
+       "memory",
+       "통합 메모리",
+       "128GB"
+      ],
+      [
+       "hard-drive",
+       "SSD",
+       "4TB"
+      ],
+      [
+       "code",
+       "운영체제",
+       "DGX OS"
+      ]
+     ],
+     "spec_rows": [
+      [
+       "제품명",
+       "Dell Pro Max GB10"
+      ],
+      [
+       "AI 프로세서",
+       "NVIDIA GB10 Grace Blackwell"
+      ],
+      [
+       "CPU",
+       "20코어 ARM 기반 CPU"
+      ],
+      [
+       "메모리",
+       "128GB LPDDR5x 통합 메모리"
+      ],
+      [
+       "저장장치",
+       "M.2 NVMe SSD 4TB"
+      ],
+      [
+       "운영체제",
+       "NVIDIA DGX OS · Ubuntu 기반 Linux"
+      ],
+      [
+       "네트워크",
+       "10GbE · NVIDIA ConnectX-7"
+      ],
+      [
+       "판매 구성",
+       "선택한 사양의 완제품"
+      ]
+     ],
+     "connectivity": {
+      "title": "연결까지, 한눈에.",
+      "text": "제품 뒷면의 실제 연결 단자를 확인하세요.",
+      "labels": [
+       "10GbE",
+       "ConnectX-7"
+      ],
+      "image": {
+       "src": "assets/images/supercomputer/gb10-rear-1600.webp",
+       "alt": "Dell GB10 후면, 네트워크 및 연결 단자",
+       "width": 1600,
+       "height": 562,
+       "caption": "Dell GB10 후면"
+      }
+     },
+     "environment": {
+      "title": [
+       "사용할 프로그램부터",
+       "함께 확인해요."
+      ],
+      "text": "DGX OS와 ARM 기반으로 작동하는 AI 전용 환경입니다. 사용하려는 모델과 프로그램의 지원 여부를 먼저 확인해 주세요.",
+      "chips": [
+       "Linux",
+       "ARM",
+       "NVIDIA DGX OS"
+      ]
+     },
+     "faq": [
+      [
+       "2TB와 4TB는 어떻게 선택하나요?",
+       "저장공간이 다른 두 완제품 모델입니다. 위에서 원하는 모델을 선택하면 해당 상품의 가격과 사양을 확인할 수 있습니다."
+      ],
+      [
+       "Windows 프로그램도 사용할 수 있나요?",
+       "이 제품은 Ubuntu 기반 DGX OS를 사용합니다. 일반 Windows 프로그램의 실행을 전제로 구매하지 마시고, 필요한 프로그램이 Linux와 ARM 환경을 지원하는지 먼저 확인해 주세요."
+      ],
+      [
+       "사내 문서 검색도 바로 제공되나요?",
+       "제품 구매는 하드웨어 기준입니다. 업무형 로컬 AI 패키지가 기본 포함되는 것은 아닙니다. 문서 검색 등 필요한 기능, 데이터 연결, 설치·교육 범위와 지원 가능 여부는 별도 상담에서 확인합니다."
+      ],
+      [
+       "어떤 AI 모델까지 사용할 수 있나요?",
+       "모델 종류와 정밀도, 문맥 길이, 동시 사용 인원에 따라 실행 조건과 응답 성능이 달라집니다. 도입 상담에 사용하려는 모델과 업무를 알려주시면 검토 범위를 안내합니다."
+      ],
+      [
+       "배송과 보증 조건은 어디서 확인하나요?",
+       "실제 공급 일정, 국내 공급 모델과 보증 조건은 견적 문의에서 확인할 수 있습니다."
+      ]
+     ]
+    },
+    "models": [
+     {
+      "product_code": 129615,
+      "model_label": "2TB",
+      "price": 12052100,
+      "sale_state": "on_sale"
+     },
+     {
+      "product_code": 129614,
+      "model_label": "4TB",
+      "price": 14209400,
+      "sale_state": "on_sale"
+     }
+    ]
+   }
+  },
+  "900003": {
+   "ok": true,
+   "item": {
+    "product_code": 900003,
+    "name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "official_name": "워크스테이션 [14900K/64G/2TB+4TB/RTX5090]",
+    "maker": "팝콘",
+    "model_name": null,
+    "accelerator": null,
+    "processor": null,
+    "memory": "64GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": null,
+    "derived": [
+     "memory",
+     "storage"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 15000000,
+    "sale_state": "on_sale",
+    "detail": {},
+    "models": []
+   }
+  },
+  "900002": {
+   "ok": true,
+   "item": {
+    "product_code": 900002,
+    "name": "[테스트] 미니 AI PC [128GB/2TB NVMe] NVIDIA DGX Spark기반",
+    "official_name": "[테스트] 미니 AI PC [128GB/2TB NVMe] NVIDIA DGX Spark기반",
+    "maker": "TESTMAKER",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "2TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 8000000,
+    "sale_state": "on_sale",
+    "detail": {},
+    "models": []
+   }
+  },
+  "900001": {
+   "ok": true,
+   "item": {
+    "product_code": 900001,
+    "name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "official_name": "ASUS Ascent GX10 GB10 (128GB, M.2 4TB)",
+    "maker": "ASUS",
+    "model_name": null,
+    "accelerator": "NVIDIA GB10",
+    "processor": "20코어 ARM 기반 CPU",
+    "memory": "128GB",
+    "storage": "4TB",
+    "os": null,
+    "architecture": "ARM",
+    "derived": [
+     "accelerator",
+     "processor",
+     "memory",
+     "storage",
+     "architecture"
+    ],
+    "model_group": null,
+    "model_label": null,
+    "featured_rank": null,
+    "images": [],
+    "price": 9000000,
+    "sale_state": "on_sale",
+    "detail": {},
+    "models": []
+   }
+  }
+ }
+}

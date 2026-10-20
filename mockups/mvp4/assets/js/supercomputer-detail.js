@@ -58,7 +58,7 @@
     var brand = info.brand_label || (p.maker ? String(p.maker).toUpperCase() : '');
     return '<section class="sc-product-hero" aria-labelledby="sc-title"><div class="sc-gallery"><div class="sc-gallery-top"><span class="sc-soft-label">AI 전용 장비</span>' + (brand ? '<span>' + h(brand) + '</span>' : '') + '</div><div class="sc-product-photo">' + (main ? '<img src="' + h(main.src) + '" alt="' + h(main.alt || p.name) + '" width="640" height="640" fetchpriority="high" data-sc-product-image>' : '<div class="sc-image-fallback">' + icon('package') + '<span>제품 이미지를 준비하고 있어요.</span></div>') + '</div>' + galleryThumbs(p) + caption + '</div>' +
       '<div class="sc-product-info"><div class="sc-product-meta"><span class="sc-eyebrow">' + h(info.eyebrow || 'AI 슈퍼컴퓨터') + '</span><span class="sc-product-id">상품번호 ' + h(p.id) + '</span></div><h1 id="sc-title">' + h(p.name) + '</h1>' + (info.lead ? '<p class="sc-lead">' + h(info.lead) + '</p>' : '') +
-      '<div class="sc-facts">' + facts(p).map(function (s) { return '<div>' + icon(s[0]) + '<span>' + h(s[1]) + '</span><strong>' + h(val(s[2])) + '</strong></div>'; }).join('') + '</div>' + choices(p) +
+      '<div class="sc-facts">' + facts(p).map(function (s) { return '<div>' + icon(s[0]) + '<span>' + h(s[1]) + '</span><strong>' + h(val(s[2])) + '</strong>' + (s[3] ? '<small class="sc-derived">상품명 기준</small>' : '') + '</div>'; }).join('') + '</div>' + choices(p) +
       '<div class="sc-purchase"><div class="sc-unit-price"><span>판매가 <small>1대 기준</small></span><strong>' + h(stopped ? '판매 중지' : money(price(p))) + '</strong></div><div class="sc-quantity-row"><label id="sc-quantity-label">수량</label><div class="sc-quantity" role="group" aria-labelledby="sc-quantity-label"><button type="button" data-sc-minus aria-label="수량 한 대 줄이기"' + (q <= 1 ? ' disabled' : '') + '>−</button><output data-sc-quantity aria-live="polite">' + q + '<span>대</span></output><button type="button" data-sc-plus aria-label="수량 한 대 늘리기"' + (q >= 10 ? ' disabled' : '') + '>+</button></div></div><div class="sc-total-row"><span>상품 합계</span><strong data-sc-total>' + h(money(price(p) === null ? null : price(p) * q)) + '</strong></div>' +
       (unavailable ? '<div class="sc-availability" role="status">' + icon('warning-circle') + '<div><strong>' + (stopped ? '현재 판매가 중지된 상품이에요.' : '현재 판매 여부를 확인하고 있어요.') + '</strong><p>문의하시면 공급 일정과 구매 가능 여부를 안내해 드립니다.</p></div></div>' : '') +
       '<div class="sc-actions"><a class="btn btn-primary" data-sc-action="quote" href="' + h(route('quote')) + '">' + (unavailable ? '장비 입고 문의' : '장비 견적 문의') + icon('arrow-right') + '</a><a class="btn sc-adoption" data-sc-action="adoption" href="' + h(route('adoption')) + '">' + icon('chat-circle') + 'AI 설치 상담</a></div><p class="sc-price-caption">가격·공급 일정은 문의 시 확인합니다. AI 설치·교육은 별도 상담하며, 지원 가능 여부를 먼저 검토합니다.</p></div></div></section>';
@@ -71,7 +71,8 @@
   function specRows(p) {
     var rows = Array.isArray(d(p).spec_rows) ? d(p).spec_rows.filter(function (r) { return Array.isArray(r) && r.length === 2; }) : [];
     if (rows.length) return rows;
-    return [['제품명', p.name], ['제조사', val(p.maker)], ['모델명', val(p.modelName)], ['AI 가속기', val(p.accelerator)], ['프로세서', val(p.processor)], ['메모리', val(p.memory)], ['저장장치', val(p.storage)], ['운영체제', val(p.os)], ['아키텍처', val(p.architecture)], ['판매 구성', '선택한 사양의 완제품']];
+    var m = function (k) { return val(D.mark(p, k, p[k])); };
+    return [['제품명', p.name], ['제조사', m('maker')], ['모델명', val(p.modelName)], ['AI 가속기', m('accelerator')], ['프로세서', m('processor')], ['메모리', m('memory')], ['저장장치', m('storage')], ['운영체제', val(p.os)], ['아키텍처', m('architecture')], ['판매 구성', '선택한 사양의 완제품']];
   }
   function scope() {
     return '<div class="sc-service-scope"><div><span class="sc-scope-icon">' + icon('package') + '</span><h3>하드웨어 구매</h3><p>선택한 완제품의 가격, 공급 일정과 보증 조건을 안내합니다.</p></div><div><span class="sc-scope-icon">' + icon('chat-circle') + '</span><h3>업무용 AI 설치도 필요하신가요?</h3><p>장비 구매와 별도로, 필요한 기능·설치·교육 범위와 지원 가능 여부를 상담에서 확인합니다.</p></div><a class="sc-inline-link" data-sc-action="adoption" href="' + h(route('adoption')) + '">업무용 AI 설치 상담하기 ' + icon('arrow-right') + '</a></div>';
@@ -139,10 +140,31 @@
     if (img && img.matches && img.matches('[data-sc-product-image]')) img.parentElement.innerHTML = '<div class="sc-image-fallback">' + icon('package') + '<span>제품 이미지를 불러오지 못했어요.</span></div>';
   }, true);
   // 모델을 바꿀 때는 화면을 비우지 않고 새 상품을 읽은 뒤 그린다.
+  // R02(2026-10-20): 모델을 바꿔도 보던 구획(#sc-specs 등)에 그대로 머문다 — 새 상품에 그 구획이 없으면 주소에서 #구획을 지우고
+  // 상품 머리(사진·가격)로 옮긴다. 구획 없이 보던 중이면 보던 높이를 지킨다.
+  // 빠르게 모델을 바꾸거나 뒤로 가서 응답 순서가 뒤집혀도, 마지막으로 고른 상품의 응답만 화면에 그린다(늦은 응답은 버린다).
+  var loadSeq = 0;
+  function afterModelChange(y) {
+    if (location.hash && location.hash.length > 1) {
+      if (toHash()) return;
+      history.replaceState(null, '', location.pathname + location.search);
+      var hero = app.querySelector('.sc-product-hero'); if (hero) scrollToSection(hero);
+      return;
+    }
+    window.scrollTo(0, y);
+  }
   function load(keep) {
+    var seq = ++loadSeq, want = id, y = window.scrollY;
     if (!keep) { phase = 'loading'; render(false); }
-    D.detail(id).then(function (p) { product = p; phase = 'ready'; render(!!keep); if (!keep && toHash()) [150, 600].forEach(function (ms) { setTimeout(toHash, ms); }); },
-      function (e) { product = null; phase = e && e.status === 404 ? 'missing' : 'error'; render(false); });
+    D.detail(want).then(function (p) {
+      if (seq !== loadSeq || want !== id) return;
+      product = p; phase = 'ready'; render(!!keep);
+      if (keep) afterModelChange(y);
+      else if (toHash()) [150, 600].forEach(function (ms) { setTimeout(function () { if (seq === loadSeq) toHash(); }, ms); });
+    }, function (e) {
+      if (seq !== loadSeq || want !== id) return;
+      product = null; phase = e && e.status === 404 ? 'missing' : 'error'; render(false);
+    });
   }
   // F05(2026-10-20): 상세 메뉴(#sc-specs 등)를 누르면 브라우저가 popstate 를 낸다 — 같은 상품·같은 수량이면 다시 읽거나
   // 다시 그리지 않고 그 구획으로만 옮긴다(선택한 사진·모델·수량 유지). 상품이나 수량이 바뀐 이력 이동만 다시 읽는다.

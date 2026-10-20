@@ -1,0 +1,19 @@
+{
+ "case": "C08-empty",
+ "purpose": "카테고리 전체가 비어 있음",
+ "expect": {
+  "ad_models": [],
+  "ad_cta": null,
+  "list": []
+ },
+ "input_rows": [],
+ "list": {
+  "ok": true,
+  "category": {
+   "key": "ai-supercomputer",
+   "name": "AI 슈퍼컴퓨터"
+  },
+  "items": []
+ },
+ "detail": {}
+}

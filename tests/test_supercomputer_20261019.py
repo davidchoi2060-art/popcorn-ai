@@ -62,7 +62,8 @@ class Catalog(unittest.TestCase):
 
     def test_unprofiled_product_is_filled_from_its_own_name(self):
         it = SC.item(row(product_code=300001, product_name='[ACER] Veriton GN100 [128GB/4TB NVME/AS 2Y] NVIDIA DGX Spark기반', p_maker='ACER'))
-        self.assertEqual((it['maker'], it['memory'], it['storage'], it['accelerator'], it['os']), ('ACER', '128GB', '4TB', 'NVIDIA GB10', 'DGX OS'))
+        self.assertEqual((it['maker'], it['memory'], it['storage'], it['accelerator'], it['os']), ('ACER', '128GB', '4TB', 'NVIDIA GB10', None))
+        self.assertEqual(it['derived'], ['accelerator', 'processor', 'memory', 'storage', 'architecture'])   # 상품명 기준
         ws = SC.item(row(product_code=300002, product_name='워크스테이션 [14900K/64G/2TB+4TB/RTX5090]', p_maker='팝콘'))
         self.assertEqual((ws['memory'], ws['storage'], ws['accelerator'], ws['os']), ('64GB', '2TB', None, None))   # GB10 사양을 물려주지 않는다
 
