@@ -112,6 +112,7 @@
         (b.check ? '<aside class="pa-check"><strong>확인 필요 · 답변 안의 불일치</strong>' + esc(b.check) + '</aside>' : '') +
         (issue ? '<p class="pa-issue" role="note">' + esc(issue) + '</p>' : '') +
         '<div class="pa-product-actions" data-nocopy>' + (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">상품 상세 ↗</a>' : '') +
+        (type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy', '팝콘PC몰에서 구매') : '') +
         (type === 'pc' ? '<button type="button" class="pa-copy" data-pa-add="' + esc(code) + '" data-pa-turn="' + esc(a.turnId) + '" aria-pressed="' + added + '">' + (added ? '담음 · 빼기' : '비교에 담기') + '</button>' : type === 'ai_device' ? '<span class="pa-compare-note">AI 장비는 PC 비교에 담을 수 없어요</span>' : '') + '</div></section>';
     }
     var body;

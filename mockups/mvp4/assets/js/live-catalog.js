@@ -27,6 +27,17 @@
     event.stopImmediatePropagation();
     img.src = m[1] + '.gif';
   }, true);
+  // 2026-10-20 승인 「구매 경로 분리」 -- 일반 완제품(이 PC 카탈로그 상품)은 팝콘PC몰 그 상품 페이지에서 구매한다.
+  // 같은 상품번호(pd_no)의 몰 상품 주소일 때만 쓴다. 몰 홈·검색·다른 상품으로 대체하지 않고, 없으면 빈 값(확인 필요)이다.
+  P.mallBuyUrl = function (p) {
+    if (!p || typeof p.mallUrl !== 'string') return '';
+    var u; try { u = new URL(p.mallUrl); } catch (e) { return ''; }
+    return u.protocol === 'https:' && u.hostname === 'www.popcornpc.co.kr' && u.pathname === '/shop/system_detail.html' && u.searchParams.get('pd_no') === String(p.id) ? u.href : '';
+  };
+  P.mallBuyLink = function (p, cls, label) {
+    var url = P.mallBuyUrl(p);
+    return url ? '<a class="' + cls + '" data-mall-buy="' + P.h(p.id) + '" href="' + P.h(url) + '" target="_blank" rel="noopener">' + P.h(label || '팝콘PC몰에서 구매하기') + ' <span aria-hidden="true">↗</span></a>' : '';
+  };
   var SLOT = { CPU: 'CPU', GPU: '그래픽카드', RAM: '메모리', SSD: '저장장치', HDD: '저장장치', MB: '메인보드', POWER: '파워', PSU: '파워', CASE: '케이스', COOLER: 'CPU 쿨러', OS: '운영체제' };
 
   function get(url) {
