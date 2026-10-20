@@ -24,12 +24,16 @@
   <link rel="stylesheet" href="assets/css/header-ui.css?v=20261020-llm2"><script defer src="assets/js/header-ui.js?v=20261020-llm2"></script><script src="assets/js/boot.js?v=20261018-v7-3" defer></script>
   <script defer src="assets/js/live-supercomputer.js?v=20261020-x01d"></script>
   <script defer src="assets/js/llm-examples.js?v=20261020-llm2"></script>
-  <script defer src="assets/js/ai-package-devices.js?v=20261020-llm2"></script>
+  <script defer src="assets/js/page-loading.js?v=20261020-ld1"></script>
+  <script defer src="assets/js/ai-package-devices.js?v=20261020-ld1"></script>
   <link rel="stylesheet" href="assets/css/llm-examples.css?v=20261020-llm2">
+  <link rel="stylesheet" href="assets/css/page-loading.css?v=20261020-ld1">
   <link rel="stylesheet" href="assets/css/ai-package-cards.css?v=20261019-v9-1">
 </head>
 <body data-page="ai-packages">
-  <div id="app"></div>
+  <div id="app"><!-- 스크립트가 화면을 그리기 전 진입 로딩(카테고리 로딩 1안 · AI 패키지). boot.js 가 그리면 바로 바뀐다. -->
+    <div class="pl-static" role="status" aria-busy="true"><div class="pl-head pl-package"><span class="pl-pkg" aria-hidden="true"><span class="pl-pkg-tile t1"><img src="assets/icons/file-text.svg" alt="" width="22" height="22"></span><span class="pl-pkg-tile t2"><img src="assets/icons/chat-circle.svg" alt="" width="22" height="22"></span><span class="pl-pkg-tile t3"><img src="assets/icons/code.svg" alt="" width="22" height="22"></span><span class="pl-pkg-base"><b>AI</b></span></span><p class="pl-text">AI 패키지를 불러오고 있어요</p><span class="pl-dots" aria-hidden="true"><i></i><i></i><i></i></span></div><div class="pl-skel" aria-hidden="true"><span></span><span></span><span></span></div></div>
+  </div>
   <noscript><p>상품 화면을 보려면 브라우저의 자바스크립트를 켜 주세요.</p></noscript>
 </body>
 </html>

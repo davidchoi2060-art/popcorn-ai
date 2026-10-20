@@ -65,6 +65,8 @@
       '<header class="scl-head"><p class="sc-eyebrow">AI 전용 장비</p><h1>AI 슈퍼컴퓨터</h1><p>AI 모델 실행·개발을 위한 완제품을 비교해 보세요. AI 설치·교육은 장비 구매와 별도로 상담합니다.</p>' + (n !== null ? '<p class="scl-count" aria-live="polite">' + n + '개 제품</p>' : '') + '</header>';
   }
   function message(kind) {
+    // 진입 로딩 = 카테고리 로딩 1안(2026-10-20): 연산 장비 그림·문구·점 + 카드 자리 스켈레톤.
+    if (kind === 'loading' && P.pageLoading) return '<section class="scl-loading" role="status" aria-busy="true">' + P.pageLoading.head('super') + '<div class="pl-skel" aria-hidden="true"><span></span><span></span><span></span></div></section>';
     var m = { loading: ['cpu', '제품을 불러오고 있어요.', '현재 가격과 판매 상태를 확인합니다.', ''], error: ['warning-circle', '제품 목록을 불러오지 못했어요.', '잠시 후 다시 시도해 주세요.', '<button type="button" class="btn btn-primary" data-scl-retry>다시 시도</button>'],
       none: ['package', '아직 등록된 제품이 없어요.', '새 제품이 등록되면 이곳에 나옵니다.', '<a class="btn btn-outline" href="index.html">홈으로</a>'], filtered: ['magnifying-glass', '조건에 맞는 제품이 없어요.', '선택한 조건을 바꾸거나 지워 보세요.', '<button type="button" class="btn btn-primary" data-scl-clear>조건 지우기</button>'] }[kind];
     return '<section class="sc-empty scl-empty"' + (kind === 'loading' ? ' aria-busy="true"' : '') + '><span class="sc-empty-icon">' + icon(m[0]) + '</span><h2>' + m[1] + '</h2><p>' + m[2] + '</p>' + (m[3] ? '<div class="sc-empty-actions">' + m[3] + '</div>' : '') + '</section>';

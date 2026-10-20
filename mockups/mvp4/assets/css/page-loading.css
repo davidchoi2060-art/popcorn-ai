@@ -1,0 +1,24 @@
+/* /mvp4 카테고리별 진입 로딩 1안(2026-10-20) — 그림 · 문구 · 노랑 점 3개. 스켈레톤은 각 화면 것을 쓴다. */
+.pl-head{display:flex;flex-direction:column;align-items:center;gap:12px;padding:26px 16px 22px;text-align:center}
+.pl-art{display:block;width:auto;height:118px;max-width:100%;object-fit:contain}
+.pl-text{margin:0;font-size:18px;font-weight:800;letter-spacing:-.03em;color:#1d1b26;word-break:keep-all}
+.pl-dots{display:flex;gap:9px}
+.pl-dots i{width:9px;height:9px;border-radius:50%;background:#e2e0ee;animation:pl-dot 1.2s ease-in-out infinite}
+.pl-dots i:nth-child(2){animation-delay:.4s}.pl-dots i:nth-child(3){animation-delay:.8s}
+@keyframes pl-dot{0%,60%,100%{background:#e2e0ee}20%,40%{background:#ffd21f}}
+/* AI 패키지: 중립 도구 묶음(문서·대화·코드) + AI 받침 */
+.pl-pkg{position:relative;display:block;width:150px;height:118px}
+.pl-pkg:before{content:"";position:absolute;inset:6px 0 0;border-radius:50%;background:radial-gradient(closest-side,#efe9ff,rgba(239,233,255,0))}
+.pl-pkg-base{position:absolute;left:26px;right:26px;bottom:10px;height:38px;border-radius:10px;background:linear-gradient(180deg,#e4dbff,#cfc1fb);box-shadow:0 8px 18px rgba(108,81,255,.18);display:flex;align-items:center;justify-content:center}
+.pl-pkg-base b{display:inline-flex;align-items:center;justify-content:center;width:30px;height:24px;border-radius:6px;background:#5b3fd6;color:#fff;font-size:13px;font-weight:850}
+.pl-pkg-tile{position:absolute;display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;background:#fff;box-shadow:0 6px 14px rgba(76,52,160,.14)}
+.pl-pkg-tile img{width:20px;height:20px;opacity:.75}
+.pl-pkg-tile.t1{left:16px;top:26px;transform:rotate(-12deg)}.pl-pkg-tile.t2{left:57px;top:4px}.pl-pkg-tile.t3{right:16px;top:24px;transform:rotate(10deg)}
+.pl-compact{padding:14px 12px 16px;gap:9px}.pl-compact .pl-art{height:84px}.pl-compact .pl-text{font-size:16px}.pl-compact .pl-pkg{transform:scale(.75);margin:-14px 0}
+@media(max-width:680px){.pl-head{padding:18px 12px 16px;gap:10px}.pl-art{height:92px}.pl-text{font-size:16px}.pl-pkg{transform:scale(.8);margin:-10px 0}}
+@media(prefers-reduced-motion:reduce){.pl-dots i{animation:none}.pl-dots i:first-child{background:#ffd21f}}
+/* 정적 진입 화면(스크립트가 그리기 전, AI 패키지) */
+.pl-static{max-width:1180px;margin:0 auto;padding:30px 20px}
+.pl-skel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:8px}
+.pl-skel span{display:block;border:1px solid #eaecf1;border-radius:14px;padding:16px;height:220px;background:linear-gradient(#eef0f4,#eef0f4) 16px 16px/calc(100% - 32px) 110px no-repeat,linear-gradient(#eef0f4,#eef0f4) 16px 144px/70% 14px no-repeat,linear-gradient(#eef0f4,#eef0f4) 16px 170px/45% 14px no-repeat}
+@media(max-width:680px){.pl-skel{grid-template-columns:1fr}.pl-skel span:nth-child(n+2){display:none}}

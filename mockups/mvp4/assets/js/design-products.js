@@ -69,7 +69,9 @@
   function notice(title, text, tone) { return '<div class="dp-notice ' + (tone === 'warning' ? 'dp-notice-warning' : '') + '" role="status">' + icon(tone === 'warning' ? 'warning-circle' : 'info') + '<div><strong>' + h(title) + '</strong><p>' + h(text) + '</p></div></div>'; }
   function empty(title, text, button) { return '<section class="dp-empty">' + icon('computer-tower') + '<h2>' + h(title) + '</h2><p>' + h(text) + '</p>' + (button || '') + '</section>'; }
   function skeleton(detail) {
-    return '<div class="dp-loading" role="status"><p>상품 정보를 불러오고 있어요.</p><div class="' + (detail ? 'dp-detail-skeleton' : 'dp-grid') + '" aria-hidden="true">' + Array.from({ length: detail ? 2 : 6 }, function () { return '<div class="dp-skeleton-card"><span class="dp-skeleton dp-skeleton-photo"></span><span class="dp-skeleton dp-skeleton-line"></span><span class="dp-skeleton dp-skeleton-line dp-short"></span></div>'; }).join('') + '</div></div>';
+    // 목록 진입은 카테고리 로딩 1안 머리(PC 본체 그림·문구·점)를 쓴다(2026-10-20). 상세·다른 화면은 기존 문구.
+    var top = !detail && P.pageLoading ? P.pageLoading.head('pc') : '<p>상품 정보를 불러오고 있어요.</p>';
+    return '<div class="dp-loading" role="status" aria-busy="true">' + top + '<div class="' + (detail ? 'dp-detail-skeleton' : 'dp-grid') + '" aria-hidden="true">' + Array.from({ length: detail ? 2 : 6 }, function () { return '<div class="dp-skeleton-card"><span class="dp-skeleton dp-skeleton-photo"></span><span class="dp-skeleton dp-skeleton-line"></span><span class="dp-skeleton dp-skeleton-line dp-short"></span></div>'; }).join('') + '</div></div>';
   }
   function bindImageFallback(scope) {
     scope.addEventListener('error', function (event) {
