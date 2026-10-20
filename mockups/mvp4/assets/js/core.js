@@ -32,7 +32,11 @@
     return typeof value === 'number' && Number.isFinite(value) ? new Intl.NumberFormat('ko-KR').format(value) + '원' : '구성 확인';
   };
 
-  function brand() {
+  // 헤더는 2026-10-20 대표 승인 가로형 로고(심볼+워드마크 한 장)를 쓴다. 글자가 그림 안에 있어 별도 「팝콘AI」 글자는 헤더에서만 뺀다.
+  // 푸터·파비콘은 기존 logo.png 그대로.
+  function brand(where) {
+    if (where === 'header') return '<a class="site-brand site-brand-logo" href="' + PAI.href('index') + '" aria-label="팝콘AI 처음 화면">' +
+      '<img class="brand-logo" src="' + PAI.image('brand/popcornai-header-logo.png') + '" alt="" width="420" height="153" decoding="async"></a>';
     return '<a class="site-brand" href="' + PAI.href('index') + '" aria-label="팝콘AI 처음 화면">' +
       '<img src="' + PAI.image('logo.png') + '" alt="" width="42" height="42"><span>팝콘AI</span></a>';
   }
@@ -51,7 +55,7 @@
 
   PAI.shell = function (content) {
     return '<a class="skip-link" href="#main-content">본문으로 건너뛰기</a>' +
-      '<header class="site-header"><div class="container header-inner">' + brand() + navigation('desktop-nav') +
+      '<header class="site-header"><div class="container header-inner">' + brand('header') + navigation('desktop-nav') +
       '<div class="header-actions"><button class="icon-button" type="button" data-open-dialog="site-search" aria-label="상품 검색" aria-haspopup="dialog" aria-controls="site-search">' + PAI.icon('magnifying-glass') + '</button>' +
       '<a class="saved-link" href="' + PAI.href('bridge', { target: 'saved' }) + '">' + PAI.icon('clipboard-text') + '<span>내 견적</span></a>' +
       '<button class="icon-button menu-button" type="button" data-open-dialog="site-menu" aria-label="전체 메뉴 열기" aria-haspopup="dialog" aria-controls="site-menu">' + PAI.icon('list') + '</button></div></div></header>' +
