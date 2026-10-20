@@ -104,6 +104,24 @@
       img.parentElement.innerHTML = '<span class="cf-icon-image">' + P.icon(img.dataset.cfFallback || 'package') + '</span>';
     }, true);
   }
+  // 2026-10-20 승인 「누른 항목만 제자리에서」 -- 부품 행은 한 번에 하나만 열린다. 열고 닫기는 native details 그대로
+  // (클릭·Enter·Space 한 번에 한 번 토글)이고, 여기서는 다른 열린 행만 닫는다. 위쪽 행이 닫혀 문서가 줄어도
+  // 누른 행이 화면에서 같은 자리에 머물도록 그 차이만큼만 스크롤을 보정한다(이동·재렌더·history 변경 없음).
+  if (!P.cfPartSingleOpen) {
+    P.cfPartSingleOpen = true;
+    document.addEventListener('toggle', function (event) {
+      var part = event.target;
+      if (!part || !part.matches || !part.matches('details.cf-part') || !part.open) return;
+      var list = part.closest('.cf-part-list');
+      if (!list) return;
+      var summary = part.querySelector('summary'), before = summary.getBoundingClientRect().top;
+      Array.prototype.forEach.call(list.querySelectorAll('details.cf-part[open]'), function (other) {
+        if (other !== part) other.open = false;
+      });
+      var shift = summary.getBoundingClientRect().top - before;
+      if (Math.abs(shift) > 1) window.scrollBy({ top: shift, behavior: 'instant' });
+    }, true);
+  }
   P.configurationConceptV12 = { render: render, mount: mount, quantity: quantity, parts: parts, facts: facts, pending: pending };
   if (!document.body || !document.body.hasAttribute('data-configuration-concept')) return;
   var query = new URLSearchParams(window.location.search), selected = P.getCatalogProduct(query.get('id') || '90623');

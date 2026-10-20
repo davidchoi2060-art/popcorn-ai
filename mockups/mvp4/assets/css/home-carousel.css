@@ -80,3 +80,55 @@
 @media(max-width:800px){.hc-supercomputer .hc-copy{width:100%;padding:24px 24px 0}.hc-supercomputer .hc-copy h2{font-size:34px}.hc-supercomputer .hc-description br{display:none}.hc-supercomputer .hc-image{object-position:64% bottom}.hc-supercomputer .hc-note{display:none}}
 @media(min-width:601px) and (max-width:800px){.hc-supercomputer .hc-copy{padding-left:40px}.hc-supercomputer .hc-image{object-position:center bottom}}
 @media(max-width:370px){.hc-supercomputer .hc-copy{padding-inline:19px}.hc-supercomputer .hc-copy h2{font-size:31px}}
+
+/* 2026-10-20 approved AI finder CTA (option 3 + moving bubbles). Replaces the small .hc-chat entry in place.
+   Scoped to .hc-finder; PC/ribbon stay still, only the two bubbles pop and rise (6s loop, 3s apart). */
+.hc-chat.hc-finder{display:grid;grid-template-columns:45% 55%;align-items:center;gap:0;position:relative;margin-top:14px;min-height:356px;padding:34px 30px 32px 50px;background:#fcfbff;border:1px solid #e1d6ff;border-radius:18px;overflow:hidden;box-shadow:0 5px 25px #6b4ce408;font-size:16px;color:#141a2a;line-height:1.5}
+.hc-finder-copy{position:relative;z-index:2;min-width:0}
+.hc-finder-eyebrow{font-size:20px;line-height:1.4;font-weight:550;letter-spacing:-.65px;color:#626a7a;margin:0 0 13px}
+.hc-finder h2{font-size:60px;line-height:1.06;letter-spacing:-2.5px;font-weight:850;margin:0 0 16px;color:#141a2a}
+.hc-finder h2 span{color:#723afa}
+.hc-finder-description{font-size:19px;line-height:1.5;color:#626a7a;letter-spacing:-.65px;margin:0 0 19px;word-break:keep-all}
+.hc-finder-cta{width:100%;max-width:388px;min-height:64px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:20px;background:#703cf4;color:#fff;font-size:23px;font-weight:750;letter-spacing:-.65px;transition:background .18s,box-shadow .18s}
+.hc-finder-cta:hover{background:#602cde;box-shadow:0 8px 20px #703cf425}
+.hc-chat.hc-finder .hc-finder-cta .icon{width:24px;height:24px;filter:brightness(0) invert(1)}
+.hc-finder-visual{position:relative;align-self:stretch;display:flex;flex-direction:column;justify-content:flex-end;min-width:0}
+.hc-finder-scene{position:relative;height:275px;isolation:isolate}
+.hc-finder-pc{position:absolute;right:-10px;top:-91px;width:560px;height:auto;max-width:none;pointer-events:none;z-index:0}
+.hc-finder-bubble{position:absolute;pointer-events:none;z-index:1;will-change:transform,opacity;animation:hc-finder-pop-rise 6s infinite both}
+.hc-finder-bubble img{position:absolute;width:100%;height:auto;max-width:none;display:block}
+.hc-finder-purple{left:-107px;top:-40px;width:358px;height:268.5px;animation-delay:0s}
+.hc-finder-white{left:60px;top:83px;width:278px;height:208.5px;animation-delay:-3s}
+.hc-finder-journey{display:flex;align-items:center;justify-content:space-around;margin:0 28px 0 70px;padding:0;list-style:none;font-size:21px;font-weight:760;letter-spacing:-.5px;position:relative;z-index:2}
+.hc-chat.hc-finder .hc-finder-journey .icon{width:22px;height:22px;display:block;filter:invert(29%) sepia(96%) saturate(2706%) hue-rotate(245deg) brightness(104%) contrast(100%)}
+@keyframes hc-finder-pop-rise{
+  0%{opacity:0;transform:translateY(62px) scale(.78)}
+  6%{opacity:1;transform:translateY(20px) scale(1.06)}
+  12%{opacity:1;transform:translateY(27px) scale(.98)}
+  18%{opacity:1;transform:translateY(14px) scale(1)}
+  37%{opacity:1;transform:translateY(-5px) scale(1)}
+  56%{opacity:1;transform:translateY(-28px) scale(1)}
+  69%{opacity:0;transform:translateY(-68px) scale(.95)}
+  100%{opacity:0;transform:translateY(-68px) scale(.95)}
+}
+@media(prefers-reduced-motion:reduce){.hc-finder-bubble{animation:none;opacity:1;transform:none;will-change:auto}.hc-finder-cta{transition:none}}
+@media(max-width:1100px) and (min-width:801px){
+  .hc-chat.hc-finder{padding:32px;grid-template-columns:48% 52%}
+  .hc-finder h2{font-size:49px}.hc-finder-eyebrow{font-size:18px}.hc-finder-description{font-size:17px}.hc-finder-cta{font-size:19px}
+  .hc-finder-scene{transform:scale(.82);transform-origin:right bottom}
+  .hc-finder-journey{font-size:18px;margin:0 0 0 15px}
+}
+@media(max-width:800px){
+  .hc-chat.hc-finder{grid-template-columns:1fr;min-height:0;margin:14px 14px 0;padding:26px 22px 23px;gap:10px;flex-wrap:nowrap}
+  .hc-finder-eyebrow{font-size:16px;letter-spacing:-.5px;margin-bottom:12px}
+  .hc-finder h2{font-size:44px;letter-spacing:-1.7px;line-height:1.08;margin-bottom:14px}
+  .hc-finder-description{font-size:15px;letter-spacing:-.45px;margin-bottom:18px;max-width:265px}
+  .hc-finder-cta{max-width:none;min-height:56px;font-size:18px;gap:16px;border-radius:10px}
+  .hc-finder-visual{height:225px;margin:0 -11px}
+  .hc-finder-scene{position:absolute;width:310px;height:210px;left:50%;top:0;transform:translateX(-50%)}
+  .hc-finder-pc{width:345px;top:-40px;right:-15px}
+  .hc-finder-purple{width:210px;height:157.5px;left:-45px;top:0}
+  .hc-finder-white{width:172px;height:129px;left:20px;top:52px}
+  .hc-finder-journey{position:absolute;bottom:0;left:0;right:0;margin:0 5px;font-size:17px}
+  .hc-chat.hc-finder .hc-finder-journey .icon{width:19px;height:19px}
+}
