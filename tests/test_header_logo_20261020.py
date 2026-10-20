@@ -16,7 +16,7 @@ def test_master_is_untouched_copy():
 def test_header_uses_logo_footer_keeps_old():
     js = (ROOT / "assets" / "js" / "core.js").read_text(encoding="utf-8")
     assert "brand('header')" in js
-    assert "brand/popcornai-header-logo-v2.png" in js and 'width="420" height="153"' in js
+    assert "brand/popcornai-header-logo-final.png" in js and 'width="420" height="153"' in js
     assert 'aria-label="팝콘AI 처음 화면"' in js
     # 푸터 쪽 brand() 는 logo.png + 「팝콘AI」 글자를 유지한다
     assert "PAI.image('logo.png')" in js and "<span>팝콘AI</span>" in js
@@ -52,10 +52,10 @@ def test_header_ui_finds_brand_with_extra_class():
     assert not pat.search('<a class="site-brand-logo" href="x"><img></a>')
 
 
-def test_header_logo_v2_is_the_approved_original_bytes():
-    """2026-10-20 대표 직접 요청 「이 이미지로 로고만 교체해줘」 -- 원본 바이트 그대로(재생성·크롭·배경 제거 없음)."""
-    v2 = (BRAND / "popcornai-header-logo-v2.png").read_bytes()
-    assert len(v2) == 203730
-    assert hashlib.sha256(v2).hexdigest() == "f58181a879354da5c5bfef2c5eedea28c87b1441072f144088a854ad69014833"
-    prov = json.loads((BRAND / "popcornai-header-logo-v2.provenance.json").read_text(encoding="utf-8"))
-    assert prov["sha256"] == hashlib.sha256(v2).hexdigest()
+def test_header_logo_final_is_the_approved_original_bytes():
+    """2026-10-20 대표 최종 확정 「이게 정말 최종 로고임.. 이 이미지만 바꿔줘」(v2 를 대체) -- 원본 바이트 그대로(재생성·크롭·배경 제거 없음)."""
+    img = (BRAND / "popcornai-header-logo-final.png").read_bytes()
+    assert len(img) == 204469
+    assert hashlib.sha256(img).hexdigest() == "25e86af8131998955cc2bd42b43a56db9de5cd30d86079e849c2562286ceff40"
+    prov = json.loads((BRAND / "popcornai-header-logo-final.provenance.json").read_text(encoding="utf-8"))
+    assert prov["sha256"] == hashlib.sha256(img).hexdigest()

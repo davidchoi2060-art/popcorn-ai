@@ -36,7 +36,7 @@
   // 푸터·파비콘은 기존 logo.png 그대로.
   function brand(where) {
     if (where === 'header') return '<a class="site-brand site-brand-logo" href="' + PAI.href('index') + '" aria-label="팝콘AI 처음 화면">' +
-      '<img class="brand-logo" src="' + PAI.image('brand/popcornai-header-logo-v2.png') + '" alt="" width="420" height="153" decoding="async"></a>';
+      '<img class="brand-logo" src="' + PAI.image('brand/popcornai-header-logo-final.png') + '" alt="" width="420" height="153" decoding="async"></a>';
     return '<a class="site-brand" href="' + PAI.href('index') + '" aria-label="팝콘AI 처음 화면">' +
       '<img src="' + PAI.image('logo.png') + '" alt="" width="42" height="42"><span>팝콘AI</span></a>';
   }
