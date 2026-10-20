@@ -89,7 +89,7 @@
     }
     function stateNotice() {
       // 응답 대기(2026-10-20 대표 「마지막 시안을 작게 해서 애니메이션」): 실제 요청 중에만 그려지고 답·오류·중단이면 다시 그려지며 사라진다.
-      if (model.state === 'loading') return '<div class="dc-state-box dc-loading dc-wait" role="status">' + (P.chatWaitArt ? P.chatWaitArt() : icon('clock')) + '<div><strong>답변을 준비하고 있어요</strong><p>잠시만 기다려 주세요.</p><button type="button" data-dc-action="stop">기다리기 중단</button></div></div>';
+      if (model.state === 'loading') return '<div class="dc-state-box dc-loading dc-wait" role="status">' + (P.chatWaitArt ? P.chatWaitArt() : icon('clock')) + '<div><strong>AI가 답변을 준비하고 있어요.</strong><p>조금만 기다려 주세요.</p></div></div>';
       var errors = { error: ['답변을 불러오지 못했어요.', '입력한 내용을 유지했어요. 다시 보내거나 내용을 고칠 수 있어요.'], offline: ['연결 상태를 확인해 주세요.', '대화를 이어가지 못했어요. 연결을 확인한 뒤 다시 시도해 주세요.'], timeout: ['답변이 예상보다 오래 걸리고 있어요.', '응답을 확인하지 못했어요. 입력한 내용을 보관한 채 다시 시도할 수 있어요.'], 'rate-limit': ['요청이 잠시 많아요.', '잠시 후 다시 보내 주세요. 입력한 내용은 그대로 남아 있어요.'], 'long-message': ['내용을 조금 나누어 보내주세요.', '한 번에 10,000자까지 입력할 수 있어요. 원문은 입력창에 그대로 두었어요.'] };
       if (errors[model.state]) { var item = errors[model.state]; return '<div class="dc-state-box dc-error" role="alert">' + icon('warning-circle') + '<div><strong>' + h(item[0]) + '</strong><p>' + h(item[1]) + '</p>' + (model.state !== 'long-message' ? '<button type="button" data-dc-action="retry">' + icon('arrow-counter-clockwise') + '다시 시도</button>' : '') + '</div></div>'; }
       if (model.state === 'clarify') return '<div class="dc-inline-actions"><button class="dc-draft-chip" type="button" data-dc-draft="예산은 아직 정하지 않았어요.">예산은 아직 몰라요</button><button class="dc-draft-chip" type="button" data-dc-draft="어떤 사양이 필요한지 잘 모르겠어요.">사양을 잘 몰라요</button></div>';
@@ -115,7 +115,17 @@
         '<section class="dc-candidates"><div class="dc-candidates-heading"><h2>살펴볼 PC</h2>' + (cards.length > 1 ? '<a href="' + h(url('compare', 'normal', { ids: cards.map(function (p) { return p.id; }).join(',') })) + '">비교하기 ' + icon('caret-right') + '</a>' : '') + '</div>' +
         (cards.length ? cards.map(function (p) { return card(p, !!model.selected && String(model.selected.id) === String(p.id)); }).join('') : empty(isLoading ? '구성을 살펴보고 있어요.' : '아직 보여드릴 PC가 없어요.', isLoading ? '확인하는 동안 대화를 계속 읽을 수 있어요.' : '원하는 조건을 알려주거나 상품을 먼저 둘러보세요.', isLoading ? '' : buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline'))) + '</section></aside></div>';
     }
-    function render() { if (root) root.innerHTML = markup(); }
+    // 화면을 통째로 다시 그리면 대화 기록 스크롤이 맨 위(첫 질문)로 돌아간다. 새 질문을 보냈을 때만 그 질문을 위에 맞추고, 그 밖에는 읽던 위치를 그대로 둔다.
+    function render() {
+      if (!root) return;
+      var old = root.querySelector('.dc-chat-log'), keep = old ? { top: old.scrollTop, users: old.querySelectorAll('.dc-message-user').length } : null;
+      root.innerHTML = markup();
+      var log = root.querySelector('.dc-chat-log');
+      if (!log || !keep) return;
+      var users = log.querySelectorAll('.dc-message-user'), last = users[users.length - 1];
+      if (users.length > keep.users && last) log.scrollTop = Math.max(0, last.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop - 12);
+      else log.scrollTop = keep.top;
+    }
     function stop() { if (controller) { var c = controller; controller = null; c.abort(); } }
     // 화면이 보여 주는 PC 를 서버가 읽을 수 있게 상품번호만 보낸다(가격·이름은 보내지 않는다).
     function displayContext() {
@@ -184,7 +194,6 @@
         if (node.hasAttribute('data-dc-select')) { var p = product(node.dataset.dcSelect); if (p) { model.selected = p; model.notice = p.name + '을 선택했어요. 상세 구성과 견적을 이어서 확인해보세요.'; render(); if (p.liveDetail === 'pending' && P.live) P.live.loadDetail(p.id).then(render); } return; }
         var action = node.dataset.dcAction;
         if (action === 'new') { stop(); model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.mobile = 'chat'; render(); }
-        if (action === 'stop') { stop(); model.state = model.ids.length ? 'results' : model.log.length ? 'clarify' : 'welcome'; model.notice = '기다리기를 중단했어요. 입력한 내용은 그대로 남아 있어요.'; render(); }
         if (action === 'retry') send(true);
         if (action === 'conditions') { model.state = 'clarify'; model.mobile = 'products'; render(); var b = root.querySelector('[data-dc-condition="budget"]'); if (b) b.focus(); }
       });
