@@ -1,0 +1,3972 @@
+<!DOCTYPE html>
+<html lang='ko'>
+<head>
+<meta charset="euc-kr">
+<meta http-equiv="Content-Script-Type" content="text/javascript">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="description" content="배그컴퓨터전문,조립20년경력,조립전문점,맞춤가서비스"/>
+<meta name="keywords" content="프리미엄팝콘피씨=조립1위, 조립컴퓨터, 사무용컴퓨터,게이밍컴퓨터,디자인컴퓨터, 온라인견적"/>
+<meta name="naver-site-verification" content="fde81182c0e3bf04251854d8633bc75c91164e33"/>
+<meta name="google-site-verification" content="a142603265w204472483p197845828"/>
+<meta name="apple-mobile-web-app-title" content="프리미엄팝콘피씨=조립1위"/>
+<meta property="og:type" content="website">
+<meta property="og:title" content="프리미엄팝콘피씨=조립1위">
+<meta property="og:description" content="배그컴퓨터전문,조립20년경력,조립전문점,맞춤가서비스">
+<meta property="og:image" content="/skin/shop/basic/customizing/logo.png">
+<meta property="og:url" content="">
+	
+<title>프리미엄팝콘피씨=조립1위</title>
+<link rel="shortcut icon" href="/skin/shop/basic/customizing/favicon.ico">
+<script type="text/javascript" src="/js/jquery-1.4.2.min.js"></script>
+<script type="text/javascript" src="/js/common.js"></script>
+ 
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+	var g4_path      = '..';
+	var g4_bbs       = 'bbs';
+	var g4_bbs_img   = 'img';
+	var g4_url       = 'http://www.popcornpc.co.kr';
+	var g4_is_member = '';
+	var g4_is_admin  = '';
+	var g4_bo_table  = '';
+	var g4_sca       = '';
+	var g4_charset   = 'euc-kr';
+	var g4_cookie_domain = '.popcornpc.co.kr';
+	var g4_is_gecko  = navigator.userAgent.toLowerCase().indexOf('gecko') != -1;
+	var g4_is_ie     = navigator.userAgent.toLowerCase().indexOf('msie') != -1;
+
+	function execDaumPostcode(id1, id2, id3, id4) {
+		new daum.Postcode({
+			oncomplete: function(data) {
+				var fullAddr = ''; // 최종 주소 변수
+				var extraAddr = ''; // 조합형 주소 변수
+				if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+					fullAddr = data.roadAddress;
+				} else { // 사용자가 지번 주소를 선택했을 경우(J)
+					fullAddr = data.jibunAddress;
+				}
+				if(data.userSelectedType === 'R'){
+					if(data.bname !== ''){
+						extraAddr += data.bname;
+					}
+					if(data.buildingName !== ''){
+						extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+					}
+					fullAddr += (extraAddr !== '' ? ' ('+ extraAddr +')' : '');
+				}
+				var zonecode_1 = data.zonecode.substring(0,3);
+				var zonecode_2 = data.zonecode.substring(3,5);
+				var postcode_1 = data.postcode.substring(0,3);
+				var postcode_2 = data.postcode.substring(4,7);
+				if (data.userSelectedType === 'R') { // 사용자가 도로명 주소를 선택했을 경우
+					document.getElementById(id1).value = zonecode_1;
+					document.getElementById(id2).value = zonecode_2;
+				} else { // 사용자가 지번 주소를 선택했을 경우(J)
+					document.getElementById(id1).value = zonecode_1;
+					document.getElementById(id2).value = zonecode_2;
+				}
+				document.getElementById(id3).value = fullAddr;
+				document.getElementById(id4).focus();
+								
+				if(typeof order_delivery_cost == 'function' ) {
+					order_delivery_cost();
+				}
+				
+			}
+		}).open();
+	}
+	 
+	</script>
+	
+	<script>
+	if(window.location.protocol == 'http:'){
+		window.location.protocol = 'https:';
+	}
+	</script>	
+	<link rel="stylesheet" href="/skin/shop/basic/css/common.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/header.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/skin.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/estimate.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/system_detail.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/mypage.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/member.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/etc.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/customizing.css?patch=20260320" />
+<link rel="stylesheet" href="/skin/shop/basic/css/remodal.css">
+<link rel="stylesheet" href="/skin/shop/basic/css/remodal-default-theme.css">
+<link rel="stylesheet" href="/skin/shop/basic/css/swiper.min.css" />
+	
+<link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+
+<script type="text/javascript" src="/skin/shop/basic/js/jquery.min.js"></script>
+<script type="text/javascript" src="/skin/shop/basic/js/jquery-ui.js"></script>
+<script type="text/javascript" src="/skin/shop/basic/js/remodal.js"></script>
+<script type="text/javascript" src="/skin/shop/basic/js/jquery-supergallery-plugin2.min.js"></script>
+<script type="text/javascript" src="/skin/shop/basic/js/swiper.min.js"></script>
+<script type="text/javascript" src="/js/basic.js"></script>
+<!-- Google Tag Manager -->
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-WTFCVBQ4');</script>
+<!-- End Google Tag Manager -->
+<!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WTFCVBQ4" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=AW-11292412167"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'AW-11292412167');
+</script>
+
+<script type="text/javascript" charset="UTF-8" src="//t1.daumcdn.net/adfit/static/kp.js"></script>
+<script type="text/javascript">
+      kakaoPixel('642705823190894975').pageView();
+</script>
+<!-- Meta Pixel Code -->
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script','https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '1609275569684511');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1609275569684511&ev=PageView&noscript=1"/></noscript>
+<!-- End Meta Pixel Code -->
+
+<script>
+function slide_on(obj,flag,tab){
+	var img_ul = "";
+	var $this = $(obj);
+	if(flag){
+		img_ul = $this.parents(".bnr").find("ul");
+	}
+	else{
+		if(tab){
+			if(tab=="game"){
+            	var index = $(".gamepc_slide").find(".tab .on").parent().index();
+            	img_ul = $(".game_list").eq(index).find("ul");
+			}if(tab=="item"){
+				// 메인 블루아이티 추천상품 일시
+				img_ul = $this.parent().find(".inner > ul");
+			}else if(tab=="set"){
+				img_ul = $this.parent().children("ul");
+			}else{
+				//이벤트 일시
+				var index = $(".event_view").find(".tab .on").parent().index();
+				img_ul = $(".events").find("ul:eq("+index+")");
+			}
+		}else{
+			img_ul = $this.parent().find("ul");
+		}
+	}
+
+	// img_ul.find => children 변경 20210419
+	var list_img = img_ul.children("li").width();
+	var length = img_ul.children("li").length;
+	var current = $("#header .current");
+	var str = "";
+	
+	
+	if($this.hasClass("next")){
+		if(flag){ 
+			str = img_ul.find("li").eq(0).next().attr("class");
+			current.text(str.substr(-1,1)); 
+		}
+		img_ul.animate({
+			"margin-left" : "-="+list_img+""
+		},function(){
+			// img_ul.find => children 변경 20210419
+			img_ul.children("li").eq(0).appendTo(img_ul);
+			img_ul.css("margin-left","0");
+		})
+	}else{
+		if(flag){ 
+			str = img_ul.find("li").eq(length-1).attr("class");
+			current.text(str.substr(-1,1)); 
+		}
+		// img_ul.find => children 변경 20210419
+		img_ul.children("li").eq(length-1).prependTo(img_ul);
+		img_ul.css("margin-left",-list_img);
+		img_ul.animate({ "margin-left" : "+="+list_img+"" })
+	}
+	
+}
+
+var arr = new Array();
+var position_array = new Array();
+
+$(document).ready(function(){
+	var url = "/shop/system_detail.html";
+	var ctgr_layer = $(".ctgr_layer");
+	var ctgr_all = $(".ctgr_all li");
+	var ctgr_parent = $(".ctgr_parent");
+
+    $(".category_nav li").click(function(){
+		var parent = $(this).parents(".contents").parent();
+		var idx = $(this).index();
+		var target = parent.find(".popular_all:eq("+idx+")");
+		var offset = target.offset(); 
+		$("html, body").scrollTop((offset.top)-20) 
+		
+		return false;
+	});
+
+	
+	$(".ctgr_all li a").mouseover(function(){
+		var cate = $(this).attr("cate");
+		ctgr_layer.show();
+		ctgr_layer.find("[class^=\"layer_\"]").hide();
+		ctgr_layer.find(".layer_"+cate+"").show();
+		ctgr_all.find("a").removeClass("on");
+		$(this).addClass("on");
+
+			
+		
+	});
+
+	$(".ctgr_parent").mouseleave(function(){
+		if ((url != "/index.php")&&(url != "/shop/index.html")) {
+			ctgr_parent.hide();	
+		}else{
+        	ctgr_layer.hide();
+        	ctgr_layer.find("[class^=\"layer_\"]").hide();
+		}
+    	ctgr_all.find("a").removeClass("on");
+
+    	    	
+	});
+
+
+		
+	$(".menu_all").click(function(){
+		    		if ((url != "/index.php")&&(url != "/shop/index.html")) {
+    			ctgr_all.eq(0).trigger("mouseover");
+    			if(ctgr_parent.is(":visible")){
+    				ctgr_parent.hide();	
+        		}else{
+        			ctgr_parent.show();
+            	}
+        	}
+    	    });
+
+
+	if(url == "/index.php" && $(".popular_item_4").length > 0){
+		$(".popular_item_4 .category_arr li").each(function(){
+	    	var idx = $(this).index();
+	    	var img_data = $(this).find("a").attr("data1");
+			var img_on_data = $(this).find("a").attr("data2");
+			arr.push({"bg":img_data,"bg_on":img_on_data})
+	    })
+    	$(".popular_item_4 .contents").each(function(){
+    		position_array.push($(this).offset().top)
+    	})
+    	
+	}
+
+	$(window).scroll(function(){
+		var wing = $(".wing");
+		var scroll = $(window).scrollTop();
+		wing.stop();
+		//wing.animate( { "top" : scroll+200 },300);	
+		if(scroll > 250){
+			if($("#fixedBanner").length > 0){
+    			wing.animate( { "top" : scroll - 30 },300);
+			}else{
+				wing.animate( { "top" : scroll + 30 },300);
+			}
+		}else{
+			wing.animate( { "top" : "200px" },300);
+		}
+			
+		if(url == "/index.php" && $(".popular_item_4").length > 0){
+			var closest_val = closest(scroll, position_array);
+			var idx = position_array.indexOf(closest_val);
+			
+			var ctgr_arr = $(".category_arr");
+			
+			if(scroll > position_array[0]){
+				ctgr_arr.addClass("fixed")
+				if(scroll >= (position_array[position_array.length-1] - 100)){
+					ctgr_arr.removeClass("fixed")
+				}
+				
+			}else{
+				ctgr_arr.removeClass("fixed")
+			} 
+
+			$(".popular_item_4 .category_arr li").hover(function(){
+				var idx = $(this).index();
+				$(this).find("a").addClass("on").css({
+					"background-image" : "url("+arr[idx]["bg_on"]+")"					
+				});
+			},function(){
+				$(this).find("a").removeClass("on")
+				$(".popular_item_4 .category_arr li").each(function(i){
+					if(!$(this).find("a").hasClass("active")){
+						$(this).find("a").css({
+							"background-image" : "url("+arr[i]["bg"]+")"
+						});
+			    	}
+				})
+			});
+// 			$(".category_arr li").each(function(i){
+//     			$(this).find("a").removeClass("active").css({
+//     				"background-image" : "url("+arr[i]["bg"]+")"
+//     			});
+//         	})
+//         	ctgr_arr.find("li > a:eq("+idx+")").addClass("active").css({
+// 				"background-image" : "url("+arr[idx]["bg_on"]+")"
+// 			});
+		}
+		return false;
+	});
+
+	$(".wing .btn").click(function(){
+		var img_ul = $(".wing .list ul");
+		var list_img = img_ul.find("li").height();
+		var length = img_ul.find("li").length;
+		
+		if($(this).hasClass("next")){
+			img_ul.animate({
+				"margin-top" : "-="+list_img+""
+			},function(){
+				img_ul.find("li").eq(0).appendTo(img_ul);
+				img_ul.css("margin-top","0");
+			})
+		}else{
+			img_ul.find("li").eq(length-1).prependTo(img_ul);
+			img_ul.css("margin-top",-list_img);
+			img_ul.animate({ "margin-top" : "+="+list_img+"" })
+		}
+		
+		return false;
+	})
+	
+	$("#gnb > li").hover(function(){
+		$(this).find(".sub_menu").stop(true,true).slideDown();
+	},function(){
+		$(this).find(".sub_menu").stop(true,true).slideUp();
+	})
+	
+	
+	
+	var headInterval = setInterval(function(){
+		$("#header .bnr_top .next").trigger("click");
+    },3000);
+
+	$("#header .bnr li").hover(function(){
+		clearInterval(headInterval);
+	},function(){
+		headInterval = setInterval(function(){
+			$("#header .bnr_top .next").trigger("click");
+	    },3000);
+	})
+	
+	
+	
+	var $handle = $("#custom_handle");
+	$("#level_slider").slider({
+		max: 300,
+		slide: function( event, ui ) {
+			var val = ui.value;
+			console.log(val)
+			//rgba(68, 80, 154, 1)
+			/*
+				300 = 23% 69
+				300 = 50% 150
+				300 = 77% 	231
+				300 = 100% 	300
+			    rgb(67,79,152) 0%, rgb(123,136,246) 23%, rgb(99,193,45) 50%, rgb(238,223,74) 77%, rgb(229,66,64) 100%
+			*/
+			var  r = 0;// + val;
+			var  g = 0;// + val;
+			var  b = 0;// + val;
+			if(0<=val && val<=69){
+				//console.log("1단계");
+				r = 67+Math.floor(0.78*val);
+				g = 79+Math.floor(0.81*val);
+				b = 152+Math.floor(1.36*val);
+			}else if(69<=val && val<=150){
+				//console.log("2단계");
+				val = val - 69;
+				r = 123-Math.floor(1.944*val);
+				g = 136+Math.floor(0.7037*val);
+				b = 246-Math.floor(2.481*val);
+			}else if(150<=val && val<=231){
+				//console.log("3단계");
+				val = val - 150;
+				r = 99+Math.floor(1.716*val);
+				g = 193+Math.floor(0.37037*val);
+				b = 45+Math.floor(0.035*val);
+			}else if(231<=val && val<=300){
+				//console.log("4단계");
+				val = val - 231;
+				r = 238-Math.floor(0.1304*val);
+				g = 223-Math.floor(2.2753*val);
+				b = 74-Math.floor(0.14492*val);
+			}
+			//console.log("rgb("+r+","+g+","+b+")")
+			$(".color").css("background","rgb("+r+","+g+","+b+")");
+			$(".level").html(ui.value);
+		}
+	});
+	
+});
+
+function main_search(word){
+	document.main_search.main_search.value = word;
+	document.main_search.submit();
+}
+
+function all_category(){	
+	$("#all_category").toggle();
+	}
+
+function closest (num, arr) {
+    var curr = arr[0];
+    var diff = Math.abs (num - curr);
+    for (var val = 0; val < arr.length; val++) {
+        var newdiff = Math.abs (num - arr[val]);
+        if (newdiff < diff) {
+            diff = newdiff;
+            curr = arr[val];
+        }
+    }
+    return curr;
+}
+
+function go_category(idx){
+	var top = $("#item_"+idx).offset().top;
+	$(window).scrollTop(top - 25)
+}
+
+
+//------------------------------------------------------
+//---------- 스킨에서 사용되는 자바스크립트 공통 함수 
+//------------------------------------------------------
+// 1. 콤마 찍기
+function fn_comma(str,type){
+	str = String(str);
+	if (type){    
+    	return str.replace(/(\d)(?=(?:\d{3})+(?!\d))/g, '$1,');
+    }else{
+    	var num = Number(str.replace(/,/gi,""));
+		if (isNaN(num)){
+			return "";
+		}
+		return num;
+    }
+} 
+// 2. 값 입력시 콤마찍기 - onkeyup="fn_comma_input(this)"
+function fn_comma_input(obj) {
+	if (obj.value == "") return;
+    obj.value = fn_comma(fn_comma(obj.value,false),true);
+}
+
+// 3. 이용후기, 제품문의에 대한 임시 팝업용 .. 추후 커뮤니티가 개발되면 그쪽으로 링크해야한다.
+function fn_popup_bbs(board,pdno){
+	var url = "/shop/popup.html?bo_table="+board+"&pd_no="+pdno;
+	var popup = window.open(url, "bbs", "width=800,height=600,status=no,toolbar=no,menubar=no,location=no");
+	popup.focus();
+}
+
+// 4. 무이자, 대량구매 등 각종 팝업
+function fn_open_etc(type){
+	var url = "/shop/popup.html?type="+type;
+	var option = "height=950, width=680";
+	if(type.indexOf("data") != -1){
+		option = "height=878, width=400";
+	}else if(type == "member"){
+		option = "height=380, width=800";
+	}
+	var popup = window.open(url, "etc", ""+option+",status=no,toolbar=no,menubar=no,location=no");
+}
+
+//5. 이미지 확대보기 팝업
+function fn_open_zoom(num){
+	var url = "/shop/zoom.html?pd_no="+num;
+	var popup = window.open(url, "zoom", "height=685, width=620,status=no,toolbar=no,menubar=no,location=no");
+}
+</script>
+</head>
+
+<body>
+
+<div id="viewport">
+
+	<!-- S:HEADER -->
+	<div id="header" class="ver_2">
+		<div class="wing_box contains">
+    		<div class="wing">
+    			    			<ul>
+    				<li><a href='https://popcornpc.co.kr/bbs/board.php?bo_table=comm_pcsangdam' target=''><img src='/data/design/chuchyn_1078_1.png'/></a></li><li><a href='https://popcornpc.co.kr/shop/estimatepc.html' target=''><img src='/data/design/chuchyn_1079_1.png'/></a></li><li><a href='https://pf.kakao.com/_smRxmE' target=''><img src='/data/design/chuchyn_1080_1.png'/></a></li>				</ul>
+    		</div>
+    		<div class="wing">
+    			    			<ul>
+    				<li><a href='https://www.youtube.com/channel/UCCUVI9UtaZBBwEc7tNOmq2w' target=''><img src='/data/design/chuchyn_61_1.jpg'/></a></li><li><a href=' https://consumer.tosspayments.com/payment-history/card' target=''><img src='/data/design/chuchyn_1625_1.png'/></a></li>    				<li class="view">
+    					<div class="cart">
+    						                        	<a href="/shop/order_basket_list.html">
+        						<span class="cnt">0</span>
+        						<span class="txt">카트</span>
+                        	</a>
+    					</div>
+    					<div class="product">
+    						<div class="tit">최근본상품</div>
+    						<div class="contents">
+    							<a href="#" class="btn prev">
+    								<img src="/skin/shop/basic/images/icon/scroll_up.jpg" />
+    							</a>
+    							<div class="list">
+        							<ul>
+        								        							</ul>
+    							</div>
+    							<a href="#" class="btn next">
+    								<img src="/skin/shop/basic/images/icon/scroll_down.jpg" />
+    							</a>
+    						</div>
+    					</div>
+    				</li>
+    				<li class="skip">
+    					<a href="javascript:window.scrollTo(0,0);">TOP</a>
+    				</li>
+    			</ul>
+    		</div>
+		</div>
+	
+		<div class="header_top">
+			<div class="contains clear">
+			   	<ul class="shortcuts">
+   					<li><a href="#"><span>HOME</span></a></li>
+   					<li><a href='https://www.youtube.com/channel/UCCUVI9UtaZBBwEc7tNOmq2w' target='_blank'>	<img src='/skin/shop/basic/images/icon/sns_youtube.png'></a></li><li><a href='http://blog.naver.com/proteam1234' target='_blank'>	<img src='/skin/shop/basic/images/icon/sns_blog.png'></a></li><li><a href='https://www.instagram.com/herosys1' target='_blank'>	<img src='/skin/shop/basic/images/icon/sns_instagrm.png'></a></li><li><a href='https://pf.kakao.com/_smRxmE' target='_blank'>	<img src='/skin/shop/basic/images/icon/sns_kakao.png'></a></li>								
+				</ul>
+				
+				<ul class="menu">
+										
+					<li><a href="/bbs/login.php">로그인</a></li>
+					<li><a href="/shop/member.html">회원가입</a></li>
+					<li><a href="/shop/order_basket_list.html">장바구니</a></li>
+					<li><a href="/bbs/login.php?action=nonmember_order_list">주문ㆍ배송조회</a></li>
+									</ul>
+			</div>
+		</div>
+		
+		<div class="header_bottom">
+			<div class="mid_cont">
+    			<div class="contains clear">
+					    				<h1 class="logo"><a href="/"><img src="/skin/shop/basic/customizing/logo.png" /></a></h1>
+    				<div class="search_wrap">					<div class="search_word clear"><ul></ul></div>    					
+    					<form name="main_search" class="search_form clear" method="post" action="/shop/product_search.html" target="_parent">
+    						<input type="text" name="main_search" class="search_text" placeholder="" value=""/>
+    						<a href="javascript:document.main_search.submit()" class="search_btn">검색</a>
+    					</form>    				
+										</div>
+					    				
+    				<div class="bnr">
+												    					<div class="bnr_top">
+    						<span class="cnt"><span class="current">1</span> / <span class="all">1</span></span>
+    						<a href="#" class="arr prev" onclick="slide_on(this,'1'); return false;"><img src="/skin/shop/basic/images/icon/bnr_prev.png" alt="이전버튼" /></a>
+    						<a href="#" class="arr next" onclick="slide_on(this,'1'); return false;"><img src="/skin/shop/basic/images/icon/bnr_next.png" alt="다음버튼" /></a>
+    					</div>
+    					<ul>
+							<li class="bnr_1"><a href='https://www.popcornpc.co.kr/shop/event.html?tab=1' target=''><img src='/data/design/chuchyn_1514_1.jpg'/></a></li>    					</ul>
+    					    				</div>
+    			</div>
+			</div>
+		
+		
+					
+			<nav id="nav" class="nav">
+				<div class="contains clear">
+					<ul id="gnb" class="on">					
+						<li><a href="javascript:all_category();" class="menu_all">전체 카테고리</a></li>
+						<li><a href='/shop/system_list.html' class='' target=''><span>조립PC</span></a></li><li><a href='/shop/gamepc_list.html' class='game' target=''><span>게임PC</span><span class='game_label'>Game</span></a></li><li><a href='/shop/event.html?ev_no=211' class='' target=''><span><font color=red>주간인기상품</font></span></a></li><li><a href='/shop/estimatepc.html' class='' target=''><span>온라인견적</span></a></li><li><a href='/bbs/board.php?bo_table=comm_pcsangdam' class='' target=''><span>PC견적상담</span></a></li><li><a href='https://www.popcornpc.co.kr/shop/event.html?ev_no=299' class='' target=''><span><font color=blue>초슬림 / 미니타워 PC</font></span></a></li><li><a href='https://popcornpc.co.kr/bbs/board.php?bo_table=comm_free&page=1&sca=&sfl=&stx=&sst=&sod=&spt=0&page=1&sca=&pd_no=' class='' target=''><span><font color=#BF00FF>고객 구매상품 영상</font></span></a></li><li><a href='/shop/community.html' class='customer' target=''><span>커뮤니티</span></a><div class='sub_menu'><ul><li><a href='/bbs/board.php?bo_table=comm_post'>구매후기</a></li><li><a href='/bbs/board.php?bo_table=comm_free'>구매제품 동영상</a></li><li><a href='/bbs/board.php?bo_table=comm_pcsangdam'>견적상담</a></li><li><a href='/bbs/board.php?bo_table=comm_data'><자료실></a></li></ul></div></li>						
+						<!-- 헤더 커스터 마이징을 위한 기본메뉴구성 셋 
+						<li><a href="/shop/system_list.html" >조립PC</a></li>
+						<li><a href="/shop/product_list.html">부품/주변기기</a></li>
+						<li><a href="/shop/estimatepc.html"  >온라인견적</a></li>
+						<li><a href="/bbs/board.php?bo_table=comm_pcsangdam"  >PC 견적상담</a></li>
+						<li><a href="/shop/event.html"		 class="event ">이벤트</a></li>
+						<li><a href="/shop/brandshop.html"   >브랜드샵</a></li>
+						<li><a href="/shop/community.html"   class="customer ">커뮤니티</a>
+							<div class="sub_menu"><ul><li><a href="/bbs/board.php?bo_table=comm_post">구매후기</a></li><li><a href="/bbs/board.php?bo_table=comm_free">질문 & 답변</a></li></ul></div>
+						</li>	
+						-->						
+					</ul>
+										<div class="ctgr_parent ">
+            			<div class="ctgr_all">
+            				<ul>							
+							<li><a href='/shop/system_list.html?depth=1&cate1=6573' cate='6573'>프리미엄 3년 무상 서비스</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11598' cate='6573_11598'>초저가 가성비짱</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11382' cate='6573_11382'>인터넷 / 사무용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11135' cate='6573_11135'>디자인 / 업무용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11039' cate='6573_11039'>게임 / 그래픽 / 주식용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11254' cate='6573_11254'>고성능 / 전문가용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11690' cate='6573_11690'>완벽한 / BTF / 솔루션 </a></li><li><a href='/shop/system_list.html?depth=2&cate2=11399' cate='6573_11399'>인텔 컴퓨터</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11406' cate='6573_11406'>라이젠 컴퓨터</a></li><li><a href='/shop/event.html?ev_no=293' cate='6573_11398'>쿼드로 | AI, 딥러닝, 빅데이터</a></li><li><a href='/shop/product_list.html?ct_no=11039' cate='11039'>배틀그라운드 컴퓨터</a></li><li><a href='/shop/product_list.html?ct_no=11498' cate='11498'>모니터 + 윈도우 패키지</a></li><li><a href='/shop/product_list.html?ct_no=' cate=''>--------------------------------</a></li><li><a href='/shop/product_list.html?ct_no=10791' cate='10791'>컴퓨터_주변기기</a></li><li><a href='/shop/product_list.html?ct_no=9627' cate='9627'>모니터</a></li>											 
+            				</ul>
+            				            			</div>
+	
+	
+            			<div class="ctgr_layer"> 
+            			            			
+        				            				<div id="" class="layer_6573" style="display: none;">
+            					<ul>
+									<li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11690'>완벽한 BTF 솔루션</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11598'>초저가 가성비짱</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11015'>프리미엄 피씨</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11382'>가정용 / 사무용</a></dt>
+
+													
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11039'>게임 / 그래픽 / 주식용</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11135'>디자인 / 업무용</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11254'>고성능 / 전문가용</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11399'>인텔컴퓨터</a></dt>
+
+													
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11406'>라이젠컴퓨터</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11398'>VFX/AI/딥러닝/빅데이터</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11605'>익스트림 PC</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11547'>초슬림 / 미니타워 PC</a></dt>
+
+													
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11498'>모니터+윈도우패키지</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/system_list.html?depth=2&cate2=11590'>견적왕 추천PC</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													
+													
+													</dl>
+													</li>            						
+            					</ul>
+            				</div>
+        				            				<div id="" class="layer_10791" style="display: none;">
+            					<ul>
+									<li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11625'>전체리스트</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11779'>주요부품특별할인전</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11580'>중고그래픽카드</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11589'>그래픽카드중고pc</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11581'>엔비디아[Nvidia]</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11582'>라데온[AMD RADEON]</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11033'>운영체제(OS)</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10842'>제작,서비스</a></dt>
+
+													
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10797'>프로세서(CPU)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11763'>인텔15세대(애로우레이크)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11635'>인텔14세대(랩터레이크R)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11583'>인텔13세대(랩터레이크)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11405'>인텔12세대(엘더레이크)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11396'>인텔11세대(로켓레이크)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10871'>인텔10세대 이하</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11013'>인텔_코어X-시리즈</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11620'>인텔_제온 프로세서</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10968'>라이젠 3000시리즈</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11312'>라이젠 4000시리즈</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11367'>라이젠 4세대</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11572'>라이젠 5세대</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11687'>라이젠 6세대</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11618'>라이젠 쓰레드리퍼</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10798'>CPU쿨러</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11194'>공랭쿨러</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11195'>수냉쿨러</a></dd>
+
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10799'>메인보드(M/B)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11775'>인텔_워크스테이션</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11764'>인텔15세대(애로우레이크)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11584'>인텔13세대(H710/B760/Z790)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11407'>인텔12세대(H610/B660/Z690)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11394'>인텔11세대(H510/B560/Z590)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11303'>인텔10세대(H410/B460/Z490)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10964'>라이젠3세대(A320/B450/X470)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11313'>라이젠4세대(A520/B550/X570)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11573'>라이젠5세대(A620/B650/b850/X670/X870)</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11619'>라이젠_워크스테이션</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10800'>메모리(RAM)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11408'>DDR5 메모리</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10911'>DDR4 메모리</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10912'>서버용 REG/ECC</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10913'>노트북용 메모리</a></dd>
+
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10804'>그래픽카드(VGA)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11774'>지포스_RTX5000</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11574'>지포스_RTX4000</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11178'>지포스_RTX3000</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11176'>지포스_RTX2000</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11174'>지포스_GTX1000 이하</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11177'>AMD 라데온 VGA</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11175'>쿼드로/테슬라 VGA</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11597'>인텔 ARC 시리즈</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10801'>고속저장(SSD)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11172'>NVMe 타입 SSD</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11295'>S-ATA 타입 SSD</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10802'>저장장치(HDD)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=10918'>1TB HDD</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10919'>2TB HDD</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=10920'>3TB 이상</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11375'>외장하드</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11373'>NAS/DAS</a></dd>
+
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10805'>케이스(CASE)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11179'>미들타워</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11662'>미니타워</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11182'>빅타워</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11220'>랙마운트</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10803'>시디롬(ODD)</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10806'>파워(POWER)</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11185'>정격450W이하</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11184'>정격500/550W</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11186'>정격600/650W</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11188'>정격700/850W</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11663'>정격1000W이상</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11595'>비정격 파워</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10952'>프린터</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11131'>레이저프린터/복합기</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11130'>잉크젯프린터/복합기</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11132'>프린터소모품</a></dd>
+
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11594'>컴퓨터서버</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10807'>(기타)쿨러등</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11297'>수냉케이스</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11298'>수냉쿨러세트</a></dd>
+
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10846'>네이워크장비/기타</a></dt>
+
+													<dd><a href='/shop/product_list.html?ct_no=11190'>2.4GHz</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11191'>2.4GHz/5GHz</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11641'>kvm/km 스위치</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11646'>pci-e 확장카드</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11647'>공유기</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11221'>랜카드</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11644'>리피터</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11642'>분배기/선택기</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11640'>블루투스 동글</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11192'>스위칭허브</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11667'>웹하드</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11645'>컨버터</a></dd>
+<dd><a href='/shop/product_list.html?ct_no=11643'>컨트롤러</a></dd>
+
+													</dl>
+													</li>            						
+            					</ul>
+            				</div>
+        				            				<div id="" class="layer_9627" style="display: none;">
+            					<ul>
+									<li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11372'>23인치 이하</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10497'>24인치 모니터</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10552'>27인치 모니터</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=10468'>32인치 이상</a></dt>
+
+													
+													</dl>
+													</li><li>
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=9685'>모니터 케이블</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													<dt><a href='/shop/product_list.html?ct_no=11601'>모니터암/받침대</a></dt>
+
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													
+													
+													</dl>
+													
+													<dl style='margin-bottom:20px;'>
+													
+													
+													</dl>
+													</li>            						
+            					</ul>
+            				</div>
+        				        				
+        				     						<div id="" class="layer_6573_11690" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11598" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11382" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11039" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11135" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11254" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11399" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11406" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				     						<div id="" class="layer_6573_11398" style="display: none;">
+            					<ul>
+													
+            					</ul>
+            				</div>       
+        				        				
+        				
+        				
+        				            			</div>
+            		</div><!-- ctgr_parent -->
+            		
+					<div id="all_category" style="display:none;position:absolute;z-index:100; top: 42px;"> 
+					<table width="100%" align="center" border="0" cellspacing="0" cellpadding="0" bgcolor="#FFFFFF" style="opacity:100;filter:alpha(opacity=100); border-left:1px solid #848484; border-right:1px solid #848484; border-bottom:1px solid #848484; border-top:1px solid #848484;">
+						<tr> 
+							<td style="padding:0 0 0 0"> 
+								<table width="100%" border="0" align="center" cellpadding="0" cellspacing="0">
+									<tr> 
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">ai 슈퍼컴퓨터</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">프리미엄 피씨</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/system_list.html?depth=2&cate2=11690'><span>완벽한 BTF 솔루션</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11598'><span>초저가 가성비짱</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11015'><span>프리미엄 피씨</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11382'><span>가정용 / 사무용</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11039'><span>게임 / 그래픽 / 주식용</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11135'><span>디자인 / 업무용</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11254'><span>고성능 / 전문가용</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11399'><span>인텔컴퓨터</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11406'><span>라이젠컴퓨터</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11398'><span>VFX/AI/딥러닝/빅데이터</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11605'><span>익스트림 PC</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11547'><span>초슬림 / 미니타워 PC</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11498'><span>모니터+윈도우패키지</span></a><br/>
+																														<a href='/shop/system_list.html?depth=2&cate2=11590'><span>견적왕 추천PC</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">컴퓨터주변기기</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11625'><span>전체리스트</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11580'><span>중고그래픽카드</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11033'><span>운영체제(OS)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10842'><span>제작,서비스</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10797'><span>프로세서(CPU)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10798'><span>CPU쿨러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10799'><span>메인보드(M/B)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10800'><span>메모리(RAM)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10804'><span>그래픽카드(VGA)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10801'><span>고속저장(SSD)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10802'><span>저장장치(HDD)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10805'><span>케이스(CASE)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10803'><span>시디롬(ODD)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10806'><span>파워(POWER)</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10952'><span>프린터</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11594'><span>컴퓨터서버</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10807'><span>(기타)쿨러등</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10846'><span>네이워크장비/기타</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11494'><span>채굴기</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">가전제품[린클음식물처리기 / 비비딕벌레퇴치기]</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11509'><span>가전 전체상품</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11515'><span>린클음식물처리기</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11523'><span>빔프로젝트</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11516'><span>생활가전</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11520'><span>주방가전</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11609'><span>노트북/타블렛</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11525'><span>공기정화기</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11524'><span>차량용품</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">기타주변기기</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11648'><span>기타</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11359'><span>마사지건</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11376'><span>마스크</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11358'><span>멀티탭</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11776'><span>베어본</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11387'><span>소프트웨어</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11624'><span>책상/의자</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11585'><span>타블렛</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11607'><span>노트북</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11606'><span>충전기</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">모니터</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11372'><span>23인치 이하</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10497'><span>24인치 모니터</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10552'><span>27인치 모니터</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10468'><span>32인치 이상</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=9685'><span>모니터 케이블</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11601'><span>모니터암/받침대</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+										</tr><tr height='0'><td colspan=6></td></tr><tr>										<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">소모품</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=10853'><span>사무용품</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=5906'><span>마우스패드/손목받침대</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=2962'><span>멀티탭</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=6562'><span>케이블 정리용품</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=1021'><span>청소용품/클리너</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11410'><span>USB 용품</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">음향＊방송장비</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11368'><span>스피커</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=9796'><span>헤드셋＊이어폰</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10950'><span>캡쳐메인보드</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11338'><span>사운드카드</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11337'><span>개인방송장비</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10869'><span>USB/메모리카드</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11365'><span>마이크/웹캠</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">키보드,마우스외</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=9523'><span>키보드</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=9524'><span>마우스</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10475'><span>키보드+마우스</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=9580'><span>게이밍기어세트</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">가상화폐  채굴기</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11602'><span>Aleo테스넷 채굴기</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11675'><span>도지코인&라이트코인</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11501'><span>채굴기 부품</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">케이블/변환젠더</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11439'><span>KVM 스위치</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10610'><span>USB 케이블</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=11409'><span>랜케이블</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10232'><span>모니터 케이블</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10423'><span>스테레오 케이블</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10225'><span>전원 케이블</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">쿨링/튜닝용품</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=3534'><span>RAM 쿨러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=3535'><span>VGA 쿨러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=3533'><span>HDD 쿨러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=5203'><span>시스템 쿨러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=3539'><span>튜닝 용품</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+										</tr><tr height='0'><td colspan=6></td></tr><tr>										<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">노트북</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=11781'><span>ASUS</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																				<td width="199" valign=top style="border-right:1px solid #e8e8e8" > 
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="46" bgcolor="#f2f2f2" style="padding:5px 5px 5px 8px; border-bottom:1px solid #d9d9d9"><span style="font-size:14px; font-weight:bold">고객님 개인결제</span></td>
+												</tr>
+											</table>
+											<table border="0" cellspacing="0" cellpadding="0" width="100%">
+												<tr> 
+													<td height="25" style="padding:5px 5px 5px 8px; line-height:18px"> 
+														<div style="width:100%; height:200px; overflow:auto"> 
+																														<a href='/shop/product_list.html?ct_no=10503'><span>일반 딜러</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10246'><span>일반 결제</span></a><br/>
+																														<a href='/shop/product_list.html?ct_no=10247'><span>분할 결제</span></a><br/>
+																													</div>
+													</td>
+												</tr>
+											</table>
+										</td>
+																														
+									</tr>
+								</table>
+							</td>
+						</tr>
+					</table>
+					</div><!-- all_category -->  
+					          		
+				</div>
+			</nav><!-- nav -->
+		</div>
+    		
+	</div>
+	<!-- E:HEADER -->
+	
+
+
+
+
+
+
+
+<script>
+	//뒤로가기
+	window.onpageshow = function(event) {
+		if ( event.persisted || (window.performance && window.performance.navigation.type == 2)) {
+			window.location.reload();
+	    }
+	}
+
+	var func_flag = true; // sid 존재시 처리용 20220701 mirim
+	 
+	function print_data(pd_no,type,flag){
+		var input = "";
+		var unique_num = new Array();
+		var amount = $("#amount_1").val();
+		var change_cnt = 0;
+
+		// 사양변경,추가부품 (메인수량과 함께 증가)
+		$("[id=pcode]").each(function() {			
+			var txt = $(this).closest("td").next().text();
+
+			if (txt != "기본사양" && txt != "선택안함"){	
+				var $this = $(this);
+				var name = $this.attr("name");
+				var val = $this.val();
+				var idx = name.replace(/[^0-9]/g, "");
+				var change_obj = $this.closest("td").children("input[name$="+idx+"]");
+				if(idx){ 
+					unique_num.push(idx);
+					change_cnt++;
+				}
+				change_obj.each(function(){
+					input += "<input type=\"hidden\" name=\"change_"+$(this).attr("name")+"\" value=\""+$(this).val()+"\">";
+				})
+				
+			}
+		});
+
+		// 세트상품,메인상품  
+		$("[id=ao_pd_no]").each(function() {			
+			if ($(this).index() > 0 ){ // 메인상품제외
+				input += "<input type=\"hidden\" name=\"change_"+$(this).attr("name")+"\" value=\""+$(this).val()+"\">";
+				change_cnt++;
+			}
+		});
+
+		// 체크용 포장상품
+		$("[id=chk_box]").each(function() {			
+			if($(this).is(":checked")){
+				input += "<input type=\"hidden\" name=\"change_"+$(this).attr("name")+"\" value=\""+$(this).val()+"\">";
+				change_cnt++;
+			}
+		});
+
+		/* if(change_cnt > 0){} */		
+
+		input += "<input type=\"hidden\" id=\"change_idx\" name=\"change_idx\" value=\""+unique_num+"\">";
+		input += "<input type=\"hidden\" id=\"change_amount\" name=\"change_amount\" value=\""+amount+"\">";
+
+		$("#change_data").empty().append(input);
+
+		// 프린트 페이지에서 호출시
+		/* var add_param = "";
+		if(flag){
+			add_param = "&tab=y";
+		} */
+		var action_url = "/shop/system_print.html?pd_no="+pd_no+"";
+		if(type == "print"){
+			$("#change_data").attr("target","_blank");
+		}else{
+			var pop_width = "1024"; 
+			/* if(type == "capture"){
+				pop_width = "810"
+			} */
+			action_url += "&sendmail="+type+"";
+			window.open(
+				"/shop/system_print.html?pd_no="+pd_no+"&sendmail="+type+"",
+				'sendmail',
+				"width="+pop_width+", height=800, scrollbars=yes, resizable=no"
+			);
+			
+			$("#change_data").attr("target","sendmail");
+		}
+
+		$("#change_data").attr("action",action_url)
+		$("#change_data").submit();
+		
+		/* $("#change_data").attr("action","/shop/system_print.html?pd_no="+pd_no+"")
+		$("#change_data").attr("target","_blank");
+		$("#change_data").submit(); */
+		
+		
+	}
+
+
+    function change_part(obj,img,type){
+    	$this = $(obj);
+    	var parent = $this.parents(".select_box");
+    	var item = parent.find(".item_layer");
+		var price = 0;
+   		var name = "";
+   		var spec = "";
+		var pdno = "";
+		var dealer_price = 0;
+		
+
+				
+        
+		
+    	if($this.is("li")){
+    		name = $this.find(".name").text();
+			spec = $this.find(".spec").text();
+			pdno = $this.find(".pdno").text();
+			price = $this.find(".price").text();
+			dealer_price = $this.find(".dealer_price").text();
+			$this.closest("td").next().text(price).addClass("on");
+			
+        }else{
+        	name = $this.text();
+			spec = $this.next().text();
+			pdno = $this.next().next().text();
+			$this.closest("td").next().text(type).removeClass("on");
+		}
+
+    	parent.find(".selected").text(name);
+    	$this.closest("td").prev().find("img").attr("src",img);	
+	    $this.closest("td").find("#difference").val(fn_comma(price,false));		
+		$this.closest("td").find("#dealer_price").val(fn_comma(dealer_price,false));
+		$this.closest("td").find("#pcode").val(pdno);
+
+    	$(".simple").find(".thumb").attr("src",img);
+    	$(".simple").find(".name").attr("href","/shop/product_detail.html?pd_no="+pdno+"").text(name);
+		$(".simple").find(".advice").text(spec);
+
+	    if(func_flag){ // sid trigger 실행시 레이어 펼쳐지지 않도록 처리. 20220701 mirim
+        	if(item.is(":visible")){
+        		item.slideUp();
+        		parent.removeClass("on");
+        		$('.item').css("pointer-events","none");
+        	}else{
+        		item.slideDown();
+        		parent.addClass("on");
+        	}
+		}
+		priceCalculation();
+    }
+
+    function over_change_part(obj,img,type){
+    	$this = $(obj);
+   		var spec = $this.find(".spec").text();
+   		var name = $this.find(".name").text();
+   		var pdno = $this.find(".pdno").text();
+
+    	$this.closest("td").prev().find("img").attr("src",img);	
+
+	    
+    	$(".simple").find(".thumb").attr("src",img);
+    	$(".simple").find(".name").attr("href","/shop/product_detail.html?pd_no="+pdno+"").text(name);
+		$(".simple").find(".advice").text(spec);
+    
+    }
+    
+	$(function(){			
+			
+		$(".select_box").each(function(){
+			if ($(this).find(".selected").attr("pcg") == 0){
+				$(this).find(".selected").addClass("none");
+			}
+		})
+		
+		$(".selected").click(function(){
+			var main = $(this); //selected
+			var spec = $(this).prev().text();
+			var item = $(this).next();
+			var parent = $(this).parent();
+
+			var val = $(this).text();
+			var src = $(this).attr("data");
+			var pd_no = parent.find(".pdno").text();
+
+			if ($(this).attr("pcg") != 0){
+				//$(".item_layer").slideUp();
+				//$(".select_box").removeClass("on");
+    			if(item.is(":visible")){
+    				item.slideUp();
+    				parent.removeClass("on");
+    			}else{
+    				item.slideDown();
+    				parent.addClass("on");
+    				$('.item').css("pointer-events","auto");
+
+    				// add ajax
+    				getGroupProductAjax($(this).attr("id_no"))
+    			}
+			}else{
+				 $(".simple").find(".thumb").attr("src",src);
+				 $(".simple").find(".name").attr("href","/shop/product_detail.html?pd_no="+pd_no+"").text(val);
+				 $(".simple").find(".advice").text(spec);
+			}
+			
+			return false;
+		});
+
+		// 카테고리 네비게이션
+		$(".nav .curr").hover(function(){
+			$(this).find(".nav_sub").show();
+		},function(){
+			$(this).find(".nav_sub").hide();
+		});
+
+		// 셋트상품 on off
+		$(".set .tab li").click(function(){
+			var index = $(this).index();
+			$(".set .tab li a").removeClass("on");
+			$(this).find("a").addClass("on");
+			
+			$(".set .cont").hide();
+			$(this).parents(".set").find(".cont:eq("+index+")").show();
+			
+			return false;
+		});
+
+		// 셋트상품 on off
+		$(".set2 .tab li").click(function(){
+			var index = $(this).index();
+			$(".set2 .tab li a").removeClass("on");
+			$(this).find("a").addClass("on");
+			
+			$(".set2 .cont").hide();
+			$(this).parents(".set2").find(".cont:eq("+index+")").show();
+			
+			return false;
+		});
+		
+
+		// 리뷰 관련 스크립트
+		$(".review_box .rselected").click(function(){
+			var select = $(this).parent(".select_box");
+			if(!select.hasClass("on")){
+				select.addClass("on");
+			}else{
+				select.removeClass("on");
+			}
+		})
+
+		$(".review_box .option_layer li").click(function(){
+			var option_layer = $(this).parents(".option_layer");
+			var $this = option_layer.find("li");
+			var select = option_layer.parent(".select_box");
+			var selected = $(this).attr("data_value");
+			
+			$this.removeClass("on")
+			$(this).addClass("on");
+
+			select.find(".rselected").html($(this).text());
+			select.removeClass("on");
+		
+			getReviewList();
+		})
+
+		$("#prd").click(function(){
+			$("#endLimit").val("10");
+			getReviewList();
+		})
+		
+		
+	    $(".ticker li").hover(function(){
+        	$(this).parent().removeClass("ticker")
+        },function(){
+        	$(this).parent().addClass("ticker")
+        })
+        setInterval(auto_ticker,3000);
+        
+
+		$(".page_event .tab li").hover(function(){
+			var idx = $(this).index();
+			if(idx != 0){
+				var $this = $(".page_event .tab li");
+				var box = $(this).parent(".tab").next().find(".inner");
+				$this.removeClass("on");
+				$(this).addClass("on")
+				box.removeClass("on");
+				box.eq(idx - 1).addClass("on");
+			}
+		})
+		
+		$(".share_btn").click(function(){
+			$(this).parent().find(".share_layer").addClass("on");
+			return false;
+		})
+		
+		$(".share_layer .close").click(function(){
+			$(this).parent().parent().find(".share_layer").removeClass("on");
+		})
+		
+		$(".view .list > li").hover(function(){
+			console.log(1)
+			if($(this).index() == 0){
+				var src = $(this).find("img").attr("src");
+				var change_src = src.replace("100", "600");
+				$("#viewimg").attr("src", change_src); 
+			}else{
+				$("#viewimg").attr("src", $(this).find("img").attr("img_data"));
+			}
+		})
+
+		priceCalculation();
+		getReviewList(); // 리뷰
+	});
+
+
+	$(document).on("click",".attach img", function(){
+		window.open($(this).attr("src"))
+	});
+		
+	$(document).on("click",".review_box .info", function(){
+		var detail = $(this).closest(".row").find(".detailed_box");
+		if(!detail.hasClass("on")){
+			detail.addClass("on");
+		}else{
+			detail.removeClass("on");
+		}
+	});
+	
+	// 후기 롤링
+	function auto_ticker(){
+		$(".ticker li:first-child").animate({
+            marginTop: '-25px'
+		},400, function(){
+            var parent_ul = $(this).parent();
+            $(this).detach().appendTo(parent_ul).removeAttr('style');
+        });
+    	
+    }
+
+	// 후기 더보기
+	function moreView(){
+		var data = Number($("#endLimit").val());
+		if($("#endLimit").val() == 30){
+			//최대 2번까지 더보기
+			return false;
+		} 
+		
+		$("#endLimit").val(data + 10);
+		getReviewList();
+	}
+	
+	// 후기
+	function getReviewList(){
+		//pd_no, order_by
+		//end limit 10,20,30
+		var pd_no = "";
+		var order_by = $(".review_box .option_layer li.on").attr("data_value");
+		
+		if($("#prd").is(":checked")){
+			pd_no = '121228';
+		}
+		
+	 	$.ajax({
+			type:"POST",
+			url:"/shop/review_ajax.php",	
+			data:{
+				pd_no : pd_no,
+				end_limit : $("#endLimit").val(),
+				sort : order_by
+			},
+			success: function(data){
+				var	html = ""; 
+				html += "<ul>"; 
+				$.each(data.product, function(key, obj){
+					var upload = "";
+					var imgfile = "";
+					if(obj.img.length > 0){
+						imgfile += "<div class=\"attach\">";
+						upload = "upload";
+						if(obj.img.length > 1){
+							upload += " multy";
+						}
+						
+						$.each(obj.img, function(i){
+							imgfile += "<img src=\""+obj.img[i]+"\" width=\"150\" title=\"클릭하시면 원본크기로 보실 수 있습니다.\">";
+						})
+
+						imgfile += "</div>";
+					}
+
+					html += "<li class=\"row\">"
+					html += "	<div class=\"data\">"
+					html += "		<div class=\"info "+upload+"\">"
+					html += "			<p class=\"subject\">["+obj.pname+"]</p>"
+					html += "			<p class=\"cont\">"+obj.subject+"</p>"
+					html += "		</div>"
+					html += "		<div class=\"write\">"
+					html += "			<span>"+obj.id+"</span>"
+					html += "			<span>"+obj.date+"</span>"
+					html += "		</div>"
+					html += "		<span class=\"grade\">"+obj.grade+"</span>"
+					html += "	</div>"
+					html += "	<div class=\"detailed_box\">"
+					html += "		<div class=\"detail\">"
+					html += "			<dl>"
+					html += "				<dt>상품코드 :</dt>"
+					html += "				<dd>"+obj.pno+"</dd>"
+					html += "				<dt>상품명 :</dt>"
+					html += "				<dd>"+obj.pname+"</dd>"
+					/* html += "				<dt>옵션 :</dt>"
+					html += "				<dd>PC본체 화이트(심플)</dd>" */
+					html += "			</dl>"
+					html += "			<div>"+obj.content+"</div>"
+					html += ""+imgfile+""
+					html += "		</div>"
+					html += "		<div class=\"btn_wrap\">"
+					html += "			<a href=\"/shop/product_detail.html?pd_no="+obj.pno+"\" class=\"btn\" target=\"_blank\">해당상품 이동</a>"
+					html += "		</div>"
+					html += "	</div>"
+					html += "</li>";
+				})
+				
+				html += "</ul>"; 
+				html += ""+data.more+"";
+				
+				$("#reviewList").html(html);
+				$(".rv_total").html(data.total)
+
+			},
+            error:function(request,status,error){
+    			console.log("code:"+request.status+"\n"+"message:"+request.responseText+"\n"+"error:"+error);
+            }
+		});
+		
+		
+	}
+	
+
+	// [추가옵션 & 추가상품 & 셋트상품]  ** 단품/조립 함수명만 같음
+	function addProductInsert(pd_no,pd_name,pd_price,pd_dealer_price,pd_mileage,pd_amount){
+		$("#add_option").addClass("on");
+
+		// 마일리지, 맞춤가는 구현 안됨.. 구현하기 위해서는 order_basket_system_action.php 수정되어야 한다. XXX시작되는 변수.. 2018.05.17
+		var html = "";
+		html += "<li><div class='txt'>[추가품목]</div><div class='opt_name'><a href='#'>"+pd_name+"</a></div>";
+		html += "<input type='hidden' id='ao_pd_no' name='chu_product_code[]' value='"+pd_no+"'/>";
+		html += "<input type='hidden' id='ao_pd_mileage' name='XXX_mileage[]' value='"+pd_mileage+"'/>";
+		html += "<input type='hidden' id='ao_pd_price' name='chu_product_pcode_price[]' value='"+pd_price+"'/>";
+		html += "<input type='hidden' id='ao_pd_dealer_price' value='"+pd_dealer_price+"'/>";		
+		html += "<div class='amount_wrap'></div>";
+		html += "<div class='price_wrap'><span class='price'>"+fn_comma(pd_price,true)+"</span>원";
+		html += "<a href='#' onclick='addOptionDelete(this);return false;'><img src='/skin/shop/basic/images/icon/del.png'></a>";
+		html += "</div></li>";
+
+		$("#add_option ul").append(html);	
+		priceCalculation();	
+	}
+
+	// [추가옵션] 삭제
+	function addOptionDelete(obj) {
+		$(obj).parent().parent().remove();
+	 	if ($("[id=ao_pd_no]").length == 0){
+			$("#add_option").removeClass("on");
+		}
+		priceCalculation();
+	}
+
+	// [추가옵션] 수량 
+	function addOptionCountUpDown(obj,updn){
+		countUpDown($(obj).parent().find("#ao_pd_amount"),updn);
+	}
+
+	// 메인상품 수량 변경
+	function mainProductCountUpDown(updn){
+		countUpDown($("#amount_1"),updn);
+		$("#amount_2").val($("#amount_1").val());
+	}
+	function mainProductCountChange(obj){
+		var num = fn_comma(obj.value,false);
+		if (num != ""){
+			$("#amount_1").val(num);
+			$("#amount_2").val(num);
+		}
+	}
+
+	// 수량 변경 
+	function countUpDown(obj,updn){
+		var amount = Number($(obj).val()) + updn;
+		if (amount > 0){
+			$(obj).val(amount);
+		}		
+		priceCalculation();
+	}
+
+	// 계산 
+	function priceCalculation(){
+		var total_price = 0;
+		var total_dealer_price = 0;
+		var change_price = 0;
+		var change_dealer_price = 0;
+		var change_count = 0;
+
+		// 사양변경,추가부품 (메인수량과 함께 증가)
+		$("[id=pcode]").each(function() {			
+			var price  = $(this).parent().find("#difference").val();
+			var dealer_price  = $(this).parent().find("#dealer_price").val();
+
+			var txt = $(this).closest("td").next().text();
+			if (txt != "기본사양" && txt != "선택안함"){	
+				change_price += Number(price);
+				change_dealer_price += Number(dealer_price);	
+				change_count ++;
+			}
+		});
+
+		total_price = change_price;
+		total_dealer_price = change_dealer_price;
+
+		// 세트상품,메인상품  
+		$("[id=ao_pd_no]").each(function() {			
+			var price  = $(this).parent().find("#ao_pd_price").val();	
+			var dealer_price  = $(this).parent().find("#ao_pd_dealer_price").val();	
+
+			total_price += Number(price);
+			total_dealer_price += Number(dealer_price);
+
+			if ($(this).index() > 0 ){ // 메인상품제외
+				change_price += Number(price);				
+				change_count ++;
+				var html = fn_comma(price,true);
+				$(this).parent().find(".price").html(html);
+			}
+		});
+
+		// 체크용 포장상품
+		$("[id=chk_box]").each(function() {			
+			if($(this).is(":checked")){
+				$(this).parent().find("#chk_pd_price").prop( "disabled", false );
+				var price  = $(this).parent().find("#chk_pd_price").val();
+				var dealer_price  = $(this).parent().find("#chk_pd_dealer_price").val();
+				total_price += Number(price);
+				total_dealer_price += Number(dealer_price);
+			}else{
+				$(this).parent().find("#chk_pd_price").prop( "disabled", true );
+			}
+		});
+
+		var cnt = $("#amount_1").val();	// 총 수량 
+
+		$("#change_count").html(fn_comma(change_count,true));
+		$("#change_price").html(fn_comma(change_price,true));
+		$("#total_price").html(fn_comma(total_price * cnt,true));
+		$("#total_dealer_price").html(fn_comma(total_dealer_price * cnt,true));		
+		$("#dptprice1").val(total_price);
+	}
+
+
+	function getGroupProductAjax(id_no){
+		var item = $("#pcg_"+id_no);
+		var search_group = new Array();
+		var arr = new Array();									
+		arr[0] = item.attr("p_cno");
+		arr[1] = item.attr("ev_no");
+		arr[2] = item.attr("id_no");
+		arr[3] = item.attr("pd_cnt");	
+		search_group.push(arr);		
+		
+		// 데이터가 없을때만 ajax 타도록
+		if(item.find(".item").length == 0){
+    		$.ajax({
+	            url: "/shop/system_detail_ajax.php",
+	            method: "POST",
+	            dataType : "json",
+	            data: {
+	            	search_group : search_group
+	            },
+				beforeSend : function(xhr){
+					$("#pcg_"+id_no).html("<div style=\"font-size: 13px;text-align:center; padding: 30px 0; font-family: 'Malgun Gothic'; color: #000;letter-spacing: -1px;\"><img src=\"/skin/shop/basic/images/common/loader.gif\" style=\"margin-bottom: 10px;\">잠시만 기다려주세요. 데이터를 로딩 중입니다.</div>" );
+				},
+	            success: function(data){	
+	        		for (var key in data) {
+						$("#pcg_"+key).html(data[key]);
+					}		      
+	            	
+	            }
+	        });
+		}
+    	
+	}
+</script>
+
+<style>
+	.detail_wrap .detail_top dd .product_change{
+		display: inline-block;
+		position: relative;
+		top: 1px;
+		left: 20px;
+		width: 150px;
+	    height: 30px;
+	    line-height: 30px;
+	    border: 2px solid #cbcbcc;
+	    color: #222;
+	    font-size: 20px;
+	    font-weight: 500;
+	    text-align: center;
+	    background: linear-gradient(to bottom, rgb(254,254,254) 0%,rgb(252,252,252) 22%,rgb(249,249,249) 100%);
+	}
+</style>
+
+<!-- 20220901 -->
+<script type="text/javascript">
+$(function(){
+	var fixScroll = 0;
+    /* $(window).scroll(function(event){
+    	var scroll = $(this).scrollTop();
+        if(scroll > 1600){
+        	$(".simple").addClass("fix");
+        	if(scroll > 2500){
+        		$(".simple").removeClass("fix");
+        		$(".simple").addClass("fix_end");
+        	}else{
+        		$(".simple").addClass("fix");
+        		$(".simple").removeClass("fix_end");
+        	}
+        }else{
+        	$(".simple").removeClass("fix");
+        	$(".simple").removeClass("fix_end");
+		}
+        fixScroll = scroll;
+	}); */
+});
+</script>
+
+<form name="system_list" method="post">
+<input type="hidden" id="ao_pd_no"		name="sy_no" value="121228" >
+<input type="hidden" id="ao_pd_price"	name="price" value="1707400" >
+<input type="hidden" id="ao_pd_mileage" name="mileage" value="1710" >
+<input type="hidden" id="ao_pd_dealer_price" name="dealer_price" value="1673250" >
+<input type="hidden" id="dptprice1"		name="dptprice1">
+
+<input type="hidden" name="flag" value="1" >
+<input type="hidden" name="returnUrl" value="/shop/order_basket_list.html" >
+<input type="hidden" name="barogume" value="0" >
+
+<input type="hidden" name="flag5" value="2">
+<input type="hidden" name="no5" value="121228">
+<input type="hidden" name="chu_product_price">
+
+<input type="hidden" name="mode" value="4" > <!-- npay -->
+
+<div id="content" class="sub">
+	<div class="contains">
+		<div class="detail_wrap assembly ver_1">			
+			<div class='nav clear'><ul><li class='curr'><a href='#' class='menu'>홈</a></li><li class='curr'><a href='#' class='menu'>프리미엄 피씨</a><div class='nav_sub'><ul><li><a href='/shop/product_list.html?ct_no=11782'>ai 슈퍼컴퓨터</a></li><li><a href='/shop/system_list.html?depth=1&cate1=6573'>프리미엄 피씨</a></li><li><a href='/shop/product_list.html?ct_no=10791'>컴퓨터주변기기</a></li><li><a href='/shop/product_list.html?ct_no=11506'>가전제품[린클음식물처리기 / 비비딕벌레퇴치기]</a></li><li><a href='/shop/product_list.html?ct_no=11334'>기타주변기기</a></li><li><a href='/shop/product_list.html?ct_no=9627'>모니터</a></li><li><a href='/shop/product_list.html?ct_no=11'>소모품</a></li><li><a href='/shop/product_list.html?ct_no=9793'>음향＊방송장비</a></li><li><a href='/shop/product_list.html?ct_no=9522'>키보드,마우스외</a></li><li><a href='/shop/product_list.html?ct_no=11499'>가상화폐  채굴기</a></li><li><a href='/shop/product_list.html?ct_no=10224'>케이블/변환젠더</a></li><li><a href='/shop/product_list.html?ct_no=2980'>쿨링/튜닝용품</a></li><li><a href='/shop/product_list.html?ct_no=11770'>노트북</a></li><li><a href='/shop/product_list.html?ct_no=10245'>고객님 개인결제</a></li></ul></div></li><li class='curr'><a href='#' class='menu'>프리미엄 피씨</a><div class='nav_sub'><ul><li><a href='/shop/system_list.html?depth=2&cate2=11690'>완벽한 BTF 솔루션</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11598'>초저가 가성비짱</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11015'>프리미엄 피씨</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11382'>가정용 / 사무용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11039'>게임 / 그래픽 / 주식용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11135'>디자인 / 업무용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11254'>고성능 / 전문가용</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11399'>인텔컴퓨터</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11406'>라이젠컴퓨터</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11398'>VFX/AI/딥러닝/빅데이터</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11605'>익스트림 PC</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11547'>초슬림 / 미니타워 PC</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11498'>모니터+윈도우패키지</a></li><li><a href='/shop/system_list.html?depth=2&cate2=11590'>견적왕 추천PC</a></li></ul></div></li></ul></div>			<div class="headline">
+				<div class="event"></div>
+				<div class="prd_no">상품번호 : 121228</div>
+			</div>
+			
+			<div class="detail_top">
+				<div class="view">
+    				<div class="thumb">
+    					<img src="/data/pimg/121/121228_600.jpg" id="viewimg" />
+    				</div>
+					<a href="#" class="zoom_btn" onclick="fn_open_zoom('121228'); return false;">이미지 확대</a>
+					<p class="desc">상기 이미지는 구성 예시입니다.</p>
+					<ul class="list"><li><img src="/data/pimg/121/121228_100.jpg" /></li><li><img src="/data/pimg/121/plus0_121228_100.jpg" img_data="/data/pimg/121/plus0_121228_600.jpg" ></li><li><img src="/data/pimg/121/plus1_121228_100.jpg" img_data="/data/pimg/121/plus1_121228_600.jpg" ></li></ul>					
+				</div>
+				<div class="info">
+					<span class="name">
+						골드 NO.04.121228 [인기상품]  [인텔 Hit] [고사양게이밍 베스트][12400F/16G/500GB/RTX5060TI]					</span>
+					<br/><span style='font-size:15px;'>#게임용 #디자인용 #사무용 #녹스 #주식용 #인터넷강의 #화상회의</span>					
+					
+					<div class="spec">
+						<table class="table">
+							    						<tr>
+    							<th><span>프로세서(CPU)</span></th>
+    							<td><strong>[인텔]</strong> i5 12세대 12400F [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]™</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>CPU쿨러</span></th>
+    							<td><strong>[JIUSHARK]</strong> JF120R Emerald RGB 블랙</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>메모리(RAM)</span></th>
+    							<td><strong>[삼성전자]</strong> DDR4 16G PC4-25600 [8G x 2]</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>메인보드</span></th>
+    							<td><strong>[GIGABYTE]</strong> H610M H V2 D4</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>그래픽(VGA)</span></th>
+    							<td><strong>[MSI]</strong> 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>초고속(SSD)</span></th>
+    							<td><strong>[Western Digital]</strong> WD Blue SN5100 M.2 NVMe 500GB</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>케이스</span></th>
+    							<td>[DARKFLASH] DS500 RGB 블랙</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>파워</span></th>
+    							<td>[마이크로닉스] Classic II 풀체인지 600W 80PLUS BRONZE ATX3.1</td>
+    						</tr>
+    						    						<tr>
+    							<th><span>시스템 쿨링</span></th>
+    							<td><font color=#D8D8D8><strong>[시스템쿨러]</strong>를 선택하세요.</font></td>
+    						</tr>
+    						    						<tr>
+    							<th><span>배송</span></th>
+    							<td><font color=#D8D8D8><strong>[택배 배송 + 발포제]</strong><font color=led>(내부공간 채워 배송파손 예방 발포제)을 선택하셔요.</font></font></td>
+    						</tr>
+    												</table>
+					</div>
+    				
+					
+					
+					<div class="avg_area clear">
+						<div class="prd_grade">
+    						    						<span class="review">이용후기 0건</span>
+    						<span class="grade">
+    							상품평 <img src='/skin/shop/basic/images/icon/avg_off.png' /><img src='/skin/shop/basic/images/icon/avg_off.png' /><img src='/skin/shop/basic/images/icon/avg_off.png' /><img src='/skin/shop/basic/images/icon/avg_off.png' /><img src='/skin/shop/basic/images/icon/avg_off.png' />						
+    							<span class="txt">0</span>
+    						</span>
+						</div>
+						<!-- <a href="javascript:order_wish(121228)" onfocus=blur(); class="wish">찜하기</a> -->
+					</div>
+					
+					
+					<div class="price_wrap clear">
+						<ul class="price market">
+							<li>시중가<span>1,960,000</span>원</li>
+							<li>판매가<span>1,707,400</span>원</li>
+													</ul>
+					</div>
+					<div class="btn_wrap">
+						<a href="#" onclick="fn_open_etc('card'); return false;" class="card_event">무이자할부 정보</a>
+						<a href="#" onclick="fn_open_etc('121228'); return false;" class="question">대량구매/상담</a>
+					</div>	
+					<dl class="clear">
+						<dt>택배</dt>
+						<dd>
+							3,000						</dd>
+						<dt>제조사</dt>
+						<dd>팝콘피씨</dd>
+						<dt>상품번호</dt>
+						<dd>121228</dd>
+						<dt>수량</dt>
+						<dd>
+							<div style="float: left;" class="amount_wrap clear">
+								<a href="#" class="amount_down" onclick='mainProductCountUpDown(-1);return false;'><img src="/skin/shop/basic/images/icon/minus.png" /></a>
+								<input type="text" id="amount_1" class="amount" name="amount" value="1" onchange="mainProductCountChange(this);"/>
+								<a href="#" class="amount_up" onclick='mainProductCountUpDown(1);return false;'><img src="/skin/shop/basic/images/icon/plus.png" /></a>
+							</div>
+							<div style="float: left;">
+								<a href="#tab1" class="product_change">상품 사양변경</a>
+							</div>
+						</dd>
+						<dt>적립금</dt>
+						<dd><span class="mileage">1,710</span></dd>
+					</dl>
+					<div class="buy_wrap clear">
+						<div class="add_prd">
+																					<a href="javascript:order_wish('121228');" class="btn wish_btn " title="관심상품">찜하기</a>
+							<a href="javascript:order_basket('basket');" class="btn basket_btn">장바구니</a>
+							<a href="javascript:order_basket('buy');" class="btn buy_btn">구매하기</a>
+							
+								
+							<a href="#" class="btn print_btn" onclick="print_data('121228','print'); return false;">견적서출력</a>
+							<a href="#" class="btn share_btn">공유</a>
+							<div class="share_layer">
+								<ul class="flex">
+									<li>
+										<a href="#" onclick="print_data('121228','mail'); return false;">메일보내기</a>
+									</li>
+									<li>
+										<a href="#" onclick="print_data('121228','link'); return false;">링크복사</a>
+									</li>
+									<li>
+										<a href="#" onclick="print_data('121228','html'); return false;">소스복사</a>
+									</li>
+									<li>
+										<a href="/shop/mypage_consult.html?tab=2" target="_blank">1대1문의</a>
+									</li>
+									<li>
+										<a href="#" onclick="print_data('121228','capture'); return false;">견적캡쳐</a>
+									</li>
+								</ul>
+								<span class="close"><img src="/skin/shop/basic/images/icon/layer_close.png" /></span>
+							</div>
+														
+													</div>
+						
+						<!-- Npay -->
+												
+					</div><!-- buy_wrap -->
+					
+					    					<div class="review_box">
+    						<div class="title clear">
+    							<p>고객님 구매 제품 동영상</p>
+    							<a href="/bbs/board.php?bo_table=comm_free" class="more" target="_blank">더보기</a>
+    						</div>
+    						<div class="box">
+    							<ul class="ticker">
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2279&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 9월29일 전*창 (65009)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2278&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월7일 함 *수 (65043)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2277&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월8일 박*환 (65052)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2276&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월8일 안*빈 (65051)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2275&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월2일 김*은 (65020)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2274&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월2일 송*린 (65022)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2273&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 10월2일 맹*영 (65021)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2272&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 9월 29일 강*기 (64996)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2271&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2026년 9월 8일 대**퓨터 64917</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    								<li>
+    									<a href="/bbs/board.php?bo_table=comm_free&wr_id=2270&sop=and&sca=&pd_no=&sfl=&stx=&page=1" class="subject" target="_blank">
+    										<span>발송완료 2029넌9월8일 이*우 (64911)</span>
+    										    									</a>
+    									<span class="writer">최고관리자</span>
+    									<span class="grade"></span>
+    								</li>
+    								    							</ul>
+    						
+    						</div>
+    					</div>
+										
+				</div>					
+			</div>
+					
+			<div class="bnr">
+			<div class="ad_box">
+    					  				<a href="#" class="arr prev" onclick="slide_on(this); return false;"><img src="/skin/shop/basic/images/icon/prev.png" alt="이전"></a>
+   					<a href="#" class="arr next" onclick="slide_on(this); return false;"><img src="/skin/shop/basic/images/icon/next.png" alt="다음"></a>
+   					<ul class="flex"><li><a href='' target='_blank'><img src='/data/design/chuchyn_1462_1.jpg' /></a></li></ul>
+    			</div>
+			<div class="ad_box">
+    				    				<a href="#" class="arr prev" onclick="slide_on(this); return false;"><img src="/skin/shop/basic/images/icon/prev.png" alt="이전"></a>
+    				<a href="#" class="arr next" onclick="slide_on(this); return false;"><img src="/skin/shop/basic/images/icon/next.png" alt="다음"></a>
+    				<ul class="flex"></ul>
+    			</div>    			    			
+    		</div>
+			
+						
+			
+			
+			
+  
+
+	    		
+
+
+				<div class="detail_contents">
+				
+				<div class="prd_change">
+					<div class="tab_wrap clear">
+						<ul class="tab" id="tab1">
+							<li><a href="#tab1" class="on">상품 사양변경</a></li>
+							<li><a href="#tab2">상품정보</a></li>
+							<li><a href="#tab3">배송정보</a></li>
+							
+							<li><a href="#tab4">구매후기(<span class="rv_total">0</span>)</a></li>
+							
+							<li><a href="#tab5">상품 Q&A</a></li>
+	
+						</ul>
+					</div>
+    					
+    					<div class="contents clear">
+    						<div class="change">
+	  							<table class="table part_basic part">
+    								<tr>
+    									<th colspan="3">PC 주요부품</th>
+    									<th>변동내역</th>
+    								</tr>    			
+									
+				<tr >
+					<td class='cate'>윈도우(OS)</td>
+					<td class='mg'><img src='/data/pimg/92/92552_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price0' value='0'>
+						<input type='hidden' id='pcode' name='pcode0' value='92552'>					
+						<input type='hidden' id='difference' name='product_price0' value='0'>
+						<input type='hidden' name='pcate0' value='os1'>
+						<input type='hidden' name='state0' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>정품 윈도우 설치로 PC의 보안성을 높이세요. 재설치의 용이성까지</span>
+							<a href='#' class='selected' data='/data/pimg/92/92552_300.jpg' id_no='0' pcg='10049'> <font color=#D8D8D8><strong>[윈도우]</strong>를 선택하세요.</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/92/92552_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[윈도우]</strong>를 선택하세요.</font> </span>
+								<span class='spec'>정품 윈도우 설치로 PC의 보안성을 높이세요. 재설치의 용이성까지</span>
+								<span class='pdno'>92552</span>
+								<div id='pcg_0' p_cno='92552' ev_no='10049' id_no='0' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>모니터</td>
+					<td class='mg'><img src='/data/pimg/106/106993_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price1' value='0'>
+						<input type='hidden' id='pcode' name='pcode1' value='106993'>					
+						<input type='hidden' id='difference' name='product_price1' value='0'>
+						<input type='hidden' name='pcate1' value='monitor1'>
+						<input type='hidden' name='state1' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/data/pimg/106/106993_300.jpg' id_no='1' pcg='10024'> <font color=#D8D8D8><strong>[모니터]</strong>를 선택하세요.</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/106/106993_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[모니터]</strong>를 선택하세요.</font> </span>
+								<span class='spec'></span>
+								<span class='pdno'>106993</span>
+								<div id='pcg_1' p_cno='106993' ev_no='10024' id_no='1' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>프로세서(CPU)</td>
+					<td class='mg'><img src='/data/pimg/110/110964_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price2' value='0'>
+						<input type='hidden' id='pcode' name='pcode2' value='110964'>					
+						<input type='hidden' id='difference' name='product_price2' value='0'>
+						<input type='hidden' name='pcate2' value='cpu1'>
+						<input type='hidden' name='state2' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>인텔 / 세대명 : 엘더레이크(12세대) / 코어i5-12400F / 코어 갯수 : 6 / 쓰레드 : 12 / 소켓 형태 : LGA1700 / 동작 클럭 : 2.5(GHz) / 터보 클럭 : 4.4(GHz) / L3 캐시메모리 : 18(MB) / 내장그래픽 : 없음 / 열 …</span>
+							<a href='#' class='selected' data='/data/pimg/110/110964_300.jpg' id_no='2' pcg='10011'> <strong>[인텔]</strong> i5 12세대 12400F [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]™ </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/110/110964_300.jpg","기본사양"); return false;'> <strong>[인텔]</strong> i5 12세대 12400F [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]™ </span>
+								<span class='spec'>인텔 / 세대명 : 엘더레이크(12세대) / 코어i5-12400F / 코어 갯수 : 6 / 쓰레드 : 12 / 소켓 형태 : LGA1700 / 동작 클럭 : 2.5(GHz) / 터보 클럭 : 4.4(GHz) / L3 캐시메모리 : 18(MB) / 내장그래픽 : 없음 / 열 …</span>
+								<span class='pdno'>110964</span>
+								<div id='pcg_2' p_cno='110964' ev_no='10011' id_no='2' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>CPU쿨러</td>
+					<td class='mg'><img src='/data/pimg/121/121846_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price3' value='0'>
+						<input type='hidden' id='pcode' name='pcode3' value='121846'>					
+						<input type='hidden' id='difference' name='product_price3' value='0'>
+						<input type='hidden' name='pcate3' value='culer1'>
+						<input type='hidden' name='state3' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>JIUSHARK / CPU쿨러 / 공랭 / TDP : 220(W) / 히트파이프 : 4(EA) / 전원단자 : 4핀 / 최대 팬속도 : 1,800(RPM) / 높이 : 157(mm) / LGA1700 / LGA1200 / LGA115(X) / LGA1851 / AM5 / AM4 / LED 라이트 / A/S기간 …</span>
+							<a href='#' class='selected' data='/data/pimg/121/121846_300.jpg' id_no='3' pcg='10241'> <strong>[JIUSHARK]</strong> JF120R Emerald RGB 블랙 </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/121/121846_300.jpg","기본사양"); return false;'> <strong>[JIUSHARK]</strong> JF120R Emerald RGB 블랙 </span>
+								<span class='spec'>JIUSHARK / CPU쿨러 / 공랭 / TDP : 220(W) / 히트파이프 : 4(EA) / 전원단자 : 4핀 / 최대 팬속도 : 1,800(RPM) / 높이 : 157(mm) / LGA1700 / LGA1200 / LGA115(X) / LGA1851 / AM5 / AM4 / LED 라이트 / A/S기간 …</span>
+								<span class='pdno'>121846</span>
+								<div id='pcg_3' p_cno='121846' ev_no='10241' id_no='3' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>메모리(RAM)</td>
+					<td class='mg'><img src='/data/pimg/109/109547_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price4' value='0'>
+						<input type='hidden' id='pcode' name='pcode4' value='109547'>					
+						<input type='hidden' id='difference' name='product_price4' value='0'>
+						<input type='hidden' name='pcate4' value='ram1'>
+						<input type='hidden' name='state4' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>삼성전자 / 데스크탑 / DDR4 / DIMM / 16(GB) / 3200(MHz),PC4-25600 / 전압 : 1.20(V) / 패키지 구성 : 1(EA) /</span>
+							<a href='#' class='selected' data='/data/pimg/109/109547_300.jpg' id_no='4' pcg='10189'> <strong>[삼성전자]</strong> DDR4 16G PC4-25600 [8G x 2] </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/109/109547_300.jpg","기본사양"); return false;'> <strong>[삼성전자]</strong> DDR4 16G PC4-25600 [8G x 2] </span>
+								<span class='spec'>삼성전자 / 데스크탑 / DDR4 / DIMM / 16(GB) / 3200(MHz),PC4-25600 / 전압 : 1.20(V) / 패키지 구성 : 1(EA) /</span>
+								<span class='pdno'>109547</span>
+								<div id='pcg_4' p_cno='109547' ev_no='10189' id_no='4' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>메인보드</td>
+					<td class='mg'><img src='/data/pimg/113/113685_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price5' value='0'>
+						<input type='hidden' id='pcode' name='pcode5' value='113685'>					
+						<input type='hidden' id='difference' name='product_price5' value='0'>
+						<input type='hidden' name='pcate5' value='board1'>
+						<input type='hidden' name='state5' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>GIGABYTE / 인텔 / LGA1700 / H610 (인텔) / m-ATX / DDR4 / 3,200(MHz),PC4-25600 / 슬롯 : 2(EA) / 최대 64(GB) / M.2 : 1(EA) / SATA3 : 4(EA) / D-SUB / DVI / HDMI / PCI-Ex. x16 : 1(EA) / PCI-Ex. x1 : 1(EA)…</span>
+							<a href='#' class='selected' data='/data/pimg/113/113685_300.jpg' id_no='5' pcg='10072'> <strong>[GIGABYTE]</strong> H610M H V2 D4 </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/113/113685_300.jpg","기본사양"); return false;'> <strong>[GIGABYTE]</strong> H610M H V2 D4 </span>
+								<span class='spec'>GIGABYTE / 인텔 / LGA1700 / H610 (인텔) / m-ATX / DDR4 / 3,200(MHz),PC4-25600 / 슬롯 : 2(EA) / 최대 64(GB) / M.2 : 1(EA) / SATA3 : 4(EA) / D-SUB / DVI / HDMI / PCI-Ex. x16 : 1(EA) / PCI-Ex. x1 : 1(EA)…</span>
+								<span class='pdno'>113685</span>
+								<div id='pcg_5' p_cno='113685' ev_no='10072' id_no='5' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>그래픽(VGA)</td>
+					<td class='mg'><img src='/data/pimg/124/124631_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price6' value='0'>
+						<input type='hidden' id='pcode' name='pcode6' value='124631'>					
+						<input type='hidden' id='difference' name='product_price6' value='0'>
+						<input type='hidden' name='pcate6' value='vga1'>
+						<input type='hidden' name='state6' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>MSI / nVIDIA / Geforce RTX 50 / RTX 5060 Ti / 기본 클럭 : 2,407(MHz) / 부스트 클럭 : 2,602(MHz) / OC 클럭 : 2,617(MHz) / PCIe5.0 / 쿠다프로세서 : 4,608(EA) / 메모리용량 : 8(GB) / GDDR7 / 128(bit) / 28…</span>
+							<a href='#' class='selected' data='/data/pimg/124/124631_300.jpg' id_no='6' pcg='10317'> <strong>[MSI]</strong> 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/124/124631_300.jpg","기본사양"); return false;'> <strong>[MSI]</strong> 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB </span>
+								<span class='spec'>MSI / nVIDIA / Geforce RTX 50 / RTX 5060 Ti / 기본 클럭 : 2,407(MHz) / 부스트 클럭 : 2,602(MHz) / OC 클럭 : 2,617(MHz) / PCIe5.0 / 쿠다프로세서 : 4,608(EA) / 메모리용량 : 8(GB) / GDDR7 / 128(bit) / 28…</span>
+								<span class='pdno'>124631</span>
+								<div id='pcg_6' p_cno='124631' ev_no='10317' id_no='6' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>랜/사운드</td>
+					<td class='mg'><img src='/data/pimg/51/51190_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price7' value='0'>
+						<input type='hidden' id='pcode' name='pcode7' value='51190'>					
+						<input type='hidden' id='difference' name='product_price7' value='0'>
+						<input type='hidden' name='pcate7' value='sound1'>
+						<input type='hidden' name='state7' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>내장형 6/8채널 사운드코덱</span>
+							<a href='#' class='selected' data='/data/pimg/51/51190_300.jpg' id_no='7' pcg='0'> <font color=#D8D8D8><strong>[사운드/랜카드]</strong> 6/8채널 사운드 / 기가비트 랜 내장</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/51/51190_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[사운드/랜카드]</strong> 6/8채널 사운드 / 기가비트 랜 내장</font> </span>
+								<span class='spec'>내장형 6/8채널 사운드코덱</span>
+								<span class='pdno'>51190</span>
+								
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>초고속(SSD)</td>
+					<td class='mg'><img src='/data/pimg/128/128462_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price8' value='0'>
+						<input type='hidden' id='pcode' name='pcode8' value='128462'>					
+						<input type='hidden' id='difference' name='product_price8' value='0'>
+						<input type='hidden' name='pcate8' value='hdd2'>
+						<input type='hidden' name='state8' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>Western Digital / 내장형SSD / 게임기 호환 : PS5 호환 / 500GB / M.2(NVMe) / NVMe 2.0 / M.2사이즈 : 2280 / 메모리타입 : QLC / 3D / 읽기속도 : 6,600(MB/s) / 쓰기속도 : 5,600(MB/s) / 읽기(IOPS) : 660(K) /…</span>
+							<a href='#' class='selected' data='/data/pimg/128/128462_300.jpg' id_no='8' pcg='10267'> <strong>[Western Digital]</strong> WD Blue SN5100 M.2 NVMe 500GB </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/128/128462_300.jpg","기본사양"); return false;'> <strong>[Western Digital]</strong> WD Blue SN5100 M.2 NVMe 500GB </span>
+								<span class='spec'>Western Digital / 내장형SSD / 게임기 호환 : PS5 호환 / 500GB / M.2(NVMe) / NVMe 2.0 / M.2사이즈 : 2280 / 메모리타입 : QLC / 3D / 읽기속도 : 6,600(MB/s) / 쓰기속도 : 5,600(MB/s) / 읽기(IOPS) : 660(K) /…</span>
+								<span class='pdno'>128462</span>
+								<div id='pcg_8' p_cno='128462' ev_no='10267' id_no='8' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>대용량(HDD)</td>
+					<td class='mg'><img src='/data/pimg/92/92547_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price9' value='0'>
+						<input type='hidden' id='pcode' name='pcode9' value='92547'>					
+						<input type='hidden' id='difference' name='product_price9' value='0'>
+						<input type='hidden' name='pcate9' value='hdd1'>
+						<input type='hidden' name='state9' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>[하드디스크]를 선택하세요.</span>
+							<a href='#' class='selected' data='/data/pimg/92/92547_300.jpg' id_no='9' pcg='10272'> <font color=#D8D8D8><strong>[하드디스크]</strong>를 선택하세요.</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/92/92547_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[하드디스크]</strong>를 선택하세요.</font> </span>
+								<span class='spec'>[하드디스크]를 선택하세요.</span>
+								<span class='pdno'>92547</span>
+								<div id='pcg_9' p_cno='92547' ev_no='10272' id_no='9' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>케이스</td>
+					<td class='mg'><img src='/data/pimg/124/124985_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price11' value='0'>
+						<input type='hidden' id='pcode' name='pcode11' value='124985'>					
+						<input type='hidden' id='difference' name='product_price11' value='0'>
+						<input type='hidden' name='pcate11' value='case1'>
+						<input type='hidden' name='state11' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>darkFlash / PC용 케이스 / 미들타워 / 지원 파워 : ATX / ATX / mATX / MiniITX / 수랭쿨러 지원 : 최대 3열 / CPU쿨러장착높이 : 165(mm) / VGA장착길이 : 405(mm) / 3.5베이 : 2 / 스토리지 장착 개수 : 2 / PCI…</span>
+							<a href='#' class='selected' data='/data/pimg/124/124985_300.jpg' id_no='11' pcg='10219'> [DARKFLASH] DS500 RGB 블랙 </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/124/124985_300.jpg","기본사양"); return false;'> [DARKFLASH] DS500 RGB 블랙 </span>
+								<span class='spec'>darkFlash / PC용 케이스 / 미들타워 / 지원 파워 : ATX / ATX / mATX / MiniITX / 수랭쿨러 지원 : 최대 3열 / CPU쿨러장착높이 : 165(mm) / VGA장착길이 : 405(mm) / 3.5베이 : 2 / 스토리지 장착 개수 : 2 / PCI…</span>
+								<span class='pdno'>124985</span>
+								<div id='pcg_11' p_cno='124985' ev_no='10219' id_no='11' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>파워</td>
+					<td class='mg'><img src='/data/pimg/120/120943_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price12' value='0'>
+						<input type='hidden' id='pcode' name='pcode12' value='120943'>					
+						<input type='hidden' id='difference' name='product_price12' value='0'>
+						<input type='hidden' name='pcate12' value='power1'>
+						<input type='hidden' name='state12' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>마이크로닉스 / ATX / 600(W) / 액티브PFC / 팬크기 : 120(mm) / +12V : 50(A) / +5V : 22(A) / +3.3V : 22(A) / SATA : 6 / 대기전력1W / 플랫케이블 / 80PLUS : BRONZE / 무상 7(년) /</span>
+							<a href='#' class='selected' data='/data/pimg/120/120943_300.jpg' id_no='12' pcg='10226'> [마이크로닉스] Classic II 풀체인지 600W 80PLUS BRONZE ATX3.1 </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/120/120943_300.jpg","기본사양"); return false;'> [마이크로닉스] Classic II 풀체인지 600W 80PLUS BRONZE ATX3.1 </span>
+								<span class='spec'>마이크로닉스 / ATX / 600(W) / 액티브PFC / 팬크기 : 120(mm) / +12V : 50(A) / +5V : 22(A) / +3.3V : 22(A) / SATA : 6 / 대기전력1W / 플랫케이블 / 80PLUS : BRONZE / 무상 7(년) /</span>
+								<span class='pdno'>120943</span>
+								<div id='pcg_12' p_cno='120943' ev_no='10226' id_no='12' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>시스템 쿨링</td>
+					<td class='mg'><img src='/data/pimg/122/122410_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price19' value='0'>
+						<input type='hidden' id='pcode' name='pcode19' value='122410'>					
+						<input type='hidden' id='difference' name='product_price19' value='0'>
+						<input type='hidden' name='pcate19' value='etc9'>
+						<input type='hidden' name='state19' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>[케이스 쿨링펜] 를 선택하세요.</span>
+							<a href='#' class='selected' data='/data/pimg/122/122410_300.jpg' id_no='19' pcg='10332'> <font color=#D8D8D8><strong>[시스템쿨러]</strong>를 선택하세요.</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/122/122410_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[시스템쿨러]</strong>를 선택하세요.</font> </span>
+								<span class='spec'>[케이스 쿨링펜] 를 선택하세요.</span>
+								<span class='pdno'>122410</span>
+								<div id='pcg_19' p_cno='122410' ev_no='10332' id_no='19' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>사은품</td>
+					<td class='mg'><img src='/data/pimg/95/95593_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price33' value='0'>
+						<input type='hidden' id='pcode' name='pcode33' value='95593'>					
+						<input type='hidden' id='difference' name='product_price33' value='0'>
+						<input type='hidden' name='pcate33' value='etc1'>
+						<input type='hidden' name='state33' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>마우스패드 / 제조회사 : 팝콘피씨 / 제품 분류 : 마우스패드 / 재질 구분 : 패브릭 /</span>
+							<a href='#' class='selected' data='/data/pimg/95/95593_300.jpg' id_no='33' pcg='0'> <font color=blue>팝콘피씨 게이밍 장패드</font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/95/95593_300.jpg","기본사양"); return false;'> <font color=blue>팝콘피씨 게이밍 장패드</font> </span>
+								<span class='spec'>마우스패드 / 제조회사 : 팝콘피씨 / 제품 분류 : 마우스패드 / 재질 구분 : 패브릭 /</span>
+								<span class='pdno'>95593</span>
+								
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>조립비+AS</td>
+					<td class='mg'><img src='/data/pimg/99/99366_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price37' value='0'>
+						<input type='hidden' id='pcode' name='pcode37' value='99366'>					
+						<input type='hidden' id='difference' name='product_price37' value='0'>
+						<input type='hidden' name='pcate37' value='jolib1'>
+						<input type='hidden' name='state37' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>제작 및 3년 무상서비스 (1년 출장+2년 택배)</span>
+							<a href='#' class='selected' data='/data/pimg/99/99366_300.jpg' id_no='37' pcg='0'> 제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/99/99366_300.jpg","기본사양"); return false;'> 제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) </span>
+								<span class='spec'>제작 및 3년 무상서비스 (1년 출장+2년 택배)</span>
+								<span class='pdno'>99366</span>
+								
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>배송</td>
+					<td class='mg'><img src='/data/pimg/122/122715_300.jpg' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price38' value='0'>
+						<input type='hidden' id='pcode' name='pcode38' value='122715'>					
+						<input type='hidden' id='difference' name='product_price38' value='0'>
+						<input type='hidden' name='pcate38' value='basong'>
+						<input type='hidden' name='state38' value='변경'>
+                        
+						<div class='select_box'>
+							<span class='spec'>우레탄 소재를 이용하여 컴퓨터 본체 내부의 빈 공간을 꽉 채워 혹시 모를 파손을 획기적으로 예방할 수 있는 제품입니다</span>
+							<a href='#' class='selected' data='/data/pimg/122/122715_300.jpg' id_no='38' pcg='10333'> <font color=#D8D8D8><strong>[택배 배송 + 발포제]</strong><font color=led>(내부공간 채워 배송파손 예방 발포제)을 선택하셔요.</font></font> </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/data/pimg/122/122715_300.jpg","기본사양"); return false;'> <font color=#D8D8D8><strong>[택배 배송 + 발포제]</strong><font color=led>(내부공간 채워 배송파손 예방 발포제)을 선택하셔요.</font></font> </span>
+								<span class='spec'>우레탄 소재를 이용하여 컴퓨터 본체 내부의 빈 공간을 꽉 채워 혹시 모를 파손을 획기적으로 예방할 수 있는 제품입니다</span>
+								<span class='pdno'>122715</span>
+								<div id='pcg_38' p_cno='122715' ev_no='10333' id_no='38' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>기본사양</td>					
+				</tr>
+			    							</table>
+    							<table class="table part_add part">
+    								<tr>
+    									<th colspan="3">PC 추가부품</th>
+    									<th>변동내역</th>
+    								</tr>				
+									
+				<tr >
+					<td class='cate'>CD/DVD</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price10' value='0'>
+						<input type='hidden' id='pcode' name='pcode10' value='0'>					
+						<input type='hidden' id='difference' name='product_price10' value='0'>
+						<input type='hidden' name='pcate10' value='odd1'>
+						<input type='hidden' name='state10' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='10' pcg='10067'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_10' p_cno='0' ev_no='10067' id_no='10' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>모니터 추가</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price13' value='0'>
+						<input type='hidden' id='pcode' name='pcode13' value='0'>					
+						<input type='hidden' id='difference' name='product_price13' value='0'>
+						<input type='hidden' name='pcate13' value='monitor2'>
+						<input type='hidden' name='state13' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='13' pcg='10319'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_13' p_cno='0' ev_no='10319' id_no='13' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>모니터악세사리</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price14' value='0'>
+						<input type='hidden' id='pcode' name='pcode14' value='0'>					
+						<input type='hidden' id='difference' name='product_price14' value='0'>
+						<input type='hidden' name='pcate14' value='etc4'>
+						<input type='hidden' name='state14' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='14' pcg='10062'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_14' p_cno='0' ev_no='10062' id_no='14' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>LAN카드</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price17' value='0'>
+						<input type='hidden' id='pcode' name='pcode17' value='0'>					
+						<input type='hidden' id='difference' name='product_price17' value='0'>
+						<input type='hidden' name='pcate17' value='lan1'>
+						<input type='hidden' name='state17' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='17' pcg='10041'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_17' p_cno='0' ev_no='10041' id_no='17' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>오피스/소프트웨어</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price20' value='0'>
+						<input type='hidden' id='pcode' name='pcode20' value='0'>					
+						<input type='hidden' id='difference' name='product_price20' value='0'>
+						<input type='hidden' name='pcate20' value='etc11'>
+						<input type='hidden' name='state20' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='20' pcg='10158'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_20' p_cno='0' ev_no='10158' id_no='20' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>키보드+마우스</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price22' value='0'>
+						<input type='hidden' id='pcode' name='pcode22' value='0'>					
+						<input type='hidden' id='difference' name='product_price22' value='0'>
+						<input type='hidden' name='pcate22' value='keymouse1'>
+						<input type='hidden' name='state22' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='22' pcg='10186'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_22' p_cno='0' ev_no='10186' id_no='22' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>키보드</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price23' value='0'>
+						<input type='hidden' id='pcode' name='pcode23' value='0'>					
+						<input type='hidden' id='difference' name='product_price23' value='0'>
+						<input type='hidden' name='pcate23' value='kbd1'>
+						<input type='hidden' name='state23' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='23' pcg='10050'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_23' p_cno='0' ev_no='10050' id_no='23' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>마우스</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price24' value='0'>
+						<input type='hidden' id='pcode' name='pcode24' value='0'>					
+						<input type='hidden' id='difference' name='product_price24' value='0'>
+						<input type='hidden' name='pcate24' value='mouse1'>
+						<input type='hidden' name='state24' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='24' pcg='10051'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_24' p_cno='0' ev_no='10051' id_no='24' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>스피커</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price26' value='0'>
+						<input type='hidden' id='pcode' name='pcode26' value='0'>					
+						<input type='hidden' id='difference' name='product_price26' value='0'>
+						<input type='hidden' name='pcate26' value='spk1'>
+						<input type='hidden' name='state26' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='26' pcg='10053'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_26' p_cno='0' ev_no='10053' id_no='26' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>헤드셋</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price27' value='0'>
+						<input type='hidden' id='pcode' name='pcode27' value='0'>					
+						<input type='hidden' id='difference' name='product_price27' value='0'>
+						<input type='hidden' name='pcate27' value='headset1'>
+						<input type='hidden' name='state27' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='27' pcg='10055'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_27' p_cno='0' ev_no='10055' id_no='27' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>유/무선공유기</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price28' value='0'>
+						<input type='hidden' id='pcode' name='pcode28' value='0'>					
+						<input type='hidden' id='difference' name='product_price28' value='0'>
+						<input type='hidden' name='pcate28' value='network1'>
+						<input type='hidden' name='state28' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='28' pcg='10228'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_28' p_cno='0' ev_no='10228' id_no='28' pd_cnt='0'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			
+				<tr >
+					<td class='cate'>웹캠/카메라</td>
+					<td class='mg'><img src='/skin/shop/basic/images/icon/default_pc_add.gif' height='46'/></td>
+					<td class='select'>
+
+						<input type='hidden' id='dealer_price' name='dealer_price29' value='0'>
+						<input type='hidden' id='pcode' name='pcode29' value='0'>					
+						<input type='hidden' id='difference' name='product_price29' value='0'>
+						<input type='hidden' name='pcate29' value='tv1'>
+						<input type='hidden' name='state29' value='추가'>
+                        
+						<div class='select_box'>
+							<span class='spec'></span>
+							<a href='#' class='selected' data='/skin/shop/basic/images/icon/default_pc_add.gif' id_no='29' pcg='10249'> 추가부품을 선택하세요. </a>							
+							<div class='item_layer'>
+								<span class='item_basic' onclick='change_part(this,"/skin/shop/basic/images/icon/default_pc_add.gif","선택안함"); return false;'> 추가부품을 선택하세요. </span>
+								<span class='spec'></span>
+								<span class='pdno'>0</span>
+								<div id='pcg_29' p_cno='0' ev_no='10249' id_no='29' pd_cnt='1'>상품을 가져오고 있습니다.</li>
+							</div>			
+						</div>
+					</td>
+					<td class='status'>선택안함</td>					
+				</tr>
+			    							</table>
+    						
+								<div class="selected_parts" id="add_option">
+									<div class="tit">추가한 세트 상품</div>
+									<ul></ul>    							
+    							</div>    							
+    						</div>
+    						
+    						<div class="simple">
+    							<div class="tit">상품간략 정보</div>
+    							<div class="info">
+    								<img src="/data/pimg/121/121228_600.jpg" class="thumb" width="200" height="200">
+    								<a href="#" class="name" target="_blank">골드 NO.04.121228 [인기상품]  [인텔 Hit] [고사양게이밍 베스트][12400F/16G/500GB/RTX5060TI]</a>
+									<span class="advice">골드 NO.04.121228 [인기상품]  [인텔 Hit] [고사양게이밍 베스트][12400F/16G/500GB/RTX5060TI]</span>
+    							</div>
+    							<div class="total_wrap"> 
+    								<div class="price_result">
+    									<ul class="only">
+											<li>
+    											<span class="dt">판매가</span>
+    											<div class="dd">
+    												<span class="price">1,707,400</span>원
+    											</div>
+    										</li>
+											<li>
+    											<span class="dt">변동내역</span>
+    											<div class="dd">
+    												<span class="plus_amt" id='change_count'>0</span>건
+    											</div>
+    										</li>
+											<li>
+    											<span class="dt">추가금액</span>
+    											<div class="dd">
+    												<span class="price" id='change_price'>0</span>원
+    											</div>
+    										</li>
+
+    										<li class="count">
+    											<span class="dt">구매수량</span>
+    											<div class="dd">
+    												<div class="rst_amount clear">
+        												<input type="text" id="amount_2" class="amount" value="1" onchange="mainProductCountChange(this);"/>
+        												<a href="#" class="amt_up" onclick='mainProductCountUpDown(1);return false;'><img src="/skin/shop/basic/images/icon/up.png" /></a>
+        												<a href="#" class="amt_down" onclick='mainProductCountUpDown(-1);return false;'><img src="/skin/shop/basic/images/icon/down.png" /></a>
+    												</div>
+    											</div>
+    										</li>
+
+
+											    										<li class="total card">
+    											<span class="dt">합계금액</span>
+    											<div class="dd">
+    												<span class="price" id='total_price'></span><span class="won">원</span>
+    											</div>
+    										</li>
+    										<li class="total cash" >
+    											<span class="dt">맞춤가격</span>
+    											<div class="dd">
+    												<span class="price" id='total_dealer_price'></span><span class="won">원</span>
+    											</div>
+    										</li>
+    									</ul>
+    								</div>
+    								<!-- <a href="javascript:order_basket('buy');" class="btn buy_btn">구매하기</a> -->
+    								<div class="buy_wrap">
+    									    										<a href="javascript:order_basket('buy');" class="btn buy_btn">구매하기</a>
+    										<a href="javascript:order_basket('basket');" class="sub_btn btn basket_btn">장바구니</a>
+											<a href="#" class="sub_btn btn print_btn" onclick="print_data('121228','print'); return false;">견적서출력</a>
+										    								</div>
+    							</div>   
+    						</div> <!-- simple -->
+    					</div><!-- contents -->
+					</div><!-- prd_change -->
+
+<!---------------------------------- 추가(셋트) 상품 시작 ------------------------------------------------------>
+										<div class="prd_set">
+					    <div class="set">
+					    	<div class="set_top clear">
+					    		<div class="tit">판매자의 추천 세트 상품</div>
+					    		<ul class="tab">
+									<li><a href='#' class='on'>키보드/마우스 세트</a></li>
+<li><a href='#' >멀티탭 / 모니터 받침대</a></li>
+<li><a href='#' >네트워크 소모품</a></li>
+<li><a href='#' >내장 / 외장 ODD</a></li>
+				
+								</ul>
+					    	</div>
+					    	<div class="cont_all">
+					    							        	<div class="cont clear">
+					        		<a href="#" class="arr prev" onclick="slide_on(this,'','set'); return false;"></a>
+    								<a href="#" class="arr next" onclick="slide_on(this,'','set'); return false;"></a>
+					        		<ul>
+								    						        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107155_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107155','ABKO 게이밍 블랙 패키지 - PC방 인기 상품  <font color=red>기계식 광축 키보드 + RGB 마우스 + 가상 7.1 헤드셋</font><em><strong><font color=red> HIT</font></strong></em>','115500','112960','120',1);return false;" add_data="107155">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107155" class="name" target="_blank">
+					        						ABKO 게이밍 블랙 패키지 - PC방 인기 상품  <font color=red>기계식 광축 키보드 + RGB 마우스 + 가상 7.1 헤드셋</font><em><strong><font color=red> HIT</font></strong></em> 107155					        						<!-- span class="advice">키보드 / 제조회사 : ABKO / 연결 방식 : 유선 / 인터페이스 : USB / 접점 방식 : 무접점(광) / 기능키 : 게이밍, 멀티미디어 / 동시입력 : 무한 입력 / LED 백라이트 : 레인보우 백라이트 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>115,500</span></li>
+					        						<li class="cash">맞춤가격<span>112,960</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107156_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107156','ABKO 게이밍 화이트 패키지 - PC방 인기 상품  <font color=red>기계식 광축 키보드 + RGB 마우스 + 가상 7.1 헤드셋</font><em><strong><font color=red> HIT</font></strong></em>','115500','112960','120',1);return false;" add_data="107156">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107156" class="name" target="_blank">
+					        						ABKO 게이밍 화이트 패키지 - PC방 인기 상품  <font color=red>기계식 광축 키보드 + RGB 마우스 + 가상 7.1 헤드셋</font><em><strong><font color=red> HIT</font></strong></em> 107156					        						<!-- span class="advice">키보드 / 제조회사 : ABKO / 연결 방식 : 유선 / 인터페이스 : USB / 접점 방식 : 무접점(광축) / 기능키 : 게이밍,멀티미디어 / 동시입력 : 무한입력 / LED 백라이트 : 레인보우 백라이트 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>115,500</span></li>
+					        						<li class="cash">맞춤가격<span>112,960</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/120/120418_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('120418','마이크로닉스 스페셜 화이트 합본팩(키보드+마우스+헤드셋)</p>[EX580L적축 + MG530RGB + W301RGB]','95000','92910','100',1);return false;" add_data="120418">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=120418" class="name" target="_blank">
+					        						마이크로닉스 스페셜 화이트 합본팩(키보드+마우스+헤드셋)</p>[EX580L적축 + MG530RGB + W301RGB] 120418					        						<!-- span class="advice">마이크로닉스 / 유선 / USB / 키배열 : 104 / 게이밍용 / 접점 방식 : 무접점(광축) / 멀티미디어 키 / 동시입력 : 무한 / 생활방수 / 백라이트(LED/RGB) : 레인보우 / 체리식 스테빌라이저 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>95,000</span></li>
+					        						<li class="cash">맞춤가격<span>92,910</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/112/112177_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('112177','앱코 HACKER KM400 콤보 키보드+마우스 레인보우 LED 게이밍','25200','24700','30',1);return false;" add_data="112177">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=112177" class="name" target="_blank">
+					        						앱코 HACKER KM400 콤보 키보드+마우스 레인보우 LED 게이밍 112177					        						<!-- span class="advice">ABKO / 유선(USB) / 키배열 : 105 / 게이밍용 : 게이밍용 / 멤브레인 / 백라이트(LED/RGB) : 레인보우 / 동시입력 : 19키 / 루프 / 광 / 최대 감도 : 3200(DPI) / 버튼 개수 : DPI, 6버튼 / 백라이트 지원 : RGB / </span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>25,200</span></li>
+					        						<li class="cash">맞춤가격<span>24,700</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/106/106673_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('106673','로지텍 무선데스크탑 MK270r [키보드+마우스]','38500','37540','40',1);return false;" add_data="106673">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=106673" class="name" target="_blank">
+					        						로지텍 무선데스크탑 MK270r [키보드+마우스] 106673					        						<!-- span class="advice">로지텍 / 무선 / 사무용 / 키배열 : 111 / 멤브레인 / 버튼수 : 3 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>38,500</span></li>
+					        						<li class="cash">맞춤가격<span>37,540</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/98/98751_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('98751','로지텍 무선데스크탑 MK235 [키보드+마우스]<em><strong><font color=red> HIT</font></strong></em>','27900','27200','30',1);return false;" add_data="98751">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=98751" class="name" target="_blank">
+					        						로지텍 무선데스크탑 MK235 [키보드+마우스]<em><strong><font color=red> HIT</font></strong></em> 98751					        						<!-- span class="advice">로지텍 / 무선 / 사무용 / 멤브레인 / 생활방수 / 버튼수 : 3 / 1000(DPI) /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>27,900</span></li>
+					        						<li class="cash">맞춤가격<span>27,200</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        		</ul>
+					        	</div>
+					        						        	<div class="cont clear">
+					        		<a href="#" class="arr prev" onclick="slide_on(this,'','set'); return false;"></a>
+    								<a href="#" class="arr next" onclick="slide_on(this,'','set'); return false;"></a>
+					        		<ul>
+								    						        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111298_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111298','신성전기 멀티탭 [5구/16A/접지/개별스위치/1.5M]','10800','10580','10',1);return false;" add_data="111298">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111298" class="name" target="_blank">
+					        						신성전기 멀티탭 [5구/16A/접지/개별스위치/1.5M] 111298					        						<!-- span class="advice">멀티탭 / 제조회사 : 신성전기산업 / 멀티탭 형태 : 개별스위치 / 연결 가능 수 : 5구 / 길이 : 1.5M / 과부하차단 : 과부하차단 / 전원On/off : 전원On/off /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>10,800</span></li>
+					        						<li class="cash">맞춤가격<span>10,580</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111297_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111297','신성전기 멀티탭 [6구/16A/접지/개별스위치/1.5M]','11900','11660','10',1);return false;" add_data="111297">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111297" class="name" target="_blank">
+					        						신성전기 멀티탭 [6구/16A/접지/개별스위치/1.5M] 111297					        						<!-- span class="advice">멀티탭 / 제조회사 : 신성전기산업 / 멀티탭 형태 : 개별스위치 / 연결 가능 수 : 6구 / 길이 : 1.5M / 과부하차단 : 과부하차단 / 전원On/off : 전원On/off /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>11,900</span></li>
+					        						<li class="cash">맞춤가격<span>11,660</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111295_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111295','모노케어 5구/16A/접지/스위치/멀티탭/1.5M','6500','6360','10',1);return false;" add_data="111295">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111295" class="name" target="_blank">
+					        						모노케어 5구/16A/접지/스위치/멀티탭/1.5M 111295					        						<!-- span class="advice">공구.전기용품 / 모노케어 5구/16A/접지/스위치/멀티탭/1.5M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>6,500</span></li>
+					        						<li class="cash">맞춤가격<span>6,360</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111296_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111296','모노케어 6구/16A/접지/스위치/멀티탭/1.5M','5600','5480','10',1);return false;" add_data="111296">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111296" class="name" target="_blank">
+					        						모노케어 6구/16A/접지/스위치/멀티탭/1.5M 111296					        						<!-- span class="advice">공구.전기용품 / 모노케어 6구/16A/접지/스위치/멀티탭/1.5M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>5,600</span></li>
+					        						<li class="cash">맞춤가격<span>5,480</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/102/102712_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('102712','[팝콘피씨] <B style=letter-spacing:0.2>삼나무 <font color=magenta>원목</font> 모니터 받침대</B>','15900','15550','20',1);return false;" add_data="102712">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=102712" class="name" target="_blank">
+					        						[팝콘피씨] <B style=letter-spacing:0.2>삼나무 <font color=magenta>원목</font> 모니터 받침대</B> 102712					        						<!-- span class="advice">삼나무 원목 모니터 받침대</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>15,900</span></li>
+					        						<li class="cash">맞춤가격<span>15,550</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        		</ul>
+					        	</div>
+					        						        	<div class="cont clear">
+					        		<a href="#" class="arr prev" onclick="slide_on(this,'','set'); return false;"></a>
+    								<a href="#" class="arr next" onclick="slide_on(this,'','set'); return false;"></a>
+					        		<ul>
+								    						        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114104_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114104','라인업시스템 LANSTARplus LSP-7UTP-5M CAT.6A UTP 랜케이블 (5m)','3000','2930','30',1);return false;" add_data="114104">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114104" class="name" target="_blank">
+					        						라인업시스템 LANSTARplus LSP-7UTP-5M CAT.6A UTP 랜케이블 (5m) 114104					        						<!-- span class="advice">케이블.USB.LAN.데이터.전원 / Lanstar-Plus] Cat.7 UTP 랜 케이블 ,5M [20304] CAT.6A(CAT.7) LSP-7UTP-5M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>3,000</span></li>
+					        						<li class="cash">맞춤가격<span>2,930</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114105_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114105','라인업시스템 LANSTARplus LSP-7UTP-20M CAT.6A UTP 랜케이블 (20m)','9500','9290','100',1);return false;" add_data="114105">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114105" class="name" target="_blank">
+					        						라인업시스템 LANSTARplus LSP-7UTP-20M CAT.6A UTP 랜케이블 (20m) 114105					        						<!-- span class="advice">케이블.USB.LAN.데이터.전원 / Lanstar-Plus] Cat.7 UTP 랜 케이블 ,20M [20308] CAT.6A(CAT.7) LSP-7UTP-20M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>9,500</span></li>
+					        						<li class="cash">맞춤가격<span>9,290</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114102_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114102','라인업시스템 LANSTARplus LSP-7UTP-3M CAT.6A UTP 랜케이블 (3m)','2000','1950','20',1);return false;" add_data="114102">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114102" class="name" target="_blank">
+					        						라인업시스템 LANSTARplus LSP-7UTP-3M CAT.6A UTP 랜케이블 (3m) 114102					        						<!-- span class="advice">케이블.USB.LAN.데이터.전원 / Lanstar-Plus] Cat.7 UTP 랜 케이블 ,3M [20303] CAT.6A(CAT.7) LSP-7UTP-3M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>2,000</span></li>
+					        						<li class="cash">맞춤가격<span>1,950</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114103_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114103','라인업시스템 LANSTARplus LSP-7UTP-10M CAT.6A UTP 랜케이블 (10m)','4700','4580','50',1);return false;" add_data="114103">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114103" class="name" target="_blank">
+					        						라인업시스템 LANSTARplus LSP-7UTP-10M CAT.6A UTP 랜케이블 (10m) 114103					        						<!-- span class="advice">케이블.USB.LAN.데이터.전원 / Lanstar-Plus] Cat.7 UTP 랜 케이블 ,10M [20306] CAT.6A(CAT.7) LSP-7UTP-10M</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>4,700</span></li>
+					        						<li class="cash">맞춤가격<span>4,580</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        		</ul>
+					        	</div>
+					        						        	<div class="cont clear">
+					        		<a href="#" class="arr prev" onclick="slide_on(this,'','set'); return false;"></a>
+    								<a href="#" class="arr next" onclick="slide_on(this,'','set'); return false;"></a>
+					        		<ul>
+								    						        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/100/100958_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('100958','<B style=letter-spacing:0.2>트랜센드 Extra Slim Portable CD/DVD Writer TS8XDVDS-K</B>','45000','44330','50',1);return false;" add_data="100958">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=100958" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>트랜센드 Extra Slim Portable CD/DVD Writer TS8XDVDS-K</B> 100958					        						<!-- span class="advice">트랜센드 / DVD 멀티 레코더 / 외장형 / M-DISC (영구보존) / </span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>45,000</span></li>
+					        						<li class="cash">맞춤가격<span>44,330</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/121/121554_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('121554','NEXT-201DVD-COMBO 이지넷 USB2.0 External ODD (DVD-Combo) / CD,DVD 읽기 / CD 쓰기지원','13000','12810','10',1);return false;" add_data="121554">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=121554" class="name" target="_blank">
+					        						NEXT-201DVD-COMBO 이지넷 USB2.0 External ODD (DVD-Combo) / CD,DVD 읽기 / CD 쓰기지원 121554					        						<!-- span class="advice">이지넷유비쿼터스 / CD/DVD 콤보 / 외장형 / USB2.0 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>13,000</span></li>
+					        						<li class="cash">맞춤가격<span>12,810</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/118/118513_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('118513','NEXT-200DVD-RW 이지넷 USB3.0 External ODD (DVD-RW) Multi플레이어 / 일체형케이블타입','17900','17630','20',1);return false;" add_data="118513">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=118513" class="name" target="_blank">
+					        						NEXT-200DVD-RW 이지넷 USB3.0 External ODD (DVD-RW) Multi플레이어 / 일체형케이블타입 118513					        						<!-- span class="advice">이지넷유비쿼터스 / DVD 멀티 레코더 / 외장형 / USB3.0 / </span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>17,900</span></li>
+					        						<li class="cash">맞춤가격<span>17,630</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        		</ul>
+					        	</div>
+					        						    	</div>
+					    </div>
+					</div>
+					<!---------------------------------- 추가(셋트) 상품 끝 ------------------------------------------------------>
+<!---------------------------------- 추가(셋트) 상품 시작2 ------------------------------------------------------>
+										<div class="prd_set">
+					    <div class="set2">
+					    	<div class="set_top clear">
+					    		<div class="tit">판매자의 추천 세트 상품</div>
+					    		<ul class="tab">
+									<li><a href='#' class='on'>스피커</a></li>
+				
+								</ul>
+					    	</div>
+					    	<div class="cont_all">
+					    							        	<div class="cont clear">
+					        		<a href="#" class="arr prev" onclick="slide_on(this,'','set'); return false;"></a>
+    								<a href="#" class="arr next" onclick="slide_on(this,'','set'); return false;"></a>
+					        		<ul>
+								    						        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/109/109320_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('109320','BZ-SL4 노블레스 - 화이트','33400','32570','30',1);return false;" add_data="109320">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=109320" class="name" target="_blank">
+					        						BZ-SL4 노블레스 - 화이트 109320					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / BZ-SL4 노블레스 - 화이트</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>33,400</span></li>
+					        						<li class="cash">맞춤가격<span>32,570</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/121/121609_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('121609','스카이디지탈 슈퍼캐스트 X LIVE 4K','300800','300500','3010',1);return false;" add_data="121609">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=121609" class="name" target="_blank">
+					        						스카이디지탈 슈퍼캐스트 X LIVE 4K 121609					        						<!-- span class="advice">멀티미디어.TV카드.영상편집 / 스카이디지탈 슈퍼캐스트 X LIVE 4K</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>300,800</span></li>
+					        						<li class="cash">맞춤가격<span>300,500</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/93/93702_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('93702','(Britz) 브리츠인터내셔널 BR-1000A Cuve Black 2 /사운드/스피커','36000','35100','40',1);return false;" add_data="93702">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=93702" class="name" target="_blank">
+					        						(Britz) 브리츠인터내셔널 BR-1000A Cuve Black 2 /사운드/스피커 93702					        						<!-- span class="advice">사운드/스피커 / 제조회사 : Britz / 제품 분류 : PC 스피커 / 연결 인터페이스 : 3.5mm잭 / 전원 형태 : AC 전원 / 스피커 채널 : 2채널 /</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>36,000</span></li>
+					        						<li class="cash">맞춤가격<span>35,100</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/109/109319_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('109319','<B style=letter-spacing:0.2>[Britz] BZ-SL4 노블레스 블랙 (2.0 채널/RMS 5W/USB 전원)</B>','33400','32570','30',1);return false;" add_data="109319">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=109319" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>[Britz] BZ-SL4 노블레스 블랙 (2.0 채널/RMS 5W/USB 전원)</B> 109319					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / BZ-SL4 노블레스 - 블랙</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>33,400</span></li>
+					        						<li class="cash">맞춤가격<span>32,570</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/102/102914_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('102914','Britz 브리츠인터내셔널 BZ-T8700','266400','261070','270',1);return false;" add_data="102914">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=102914" class="name" target="_blank">
+					        						Britz 브리츠인터내셔널 BZ-T8700 102914					        						<!-- span class="advice">음향가전 / Britz 브리츠인터내셔널 BZ-T8700</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>266,400</span></li>
+					        						<li class="cash">맞춤가격<span>261,070</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111874_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111874','브리츠인터내셔널 BZ-V990S','37900','37070','40',1);return false;" add_data="111874">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111874" class="name" target="_blank">
+					        						브리츠인터내셔널 BZ-V990S 111874					        						<!-- span class="advice">음향가전 / 브리츠인터내셔널 BZ-V990S</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>37,900</span></li>
+					        						<li class="cash">맞춤가격<span>37,070</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/121/121347_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('121347','지군코리아 GPRO-QHD800 4K','70300','70230','700',1);return false;" add_data="121347">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=121347" class="name" target="_blank">
+					        						지군코리아 GPRO-QHD800 4K 121347					        						<!-- span class="advice">멀티미디어.TV카드.영상편집 / G GOON GPRO-QHD800 4K</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>70,300</span></li>
+					        						<li class="cash">맞춤가격<span>70,230</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/111/111877_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('111877','Britz 브리츠인터내셔널 BR-MEC2000','313800','307520','310',1);return false;" add_data="111877">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=111877" class="name" target="_blank">
+					        						Britz 브리츠인터내셔널 BR-MEC2000 111877					        						<!-- span class="advice">음향가전 / Britz 브리츠인터내셔널 BR-MEC2000</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>313,800</span></li>
+					        						<li class="cash">맞춤가격<span>307,520</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/100/100098_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('100098','Britz 브리츠액세서리즈 BA-R90 블랙','24900','24400','20',1);return false;" add_data="100098">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=100098" class="name" target="_blank">
+					        						Britz 브리츠액세서리즈 BA-R90 블랙 100098					        						<!-- span class="advice">멀티미디어장비(이동해야함) / Britz 브리츠액세서리즈 BA-R90 블랙</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>24,900</span></li>
+					        						<li class="cash">맞춤가격<span>24,400</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114177_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114177','마이크로닉스 WIZMAX W301 7.1채널 RGB 게이밍 헤드셋 (블랙)','26800','26210','270',1);return false;" add_data="114177">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114177" class="name" target="_blank">
+					        						마이크로닉스 WIZMAX W301 7.1채널 RGB 게이밍 헤드셋 (블랙) 114177					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / 마이크로닉스 WIZMAX W301 7.1채널 RGB 게이밍 헤드셋 (블랙)</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>26,800</span></li>
+					        						<li class="cash">맞춤가격<span>26,210</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/121/121345_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('121345','한성컴퓨터 HW40 4K UHD 웹캠','50300','50250','500',1);return false;" add_data="121345">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=121345" class="name" target="_blank">
+					        						한성컴퓨터 HW40 4K UHD 웹캠 121345					        						<!-- span class="advice">멀티미디어.TV카드.영상편집 / 한성컴퓨터 HW40 4K UHD 웹캠</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>50,300</span></li>
+					        						<li class="cash">맞춤가격<span>50,250</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107250_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107250','<B style=letter-spacing:0.2>[마이크로닉스] BT-1000 V2 화이트 (사운드바/RMS 10W/블루투스)</B>','30500','29830','30',1);return false;" add_data="107250">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107250" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>[마이크로닉스] BT-1000 V2 화이트 (사운드바/RMS 10W/블루투스)</B> 107250					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / 마이크로닉스 BT-1000 V2 블루투스 커브드 (화이트)</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>30,500</span></li>
+					        						<li class="cash">맞춤가격<span>29,830</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107251_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107251','<B style=letter-spacing:0.2>[마이크로닉스] BT-1000 V2 그레이 (사운드바/RMS 10W/블루투스)</B>','30500','29830','30',1);return false;" add_data="107251">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107251" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>[마이크로닉스] BT-1000 V2 그레이 (사운드바/RMS 10W/블루투스)</B> 107251					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / 마이크로닉스 BT-1000 V2 블루투스커브드(다크그레이)</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>30,500</span></li>
+					        						<li class="cash">맞춤가격<span>29,830</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/112/112384_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('112384','Britz BZ-GX35 레트로 감성 블루투스 스피커','65300','63990','650',1);return false;" add_data="112384">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=112384" class="name" target="_blank">
+					        						Britz BZ-GX35 레트로 감성 블루투스 스피커 112384					        						<!-- span class="advice">음향가전 / Britz BZ-GX35 레트로 감성 블루투스 스피커</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>65,300</span></li>
+					        						<li class="cash">맞춤가격<span>63,990</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/114/114176_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('114176','마이크로닉스 WIZMAX H300 가상 7.1채널 게이밍 헤드셋','24900','24350','250',1);return false;" add_data="114176">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=114176" class="name" target="_blank">
+					        						마이크로닉스 WIZMAX H300 가상 7.1채널 게이밍 헤드셋 114176					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / 마이크로닉스 WIZMAX H300 가상 7.1채널 게이밍 헤드셋</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>24,900</span></li>
+					        						<li class="cash">맞춤가격<span>24,350</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/101/101753_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('101753','<B style=letter-spacing:0.2>MAXTILL SB-100 사운드바 블랙</B>','17100','16670','20',1);return false;" add_data="101753">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=101753" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>MAXTILL SB-100 사운드바 블랙</B> 101753					        						<!-- span class="advice">게이밍헤드셋.스피커.마이크 / (MAXTILL) SB-100 /사운드/스피커</span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>17,100</span></li>
+					        						<li class="cash">맞춤가격<span>16,670</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107191_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107191','<B style=letter-spacing:0.2>[MAXTILL] SB-200 화이트 (사운드바/RMS 6W/USB 전원)</B>','16200','15840','20',1);return false;" add_data="107191">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107191" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>[MAXTILL] SB-200 화이트 (사운드바/RMS 6W/USB 전원)</B> 107191					        						<!-- span class="advice">스피커/스피커 주변기기 / 제조회사 : MAXTILL / 제품 분류 : 사운드바 / 스피커 채널 : 2채널 / 연결 인터페이스 : USB / 전원 형태 : USB 전원 / </span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>16,200</span></li>
+					        						<li class="cash">맞춤가격<span>15,840</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        			<li class="list">
+					        				<div class="img_wrap">
+					        					<img src="/data/pimg/107/107192_300.jpg" width="150" height="150" class="thumb" alt="상품">
+					        					<a href="#" class="btn add_btn" onclick="addProductInsert('107192','<B style=letter-spacing:0.2>[MAXTILL] SB-200 블랙 (사운드바/RMS 6W/USB 전원)</B>','16200','15840','20',1);return false;" add_data="107192">추가하기</a>
+					        				</div>
+					        				<div class="info">
+					        					<a href="/shop/product_detail.html?pd_no=107192" class="name" target="_blank">
+					        						<B style=letter-spacing:0.2>[MAXTILL] SB-200 블랙 (사운드바/RMS 6W/USB 전원)</B> 107192					        						<!-- span class="advice">스피커/스피커 주변기기 / 제조회사 : MAXTILL / 제품 분류 : 사운드바 스피커 / 연결 인터페이스 : 3.5mm잭 / 전원 형태 : USB 전원 / 스피커 채널 : 2.0채널 / </span-->
+					        					</a>
+					        					<ul class="price only">
+					        						<li class="card">판매가격<span>16,200</span></li>
+					        						<li class="cash">맞춤가격<span>15,840</span></li>
+					        					</ul>
+					        				</div>
+					        			</li>
+					        								        		</ul>
+					        	</div>
+					        						    	</div>
+					    </div>
+					</div>
+					<!---------------------------------- 추가(셋트) 상품 끝2 ------------------------------------------------------>
+					
+
+					<div class="prd_detail">
+						<div class="tab_wrap clear">
+							<ul class="tab" id="tab2">
+								<li><a href="#tab1">상품 사양변경</a></li>
+								<li><a href="#tab2" class="on">상품정보</a></li>
+								<li><a href="#tab3">배송정보</a></li>
+							
+							<li><a href="#tab4">구매후기(<span class="rv_total">0</span>)</a></li>
+							
+							<li><a href="#tab5">상품 Q&A</a></li>
+	
+							</ul>
+						</div>
+						<div class="contents">
+							<p><br></p><h1>프로세서(CPU)</h1><div style='width:800;height:500;overflow:auto;'><p><img title="164154081162363134.jpg" src="http://image.winwinprice.co.kr/pimg_free/466/466558_im_20220107084113_0.jpg "><br style="clear: both;">&nbsp;</p></div><br/>
+<h1>CPU쿨러</h1><div style='width:800;height:500;overflow:auto;'><p><img title="172377518466271791.jpg" src="http://image.winwinprice.co.kr/cheditor3/2408/172377518466271791.jpg"><img title="172377519616273806.jpg" src="http://image.winwinprice.co.kr/cheditor3/2408/172377519616273806.jpg"><br style="clear: both;"><br style="clear: both;">&nbsp;</p></div><br/>
+<h1>메모리(RAM)</h1><div style='width:800;height:500;overflow:auto;'><img title="161396003023392898.jpg" src="http://image.winwinprice.co.kr/cheditor3/2102/161396003023392898.jpg"><br style="clear: both;"><img title="161396005932364759.jpg" src="http://image.winwinprice.co.kr/cheditor3/2102/161396005932364759.jpg"><br style="clear: both;"><br></div><br/>
+<h1>메인보드</h1><div style='width:800;height:500;overflow:auto;'><p><img src="http://image.winwinprice.co.kr/cheditor3/2305/168473771314066850.jpg" title="168473771314066850.jpg">&nbsp;</p></div><br/>
+<h1>그래픽(VGA)</h1><div style='width:800;height:500;overflow:auto;'><p><img src="http://image.winwinprice.co.kr/pimg_free/523/523815_im_20250422034918_0.jpg " title="174530439043471914.jpg">&nbsp;</p></div><br/>
+<h1>초고속(SSD)</h1><div style='width:800;height:500;overflow:auto;'><p><img src="http://image.winwinprice.co.kr/cheditor3/2510/176095397288251742.jpg" title="176095397288251742.jpg"><br style="clear: both;">&nbsp;</p></div><br/>
+<h1>케이스</h1><div style='width:800;height:500;overflow:auto;'><p><img src="http://image.winwinprice.co.kr/cheditor3/2503/174280422677980146.jpg" title="174280422677980146.jpg"><br style="clear:both;">&nbsp;</p></div><br/>
+<h1>파워</h1><div style='width:800;height:500;overflow:auto;'><p><img src="http://image.winwinprice.co.kr/cheditor3/2404/171394457053641858.jpg" title="171394457053641858.jpg"><br style="clear:both;">&nbsp;</p></div><br/>
+<h1>배송</h1><div style='width:800;height:500;overflow:auto;'><p>&nbsp;<a href="https://www.youtube.com/watch?v=FMF7PO1fl_Q&amp;feature=youtu.be" target="_self">https://www.youtube.com/watch?v=FMF7PO1fl_Q&amp;feature=youtu.be</a><br><img src="https://popcornpc.co.kr/data/cheditor3/2411/173223927341804373.png" title="173223927341804373.png"><br style="clear:both;">&nbsp;</p></div><br/>
+						</div>
+					</div>
+	
+					<div class="prd_delivery">
+						<div class="tab_wrap clear">
+    						<ul class="tab" id="tab3">
+    							<li><a href="#tab1">상품 사양변경</a></li>
+    							<li><a href="#tab2">상품정보</a></li>
+    							<li><a href="#tab3" class="on">배송정보</a></li>
+							
+							<li><a href="#tab4">구매후기(<span class="rv_total">0</span>)</a></li>
+							
+							<li><a href="#tab5">상품 Q&A</a></li>
+	
+    						</ul>
+    					</div>
+    					<div class="contents info">
+    						<div class="tit">배송정보</div>
+    						<table class="comm_table">
+    							<tr>
+    								<th>배송방법</th>
+    								<td>
+    									<ul>
+											
+												<li>상품은 기본적으로 택배로 배송되며, 입금확인 후 평균 3일 이내로 배송됩니다.</li>
+												<li>토요일/공휴일은 배송기간에 포함되지 않습니다.</li>
+												<li>도서/산간지역은 추가 2~3일 정도 소요됩니다.</li>
+												<li>일시품절, 제조사 상품수급 문제, 천재지변 등의 사유로 배송이 늦어질 수 있습니다.</li>
+																							
+    									</ul>
+    								</td>
+    							</tr>
+    							<tr>
+    								<th>배송지역</th>
+    								<td>
+    									<ul>
+    										
+												<li>전국 (일부지역 제외)</li>
+												    									</ul>
+    								</td>
+    							</tr>
+    							<tr>
+    								<th>배송비</th>
+    								<td>
+										
+											<li>도서 산간지역은 추가비용이 발생할 수 있습니다.</li>
+											<li>부피나 중량이 큰 제품은 배송 방법이 변경 될 수 있으며, 이에 따른 운임비가 추가될 수 있습니다.</li>
+											<li>배송이 늦어지는 경우 미리 연락드립니다. 상품 이미지의 색상은 실제 상품과 차이가 있을 수 있습니다.</li>
+											<li>착불배송의 경우 해당 지역에 따라 추가운임이 발생할 수 있습니다.</li>
+											    								</td>
+    							</tr>
+    						</table>
+    					</div>
+					</div><!-- prd_delivery -->
+					
+						 
+					<div class="prd_talk">
+						<div class="tab_wrap clear">
+    						<ul class="tab" id="tab4">
+    							<li><a href="#tab1">상품 사양변경</a></li>
+    							<li><a href="#tab2">상품정보</a></li>
+    							<li><a href="#tab3">배송정보</a></li>
+							<li><a href="#tab4" class="on">구매후기(<span class="rv_total">0</span>)</a></li>							
+								<li><a href="#tab5">상품 Q&A</a></li>
+			
+    						</ul>
+    					</div>
+    					<div class="contents">    						
+    						<div class="review_box">
+    							<div class="head">
+    								<div class="select_box">
+                                    	<span class="rselected">최신순</span>	
+                                    	<ul class="option_layer">
+                                    		<li data_value="" class="on">최신순</li>
+                                    		<li data_value="wr_3" class="">평점순</li>
+                                    		<!-- <li data_value="" class="">추천순</li> -->
+                                    	</ul>
+                                	</div>
+                                	<div class="check">
+                                    	<input type="checkbox" id="prd" class="checkbox" />
+                                    	<label for="prd">해당상품 후기만 보기</label>
+                                	</div>
+    								<a href="/shop/mypage.html" class="btn" target="_blank">리뷰 작성하기</a>
+    							</div><!-- head -->
+    							<div class="body" id="reviewList"></div><!-- body -->
+    							<input type="hidden" id="endLimit" value="10" />
+    						</div>
+    						
+    					
+    					
+							<!-- <iframe width='100%' height='400' name='productTalk' id='productTalk' src='/bbs/board.php?bo_table=product_talk&pd_no=121228' border=0 marginWidth=0 marginHeight=0  frameBorder=0 scrolling=no onload="resizeTalk(this)"></iframe> -->
+    					</div>
+					</div>
+							
+					
+					<div class="prd_qna">
+						<div class="tab_wrap clear">
+    						<ul class="tab" id="tab5">
+    							<li><a href="#tab1">상품 사양변경</a></li>
+    							<li><a href="#tab2">상품정보</a></li>
+    							<li><a href="#tab3">배송정보</a></li>
+								
+							<li><a href="#tab4">구매후기(<span class="rv_total">0</span>)</a></li>
+														
+							<li><a href="#tab5" class="on">상품 Q&A</a></li>     							
+    						</ul>
+    					</div>
+    					<div class="contents">
+							<iframe width='100%' height='500' name='product_qanda' id='product_qanda' src='/bbs/board.php?bo_table=product_qanda&pd_no=121228' border=0 marginWidth=0 marginHeight=0  frameBorder=0 scrolling=no onload="resizeQanda(this)"></iframe>
+    					</div>
+					</div>				
+				</div>
+
+		</div><!-- detail_wrap-->
+	</div><!-- contains -->
+</div><!-- content -->
+</form>
+
+<form id="change_data" name="change_data" method='post'></form>
+
+
+<script>
+
+function order_basket(ttype){
+	if (orderCheck()) return;
+	if(ttype=='buy'){
+		document.system_list.barogume.value='1';
+	}else{
+		document.system_list.barogume.value='0';
+	}
+   document.system_list.action = "/shop/order_basket_system_action.php";
+   document.system_list.submit();
+}
+
+//필수항목 체크 : 2020.09.23
+function orderCheck(){
+	var msg = "";
+	$("[id=pcode]").each(function() {			
+		var pname = $(this).val();
+		if (pname.indexOf("XXX") == 0){
+			pname = pname.substring(4);			
+			msg = pname + " 선택은 필수 입니다. 【 "+pname+" 】를 선택해주세요.";
+		}
+	});
+	
+	if (msg == ""){
+		return false;
+	}else{
+		alert(msg);
+		return true;
+	}
+}
+
+function order_wish(pd_no){
+	login_id ='';
+	if(login_id==""){
+		if(confirm('찜하기는 로그인 후 가능합니다.로그인 하시겠습니까?')){
+			location.href="/bbs/login.php?url=/shop/system_detail.html?pd_no=121228";
+			return;
+		}else{
+			return;
+		}		
+	}else{
+		window.open("/shop/wish_popup.html?pd_no=121228", "popup", "height=500, width=505, scrollbars=yes, status=no,toolbar=no,menubar=no,location=no");
+	}
+}
+
+function resizeTalk(fr) {
+ document.getElementById("productTalk").height = productTalk.document.body.scrollHeight+20;
+ document.getElementById("productTalk").width = productTalk.document.body.scrollWidth; 
+}
+
+function resizeQanda(fr) {
+ document.getElementById("product_qanda").height = product_qanda.document.body.scrollHeight+20;
+ document.getElementById("product_qanda").width = product_qanda.document.body.scrollWidth; 
+}
+
+function resizeChuga(fr) {
+ document.getElementById("chugaProduct").height = chugaProduct.document.body.scrollHeight+20;
+ document.getElementById("chugaProduct").width = chugaProduct.document.body.scrollWidth; 
+}
+</script>
+
+	<!-- S:FOOTER -->
+	<div id="footer" class="ver_1">
+				<div class="contains">
+			<div class="footer_top clear">
+				<ul>
+					<li><a href="/shop/company.html?incurl=company_01.php">회사소개</a></li>
+					<li><a href="/shop/customer.html?incurl=customer_07.php">이용약관</a></li>
+					<li><a href="/shop/customer.html?incurl=customer_08.php" class="privacy">개인정보처리방침</a></li>
+					<li><a href="/shop/customer.html">고객센터</a></li>
+									</ul>
+			</div>
+			<div class="footer_bottom clear">
+				<div class="company_info">
+					<!-- <img src="/skin/shop/basic/customizing/logo.png" /> -->
+					<div class="account">
+						<p>입금계좌안내</p>
+						<ul>					
+																	
+							<li>
+								<span><img src='/skin/shop/basic/images/icon/bank_sh.png' /></span>								<span class="num">140-012-635175</span>
+								<span class="holder">(주)팝콘컴퓨터</span>
+							</li>	
+												</ul>
+					</div>
+					<ul>
+						<li>
+							<span>상호</span> : 주식회사 팝콘컴퓨터 
+						</li>
+						<li>
+							<span>대표이사</span> : 이미숙 
+							<span>주소</span> : 서울특별시 용산구 원효로 188 (원효로2가 JM빌딩 5층) <a href="http://www.ftc.go.kr/info/bizinfo/communicationViewPopup.jsp?wrkr_no=7948100671" class="confirm" target="_blank">사업자 정보확인</a>
+						</li>
+						<li>
+							<span>사업자등록번호</span> : 794-81-00671 
+							<span>통신판매업신고</span> : 제2017-서울용산-0755호 <a href=" http://www.ftc.go.kr/www/bizCommList.do?key=232&searchCnd=wrkr_no&searchKrwd=7948100671" class="confirm" target="_blank">서비스가입사실 확인</a>							                                                                                   
+						</li>
+						<li>
+							<span>고객센터주문상담</span> :  1644-0249 
+							<span>FAX</span> : 0303-3444-8834 
+							<span>EMAIL</span> : webmaster@popcornpc.co.kr						</li>
+						<li>
+							<span>분쟁조정기관표시</span> : 전자거래분쟁중재위원회 
+							<span>개인정보관리 책임자</span> : 최정진 과장						</li>
+						<li>
+							<span>호스팅 제공자</span> : (주)아이티이지						</li>
+					</ul>
+					<span class="copyright">Copyright 2019 &copy; 주식회사 팝콘컴퓨터 ALL Rights Reserved.</span>
+				</div>
+				<div class="contact">
+				<dt style="font-size:20px">고객센터</dt>
+					<span class="tel">1644-0249</span>
+					<span class="time" style='text-align:left'>ㆍ문의시간 09:30 ~ 18:30 (토, 일, 공휴일 휴무)<br/>ㆍ점심시간 12:00 ~ 13:00<br/>ㆍ주문처리시간 정오(12시) 이전 결재건 당일 발송</span>
+					<dl>
+						<dt>배송안내</dt>
+						<dd>주문하신 상품은 (조립PC) 결제 후 1~3일 뒤 받아보실 수 있습니다. (토, 일, 공휴일 제외)</dd>
+					</dl>
+					<dl>
+						<dt>매장 방문수령</dt>
+						<dd>서울특별시 용산구 원효로 188 (원효로2가 JM빌딩 5층)</dd>
+					</dl>
+				</div>
+				<div class="safety clear">
+					<ul>
+						<li class="txt">
+							<span>현금결제시 고객님의 안전거래를 위해 가입한 구매안전 서비스를 이용하실 수 있습니다.</span>
+						</li>
+						<li>
+															<a href="#" onclick="javascript:window.open('https://pgweb.tosspayments.com/ms/escrow/s_escrowYn.do?mertid=WIN_popcoreucq', 'tosspay', 'scrollbars=no, resizable=no, width=465, height=530'); return false;" target="_blank" class="toss_link"></a>
+								<img src="/skin/shop/basic/images/common/safety_toss.png" alt="에스크로 서비스 확인" />
+														
+						</li>
+					</ul>
+				</div>				
+			</div>
+		</div>		
+			</div>
+	<!-- E:FOOTER -->
+</div>
+
+<!-- 공통 적용 스크립트 , 모든 페이지에 노출되도록 설치. 단 전환페이지 설정값보다 항상 하단에 위치해야함 --> 
+<script type="text/javascript" src="//wcs.naver.net/wcslog.js"> </script> 
+
+<script type="text/javascript" src="//wcs.naver.net/wcslog.js"></script>
+<script type="text/javascript">
+if(!wcs_add) var wcs_add = {};
+wcs_add["wa"] = "9cead22b5a2788";
+if(window.wcs) {
+wcs_do();
+}
+</script>
+
+<script type="text/javascript"> 
+if (!wcs_add) var wcs_add={};
+wcs_add["wa"] = "s_2823bc45e749";
+if (!_nasa) var _nasa={};
+if(window.wcs){
+	wcs.inflow();
+	wcs_do(_nasa);
+}
+</script><script language="javascript" src="../js/wrest.js"></script>
+
+<!-- 새창 대신 사용하는 iframe -->
+<iframe width=0 height=0 name='hiddenframe' style='display:none;'></iframe>
+
+
+</body>
+</html>
+	
+		
+		<script async src="https://www.googletagmanager.com/gtag/js?id=G-PGRHMDJ26J"></script>
+	<script>
+	  window.dataLayer = window.dataLayer || [];
+	  function gtag(){dataLayer.push(arguments)};
+	  gtag('js', new Date());
+	  gtag('config', 'G-PGRHMDJ26J');
+	  	</script>
+		
+	
+	
