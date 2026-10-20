@@ -25,8 +25,9 @@ class Loading(unittest.TestCase):
     def test_chat_wait_small_and_tied_to_request(self):
         conv = read('assets/js/design-conversation.js')
         self.assertIn("if (model.state === 'loading') return '<div class=\"dc-state-box dc-loading dc-wait\"", conv)
-        self.assertIn('답변을 준비하고 있어요', conv)
-        self.assertIn('data-dc-action="stop"', conv)
+        self.assertIn('<strong>AI가 답변을 준비하고 있어요.</strong><p>조금만 기다려 주세요.</p>', conv)
+        self.assertNotIn('기다리기 중단', conv)
+        self.assertNotIn('data-dc-action="stop"', conv)
         css = read('assets/css/category-loading.css')
         self.assertIn('width:96px;height:96px', css)
         self.assertIn('width:72px;height:72px', css)
