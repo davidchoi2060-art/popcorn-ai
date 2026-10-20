@@ -16,6 +16,7 @@ from api import talk, talk_rules as TR, reco_explore as X
 from api import talk_pc_advice as PA
 from tests.test_talk_reask_defaults_20261012 import ADVICE, parse
 from tests import test_talk_schema_game_scope as GS
+from api import sold_reco as SOLD
 
 
 class CurrentPcWantedPart(unittest.TestCase):
@@ -38,8 +39,8 @@ class GenericGameName(unittest.TestCase):
         self.assertFalse(TR.unnamed_game(st(["메이플스토리"])))
         self.assertFalse(TR.unnamed_game(st(["스팀 인디(통칭)", "메이플스토리"])))
 
-    def _sold_branch(self, names):
-        v = GS.vocab(listed=list(names))
+    def _sold_branch(self, names, listed=None):
+        v = GS.vocab(listed=list(names) if listed is None else listed)
         grid_state, _ = GS.TS.validate_state({"usages": ["고사양 게임"], "budget_won": 1500000,
                                               "game": {"names": names}}, v)
         tree = ast.parse((GS.ROOT / "api/grid_public.py").read_text(encoding="utf-8-sig"))
@@ -49,7 +50,7 @@ class GenericGameName(unittest.TestCase):
         cards = Mock(return_value=[])
         env = {"RECO_SOURCE": "sold", "state": grid_state, "game_usages": ["고사양 게임"],
                "game_grade": grid_state.game.grade, "card_sets": [], "notes": [],
-               "is_game_usage": GS.TS.is_game_usage, "SOLD": SimpleNamespace(card_sets=cards),
+               "is_game_usage": GS.TS.is_game_usage, "SOLD": SimpleNamespace(card_sets=cards, game_names_ok=SOLD.game_names_ok),
                "_game_context": Mock(return_value={}), "assumed": [], "ai_estimated": [],
                "DEFAULT_RESOLUTION": GS.TS.DEFAULT_RESOLUTION, "ASSUMED_RESOLUTION": "game.resolution=1080p",
                "conn": None, "vocab": v, "body": None, "talk_notes": [],
@@ -60,6 +61,12 @@ class GenericGameName(unittest.TestCase):
     def test_recommend_sends_game_target_for_generic_name(self):
         self.assertEqual(self._sold_branch(["스팀 인디(통칭)"]), ["고사양 게임"])
         self.assertEqual(self._sold_branch(["메이플스토리"]), [])     # 실제 게임은 기존 보류 그대로
+
+    def test_recommend_sends_game_target_for_light_or_casual_name(self):
+        # 2026-10-20 G01 -- 웹보드 게임·「캐주얼 게임」 낱말은 등급 없이도 판매 추천으로 보낸다
+        self.assertEqual(self._sold_branch(["한게임 포커"], listed=[]), ["고사양 게임"])
+        self.assertEqual(self._sold_branch(["캐주얼 게임"], listed=[]), ["고사양 게임"])
+        self.assertEqual(self._sold_branch(["메이플스토리"], listed=[]), [])   # 목록 밖 실제 게임은 보류 그대로
 
 
 class MixedWeighClause(unittest.TestCase):

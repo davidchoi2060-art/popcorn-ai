@@ -150,7 +150,9 @@ class GameScopeTests(unittest.TestCase):
         env = {'RECO_SOURCE': 'sold', 'state': grid_state,
                'game_usages': ['고사양 게임', '캐주얼 게임'],
                'game_grade': grid_state.game.grade, 'card_sets': [], 'notes': [],
-               'is_game_usage': TS.is_game_usage, 'SOLD': SimpleNamespace(card_sets=cards),
+               'is_game_usage': TS.is_game_usage, 'SOLD': SimpleNamespace(card_sets=cards,
+                                                                             # 이름 판정은 원천 그대로 두되 DB 모듈을 읽지 않는다 -- 이 상태(목록 안 게임)에서는 TR.unnamed_game 과 같다
+                                                                             game_names_ok=lambda st, voc: TR.unnamed_game(st)),
                '_game_context': context, 'assumed': [], 'ai_estimated': [],
                'DEFAULT_RESOLUTION': TS.DEFAULT_RESOLUTION,
                'ASSUMED_RESOLUTION': 'game.resolution=1080p', 'conn': None, 'vocab': v,

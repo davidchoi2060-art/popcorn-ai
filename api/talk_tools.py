@@ -445,10 +445,15 @@ def find_pcs(args: dict, book: FactBook) -> dict:
         # 등급·grade_src 는 받지 않는다 -- 확정 목록 등급만 서버가 붙인다(모듈 docstring 「읽기만 한다」).
         raw["game"] = {"names": games, "resolution": args.get("resolution")}
     book.units = units if units and units >= 2 else book.units
+    wants = {"units": book.units} if book.units else {}
+    # 144Hz 이상 고주사율 목표는 손님 문장 규칙(reco_explore.extract)으로 읽는다 -- 캐주얼 게임도 그 목표면 한 단계 위(G01 E).
+    from . import reco_explore as EXPLORE
+    if EXPLORE.extract(book.request_text or "").get("high_fps"):
+        wants["high_fps"] = True
 
     def ask(state: dict) -> dict:
         return GP.recommend(GP.RecommendBody(state=state, nav=nav, anchor_code=book.anchor_code if nav else None,
-                                             wants={"units": book.units} if book.units else None))
+                                             wants=wants or None))
 
     def count(r: dict) -> int:
         return sum(1 for cs in r.get("card_sets") or [] for it in (cs.get("items") or [])[:MAX_ITEMS_PER_SET]
@@ -486,6 +491,8 @@ def find_pcs(args: dict, book: FactBook) -> dict:
             out.append({"ref": ref, **_compact_item(it)})
         sets.append({"usage": cs.get("usage"), "min_level": cs.get("min_level"),
                      "min_level_work": cs.get("min_level_work"), "items": out,
+                     # 무엇을 기준으로 찾았는지(서버 문장 · G01) -- 답의 «필요 사양» 설명은 이 기준과 보여 준 PC 사양을 따른다.
+                     "demand": (cs.get("demand") or {}).get("notes") or [],
                      "empty_reason": cs.get("empty_note") or cs.get("empty_reason")})
     found = sum(len(s["items"]) for s in sets)
     status = ("nearest" if relaxed else "ok") if found else ("needs" if res.get("needs") else "empty")
