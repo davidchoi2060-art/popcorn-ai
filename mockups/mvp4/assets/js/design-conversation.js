@@ -41,6 +41,8 @@
     var source = p && typeof P.catalogImage === 'function' ? P.catalogImage(p) : null;
     return source ? '<img class="' + h(cls || '') + '" src="' + h(source) + '" alt="' + h(p.name) + '" loading="lazy">' : '<span class="dc-photo-placeholder">' + icon('computer-tower') + '<small>상품 사진 준비 중</small></span>';
   }
+  // 2026-10-20 승인 「구매 경로 분리」 -- 선택·비교한 일반 완제품의 다음 행동은 그 상품의 팝콘PC몰 페이지다(견적 보관·상담 아님).
+  function buyButton(p, unsure) { return (P.mallBuyLink && P.mallBuyLink(p, 'btn btn-small btn-primary', unsure ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 구매하기')) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
   function buttonLink(label, screen, state, values, style) { return '<a class="btn ' + (style || 'btn-outline') + '" href="' + h(url(screen, state, values)) + '">' + h(label) + icon('caret-right') + '</a>'; }
   function normalize(value) { return String(value || '').toLowerCase().replace(/[\s·:()_-]/g, ''); }
   function spec(p, row) {
@@ -68,7 +70,7 @@
   function card(p, selected) {
     return '<article class="dc-product-card' + (selected ? ' is-selected' : '') + '"><a class="dc-product-photo" href="' + h(url('product', 'normal', { id: p.id })) + '">' + photograph(p) + '</a>' +
       '<div class="dc-product-content"><h3><a href="' + h(url('product', 'normal', { id: p.id })) + '">' + h(p.name) + '</a></h3><p>' + (shortSpecs(p) || h(p.summary || '세부 구성을 확인해 주세요.')) + '</p><strong>' + h(money(p)) + '</strong>' +
-      '<div class="dc-product-actions"><button type="button" class="btn btn-small ' + (selected ? 'btn-primary' : 'btn-outline') + '" data-dc-select="' + h(p.id) + '" aria-pressed="' + String(selected) + '">' + (selected ? '선택한 PC' : '이 PC 선택') + '</button><a href="' + h(url('product', 'normal', { id: p.id })) + '">상세 ' + icon('caret-right') + '</a></div></div></article>';
+      '<div class="dc-product-actions"><button type="button" class="btn btn-small ' + (selected ? 'btn-primary' : 'btn-outline') + '" data-dc-select="' + h(p.id) + '" aria-pressed="' + String(selected) + '">' + (selected ? '선택한 PC' : '이 PC 선택') + '</button><a href="' + h(url('product', 'normal', { id: p.id })) + '">상세 ' + icon('caret-right') + '</a>' + (P.mallBuyLink ? P.mallBuyLink(p, 'dc-mall-buy', '팝콘PC몰 구매') : '') + '</div></div></article>';
   }
 
   P.designScreens.chat = function (ctx) {
@@ -96,13 +98,14 @@
       if (errors[model.state]) { var item = errors[model.state]; return '<div class="dc-state-box dc-error" role="alert">' + icon('warning-circle') + '<div><strong>' + h(item[0]) + '</strong><p>' + h(item[1]) + '</p>' + (model.state !== 'long-message' ? '<button type="button" data-dc-action="retry">' + icon('arrow-counter-clockwise') + '다시 시도</button>' : '') + '</div></div>'; }
       if (model.state === 'clarify') return '<div class="dc-inline-actions"><button class="dc-draft-chip" type="button" data-dc-draft="예산은 아직 정하지 않았어요.">예산은 아직 몰라요</button><button class="dc-draft-chip" type="button" data-dc-draft="어떤 사양이 필요한지 잘 모르겠어요.">사양을 잘 몰라요</button></div>';
       if (model.state === 'no-results') return '<div class="dc-inline-actions"><button class="btn btn-small btn-primary" type="button" data-dc-action="conditions">조건 다시 정하기</button>' + buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline') + '</div>';
-      if (model.handoff) return '<div class="dc-inline-actions">' + buttonLink('사람 상담 신청하기', 'consult', 'normal', model.selected ? { id: model.selected.id } : {}, 'btn-small btn-outline') + '</div>';
+      // 일반 완제품은 상품 상담으로 넘기지 않는다(2026-10-20 구매 경로 분리) -- 사람 상담은 상품 없는 일반 문의로, 선택 PC 는 몰 구매로.
+      if (model.handoff) return '<div class="dc-inline-actions">' + (model.selected ? buyButton(model.selected, false) : '') + buttonLink('사람 상담 신청하기', 'consult', 'normal', {}, 'btn-small btn-outline') + '</div>';
       return '';
     }
     function selection() {
       if (!model.selected) return empty('아직 선택한 PC가 없어요.', '상품의 구성을 비교하고 마음에 드는 PC를 골라보세요.');
       var p = model.selected, blocked = purchaseIssue(p);
-      return '<div class="dc-chosen"><div class="dc-chosen-top">' + photograph(p) + '<div><strong>' + h(p.name) + '</strong><p>' + h(money(p)) + '</p></div></div>' + (blocked ? '<p class="dc-unavailable-label" role="status">' + h(blocked) + '</p>' : '') + '<div class="dc-chosen-links">' + buttonLink('선택 PC 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + (blocked ? buttonLink('상품·구성 문의', 'consult', 'normal', { id: p.id }, 'btn-small btn-outline') : buttonLink('선택 상품 견적 확인', 'quote', 'normal', { id: p.id }, 'btn-small btn-primary')) + '</div></div>';
+      return '<div class="dc-chosen"><div class="dc-chosen-top">' + photograph(p) + '<div><strong>' + h(p.name) + '</strong><p>' + h(money(p)) + '</p></div></div>' + (blocked ? '<p class="dc-unavailable-label" role="status">' + h(blocked) + '</p>' : '') + '<div class="dc-chosen-links">' + buttonLink('선택 PC 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, !!blocked) + '</div></div>';
     }
     function inCompare(id) { return model.compare.some(function (c) { return c.id === String(id); }); }
     // 관심·비교상품(2026-10-20 대표 승인): 답변 카드의 「비교에 담기」가 여기에 쌓인다. 저장하지 않는다(새 대화·새로고침이면 비운다).
@@ -274,7 +277,7 @@ P.designScreens.compare = function (ctx) {
     var unavailableId = state === 'unavailable' && chosen.length ? String(chosen[0].id) : null;
     var differences = false, mobileIndex = 0, root = null;
     function visibleRows() { return ROWS.filter(function (row) { return !differences || chosen.length < 2 || new Set(chosen.map(function (p) { return normalize(spec(p, row)); })).size > 1; }); }
-    function actions(p) { return '<div class="dc-compare-actions">' + buttonLink('상품 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + (String(p.id) === unavailableId || purchaseIssue(p) ? '<button class="btn btn-small btn-primary" disabled>견적 전 확인 필요</button>' + buttonLink('상품·구성 문의', 'consult', 'normal', { id: p.id }, 'btn-small btn-outline') : buttonLink('선택 상품 견적 확인', 'quote', 'normal', { id: p.id }, 'btn-small btn-primary')) + '</div>'; }
+    function actions(p) { return '<div class="dc-compare-actions">' + buttonLink('상품 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, String(p.id) === unavailableId || !!purchaseIssue(p)) + '</div>'; }
     function productHead(p) { var note = purchaseIssue(p) || (String(p.id) === unavailableId ? '구매 가능 여부 확인 중' : ''); return '<div class="dc-compare-product">' + photograph(p) + '<h2>' + h(p.name) + '</h2>' + (note ? '<p class="dc-unavailable-label">' + h(note) + '</p>' : '') + '<button class="dc-compare-remove" type="button" data-dc-remove="' + h(p.id) + '" aria-label="' + h(p.name) + ' 비교에서 제거">' + icon('x') + '제거</button></div>'; }
     function markup() {
       var rows = visibleRows();
