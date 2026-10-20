@@ -144,6 +144,7 @@ import secrets
 import statistics
 import threading
 import time
+from typing import Literal
 from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException, Query, Request
@@ -557,6 +558,8 @@ class ParseBody(BaseModel):
     state: dict | None = None
     # 상품번호만 받으며, 실제 공개 구성은 도구 상담이 서버에서 다시 읽는다.
     display_context: TS.DisplayContext | None = None
+    # /mvp4 답변 화면만 "marked" -- 핵심어 표시(==어구==)를 같은 답 안에서 받는다(2026-10-20 형광펜 노트 승인). 없으면 지금과 같다.
+    reply_format: Literal["plain", "marked"] | None = None
     # 대화 흐름 카운터(2026-09-17 잡담 허용 단계). 계약은 `talk_schema.ChatFlow` --
     # **TalkState 와 형제**이고 부분집합이 아니다(그 파일 §1-b 에 근거). 화면이 응답의
     # 같은 필드를 그대로 되돌려 보낸다. 없으면 0(첫 문장)으로 본다. 서버는 이 값을 믿지
@@ -580,6 +583,38 @@ ADVICE_OK_EXCEPTIONS = frozenset({"contradiction", "too_long"})
 # 시작 단추 키. 정본은 api/talk_entry.KEYS, 화면은 mockups/mvp3/talk.js 의 STARTERS -- 둘이 같아야
 # 센다(테스트가 대조한다).
 ENTRY_KEYS = frozenset(TE.KEYS)
+
+
+_RE_EXPLICIT_CHANGE = re.compile(r"(바꿔|바꾸|변경|추가해|빼\s*줘|말고|대신|다시\s*(추천|찾|골라)|새로\s*(추천|찾))")
+
+
+def _reference_note(text: str, context, state_raw) -> str | None:
+    """이번 문장의 「N번째」·「선택한 상품」이 가리키는 PC 를 한 줄로. 못 가리키면 None.
+    도구 상담과 같은 규칙(talk_tools.resolve_reference)이다 -- 두 경로가 다른 PC 를 보면 안 된다."""
+    from . import talk_tools as TT
+    try:
+        ref = TT.resolve_reference(text, context, state_raw if isinstance(state_raw, dict) else None, TT.FactBook())
+    except Exception:  # noqa: BLE001 -- 확인이 실패해도 상담은 계속한다
+        log.warning("[talk] reference resolve failed", exc_info=True)
+        return None
+    if not ref:
+        return None
+    where = {"last_answer": "직전 답변", "right_list": "화면 오른쪽 목록", "right_list_fallback": "화면 목록",
+             "selected": "선택한 PC"}.get(ref["source"], "화면")
+    pos = f"{where}의 {ref['ordinal']}번째" if ref["source"] != "selected" else where
+    log.info("[talk] reference: source=%s ordinal=%s status=%s", ref["source"], ref["ordinal"], ref["status"])
+    if ref["status"] == "ok":
+        spec = ref.get("spec") or {}
+        bits = [f"{k} {v}" for k, v in spec.items() if k in ("cpu", "gpu") and v][:2]
+        if spec.get("ram_gb"):
+            bits.append(f"메모리 {spec['ram_gb']}GB")
+        price = f" {ref['price_now']:,}원" if type(ref.get("price_now")) is int else ""
+        return (f"손님이 이번 문장에서 가리킨 PC({pos}): 「{(ref.get('name') or '')[:80]}」{price}"
+                + (" · " + ", ".join(bits) if bits else "")
+                + " -- 이 PC 로 이번 질문에 답한다. 예산·주용도는 그대로다.")
+    if ref["status"] == "missing":
+        return f"손님이 말한 {pos} PC 는 없다({ref['count']}대만 있었다) -- 어느 PC 인지 이름으로 확인한다."
+    return f"손님이 말한 {pos} PC 는 지금 판매 목록에서 확인되지 않는다 -- 다른 PC 로 바꿔 말하지 않는다."
 
 
 def _trim_history(history) -> list:
@@ -1364,7 +1399,8 @@ def parse_talk(body: ParseBody, request: Request):
         with engine.connect() as conn:
             access_gate.check_rate(conn, request, what="talk.parse")
         agent_res = AGENT.as_parse(text, body.history or [], body.state, body.chat_flow,
-                                  display_context=body.display_context, request_text=body.text)
+                                  display_context=body.display_context, request_text=body.text,
+                                  marks=body.reply_format == "marked")
         if agent_res is not None:
             if truncated:
                 agent_res["reply"] = (TX.NOTE_TOO_LONG % format(len(text), ",") + "\n\n" + agent_res["reply"]).strip()
@@ -1384,6 +1420,11 @@ def parse_talk(body: ParseBody, request: Request):
         admin_fixes = text_fixes.load(conn)
 
     history = _trim_history(body.history)
+    # 「위 2번째 상품으로 …」 -- 도구 상담이 실패해 이 경로가 받아도 같은 PC 를 본다(2026-10-20 대표 승인 「대화가 이어지는 부분」).
+    # 순번은 화면이 보낸 답변 묶음의 상품번호로 서버가 정하고, 그 PC 를 이력 한 줄로 [A]·[B] 에 함께 넘긴다.
+    ref_note = _reference_note(text, body.display_context, body.state)
+    if ref_note:
+        history = [*history, ("assistant", ref_note)][-HISTORY_MAX_TURNS:]
     prev_ok = bool(body.state) and _prev_state_json(body.state) != _NO_PREV_STATE
     if body.state and not prev_ok:
         # 화면이 보낸 이전 state 가 스키마로 안 접힌다 -- 첫 문장처럼 다룬다. 삼키지 않고
@@ -1496,6 +1537,10 @@ def parse_talk(body: ParseBody, request: Request):
                                              admin_fixes=admin_fixes)
         state, dropped = TS.validate_state(raw_state, vocab)
         dropped.extend(fixes)
+        # 앞 답변의 PC 를 가리킨 질문(「위 2번째로 오버워치도 되나요?」)은 그 PC 에 대한 질문이지 조건 변경이 아니다 --
+        # 바꾸라고 분명히 말하지 않았으면 용도·게임 조건은 앞 턴 그대로 둔다(유지 조건과 이번 질문의 목적을 나눈다).
+        if ref_note and prev_state_obj is not None and prev_state_obj.usages and not _RE_EXPLICIT_CHANGE.search(text):
+            state = state.model_copy(update={"usages": list(prev_state_obj.usages), "game": prev_state_obj.game})
         # §6 missing 은 **서버가 다시 센다** -- 모델이 적은 missing 은 쓰지 않는다(모델이
         # "game.resolution" 처럼 계약 밖 좌표를 적어도 카드가 막히지 않게).
         missing = TS.missing_for(state, vocab)
@@ -1681,7 +1726,8 @@ def parse_talk(body: ParseBody, request: Request):
                 reply = " ".join(x for x in (TD.no_usage_reply(TD.basis_work(fit) if fit else None), price_line,
                                              " ".join(cond_notes)) if x).strip()
                 log.info("[talk] answer-first: no usage after ask - assumed general use")
-        elif plain_pc and not missing and (
+        # 앞 답변의 PC 를 가리킨 후속 질문(「위 2번째로 오버워치도 되나요?」)은 그 질문의 답을 앞 용도 정형문으로 덮지 않는다.
+        elif plain_pc and not missing and not ref_note and (
                 # PC 구성 설명([B])이 위에 나가는 턴은 AI 확인 문장 대신 가정 한 줄로 그 설명을 마무리한다
                 (getattr(ans, "kind", "game") == "pc_advice" and (ans.answer or "").strip())
                 or (asked_before and "?" in reply)
