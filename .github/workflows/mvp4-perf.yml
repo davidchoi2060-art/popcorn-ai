@@ -1,0 +1,93 @@
+# 공개 사이트 /mvp4 상품 목록 부품 사진 측정 — 서버·DB 는 읽기만 한다(GET 만 연다).
+#
+# 클라우드 작업 세션은 popcornai.co.kr 에 직접 접속할 수 없어서, GitHub 러너의 실제 Chromium 으로 잰다.
+# PR 에서는 배포본(before)과 PR 의 mvp4 JS 를 바꿔 끼운 것(after)을 같은 러너에서 번갈아 잰다.
+# 서버 변경은 바꿔 끼울 수 없으므로 병합·배포 뒤 workflow_dispatch 로 배포본만 다시 잰다.
+# 러너는 해외(GitHub 호스팅)라 국내 고객보다 왕복 지연이 길다 — 절대값이 아니라 같은 조건의 전후 비교로 읽는다.
+#
+# 결과는 artifact 와, 매 실행 덮어쓰는 전용 브랜치 ci/mvp4-perf 에 올린다(mvp3-capture.yml 과 같은 이유 —
+# 클라우드 세션은 artifact 저장소에 닿지 못한다). 그 브랜치는 main 으로 병합하지 않는다.
+#
+# ⚠ GitHub 호스팅 러너(ubuntu-latest)에서만 돈다. self-hosted 러너나 secrets 를 넣지 않는다.
+name: mvp4 부품 사진 측정
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples:
+        description: '보통 망 표본 수'
+        default: '3'
+  pull_request:
+    paths:
+      - .github/workflows/mvp4-perf.yml
+      - tools/perf/**
+      - mockups/mvp4/assets/js/live-cards.js
+      - mockups/mvp4/assets/js/live-catalog.js
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mvp4-perf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    permissions:
+      contents: write   # ci/mvp4-perf 브랜치 푸시에만 쓴다(포크 PR 은 GitHub 가 읽기 전용으로 내린다)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            tools/perf
+            mockups/mvp4/assets/js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright 설치 (작업 폴더 밖 임시 위치)
+        shell: bash
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: 측정
+        shell: bash
+        env:
+          OUT: ${{ runner.temp }}/mvp4-perf
+          SAMPLES: ${{ inputs.samples || '3' }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          mkdir -p "$OUT"
+          # perf 스크립트를 임시 폴더로 옮겨 그 옆 node_modules 를 쓰게 한다(ESM 은 NODE_PATH 를 보지 않는다)
+          cp tools/perf/*.mjs "$RUNNER_TEMP/pw/"
+          extra=""
+          [ "$EVENT" = pull_request ] && extra="--override $GITHUB_WORKSPACE/mockups/mvp4/assets/js"
+          node "$RUNNER_TEMP/pw/mvp4_part_images.mjs" --base https://popcornai.co.kr/mvp4/ --samples "$SAMPLES" $extra --out "$OUT/result.json"
+          node "$RUNNER_TEMP/pw/mvp4_part_images_report.mjs" "$OUT/result.json" | tee "$OUT/report.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: 결과 올리기
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mvp4-perf
+          path: ${{ runner.temp }}/mvp4-perf
+          if-no-files-found: warn
+          retention-days: 14
+      - name: 결과를 전용 브랜치에 올리기
+        if: always() && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          dir="$RUNNER_TEMP/mvp4-perf"
+          [ -d "$dir" ] && [ -n "$(ls -A "$dir")" ] || { echo '결과 없음'; exit 0; }
+          cd "$dir"
+          git init -q -b perf .
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -q -m "mvp4 부품 사진 측정 run ${GITHUB_RUN_ID} (${GITHUB_SHA::7}, ${GITHUB_EVENT_NAME})"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push -q -f "https://github.com/${REPO}.git" perf:refs/heads/ci/mvp4-perf
+          echo "결과 브랜치: ci/mvp4-perf" | tee -a "$GITHUB_STEP_SUMMARY"

@@ -117,20 +117,29 @@
         return P.catalogProducts;
       }).catch(function (err) { P.catalogProducts = []; P.live.state = 'error'; P.live.error = err; throw err; });
     },
+    // 같은 상품을 이미 읽는 중이면 그 요청을 함께 기다린다(목록 카드·상세·대화가 같은 상품을 동시에 부를 때 한 번만 받는다).
+    // 끝난 결과는 쌓아 두지 않는다 — 공개 구성은 매번 서버 판정(no-store)을 따른다.
     loadDetail: function (id) {
       var p = P.getCatalogProduct(id);
       if (!p) return Promise.resolve(null);
-      return get(OFFER + encodeURIComponent(p.id)).then(function (res) {
-        if (res.status === 200 && res.body && res.body.ok) applyOffer(p, res.body);
-        else if (res.status === 404) {
-          p.specs = []; p.bomStatus = 'missing'; p.liveDetail = 'not_public';
-          return get(REGISTERED + encodeURIComponent(p.id)).then(function (r2) { if (r2.status === 200 && r2.body && r2.body.ok) applyRegistered(p, r2.body); return p; }, function () { return p; });
-        }
-        else { p.liveDetail = 'error'; }
-        return p;
-      }, function () { p.liveDetail = 'error'; return p; });
+      var key = String(p.id);
+      if (inflight[key]) return inflight[key];
+      var done = function (v) { delete inflight[key]; return v; };
+      return (inflight[key] = readDetail(p).then(done, function (err) { delete inflight[key]; throw err; }));
     }
   };
+  var inflight = Object.create(null);
+  function readDetail(p) {
+    return get(OFFER + encodeURIComponent(p.id)).then(function (res) {
+      if (res.status === 200 && res.body && res.body.ok) applyOffer(p, res.body);
+      else if (res.status === 404) {
+        p.specs = []; p.bomStatus = 'missing'; p.liveDetail = 'not_public';
+        return get(REGISTERED + encodeURIComponent(p.id)).then(function (r2) { if (r2.status === 200 && r2.body && r2.body.ok) applyRegistered(p, r2.body); return p; }, function () { return p; });
+      }
+      else { p.liveDetail = 'error'; }
+      return p;
+    }, function () { p.liveDetail = 'error'; return p; });
+  }
 
   // 실제 라우트: /mvp4/?screen=…  (상태는 응답이 정하므로 대화 시작 방식만 싣는다)
   P.designHref = function (screen, state, params) {
