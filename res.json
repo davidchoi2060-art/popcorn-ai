@@ -1,0 +1,287 @@
+{
+ "pc": {
+  "info": {
+   "slides": [
+    {
+     "cls": "hc-slide hc-showcase",
+     "label": "1 / 6 · PC & AI",
+     "h2": "좋은 PC에서,쓸모 있는 AI까지.",
+     "img": "assets/images/carousel/hero-tv-commercial-clean.png",
+     "links": [
+      "PC 둘러보기 -> ./?screen=catalog",
+      "AI 패키지 보기 -> ai-packages.html"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-gaming",
+     "label": "2 / 6 · 게이밍 PC",
+     "h2": "좋아하는 게임,나답게 즐기다.",
+     "img": "assets/images/carousel/gaming-blue-clean.png",
+     "links": [
+      "게이밍 PC 보기 -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EA%B2%8C%EC%9D%B4%EB%B0%8D+PC#catalog-products",
+      "AI와 게임 PC 찾기 -> ./?screen=chat"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-ai",
+     "label": "3 / 6 · AI 패키지",
+     "h2": "일에 집중하도록,AI는 당신 곁에.",
+     "img": "assets/images/carousel/ai-lavender-clean.png",
+     "links": [
+      "AI 패키지 보기 -> ai-packages.html",
+      "우리 업무로 도입 상담 -> ai-consult.html?package=business&intent=adoption"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-people",
+     "label": "4 / 6 · 당신의 PC",
+     "h2": "당신의 하루에,딱 맞는 PC.",
+     "img": "assets/images/carousel/model-showroom-clean.png",
+     "links": [
+      "나에게 맞는 PC 찾기 -> ./?screen=chat",
+      "모든 PC 둘러보기 -> ./?screen=catalog"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-collection",
+     "label": "5 / 6 · 용도별 쇼핑",
+     "h2": "게임도, 일도.필요한 PC를 한곳에서.",
+     "img": "assets/images/carousel/category-display-clean.png",
+     "links": [
+      "게이밍 PC -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EA%B2%8C%EC%9D%B4%EB%B0%8D+PC#catalog-products",
+      "미니 PC -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EB%AF%B8%EB%8B%88+PC#catalog-products",
+      "AI 패키지 -> ai-packages.html"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-supercomputer",
+     "label": "6 / 6 · AI 슈퍼컴퓨터",
+     "h2": "큰 AI를 다루는,나만의 슈퍼컴퓨터.",
+     "img": "assets/images/carousel/ai-supercomputer-showroom-clean.png",
+     "links": [
+      "AI 슈퍼컴퓨터 전체 보기 -> supercomputers.html"
+     ]
+    }
+   ],
+   "counter": "01 / 06",
+   "interval": "3000",
+   "autoplay": "enabled",
+   "selectors": 6
+  },
+  "checks": [
+   {
+    "active": "1",
+    "counter": "01 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 430,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   },
+   {
+    "active": "2",
+    "counter": "02 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 380,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   },
+   {
+    "active": "3",
+    "counter": "03 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 380,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   },
+   {
+    "active": "4",
+    "counter": "04 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 380,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   },
+   {
+    "active": "5",
+    "counter": "05 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 144,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   },
+   {
+    "active": "6",
+    "counter": "06 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 393,
+    "stageH": 470,
+    "imgTop": 0,
+    "imgLoaded": true
+   }
+  ],
+  "keyboard": {
+   "end": "6",
+   "wrapRight": "1",
+   "toggleAfterManual": "재생"
+  },
+  "errors": []
+ },
+ "m": {
+  "info": {
+   "slides": [
+    {
+     "cls": "hc-slide hc-showcase",
+     "label": "1 / 6 · PC & AI",
+     "h2": "좋은 PC에서,쓸모 있는 AI까지.",
+     "img": "assets/images/carousel/hero-tv-commercial-clean.png",
+     "links": [
+      "PC 둘러보기 -> ./?screen=catalog",
+      "AI 패키지 보기 -> ai-packages.html"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-gaming",
+     "label": "2 / 6 · 게이밍 PC",
+     "h2": "좋아하는 게임,나답게 즐기다.",
+     "img": "assets/images/carousel/gaming-blue-clean.png",
+     "links": [
+      "게이밍 PC 보기 -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EA%B2%8C%EC%9D%B4%EB%B0%8D+PC#catalog-products",
+      "AI와 게임 PC 찾기 -> ./?screen=chat"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-ai",
+     "label": "3 / 6 · AI 패키지",
+     "h2": "일에 집중하도록,AI는 당신 곁에.",
+     "img": "assets/images/carousel/ai-lavender-clean.png",
+     "links": [
+      "AI 패키지 보기 -> ai-packages.html",
+      "우리 업무로 도입 상담 -> ai-consult.html?package=business&intent=adoption"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-people",
+     "label": "4 / 6 · 당신의 PC",
+     "h2": "당신의 하루에,딱 맞는 PC.",
+     "img": "assets/images/carousel/model-showroom-clean.png",
+     "links": [
+      "나에게 맞는 PC 찾기 -> ./?screen=chat",
+      "모든 PC 둘러보기 -> ./?screen=catalog"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-collection",
+     "label": "5 / 6 · 용도별 쇼핑",
+     "h2": "게임도, 일도.필요한 PC를 한곳에서.",
+     "img": "assets/images/carousel/category-display-clean.png",
+     "links": [
+      "게이밍 PC -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EA%B2%8C%EC%9D%B4%EB%B0%8D+PC#catalog-products",
+      "미니 PC -> https://popcornai.co.kr/mvp4/?screen=catalog&category=%EB%AF%B8%EB%8B%88+PC#catalog-products",
+      "AI 패키지 -> ai-packages.html"
+     ]
+    },
+    {
+     "cls": "hc-slide hc-supercomputer",
+     "label": "6 / 6 · AI 슈퍼컴퓨터",
+     "h2": "큰 AI를 다루는,나만의 슈퍼컴퓨터.",
+     "img": "assets/images/carousel/ai-supercomputer-showroom-clean.png",
+     "links": [
+      "AI 슈퍼컴퓨터 전체 보기 -> supercomputers.html"
+     ]
+    }
+   ],
+   "counter": "01 / 06",
+   "interval": "3000",
+   "autoplay": "enabled",
+   "selectors": 6
+  },
+  "checks": [
+   {
+    "active": "1",
+    "counter": "01 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 222,
+    "stageH": 520,
+    "imgTop": 275,
+    "imgLoaded": true
+   },
+   {
+    "active": "2",
+    "counter": "02 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 222,
+    "stageH": 520,
+    "imgTop": 275,
+    "imgLoaded": true
+   },
+   {
+    "active": "3",
+    "counter": "03 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 222,
+    "stageH": 520,
+    "imgTop": 275,
+    "imgLoaded": true
+   },
+   {
+    "active": "4",
+    "counter": "04 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 222,
+    "stageH": 520,
+    "imgTop": 275,
+    "imgLoaded": true
+   },
+   {
+    "active": "5",
+    "counter": "05 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 177,
+    "stageH": 520,
+    "imgTop": -249,
+    "imgLoaded": true
+   },
+   {
+    "active": "6",
+    "counter": "06 / 06",
+    "hidden": false,
+    "overflow": 0,
+    "copyBottom": 216,
+    "stageH": 520,
+    "imgTop": 275,
+    "imgLoaded": true
+   }
+  ],
+  "keyboard": {
+   "end": "6",
+   "wrapRight": "1",
+   "toggleAfterManual": "재생"
+  },
+  "errors": []
+ },
+ "autoplay": [
+  "1",
+  "2",
+  "3",
+  "5",
+  "6",
+  "1",
+  "2"
+ ]
+}
