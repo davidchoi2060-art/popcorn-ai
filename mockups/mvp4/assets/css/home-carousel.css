@@ -67,3 +67,16 @@
 /* The entire banner moves together; copy does not pop in separately. */
 .hc-carousel[data-transitioning=true] .hc-slide:not([hidden]){will-change:transform}
 
+
+/* 6th banner: AI supercomputer category (approved option 1, bright AI showroom). Copy and CTA stay HTML. */
+.hc-supercomputer{background:#f6f8fb}
+.hc-supercomputer .hc-copy{padding-top:52px;width:40%}
+.hc-supercomputer .hc-kicker{color:#1748d6}
+.hc-supercomputer .hc-copy h2{font-size:44px}
+.hc-supercomputer .hc-description{max-width:340px}
+.hc-supercomputer .hc-actions{max-width:270px}
+.hc-note{font-size:12px;line-height:1.55;color:#5b606b;margin-top:16px;word-break:keep-all}
+@media(min-width:801px) and (max-width:1100px){.hc-supercomputer .hc-copy{width:43%;padding-top:40px}.hc-supercomputer .hc-copy h2{font-size:36px}.hc-supercomputer .hc-actions{max-width:240px}}
+@media(max-width:800px){.hc-supercomputer .hc-copy{width:100%;padding:24px 24px 0}.hc-supercomputer .hc-copy h2{font-size:34px}.hc-supercomputer .hc-description br{display:none}.hc-supercomputer .hc-image{object-position:64% bottom}.hc-supercomputer .hc-note{display:none}}
+@media(min-width:601px) and (max-width:800px){.hc-supercomputer .hc-copy{padding-left:40px}.hc-supercomputer .hc-image{object-position:center bottom}}
+@media(max-width:370px){.hc-supercomputer .hc-copy{padding-inline:19px}.hc-supercomputer .hc-copy h2{font-size:31px}}
