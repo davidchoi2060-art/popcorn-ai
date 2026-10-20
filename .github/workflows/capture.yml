@@ -1,0 +1,38 @@
+# 일회성: 배포된 /mvp4 메인 롤링 배너 6장 PC 1440·모바일 390 확인 캡처. 읽기 전용, 비밀값 없음.
+name: mvp4 배너 캡처
+on:
+  push:
+    branches: ['ci/mvp4-banner6-capture']
+permissions:
+  contents: write
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Playwright
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: 캡처
+        run: |
+          mkdir -p "$RUNNER_TEMP/out"
+          NODE_PATH="$RUNNER_TEMP/pw/node_modules" node tools/shot.cjs https://popcornai.co.kr/mvp4/ "$RUNNER_TEMP/out" > "$RUNNER_TEMP/out/res.json"
+          for p in mvp4/index.html mvp4/supercomputers.html mvp3/index.html mvp4/assets/images/carousel/ai-supercomputer-showroom-clean.png; do
+            echo "$p $(curl -s -o /tmp/f -w '%{http_code}' https://popcornai.co.kr/$p) $(sha256sum /tmp/f | cut -c1-64)" >> "$RUNNER_TEMP/out/http.txt"; done
+          curl -s https://popcornai.co.kr/mvp4/index.html | grep -o 'home-carousel[^"]*' >> "$RUNNER_TEMP/out/http.txt"
+          cat "$RUNNER_TEMP/out/http.txt"
+      - name: 결과 브랜치
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd "$RUNNER_TEMP/out"
+          git init -q -b r . && git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "mvp4 배너 캡처 ${GITHUB_RUN_ID}"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${GITHUB_REPOSITORY}.git" r:refs/heads/ci/mvp4-banner6-capture-results
