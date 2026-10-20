@@ -1,0 +1,30 @@
+# 골드 14400F 상품 연결 대조 일회용 — 이 브랜치 전용, main 에 병합하지 않는다. 공개 GET 만.
+name: 골드 상품 대조 (일회용)
+on:
+  push:
+    branches: [ci/gold-product-20261020]
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 대조
+        env:
+          OUT: ${{ runner.temp }}/out
+        run: python3 probe/run.py | tee "$RUNNER_TEMP/log.txt"
+      - name: 결과 브랜치
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cp "$RUNNER_TEMP/log.txt" "$RUNNER_TEMP/out/" || true
+          cd "$RUNNER_TEMP/out"
+          git init -q -b r .
+          git add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -q -m "probe ${GITHUB_RUN_ID}"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" push -q -f "https://github.com/${REPO}.git" r:refs/heads/ci/gold-product-20261020-results
