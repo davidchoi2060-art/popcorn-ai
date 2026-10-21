@@ -15,10 +15,14 @@ on:
     inputs:
       codes:
         description: '몰 상품번호 (쉼표·범위, 예: 130569-130679,112660)'
-        required: true
+        required: false
         default: ''
       ai_codes:
         description: '팝콘AI 대표 사진(카드)도 받을 상품번호 (쉼표, 비교용)'
+        required: false
+        default: ''
+      paths:
+        description: '팝콘AI 공개 사진 경로도 받는다 (쉼표, 예: /api/product-images/119270/detail)'
         required: false
         default: ''
       detail:
@@ -42,6 +46,7 @@ jobs:
         env:
           CODES: ${{ inputs.codes }}
           AI_CODES: ${{ inputs.ai_codes }}
+          PATHS: ${{ inputs.paths }}
           DETAIL: ${{ inputs.detail }}
         run: |
           set -uo pipefail
@@ -66,6 +71,11 @@ jobs:
           for code in ${AI_CODES//,/ }; do
             curl -sS -o "out/ai/${code}_card.webp" -w "$code card %{http_code} %{size_download}\n" \
               "https://popcornai.co.kr/api/customer/products/$code/representative-image?size=card" >> out/ai_status.txt || true
+          done
+          for path in ${PATHS//,/ }; do
+            case "$path" in /api/product-images/*|/api/customer/products/*) ;; *) continue;; esac
+            name=$(echo "$path" | tr -c 'a-zA-Z0-9\n' '_')
+            curl -sS -o "out/ai/$name" -w "$path %{http_code} %{size_download} %{content_type}\n" "https://popcornai.co.kr$path" >> out/ai_status.txt || true
           done
           # 상세 HTML 은 크고 쓸 데가 주소 목록뿐이라 올리지 않는다.
           rm -rf out/html
