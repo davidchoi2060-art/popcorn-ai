@@ -134,6 +134,17 @@
     function esc(v) { return h(String(v)); }
     var kind = 'tasks', stage = 0, sourceKey = null, transcriptOpen = false, documentOpen = false, syncDetails = false;
     var allItems = groups.decisions.concat(groups.tasks, groups.pending);
+    var KEY = 'pai-guide-meetings';
+    // 기업 컨설팅 설명에서 「돌아가기」나 브라우저 뒤로로 돌아왔을 때만 보던 탭·단계·근거 을 되살린다(이 탭의 sessionStorage, 업무별 칸).
+    function returning() { try { var nav = performance.getEntriesByType('navigation')[0]; return (nav && nav.type === 'back_forward') || location.hash === '#company-link'; } catch (e) { return false; } }
+    function remember() { try { sessionStorage.setItem(KEY, JSON.stringify({kind: kind, stage: stage, sourceKey: sourceKey})); } catch (e) { /* 저장 못 해도 화면은 그대로 쓴다 */ } }
+    function recall() { try { return returning() ? JSON.parse(sessionStorage.getItem(KEY) || 'null') : null; } catch (e) { return null; } }
+    var saved = recall();
+    if (saved && has(groups, saved.kind)) {
+      kind = saved.kind;
+      if (saved.stage >= 0 && saved.stage < steps.length) stage = saved.stage;
+      if (groups[kind].some(function (x) { return x.id === saved.sourceKey; })) { sourceKey = saved.sourceKey; transcriptOpen = true; }
+    }
     function renderResults() {
       each('[data-mg-kind]', function (b) { b.setAttribute('aria-pressed', String(b.dataset.mgKind === kind)); });
       q('#mg-results').innerHTML = groups[kind].map(function (item, n) {
@@ -180,6 +191,7 @@
         renderSource(); renderAux();
       }
       else if (b.id === 'mg-document-button') { documentOpen = !documentOpen; renderAux(); }
+      remember();
     });
     q('#mg-transcript').addEventListener('toggle', function () { if (!syncDetails) transcriptOpen = q('#mg-transcript').open; });
     renderResults(); renderSource(); renderStage(); renderAux();

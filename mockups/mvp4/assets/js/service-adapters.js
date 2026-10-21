@@ -37,7 +37,19 @@
     box.disabled = false; if (span) span.innerHTML = '';
     if (span) { span.appendChild(document.createTextNode(P.inquiryConsentText + ' ')); var b = document.createElement('b'); b.className = 'required'; b.textContent = '필수'; span.appendChild(b); }
   }
+  // 30인 이하 기업 AI 업무개선 컨설팅(2026-10-21 승인). 개인 업무 AI 도입 상담과 섞이지 않게 첫 줄에 서비스 이름을 따로 적고,
+  // 개인 업무(관심 기능)·구성 방식은 넣지 않는다. 서버 주제는 아직 「기타」다 -- 고유 주제는 마이그레이션 0169 확인 대기.
+  var COMPANY_FROM = { P: '업무형 소개', D: '사내 문서 검색 설명', M: '회의록 정리 설명', R: '고객 답변 초안 설명' };
+  function companyMessage(p) {
+    var lines = ['[기업 AI 업무개선 컨설팅] 30인 이하 기업 대상'];
+    var meta = [['진입', COMPANY_FROM[p.from] || '직접 방문'], ['회사', p.company]]
+      .filter(function (x) { return x[1] && String(x[1]).trim(); }).map(function (x) { return x[0] + ': ' + String(x[1]).trim(); });
+    lines.push(meta.join(' / '));
+    var head = lines.join('\n');
+    return p.request ? (head + '\n' + p.request).slice(0, 500) : head;
+  }
   function message(p) {
+    if (p.service === 'company') return companyMessage(p);
     var kind = p.intent === 'quote' ? '견적 문의' : '도입 상담';
     var lines = ['[AI 패키지 ' + kind + '] ' + (PACKAGES[p.packageId] || p.packageId || '')];
     var meta = [['관심 기능', USES[p.use] || p.use], ['구성 방식', p.intent === 'quote' ? SETUP[p.setup] || p.setup : ''], ['예산', p.budget], ['수량', p.quantity], ['사용 인원', p.people], ['환경', p.environment], ['회사', p.company]]

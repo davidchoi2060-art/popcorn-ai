@@ -103,10 +103,15 @@ var stages=[
   // 화면은 주소의 use 만 보고 고른다 -- 새로고침·뒤로·앞으로·직접 주소가 모두 같은 업무를 연다.
   P.serviceGuides = P.serviceGuides || {};
   P.serviceGuides.documents = {label: '사내 문서 검색', body: body, mount: mount};
+  // 2026-10-21 승인(30인 이하 기업 컨설팅) -- 세 업무 설명 하단에 기업 컨설팅 설명으로 가는 보조 링크만 둔다. 위의 개인 상담 버튼은 그대로다.
+  var COMPANY_FROM = {documents: 'D', meetings: 'M', replies: 'R'};
+  function companyLink(use) {
+    return '<aside class="svc-company" id="company-link" aria-labelledby="svc-company-title"><div><span class="svc-company-tag">30인 이하 기업 대상 · 별도 컨설팅</span><h2 id="svc-company-title">여러 담당자가 함께하는 회사 업무라면</h2><p>이 화면의 회사 맞춤은 담당자 한 사람이 맡은 업무의 자료·양식·규칙에 맞추는 범위입니다. 여러 담당자·부서에 걸친 업무 흐름은 기업 AI 업무개선 컨설팅에서 따로 살펴봅니다.</p></div><a class="text-link" id="svc-company-link" href="ai-company.html?from=' + COMPANY_FROM[use] + '">30인 이하 기업 컨설팅 ' + i('arrow-right') + '</a></aside>';
+  }
   P.pages['ai-service'] = function () {
     var use = P.qs.get('use'), g = P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use) ? P.serviceGuides[use] : null;
     if (g && g.label) document.title = '회사 맞춤 내부 AI 구축 · ' + g.label + ' | 팝콘AI';
-    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? g.body() : unknown()) + '</div>', mount: g ? g.mount : null};
+    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? g.body() + companyLink(use) : unknown()) + '</div>', mount: g ? g.mount : null};
   };
   function mount() {
     var root = document.getElementById('pop-local-service');
