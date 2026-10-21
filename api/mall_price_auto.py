@@ -327,16 +327,44 @@ def due_slot(now, last_auto_started):
     return slot
 
 
+# 이 프로세스가 뜬 시각. 이보다 먼저 시작해 끝나지 못한 실행은 «서버 재시작에 죽은 실행»이다.
+# (2026-10-21 실측: 배포가 하루에도 여러 번 API 를 다시 띄우는데, 수집 도중(공개 페이지 수 분)에 재시작되면
+#  그 실행 행이 ok=NULL 로 남았다. 그 행이 «그 시각은 이미 돌았다»로 세어져 만회가 영영 안 됐고,
+#  2시간 동안은 「이미 실행 중」으로 다음 실행까지 막았다 — 화면 판매가가 몰보다 하루 이틀 늦었던 원인.)
+PROCESS_STARTED = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+ORPHAN_REASON = "서버가 다시 시작되어 중단됨"
+# started_at 은 TIMESTAMP(무시간대, 세션 시간대의 now()) — 같은 세션 시간대로 붙여 비교한다
+_STARTED = "started_at AT TIME ZONE current_setting('TimeZone')"
+
+
 def _last_auto_started(conn=None):
     # 정기 실행(auto)만 센다. 명령줄 · 관리자 「지금 실행」은 manual 이라 정기 시각을 채우지 않는다.
+    # 끝난 실행(성공·실패)과 이 프로세스가 돌리고 있는 실행만 센다 — 재시작에 죽은 실행(닫기 전 · 닫은 뒤 둘 다)은
+    # 그 시각을 채우지 않는다.
     sql = text(
-        # started_at 은 TIMESTAMP(무시간대, 세션 시간대의 now()) — 같은 세션 시간대로 붙여 비교한다
-        "SELECT max(started_at) AT TIME ZONE current_setting('TimeZone')"
-        " FROM mall_price_runs WHERE moment='auto'")
+        "SELECT max(" + _STARTED + ") FROM mall_price_runs WHERE moment='auto'"
+        " AND (ok IS NOT NULL OR " + _STARTED + " >= :since) AND fail_reason IS DISTINCT FROM :orphan")
+    args = {"since": PROCESS_STARTED, "orphan": ORPHAN_REASON}
     if conn is not None:
-        return conn.execute(sql).scalar()
+        return conn.execute(sql, args).scalar()
     with engine.connect() as c:
-        return c.execute(sql).scalar()
+        return c.execute(sql, args).scalar()
+
+
+def abandon_orphans(conn=None) -> int:
+    """이 프로세스보다 먼저 시작해 끝나지 못한 실행을 실패로 닫는다(스케줄러가 뜰 때 한 번).
+
+    안 닫으면 `running()` 이 2시간 동안 「이미 실행 중」으로 정기 실행·「지금 실행」을 막는다.
+    다른 프로세스(명령줄)에서 아직 돌고 있던 실행이었다면 그 실행이 끝날 때 `finish_run` 이 결과를 다시 적는다.
+    """
+    sql = text(
+        "UPDATE mall_price_runs SET ok=false, finished_at=clock_timestamp(), fail_reason=:r"
+        " WHERE ok IS NULL AND moment IN ('auto','manual') AND " + _STARTED + " < :since")
+    args = {"r": ORPHAN_REASON, "since": PROCESS_STARTED}
+    if conn is not None:
+        return conn.execute(sql, args).rowcount
+    with engine.begin() as c:
+        return c.execute(sql, args).rowcount
 
 
 def _tick():
@@ -373,6 +401,12 @@ def start_scheduler() -> None:
     global _scheduler
     if _scheduler is not None or not scheduler_enabled():
         return
+    try:
+        n = abandon_orphans()
+        if n:
+            log.info("[mall-price-auto] closed %s run(s) left open by a previous process", n)
+    except Exception:                                               # noqa: BLE001
+        log.exception("[mall-price-auto] closing old runs failed")
     stop = threading.Event()
     t = threading.Thread(target=_loop, args=(stop,), name="mall-price-scheduler", daemon=True)
     t.start()
