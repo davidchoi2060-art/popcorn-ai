@@ -59,9 +59,11 @@ def _swap(text: str, slot: str, old_key: str, new: str):
     return None if hit is None else ",@@".join(chunks)
 
 
-def _apply(conn, frm: str, to: str) -> None:
+def _apply(conn, frm: str, to: str, only_public: bool = False) -> None:
     d = json.loads(DATA.read_text(encoding="utf-8"))
     for p in d["products"]:
+        if only_public and not p["public_configuration"]:
+            continue
         sst = conn.execute(sa.text("SELECT spec_source_text FROM products WHERE product_code=:c"),
                            {"c": p["code"]}).scalar()
         if not sst:
