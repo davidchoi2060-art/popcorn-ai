@@ -46,8 +46,8 @@ class Wiring(unittest.TestCase):
         self.assertIn("p.description = body && body.description", js)
 
     def test_migration_chain(self):
-        m = (ROOT / "db/migrations/versions/0171_registered_about.py").read_text(encoding="utf-8")
-        self.assertIn('revision = "0171"', m)
+        m = (ROOT / "db/migrations/versions/0172_registered_about.py").read_text(encoding="utf-8")
+        self.assertIn('revision = "0172"', m)
         self.assertIn("from api.registered_about import build", m)
 
 

@@ -240,7 +240,7 @@ def lexicon(conn) -> dict:
 
 
 def about_inputs(conn, code):
-    """소개를 만드는 근거 — (상품명, 평가 사양, 용도 평가 목록). 0171 채우기와 읽을 때 만들기가 같은 것을 쓴다."""
+    """소개를 만드는 근거 — (상품명, 평가 사양, 용도 평가 목록). 0172 채우기와 읽을 때 만들기가 같은 것을 쓴다."""
     row = conn.execute(text("SELECT crawl_name, spec FROM product_fit_products WHERE product_code = :c"),
                        {"c": code}).mappings().first()
     fits = [dict(r) for r in conn.execute(text(

@@ -11,9 +11,9 @@
   형식·말투는 승인 구성 소개(제목 · 소개 · 특징 3개 · 사용 상황)를 따른다.
 
 ■ 어디에 두나
-  pc_registered_about(0171) 에 저장하고 상세(/api/customer/pc-registered/{code})가 읽는다. 관리자가 고친 행(origin='admin')은
+  pc_registered_about(0172) 에 저장하고 상세(/api/customer/pc-registered/{code})가 읽는다. 관리자가 고친 행(origin='admin')은
   다시 만들지 않는다. 표에 없는 새 상품은 읽을 때 같은 함수로 만들어 보인다(저장은 하지 않는다).
-이 모듈은 DB 를 부르지 않는다(마이그레이션 0171 이 같은 함수를 쓴다).
+이 모듈은 DB 를 부르지 않는다(마이그레이션 0172 이 같은 함수를 쓴다).
 """
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""승인 구성이 없는 판매 PC 의 상세 소개 조회·수정 (0171 pc_registered_about · 2026-10-21 대표 「DB화」).
+"""승인 구성이 없는 판매 PC 의 상세 소개 조회·수정 (0172 pc_registered_about · 2026-10-21 대표 「DB화」).
 
 관리자가 고친 소개는 origin='admin' 으로 남고, 고치기 전 내용은 history 에 쌓인다(되돌릴 근거).
 고객 상세(/api/customer/pc-registered/{code})는 이 표를 그대로 읽는다.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""0171 — 승인 구성이 없는 판매 PC 의 상세 소개(「ABOUT THIS PC」) 표 (2026-10-21 대표 「진행해」 · 「DB화 하는거지?」)
+"""0172 — 승인 구성이 없는 판매 PC 의 상세 소개(「ABOUT THIS PC」) 표 (2026-10-21 대표 「진행해」 · 「DB화 하는거지?」)
 
 ■ 왜
   /mvp4 상세 하단 소개는 승인 구성(pc_configurations.content)이 있는 82대에만 있었다(판매 PC 322대 중 · 2026-10-21 실측).
@@ -13,8 +13,7 @@
                         이미 있는 행은 건드리지 않는다(관리자가 고친 값을 지킨다).
 
 ■ 번호
-  0170 은 다른 작업(기업 컨설팅 분류)이 잡고 아직 병합 전이라 0169 다음에 잇는다. 둘 중 나중에 병합되는 쪽이
-  down_revision 을 먼저 들어간 쪽으로 바꾼다(head 가 둘이면 배포의 `alembic upgrade head` 가 멈춘다).
+  같은 날 0170·0171(몰 부품)이 먼저 병합돼 그 뒤에 잇는다(head 가 둘이면 배포의 `alembic upgrade head` 가 멈춘다).
 """
 import json
 import sys
@@ -23,8 +22,8 @@ from pathlib import Path
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0171"
-down_revision = "0169"
+revision = "0172"
+down_revision = "0171"
 branch_labels = None
 depends_on = None
 
@@ -40,7 +39,7 @@ def upgrade() -> None:
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     )""")
     op.execute("COMMENT ON TABLE pc_registered_about IS "
-               "'승인 구성이 없는 판매 PC 의 상세 소개(ABOUT THIS PC) - 0171 · api/registered_about'")
+               "'승인 구성이 없는 판매 PC 의 상세 소개(ABOUT THIS PC) - 0172 · api/registered_about'")
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from api.registered_about import build   # noqa: E402  (단일 원천 — 읽을 때 만들기와 같은 함수)
     conn = op.get_bind()
