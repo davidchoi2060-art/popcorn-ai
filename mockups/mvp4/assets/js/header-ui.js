@@ -92,12 +92,13 @@
     }
     function filterUrl() {
       var url = new URL(location.href);
-      ['q', 'category', 'sort', 'sale'].forEach(function (name) {
+      ['q', 'category', 'sort'].forEach(function (name) {
         var value = form.elements[name].value;
-        if (value && !(name === 'sort' && value === 'default') && !(name === 'sale' && value === 'selling')) url.searchParams.set(name, value);
+        if (value && !(name === 'sort' && value === 'default')) url.searchParams.set(name, value);
         else url.searchParams.delete(name);
       });
       url.searchParams.delete('purpose');
+      url.searchParams.delete('sale');   // 판매 상태 칸은 뺐다(2026-10-21 대표 — 목록은 판매중만 나온다)
       return url;
     }
     var restoring = false;
@@ -140,7 +141,6 @@
       form.elements.q.value = q.get('q') || '';
       form.elements.category.value = q.get('category') || q.get('purpose') || '';
       form.elements.sort.value = q.get('sort') || 'default';
-      form.elements.sale.value = q.get('sale') || 'selling';
       form.elements.category.dispatchEvent(new Event('change', { bubbles: true }));
       restoring = false;
       alignSearch(false, false);

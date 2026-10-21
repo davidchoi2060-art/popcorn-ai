@@ -33,7 +33,7 @@ def test_business_use_entries_go_to_their_explanation():
 
 def test_explanation_page_uses_site_shell_and_its_own_body_only():
     html = read("ai-service.html")
-    assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261020-logo2" in html
+    assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261021-sale1" in html
     assert "ai-local-service.js?v=20261021-mm3" in html and "ai-local-service.css?v=20261021-mm3" in html
     js = code("assets/js/ai-local-service.js")
     assert "window.openai" not in js and "setWidgetState" not in js and "fetch(" not in js and "localStorage" not in js
