@@ -15,6 +15,7 @@ body[data-finder] .page-main .btn-outline:hover{background:#f2f6ff;border-color:
 body[data-finder] .page-main .btn-outline .icon{filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
 body[data-finder] .page-main .btn-outline[aria-pressed=true]{background:#eaf0ff;border-color:#214bee}
 body[data-finder] .page-main :is(button,a,input,textarea,summary):focus-visible{outline:3px solid #f0b72d;outline-offset:3px}
+body[data-finder] .page-main .dc-composer textarea:focus-visible{outline:0}  /* 입력창은 바깥 상자(:focus-within)가 초점을 보여 준다 -- 안쪽 노란 테두리 없음(2026-10-21 대표) */
 
 /* 시작 · 대화 */
 body[data-finder=chat] .dc-heading h1{font-size:40px;letter-spacing:-.05em}
