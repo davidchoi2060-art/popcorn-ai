@@ -71,19 +71,20 @@ class CobaltScope(unittest.TestCase):
 
 
 class FeaturePanel(unittest.TestCase):
-    def test_buy_select_compare_are_separate_existing_actions(self):
+    def test_reco_panel_wish_and_detail_only(self):
+        # 2026-10-21 대표 확정 1번 시안: 추천 카드는 찜하기·자세히 보기만 둔다(「이 PC 선택」·「선택한 PC」 영역 삭제).
         s = src("design-conversation.js")
-        fn = s[s.index("    function featured() {"):s.index("    function markup() {\n      var cards")]
-        self.assertIn("buyButton(p, !!issue, 'btn btn-primary dc-feature-buy')", fn)
-        self.assertIn('data-dc-select="', fn)
-        self.assertIn("data-dc-unselect", fn)
-        self.assertIn('data-pa-add="', fn)
-        self.assertIn('data-pa-kind="pc"', fn)
-        self.assertIn("부품 가격 변동으로 최종 금액이 달라질 수 있어요.", fn)
-        for banned in ("send(", "model.draft", "model.log", "fetch("):
-            self.assertNotIn(banned, fn)
-        self.assertIn("' + featured() + '", s)
-
+        fn = s[s.index("  function card(p, extra) {"):s.index("  P.designScreens.chat")] if "  P.designScreens.chat" in s else s[s.index("  function card(p, extra) {"):]
+        fn = fn[:fn.index("\n  }\n")]
+        self.assertIn("P.wishButton({ kind:", fn)
+        self.assertIn("자세히 보기", fn)
+        side = s[s.index("    function side() {"):s.index("    function markup() {")]
+        self.assertIn("조건 수정", side)
+        self.assertIn("data-wish-has", side)
+        for banned in ("data-dc-select", "data-pa-add", "send(", "fetch(", "선택한 PC"):
+            self.assertNotIn(banned, side)
+        self.assertNotIn("data-dc-select", s)
+        self.assertNotIn("data-pa-add", s)
 
 if __name__ == "__main__":
     unittest.main()

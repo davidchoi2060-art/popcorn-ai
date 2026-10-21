@@ -83,7 +83,7 @@
     return ai.some(function (d) { return String(d && d.id) === String(code); }) ? 'ai_device' : 'unknown';
   }
 
-  /* opts: {pcHref(id), issue(p), money(p), inCompare(code, type)} — AI 장비도 담는다(2026-10-21 구매 1번 승인). */
+  /* opts: {pcHref(id), issue(p), money(p)} — 상품 줄의 찜하기는 wish-ui.js 버튼(2026-10-21 찜하기·찜목록 확정). AI 장비도 담는다(2026-10-21 구매 1번 승인). */
   function render(entry, opts) {
     var a = entry.answer, list = [], cards = a.blocks.filter(function (b) { return b.kind === 'card'; });
     function line(text, cls) {
@@ -103,7 +103,7 @@
       var href = type === 'pc' ? opts.pcHref(code) : type === 'ai_device' ? 'supercomputer.html?id=' + encodeURIComponent(code) : '';
       var issue = type === 'unknown' ? '지금 판매 목록에서 이 상품을 확인할 수 없어요.' : p && opts.issue ? opts.issue(p) : '';
       var now = p && typeof p.price === 'number' && b.card.price !== null && p.price !== b.card.price && opts.money ? '지금 목록 가격 ' + opts.money(p) + ' · 답변의 가격과 달라요' : '';
-      var added = opts.inCompare(code, type), body = b.body.join('\n'), parts = sentences(body);
+      var body = b.body.join('\n'), parts = sentences(body);
       var title = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + fmt(b.name) + '</a>' : fmt(b.name);
       return '<section class="pa-product" data-product-id="' + esc(code) + '" data-product-type="' + type + '" data-pa-ordinal="' + b.ordinal + '"><header class="pa-product-head"><span class="pa-count" data-nocopy>' + (b.ordinal < 10 ? '0' : '') + b.ordinal + '</span><h3>' + title + '</h3>' +
         // 답 줄에 금액이 없어도 서버 카드 가격이 있으면 그 값을 쓴다(2026-10-21 「70만원」 캡처: 판매가가 있는데 「가격 확인 필요」).
@@ -114,7 +114,7 @@
         (issue ? '<p class="pa-issue" role="note">' + esc(issue) + '</p>' : '') +
         '<div class="pa-product-actions" data-nocopy>' + (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">상품 상세 ↗</a>' : '') +
         (type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy', '팝콘PC몰에서 바로 구매') : '') +
-        (type === 'pc' || type === 'ai_device' ? '<button type="button" class="pa-copy" data-pa-add="' + esc(code) + '" data-pa-kind="' + type + '" data-pa-turn="' + esc(a.turnId) + '" aria-pressed="' + added + '" aria-label="' + esc(b.name) + (added ? ' 비교에서 빼기' : ' 비교에 담기') + '">' + (added ? '담음 · 비교에서 빼기' : '비교에 담기') + '</button>' : '') + '</div></section>';
+        (type === 'pc' || type === 'ai_device' ? (P.wishButton ? P.wishButton({ kind: type, id: code, name: strip(b.name), cls: 'pa-wish' }) : '') : '') + '</div></section>';
     }
     var body;
     if (!cards.length) body = a.blocks.map(plain).join('');

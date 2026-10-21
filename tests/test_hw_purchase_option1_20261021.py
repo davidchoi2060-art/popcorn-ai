@@ -176,12 +176,13 @@ class SavedDeleteAndCompare(unittest.TestCase):
 
     def test_compare_kinds_dedupe_and_unselect(self):
         s = src("design-conversation.js")
-        for t in ("data-dc-unselect", "선택 해제", "비교에서 빼기", "data-pa-kind", "AI 장비", "(장비 메모리 · 그래픽카드 전용 메모리와 같은 기준 아님)"):
+        for t in ("data-dc-unselect", "질문 대상"):
             self.assertIn(t, s)
+        self.assertIn("kind: 'ai_device'", src("supercomputer-detail.js"))   # AI 장비도 같은 찜목록에 kind 로 구분해 담는다
         unselect = s[s.index("node.hasAttribute('data-dc-unselect')"):]
         unselect = unselect[:unselect.index("return; }")]
         self.assertIn("model.selected = null", unselect)
-        for kept in ("model.draft", "model.conditions", "model.log", "model.compare", "liveTalk", "send("):
+        for kept in ("model.draft =", "model.conditions", "model.log", "model.ask", "wishlist", "liveTalk", "send("):
             self.assertNotIn(kept, unselect)   # 선택 해제는 선택만 비운다
         carry = src("compare-carry.js")
         self.assertIn("pai-compare-carry-v1", carry)

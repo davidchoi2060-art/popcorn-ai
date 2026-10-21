@@ -20,7 +20,7 @@ class F1Keep(unittest.TestCase):
     def test_chat_state_kept_per_tab(self):
         s = src("design-conversation.js")
         self.assertIn("KEEP = 'pai-finder-chat-v1'", s)
-        for k in ("'draft'", "'conditions'", "'compare'", "'log'", "'convo'"):
+        for k in ("'draft'", "'conditions'", "'ask'", "'log'", "'convo'"):
             self.assertIn(k, s[s.index("SAVED = ["):s.index("restoredScroll = null;")])
         self.assertIn("window.sessionStorage.setItem(KEEP", s)
         self.assertNotIn("localStorage.setItem(KEEP", s)   # 다른 탭·다음 방문으로 새지 않는다
@@ -32,14 +32,16 @@ class F1Keep(unittest.TestCase):
         fn = s[s.index("if (action === 'new')"):]
         fn = fn[:fn.index("\n")]
         self.assertIn("model.draft = ''", fn)
-        self.assertIn("model.compare = []", fn)
+        self.assertIn("model.ask = []", fn)
+        self.assertNotIn("wishlist", fn)   # 새 대화는 찜목록을 비우지 않는다
         self.assertIn("render()", fn)   # render 가 빈 상태를 보관한다
 
 
 class F2Resave(unittest.TestCase):
     def test_already_saved_checks_the_list(self):
         s = src("supercomputer-detail.js")
-        fn = s[s.index("  function save(btn) {"):s.index("  function compare() {")]
+        fn = s[s.index("  function save(btn) {"):]
+        fn = fn[:fn.index("\n  }\n")]
         self.assertIn("P.savedQuotes.list()", fn)
         self.assertIn("x.id === saved[key]", fn)
         self.assertIn("delete saveIds[key]", fn)   # 지워졌으면 새 요청 번호
@@ -48,9 +50,12 @@ class F2Resave(unittest.TestCase):
 
 class F3Sync(unittest.TestCase):
     def test_compare_screen_removal_reaches_chat(self):
+        # 2026-10-21 찜목록 하나로 합침: 대화는 자기 비교 목록을 두지 않고, 찜 버튼은 같은 저장소의 상태를 함께 맞춘다.
         s = src("design-conversation.js")
-        self.assertIn("function forget(id, kind)", s)
-        self.assertIn("forget(node.dataset.dcRemove, node.dataset.dcKind || 'pc')", s)
+        self.assertNotIn("model.compare", s)
+        ui = src("wish-ui.js")
+        self.assertIn("W.onChange(sync)", ui)
+        self.assertIn("document.querySelectorAll('[data-wish-id][data-wish-kind]')", ui)
 
 
 class F4Label(unittest.TestCase):

@@ -124,7 +124,7 @@
   }
   function cardB(product) {
     var data = withTitle(product, withSummary(product, P.catalogCardDataV12(product)));
-    return '<article class="cc-card cc-card-b" data-card-product="' + h(data.id) + '"><div class="cc-card-top"><div class="cc-card-copy"><span class="cc-category">' + h(data.category || '조립 PC') + '</span>' + title(data) + '<strong class="cc-price">' + h(data.priceLabel) + '</strong><span class="cc-status">' + P.icon('tag') + h(data.saleLabel) + '</span></div>' + photo(data) + '</div><div class="cc-card-lower">' + quickSpecs(data) + (data.sourceNote ? '<p class="cc-source-note">' + h(data.sourceNote) + '</p>' : '') + parts(product, data) + '<p class="cc-card-caption">주요 부품부터, 전체 구성을 확인하세요.</p><div class="cc-card-actions"><a class="btn btn-primary" href="' + h(data.detailHref) + '">상품 자세히 보기' + P.icon('arrow-right') + '</a><a class="btn btn-outline" href="' + h(data.chatHref) + '">' + P.icon('chat-circle') + 'AI에게 물어보기</a></div></div></article>';
+    return '<article class="cc-card cc-card-b" data-card-product="' + h(data.id) + '"><div class="cc-card-top"><div class="cc-card-copy"><span class="cc-category">' + h(data.category || '조립 PC') + '</span>' + title(data) + '<strong class="cc-price">' + h(data.priceLabel) + '</strong><span class="cc-status">' + P.icon('tag') + h(data.saleLabel) + '</span></div>' + photo(data) + '</div><div class="cc-card-lower">' + quickSpecs(data) + (data.sourceNote ? '<p class="cc-source-note">' + h(data.sourceNote) + '</p>' : '') + parts(product, data) + '<p class="cc-card-caption">주요 부품부터, 전체 구성을 확인하세요.</p><div class="cc-card-actions"><a class="btn btn-primary" href="' + h(data.detailHref) + '">상품 자세히 보기' + P.icon('arrow-right') + '</a><a class="btn btn-outline" href="' + h(data.chatHref) + '">' + P.icon('chat-circle') + 'AI에게 물어보기</a>' + (P.wishButton ? P.wishButton({ kind: 'pc', id: data.id, name: data.shortName || product.name, cls: 'btn btn-outline cc-wish' }) : '') + '</div></div></article>';
   }
   P.catalogCardRenderer = function (p) { return cardB(p); };
   P.catalogGridClass = 'cc-grid cc-grid-b';
@@ -199,7 +199,7 @@
     return '<section class="cf-components" aria-labelledby="cf-check-title"><div class="cf-section-heading"><div><span class="cf-eyebrow">BEFORE YOU BUY</span><h2 id="cf-check-title">구매 전 확인</h2></div></div><ul class="cf-checks">' + rows.map(function (s) { return '<li>' + P.icon('info') + '<span>' + h(s) + '</span></li>'; }).join('') + '</ul></section>';
   }
   function more(p) {
-    return '<div class="cf-more-actions"><a class="btn btn-outline" href="' + h(P.designHref('chat', 'product', { id: p.id })) + '">' + P.icon('chat-circle') + '이 PC, 나에게 맞을까? AI에게 물어보기</a>' +
+    return '<div class="cf-more-actions"><a class="btn btn-outline" href="' + h(P.designHref('chat', 'product', { id: p.id })) + '">' + P.icon('chat-circle') + '이 PC에 대해 AI에게 질문하기</a>' +
       (p.mallUrl ? '<a class="btn btn-outline" href="' + h(p.mallUrl) + '" target="_blank" rel="noopener">팝콘PC에서 부품 옵션 변경하기 <span aria-hidden="true">↗</span></a>' : '') + '</div>';
   }
   var originalProduct = P.designScreens.product;
@@ -216,6 +216,14 @@
     html = html.replace('<a class="cf-back"', extra + '<a class="cf-back"');
     // 대표 사진 고지(서버 문장 · /mvp3 와 같은 「AI 조립 예시」 안내)를 사진 바로 아래에 둔다.
     if (p.photoNotice && p.image) html = html.replace('</details></div></section><section class="cf-components"', '</details></div></section><p class="cf-photo-notice">' + h(p.photoNotice) + '</p><section class="cf-components"');
+    // 찜하기(2026-10-21 확정 1번 시안 04): 구매가 주 버튼이고 그 바로 아래에 찜 상태와 찜목록 링크. 모든 상세에 같다.
+    if (P.wishButton) html = html.replace('</div><p class="cf-consent-note">', '<div class="cf-wish-row">' + P.wishButton({ kind: 'pc', id: p.id, name: p.name, cls: 'cf-wish' }) + P.wishLink({ params: { from: p.id }, cls: 'cf-wish-link' }) + '</div><p class="cf-wish-help">다시 누르면 찜이 해제돼요.</p></div><p class="cf-consent-note">');
+    var fu = P.primaryFit ? P.primaryFit(p) : '';
+    if (fu) html = html.replace('<h1>', '<span class="cf-fit-badge" title="팝콘 기준 용도 평가 · 실측 아님">' + h(fu) + '</span><h1>');
+    // 어디서 왔는지에 맞춘 돌아가기(직접 들어온 상세에는 없는 단계를 보이지 않는다).
+    var from = ctx.query && ctx.query.get ? ctx.query.get('from') : '', pick = ctx.query && ctx.query.get ? ctx.query.get('pick') : '';
+    var backTo = from === 'compare' && pick ? ['비교 결과로 돌아가기', P.designHref('compare', 'normal', { pick: pick })] : from === 'wish' ? ['찜목록으로 돌아가기', P.wishHref()] : from === 'chat' ? ['AI 대화로 돌아가기', P.designHref('chat', 'welcome')] : null;
+    if (backTo) html = html.replace(/<nav class="cf-breadcrumb"[\s\S]*?<\/nav>/, '<div class="cf-from"><a class="wl-back" href="' + h(backTo[1]) + '">' + P.icon('arrow-left') + h(backTo[0]) + '</a>' + (from === 'compare' && P.wishSteps ? P.wishSteps(3) : '') + '</div>');
     document.title = P.cardTitleV12(p) + ' · PC 구성 | 팝콘AI';
     return { html: html, mount: function () { var root = document.querySelector('.cf-page'); if (root && !(ctx.state === 'price-unavailable')) C.mount(root, p, q); } };
   };
