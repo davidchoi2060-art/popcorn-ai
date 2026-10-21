@@ -1097,6 +1097,156 @@
    "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
   },
   {
+   "file": "assets/images/products/130642.webp",
+   "product_code": 130642,
+   "sha256": "2e73c64ebe01c590d6d511d590f46452f228f2ec5dc822be175711df718815d6",
+   "bytes": 170848,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "b9dfac652bd8040905d3d125847c54bc9dff79bbd035ac780f5ca9349986946d",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130643.webp",
+   "product_code": 130643,
+   "sha256": "28ae861d246ea33d54190bc34905691286d87500fe27f6fcd21df6bbf0217454",
+   "bytes": 164750,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "25d4731076fef6b16c109b07a290996c19a5153874f4839553c67417e180fb1a",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130644.webp",
+   "product_code": 130644,
+   "sha256": "2cce795a329f45d61ffb597b6ddf8f920c3fd4f1e5e56ec0c0f6dceab0e2039a",
+   "bytes": 50172,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 121065,
+   "delivered_png_sha256": "555a9304fff13c964382100cbcd7e8d3a80f6ebba4a38fae25ba431cd20d44a8",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130645.webp",
+   "product_code": 130645,
+   "sha256": "e602cfcd5c7b8fe44dfbaa45a64dbd6eedda3afbaa238169f75e928f3019496e",
+   "bytes": 177656,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "e4cb1664ad7554b432fc01d4b1b023b7e8572d48a225fd2fef5ff3fdd7eb5e75",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130646.webp",
+   "product_code": 130646,
+   "sha256": "7c63e411d5f63cfc45b4256ef18306b8c8a86669443277013a8adcf404291c33",
+   "bytes": 175288,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "93bd13175f5303ff96fcdf6ef1d495b6efeae82f1d38e462d16d2ae74bec2fd5",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130647.webp",
+   "product_code": 130647,
+   "sha256": "8e7fae26a569fe5d83c6cd24cef8bdf94ba1b85d576d6edb9e3162691402267e",
+   "bytes": 168466,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "c0411d8035a2d3987cfc10a420e8b99fea22908c91e10bc3822514fa3c27b57f",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130648.webp",
+   "product_code": 130648,
+   "sha256": "742cc8e2cdf21d92d57dc462cca1c4346bca0c211c3ae053da01199f3a3dd9c5",
+   "bytes": 168786,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "808ba63c118158586c2fe77905e5f5783babeebc3be04a070ca7f68db6e1d53a",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130649.webp",
+   "product_code": 130649,
+   "sha256": "0baea74ded1273a7191bc0fffb72eb505b177a08a2710f772cd13f1a35c1f167",
+   "bytes": 172798,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "b2ad06a2bd09980c30cd104962ea00bcf7da9d3855a6dddb738df8fae0810073",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130650.webp",
+   "product_code": 130650,
+   "sha256": "b7dbc838d8550cb0344916e05789e3191f1c2b259867269995c411edcb928100",
+   "bytes": 169458,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "cbab7a45911ef3ff1349b0c2de6808a863456cef3e2bac359643799464b8fe52",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130651.webp",
+   "product_code": 130651,
+   "sha256": "ca6bf2b4ef9b786937d9ccc56a9a87f7dbdfbd5efa402a4361c13caad1e77ba6",
+   "bytes": 240800,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 114455,
+   "delivered_png_sha256": "69213b0a18484c8dfee2327e298734eea8f3c90007b131cde5d0a6b343850c6f",
+   "batch": "batch-09 (zip sha256 5216c83e...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
    "file": "assets/images/products/130655.webp",
    "product_code": 130655,
    "sha256": "d5ce5b7074908e54d1bf68d4e413985a85ef23993d7793497e98cd75c68485f5",
