@@ -3,7 +3,8 @@
  * 1) 상품 목록 = B 부품 탐색형 카드. 승인 시안 card-concepts.js 의 cardB()/parts()/partHref() 렌더만 옮겼다
  *    (비교용 고정 3상품·페이지 초기화·임시 상세 route override 는 싣지 않는다). 검색·필터·정렬·더 보기는
  *    design-products.js 의 실제 목록 그대로이고, 카드만 P.catalogCardRenderer 로 바꾼다.
- *    부품 줄은 상품마다 공개 구성(/api/customer/pc-offers/{code})을 화면에 보이는 카드만 차례로 읽어 채운다.
+ *    부품 줄은 상품마다 상세와 같은 경로(P.live.loadDetail: 공개 구성 /api/customer/pc-offers/{code}, 비공개면
+ *    몰 등록 구성 /api/customer/pc-registered/{code})로 화면에 가까운 카드부터 차례로 읽어 채운다.
  * 2) 상품 상세 = 승인 구성 상세(configuration-concept.js). 부품마다 사진·실제 사양·역할을 펼친다.
  *    부품 사진은 서버가 그 부품 설명 코드로 공개 승인한 사진(parts[].photo)만 쓴다 — 이름으로 찾지 않는다.
  *    기존 /mvp3 상세가 보여 주던 것(소개·장점·구매 전 확인·AI 상담·팝콘PC 옵션 변경)을 함께 둔다.
@@ -45,7 +46,7 @@
     return null;
   }
   function parts(product, data) {
-    if (product.liveDetail === 'pending' && product.configurationPublic) return '<section class="cc-parts" aria-busy="true" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3></div><p class="cc-source-note">부품 구성을 불러오고 있어요.</p></section>';
+    if (product.liveDetail === 'pending') return '<section class="cc-parts" aria-busy="true" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3></div><p class="cc-source-note">부품 구성을 불러오고 있어요.</p></section>';
     var list = product.bomStatus === 'mismatch' ? [] : (product.specs || []).filter(function (spec) { return spec && spec.label && spec.value; }).slice(0, 8);
     if (!list.length) return '';
     return '<section class="cc-parts" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3><a href="' + h(data.detailHref) + '">전체 구성' + P.icon('caret-right') + '</a></div><ul class="cc-part-grid">' + list.map(function (spec) {
@@ -56,7 +57,7 @@
       return '<li><' + (link ? 'a href="' + h(link) + '"' : 'span') + ' class="cc-part" title="' + h(spec.value) + '"' + (link ? ' aria-label="' + h(spec.label + ': ' + spec.value + ' 상세 보기') + '"' : '') + '><span class="cc-part-media">' + media + '</span><span>' + h(partLabel(spec)) + '</span></' + (link ? 'a' : 'span') + '></li>';
     }).join('') + '</ul></section>';
   }
-  // 공개 구성이 없거나 아직 못 읽은 상품: 핵심 4칸을 서버 카드 사양(상품 평가 사양 · /api/customer/pc-catalog spec)으로
+  // 구성을 아직 못 읽었거나 공개·등록 구성 모두 없는 상품: 핵심 4칸을 서버 카드 사양(상품 평가 사양 · /api/customer/pc-catalog spec)으로
   // 채운다. 구성표 기반이 아님을 밝힌다(추정 용량·합산은 하지 않는다 — 서버 값 그대로).
   function withSummary(product, data) {
     if (Array.isArray(product.specs) && product.specs.length) return data;
@@ -67,11 +68,62 @@
       if (!row || !String(row.value || '').trim()) return cell;
       used = true; return { label: cell.label, slot: cell.slot, lines: [String(row.value)], pending: false };
     });
-    if (used && !data.sourceNote) data.sourceNote = '상품 사양 요약 · 정확한 부품 구성은 상세에서 확인';
+    // 읽는 중에는 아래 「부품 구성을 불러오고 있어요」가 대신 말한다 — 끝내 구성이 없을 때만 이 안내를 둔다.
+    if (used && !data.sourceNote && product.liveDetail !== 'pending') data.sourceNote = '상품 사양 요약 · 정확한 부품 구성은 상세에서 확인';
+    return data;
+  }
+  // 상품명(몰 제목)의 [CPU/메모리/SSD/그래픽] 이 기준이다(2026-10-21 대표 「제목이 틀리긴 힘드니까 그걸 기준으로」).
+  // 몰 구성이나 요약 사양이 제목과 다른 칸만 제목 값으로 바꾼다. 같거나 제목에 없는 칸은 그대로 둔다.
+  var TITLE_RE = /\[\s*([^\[\]\/]+?)\s*\/\s*(\d+)\s*G(?:B)?\s*\/\s*([^\/\]]+?)\s*\/\s*([^\]]+?)\s*(?:\]|$)/i;
+  function titleSpec(product) {
+    var m = String(product.officialName || product.name || '').match(TITLE_RE);
+    if (!m) return null;
+    var ssd = m[3].split('+')[0].trim(), gpu = m[4].replace(/\s*\*\s*\d+\s*EA\s*$/i, '').trim();
+    return { CPU: m[1].trim(), RAM: Number(m[2]), SSD: ssd, GPU: gpu };
+  }
+  function gbOf(text) {
+    var m = String(text || '').match(/(\d+(?:\.\d+)?)\s*(TB|GB|G)(?![A-Za-z0-9])/i);
+    return m ? Math.round(Number(m[1]) * (/^T/i.test(m[2]) ? 1000 : 1)) : null;
+  }
+  // 메모리 총량: 구성 줄(용량 × 개수 · 「* N개」)을 더한다. 읽지 못한 줄이 하나라도 있으면 모른다(null).
+  function ramTotal(product) {
+    var rows = (product.specs || []).filter(function (s) { return String(s.slot || '').toUpperCase() === 'RAM'; });
+    if (!rows.length) {
+      var sum = (product.summarySpecs || []).find(function (r) { return r.slot === 'RAM'; });
+      return sum ? gbOf(sum.value) : null;
+    }
+    var total = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var gb = gbOf(rows[i].value);
+      if (gb === null) return null;
+      var kits = String(rows[i].value).match(/[*x×]\s*(\d+)\s*개/);
+      var qty = kits ? Number(kits[1]) : (Number.isInteger(rows[i].quantity) && rows[i].quantity > 0 ? rows[i].quantity : 1);
+      total += gb * qty;
+    }
+    return total;
+  }
+  function modelKey(text, slot) {
+    var t = String(text || '').toUpperCase().replace(/\s+/g, '');
+    if (slot === 'GPU') { var g = t.match(/(\d{3,4})(TI|SUPER|XT)?/); return g ? g[1] + (g[2] || '') : null; }
+    var c = String(text || '').toUpperCase().match(/(?:^|[^0-9A-Z])(\d{3,5}[A-Z0-9]{0,4})(?![0-9A-Z])/); return c ? c[1] : null;
+  }
+  function withTitle(product, data) {
+    var t = titleSpec(product);
+    if (!t) return data;
+    data.specs = data.specs.map(function (cell) {
+      var shown = cell.lines.join(' '), want = null;
+      if (cell.slot === 'RAM') { var have = ramTotal(product); if (cell.pending || (have !== null && have !== t.RAM)) want = t.RAM + 'GB'; }
+      else if (cell.slot === 'SSD') { var a = gbOf(t.SSD); if (a !== null && (cell.pending || gbOf(shown) !== a)) want = t.SSD.replace(/G$/i, 'GB'); }
+      else if (cell.slot === 'CPU' || cell.slot === 'GPU') {
+        var k = modelKey(t[cell.slot], cell.slot);
+        if (k && (cell.pending || modelKey(shown, cell.slot) !== k)) want = t[cell.slot];
+      }
+      return want ? { label: cell.label, slot: cell.slot, lines: [want], pending: false } : cell;
+    });
     return data;
   }
   function cardB(product) {
-    var data = withSummary(product, P.catalogCardDataV12(product));
+    var data = withTitle(product, withSummary(product, P.catalogCardDataV12(product)));
     return '<article class="cc-card cc-card-b" data-card-product="' + h(data.id) + '"><div class="cc-card-top"><div class="cc-card-copy"><span class="cc-category">' + h(data.category || '조립 PC') + '</span>' + title(data) + '<strong class="cc-price">' + h(data.priceLabel) + '</strong><span class="cc-status">' + P.icon('tag') + h(data.saleLabel) + '</span></div>' + photo(data) + '</div><div class="cc-card-lower">' + quickSpecs(data) + (data.sourceNote ? '<p class="cc-source-note">' + h(data.sourceNote) + '</p>' : '') + parts(product, data) + '<p class="cc-card-caption">주요 부품부터, 전체 구성을 확인하세요.</p><div class="cc-card-actions"><a class="btn btn-primary" href="' + h(data.detailHref) + '">상품 자세히 보기' + P.icon('arrow-right') + '</a><a class="btn btn-outline" href="' + h(data.chatHref) + '">' + P.icon('chat-circle') + 'AI에게 물어보기</a></div></div></article>';
   }
   P.catalogCardRenderer = function (p) { return cardB(p); };
@@ -105,7 +157,8 @@
   function scan() {
     document.querySelectorAll('.cc-card-b[data-card-product]').forEach(function (el) {
       var id = el.getAttribute('data-card-product'), p = P.getCatalogProduct(id);
-      if (!p || seen[id] || !p.configurationPublic || p.liveDetail !== 'pending') return;
+      // 공개 승인 구성이 없는 상품도 읽는다 — 상세처럼 몰 등록 구성으로 부품 줄을 채운다(2026-10-21 대표: 목록만 부품 구성이 비었음).
+      if (!p || seen[id] || p.liveDetail !== 'pending') return;
       seen[id] = true; queue.push(id);
     });
     pump();
