@@ -3,7 +3,8 @@
  * 1) 상품 목록 = B 부품 탐색형 카드. 승인 시안 card-concepts.js 의 cardB()/parts()/partHref() 렌더만 옮겼다
  *    (비교용 고정 3상품·페이지 초기화·임시 상세 route override 는 싣지 않는다). 검색·필터·정렬·더 보기는
  *    design-products.js 의 실제 목록 그대로이고, 카드만 P.catalogCardRenderer 로 바꾼다.
- *    부품 줄은 상품마다 공개 구성(/api/customer/pc-offers/{code})을 화면에 보이는 카드만 차례로 읽어 채운다.
+ *    부품 줄은 상품마다 상세와 같은 경로(P.live.loadDetail: 공개 구성 /api/customer/pc-offers/{code}, 비공개면
+ *    몰 등록 구성 /api/customer/pc-registered/{code})로 화면에 가까운 카드부터 차례로 읽어 채운다.
  * 2) 상품 상세 = 승인 구성 상세(configuration-concept.js). 부품마다 사진·실제 사양·역할을 펼친다.
  *    부품 사진은 서버가 그 부품 설명 코드로 공개 승인한 사진(parts[].photo)만 쓴다 — 이름으로 찾지 않는다.
  *    기존 /mvp3 상세가 보여 주던 것(소개·장점·구매 전 확인·AI 상담·팝콘PC 옵션 변경)을 함께 둔다.
@@ -45,7 +46,7 @@
     return null;
   }
   function parts(product, data) {
-    if (product.liveDetail === 'pending' && product.configurationPublic) return '<section class="cc-parts" aria-busy="true" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3></div><p class="cc-source-note">부품 구성을 불러오고 있어요.</p></section>';
+    if (product.liveDetail === 'pending') return '<section class="cc-parts" aria-busy="true" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3></div><p class="cc-source-note">부품 구성을 불러오고 있어요.</p></section>';
     var list = product.bomStatus === 'mismatch' ? [] : (product.specs || []).filter(function (spec) { return spec && spec.label && spec.value; }).slice(0, 8);
     if (!list.length) return '';
     return '<section class="cc-parts" aria-label="' + h(data.shortName) + ' 부품 구성"><div class="cc-parts-heading"><h3>부품 구성</h3><a href="' + h(data.detailHref) + '">전체 구성' + P.icon('caret-right') + '</a></div><ul class="cc-part-grid">' + list.map(function (spec) {
@@ -56,7 +57,7 @@
       return '<li><' + (link ? 'a href="' + h(link) + '"' : 'span') + ' class="cc-part" title="' + h(spec.value) + '"' + (link ? ' aria-label="' + h(spec.label + ': ' + spec.value + ' 상세 보기') + '"' : '') + '><span class="cc-part-media">' + media + '</span><span>' + h(partLabel(spec)) + '</span></' + (link ? 'a' : 'span') + '></li>';
     }).join('') + '</ul></section>';
   }
-  // 공개 구성이 없거나 아직 못 읽은 상품: 핵심 4칸을 서버 카드 사양(상품 평가 사양 · /api/customer/pc-catalog spec)으로
+  // 구성을 아직 못 읽었거나 공개·등록 구성 모두 없는 상품: 핵심 4칸을 서버 카드 사양(상품 평가 사양 · /api/customer/pc-catalog spec)으로
   // 채운다. 구성표 기반이 아님을 밝힌다(추정 용량·합산은 하지 않는다 — 서버 값 그대로).
   function withSummary(product, data) {
     if (Array.isArray(product.specs) && product.specs.length) return data;
@@ -67,7 +68,8 @@
       if (!row || !String(row.value || '').trim()) return cell;
       used = true; return { label: cell.label, slot: cell.slot, lines: [String(row.value)], pending: false };
     });
-    if (used && !data.sourceNote) data.sourceNote = '상품 사양 요약 · 정확한 부품 구성은 상세에서 확인';
+    // 읽는 중에는 아래 「부품 구성을 불러오고 있어요」가 대신 말한다 — 끝내 구성이 없을 때만 이 안내를 둔다.
+    if (used && !data.sourceNote && product.liveDetail !== 'pending') data.sourceNote = '상품 사양 요약 · 정확한 부품 구성은 상세에서 확인';
     return data;
   }
   function cardB(product) {
@@ -105,7 +107,8 @@
   function scan() {
     document.querySelectorAll('.cc-card-b[data-card-product]').forEach(function (el) {
       var id = el.getAttribute('data-card-product'), p = P.getCatalogProduct(id);
-      if (!p || seen[id] || !p.configurationPublic || p.liveDetail !== 'pending') return;
+      // 공개 승인 구성이 없는 상품도 읽는다 — 상세처럼 몰 등록 구성으로 부품 줄을 채운다(2026-10-21 대표: 목록만 부품 구성이 비었음).
+      if (!p || seen[id] || p.liveDetail !== 'pending') return;
       seen[id] = true; queue.push(id);
     });
     pump();
