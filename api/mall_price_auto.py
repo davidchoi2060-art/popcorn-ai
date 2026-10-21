@@ -54,7 +54,8 @@ ENV_ID, ENV_PW, ENV_EXPORT = "MALL_ADMIN_ID", "MALL_ADMIN_PW", "MALL_EXPORT_URL"
 ENV_EXPORT_DATA = "MALL_EXPORT_DATA"   # 내려받기가 POST 일 때 보낼 폼 본문(쿼리 문자열 형식)
 LOGIN_URL = R.BASE + "/bbs/login.php"
 ADMIN_URL = R.BASE + "/adm/"
-DELAY = 1.5                            # 공개 페이지 요청 간격(초)
+DELAY = 1.5                            # 공개 페이지 요청 간격(초) — 줄마다
+WORKERS = 3                            # 동시에 읽는 줄 수(몰에 초당 2건 안팎)
 MAX_READS = int(os.environ.get("MALL_PRICE_MAX_READS") or 3000)
 FAIL_RATIO = 0.5                       # 공개 페이지 읽기가 이 비율을 넘게 실패하면 실행 실패
 STALE_RUNNING = "2 hours"              # 이보다 오래 «실행 중»인 행은 죽은 실행으로 본다
@@ -170,24 +171,48 @@ def targets(conn, *, include_parts=False) -> list[tuple[int, str]]:
     return [(r[0], r[1]) for r in conn.execute(text(sql), {"pt": MP.PC_PART_TYPE, "n": MAX_READS})]
 
 
-def collect_public(codes, *, sleep=time.sleep, read=None, clock=time.monotonic) -> tuple[dict, dict]:
+def collect_public(codes, *, sleep=time.sleep, read=None, clock=time.monotonic, workers=None) -> tuple[dict, dict]:
+    # 줄(lane) 여럿이 나눠 읽는다 — 줄마다 요청 사이 DELAY 를 지킨다. 한 줄로 읽으면 300여 건에 14분쯤 걸려
+    # 그 사이 배포 재시작(바쁜 날은 10분 간격)에 거의 매번 죽었다(2026-10-21 실측).
     read = read or R.read_price
-    prices, failed, errs = {}, 0, {}
+    workers = max(1, min(workers or WORKERS, len(codes) or 1))
+    lanes = [list(enumerate(codes))[i::workers] for i in range(workers)]
+    got, stopped = {}, []
     deadline = clock() + COLLECT_LIMIT
-    for i, (code, part_type) in enumerate(codes):
-        if i:
-            sleep(DELAY)
-        if clock() > deadline:
-            info = {"source": "pages", "asked": len(codes), "read": len(prices), "failed": failed,
-                    "stopped_at": i}
-            raise CollectError("공개 상품 페이지 읽기가 %d분을 넘어 멈췄습니다 (%d/%d건 읽음)"
-                               % (COLLECT_LIMIT // 60, i, len(codes)), info)
-        got = read(code, part_type)
-        if got.get("ok") and got.get("price"):
-            prices[code] = int(got["price"])
+
+    def lane(items):
+        for j, (i, (code, part_type)) in enumerate(items):
+            if stopped:
+                return
+            if j:
+                sleep(DELAY)
+            if clock() > deadline:
+                stopped.append(i)
+                return
+            got[i] = read(code, part_type)
+
+    if workers == 1:
+        lane(lanes[0])
+    else:
+        threads = [threading.Thread(target=lane, args=(items,), daemon=True) for items in lanes]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+    if stopped:
+        i = min(stopped)
+        info = {"source": "pages", "asked": len(codes), "read": sum(1 for g in got.values() if g.get("ok")),
+                "failed": None, "stopped_at": i}
+        raise CollectError("공개 상품 페이지 읽기가 %d분을 넘어 멈췄습니다 (%d/%d건 읽음)"
+                           % (COLLECT_LIMIT // 60, len(got), len(codes)), info)
+    prices, failed, errs = {}, 0, {}
+    for i, (code, _pt) in enumerate(codes):
+        g = got.get(i) or {}
+        if g.get("ok") and g.get("price"):
+            prices[code] = int(g["price"])
         else:
             failed += 1
-            k = got.get("err") or "?"
+            k = g.get("err") or "?"
             errs[k] = errs.get(k, 0) + 1
     info = {"source": "pages", "asked": len(codes), "read": len(prices), "failed": failed,
             "errors": dict(sorted(errs.items(), key=lambda x: -x[1])[:5])}

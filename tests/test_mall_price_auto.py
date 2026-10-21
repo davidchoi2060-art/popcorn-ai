@@ -74,10 +74,21 @@ class CollectPublicTests(unittest.TestCase):
         sleeps = []
         got = {1: {"ok": True, "price": 1000}, 2: {"ok": False, "err": "http"}, 3: {"ok": True, "price": 3000}}
         prices, info = AUTO.collect_public([(1, "PC_COMPLETE"), (2, "PC_COMPLETE"), (3, "PC_COMPLETE")],
-                                           sleep=sleeps.append, read=lambda c, pt: got[c])
+                                           sleep=sleeps.append, read=lambda c, pt: got[c], workers=1)
         self.assertEqual(prices, {1: 1000, 3: 3000})
         self.assertEqual(sleeps, [AUTO.DELAY, AUTO.DELAY])     # 요청 사이마다 1.5초
         self.assertEqual((info["read"], info["failed"], info["errors"]), (2, 1, {"http": 1}))
+
+    def test_lanes_read_everything_once_and_keep_their_own_spacing(self):
+        # 배포 재시작(10분 간격)보다 짧게 끝나도록 줄 여럿이 나눠 읽는다 — 줄 안에서는 요청 사이 DELAY
+        seen, sleeps = [], []
+        codes = [(c, "PC_COMPLETE") for c in range(1, 11)]
+        prices, info = AUTO.collect_public(codes, sleep=sleeps.append, workers=3,
+                                           read=lambda c, pt: seen.append(c) or {"ok": True, "price": c * 100})
+        self.assertEqual(sorted(seen), list(range(1, 11)))
+        self.assertEqual(prices, {c: c * 100 for c in range(1, 11)})
+        self.assertEqual(len(sleeps), 10 - 3)                    # 줄마다 첫 요청 앞에는 쉬지 않는다
+        self.assertEqual((info["read"], info["failed"]), (10, 0))
 
     def test_more_than_half_failed_is_a_failed_run(self):
         with self.assertRaises(AUTO.CollectError) as e:
@@ -96,7 +107,7 @@ class CollectPublicTests(unittest.TestCase):
             return {"ok": True, "price": 1000}
         with self.assertRaises(AUTO.CollectError) as e:
             AUTO.collect_public([(1, "x"), (2, "x"), (3, "x")], sleep=lambda s: None,
-                                read=read, clock=clock)
+                                read=read, clock=clock, workers=1)
         self.assertEqual(e.exception.args[1]["stopped_at"], 2)
         self.assertLess(AUTO.COLLECT_LIMIT, 2 * 3600)            # STALE_RUNNING = 2 hours
 
