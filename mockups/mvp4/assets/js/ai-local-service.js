@@ -25,10 +25,13 @@ var stages=[
   function body() {
     return '<div class="ls-page" id="pop-local-service" data-use="documents">' +
       '<section class="ls-hero">' +
+      '  <div class="ls-hero-copy">' +
       '  <div class="ls-eyebrow">팝콘AI 업무 도입 패키지</div>' +
       '  <h1>회사 자료는 회사 안에.<br>AI는 우리 업무에 맞게.</h1>' +
       '  <p class="ls-lead">우리 회사 장비와 자료, 일하는 방식에 맞춰<br>AI를 도입하는 과정을 함께 설계합니다.</p>' +
       '  <div class="ls-row"><span class="ls-pill">' + i('shield', 'ls-icon') + '내부 전용 구축 목표</span><span class="ls-pill">PC 구성 · AI 설치 · 사용 안내</span></div>' +
+      '  </div>' +
+      '  <figure class="ls-hero-art" aria-hidden="true"><img class="ls-hero-art-img" src="assets/images/business/documents-miniature.png" alt="" width="998" height="470" decoding="async"></figure>' +
       '  <div class="ls-promise"><strong>외부 전송 없는 내부 전용 환경을 목표로 상담합니다.</strong><br>자료 저장 위치와 실제 통신 경로를 점검한 뒤 적용 범위를 확정합니다.</div>' +
       '</section>' +
       '<section class="ls-section" aria-labelledby="ls-network-title">' +

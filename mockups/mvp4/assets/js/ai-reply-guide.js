@@ -15,10 +15,13 @@
   var MARKUP =
     '<div class="rp-page" id="pop-reply-guide" lang="ko" data-use="replies">' +
     '<section class="rp-hero">' +
+    ' <div class="rp-hero-copy">' +
     ' <div class="rp-eyebrow">POPCORN AI · 업무 도입 패키지</div>' +
     ' <h1>우리 회사 기준으로 쓰고,<br>담당자가 확인해서 보냅니다.</h1>' +
     ' <p class="rp-lead">고객의 질문과 사내 안내 자료를 함께 살펴<br>답할 수 있는 내용과 확인이 필요한 내용을 나눕니다.<br>회사 말투와 응대 절차에 맞는 답변 초안을 구축합니다.</p>' +
     ' <div class="rp-tags"><span>사내 자료를 근거로</span><span>확인 전 약속은 보류</span><span>고객 발송은 직원이</span></div>' +
+    ' </div>' +
+    ' <figure class="rp-hero-art" aria-hidden="true"><img class="rp-hero-art-img" src="assets/images/business/replies-miniature.png" alt="" width="984" height="418" decoding="async"></figure>' +
     '</section>' +
     '<section class="rp-section">' +
     ' <span class="rp-eyebrow">01 · 실제 업무는 이렇게 흐릅니다</span>' +

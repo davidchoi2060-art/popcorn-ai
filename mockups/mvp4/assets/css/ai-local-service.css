@@ -15,3 +15,7 @@
 .ls-page .ls-gap{margin-top:18px}.ls-page .ls-toggle button,.ls-page h1,.ls-page h2,.ls-page h3{word-break:keep-all}
 .ls-page .ls-unknown{padding:34px clamp(18px,4vw,38px)}
 @media(max-width:560px){.ls-page .ls-net-node .ls-icon{grid-row:1/3;margin:3px 0 0;width:24px;height:24px}.ls-page .ls-primary{justify-content:center}.ls-page .ls-back{display:inline-flex;margin:8px 0 0}}
+/* 2026-10-21 사내 문서 검색 상단 미니어처(승인 시안). 이 구획 안에서만 배치한다 -- PC 는 문구 왼쪽·그림 오른쪽, 좁은 폭은 문구 위·그림 아래.
+ * 글자 크기는 바꾸지 않는다. 그림은 원래 비율 그대로 전부 보이게 하고 치수를 미리 잡는다. */
+#pop-local-service .ls-hero{display:grid;grid-template-columns:minmax(500px,1fr) minmax(0,560px);grid-template-areas:"copy art" "note note";column-gap:24px;align-items:center}#pop-local-service .ls-hero-copy{grid-area:copy;min-width:0}#pop-local-service .ls-promise{grid-area:note}#pop-local-service .ls-hero-art{grid-area:art;margin:0;min-width:0}#pop-local-service .ls-hero-art-img{display:block;width:100%;height:auto;aspect-ratio:998/470;object-fit:contain}
+@media(max-width:1023px){#pop-local-service .ls-hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "note" "art"}#pop-local-service .ls-hero-art{margin-top:18px}}

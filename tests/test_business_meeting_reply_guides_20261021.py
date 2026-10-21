@@ -35,8 +35,8 @@ def test_four_detail_entries_and_home_go_to_their_own_explanation():
 
 def test_service_page_routes_by_use_and_loads_both_guides():
     html = read("ai-service.html")
-    for asset in ("ai-meeting-guide.js?v=20261021-co1", "ai-reply-guide.js?v=20261021-co1",
-                  "ai-meeting-guide.css?v=20261021-mr1", "ai-reply-guide.css?v=20261021-mr1", "header-ui.js?v=20261020-logo2"):
+    for asset in ("ai-meeting-guide.js?v=20261021-mm3", "ai-reply-guide.js?v=20261021-mm3",
+                  "ai-meeting-guide.css?v=20261021-mm3", "ai-reply-guide.css?v=20261021-mm3", "header-ui.js?v=20261020-logo2"):
         assert asset in html, asset
     assert "P.serviceGuides.meetings = {label: '회의록 정리'" in read(MEETING)
     assert "P.serviceGuides.replies = {label: '고객 답변 초안'" in read(REPLY)
@@ -112,3 +112,21 @@ def test_design_only_labels_removed_and_virtual_labels_kept():
         body = js[js.index("var MARKUP"):]
         assert "디자인 시안" not in body and "상담 미리보기" not in body and "상담 연결 미리보기" not in body
         assert "가상" in body
+
+
+# 2026-10-21 상단 미니어처(회의록 승인 3번 · 문서 검색·고객 답변 승인 시안): 그림은 각 hero 안에만, 장식(alt="")으로, 치수를 잡아 넣는다.
+def test_hero_miniatures_are_scoped_decorative_and_sized():
+    import hashlib
+    img = ROOT / "assets/images/business"
+    assert hashlib.sha256((img / "meeting-miniature.png").read_bytes()).hexdigest() == "b858e136730510a2c9a8eb1532ed5a5301f7a72468a781de7f0da5c2fc4b9418"
+    for rel, name, wh, scope in ((MEETING, "meeting-miniature.png", 'width="2048" height="768"', "#pop-meeting-guide"),
+                                 ("assets/js/ai-local-service.js", "documents-miniature.png", 'width="998" height="470"', "#pop-local-service"),
+                                 (REPLY, "replies-miniature.png", 'width="984" height="418"', "#pop-reply-guide")):
+        js = read(rel)
+        assert js.count(name) == 1 and wh in js and 'aria-hidden="true"><img' in js and 'alt=""' in js, rel
+        assert (img / name).exists(), name
+    for css, scope in (("assets/css/ai-meeting-guide.css", "#pop-meeting-guide"), ("assets/css/ai-local-service.css", "#pop-local-service"), ("assets/css/ai-reply-guide.css", "#pop-reply-guide")):
+        src = read(css); assert "상단 미니어처" in src, css
+        tail = src[src.index("상단 미니어처"):]; tail = tail[tail.index("*/") + 2:]
+        rules = [r.split("{")[0].strip() for r in tail.replace("@media(max-width:1023px){", "").split("}") if "{" in r and not r.strip().startswith("/*")]
+        assert rules and all(r.startswith(scope) for r in rules if r), (css, rules)

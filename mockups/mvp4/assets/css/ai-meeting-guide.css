@@ -14,3 +14,7 @@
 #pop-meeting-guide button:focus-visible,#pop-meeting-guide summary:focus-visible,#pop-meeting-guide a:focus-visible{outline:3px solid var(--mg-purple);outline-offset:3px}
 #pop-meeting-guide .mg-back{display:inline-flex;margin:2px 0 4px;font-size:14px}#pop-meeting-guide .mg-consult{margin-top:16px}
 #pop-meeting-guide h1,#pop-meeting-guide h2,#pop-meeting-guide h3{word-break:keep-all}
+/* 2026-10-21 회의록 상단 미니어처(승인 3번). 이 구획 안에서만 배치한다 -- PC 는 문구 왼쪽·그림 오른쪽, 좁은 폭은 문구 위·그림 아래.
+ * 글자 크기는 바꾸지 않는다. 그림은 원래 비율(2048:768) 그대로 전부 보이게 하고, 치수를 미리 잡아 늦게 받아도 본문이 밀리지 않게 한다. */
+#pop-meeting-guide .mg-hero{display:grid;grid-template-columns:minmax(440px,1fr) minmax(0,640px);grid-template-areas:"copy art" "note note";column-gap:24px;align-items:center}#pop-meeting-guide .mg-hero-copy{grid-area:copy;min-width:0}#pop-meeting-guide .mg-hero-note{grid-area:note}#pop-meeting-guide .mg-hero-art{grid-area:art;margin:0;min-width:0}#pop-meeting-guide .mg-hero-art-img{display:block;width:100%;height:auto;aspect-ratio:2048/768;object-fit:contain}
+@media(max-width:1023px){#pop-meeting-guide .mg-hero{grid-template-columns:minmax(0,1fr);grid-template-areas:"copy" "note" "art"}#pop-meeting-guide .mg-hero-art{margin-top:18px}}

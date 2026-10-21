@@ -11,3 +11,6 @@
 #pop-reply-guide button:focus-visible,#pop-reply-guide summary:focus-visible,#pop-reply-guide a:focus-visible,#pop-reply-guide input:focus-visible{outline:3px solid var(--rp-purple);outline-offset:3px}
 #pop-reply-guide .rp-back{display:block;margin:10px 0 0;font-size:14px}
 #pop-reply-guide h1,#pop-reply-guide h2,#pop-reply-guide h3{word-break:keep-all}
+/* 2026-10-21 고객 답변 초안 상단 미니어처(승인 시안). 이 구획 안에서만 배치한다 -- PC 는 문구 왼쪽·그림 오른쪽, 좁은 폭은 문구 위·그림 아래. */
+#pop-reply-guide .rp-hero{display:grid;grid-template-columns:minmax(500px,1fr) minmax(0,600px);column-gap:24px;align-items:center}#pop-reply-guide .rp-hero-copy{min-width:0}#pop-reply-guide .rp-hero-art{margin:0;min-width:0}#pop-reply-guide .rp-hero-art-img{display:block;width:100%;height:auto;aspect-ratio:984/418;object-fit:contain}
+@media(max-width:1023px){#pop-reply-guide .rp-hero{grid-template-columns:minmax(0,1fr)}#pop-reply-guide .rp-hero-art{margin-top:18px}}
