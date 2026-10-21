@@ -24,7 +24,7 @@ class F1Keep(unittest.TestCase):
             self.assertIn(k, s[s.index("SAVED = ["):s.index("restoredScroll = null;")])
         self.assertIn("window.sessionStorage.setItem(KEEP", s)
         self.assertNotIn("localStorage.setItem(KEEP", s)   # 다른 탭·다음 방문으로 새지 않는다
-        self.assertIn("function render() { draw(); remember(false); }", s)
+        self.assertIn("root.innerHTML = markup();\n      remember(false);", s)
         self.assertIn("remember(true); stop();", s)
 
     def test_new_conversation_clears(self):

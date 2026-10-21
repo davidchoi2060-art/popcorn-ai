@@ -194,11 +194,11 @@
         (cards.length ? cards.map(function (p) { return card(p, !!model.selected && String(model.selected.id) === String(p.id)); }).join('') : empty(isLoading ? '구성을 살펴보고 있어요.' : '아직 보여드릴 PC가 없어요.', isLoading ? '확인하는 동안 대화를 계속 읽을 수 있어요.' : '원하는 조건을 알려주거나 상품을 먼저 둘러보세요.', isLoading ? '' : buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline'))) + '</section></aside></div>';
     }
     // 화면을 통째로 다시 그리면 대화 기록 스크롤이 맨 위(첫 질문)로 돌아간다. 새 질문을 보냈을 때만 그 질문을 위에 맞추고, 그 밖에는 읽던 위치를 그대로 둔다.
-    function render() { draw(); remember(false); }
-    function draw() {
+    function render() {
       if (!root) return;
       var old = root.querySelector('.dc-chat-log'), keep = old ? { top: old.scrollTop, users: old.querySelectorAll('.dc-message-user').length } : null;
       root.innerHTML = markup();
+      remember(false);
       var log = root.querySelector('.dc-chat-log');
       if (!log || !keep) return;
       var users = log.querySelectorAll('.dc-message-user'), last = users[users.length - 1];
