@@ -76,7 +76,7 @@ def test_consult_form_preselects_use_from_url_and_skips_gate_for_adoption():
 
 def test_ai_pages_load_new_ai_js():
     for page in ("ai-detail.html", "ai-consult.html", "ai-packages.html", "ai-result.html", "ai-service.html"):
-        assert "ai.js?v=20261021-co1" in read(page), page
+        assert "ai.js?v=20261021-ip1" in read(page), page
 
 
 def test_home_business_card_documents_also_goes_to_the_explanation():
