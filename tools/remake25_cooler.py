@@ -273,8 +273,13 @@ def configuration(conn, code, actor, rights, image_reader, storage, mrow, msha, 
                       hash=digest(dict(content=content, parts=new_parts, offers=offers)),
                       copy=digest(dict(content=content, parts=new_parts)), id=identity))
     out['steps'].append('cooler_swapped')
-    # 2. 몰 구성 원문 쿨러칸
+    # 2. 몰 구성 원문 쿨러칸 — 이 구성을 함께 파는 오퍼(예: P90678 의 P99413)도 같은 트랜잭션에서 바꾼다
     out['steps'].append('mall_text_' + spec_text_swap(conn, code))
+    for o in offers:
+        oc = int(o['offer_id'][1:]) if o['offer_id'][:1] == 'P' and o['offer_id'][1:].isdigit() else None
+        if oc and oc != code and oc in CODES:
+            out['steps'].append(f'mall_text_{oc}_' + spec_text_swap(conn, oc))
+            out.setdefault('shared_offers', []).append(oc)
     # 3. 추천 검토 승인
     _, _, _, st = load_review(conn, identity, lock=True)
     out['review_required'] = sorted(st['required'])
@@ -360,13 +365,15 @@ def pick_actor(conn):
 
 
 def run(engine, apply=False, image_reader=None, storage=None, only=None):
+    from sqlalchemy import text
     from tools.approve_pc_publication_bulk import RIGHTS_ATTESTATION, RIGHTS_ENV
     if image_reader is None:
         from api.product_images import read_image as image_reader
     storage = storage or Storage()
     report = dict(mode='apply' if apply else 'dry-run', started=datetime.now(timezone.utc).isoformat(),
                   part={}, configurations=[], uploads={})
-    rights = os.environ.get(RIGHTS_ENV, '')
+    from api.customer_pc_offer import rights_reference
+    rights = rights_reference() or ''   # 고객 화면과 같은 근거(환경변수 우선, 없으면 저장소 설정 파일)
     if rights != RIGHTS_ATTESTATION:
         raise RuntimeError(f'{RIGHTS_ENV} mismatch')
     msha, mrows = manifest()
@@ -389,7 +396,14 @@ def run(engine, apply=False, image_reader=None, storage=None, only=None):
                 report['part']['steps'] = ensure_part(conn, actor, rights, asset, image_reader)
         finally:
             conn.close()
+    with engine.connect() as conn:
+        owner = {c: conn.execute(text('SELECT configuration_id FROM pc_configuration_offers WHERE offer_id=:o'),
+                                 dict(o=f'P{c}')).scalar() for c in CODES}
     for code in (only or CODES):
+        if owner.get(code) and owner[code] != f'P{code}' and int(owner[code][1:]) in CODES:
+            # 자기 구성이 없고 다른 구성의 오퍼로 팔리는 상품 — 그 구성의 트랜잭션이 몰 원문까지 바꾼다
+            report['configurations'].append(dict(product_code=code, result='shared', configuration_id=owner[code]))
+            continue
         conn = tx()
         item = dict(product_code=code)
         try:
@@ -412,7 +426,7 @@ def run(engine, apply=False, image_reader=None, storage=None, only=None):
             conn.close()
         report['configurations'].append(item)
     report['summary'] = {k: sum(i['result'] == k for i in report['configurations'])
-                         for k in ('committed', 'would_commit', 'failed')}
+                         for k in ('committed', 'would_commit', 'failed', 'shared')}
     report['finished'] = datetime.now(timezone.utc).isoformat()
     return report
 
@@ -425,9 +439,11 @@ def status(engine, image_reader=None):
     from api.pc_publication_source_reader import make_source_reader
     if image_reader is None:
         from api.product_images import read_image as image_reader
-    reader = make_source_reader(image_reader=image_reader, business_rights_reference=os.environ.get(RIGHTS_ENV, ''))
+    from api.customer_pc_offer import rights_reference
+    rights = rights_reference() or ''
+    reader = make_source_reader(image_reader=image_reader, business_rights_reference=rights)
     _, mrows = manifest()
-    out = dict(rights_env_ok=os.environ.get(RIGHTS_ENV, '') == RIGHTS_ATTESTATION, configurations=[])
+    out = dict(rights_env_ok=rights == RIGHTS_ATTESTATION, configurations=[])
     with engine.connect().execution_options(isolation_level='REPEATABLE READ') as conn:
         with conn.begin():
             conn.execute(text('SET TRANSACTION READ ONLY'))
@@ -438,8 +454,9 @@ def status(engine, image_reader=None):
             out['part_product'] = dict(conn.execute(text('SELECT status,left(spec_source_text,300) AS spec FROM products '
                                                          'WHERE product_code=:c'), dict(c=NEW)).mappings().first() or {})
             for code in CODES:
-                identity = f'P{code}'
-                item = dict(product_code=code)
+                identity = conn.execute(text('SELECT configuration_id FROM pc_configuration_offers WHERE offer_id=:o'),
+                                        dict(o=f'P{code}')).scalar() or f'P{code}'
+                item = dict(product_code=code, configuration_id=identity)
                 try:
                     item['cooler'] = [r[0] for r in conn.execute(text("SELECT explanation_code FROM pc_configuration_parts "
                         "WHERE configuration_id=:id AND slot='COOLER'"), dict(id=identity))]
