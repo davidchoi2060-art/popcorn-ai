@@ -1,0 +1,978 @@
+{
+ "items": [
+  {
+   "product_code": "98149",
+   "title": "골드 NO.04.98149 [인기상품1위]인텔 [12400F/16GB/500GB/RTX5060]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 1860000,
+   "sale_price": 1624400,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "110964",
+     "name": "[인텔] i5 12세대 12400F [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "109547",
+     "name": "[삼성전자] DDR4 16G PC4-25600 [8G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "113685",
+     "name": "[GIGABYTE] H610M H V2 D4"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124852",
+     "name": "[PALIT] 지포스 RTX 5060 DUAL OC D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121242",
+     "name": "[ABKO] U30 마린 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "129250",
+     "name": "[마이크로닉스] COOLMAX ELITE II 600W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "100867",
+   "title": "골드 NO.04.100867 [AMD전체판매 1위][AMD게이밍1위] 베스트셀러[7500F/16G/500G/RTX5060]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 2080000,
+   "sale_price": 1809600,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "113800",
+     "name": "[AMD] 라이젠5 라파엘 7500F [Turbo 5.0GHz, 6코어/12쓰레드, VGA 미탑재]"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "113850",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 16GB"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "127891",
+     "name": "[ASUS] PRIME B650EM-A"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124852",
+     "name": "[PALIT] 지포스 RTX 5060 DUAL OC D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121697",
+     "name": "[3Rsystem] K400 리버스 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "129250",
+     "name": "[마이크로닉스] COOLMAX ELITE II 600W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "97909",
+   "title": "골드 NO.04.97909 게이밍 2위 가성비 PC [5600/16G/500GB/RTX3050]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 1450000,
+   "sale_price": 1262200,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "111066",
+     "name": "[AMD] 라이젠5 버미어 5600 [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121789",
+     "name": "[JIUSHARK] JF120R Emerald ARGB 화이트"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "109547",
+     "name": "[삼성전자] DDR4 16G PC4-25600 [8G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "112504",
+     "name": "[ASUS] PRIME A520M-K [라이젠 AM4 / M-ATX / 64GB]"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "128419",
+     "name": "[PALIT] 지포스 RTX 3050 STORM X D6 6GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121652",
+     "name": "[DARKFLASH] DS900M RGB 강화유리 화이트"
+    },
+    {
+     "cate": "파워",
+     "pcode": "111146",
+     "name": "[마이크로닉스] COOLMAX VISION II 500W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "102112",
+   "title": "골드 NO.04.102112 [화이트상품 1위][14400F/16G/1TB/RTX5060]",
+   "usage_tags": [],
+   "market_price": 2200000,
+   "sale_price": 1914400,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "119270",
+     "name": "[인텔] i5 14세대 14400F [Turbo 4.7GHz, 6+4코어/12+4쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "128778",
+     "name": "[OHs] CV-420 화이트"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "113850",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 16GB"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "116508",
+     "name": "[ASRock] H610M-H2/M.2 D5"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124852",
+     "name": "[PALIT] 지포스 RTX 5060 DUAL OC D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "122516",
+     "name": "[마이크론] Crucial P310 M.2 NVMe 1TB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121652",
+     "name": "[DARKFLASH] DS900M RGB 강화유리 화이트"
+    },
+    {
+     "cate": "파워",
+     "pcode": "120943",
+     "name": "[마이크로닉스] Classic II 풀체인지 600W 80PLUS BRONZE ATX3.1"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)"
+   ]
+  },
+  {
+   "product_code": "112764",
+   "title": "다이아 NO.05.112764 라이젠 5세대[7800X3D/32G/1TB/RTX5070Ti]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 4640000,
+   "sale_price": 4038900,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "113254",
+     "name": "[AMD] 라이젠7 라파엘 7800X3D [Turbo 5.0GHz, 8코어/16쓰레드, AMD Radeon Graphics]"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "120906",
+     "name": "[3Rsystem] Socoool RC1900 ARGB 솔더링 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "127555",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "127891",
+     "name": "[ASUS] PRIME B650EM-A"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "129288",
+     "name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S OC D7 16GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "122516",
+     "name": "[마이크론] Crucial P310 M.2 NVMe 1TB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121697",
+     "name": "[3Rsystem] K400 리버스 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "126686",
+     "name": "[SuperFlower] SF-750Z12DB Zillion DB ETA실버 ATX3.1"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "121275",
+   "title": "골드 NO.06.121275 [B760/DDR5][12700F/32G/500GB/RTX5060]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 2960000,
+   "sale_price": 2578300,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "110967",
+     "name": "[인텔] i7 12세대 12700F [Turbo 4.9GHz, 8+4코어/16+4쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "127555",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "113689",
+     "name": "[ASRock] B760M Pro RS D5"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124852",
+     "name": "[PALIT] 지포스 RTX 5060 DUAL OC D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "130506",
+     "name": "[MSI] MPG VIXTA 300R PZ 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "129250",
+     "name": "[마이크로닉스] COOLMAX ELITE II 600W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)"
+   ]
+  },
+  {
+   "product_code": "97000",
+   "title": "다이아 NO.05.97000 [B760/DDR5][인기상품3위] [14세대 판매 1위] [고사양게이밍 3위][14400F/32G/1TB/RTX5060Ti]",
+   "usage_tags": [],
+   "market_price": 2650000,
+   "sale_price": 2312500,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "119270",
+     "name": "[인텔] i5 14세대 14400F [Turbo 4.7GHz, 6+4코어/12+4쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "127555",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "113689",
+     "name": "[ASRock] B760M Pro RS D5"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124631",
+     "name": "[MSI] 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "122516",
+     "name": "[마이크론] Crucial P310 M.2 NVMe 1TB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121632",
+     "name": "[DARKFLASH] DS900M RGB 강화유리 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "128870",
+     "name": "[마이크로닉스] Classic II 풀체인지 700W 80PLUS 실버 ATX3.1"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "121267",
+   "title": "골드 NO.04.121267 게이밍 2위 [5600/16G/500GB/RTX3050]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 1450000,
+   "sale_price": 1262800,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "111066",
+     "name": "[AMD] 라이젠5 버미어 5600 [Turbo 4.4GHz, 6코어/12쓰레드, VGA 미탑재]"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121789",
+     "name": "[JIUSHARK] JF120R Emerald ARGB 화이트"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "109547",
+     "name": "[삼성전자] DDR4 16G PC4-25600 [8G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "112504",
+     "name": "[ASUS] PRIME A520M-K [라이젠 AM4 / M-ATX / 64GB]"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "128419",
+     "name": "[PALIT] 지포스 RTX 3050 STORM X D6 6GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "124186",
+     "name": "[DARKFLASH] DS500 RGB 화이트"
+    },
+    {
+     "cate": "파워",
+     "pcode": "111146",
+     "name": "[마이크로닉스] COOLMAX VISION II 500W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "99576",
+   "title": "골드 NO.06.99576 [B760/DDR5]인텔14세대[14700KF/32G/500G/RTX 5070]",
+   "usage_tags": [],
+   "market_price": 4730000,
+   "sale_price": 4115400,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "116034",
+     "name": "[인텔] i7 14세대 14700KF [Turbo 5.6GHz, 8+12코어/16+12쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "128954",
+     "name": "[3RSystem] 라니 SF 360 ARGB 화이트"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "127555",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "113689",
+     "name": "[ASRock] B760M Pro RS D5"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "129288",
+     "name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S OC D7 16GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "124467",
+     "name": "[3Rsystem] K400 리버스 화이트"
+    },
+    {
+     "cate": "파워",
+     "pcode": "123110",
+     "name": "[ABKO] 코어맥스 CM-700B ETA브론즈 [정격 700W / 6년 보증 / 슬리빙 케이블 / Active PFC]"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)"
+   ]
+  },
+  {
+   "product_code": "121262",
+   "title": "초저가 가성비 골드 NO.04.121262 [AMD전체판매 1위][AMD게이밍1위] [7500F/16G/500GB/RTX3050]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 1700000,
+   "sale_price": 1481200,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "113800",
+     "name": "[AMD] 라이젠5 라파엘 7500F [Turbo 5.0GHz, 6코어/12쓰레드, VGA 미탑재]"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "113162",
+     "name": "[삼성전자] DDR5-5600 16GB [8G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "126922",
+     "name": "[ASRock] A620AM-HVS"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "128419",
+     "name": "[PALIT] 지포스 RTX 3050 STORM X D6 6GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "128462",
+     "name": "[Western Digital] WD Blue SN5100 M.2 NVMe 500GB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "120979",
+     "name": "[마이크로닉스] COOLMAX 스테디 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "129250",
+     "name": "[마이크로닉스] COOLMAX ELITE II 600W"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)"
+   ]
+  },
+  {
+   "product_code": "121265",
+   "title": "초저가 가성비 다이아 NO.05.121265 [B760/DDR5][인기상품3위] [14세대 판매 1위] [고사양게이밍 3위][14400F/32G/1TB/RTX5060Ti]",
+   "usage_tags": [],
+   "market_price": 2670000,
+   "sale_price": 2323300,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "119270",
+     "name": "[인텔] i5 14세대 14400F [Turbo 4.7GHz, 6+4코어/12+4쓰레드, VGA 미탑재]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "127555",
+     "name": "[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "113689",
+     "name": "[ASRock] B760M Pro RS D5"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "124631",
+     "name": "[MSI] 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "122516",
+     "name": "[마이크론] Crucial P310 M.2 NVMe 1TB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "121632",
+     "name": "[DARKFLASH] DS900M RGB 강화유리 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "123110",
+     "name": "[ABKO] 코어맥스 CM-700B ETA브론즈 [정격 700W / 6년 보증 / 슬리빙 케이블 / Active PFC]"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "조립비+AS",
+     "pcode": "99366",
+     "name": "제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배)"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  },
+  {
+   "product_code": "123380",
+   "title": "엠에스파워 골드 NO.04 .123380 RTX 3050 [13500/16G/1TB/RTX3050]",
+   "usage_tags": [
+    "#게임용",
+    "#디자인용",
+    "#사무용",
+    "#녹스",
+    "#주식용",
+    "#인터넷강의",
+    "#화상회의"
+   ],
+   "market_price": 2010000,
+   "sale_price": 1756100,
+   "custom_price": null,
+   "parts": [
+    {
+     "cate": "프로세서(CPU)",
+     "pcode": "112864",
+     "name": "[인텔] i5 13세대 13500 [Turbo 4.8GHz, 6+8코어/12+8쓰레드, UHD 770]™"
+    },
+    {
+     "cate": "CPU쿨러",
+     "pcode": "121846",
+     "name": "[JIUSHARK] JF120R Emerald RGB 블랙"
+    },
+    {
+     "cate": "메모리(RAM)",
+     "pcode": "113162",
+     "name": "[삼성전자] DDR5-5600 16GB [8G x 2]"
+    },
+    {
+     "cate": "메인보드",
+     "pcode": "119845",
+     "name": "[MSI] MAG B760M 박격포 II"
+    },
+    {
+     "cate": "그래픽(VGA)",
+     "pcode": "115248",
+     "name": "[MSI] 지포스 RTX 3050 벤투스 2X XS OC D6 8GB"
+    },
+    {
+     "cate": "랜/사운드",
+     "pcode": "51190",
+     "name": "[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장"
+    },
+    {
+     "cate": "초고속(SSD)",
+     "pcode": "122516",
+     "name": "[마이크론] Crucial P310 M.2 NVMe 1TB"
+    },
+    {
+     "cate": "케이스",
+     "pcode": "111087",
+     "name": "[ABKO] NCORE G30 트루포스 블랙"
+    },
+    {
+     "cate": "파워",
+     "pcode": "128870",
+     "name": "[마이크로닉스] Classic II 풀체인지 700W 80PLUS 실버 ATX3.1"
+    },
+    {
+     "cate": "키보드",
+     "pcode": "95264",
+     "name": "로지텍 데스크탑 MK120 New 정품 [키보드+마우스]"
+    },
+    {
+     "cate": "사은품",
+     "pcode": "95593",
+     "name": "팝콘피씨 게이밍 장패드"
+    },
+    {
+     "cate": "배송",
+     "pcode": "122715",
+     "name": "[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요."
+    }
+   ],
+   "unset_slots": [
+    "윈도우(OS)",
+    "모니터",
+    "대용량(HDD)",
+    "시스템 쿨링"
+   ]
+  }
+ ],
+ "failed": [],
+ "cache": "/home/ghrunner/actions-runner/_work/popcorn-ai/popcorn-ai/.cache/mall_builtpc"
+}
