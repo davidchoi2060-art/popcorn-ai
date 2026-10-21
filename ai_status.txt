@@ -1,0 +1,5 @@
+/api/part-explanations/119448 200 2419 application/json
+/api/part-explanations/122413 200 1922 application/json
+/api/part-explanations/127201 404 70 application/json
+/api/part-explanations/127203 404 70 application/json
+/api/part-explanations/130506 200 2422 application/json
