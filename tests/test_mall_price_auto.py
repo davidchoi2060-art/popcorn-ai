@@ -219,6 +219,33 @@ class RunTests(unittest.TestCase):
         self.assertIsNone(AUTO._last_auto_started())
         AUTO.begin("auto", slot=slot)                             # 정기 실행은 그대로 돈다
 
+    def _orphan(self, moment="auto"):
+        # 이 프로세스보다 먼저 시작해 끝나지 못한 실행(배포 재시작에 죽은 실행)
+        with self.engine.begin() as c:
+            return c.execute(self.text(
+                "INSERT INTO mall_price_runs (moment, source, started_at)"
+                " VALUES (:m, 'pages', now() - interval '20 minutes') RETURNING run_id"), {"m": moment}).scalar()
+
+    def test_run_killed_by_a_restart_does_not_fill_the_slot(self):
+        import datetime as dt
+        self._orphan()
+        with patch.object(AUTO, "PROCESS_STARTED", dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=1)):
+            self.assertIsNone(AUTO._last_auto_started())
+            slot = dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=30)
+            self.assertEqual(AUTO.abandon_orphans(), 1)
+            run_id = AUTO.begin("auto", slot=slot)                # 「이미 실행 중」으로 막히지 않는다
+        self.assertIsNotNone(run_id)
+        with self.engine.connect() as c:
+            row = c.execute(self.text("SELECT ok, fail_reason FROM mall_price_runs ORDER BY run_id LIMIT 1")).one()
+        self.assertEqual(tuple(row), (False, AUTO.ORPHAN_REASON))
+
+    def test_a_finished_or_live_run_still_fills_the_slot(self):
+        import datetime as dt
+        AUTO.execute(AUTO.begin("auto"), "auto", collect_public_fn=lambda codes: ({1: 1000}, {"source": "pages"}))
+        AUTO.begin("auto")                                        # 이 프로세스에서 돌고 있는 실행
+        self.assertEqual(AUTO.abandon_orphans(), 0)
+        self.assertIsNone(AUTO.due_slot(dt.datetime.now(dt.timezone.utc), AUTO._last_auto_started()))
+
     def test_second_run_while_one_is_running_is_refused(self):
         AUTO.begin("manual", operator_id=None)
         with self.assertRaises(AUTO.AlreadyRunning):
