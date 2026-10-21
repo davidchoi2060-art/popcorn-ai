@@ -162,13 +162,20 @@
   function save(btn) {
     var p = product, key = id + ':' + q, unit = price(p);
     if (!p || unit === null || saving) return;
-    if (saved[key]) { status('이미 내 견적에 저장한 구성이에요. <a href="./?screen=saved">내 견적 보기</a>'); return; }
     if (!P.savedQuotes) { status('지금은 저장할 수 없어요. 잠시 후 다시 시도해 주세요.', true); return; }
     var want = id, wantQ = q;
-    saveIds[key] = saveIds[key] || P.savedQuotes.uuid();
     saving = true; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); status('내 견적에 저장하고 있어요.');
-    P.savedQuotes.saveDevice({ request_id: saveIds[key], product_code: Number(want), expected_price: unit, state: {}, sets: wantQ, kind: 'ai_device' }).then(function () {
-      saved[want + ':' + wantQ] = true;
+    // 「이미 저장」은 지금 내 견적 목록에 그 견적이 있을 때만 말한다(2026-10-21 검수 F2). 다른 탭에서 지웠으면
+    // 같은 요청 번호로는 숨긴 견적이 그대로 돌아오므로, 새 요청 번호로 다시 보관한다.
+    var check = saved[key] ? P.savedQuotes.list().then(function (d) { return (d.quotes || []).some(function (x) { return x.id === saved[key]; }); }, function () { return true; }) : Promise.resolve(false);
+    check.then(function (still) {
+      if (still) { status('이미 내 견적에 저장한 구성이에요. <a href="./?screen=saved">내 견적 보기</a>'); return 'kept'; }
+      if (saved[key]) { delete saved[key]; delete saveIds[key]; }
+      saveIds[key] = saveIds[key] || P.savedQuotes.uuid();
+      return P.savedQuotes.saveDevice({ request_id: saveIds[key], product_code: Number(want), expected_price: unit, state: {}, sets: wantQ, kind: 'ai_device' });
+    }).then(function (data) {
+      if (data === 'kept') return;
+      saved[want + ':' + wantQ] = data && data.quote && data.quote.id ? data.quote.id : true;
       if (want === id && wantQ === q) status('내 견적에 저장했어요. 저장만으로 상담이 신청되지는 않습니다. <a href="./?screen=saved">내 견적 보기</a>');
     }, function (e) {
       if (want === id && wantQ === q) status(h(P.savedQuotes.message(e, '저장하지 못했어요. 선택은 그대로예요. 다시 눌러 저장해 주세요.')), true);
