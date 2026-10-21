@@ -1,0 +1,53 @@
+{
+ "source": "몰 부품 상세 페이지 product_detail.html (2026-10-21 23:16 KST 수집)",
+ "parts": [
+  {
+   "code": 119448,
+   "cate": "케이스",
+   "mall_name": "[DARKFLASH] DS900 ARGB 강화유리 블랙",
+   "image_ext": "gif"
+  },
+  {
+   "code": 122413,
+   "cate": "파워",
+   "mall_name": "SuperFlower SF-1000F14GE LEADEX III GOLD UP ATX3.1",
+   "spec_extra": "SuperFlower / 파워 / 1000(W) / ATX / 80PLUS : 골드 / ATX3.1"
+  },
+  {
+   "code": 127201,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] 15세대 코어 울트라7 265",
+   "create": {
+    "product_name": "[병행] 인텔 코어 울트라7 시리즈2 265 [벌크]",
+    "maker": "인텔",
+    "part_type": "CPU",
+    "sale_price": 363000,
+    "spec_source_text": "인텔 / 애로우레이크 / 울트라7 시리즈2 265 / 코어 갯수 : P8+E12 / 쓰레드 : 20 / LGA1851 / 동작 클럭 : 2.4(GHz) / 터보 클럭 : 5.3(GHz) / L3 캐시메모리 : 30(MB) / 내장그래픽 / 인텔 그래픽스(Xe LPG) / 1,950(MHz) / 65-182(W) / TSMC 3nm / 인텔 딥러닝부스트 / DDR5 / 메모리 버스 : 6400(MHz) / 메모리 채널 : 2 / 벌크 /"
+   }
+  },
+  {
+   "code": 127203,
+   "cate": "메인보드",
+   "mall_name": "[GIGABYTE] B860M AORUS ELITE",
+   "create": {
+    "product_name": "GIGABYTE B860M AORUS ELITE",
+    "maker": "GIGABYTE",
+    "part_type": "MB",
+    "sale_price": 152400,
+    "spec_source_text": "GIGABYTE / 인텔 / LGA1851 / B860 (인텔) / m-ATX / DDR5 / 9,200(MHz),PC5-73600 / 슬롯 : 4(EA) / 최대 256(GB) / M.2 : 3(EA) / SATA3 : 4(EA) / PCIe5.0 / PCIe4.0 / NVMe / HDMI / DP / USB Type-C / PCI-Ex. x16 : 1(EA) / PCIex16(at x4) : 1(EA) / USB 3.0 헤더 : 1(EA) / USB3.1 Type C 헤더 : 1(EA) / USB 2.0 헤더 : 2(EA) / 썬더볼트 헤더 / Type-A (10Gbps) : 2(EA) / Type-A (5Gbps) : 4(EA) / USB A타입 : 10(EA) / USB C타입 : 1(EA) / USB 2.0 : 4(EA) / 블루투스 / RJ-45(LAN) 포트 : 1(EA) / 2.5기가비트 / 무선LAN / 7.1(Ch) / SPDIF / LED 헤더 /"
+   }
+  },
+  {
+   "code": 130506,
+   "cate": "케이스",
+   "mall_name": "[MSI] MPG VIXTA 300R PZ 블랙",
+   "create": {
+    "product_name": "MSI MPG VIXTA 300R PZ (블랙)",
+    "maker": "MSI",
+    "part_type": "CASE",
+    "sale_price": 159000,
+    "spec_source_text": "MSI / ATX 케이스 / 미들타워 / 파워 유무 : 파워미포함 / 지원 파워 : 표준-ATX / ATX / ATX(후면커넥터) / mATX / M-ATX(후면커넥터) / MiniITX / 후면커넥터 TYPE : 프로젝트 제로 / 수랭쿨러 지원 : 최대 3열 / CPU쿨러장착높이 : 165(mm) / VGA장착길이 : 420(mm) / 2.5베이 : 1(개) / 3.5베이 : 1(개) / 스토리지 장착 개수 : 최대 2개 / PCI슬롯 : 7(개) / USB / USB3.x (5Gbps) / USB-C타입 (20Gbps) / 너비 : 235(mm) / 높이 : 497(mm) / 깊이 : 455(mm) / 장착 팬 개수 : 총3개 / 측면 : 강화유리,140(mm)x2, LED / 전면 패널 : 강화유리 / 외부LED /"
+   }
+  }
+ ]
+}

@@ -12,7 +12,8 @@ _lock = threading.Lock()
 
 
 @router.get('/api/internal/missing-parts')
-def missing_parts(request: Request, mode: str = Query('report', pattern='^(report|dry)$')):
+def missing_parts(request: Request, mode: str = Query('report', pattern='^(report|dry)$'),
+                  batch: str = Query('', pattern='^b?$')):
     host = request.client.host if request.client else ''
     if host != '127.0.0.1' or request.headers.get('x-forwarded-for') or request.headers.get('x-real-ip'):
         raise HTTPException(404, 'Not Found')
@@ -21,8 +22,8 @@ def missing_parts(request: Request, mode: str = Query('report', pattern='^(repor
     try:
         from tools import register_missing_parts as tool
         if mode == 'report':
-            return tool.read_report()
+            return tool.read_report(batch)
         from api.db import engine
-        return tool.run(engine, apply=False)
+        return tool.run(engine, apply=False, data_path=tool.DATA_B if batch == 'b' else None)
     finally:
         _lock.release()

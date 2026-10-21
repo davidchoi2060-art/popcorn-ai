@@ -14,6 +14,10 @@ on:
         description: 'report 또는 dry'
         required: true
         default: 'report'
+      batch:
+        description: '빈칸=1차분, b=2차분(0177)'
+        required: false
+        default: ''
 
 concurrency:
   group: popcorn-missing-parts
@@ -30,11 +34,13 @@ jobs:
         shell: bash
         env:
           MODE: ${{ inputs.mode }}
+          BATCH: ${{ inputs.batch }}
         run: |
           set -uo pipefail
           case "$MODE" in report|dry) ;; *) echo "mode 는 report|dry"; exit 1;; esac
+          case "$BATCH" in ""|b) ;; *) echo "batch 는 빈칸|b"; exit 1;; esac
           mkdir -p out
-          curl -sS --max-time 1500 "http://127.0.0.1:8000/api/internal/missing-parts?mode=$MODE" \
+          curl -sS --max-time 1500 "http://127.0.0.1:8000/api/internal/missing-parts?mode=$MODE&batch=$BATCH" \
             -o "out/$MODE.json" -w "%{http_code}\n" > out/http.txt || echo fail >> out/http.txt
           cat out/http.txt
           head -c 3000 "out/$MODE.json" || true

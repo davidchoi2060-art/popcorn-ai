@@ -32,6 +32,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 DATA = ROOT / 'db' / 'migrations' / 'data' / 'missing_parts_20261021.json'
+# 2차분(0177): 몰 부품 상세 페이지에서 받은 자료로 남은 5개를 채운다 — 상품 행 신설(create)·
+# 상품명 기준 사양 보충(spec_extra)·gif 사진(image_ext). 상품 행은 ai_candidate_yn 기본값(false)이라 추천 후보에 들어가지 않는다.
+DATA_B = ROOT / 'db' / 'migrations' / 'data' / 'missing_parts_20261021b.json'
 WORK = Path(os.environ.get('POPCORN_MISSING_PARTS_WORK', str(ROOT / '.cache' / 'missing-parts')))
 SLOTS = {'프로세서(CPU)': 'CPU', 'CPU쿨러': 'COOLER', '메모리(RAM)': 'RAM', '메인보드': 'MB', '그래픽(VGA)': 'GPU',
          '초고속(SSD)': 'SSD', '케이스': 'CASE', '파워': 'POWER'}
@@ -71,18 +74,18 @@ class Storage:
             return 'uploaded'
 
 
-def content(src, slot, code, asset):
+def content(src, slot, code, asset, spec_extra='', image_ext='jpg'):
     from tools.build_part_explanations import ROLES, clean, extract
     from api.product_name import remove_discount_label
     name = remove_discount_label(clean(src['product_name']))
-    facts = extract(slot, src['spec_source_text'])
+    facts = extract(slot, ' / '.join(x for x in (src['spec_source_text'], spec_extra) if x))
     if not facts:
         raise RuntimeError('part_facts_empty')
     role, caution = ROLES[slot]
     url = f'https://www.popcornpc.co.kr/shop/product_detail.html?pd_no={code}'
     return dict(name=name, slot=slot, summary=' · '.join(f"{f['label']} {f['value']}" for f in facts[:3]),
                 role=role, facts=facts, highlights=[f"{f['label']}: {f['value']}" for f in facts[:3]],
-                cautions=[caution], image_url=f'https://www.popcornpc.co.kr/data/pimg/{code // 1000}/{code}_600.jpg',
+                cautions=[caution], image_url=f'https://www.popcornpc.co.kr/data/pimg/{code // 1000}/{code}_600.{image_ext}',
                 image_caption='판매처 등록 이미지', image_source_url=url,
                 sources=[dict(id='merchant', kind='merchant', title='팝콘PC 관리자 상품 사양', url=url,
                               observed_at='2026-10-21T22:00:00+09:00')],
@@ -93,11 +96,11 @@ def content(src, slot, code, asset):
                 image_asset=asset)
 
 
-def asset_for(storage, code, out):
+def asset_for(storage, code, out, image_ext='jpg'):
     from tools.prepare_product_images import prepare
     folder = WORK / 'img' / str(code)
     r = prepare(dict(product_code=code, name=str(code),
-                     merchant_image_url=f'https://www.popcornpc.co.kr/data/pimg/{code // 1000}/{code}_600.jpg'), folder)
+                     merchant_image_url=f'https://www.popcornpc.co.kr/data/pimg/{code // 1000}/{code}_600.{image_ext}'), folder)
     if r.get('status') != 'ready':
         raise RuntimeError(f"part_photo_unavailable {r.get('status')} {r.get('error')}")
     types = {'jpg': 'image/jpeg', 'png': 'image/png', 'webp': 'image/webp', 'gif': 'image/gif'}
@@ -109,13 +112,25 @@ def asset_for(storage, code, out):
     return asset
 
 
-def one(conn, code, slot, actor, rights, image_reader, storage, uploads):
+def one(conn, code, slot, actor, rights, image_reader, storage, uploads, extra=None):
     from sqlalchemy import text
     from api import part_explanation_approval as part
     from api import part_photo_approval as photo
     from api.part_explanations import fingerprint
     from tools.approve_pc_publication_bulk import photo_reader
     steps = []
+    extra = extra or {}
+    if extra.get('create'):
+        c = extra['create']
+        added = conn.execute(text('''INSERT INTO products(product_code,product_name,maker,part_type,category_group,status,
+            sale_price,market_price,spec_source_text,data_origin) VALUES(:c,:n,:m,:t,'core_part','판매중',:p,:p,:s,'real')
+            ON CONFLICT (product_code) DO NOTHING RETURNING product_code'''),
+            dict(c=code, n=c['product_name'], m=c['maker'], t=c['part_type'], p=c['sale_price'],
+                 s=c['spec_source_text'])).scalar()
+        if added is not None:
+            conn.execute(text('''INSERT INTO product_price_history(product_code,field,old_price,new_price,reason)
+                VALUES(:c,'sale',NULL,:p,'mall_part_page_20261021')'''), dict(c=code, p=c['sale_price']))
+            steps.append('product_row_created')
     src = conn.execute(text('SELECT product_code,product_name,spec_source_text,status FROM products WHERE product_code=:c'),
                        dict(c=code)).mappings().first()
     if not src:
@@ -124,8 +139,8 @@ def one(conn, code, slot, actor, rights, image_reader, storage, uploads):
         return 'skipped', [f"product_not_ready {src['status']}"]
     exists = conn.execute(text('SELECT status FROM product_explanations WHERE source_product_code=:c'), dict(c=code)).scalar()
     if exists is None:
-        asset = asset_for(storage, code, uploads)
-        body = content(src, slot, code, asset)
+        asset = asset_for(storage, code, uploads, extra.get('image_ext', 'jpg'))
+        body = content(src, slot, code, asset, extra.get('spec_extra', ''), extra.get('image_ext', 'jpg'))
         snapshot = dict(name=src['product_name'], spec=src['spec_source_text'])
         conn.execute(text('''INSERT INTO product_explanations(source_product_code,product_code,content,source_snapshot,source_fingerprint)
             VALUES(:c,:c,CAST(:content AS jsonb),CAST(:snap AS jsonb),:fp)'''),
@@ -165,7 +180,7 @@ def pick_actor(conn):
     return dict(row)
 
 
-def run(engine, apply=False, image_reader=None, storage=None):
+def run(engine, apply=False, image_reader=None, storage=None, data_path=None):
     from tools.approve_pc_publication_bulk import RIGHTS_ATTESTATION, RIGHTS_ENV
     from api.customer_pc_offer import rights_reference
     if image_reader is None:
@@ -174,7 +189,7 @@ def run(engine, apply=False, image_reader=None, storage=None):
     rights = rights_reference() or ''
     if rights != RIGHTS_ATTESTATION:
         raise RuntimeError(f'{RIGHTS_ENV} mismatch')
-    data = json.loads(DATA.read_text(encoding='utf-8'))
+    data = json.loads((data_path or DATA).read_text(encoding='utf-8'))
     report = dict(mode='apply' if apply else 'dry-run', started=datetime.now(timezone.utc).isoformat(), parts=[], uploads={})
     with engine.connect() as conn:
         actor = pick_actor(conn)
@@ -190,7 +205,7 @@ def run(engine, apply=False, image_reader=None, storage=None):
         try:
             trans = conn.begin()
             try:
-                item['result'], item['steps'] = one(conn, p['code'], slot, actor, rights, image_reader, storage, report['uploads'])
+                item['result'], item['steps'] = one(conn, p['code'], slot, actor, rights, image_reader, storage, report['uploads'], p)
                 if apply:
                     trans.commit()
                 else:
@@ -207,14 +222,14 @@ def run(engine, apply=False, image_reader=None, storage=None):
     return report
 
 
-def run_safely(mode='apply'):
+def run_safely(mode='apply', batch=''):
     """마이그레이션에서 부른다 — 예외를 올리지 않는다(배포를 멈추지 않는다)."""
     WORK.mkdir(parents=True, exist_ok=True)
     os.chmod(WORK, 0o755)
-    path = WORK / f'report-{mode}.json'
+    path = WORK / f'report-{mode}{batch}.json'
     try:
         from api.db import engine
-        report = run(engine, apply=(mode == 'apply'))
+        report = run(engine, apply=(mode == 'apply'), data_path=DATA_B if batch == 'b' else None)
     except Exception as error:
         report = dict(fatal=f'{type(error).__name__}: {error}', trace=traceback.format_exc(limit=8)[-3000:])
     path.write_text(json.dumps(report, ensure_ascii=False, indent=1, default=str), encoding='utf-8')
@@ -222,8 +237,8 @@ def run_safely(mode='apply'):
     return report
 
 
-def read_report():
-    path = WORK / 'report-apply.json'
+def read_report(batch=''):
+    path = WORK / f'report-apply{batch}.json'
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else dict(missing=True)
 
 
