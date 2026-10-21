@@ -699,6 +699,18 @@ def _psu_target_gpu(s: str):
     return targets[-1] if targets else None
 
 
+# 쓰던 PC 업그레이드만 묻는 문장인가 -- 그러면 새 PC 카드를 붙이지 않는다(2026-10-21 외부 수정 요청서 2차 N1 · 사장님 「답만」).
+# 「지금 9400F에 1660 쓰는데 5070으로 바꾸면 될까요?」에 새 PC 카드·「가정해」 PC 줄이 붙어 질문을 덮었다.
+# 손님이 새 PC·견적·추천을 함께 말하면 업그레이드만 묻는 것이 아니다.
+_CURRENT = re.compile(r"지금|현재|쓰는|쓰고|쓰던|사용\s*중|가지고\s*있|갖고\s*있|기존")
+_WANTS_NEW = re.compile(r"새\s*(?:PC|컴|피시|본체)|새로\s*(?:사|구매|맞추|장만)|추천|견적|보여|볼래|찾아|찾고|찾는|살까|사는\s*게|구매", re.I)
+
+
+def upgrade_only(sentence: str | None) -> bool:
+    s = sentence or ""
+    return bool(_UPGRADE.search(s) and _CURRENT.search(s) and not _WANTS_NEW.search(s))
+
+
 def psu_question(sentence: str) -> tuple[str, int] | None:
     """문장이 «그래픽카드 + 파워 용량»을 묻는가 -> (칩셋 키 「RTX 5070」, 손님 파워 와트). 아니면 None.
     파워 후보가 둘 이상(「500W 또는 750W 중」)이면 하나를 손님 파워로 정하지 않는다 -- None(설명 AI 가 비교한다)."""

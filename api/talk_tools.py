@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 
 from .db import engine
+from . import talk_pc_advice as PA
 from .timeutil import KST
 
 log = logging.getLogger(__name__)
@@ -438,6 +439,9 @@ def find_pcs(args: dict, book: FactBook) -> dict:
         return _invalid("nav 는 cheaper 또는 better")
     if nav and book.anchor_code is None:
         return _invalid("nav 는 이 턴에 find_pcs 로 PC를 먼저 보여 준 뒤에만 쓴다")
+    if nav is None and PA.upgrade_only(book.request_text):
+        return _res("upgrade_only", reason="쓰던 PC 업그레이드만 물었다. 새 PC를 찾거나 보여 주지 않는다. "
+                    "질문에만 답하고, 끝에 새 PC도 보고 싶으면 말해 달라고 한 줄만 덧붙인다")
     units = args.get("units")
     if units is not None and (type(units) is not int or not 1 <= units <= 500):
         return _invalid("units 는 1~500 사이 정수(PC 대수)여야 한다")
