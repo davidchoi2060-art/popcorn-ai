@@ -486,6 +486,11 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                       "resolution": res.get("game_resolution"), "platform": res.get("platform")}
     book.anchor_code = res.get("anchor_code") or book.anchor_code
     book.state, book.nav = raw, nav
+    # 예산을 풀어 찾았으면 엔진은 예산 없이 판정해 over_budget 이 모두 거짓이다 -- 손님이 말한 예산으로 다시 잰다.
+    # 150만원 이하라고 했는데 262만원 PC가 «예산 초과» 표시 없이 오른쪽 카드에 섰다(2026-10-21 외부 재검증 P2-1).
+    asked_cap = budget if budget is not None and asked["budget_bound"] != "이상" and raw.get("budget_won") is None else None
+    if asked_cap is not None:
+        book.condition["asked_budget_won"] = asked_cap   # 답의 예산 안내(budget_note)도 손님이 말한 예산으로 잰다
     sets = []
     for cs in res.get("card_sets") or []:
         items = (cs.get("items") or [])[:MAX_ITEMS_PER_SET]
@@ -493,6 +498,8 @@ def find_pcs(args: dict, book: FactBook) -> dict:
         for it in items:
             if type(it.get("product_code")) is not int:
                 continue
+            if asked_cap is not None and type(it.get("price")) is int:
+                it = {**it, "over_budget": it["price"] > asked_cap}
             ref = book.add_item(it)
             if ref not in book.found:
                 book.found.append(ref)
