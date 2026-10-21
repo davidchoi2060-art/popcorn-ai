@@ -28,6 +28,7 @@ from sqlalchemy import text
 
 from .db import engine
 from .html_text import strip_html_display
+from .registered_about import build as build_about
 
 router = APIRouter()
 
@@ -238,15 +239,42 @@ def lexicon(conn) -> dict:
     return lex
 
 
+def about_inputs(conn, code):
+    """소개를 만드는 근거 — (상품명, 평가 사양, 용도 평가 목록). 0171 채우기와 읽을 때 만들기가 같은 것을 쓴다."""
+    row = conn.execute(text("SELECT crawl_name, spec FROM product_fit_products WHERE product_code = :c"),
+                       {"c": code}).mappings().first()
+    fits = [dict(r) for r in conn.execute(text(
+        "SELECT f.usage, f.level, f.level_rank AS rank, l.work FROM product_usage_fit f"
+        " LEFT JOIN product_fit_levels l ON l.usage = f.usage AND l.level = f.level"
+        " WHERE f.product_code = :c ORDER BY l.sort_order"), {"c": code}).mappings()]
+    return (row or {}).get("crawl_name"), (row or {}).get("spec"), fits
+
+
+def about(conn, code, product_name=None):
+    """상세 소개(ABOUT THIS PC) — 저장된 행(pc_registered_about · 관리자 수정 포함) 먼저, 없으면 같은 규칙으로 만든다.
+    소개는 부품표를 막지 않는다 — 읽지 못하면 None(화면은 그 구획을 그리지 않는다)."""
+    try:
+        with conn.begin_nested():
+            saved = conn.execute(text("SELECT content FROM pc_registered_about WHERE product_code = :c"),
+                                 {"c": code}).scalar()
+            if isinstance(saved, dict):
+                return saved
+            name, spec, fits = about_inputs(conn, code)
+            return build_about(name or product_name, spec, fits)
+    except Exception:  # noqa: BLE001
+        return None
+
+
 @router.get("/api/customer/pc-registered/{code}")
 def registered(code: int, response: Response):
     with engine.connect() as conn:
         p = conn.execute(text(
-            "SELECT product_code, status, spec_source_text FROM products"
+            "SELECT product_code, status, spec_source_text, product_name FROM products"
             " WHERE product_code = :c AND part_type = 'PC_COMPLETE' AND is_visible"), {"c": code}).mappings().first()
         if p is None:
             raise HTTPException(404, "등록된 PC 구성을 찾을 수 없습니다.")
         parts, service = rows(p["spec_source_text"])
+        desc = about(conn, code, p.get("product_name"))
         lex = lexicon(conn)
         codes = [lex.get((x["slot"], x["key"])) for x in parts]
         info = {}
@@ -282,4 +310,4 @@ def registered(code: int, response: Response):
             o["photo"] = cpu["photo"]
             o["role"] = o["role"] or _BUILT_IN_ROLE[o["slot"]]
     response.headers["Cache-Control"] = "no-store"
-    return {"ok": True, "product_code": code, "basis": "mall-registered", "service": service, "parts": out}
+    return {"ok": True, "product_code": code, "basis": "mall-registered", "service": service, "parts": out, "description": desc}
