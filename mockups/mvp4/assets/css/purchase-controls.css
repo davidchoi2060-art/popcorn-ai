@@ -1,8 +1,9 @@
 /* 내 견적 개별 삭제·되돌리기 · AI 비교 빼기·선택 해제 (2026-10-21 구매·견적·AI 비교 1번 승인) */
 .ds-saved-head{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.ds-saved-delete{display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#4b5161;font-size:14px;font-weight:600}
+.ds-saved-delete{flex:none;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;min-height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:#4b5161;font-size:14px;font-weight:600}
 .ds-saved-delete .icon{width:16px;height:16px}
 .ds-saved-delete:hover{border-color:#c9ccd6;color:var(--ink)}
+.ds-saved-card .ds-price-line b{white-space:nowrap}
 .ds-saved-undo{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:14px 18px;border:1px dashed #c9ccd6;border-radius:var(--radius);background:var(--soft);font-size:15px}
 .ds-saved-undo .btn{min-height:40px}.ds-saved-undo .icon{width:18px;height:18px}
 .ds-saved-error{margin-top:8px;color:#b42318;font-size:14px}

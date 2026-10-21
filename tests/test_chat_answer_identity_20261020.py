@@ -83,7 +83,7 @@ class Assets(unittest.TestCase):
     def test_pages_load_new_assets(self):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
-            for a in ("chat-answer.css?v=20261020-ans1", "chat-answer.js?v=20261021-cb2", "design-conversation.js?v=20261021-cb2",
+            for a in ("chat-answer.css?v=20261020-ans1", "chat-answer.js?v=20261021-cb2", "design-conversation.js?v=20261021-fx1",
                       "live-talk.js?v=20261020-ans1", "configuration-concept.js?v=20261021-cb2"):
                 self.assertIn(a, t, page)
             self.assertLess(t.index("chat-answer.js"), t.index("design-conversation.js"))

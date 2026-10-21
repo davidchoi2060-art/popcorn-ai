@@ -103,6 +103,31 @@
       conditions: { purpose: '', budget: '', environment: '' }, dirty: {}, convo: { talk: null, chatFlow: null, history: [], pendingText: '' }, compare: [] };
     var controller = null, root = null, lastPick = null, A = P.chatAnswer;
     var COMPARE_MAX = 3;
+    // 화면 왕복 보존(2026-10-21 검수 F1): 다른 화면(AI 슈퍼컴퓨터·내 견적·상세)을 다녀와도 대화·작성 중 질문·조건·비교·선택·스크롤이
+    // 남는다. 이 탭(sessionStorage)에만 두고 서버로 보내지 않는다. 「새 대화」만 비운다.
+    var KEEP = 'pai-finder-chat-v1', SAVED = ['state', 'question', 'draft', 'outgoing', 'log', 'ids', 'mobile', 'handoff', 'conditions', 'dirty', 'convo', 'compare'], restoredScroll = null;
+    function remember(scroll) {
+      try {
+        var snap = { v: 1, selected: model.selected ? String(model.selected.id) : null };
+        SAVED.forEach(function (k) { snap[k] = model[k]; });
+        if (snap.state === 'loading') { snap.state = 'error'; snap.draft = model.question; }   // 떠나며 끊긴 질문은 입력창에 돌려 둔다
+        if (scroll) { var lg = root && root.querySelector('.dc-chat-log'); snap.scroll = { page: window.scrollY || 0, log: lg ? lg.scrollTop : 0 }; }
+        else snap.scroll = restoredScroll;   // 떠날 때 잰 위치는 다음에 떠날 때까지 둔다(화면이 다시 그려져도)
+        window.sessionStorage.setItem(KEEP, JSON.stringify(snap));
+      } catch (ignoreKeep) { /* 저장소를 못 쓰면 보존만 빠진다 */ }
+    }
+    (function restore() {
+      var snap = null;
+      try { snap = JSON.parse(window.sessionStorage.getItem(KEEP) || 'null'); } catch (ignoreRestore) { snap = null; }
+      if (!snap || snap.v !== 1) return;
+      SAVED.forEach(function (k) { if (snap[k] !== undefined && snap[k] !== null) model[k] = snap[k]; });
+      if (CHAT_STATES.indexOf(model.state) < 0 || model.state === 'loading') model.state = 'welcome';
+      if (!Array.isArray(model.log)) model.log = []; if (!Array.isArray(model.ids)) model.ids = []; if (!Array.isArray(model.compare)) model.compare = [];
+      // 상품에서 「AI와 이어서 대화」로 들어오면 그 상품을 고른 채 이어 간다. 아니면 고르던 상품을 그대로 둔다.
+      if (!selected && snap.selected) model.selected = product(snap.selected);
+      if (entry === 'product' && selected && !model.log.length) model.state = 'product';
+      restoredScroll = snap.scroll || null;   // 이 값은 지우지 않는다 -- 보관된 화면이 한 번 더 그려져도 같은 위치로 돌아간다
+    }());
     function candidates() { return model.ids.map(function (x) { return product(x.id); }).filter(Boolean).slice(0, 3); }
     function messages() {
       var list = model.log.slice();
@@ -169,7 +194,8 @@
         (cards.length ? cards.map(function (p) { return card(p, !!model.selected && String(model.selected.id) === String(p.id)); }).join('') : empty(isLoading ? '구성을 살펴보고 있어요.' : '아직 보여드릴 PC가 없어요.', isLoading ? '확인하는 동안 대화를 계속 읽을 수 있어요.' : '원하는 조건을 알려주거나 상품을 먼저 둘러보세요.', isLoading ? '' : buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline'))) + '</section></aside></div>';
     }
     // 화면을 통째로 다시 그리면 대화 기록 스크롤이 맨 위(첫 질문)로 돌아간다. 새 질문을 보냈을 때만 그 질문을 위에 맞추고, 그 밖에는 읽던 위치를 그대로 둔다.
-    function render() {
+    function render() { draw(); remember(false); }
+    function draw() {
       if (!root) return;
       var old = root.querySelector('.dc-chat-log'), keep = old ? { top: old.scrollTop, users: old.querySelectorAll('.dc-message-user').length } : null;
       root.innerHTML = markup();
@@ -307,6 +333,7 @@
       root.addEventListener('input', function (event) {
         if (event.target.id === 'dc-question') { model.draft = event.target.value; var count = root.querySelector('[data-dc-count]'); if (count) count.textContent = model.draft.length.toLocaleString('ko-KR'); }
         if (event.target.dataset.dcCondition) { model.conditions[event.target.dataset.dcCondition] = event.target.value; model.dirty[event.target.dataset.dcCondition] = true; }
+        remember(false);
       });
       root.addEventListener('submit', function (event) { if (!event.target.matches('[data-dc-form]')) return; event.preventDefault(); send(false); });
       root.addEventListener('keydown', function (event) {
@@ -325,7 +352,7 @@
         if (node.hasAttribute('data-dc-draft')) { model.draft = model.draft ? model.draft + '\n' + node.dataset.dcDraft : node.dataset.dcDraft; render(); root.querySelector('textarea').focus(); return; }
         if (node.hasAttribute('data-dc-select')) { var p = product(node.dataset.dcSelect); if (p) { model.selected = p; model.notice = p.name + '을 선택했어요. 상세 구성과 견적을 이어서 확인해보세요.'; render(); if (p.liveDetail === 'pending' && P.live) P.live.loadDetail(p.id).then(render); } return; }
         var action = node.dataset.dcAction;
-        if (action === 'new') { stop(); model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.compare = []; lastPick = null; model.mobile = 'chat'; render(); }
+        if (action === 'new') { stop(); restoredScroll = null; model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.compare = []; lastPick = null; model.mobile = 'chat'; render(); }
         if (action === 'retry') send(true);
         if (action === 'conditions') { model.state = 'clarify'; model.mobile = 'products'; render(); var b = root.querySelector('[data-dc-condition="budget"]'); if (b) b.focus(); }
       });
@@ -335,7 +362,9 @@
         var sel = window.getSelection(), node = sel && sel.anchorNode, el = node && (node.nodeType === 1 ? node : node.parentElement), box = el && el.closest ? el.closest('[data-pa-answer]') : null;
         if (box && root.contains(box)) { var t = A.selectionText(sel, box); if (t) lastPick = { turn: box.dataset.paAnswer, text: t }; }
       });
-      window.addEventListener('pagehide', stop, { once: true });
+      window.addEventListener('pagehide', function () { remember(true); stop(); });
+      document.addEventListener('click', function (event) { if (root && root.isConnected && event.target.closest && event.target.closest('a[href]')) remember(true); }, true);
+      if (restoredScroll) { var rs = restoredScroll; window.requestAnimationFrame(function () { var lg = root.querySelector('.dc-chat-log'); if (lg) lg.scrollTop = rs.log || 0; window.scrollTo(0, rs.page || 0); }); }
     } };
   };
 
@@ -370,6 +399,15 @@ P.designScreens.compare = function (ctx) {
       }
       return '<header class="dc-heading"><div><p class="eyebrow">COMPARE PCs</p><h1>내게 맞는 구성을 비교해보세요.</h1><p>확인된 사양과 가격을 한눈에 살펴보세요.</p></div>' + buttonLink('PC 더 고르기', 'catalog', 'normal', { ids: chosen.map(function(p){return p.id;}).join(',') }, 'btn-outline') + '</header><div class="dc-compare-toolbar"><span>선택한 PC <strong>' + chosen.length + '</strong> / 3</span><label><input type="checkbox" data-dc-differences' + (differences ? ' checked' : '') + (chosen.length < 2 ? ' disabled' : '') + '>차이만 보기</label></div>' + content + '<p class="dc-compare-footnote">세부 옵션과 구매 가능 여부는 상품 상세에서 확인해 주세요.</p>';
     }
+    // 여기서 뺀 상품은 AI로 PC 찾기 대화의 관심·비교상품에서도 뺀다(2026-10-21 검수 F3 -- 같은 비교 목록이다).
+    function forget(id, kind) {
+      try {
+        var snap = JSON.parse(window.sessionStorage.getItem('pai-finder-chat-v1') || 'null');
+        if (!snap || !Array.isArray(snap.compare)) return;
+        snap.compare = snap.compare.filter(function (c) { return !(String(c.id) === String(id) && (c.kind === 'ai_device' ? 'ai_device' : 'pc') === kind); });
+        window.sessionStorage.setItem('pai-finder-chat-v1', JSON.stringify(snap));
+      } catch (ignoreForget) { /* 저장소를 못 쓰면 이 화면만 바뀐다 */ }
+    }
     function render() { mobileIndex = Math.max(0, Math.min(mobileIndex, chosen.length - 1)); if (root) root.innerHTML = markup(); }
     return { html: '<section class="container dc-compare" data-dc-compare>' + markup() + '</section>', mount: function () {
       root = document.querySelector('[data-dc-compare]'); if (!root || root.dataset.mounted) return; root.dataset.mounted = 'true';
@@ -380,7 +418,7 @@ P.designScreens.compare = function (ctx) {
       root.addEventListener('change', function (event) { if (event.target.hasAttribute('data-dc-differences')) { differences = event.target.checked; render(); root.querySelector('[data-dc-differences]').focus(); } });
       root.addEventListener('click', function (event) {
         var node = event.target.closest('button'); if (!node || node.disabled) return;
-        if (node.hasAttribute('data-dc-remove')) { chosen = chosen.filter(function (p) { return !(String(p.id) === node.dataset.dcRemove && (isDev(p) ? 'ai_device' : 'pc') === (node.dataset.dcKind || 'pc')); }); if (chosen.length < 2) differences = false; render(); }
+        if (node.hasAttribute('data-dc-remove')) { chosen = chosen.filter(function (p) { return !(String(p.id) === node.dataset.dcRemove && (isDev(p) ? 'ai_device' : 'pc') === (node.dataset.dcKind || 'pc')); }); if (chosen.length < 2) differences = false; forget(node.dataset.dcRemove, node.dataset.dcKind || 'pc'); render(); }
         if (node.hasAttribute('data-dc-slide')) { mobileIndex += node.dataset.dcSlide === 'next' ? 1 : -1; render(); var next = root.querySelector('[data-dc-slide="' + node.dataset.dcSlide + '"]'); if (next && !next.disabled) next.focus(); }
       });
     } };
