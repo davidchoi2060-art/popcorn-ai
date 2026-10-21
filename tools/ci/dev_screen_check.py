@@ -255,7 +255,17 @@ def main():
     print('### 개발 서버 고객 추천 점검')
     print(f'- 시각(KST): {time.strftime("%Y-%m-%d %H:%M", time.gmtime(time.time() + 9 * 3600))}')
     print(f'- 문장: {TEXT}')
-    parsed, s1, t1 = post('/api/talk/parse', {'text': TEXT})
+    # 배포 직후 서버가 막 다시 떠 무거운 동안(같은 VM 의 러너·사진 작업과 겹침) 첫 요청이 90초를 넘긴 일이 있다
+    # (2026-10-21 07:07 · 07:40 -- 같은 때 pc-offers 도 0.7초 -> 11~17초). 시간 초과만 30초 쉬고 한 번 더 보낸다.
+    # 첫 시도 실패는 숨기지 않고 적는다 -- 두 번째도 넘기면 그대로 실패다.
+    try:
+        parsed, s1, t1 = post('/api/talk/parse', {'text': TEXT})
+    except (TimeoutError, urllib.error.URLError) as e:
+        if isinstance(e, urllib.error.HTTPError):
+            raise
+        print(f'- 첫 시도 실패: {type(e).__name__}: {e} -- 30초 뒤 한 번 더')
+        time.sleep(30)
+        parsed, s1, t1 = post('/api/talk/parse', {'text': TEXT})
     state = parsed.get('state')
     print(f'- /api/talk/parse: HTTP {s1}, {t1:.1f}s, state 키 {sorted(state) if isinstance(state, dict) else state!r}')
     # 고객이 실제로 보는 말풍선(답변·되묻기)도 함께 남긴다 -- 예외 질문 점검용(2026-10-11).
