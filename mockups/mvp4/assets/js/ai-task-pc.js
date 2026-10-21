@@ -26,7 +26,7 @@
   function card(c) {
     var detail = c.kind === 'ai_device' ? 'supercomputer.html?id=' + encodeURIComponent(c.id) : './?screen=product&amp;id=' + encodeURIComponent(c.id);
     var price = typeof c.price === 'number' && c.price > 0 ? c.price : null, stopped = c.saleState === 'stopped';
-    var buy = stopped ? '<button type="button" class="btn tp-buy" disabled>판매 중지</button>' : (P.mallBuyAnchor && P.mallBuyAnchor({ id: c.id, url: c.mallUrl, name: c.name, price: price, image: c.image, cls: 'btn tp-buy', label: '팝콘PC몰에서 구매' })) || '<button type="button" class="btn tp-buy" disabled>구매 링크 확인 필요</button>';
+    var buy = stopped ? '<button type="button" class="btn tp-buy" disabled>판매 중지</button>' : (P.mallBuyAnchor && P.mallBuyAnchor({ id: c.id, url: c.mallUrl, name: c.name, price: price, image: c.image, cls: 'btn tp-buy', label: '팝콘PC몰에서 바로 구매' })) || '<button type="button" class="btn tp-buy" disabled>구매 링크 확인 필요</button>';
     return '<article class="tp-card" data-tp-id="' + esc(c.id) + '" data-tp-kind="' + esc(c.kind) + '"><span class="tp-tag">검증 후보</span>' + (c.image ? '<img src="' + esc(c.image) + '" alt="" width="200" height="150" loading="lazy">' : '') +
       '<div class="tp-body"><h3>' + esc(c.name) + '</h3><small>상품번호 ' + esc(c.id) + '</small>' + (c.specs ? '<p class="tp-specs">' + esc(c.specs) + '</p>' : '') +
       '<p class="tp-price">' + (stopped ? '판매 중지' : price ? esc(price.toLocaleString('ko-KR')) + '원' : '가격 확인 필요') + (price && c.priceAt ? '<small>' + esc(c.priceAt) + ' 기준 · 팝콘AI 표시 금액</small>' : '') + '</p>' +

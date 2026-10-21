@@ -39,7 +39,7 @@
   P.mallBuyLink = function (p, cls, label) {
     if (!p || !P.mallBuyAnchor) return '';
     var price = typeof p.price === 'number' && isFinite(p.price) && p.price > 0 ? p.price : null;
-    return P.mallBuyAnchor({ id: p.id, url: p.mallUrl, name: p.name, price: price, image: P.catalogImage ? P.catalogImage(p) : null, cls: cls, label: label || '팝콘PC몰에서 구매하기' });
+    return P.mallBuyAnchor({ id: p.id, url: p.mallUrl, name: p.name, price: price, image: P.catalogImage ? P.catalogImage(p) : null, cls: cls, label: label || '팝콘PC몰에서 바로 구매' });
   };
   var SLOT = { CPU: 'CPU', GPU: '그래픽카드', RAM: '메모리', SSD: '저장장치', HDD: '저장장치', MB: '메인보드', POWER: '파워', PSU: '파워', CASE: '케이스', COOLER: 'CPU 쿨러', OS: '운영체제' };
 

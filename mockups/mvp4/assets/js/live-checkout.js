@@ -37,7 +37,7 @@
   function buy(p, label) { return (P.mallBuyLink && P.mallBuyLink(p, 'btn btn-primary', label)) || '<button class="btn btn-primary" type="button" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
   function mallOnly(p) {
     return P.designNotice('이 PC는 팝콘PC몰에서 구매해요', '견적 보관이나 연락처 입력 없이 팝콘PC몰 상품 페이지에서 옵션·가격·재고를 확인하고 구매할 수 있어요.') + P.designProductSummary(p) +
-      '<div class="ds-actions">' + buy(p, issue(p) ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 구매하기') + link('상품 상세 보기', 'product', p, 'btn-outline') + P.designLink('AI에게 질문하기', 'chat', 'product', { id: p.id }, 'btn-outline') + '</div>';
+      '<div class="ds-actions">' + buy(p, issue(p) ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 바로 구매') + link('상품 상세 보기', 'product', p, 'btn-outline') + P.designLink('AI에게 질문하기', 'chat', 'product', { id: p.id }, 'btn-outline') + '</div>';
   }
   function mallLink(p, label) { return p.mallUrl ? '<a class="btn btn-outline" href="' + h(p.mallUrl) + '" target="_blank" rel="noopener">' + h(label || '팝콘PC에서 상품 보기') + ' <span aria-hidden="true">↗</span></a>' : ''; }
   function qp(ctx, k) { return ctx.query && typeof ctx.query.get === 'function' ? ctx.query.get(k) : null; }
@@ -55,7 +55,7 @@
     var p = current(ctx), body;
     if (!p) return { html: P.designWrap('구성 확인', '선택한 상품을 확인해 주세요.', P.designEmpty('선택한 PC를 찾을 수 없어요', '상품 목록에서 다시 선택해 주세요.')) };
     if (issue(p)) body = blocked(p);
-    else body = '<h2>기본 구성</h2>' + P.designSpecTable(p) + '<h2 style="margin-top:28px">부품 변경</h2>' + P.designNotice('팝콘PC에서 부품을 변경해 주세요', '이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요. 선택한 옵션에 따라 금액이 달라져요.') + '<div class="ds-actions">' + buy(p, '팝콘PC몰에서 구매하기') + mallLink(p, '팝콘PC에서 부품 변경하기') + P.designLink('원하는 사양을 AI에게 말하기', 'chat', 'product', { id: p.id }, 'btn-outline') + '</div>';
+    else body = '<h2>기본 구성</h2>' + P.designSpecTable(p) + '<h2 style="margin-top:28px">부품 변경</h2>' + P.designNotice('팝콘PC에서 부품을 변경해 주세요', '이 상품의 부품은 팝콘PC 상품 페이지에서 옵션으로 바꿀 수 있어요. 선택한 옵션에 따라 금액이 달라져요.') + '<div class="ds-actions">' + buy(p, '팝콘PC몰에서 바로 구매') + mallLink(p, '팝콘PC에서 부품 변경하기') + P.designLink('원하는 사양을 AI에게 말하기', 'chat', 'product', { id: p.id }, 'btn-outline') + '</div>';
     return { html: P.designWrap('원하는 구성으로 살펴보세요', '원래 PC와 변경할 내용을 구분해서 확인합니다.', steps(1) + '<div class="ds-two-col"><section class="ds-panel">' + body + '</section>' + aside(p, 1, P.designLink('이 PC에 대해 AI에게 질문', 'chat', 'product', { id: p.id }, 'btn-outline')) + '</div>') };
   };
 
@@ -79,8 +79,8 @@
     var title = (s.name || (device ? '보관한 AI 슈퍼컴퓨터' : '보관한 PC')) + (device && s.model_label && String(s.name || '').indexOf(s.model_label) < 0 ? ' · ' + s.model_label : '');
     var status = device ? '' : !live ? P.designNotice('현재 판매 여부를 확인할 수 없어요', '보관 당시 견적은 남아 있습니다. 대체 PC를 살펴봐 주세요.', 'bad') : live.price !== s.price && !(s.build) ? P.designNotice('보관 이후 가격이 달라졌어요', '보관한 금액과 현재 금액을 나누어 확인해 주세요.', 'bad') : '';
     var actions = device
-      ? '<a class="btn btn-outline" href="supercomputer.html?id=' + encodeURIComponent(String(s.product_code)) + '&amp;quantity=' + n + '">현재 상품 확인</a>' + (P.mallBuyAnchor ? P.mallBuyAnchor({ id: s.product_code, url: s.mall_url, name: s.name, model: s.model_label, quantity: n, price: null, cls: 'btn btn-primary', label: '팝콘PC몰에서 구매하기' }) : '')
-      : (live ? P.designLink('현재 상품 확인', 'product', 'normal', { id: live.id }, 'btn-outline') + P.designLink('AI와 이어서 대화', 'chat', 'product', { id: live.id }, 'btn-outline') : P.designLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-outline')) + (live ? buy(live, '팝콘PC몰에서 구매하기') : '');
+      ? '<a class="btn btn-outline" href="supercomputer.html?id=' + encodeURIComponent(String(s.product_code)) + '&amp;quantity=' + n + '">현재 상품 확인</a>' + (P.mallBuyAnchor ? P.mallBuyAnchor({ id: s.product_code, url: s.mall_url, name: s.name, model: s.model_label, quantity: n, price: null, cls: 'btn btn-primary', label: '팝콘PC몰에서 바로 구매' }) : '')
+      : (live ? P.designLink('현재 상품 확인', 'product', 'normal', { id: live.id }, 'btn-outline') + P.designLink('AI와 이어서 대화', 'chat', 'product', { id: live.id }, 'btn-outline') : P.designLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-outline')) + (live ? buy(live, '팝콘PC몰에서 바로 구매') : '');
     return '<section class="ds-panel ds-saved-card" data-quote="' + h(q.id) + '" style="margin-top:16px">' + status +
       '<div class="ds-saved-head"><small class="ds-muted">' + h(q.saved_at ? new Date(q.saved_at).toLocaleString('ko-KR') + ' 보관' : '') + (device ? ' · AI 슈퍼컴퓨터' : '') + '</small>' +
       '<button type="button" class="ds-saved-delete" data-saved-delete="' + h(q.id) + '" data-saved-name="' + h(title) + '" aria-label="' + h(title) + ' 내 견적에서 삭제">' + P.icon('x') + '삭제</button></div>' +

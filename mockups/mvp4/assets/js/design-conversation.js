@@ -27,8 +27,7 @@
     if (p.statusKey === 'oos' || p.stockQty === 0) return '재고·판매 상태 확인 필요';
     if (p.reviewRequired === true) return '상품 검수 필요';
     if (!(typeof p.price === 'number' && isFinite(p.price) && p.price > 0)) return '가격 확인 필요';
-    if (p.bomStatus === 'mismatch') return '상품과 구성표 일치 여부 확인 필요';
-    if (p.bomStatus === 'missing' || !p.configurationId || !Array.isArray(p.specs) || !p.specs.length) return '부품 구성표 확인 필요';
+    // 구성표 확인은 구매를 막는 조건이 아니다(2026-10-20 대표 -- 상품 상세 pending() 과 같은 기준). 구성은 상세에서 확인한다.
     return '';
   }
   function product(id) {
@@ -45,7 +44,7 @@
   }
   function deviceIssue(d) { return d.saleState === 'stopped' ? '판매 중지' : d.saleState !== 'on_sale' ? '가격 확인 필요' : ''; }
   function deviceHref(d) { return 'supercomputer.html?id=' + encodeURIComponent(d.id); }
-  function deviceBuy(d) { return d.saleState === 'stopped' ? '<button class="btn btn-small btn-primary" disabled>판매 중지</button>' : (P.mallBuyAnchor && P.mallBuyAnchor({ id: d.id, url: d.mallUrl, name: d.name, price: d.saleState === 'on_sale' ? d.price : null, image: d.image, cls: 'btn btn-small btn-primary', label: '팝콘PC몰에서 구매하기' })) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
+  function deviceBuy(d) { return d.saleState === 'stopped' ? '<button class="btn btn-small btn-primary" disabled>판매 중지</button>' : (P.mallBuyAnchor && P.mallBuyAnchor({ id: d.id, url: d.mallUrl, name: d.name, price: d.saleState === 'on_sale' ? d.price : null, image: d.image, cls: 'btn btn-small btn-primary', label: '팝콘PC몰에서 바로 구매' })) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
   function deviceSpec(d, row) {
     if (row.key === 'price') return d.saleState === 'stopped' ? '판매 중지' : typeof d.price === 'number' && d.price > 0 ? P.money(d.price) : '가격 확인 필요';
     if (row.key === 'cpu') return d.processor || '정보 확인 필요';
@@ -61,7 +60,7 @@
     return source ? '<img class="' + h(cls || '') + '" src="' + h(source) + '" alt="' + h(p.name) + '" loading="lazy">' : '<span class="dc-photo-placeholder">' + icon('computer-tower') + '<small>상품 사진 준비 중</small></span>';
   }
   // 2026-10-20 승인 「구매 경로 분리」 -- 선택·비교한 일반 완제품의 다음 행동은 그 상품의 팝콘PC몰 페이지다(견적 보관·상담 아님).
-  function buyButton(p, unsure) { if (p && p.kind === 'ai_device') return deviceBuy(p); return (P.mallBuyLink && P.mallBuyLink(p, 'btn btn-small btn-primary', unsure ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 구매하기')) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
+  function buyButton(p, unsure, cls) { if (p && p.kind === 'ai_device') return deviceBuy(p); return (P.mallBuyLink && P.mallBuyLink(p, cls || 'btn btn-small btn-primary', unsure ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 바로 구매')) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
   function buttonLink(label, screen, state, values, style) { return '<a class="btn ' + (style || 'btn-outline') + '" href="' + h(url(screen, state, values)) + '">' + h(label) + icon('caret-right') + '</a>'; }
   function normalize(value) { return String(value || '').toLowerCase().replace(/[\s·:()_-]/g, ''); }
   function spec(p, row) {
@@ -90,7 +89,7 @@
   function card(p, selected) {
     return '<article class="dc-product-card' + (selected ? ' is-selected' : '') + '"><a class="dc-product-photo" href="' + h(url('product', 'normal', { id: p.id })) + '">' + photograph(p) + '</a>' +
       '<div class="dc-product-content"><h3><a href="' + h(url('product', 'normal', { id: p.id })) + '">' + h(p.name) + '</a></h3><p>' + (shortSpecs(p) || h(p.summary || '세부 구성을 확인해 주세요.')) + '</p><strong>' + h(money(p)) + '</strong>' +
-      '<div class="dc-product-actions"><button type="button" class="btn btn-small ' + (selected ? 'btn-primary' : 'btn-outline') + '" data-dc-select="' + h(p.id) + '" aria-pressed="' + String(selected) + '">' + (selected ? '선택한 PC' : '이 PC 선택') + '</button><a href="' + h(url('product', 'normal', { id: p.id })) + '">상세 ' + icon('caret-right') + '</a>' + (P.mallBuyLink ? P.mallBuyLink(p, 'dc-mall-buy', '팝콘PC몰 구매') : '') + '</div></div></article>';
+      '<div class="dc-product-actions"><button type="button" class="btn btn-small ' + (selected ? 'btn-primary' : 'btn-outline') + '" data-dc-select="' + h(p.id) + '" aria-pressed="' + String(selected) + '">' + (selected ? '선택한 PC' : '이 PC 선택') + '</button><a href="' + h(url('product', 'normal', { id: p.id })) + '">상세 ' + icon('caret-right') + '</a>' + (P.mallBuyLink ? P.mallBuyLink(p, 'dc-mall-buy', '팝콘PC몰에서 바로 구매') : '') + '</div></div></article>';
   }
 
   P.designScreens.chat = function (ctx) {
@@ -140,15 +139,31 @@
         }).join('') + '</ul>' : '<p class="pa-interest-empty">추천 답변이나 AI 슈퍼컴퓨터 상세에서 비교할 상품을 담아보세요. 대화와 입력 중인 문장은 그대로예요.</p>') +
         (items.length >= 2 ? '<a class="pa-open-compare" href="' + h(url('compare', 'normal', { ids: pcs.join(','), ai: devs.join(',') })) + '" target="_blank" rel="noopener">선택 상품 비교하기 ↗</a>' : '') + '</section>';
     }
+    // 코발트 추천 패널(2026-10-21 대표 승인 1번): 지금 고른 PC, 없으면 서버가 준 첫 추천 PC 하나를 크게 보인다.
+    // 구매 · 선택 · 비교는 서로 다른 버튼이고 각자 기존 동작(몰 안내창 · data-dc-select/unselect · data-pa-add)을 그대로 쓴다.
+    function featured() {
+      var list = candidates(), p = model.selected || list[0];
+      if (!p) return '';
+      var picked = !!model.selected && String(model.selected.id) === String(p.id), issue = purchaseIssue(p), added = inCompare(p.id, 'pc');
+      var detail = url('product', 'normal', { id: p.id });
+      return '<section class="dc-feature" aria-labelledby="dc-feature-title"><header class="dc-feature-head"><h2 id="dc-feature-title">' + icon('check-circle') + (picked ? '선택한 PC' : 'AI 추천 PC') + '</h2><small>구매 시 가격 확인</small></header>' +
+        '<div class="dc-feature-body"><a class="dc-feature-photo" href="' + h(detail) + '">' + photograph(p) + '</a><div class="dc-feature-info"><h3><a href="' + h(detail) + '">' + h(p.name) + '</a></h3><p>' + (shortSpecs(p) || h(p.summary || '세부 구성을 확인해 주세요.')) + '</p><strong>' + h(money(p)) + '</strong>' +
+        (issue ? '<p class="dc-unavailable-label" role="status">' + h(issue) + '</p>' : '') + '</div></div>' +
+        '<div class="dc-feature-actions">' + buyButton(p, !!issue, 'btn btn-primary dc-feature-buy') +
+        '<div class="dc-feature-pair">' + (picked ? '<button type="button" class="btn btn-outline" data-dc-unselect aria-label="' + h(p.name) + ' 선택 해제">' + icon('x') + '선택 해제</button>' : '<button type="button" class="btn btn-outline" data-dc-select="' + h(p.id) + '" aria-pressed="false">' + icon('check-circle') + '이 PC 선택</button>') +
+        '<button type="button" class="btn btn-outline" data-pa-add="' + h(p.id) + '" data-pa-kind="pc" aria-pressed="' + added + '" aria-label="' + h(p.name) + (added ? ' 비교에서 빼기' : ' 비교에 담기') + '">' + icon('arrows-left-right') + (added ? '비교에서 빼기' : '비교에 담기') + '</button></div>' +
+        '<a class="dc-feature-detail" href="' + h(detail) + '">' + icon('clipboard-text') + '상품 상세' + icon('caret-right') + '</a><p class="dc-feature-note">부품 가격 변동으로 최종 금액이 달라질 수 있어요.</p></div>' +
+        '<dl class="dc-feature-summary"><div><dt>선택한 PC</dt><dd>' + h(model.selected ? model.selected.name : '없음') + '</dd></div><div><dt>비교</dt><dd>' + model.compare.length + '</dd></div></dl></section>';
+    }
     function markup() {
       var cards = candidates(), isLoading = model.state === 'loading';
-      return '<header class="dc-heading"><div><p class="eyebrow">AI PC FINDER</p><h1>내게 맞는 PC를 함께 찾아요.</h1></div><button type="button" class="dc-new" data-dc-action="new">' + icon('arrow-counter-clockwise') + '새 대화</button></header>' +
+      return '<header class="dc-heading"><div><p class="eyebrow">AI PC FINDER</p><h1>내게 맞는 <em>PC를 함께</em> 찾아요.</h1><p class="dc-lede">AI가 용도와 예산에 맞춰, 딱 맞는 PC를 찾아드려요.</p></div><button type="button" class="dc-new" data-dc-action="new">' + icon('arrow-counter-clockwise') + '새 대화</button></header>' +
         '<div class="dc-tabs" role="tablist" aria-label="대화와 PC"><button type="button" role="tab" id="dc-tab-chat" aria-selected="' + (model.mobile === 'chat') + '" aria-controls="dc-chat-main" tabindex="' + (model.mobile === 'chat' ? '0' : '-1') + '" data-dc-tab="chat">' + icon('chat-circle') + '대화</button><button type="button" role="tab" id="dc-tab-products" aria-selected="' + (model.mobile === 'products') + '" aria-controls="dc-chat-side" tabindex="' + (model.mobile === 'products' ? '0' : '-1') + '" data-dc-tab="products">' + icon('computer-tower') + '추천 PC <span>' + cards.length + '</span></button></div>' +
         '<div class="dc-chat-layout" data-mobile="' + model.mobile + '"><section class="dc-chat-main" id="dc-chat-main" aria-label="대화"><div class="dc-chat-log" role="log" aria-live="polite">' +
-        (model.state === 'welcome' && !model.log.length ? '<div class="dc-welcome"><span class="dc-welcome-mark">' + icon('chat-circle') + '</span><h2>어떤 PC가 필요하세요?</h2><p>게임, 작업, 일상까지.<br>하고 싶은 일부터 편하게 이야기해 주세요.</p><div class="dc-welcome-prompts"><button type="button" data-dc-draft="게임용 PC를 찾고 있어요.">' + icon('game-controller') + '게임용 PC</button><button type="button" data-dc-draft="영상 편집에 사용할 PC가 필요해요.">' + icon('video-camera') + '영상 편집용</button><button type="button" data-dc-draft="업무에 쓸 PC가 필요해요.">' + icon('monitor') + '사무·업무용</button></div><img class="dc-welcome-art" src="assets/images/pc-finder-core-v3.webp" width="618" height="496" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>' : messages()) +
+        (model.state === 'welcome' && !model.log.length ? '<div class="dc-welcome"><span class="dc-welcome-mark">' + icon('chat-circle') + '</span><h2>어떤 PC가 필요하세요?</h2><p>게임, 작업, 일상까지.<br>하고 싶은 일부터 편하게 이야기해 주세요.</p><div class="dc-welcome-prompts"><button type="button" data-dc-draft="게임용 PC를 찾고 있어요.">' + icon('game-controller') + '<b>게임용 PC</b><small class="dc-prompt-hint">질문에 담기 +</small></button><button type="button" data-dc-draft="영상 편집에 사용할 PC가 필요해요.">' + icon('video-camera') + '<b>영상 편집용</b><small class="dc-prompt-hint">질문에 담기 +</small></button><button type="button" data-dc-draft="업무에 쓸 PC가 필요해요.">' + icon('monitor') + '<b>사무·업무용</b><small class="dc-prompt-hint">질문에 담기 +</small></button></div><img class="dc-welcome-art" src="assets/images/pc-finder-core-v3.webp" width="618" height="496" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>' : messages()) +
         stateNotice() + (model.notice ? '<p class="dc-local-notice" role="status">' + h(model.notice) + '</p>' : '') + '</div>' +
         '<form class="dc-composer" data-dc-form><label class="visually-hidden" for="dc-question">PC에 대해 질문하기</label><textarea id="dc-question" rows="3" placeholder="용도와 예산을 편하게 알려주세요."' + (isLoading ? ' readonly' : '') + '>' + h(model.draft) + '</textarea><div><small><span data-dc-count>' + model.draft.length.toLocaleString('ko-KR') + '</span> / 10,000자 · Shift+Enter 줄바꿈</small><button class="btn btn-primary" type="submit"' + (isLoading ? ' disabled' : '') + '>보내기' + icon('paper-plane-tilt') + '</button></div></form><p class="dc-chat-note">모르는 사양은 비워 두셔도 괜찮아요. 구매 전 상세 구성과 가격을 확인해 주세요.</p></section>' +
-        '<aside class="dc-chat-side' + (model.selected ? ' has-selected' : '') + '" id="dc-chat-side" aria-label="추천 조건과 PC"><section class="dc-side-panel"><h2>' + icon('clipboard-text') + '내 추천 조건</h2><div class="dc-conditions">' + [['purpose', '용도', '어떤 작업을 하시나요?'], ['budget', '예산', '아직 정하지 않아도 괜찮아요'], ['environment', '사용 환경', '모니터나 프로그램 등']].map(function (f) { return '<label><span>' + f[1] + '</span><input data-dc-condition="' + f[0] + '" value="' + h(model.conditions[f[0]]) + '" placeholder="' + h(f[2]) + '" maxlength="200"' + (isLoading ? ' disabled' : '') + '></label>'; }).join('') + '</div></section>' +
+        '<aside class="dc-chat-side' + (model.selected ? ' has-selected' : '') + '" id="dc-chat-side" aria-label="추천 조건과 PC">' + featured() + '<section class="dc-side-panel"><h2>' + icon('clipboard-text') + '내 추천 조건</h2><div class="dc-conditions">' + [['purpose', '용도', '어떤 작업을 하시나요?'], ['budget', '예산', '아직 정하지 않아도 괜찮아요'], ['environment', '사용 환경', '모니터나 프로그램 등']].map(function (f) { return '<label><span>' + f[1] + '</span><input data-dc-condition="' + f[0] + '" value="' + h(model.conditions[f[0]]) + '" placeholder="' + h(f[2]) + '" maxlength="200"' + (isLoading ? ' disabled' : '') + '></label>'; }).join('') + '</div></section>' +
         '<section class="dc-side-panel dc-selected-panel"><h2>' + icon('check-circle') + '선택한 PC</h2>' + selection() + '</section>' + compareTray() +
         '<section class="dc-candidates"><div class="dc-candidates-heading"><h2>살펴볼 PC</h2>' + (cards.length > 1 ? '<a href="' + h(url('compare', 'normal', { ids: cards.map(function (p) { return p.id; }).join(',') })) + '">비교하기 ' + icon('caret-right') + '</a>' : '') + '</div>' +
         (cards.length ? cards.map(function (p) { return card(p, !!model.selected && String(model.selected.id) === String(p.id)); }).join('') : empty(isLoading ? '구성을 살펴보고 있어요.' : '아직 보여드릴 PC가 없어요.', isLoading ? '확인하는 동안 대화를 계속 읽을 수 있어요.' : '원하는 조건을 알려주거나 상품을 먼저 둘러보세요.', isLoading ? '' : buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-small btn-outline'))) + '</section></aside></div>';

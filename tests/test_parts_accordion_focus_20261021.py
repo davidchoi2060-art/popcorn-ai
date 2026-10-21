@@ -30,4 +30,4 @@ def test_focus_moves_to_the_opened_row_and_respects_reduced_motion():
 
 def test_pages_load_new_version():
     for page in ("index.html", "review-flows.html"):
-        assert "configuration-concept.js?v=20261021-acc2" in (ROOT / page).read_text(encoding="utf-8")
+        assert "configuration-concept.js?v=20261021-cb2" in (ROOT / page).read_text(encoding="utf-8")

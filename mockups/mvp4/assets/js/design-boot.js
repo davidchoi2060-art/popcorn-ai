@@ -25,6 +25,8 @@
     var renderer = P.designScreens[screen];
     var result = renderer({ state: state, productId: q.get('id'), query: q });
     document.body.dataset.page = screen === 'catalog' || screen === 'product' ? 'pcs' : screen === 'chat' ? 'pc-finder' : screen;
+    // AI로 PC 찾기 코발트(2026-10-21 대표 승인): 시작·대화·추천·비교·상세·내 견적 본문에만 색을 입힌다. 헤더·푸터는 그대로.
+    if (['chat', 'compare', 'saved', 'product'].indexOf(screen) >= 0) document.body.dataset.finder = screen; else delete document.body.dataset.finder;
     document.title = '팝콘AI · ' + (screen === 'home' ? '좋은 PC에서, 쓸모 있는 AI까지' : P.designLabels[screen] || '');
     document.getElementById('app').innerHTML = P.shell(result.html);
     var skip = document.querySelector('.skip-link'); if (skip) skip.href = location.pathname + location.search + '#main-content';

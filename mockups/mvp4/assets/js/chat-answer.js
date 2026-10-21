@@ -113,7 +113,7 @@
         (b.check ? '<aside class="pa-check"><strong>확인 필요 · 답변 안의 불일치</strong>' + esc(b.check) + '</aside>' : '') +
         (issue ? '<p class="pa-issue" role="note">' + esc(issue) + '</p>' : '') +
         '<div class="pa-product-actions" data-nocopy>' + (href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">상품 상세 ↗</a>' : '') +
-        (type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy', '팝콘PC몰에서 구매') : '') +
+        (type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy', '팝콘PC몰에서 바로 구매') : '') +
         (type === 'pc' || type === 'ai_device' ? '<button type="button" class="pa-copy" data-pa-add="' + esc(code) + '" data-pa-kind="' + type + '" data-pa-turn="' + esc(a.turnId) + '" aria-pressed="' + added + '" aria-label="' + esc(b.name) + (added ? ' 비교에서 빼기' : ' 비교에 담기') + '">' + (added ? '담음 · 비교에서 빼기' : '비교에 담기') + '</button>' : '') + '</div></section>';
     }
     var body;

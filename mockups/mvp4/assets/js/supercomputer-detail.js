@@ -45,6 +45,12 @@
     if (!c || !c.image || typeof c.image.src !== 'string') return '';
     return '<section class="sc-section sc-connectivity" aria-labelledby="sc-connect-title"><div class="sc-connect-copy"><span class="sc-eyebrow">CONNECT YOUR WORKFLOW</span><h2 id="sc-connect-title">' + h(c.title || '연결 단자') + '</h2>' + (c.text ? '<p>' + h(c.text) + '</p>' : '') + (Array.isArray(c.labels) && c.labels.length ? '<div class="sc-connect-labels">' + c.labels.map(function (x) { return '<span>' + h(x) + '</span>'; }).join('') + '</div>' : '') + '</div><figure><img src="' + h(c.image.src) + '" alt="' + h(c.image.alt || '') + '" width="' + h(c.image.width || 1600) + '" height="' + h(c.image.height || 900) + '" loading="lazy">' + (c.image.caption ? '<figcaption>' + h(c.image.caption) + '</figcaption>' : '') + '</figure></section>';
   }
+  // 상품 설명 자리(2026-10-21 코발트 승인 「자리만」): 제품 사양 바로 다음. 운영에 있는 설명(연결 단자 사진·글)은 이 안에 그대로 둔다.
+  // 설명이 없는 장비는 자리만 두고 숨긴다 -- 설명을 지어 넣지 않는다.
+  function description(p) {
+    var body = connections(p);
+    return '<section class="sc-section sc-description" id="sc-description" data-product-description aria-labelledby="sc-desc-heading"' + (body ? '' : ' hidden') + '><div class="sc-section-heading"><h2 id="sc-desc-heading">상품 설명</h2></div>' + body + '</section>';
+  }
   // 상품 데이터가 정한 핵심 사양 네 칸(아이콘·이름·값). 없으면 공통 네 칸(가속기/프로세서·메모리·저장장치·OS)을 «확인 필요»와 함께.
   var ICONS = ['cpu', 'memory', 'hard-drive', 'code', 'package', 'monitor'];
   function facts(p) {
@@ -69,7 +75,7 @@
   //   링크 없음  -> 「구매 링크 확인 필요」(몰 홈·검색으로 대체하지 않는다)
   //   가격 확인  -> 구매는 열되 안내창이 «가격 확인 필요 · 최종 가격은 몰에서»를 말한다. 저장은 가격이 있을 때만.
   function buyLink(p, cls) {
-    return P.mallBuyAnchor ? P.mallBuyAnchor({ id: p.id, url: p.mallUrl, name: p.name, model: p.modelLabel, quantity: q, price: price(p), image: p.images[0] ? p.images[0].src : null, cls: cls, label: '팝콘PC몰에서 구매' }) : '';
+    return P.mallBuyAnchor ? P.mallBuyAnchor({ id: p.id, url: p.mallUrl, name: p.name, model: p.modelLabel, quantity: q, price: price(p), image: p.images[0] ? p.images[0].src : null, cls: cls, label: '팝콘PC몰에서 바로 구매' }) : '';
   }
   function buyPanel(p) {
     var stopped = p.saleState === 'stopped', buy = stopped ? '' : buyLink(p, 'btn sc-buy');
@@ -104,7 +110,7 @@
     return '<nav class="sc-section-nav" aria-label="상품 상세 메뉴"><a href="#sc-usecases">활용 예시</a><a href="#sc-specs">제품 사양</a><a href="#sc-environment">사용 환경</a><a href="#sc-faq">자주 묻는 질문</a></nav>' +
       (P.llmExamples ? P.llmExamples.section(p, route('adoption')) : '<section class="sc-usecases sc-section" id="sc-usecases"><div class="sc-section-heading"><span class="sc-eyebrow">YOUR AI, ON YOUR DESK</span><h2>AI를 직접 다루는 분을 위해.</h2></div><div class="sc-usecase-grid"><article><span class="sc-usecase-icon">' + icon('code') + '</span><span class="sc-usecase-number">01</span><h3>로컬 AI 실행</h3><p>내 장비에서 AI 모델을 실행하고 활용 환경을 살펴보세요.</p></article><article><span class="sc-usecase-icon">' + icon('cpu') + '</span><span class="sc-usecase-number">02</span><h3>AI 개발·실험</h3><p>모델과 개발 도구를 연결해 새로운 아이디어를 구현하세요.</p></article><article><span class="sc-usecase-icon">' + icon('file-text') + '</span><span class="sc-usecase-number">03</span><h3>업무 AI 도입 검토</h3><p>문서 검색과 지식 활용에 필요한 설치 환경을 함께 검토하세요.</p></article></div></section>') +
       '<section class="sc-section" id="sc-specs"><div class="sc-section-heading"><span class="sc-eyebrow">SPECIFICATIONS</span><h2>사양을 한눈에.</h2></div><details class="sc-spec-panel" open><summary><span>' + icon('cpu') + '<strong>' + h(model) + '제품 사양</strong></span><span class="sc-detail-caret">접기·펼치기 ' + icon('caret-down') + '</span></summary><dl class="sc-spec-table">' + specRows(p).map(function (r) { return '<div><dt>' + h(r[0]) + '</dt><dd>' + h(r[1]) + '</dd></div>'; }).join('') + '</dl></details></section>' +
-      connections(p) +
+      description(p) +
       '<section class="sc-section sc-environment" id="sc-environment">' + envHtml + scope() + '</section>' +
       '<section class="sc-section sc-faq" id="sc-faq"><div class="sc-section-heading"><span class="sc-eyebrow">QUESTIONS & ANSWERS</span><h2>궁금한 점을 확인하세요.</h2></div>' + faq.map(function (f) { return '<details><summary>' + h(f[0]) + icon('caret-down') + '</summary><p>' + h(f[1]) + '</p></details>'; }).join('') + '</section>' +
       '<a class="sc-back-link" href="' + h(listUrl()) + '">' + icon('arrow-left') + '다른 AI 슈퍼컴퓨터 보기</a>';

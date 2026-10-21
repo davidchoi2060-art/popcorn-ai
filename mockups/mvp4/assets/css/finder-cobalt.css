@@ -1,0 +1,90 @@
+/* AI로 PC 찾기 코발트 (2026-10-21 대표 승인 1번 · 최신 수정본).
+ * 시작·대화·추천·비교·상품 상세·내 견적 본문(.page-main)에만 입힌다. 헤더·로고·메뉴·띠메뉴·푸터는 건드리지 않는다.
+ * body[data-finder] 는 design-boot.js 가 그 다섯 화면에서만 단다. */
+body[data-finder] .page-main{--fc-blue:#2451f5;--fc-blue-hover:#143edc;--fc-deep:#183aaa;--fc-ink:#101b3b;--fc-line:#dce4f2;--fc-muted:#67738d;--fc-soft:#eef4ff;--fc-canvas:#edf3fd;
+  --purple:#2451f5;--blue:#2451f5;--lavender:#eef4ff;--line:#dce4f2;--muted:#67738d;
+  --pa-purple:#2451f5;--pa-soft:#eef4ff;--pa-line:#dce4f2;--pa-muted:#67738d;--pa-ink:#101b3b;
+  background:linear-gradient(180deg,#f4f7fe 0,var(--fc-canvas) 420px,var(--fc-canvas) 100%);color:var(--fc-ink);padding-bottom:56px}
+body[data-finder] .page-main .eyebrow,body[data-finder] .page-main .cf-eyebrow{color:var(--fc-blue)}
+body[data-finder] .page-main h1 em{font-style:normal;color:var(--fc-blue)}
+body[data-finder] .page-main .btn-primary{background:var(--fc-blue);border-color:var(--fc-blue);color:#fff}
+body[data-finder] .page-main .btn-primary:hover{background:var(--fc-blue-hover);border-color:var(--fc-blue-hover)}
+body[data-finder] .page-main .btn-primary:disabled{background:#a9b9f7;border-color:#a9b9f7}
+body[data-finder] .page-main .btn-outline{background:#fff;border-color:#5778ff;color:#214bee}
+body[data-finder] .page-main .btn-outline:hover{background:#f2f6ff;border-color:#214bee}
+body[data-finder] .page-main .btn-outline .icon{filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
+body[data-finder] .page-main .btn-outline[aria-pressed=true]{background:#eaf0ff;border-color:#214bee}
+body[data-finder] .page-main :is(button,a,input,textarea,summary):focus-visible{outline:3px solid #f0b72d;outline-offset:3px}
+
+/* 시작 · 대화 */
+body[data-finder=chat] .dc-heading h1{font-size:40px;letter-spacing:-.05em}
+body[data-finder=chat] .dc-heading>div>p.dc-lede{color:#3a4561;font-size:16px;margin-top:10px}
+body[data-finder=chat] .dc-new{background:#fff;border:1px solid var(--fc-line);border-radius:10px}
+body[data-finder=chat] .dc-chat-main,body[data-finder=chat] .dc-side-panel,body[data-finder=chat] .dc-product-card{border-color:var(--fc-line);box-shadow:0 6px 24px rgb(28 60 139 / .05)}
+body[data-finder=chat] .dc-chat-main{border-radius:18px}
+body[data-finder=chat] .dc-welcome-mark{background:#e9f0ff;border-color:#d6e2ff}
+body[data-finder=chat] .dc-welcome-mark .icon{filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
+body[data-finder=chat] .dc-welcome-prompts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+body[data-finder=chat] .dc-welcome-prompts>button{flex-direction:column;align-items:flex-start;gap:6px;padding:16px 18px;border:1px solid var(--fc-line);border-radius:14px;background:#fbfcff;color:var(--fc-ink);font-size:16px;min-height:96px;text-align:left}
+body[data-finder=chat] .dc-welcome-prompts>button:hover{border-color:#5778ff;background:#f4f7ff}
+body[data-finder=chat] .dc-welcome-prompts>button b{font-weight:750}
+body[data-finder=chat] .dc-welcome-prompts .icon{width:24px;height:24px;filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
+body[data-finder=chat] .dc-prompt-hint{font-size:12px;font-weight:600;color:var(--fc-muted)}
+body[data-finder=chat] .dc-draft-chip{border-color:var(--fc-line);background:#fff;color:#2d3a5c}
+body[data-finder=chat] .dc-message-user>p{background:#e6eeff;border-color:#d6e2ff;color:var(--fc-ink)}
+body[data-finder=chat] .dc-composer{border-color:#9fb4f5;box-shadow:0 6px 22px rgb(28 60 139 / .07)}
+body[data-finder=chat] .dc-composer:focus-within{outline-color:#c6d5ff}
+body[data-finder=chat] .dc-composer .btn{font-size:16px;min-height:50px;padding:12px 22px;border-radius:12px}
+body[data-finder=chat] .dc-tabs{background:#e3ebfb}
+body[data-finder=chat] .dc-tabs>button[aria-selected=true]{color:var(--fc-deep)}
+body[data-finder=chat] .dc-tabs button>span{background:#d9e4ff;color:var(--fc-deep)}
+
+/* 추천 패널 — 구매 · 선택 · 비교를 크게 */
+body[data-finder=chat] .dc-chat-side>.dc-feature{order:-2}
+body[data-finder=chat] .dc-feature{border:1px solid var(--fc-line);border-radius:18px;background:#fff;overflow:hidden;margin-bottom:18px;box-shadow:0 10px 32px rgb(28 60 139 / .08)}
+body[data-finder=chat] .dc-feature-head{background:var(--fc-blue);color:#fff;padding:18px 20px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+body[data-finder=chat] .dc-feature-head h2{display:flex;align-items:center;gap:8px;font-size:20px;font-weight:800;letter-spacing:-.03em;margin:0}
+body[data-finder=chat] .dc-feature-head h2 .icon{width:22px;height:22px;filter:invert(1)}
+body[data-finder=chat] .dc-feature-head small{font-size:11px;opacity:.85}
+body[data-finder=chat] .dc-feature-body{display:grid;grid-template-columns:112px minmax(0,1fr);gap:14px;padding:18px 18px 4px}
+body[data-finder=chat] .dc-feature-photo{display:flex;align-items:center;justify-content:center;aspect-ratio:1;border-radius:12px;background:#f3f6fc;overflow:hidden}
+body[data-finder=chat] .dc-feature-photo img{width:100%;height:100%;object-fit:contain}
+body[data-finder=chat] .dc-feature-info{min-width:0}
+body[data-finder=chat] .dc-feature-info h3{font-size:17px;font-weight:800;line-height:1.35;letter-spacing:-.03em;overflow-wrap:anywhere}
+body[data-finder=chat] .dc-feature-info>p{font-size:12px;color:var(--fc-muted);margin-top:6px;line-height:1.55}
+body[data-finder=chat] .dc-feature-info>strong{display:block;font-size:24px;font-weight:850;letter-spacing:-.03em;margin-top:8px;font-variant-numeric:tabular-nums}
+body[data-finder=chat] .dc-feature-actions{display:grid;gap:10px;padding:14px 18px 6px}
+body[data-finder=chat] .dc-feature-actions .dc-feature-buy{min-height:58px;font-size:18px;font-weight:800;border-radius:12px;width:100%}
+body[data-finder=chat] .dc-feature-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+body[data-finder=chat] .dc-feature-pair .btn{min-height:52px;font-size:15px;font-weight:750;border-radius:12px;padding:10px 12px;gap:7px}
+body[data-finder=chat] .dc-feature-pair .btn .icon{width:19px;height:19px}
+body[data-finder=chat] .dc-feature-detail{display:inline-flex;align-items:center;gap:7px;font-weight:750;font-size:15px;padding:6px 0;justify-self:start}
+body[data-finder=chat] .dc-feature-detail .icon{width:19px;height:19px}
+body[data-finder=chat] .dc-feature-note{font-size:12px;color:var(--fc-muted);text-align:center}
+body[data-finder=chat] .dc-feature-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0;margin:12px 18px 18px;padding:12px 16px;border-radius:12px;background:var(--fc-soft)}
+body[data-finder=chat] .dc-feature-summary>div{min-width:0}
+body[data-finder=chat] .dc-feature-summary>div+div{border-left:1px solid #d3def5;padding-left:16px;margin-left:16px}
+body[data-finder=chat] .dc-feature-summary dt{font-size:11px;color:var(--fc-muted)}
+body[data-finder=chat] .dc-feature-summary dd{margin:2px 0 0;font-size:14px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 비교 · 내 견적 · 상품 상세 */
+body[data-finder] .page-main :is(.dc-compare-table-wrap,.ds-panel,.ds-saved-card,.cf-components,.cf-purchase,.cf-product-media){border-color:var(--fc-line)}
+body[data-finder] .page-main :is(.ds-panel,.cf-purchase){background:#fff}
+body[data-finder=product] .cf-purchase .btn-primary{min-height:56px;font-size:17px;font-weight:800}
+body[data-finder] .page-main :is(.dc-compare-table,.ds-panel) .btn-primary{font-weight:800}
+
+/* 상품 설명 자리 — 부품 구성 바로 다음 */
+body[data-finder=product] .cf-description .cf-desc-body{background:#fff;border:1px solid var(--fc-line);border-radius:16px;padding:26px 28px}
+body[data-finder=product] .cf-description .cf-desc-title{font-size:19px;font-weight:800;margin:6px 0 10px}
+@media(max-width:800px){body[data-finder=product] .cf-description .cf-desc-body{padding:20px 18px}}
+
+@media(max-width:800px){
+  body[data-finder=chat] .dc-heading h1{font-size:29px;max-width:none}
+  body[data-finder=chat] .dc-heading>div>p.dc-lede{font-size:14px}
+  body[data-finder=chat] .dc-welcome-prompts{grid-template-columns:1fr}
+  body[data-finder=chat] .dc-welcome-prompts>button{min-height:0;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:13px 16px}
+  body[data-finder=chat] .dc-prompt-hint{margin-left:auto}
+  body[data-finder=chat] .dc-feature-actions .dc-feature-buy{font-size:17px}
+  body[data-finder=chat] .dc-feature-pair .btn{font-size:14px;padding:10px 8px}
+  body[data-finder=chat] .dc-feature-body{grid-template-columns:96px minmax(0,1fr)}
+}

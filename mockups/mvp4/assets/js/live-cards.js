@@ -181,13 +181,15 @@
   // ── 상품 상세 = 승인 구성 상세 + 기존 /mvp3 상세 정보 ──────────────────
   var C = P.configurationConceptV12;
   if (!C) return;
+  // 상품 설명 자리(2026-10-21 코발트 승인 「자리만」): 부품 구성 바로 다음에 늘 같은 구조를 둔다.
+  // 운영에 있는 소개(ABOUT THIS PC)는 이 자리 안에 그대로 보인다. 소개가 없는 상품은 자리만 두고 숨긴다 -- 설명을 지어 넣지 않는다.
   function intro(p) {
     var d = p.description;
-    if (!d) return '';
-    var benefits = (Array.isArray(d.benefits) ? d.benefits : []).map(function (b) { return Array.isArray(b) ? { title: b[0], text: b[1] } : b; }).filter(function (b) { return b && (b.title || b.text); });
-    return '<section class="cf-components" aria-labelledby="cf-intro-title"><div class="cf-section-heading"><div><span class="cf-eyebrow">ABOUT THIS PC</span><h2 id="cf-intro-title">' + h(d.title || '이 PC 소개') + '</h2></div></div>' +
+    var benefits = d ? (Array.isArray(d.benefits) ? d.benefits : []).map(function (b) { return Array.isArray(b) ? { title: b[0], text: b[1] } : b; }).filter(function (b) { return b && (b.title || b.text); }) : [];
+    var body = d ? '<span class="cf-eyebrow">ABOUT THIS PC</span><h3 class="cf-desc-title">' + h(d.title || '이 PC 소개') + '</h3>' +
       (d.intro ? '<p>' + h(d.intro) + '</p>' : '') + (d.scene ? '<p class="cf-muted">' + h(d.scene) + '</p>' : '') +
-      (benefits.length ? '<ul class="cf-benefits">' + benefits.map(function (b) { return '<li><strong>' + h(b.title || '') + '</strong>' + (b.text ? '<p>' + h(b.text) + '</p>' : '') + '</li>'; }).join('') + '</ul>' : '') + '</section>';
+      (benefits.length ? '<ul class="cf-benefits">' + benefits.map(function (b) { return '<li><strong>' + h(b.title || '') + '</strong>' + (b.text ? '<p>' + h(b.text) + '</p>' : '') + '</li>'; }).join('') + '</ul>' : '') : '';
+    return '<section class="cf-components cf-description" data-product-description aria-labelledby="cf-desc-heading"' + (body ? '' : ' hidden') + '><div class="cf-section-heading"><div><h2 id="cf-desc-heading">상품 설명</h2></div></div><div class="cf-desc-body">' + body + '</div></section>';
   }
   function checks(p) {
     var c = p.customerConditions;

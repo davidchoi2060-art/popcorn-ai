@@ -37,3 +37,6 @@
 .sc-mobile-purchase .sc-buy{width:auto;min-height:46px;padding:0 16px;font-size:15px}
 @media(max-width:800px){.sc-buy-foot{flex-direction:column;align-items:flex-start}.sc-buy-foot .sc-price-caption br{display:none}}
 @media(max-width:370px){.sc-sub{font-size:15px;gap:6px}.sc-sub .icon{width:18px;height:18px}}
+
+/* 상품 설명 자리(2026-10-21 코발트 승인): 제품 사양 바로 다음. 기존 설명 블록은 안에 그대로, 위 여백만 겹치지 않게. */
+.sc-description>.sc-section{margin-top:0}
