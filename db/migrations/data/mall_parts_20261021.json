@@ -1,0 +1,704 @@
+{
+ "source": "mall_pages_20261021",
+ "products": [
+  {
+   "code": 90621,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 90622,
+   "changes": [
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 90629,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 90631,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 90675,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 90678,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 90687,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 90691,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 92608,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 92805,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 93172,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 93454,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 96311,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 96988,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 96990,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 97000,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 98149,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 99025,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 99218,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 99413,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 99718,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 100866,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 100867,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 103732,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 110783,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 110785,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 113457,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 113840,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 113967,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 113968,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 114085,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 114096,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 114097,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 114098,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 119302,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 121227,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121228,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121229,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 121257,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121262,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121265,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121275,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 121290,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121499,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121501,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 121508,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121513,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    }
+   ],
+   "public_configuration": true
+  },
+  {
+   "code": 121560,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 121561,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "케이스",
+     "old": "[마이크로닉스] Master M60 MESH 블랙 HIT",
+     "old_qty": 1,
+     "new": "[MSI] MPG VIXTA 300R PZ 블랙",
+     "new_code": 130506
+    }
+   ],
+   "public_configuration": false
+  },
+  {
+   "code": 123380,
+   "changes": [
+    {
+     "slot": "CPU쿨러",
+     "old": "[ABKO] 자이로스 120X4 FRGB 블랙",
+     "old_qty": 1,
+     "new": "[JIUSHARK] JF120R Emerald RGB 블랙",
+     "new_code": 121846
+    },
+    {
+     "slot": "메모리(RAM)",
+     "old": "[삼성전자] DDR5-5600 16GB [8G x 2]",
+     "old_qty": 2,
+     "new": "[삼성전자] DDR5-5600 16GB [8G x 2]",
+     "new_code": 113162
+    }
+   ],
+   "public_configuration": false
+  }
+ ]
+}
