@@ -1,0 +1,35 @@
+/* 업무별 「이 업무에 사용할 PC」 칸 (2026-10-21 구매 1번 승인 — 시안 「AI 업무 설명 아래 · PC 선택」) */
+.tp-section{margin:56px 0 8px;padding:28px clamp(16px,3vw,32px) 32px;border:1px solid var(--line);border-radius:18px;background:#fff;scroll-margin-top:110px}
+.tp-steps{display:flex;flex-wrap:wrap;gap:6px 22px;list-style:none;counter-reset:tp;font-size:14px;color:var(--muted);padding-bottom:16px;border-bottom:1px solid var(--line)}
+.tp-steps li{counter-increment:tp;display:flex;align-items:center;gap:6px}
+.tp-steps li::before{content:counter(tp);display:grid;place-items:center;width:22px;height:22px;border:1px solid #c9ccd6;border-radius:50%;font-size:12px}
+.tp-steps li[aria-current]{color:#4a32d9;font-weight:700}.tp-steps li[aria-current]::before{background:#6c51ff;border-color:#6c51ff;color:#fff}
+.tp-head{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,360px);gap:20px;align-items:start;margin-top:22px}
+.tp-head h2{font-size:clamp(24px,2.6vw,32px);line-height:1.3}
+.tp-tasks{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.tp-task{display:inline-flex;align-items:center;min-height:42px;padding:0 18px;border:1px solid var(--line);border-radius:8px;font-size:15px;color:#4b5161}
+.tp-task.is-current{background:#6c51ff;border-color:#6c51ff;color:#fff;font-weight:700}
+.tp-note{margin-top:10px;font-size:14px;color:var(--muted)}
+.tp-reuse{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border:1px solid #e3dcff;border-radius:14px;background:#f8f6ff}
+.tp-reuse strong{display:block;font-size:16px}.tp-reuse p{font-size:14px;color:var(--muted)}
+.tp-reuse .btn{flex:0 0 auto;min-height:42px;white-space:nowrap}.tp-reuse .icon{width:16px;height:16px}
+.tp-empty{margin-top:22px;padding:22px;border:1px dashed #c9ccd6;border-radius:14px;background:var(--soft)}
+.tp-empty h3{font-size:18px}.tp-empty p{margin-top:8px;font-size:15px;color:#4b5161;line-height:1.65}
+.tp-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:22px}
+.tp-card{position:relative;display:grid;grid-template-columns:150px 1fr;gap:16px;padding:18px;border:1px solid var(--line);border-radius:14px}
+.tp-card img{width:150px;height:auto;object-fit:contain;align-self:start;margin-top:26px}
+.tp-tag{position:absolute;left:18px;top:14px;padding:2px 10px;border-radius:999px;background:#fff3c4;color:#7a4b00;font-size:12px;font-weight:700}
+.tp-body h3{font-size:19px;margin-top:22px}.tp-body small{color:var(--muted);font-size:13px}
+.tp-specs{font-size:14px;color:#4b5161;margin-top:6px}.tp-price{font-size:20px;font-weight:800;margin-top:6px}.tp-price small{display:block;font-size:12px;font-weight:400;color:var(--muted)}
+.tp-why,.tp-limit{font-size:14px;margin-top:8px}.tp-cond{margin:6px 0 0 18px;font-size:14px;color:#4b5161}
+.tp-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.tp-actions .btn{min-height:42px}
+.tp-buy{background:#141414;color:#fff;border:1px solid #141414}.tp-compare{background:#f1edff;color:#4a32d9;border:1px solid #e3dcff}.tp-compare .icon{width:16px;height:16px}
+.tp-status{font-size:13px;margin-top:6px}.tp-status:empty{display:none}.tp-status a{color:#4a32d9;text-decoration:underline}
+.tp-basis{margin-top:18px;font-size:15px}.tp-basis summary{cursor:pointer;font-weight:700;min-height:40px;display:flex;align-items:center}
+.tp-basis ul{margin:6px 0 0 20px;color:#4b5161}.tp-basis p{margin-top:8px;font-size:14px;color:var(--muted)}
+.tp-band{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px 18px;align-items:center;margin-top:22px;padding:18px 20px;border-radius:14px;background:#f1edff}
+.tp-band strong{display:block;font-size:17px;color:#3b25c4}.tp-band p{font-size:14px;color:#4b5161}
+.tp-consult{background:#6c51ff;color:#fff;border:1px solid #6c51ff;min-height:46px;white-space:nowrap}.tp-consult .icon{width:18px;height:18px;filter:brightness(0) invert(1)}
+.tp-company{grid-column:1 / -1;font-size:13px;color:#4b5161;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:900px){.tp-head{grid-template-columns:1fr}}
+@media(max-width:640px){.tp-section{margin-top:40px;padding:20px 16px 22px}.tp-card{grid-template-columns:1fr}.tp-card img{margin:24px auto 0}.tp-task{flex:1 1 auto;justify-content:center;padding:0 10px}.tp-reuse{flex-direction:column;align-items:flex-start}.tp-reuse .btn{width:100%;justify-content:center}.tp-band{grid-template-columns:1fr}.tp-consult{width:100%;justify-content:center}}

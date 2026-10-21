@@ -61,7 +61,26 @@
       '<div class="sc-facts">' + facts(p).map(function (s) { return '<div>' + icon(s[0]) + '<span>' + h(s[1]) + '</span><strong>' + h(val(s[2])) + '</strong>' + (s[3] ? '<small class="sc-derived">상품명 기준</small>' : '') + '</div>'; }).join('') + '</div>' + choices(p) +
       '<div class="sc-purchase"><div class="sc-unit-price"><span>판매가 <small>1대 기준</small></span><strong>' + h(stopped ? '판매 중지' : money(price(p))) + '</strong></div><div class="sc-quantity-row"><label id="sc-quantity-label">수량</label><div class="sc-quantity" role="group" aria-labelledby="sc-quantity-label"><button type="button" data-sc-minus aria-label="수량 한 대 줄이기"' + (q <= 1 ? ' disabled' : '') + '>−</button><output data-sc-quantity aria-live="polite">' + q + '<span>대</span></output><button type="button" data-sc-plus aria-label="수량 한 대 늘리기"' + (q >= 10 ? ' disabled' : '') + '>+</button></div></div><div class="sc-total-row"><span>상품 합계</span><strong data-sc-total>' + h(money(price(p) === null ? null : price(p) * q)) + '</strong></div>' +
       (unavailable ? '<div class="sc-availability" role="status">' + icon('warning-circle') + '<div><strong>' + (stopped ? '현재 판매가 중지된 상품이에요.' : '현재 판매 여부를 확인하고 있어요.') + '</strong><p>문의하시면 공급 일정과 구매 가능 여부를 안내해 드립니다.</p></div></div>' : '') +
-      '<div class="sc-actions"><a class="btn btn-primary" data-sc-action="quote" href="' + h(route('quote')) + '">' + (unavailable ? '장비 입고 문의' : '장비 견적 문의') + icon('arrow-right') + '</a><a class="btn sc-adoption" data-sc-action="adoption" href="' + h(route('adoption')) + '">' + icon('chat-circle') + 'AI 설치 상담</a></div><p class="sc-price-caption">가격·공급 일정은 문의 시 확인합니다. AI 설치·교육은 별도 상담하며, 지원 가능 여부를 먼저 검토합니다.</p></div></div></section>';
+      buyPanel(p) + '</div></div></section>';
+  }
+  // 구매 패널(2026-10-21 구매·견적·AI 비교 1번 승인): 주 버튼 = 팝콘PC몰에서 구매, 보조 = 견적에 저장 · AI로 비교하기,
+  // 낮은 자리 = AI 설치·구축 상담. 네 행동을 같은 무게로 늘어놓지 않는다. 구매·저장·비교가 모두 지금 고른 상품(id)·수량(q)을 쓴다.
+  //   판매 중지  -> 구매·저장 없음, 장비 입고 문의만
+  //   링크 없음  -> 「구매 링크 확인 필요」(몰 홈·검색으로 대체하지 않는다)
+  //   가격 확인  -> 구매는 열되 안내창이 «가격 확인 필요 · 최종 가격은 몰에서»를 말한다. 저장은 가격이 있을 때만.
+  function buyLink(p, cls) {
+    return P.mallBuyAnchor ? P.mallBuyAnchor({ id: p.id, url: p.mallUrl, name: p.name, model: p.modelLabel, quantity: q, price: price(p), image: p.images[0] ? p.images[0].src : null, cls: cls, label: '팝콘PC몰에서 구매' }) : '';
+  }
+  function buyPanel(p) {
+    var stopped = p.saleState === 'stopped', buy = stopped ? '' : buyLink(p, 'btn sc-buy');
+    var main = buy || '<button type="button" class="btn sc-buy" disabled>' + (stopped ? '판매 중지' : '팝콘PC몰 구매 링크 확인 필요') + '</button>';
+    var canSave = !stopped && price(p) !== null;
+    return '<div class="sc-buy-actions" data-sc-buy-panel>' + main +
+      '<div class="sc-sub-actions"><button type="button" class="btn sc-sub" data-sc-save' + (canSave ? '' : ' disabled') + '>' + icon('bookmark-simple') + '견적에 저장</button>' +
+      '<button type="button" class="btn sc-sub" data-sc-compare>' + icon('arrows-left-right') + 'AI로 비교하기</button></div>' +
+      '<p class="sc-action-status" data-sc-status role="status" aria-live="polite"></p></div>' +
+      '<div class="sc-buy-foot"><p class="sc-price-caption">장비 구매 가격입니다. AI 설치·교육·업무 구축은 별도 상담합니다.<br>부품 가격 변동으로 판매 금액이 달라질 수 있습니다.' + (canSave ? '' : ' 가격이 확인된 상품만 견적에 저장할 수 있습니다.') + '</p>' +
+      (stopped ? '<a class="sc-inline-link" data-sc-action="quote" href="' + h(route('quote')) + '">장비 입고 문의 ' + icon('arrow-right') + '</a>' : '<a class="sc-inline-link sc-adoption-link" data-sc-action="adoption" href="' + h(route('adoption')) + '">AI 설치·구축 상담 ' + icon('arrow-right') + '</a>') + '</div>';
   }
   var GENERIC_FAQ = [
     ['사내 문서 검색도 바로 제공되나요?', '제품 구매는 하드웨어 기준입니다. 업무형 로컬 AI 패키지가 기본 포함되는 것은 아닙니다. 문서 검색 등 필요한 기능, 데이터 연결, 설치·교육 범위와 지원 가능 여부는 별도 상담에서 확인합니다.'],
@@ -91,7 +110,8 @@
       '<a class="sc-back-link" href="' + h(listUrl()) + '">' + icon('arrow-left') + '다른 AI 슈퍼컴퓨터 보기</a>';
   }
   function sticky(p) {
-    return '<aside class="sc-mobile-purchase" aria-label="상품 견적 바로가기"><div><span>상품 합계 · <b data-sc-mobile-quantity>' + q + '</b>대</span><strong data-sc-total>' + h(money(price(p) === null ? null : price(p) * q)) + '</strong></div><a class="btn btn-primary" data-sc-action="quote" href="' + h(route('quote')) + '">' + (p.saleState !== 'on_sale' ? '장비 입고 문의' : '장비 견적 문의') + icon('arrow-right') + '</a></aside>';
+    var buy = p.saleState === 'stopped' ? '' : buyLink(p, 'btn sc-buy');
+    return '<aside class="sc-mobile-purchase" aria-label="상품 구매 바로가기"><div><span>상품 합계 · <b data-sc-mobile-quantity>' + q + '</b>대</span><strong data-sc-total>' + h(money(price(p) === null ? null : price(p) * q)) + '</strong></div>' + (buy || '<a class="btn btn-primary" data-sc-action="quote" href="' + h(route('quote')) + '">장비 입고 문의' + icon('arrow-right') + '</a>') + '</aside>';
   }
   function loading() {
     return '<div class="container sc-page">' + crumb() + '<section class="sc-empty" aria-busy="true"><span class="sc-empty-icon">' + icon('cpu') + '</span><p class="sc-eyebrow">AI 슈퍼컴퓨터</p><h1>상품 정보를 불러오고 있어요.</h1><p>현재 가격과 판매 상태를 확인합니다.</p></section></div>';
@@ -124,7 +144,34 @@
     });
     app.querySelector('[data-sc-minus]').addEventListener('click', function () { changeQuantity(q - 1); });
     app.querySelector('[data-sc-plus]').addEventListener('click', function () { changeQuantity(q + 1); });
+    var saveBtn = app.querySelector('[data-sc-save]'), cmpBtn = app.querySelector('[data-sc-compare]');
+    if (saveBtn) saveBtn.addEventListener('click', function () { save(saveBtn); });
+    if (cmpBtn) cmpBtn.addEventListener('click', compare);
     if (focusModel) { var selected = app.querySelector('[name="sc-model"]:checked'); if (selected) selected.focus({ preventScroll: true }); }
+  }
+  function status(html, bad) { var el = app.querySelector('[data-sc-status]'); if (!el) return; el.innerHTML = html; el.classList.toggle('is-bad', !!bad); }
+  // 견적에 저장: 같은 상품·수량은 같은 요청 번호로 보낸다 — 다시 누르거나 실패 뒤 다시 저장해도 서버에 한 건만 생긴다.
+  // 성공 문구는 서버가 저장했다고 답한 뒤에만 보인다. 저장은 상담 신청이 아니며 연락처를 묻지 않는다.
+  var saveIds = Object.create(null), saved = Object.create(null), saving = false;
+  function save(btn) {
+    var p = product, key = id + ':' + q, unit = price(p);
+    if (!p || unit === null || saving) return;
+    if (saved[key]) { status('이미 내 견적에 저장한 구성이에요. <a href="./?screen=saved">내 견적 보기</a>'); return; }
+    if (!P.savedQuotes) { status('지금은 저장할 수 없어요. 잠시 후 다시 시도해 주세요.', true); return; }
+    var want = id, wantQ = q;
+    saveIds[key] = saveIds[key] || P.savedQuotes.uuid();
+    saving = true; btn.disabled = true; btn.setAttribute('aria-busy', 'true'); status('내 견적에 저장하고 있어요.');
+    P.savedQuotes.saveDevice({ request_id: saveIds[key], product_code: Number(want), expected_price: unit, state: {}, sets: wantQ, kind: 'ai_device' }).then(function () {
+      saved[want + ':' + wantQ] = true;
+      if (want === id && wantQ === q) status('내 견적에 저장했어요. 저장만으로 상담이 신청되지는 않습니다. <a href="./?screen=saved">내 견적 보기</a>');
+    }, function (e) {
+      if (want === id && wantQ === q) status(h(P.savedQuotes.message(e, '저장하지 못했어요. 선택은 그대로예요. 다시 눌러 저장해 주세요.')), true);
+    }).then(function () { saving = false; var b = app.querySelector('[data-sc-save]'); if (b) { b.disabled = price(product) === null || product.saleState === 'stopped'; b.removeAttribute('aria-busy'); } });
+  }
+  // AI로 비교하기: 상품번호만 AI로 PC 찾기의 관심·비교상품으로 넘긴다. 이 화면을 떠나지 않는다(선택·수량 유지).
+  function compare() {
+    var ok = P.compareCarry && P.compareCarry.add('ai_device', id);
+    status(ok ? 'AI로 PC 찾기 관심·비교상품에 담았어요. 질문은 보내지 않았어요. <a href="./?screen=chat" target="_blank" rel="noopener">AI로 PC 찾기에서 보기 ↗</a>' : '이 브라우저에서는 비교 목록으로 넘길 수 없어요. 저장소 설정을 확인해 주세요.', !ok);
   }
   function changeQuantity(next) {
     q = Math.min(10, Math.max(1, next)); var p = product;
@@ -134,6 +181,8 @@
     app.querySelector('[data-sc-plus]').disabled = q >= 10;
     app.querySelectorAll('[data-sc-total]').forEach(function (node) { node.textContent = money(price(p) === null ? null : price(p) * q); });
     app.querySelectorAll('[data-sc-action]').forEach(function (a) { a.href = route(a.dataset.scAction); });
+    app.querySelectorAll('a[data-mall-buy]').forEach(function (a) { a.dataset.mallQty = String(q); });
+    status('');
     var url = new URL(window.location.href); url.searchParams.set('quantity', q); window.history.replaceState(null, '', url.href);
   }
   app.addEventListener('error', function (event) {

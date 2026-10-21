@@ -67,7 +67,7 @@ def test_dmr_footer_links_keep_personal_cta():
     assert "COMPANY_FROM" in s and "company-link" in s
     for k in ("documents: 'D'", "meetings: 'M'", "replies: 'R'"):
         assert k in s, k
-    assert "g.body() + companyLink(use)" in s
+    assert "main + companyLink(use)" in s
 
 
 def test_consult_company_mode_has_no_use_or_package_default():

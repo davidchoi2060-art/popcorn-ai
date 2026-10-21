@@ -24,6 +24,7 @@ from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import text
 
 from .db import engine
+from .mall_price_reader import product_url
 
 router = APIRouter()
 
@@ -42,7 +43,7 @@ _NODES = """
     )
 """
 _COLS = """
-    p.product_code, p.product_name, p.maker AS p_maker, p.sale_price, p.status,
+    p.product_code, p.product_name, p.maker AS p_maker, p.sale_price, p.status, p.part_type,
     d.display_name, d.maker, d.model_name, d.accelerator, d.processor, d.memory, d.storage, d.os, d.architecture,
     d.model_group, d.model_label, d.featured_rank, d.images, d.detail,
     EXISTS (SELECT 1 FROM product_explanations e WHERE e.source_product_code = p.product_code
@@ -123,6 +124,9 @@ def item(r, with_detail=False) -> dict:
         'images': _images(r),
         'price': price,
         'sale_state': state,
+        # 팝콘PC몰 상품 주소(2026-10-21 구매 1번 승인) — 상품번호(pd_no)가 이 상품 코드인 몰 상세 하나뿐이다.
+        # 몰 홈·검색·다른 모델로 대체하지 않는다. 주소 규칙의 단일 원천은 api/mall_price_reader.product_url.
+        'mall_url': product_url(r['product_code'], r.get('part_type')),
     }
     if with_detail:
         out['detail'] = r['detail'] if isinstance(r['detail'], dict) else {}
@@ -163,7 +167,7 @@ def supercomputer(code: int, response: Response):
             sib = conn.execute(text(_NODES + "SELECT " + _COLS + _FROM + " AND d.model_group = :g"
                                     " ORDER BY d.featured_rank NULLS LAST, p.product_code"),
                                {'key': KEY, 'g': found['model_group']}).mappings()
-            models = [{k: v for k, v in item(r).items() if k in ('product_code', 'model_label', 'price', 'sale_state')}
+            models = [{k: v for k, v in item(r).items() if k in ('product_code', 'model_label', 'price', 'sale_state', 'mall_url')}
                       for r in sib]
     if found is None:
         raise HTTPException(404, '이 상품은 AI 슈퍼컴퓨터 목록에 없습니다.')

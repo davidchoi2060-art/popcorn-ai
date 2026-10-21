@@ -20,10 +20,10 @@
     return { id: String(x.product_code), name: str(x.name) || '상품명 확인 필요', officialName: str(x.official_name), maker: str(x.maker), modelName: str(x.model_name),
       accelerator: str(x.accelerator), processor: str(x.processor), memory: str(x.memory), storage: str(x.storage), os: str(x.os), architecture: str(x.architecture),
       modelGroup: str(x.model_group), modelLabel: str(x.model_label), featuredRank: typeof x.featured_rank === 'number' ? x.featured_rank : null,
-      images: images, image: images.length ? images[0].src : null, price: price, saleState: state,
+      images: images, image: images.length ? images[0].src : null, price: price, saleState: state, mallUrl: str(x.mall_url),
       derived: Array.isArray(x.derived) ? x.derived.filter(function (k) { return typeof k === 'string'; }) : [],
       detail: x.detail && typeof x.detail === 'object' ? x.detail : {},
-      models: Array.isArray(x.models) ? x.models.map(function (m) { var mp = typeof m.price === 'number' && m.price > 0 ? m.price : null; return { id: String(m.product_code), label: str(m.model_label), price: mp, saleState: m.sale_state === 'on_sale' && mp !== null ? 'on_sale' : m.sale_state === 'stopped' ? 'stopped' : 'check' }; }) : [] };
+      models: Array.isArray(x.models) ? x.models.map(function (m) { var mp = typeof m.price === 'number' && m.price > 0 ? m.price : null; return { id: String(m.product_code), label: str(m.model_label), price: mp, mallUrl: str(m.mall_url), saleState: m.sale_state === 'on_sale' && mp !== null ? 'on_sale' : m.sale_state === 'stopped' ? 'stopped' : 'check' }; }) : [] };
   }
   function get(path) {
     var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 20000);

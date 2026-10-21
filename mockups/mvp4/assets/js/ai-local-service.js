@@ -111,7 +111,9 @@ var stages=[
   P.pages['ai-service'] = function () {
     var use = P.qs.get('use'), g = P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use) ? P.serviceGuides[use] : null;
     if (g && g.label) document.title = '회사 맞춤 내부 AI 구축 · ' + g.label + ' | 팝콘AI';
-    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? g.body() + companyLink(use) : unknown()) + '</div>', mount: g ? g.mount : null};
+    // 2026-10-21 구매 1번 승인 -- 구축 과정 뒤·설치 상담 앞에 「이 업무에 사용할 PC」 칸(ai-task-pc.js)을 끼운다.
+    var main = g ? (P.taskPc ? P.taskPc.insert(g.body(), use) : g.body()) : '';
+    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? main + companyLink(use) : unknown()) + '</div>', mount: g ? function () { if (g.mount) g.mount(); if (P.taskPc) P.taskPc.bind(); } : null};
   };
   function mount() {
     var root = document.getElementById('pop-local-service');
