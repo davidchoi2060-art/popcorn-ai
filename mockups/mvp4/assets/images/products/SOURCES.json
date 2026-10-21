@@ -1,0 +1,80 @@
+{
+ "note": "새 판매 PC 대표 사진(AI 조립 예시). 화면은 서버 승인 사진이 없을 때 몰 사진보다 먼저 쓴다(live-catalog.js LOCAL_PHOTOS). 실제 촬영 사진이 아니다.",
+ "images": [
+  {
+   "file": "assets/images/products/130569.webp",
+   "product_code": 130569,
+   "sha256": "35bd0c558357045bf160f8963c6b8abe1d2d978fe84894f8b7c9f86715ae5df3",
+   "bytes": 158880,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 120979,
+   "delivered_png_sha256": "b55ceb0276a87905429514c1ec2a8c30be2a39b0d5c5673a1e98b54113c5c3cb",
+   "batch": "popcorn-image-return-batch-01 (sha256 9d5f9232...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130571.webp",
+   "product_code": 130571,
+   "sha256": "123cfd7c5440556ff6dc48d5d7994e82b7c700d5778a824412025386bfc9a089",
+   "bytes": 249954,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 114455,
+   "delivered_png_sha256": "fbb880ed4fab0fc7e20c99f002e5472cf2b5c1ae68e39bb76f398f296cdafbfd",
+   "batch": "popcorn-image-return-batch-01 (sha256 9d5f9232...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130590.webp",
+   "product_code": 130590,
+   "sha256": "988ff91623d517393802f8d2161bb0fb917250a3bc1127ea414dee8b67b2ad58",
+   "bytes": 63614,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 121065,
+   "delivered_png_sha256": "3109f9c4573dd4e3c9499e3055e2c60d1611c71cb415352ccd801d7c9313dc50",
+   "batch": "popcorn-image-return-batch-01 (sha256 9d5f9232...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130655.webp",
+   "product_code": 130655,
+   "sha256": "d5ce5b7074908e54d1bf68d4e413985a85ef23993d7793497e98cd75c68485f5",
+   "bytes": 289932,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 115583,
+   "delivered_png_sha256": "6cc62c13aa5d953a3b8ec0603470a6df15c360970700d6a459c32516d0eaa5a4",
+   "batch": "popcorn-image-return-batch-01 (sha256 9d5f9232...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  },
+  {
+   "file": "assets/images/products/130673.webp",
+   "product_code": 130673,
+   "sha256": "2caccd9596c53fa63fc2a748d4d63851d9df6776bdd2a15166c2dd427321cfeb",
+   "bytes": 172150,
+   "size": [
+    1254,
+    1254
+   ],
+   "case_code": 108743,
+   "delivered_png_sha256": "27ac1df0d8a3b1c414920a83a5e3bf3b3297be4ca03ec2d8002a697b6c68cc85",
+   "batch": "popcorn-image-return-batch-01 (sha256 9d5f9232...)",
+   "kind": "AI 조립 예시 이미지 (Codex 제작, 2026-10-21)",
+   "notice": "AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음"
+  }
+ ]
+}
