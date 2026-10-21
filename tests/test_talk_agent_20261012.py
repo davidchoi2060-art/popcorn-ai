@@ -788,6 +788,8 @@ class CodexP2Budget(unittest.TestCase):
                          "예산 150만원을 넘는 PC만 있어요. 게임 PC A를 보세요.", [OVER], psu=650)
         self.assertNotIn("보여 드린 PC는", out["reply"])
         self.assertEqual(out["reply"].count("넘는 PC만"), 1)
+        # 금액이 없으면 초과액만 덧붙인다(2026-10-21 외부 재검증 P2-3).
+        self.assertIn("124,400원 높습니다", out["reply"])
 
     def test_f2_subset_never_claims_global_absence(self):            # R04 + 선택 대조
         for refs, has_lead, has_note in ((["P2"], True, False), (["P1"], False, False), (["P1", "P2"], False, True)):
@@ -923,14 +925,14 @@ class NoDeadEnd(unittest.TestCase):
         # 2026-10-16 개발 서버 86문항: 판매 안내 「쇼핑몰에서 확인」만 · 주제 밖 거절 · 경쟁사 「확인 불가」만 ·
         # 용도 없이 「조용한/화이트」에 되묻기만 · 예산 초과 PC만 보여 준 답이 일반 AI 보다 못하다고 판정됐다.
         for phrase in ("일반 안내라고 밝혀 덧붙인다", "거절하지 말고 일반 지식으로", "비교하는 요령",
-                       "가장 흔한 용도로 find_pcs", "nav=cheaper 로 한 번 더", "사람 상담 남기기"):
+                       "usages 를 비워(그 조건은 그대로 넣고) find_pcs", "nav=cheaper 로 한 번 더", "사람 상담 남기기"):
             self.assertIn(phrase, AG.SYSTEM)
         self.assertNotIn("여기서 도와드리기 어렵다고 짧게 말하고", AG.SYSTEM)
 
     def test_prompt_covers_second_round_on_dev_server(self):
         # 2026-10-16 배포 뒤 86문항 2회차: 부품 질문(램·파워·인텔/AMD·그래픽카드 하나)이 여전히 되묻기로 끝났고,
         # 예산 초과 때 더 싸게 찾아도 0장이었으며, 답이 일반 AI 보다 짧고 기준이 빠졌다는 판정이 많았다.
-        for phrase in ("되묻기만 하지 않는다. 설명한 뒤 가장 흔한 용도(게임, FHD)로 find_pcs", "부품 단품은 팔지 않는다",
+        for phrase in ("되묻기만 하지 않는다. 설명한 뒤 usages 를 비워 find_pcs", "부품 단품은 팔지 않는다",
                        "게임 이름을 빼고 용도·예산만으로", "기준·수치·이유", "과한 사양을 먼저 권하지 않는다"):
             self.assertIn(phrase, AG.SYSTEM)
         self.assertNotIn("- 2~5문장.", AG.SYSTEM)

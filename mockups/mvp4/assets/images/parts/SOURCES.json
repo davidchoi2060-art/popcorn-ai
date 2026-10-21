@@ -16,493 +16,528 @@
   },
   {
    "file": "assets/images/parts/mall-108743.webp",
-   "sha256": "701cfbafa3af5da99a7a645a6f15968cd38591a69d24c210fb15661ab2044ecb",
-   "bytes": 32808,
+   "sha256": "9c1c99a67a8b04b0b0c7ab6074dc850493c0dacc66f2a5158ace04b3548295e3",
+   "bytes": 44620,
    "size": [
-    396,
-    503
+    472,
+    600
    ],
    "applies_to": "케이스 Fractal Design Meshify 2 XL Light 강화유리 (몰 상품번호 108743)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/108/108743_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/108/108743_600.jpg",
-   "mall_name": "Fractal Design Meshify 2 XL Light 강화유리"
+   "mall_name": "Fractal Design Meshify 2 XL Light 강화유리",
+   "delivered_png_sha256": "6a386fca9d50d84c9defa4f20483c0c705b44a8a9914493520c4c3b184006c4e"
   },
   {
    "file": "assets/images/parts/mall-113132.webp",
-   "sha256": "07e38ca9b95266296a056c461e0f707846b4bbe03ddc01c1822f5ddf3f8a78fa",
-   "bytes": 17502,
+   "sha256": "ee77cbac53e9c822870ef7746a4d90d9efc747d387aea65b77f70b7a89a52131",
+   "bytes": 20590,
    "size": [
-    543,
-    138
+    600,
+    152
    ],
    "applies_to": "메모리(RAM) 삼성전자 DDR5-5600 (8GB) PC5-44800 * 2개 (몰 상품번호 113132)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/113/113132_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/113/113132_600.jpg",
-   "mall_name": "삼성전자 DDR5-5600 (8GB) PC5-44800 * 2개"
+   "mall_name": "삼성전자 DDR5-5600 (8GB) PC5-44800 * 2개",
+   "delivered_png_sha256": "31ce55be8eb9332fc9d7618f90b3a3d6bfa6658c57ef4b568e27f63871cfd842"
   },
   {
    "file": "assets/images/parts/mall-114455.webp",
-   "sha256": "2d0d828f7eff9ff71358d01e0ade73374e72eed483cb63452a04098f529825ba",
-   "bytes": 51314,
+   "sha256": "b081c111bdd4e60263bb8ef0d0b5a97c1eb9fe30e1145f3fd8cc68518f56ee3b",
+   "bytes": 55072,
    "size": [
-    476,
-    574
+    498,
+    600
    ],
    "applies_to": "케이스 리안리 LANCOOL III RGB (Black) (몰 상품번호 114455)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/114/114455_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/114/114455_600.jpg",
-   "mall_name": "리안리 LANCOOL III RGB (Black)"
+   "mall_name": "리안리 LANCOOL III RGB (Black)",
+   "delivered_png_sha256": "8932b712b5cb3e94da4a2fc00ca691fd31f2596e754d1455962f82006964b655"
   },
   {
    "file": "assets/images/parts/mall-114636.webp",
-   "sha256": "b6870d38b8ae471454c3bf0045239a0dd11bd8eb5fb3357d7d25691a4336b4fb",
-   "bytes": 23944,
+   "sha256": "985e5d5b12321baee8cbcf6425eed1b9dd421f68755287401995f1073b8ee006",
+   "bytes": 43542,
    "size": [
-    387,
-    389
+    597,
+    600
    ],
    "applies_to": "프로세서(CPU) AMD 라이젠5-4세대 5600 (버미어) (정품)[회원가입 계좌이체 맞춤할인 -2.5%] (몰 상품번호 114636)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/114/114636_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/114/114636_600.jpg",
-   "mall_name": "AMD 라이젠5-4세대 5600 (버미어) (정품)[회원가입 계좌이체 맞춤할인 -2.5%]"
+   "mall_name": "AMD 라이젠5-4세대 5600 (버미어) (정품)[회원가입 계좌이체 맞춤할인 -2.5%]",
+   "delivered_png_sha256": "200015da17c3f3ac79e65580493cf43d92906664037f45d256043531f6b82faa"
   },
   {
    "file": "assets/images/parts/mall-115583.webp",
-   "sha256": "66c3d04233a1336934f6424c04d66433897d4c4ec8fa0e0f56c9814a36b6d9e6",
-   "bytes": 75742,
+   "sha256": "bad8251fa0e94c97e6f85e22caad9676c82ef86342dcdef2cd59ff05a578d243",
+   "bytes": 89306,
    "size": [
-    562,
-    490
+    600,
+    523
    ],
    "applies_to": "케이스 JONSBO C6 White (미니타워) (몰 상품번호 115583)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/115/115583_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/115/115583_600.jpg",
-   "mall_name": "JONSBO C6 White (미니타워)"
+   "mall_name": "JONSBO C6 White (미니타워)",
+   "delivered_png_sha256": "284de888e424b0de563a4eaea4a17cfc6044141cf7c971940704ecbb19433ec4"
   },
   {
    "file": "assets/images/parts/mall-115973.webp",
-   "sha256": "1dea1e248ca492295723a07126b12238110ba5dc6e132d5cd01d668d39cec9bf",
-   "bytes": 29416,
+   "sha256": "c566e4d5a109283a894fbdd1cf67316fbcccb00b8963b36926a5fa36cdfacc98",
+   "bytes": 35534,
    "size": [
-    377,
-    566
+    400,
+    600
    ],
    "applies_to": "메모리(RAM) HIKSEMI DDR4-3200 CL18 HIKER (16GB) * 2개 (몰 상품번호 115973)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/115/115973_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/115/115973_600.jpg",
-   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (16GB) * 2개"
+   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (16GB) * 2개",
+   "delivered_png_sha256": "1e71f9fcd9b7e7e73e73ac8798ef859993d1e2f53d11f1317f933ddb3e7151af"
   },
   {
    "file": "assets/images/parts/mall-115974.webp",
-   "sha256": "1dea1e248ca492295723a07126b12238110ba5dc6e132d5cd01d668d39cec9bf",
-   "bytes": 29416,
+   "sha256": "c566e4d5a109283a894fbdd1cf67316fbcccb00b8963b36926a5fa36cdfacc98",
+   "bytes": 35534,
    "size": [
-    377,
-    566
+    400,
+    600
    ],
    "applies_to": "메모리(RAM) HIKSEMI DDR4-3200 CL18 HIKER (8GB) * 2개 (몰 상품번호 115974)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/115/115974_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/115/115974_600.jpg",
-   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (8GB) * 2개"
+   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (8GB) * 2개",
+   "delivered_png_sha256": "1e71f9fcd9b7e7e73e73ac8798ef859993d1e2f53d11f1317f933ddb3e7151af"
   },
   {
    "file": "assets/images/parts/mall-117060.webp",
-   "sha256": "bf141dd8cffacc8be0a5a52fa283757e81ecc1ef0194c33d5bec7518f7aa338d",
-   "bytes": 29942,
+   "sha256": "24de41357c2e99bbc1a25c4a57adf967d919de1dc1073100f51411217556a394",
+   "bytes": 44062,
    "size": [
-    480,
-    344
+    600,
+    430
    ],
    "applies_to": "CPU쿨러 Thermalright AXP120-X67 (몰 상품번호 117060)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/117/117060_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/117/117060_600.jpg",
-   "mall_name": "Thermalright AXP120-X67"
+   "mall_name": "Thermalright AXP120-X67",
+   "delivered_png_sha256": "3f2e6bc12c6cc299df8f74f010420c1b43daf4d21aa709dd6c9ed98faf2c33d5"
   },
   {
    "file": "assets/images/parts/mall-117460.webp",
-   "sha256": "f0fddbeec6c70e2be42f3aff3e4a9bb683a538d28701c832970fb570fcaa09aa",
-   "bytes": 38252,
+   "sha256": "69ede6ef8401a338fc7c76b171a654f7fd00aa03a1e252e6f8f771f6deec3453",
+   "bytes": 59112,
    "size": [
-    404,
-    463
+    524,
+    600
    ],
    "applies_to": "CPU쿨러 3RSYS TEAMMOST RC800 ARGB (몰 상품번호 117460)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/117/117460_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/117/117460_600.jpg",
-   "mall_name": "3RSYS TEAMMOST RC800 ARGB"
+   "mall_name": "3RSYS TEAMMOST RC800 ARGB",
+   "delivered_png_sha256": "76b27e047f2876d6801931821e1848017c991e7b51a7bdfbf2b39cc416dbaf5f"
   },
   {
    "file": "assets/images/parts/mall-121065.webp",
-   "sha256": "00ddc6a6459cd447869dc3800c8cd59c42a040ee2f71ae05ca192ffea612c6c8",
-   "bytes": 12520,
+   "sha256": "7f8a259659d3907f865ec5c69e68b4e4c50714aba8ff42a4372bd2a016fdab87",
+   "bytes": 19186,
    "size": [
-    273,
-    441
+    371,
+    600
    ],
    "applies_to": "케이스 마이크로닉스 COOLMAX 버디 (미들타워) (몰 상품번호 121065)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/121/121065_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/121/121065_600.jpg",
-   "mall_name": "마이크로닉스 COOLMAX 버디 (미들타워)"
+   "mall_name": "마이크로닉스 COOLMAX 버디 (미들타워)",
+   "delivered_png_sha256": "8bea87225a890379cbb84ce71835bfe04c2f9eb545a9d0c04ca0e8710c7f1ff0"
   },
   {
    "file": "assets/images/parts/mall-121725.webp",
-   "sha256": "696020d5df3b0225e617cf6580e6a5496bc4543df79266278f3d7b28a79bffef",
-   "bytes": 30916,
+   "sha256": "dea5d85ac980a6c19de8c1f4ff44e6dc4880f850fa112dbe4100751d593c1fb8",
+   "bytes": 35814,
    "size": [
-    555,
-    405
+    600,
+    438
    ],
    "applies_to": "파워 [마이크로닉스]Classic II 750W 80PLUS골드 풀모듈러 ATX3.1 (몰 상품번호 121725)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/121/121725_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/121/121725_600.jpg",
-   "mall_name": "[마이크로닉스]Classic II 750W 80PLUS골드 풀모듈러 ATX3.1"
+   "mall_name": "[마이크로닉스]Classic II 750W 80PLUS골드 풀모듈러 ATX3.1",
+   "delivered_png_sha256": "69772c8cfce3eda47e83b01ec5fb4df5ba9463fb0eea2acf62a9bb2e06131b5f"
   },
   {
    "file": "assets/images/parts/mall-121827.webp",
-   "sha256": "a762c98039abf7cf045fe705e4db762beb9fd92fda0022a3b039fee34c7f37db",
-   "bytes": 31188,
+   "sha256": "5bbd500481d4230088c5d897d17f6e5b0f3be7d10d67381750bbe642c0289ae1",
+   "bytes": 36052,
    "size": [
-    555,
-    405
+    600,
+    438
    ],
    "applies_to": "파워 [마이크로닉스] Classic II 1050W 80PLUS골드 풀모듈러 ATX3.1 (몰 상품번호 121827)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/121/121827_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/121/121827_600.jpg",
-   "mall_name": "[마이크로닉스] Classic II 1050W 80PLUS골드 풀모듈러 ATX3.1"
+   "mall_name": "[마이크로닉스] Classic II 1050W 80PLUS골드 풀모듈러 ATX3.1",
+   "delivered_png_sha256": "9d6574945c4288488b28d35773539c71516fa75ff4c9c32975680805312baafe"
   },
   {
    "file": "assets/images/parts/mall-122148.webp",
-   "sha256": "2dcb2f0d734e9688d6416ee4088b2269a43cd68f9d00982ca742d2f258c45369",
-   "bytes": 36932,
+   "sha256": "1519cb9efb7a33d5571585080122926ad34e900d519fa343878b8aee3b40f0a5",
+   "bytes": 55346,
    "size": [
-    464,
-    378
+    600,
+    489
    ],
    "applies_to": "메인보드 [ASUS] ProArt X870E-CREATOR WIFI (몰 상품번호 122148)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/122/122148_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/122/122148_600.jpg",
-   "mall_name": "[ASUS] ProArt X870E-CREATOR WIFI"
+   "mall_name": "[ASUS] ProArt X870E-CREATOR WIFI",
+   "delivered_png_sha256": "332b91514baabb97d804910b8554235810c00736e576c0c375e2b2aee3c2b9a1"
   },
   {
    "file": "assets/images/parts/mall-123857.webp",
-   "sha256": "d4f14f46181175be9f80d68b7d84cba276968edf1dbfaf9cd65e1f185796dd73",
-   "bytes": 24262,
+   "sha256": "9ec7ec78d39b081909563473f959742891fd8505532af2fc5ade6688730988f2",
+   "bytes": 46340,
    "size": [
-    378,
-    341
+    600,
+    541
    ],
    "applies_to": "프로세서(CPU) [AMD] 라이젠7 피닉스 8700G [Turbo 5.1GHz, 8코어/16쓰레드, AMD Radeon 780M] (몰 상품번호 123857)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/123/123857_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/123/123857_600.jpg",
-   "mall_name": "[AMD] 라이젠7 피닉스 8700G [Turbo 5.1GHz, 8코어/16쓰레드, AMD Radeon 780M]"
+   "mall_name": "[AMD] 라이젠7 피닉스 8700G [Turbo 5.1GHz, 8코어/16쓰레드, AMD Radeon 780M]",
+   "delivered_png_sha256": "4aad36d5227a040dfe487d2982512d8ef091991f9f0948804d0dd5f985fefa45"
   },
   {
    "file": "assets/images/parts/mall-126066.webp",
-   "sha256": "c4f4de1a46e498ece3f561cc8495ae178925d4f5ffac8915132076885e229a5c",
-   "bytes": 49934,
+   "sha256": "5f42757cf5599c95c5a91ae95d9c0a0a116ede443e43b867edcda1b8c8985197",
+   "bytes": 53162,
    "size": [
-    599,
-    424
+    600,
+    425
    ],
    "applies_to": "그래픽(VGA) [PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S D7 16GB (몰 상품번호 126066)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/126/126066_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/126/126066_600.jpg",
-   "mall_name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S D7 16GB"
+   "mall_name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S D7 16GB",
+   "delivered_png_sha256": "8920067d43a9200a30ddff2801680c4add7fb07c000a8ab5d2020477d8adb97d"
   },
   {
    "file": "assets/images/parts/mall-126178.webp",
-   "sha256": "a8880cf6bd2206a1162658ba5fc0720172b4a73c8e01771d384b4990d88307e6",
-   "bytes": 23908,
+   "sha256": "c073b655bee45e94cc079f6e40d634bf08f7003145dd7574c0109253e302a6fa",
+   "bytes": 24900,
    "size": [
-    586,
-    173
+    600,
+    177
    ],
    "applies_to": "초고속(SSD) 삼성전자 9100 PRO M.2 NVMe (4TB) (몰 상품번호 126178)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/126/126178_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/126/126178_600.jpg",
-   "mall_name": "삼성전자 9100 PRO M.2 NVMe (4TB)"
+   "mall_name": "삼성전자 9100 PRO M.2 NVMe (4TB)",
+   "delivered_png_sha256": "642e35a4efb4faa2486286ce8a3994c10fb26a00ffe9d24cdf0155224727327a"
   },
   {
    "file": "assets/images/parts/mall-126179.webp",
-   "sha256": "66b302da1d84bbc24d8fec911f6b2583a32d4ab661e5ff43ba18fe995bb71676",
-   "bytes": 15020,
+   "sha256": "c2c3479e2111e26e4250d62460db0990f018522466650016fe2c31a2f430dd99",
+   "bytes": 21034,
    "size": [
-    471,
-    141
+    600,
+    180
    ],
    "applies_to": "초고속(SSD) 삼성전자 9100 PRO M.2 NVMe (2TB) (몰 상품번호 126179)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/126/126179_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/126/126179_600.jpg",
-   "mall_name": "삼성전자 9100 PRO M.2 NVMe (2TB)"
+   "mall_name": "삼성전자 9100 PRO M.2 NVMe (2TB)",
+   "delivered_png_sha256": "ef585349a46a129088a15bffffb7e3697cc2938ca29e73ec619428279a829326"
   },
   {
    "file": "assets/images/parts/mall-126231.webp",
-   "sha256": "517a378eff254a5fa4ae87739fb23ff89f9527892c0959979017fb7e3d2b01a0",
-   "bytes": 9318,
+   "sha256": "da95d3f08910a939e50fea73482f6fc919db630df1efc67cd7f916c531a53dfe",
+   "bytes": 16116,
    "size": [
-    402,
-    122
+    600,
+    182
    ],
    "applies_to": "초고속(SSD) Western Digital WD BLUE SN5000 M.2 NVMe (1TB) (몰 상품번호 126231)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/126/126231_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/126/126231_600.jpg",
-   "mall_name": "Western Digital WD BLUE SN5000 M.2 NVMe (1TB)"
+   "mall_name": "Western Digital WD BLUE SN5000 M.2 NVMe (1TB)",
+   "delivered_png_sha256": "cf960f93a6d916c467ffe96a90481695f38f2c91183b74b2f779b19927131516"
   },
   {
    "file": "assets/images/parts/mall-127255.webp",
-   "sha256": "8ede65233aa10773a1e29a7390fda0acbbb667543b09b3e8887f74e51ae0f03a",
-   "bytes": 41914,
+   "sha256": "429b3b6344cbaec11fdc187185b4577ebcc07bc25f77197bd3111a9297396419",
+   "bytes": 49172,
    "size": [
-    561,
-    326
+    600,
+    349
    ],
    "applies_to": "메모리(RAM) G.SKILL DDR5-6000 CL34 FLARE X5 J 패키지 (128GB(64Gx2))[회원가입 -2.5% 현금할인] (몰 상품번호 127255)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127255_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127255_600.jpg",
-   "mall_name": "G.SKILL DDR5-6000 CL34 FLARE X5 J 패키지 (128GB(64Gx2))[회원가입 -2.5% 현금할인]"
+   "mall_name": "G.SKILL DDR5-6000 CL34 FLARE X5 J 패키지 (128GB(64Gx2))[회원가입 -2.5% 현금할인]",
+   "delivered_png_sha256": "5300ab0d444ec7d7a429c5ed49f5a900cfb534e8c0fc7004de6f82cee9deda25"
   },
   {
    "file": "assets/images/parts/mall-127471.webp",
-   "sha256": "1090d46e1f627bf86d0d1e871b97c767fcc49d4ad007c12edbf3e68b26f28d32",
-   "bytes": 68138,
+   "sha256": "97bec2c8456225870cb29b7ae8a38a0bbaf7a06146f70c662861a74cb6d36dcb",
+   "bytes": 87170,
    "size": [
-    581,
-    582
+    599,
+    600
    ],
    "applies_to": "그래픽(VGA) PALIT 지포스 RTX 5060 Ti WHITE OC D7 16GB 이엠텍[회원가입 -2.5% 현금할인] (몰 상품번호 127471)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127471_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127471_600.jpg",
-   "mall_name": "PALIT 지포스 RTX 5060 Ti WHITE OC D7 16GB 이엠텍[회원가입 -2.5% 현금할인]"
+   "mall_name": "PALIT 지포스 RTX 5060 Ti WHITE OC D7 16GB 이엠텍[회원가입 -2.5% 현금할인]",
+   "delivered_png_sha256": "691eb5ad7c7b67404ad3696e52fcf4d6f1833ea7e74cc2b5f92fb226f7ef82c1"
   },
   {
    "file": "assets/images/parts/mall-127590.webp",
-   "sha256": "3c56330ff10d775517df8c4dee0816b593f7783d9d19e0cc97461f562eb5a5ce",
-   "bytes": 7088,
+   "sha256": "3eb507caa608f993139ae9ef4de8d7e90dfbc0a11a40a9eacacbfaed899ab5d9",
+   "bytes": 11300,
    "size": [
-    423,
-    112
+    600,
+    159
    ],
    "applies_to": "메모리(RAM) HIKSEMI DDR5-5600 CL46 HIKER (16GB) * 2개 (몰 상품번호 127590)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127590_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127590_600.jpg",
-   "mall_name": "HIKSEMI DDR5-5600 CL46 HIKER (16GB) * 2개"
+   "mall_name": "HIKSEMI DDR5-5600 CL46 HIKER (16GB) * 2개",
+   "delivered_png_sha256": "3aaf6687169fc08cc5320394bb8c083308787acebcc1d96e667f3c2a2f71df7e"
   },
   {
    "file": "assets/images/parts/mall-127596.webp",
-   "sha256": "c653027fe6b7b2c8d49e990d0dba35575a0e6ffc3a84489e08dfd929a5c9ccf8",
-   "bytes": 17394,
+   "sha256": "91861e109ff425eb776af5ccbee4db0330d1adb472b2502d4c2f6e53f88065f7",
+   "bytes": 30294,
    "size": [
-    530,
-    141
+    600,
+    160
    ],
    "applies_to": "메모리(RAM) ADATA DDR5-5600 CL46 LANCER BLADE 화이트 파인인포 (32GB) * 2개 (몰 상품번호 127596)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127596_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127596_600.jpg",
-   "mall_name": "ADATA DDR5-5600 CL46 LANCER BLADE 화이트 파인인포 (32GB) * 2개"
+   "mall_name": "ADATA DDR5-5600 CL46 LANCER BLADE 화이트 파인인포 (32GB) * 2개",
+   "delivered_png_sha256": "c1ef8b3a069e5505d71de8d54ad9635c993bf09647b394bda495504d6dee1664"
   },
   {
    "file": "assets/images/parts/mall-127674.webp",
-   "sha256": "5117fc84e1f00eade1c856502578be15a3227a9fc1d274645d5b6ece49ed001c",
-   "bytes": 36016,
+   "sha256": "07f3442bf81e8ef48afb2c966707788f8441c37586505ec91bb3f94caf0a02b5",
+   "bytes": 59622,
    "size": [
-    446,
-    284
+    600,
+    382
    ],
    "applies_to": "메인보드 ASUS B850M MAX GAMING WIFI 대원씨티에스 (몰 상품번호 127674)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127674_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127674_600.jpg",
-   "mall_name": "ASUS B850M MAX GAMING WIFI 대원씨티에스"
+   "mall_name": "ASUS B850M MAX GAMING WIFI 대원씨티에스",
+   "delivered_png_sha256": "6b61be3812373ac978792ae51d55f5a6956725058d8aecef6367df17c0b2821e"
   },
   {
    "file": "assets/images/parts/mall-127687.webp",
-   "sha256": "9d55c1ba426f5f9df8e16e700b2b4192991bd881a0ebe8c0eb240c40ebede166",
-   "bytes": 34232,
+   "sha256": "a44f66e87ea2b09dc7c21f80b393f64df8d7f14e099b45898c9b386cfaae773a",
+   "bytes": 39424,
    "size": [
-    555,
-    405
+    600,
+    438
    ],
    "applies_to": "파워 마이크로닉스 Classic II 1200W 80PLUS골드 풀모듈러 ATX3.1 (몰 상품번호 127687)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/127/127687_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/127/127687_600.jpg",
-   "mall_name": "마이크로닉스 Classic II 1200W 80PLUS골드 풀모듈러 ATX3.1"
+   "mall_name": "마이크로닉스 Classic II 1200W 80PLUS골드 풀모듈러 ATX3.1",
+   "delivered_png_sha256": "e1e0c63fd069f7b1f693e4c4fca39c0338f96e4e1b12517f99254def13953eb5"
   },
   {
    "file": "assets/images/parts/mall-128278.webp",
-   "sha256": "422e8163a32a5baa791284e6c4950227d841bfa8606889a57043d94b2c8e1270",
-   "bytes": 34820,
+   "sha256": "786e6e6ea8be69c8d17b762098c3dbf09ec1ceadc1043af741c70ebd5061dd9d",
+   "bytes": 57002,
    "size": [
-    439,
-    371
+    600,
+    507
    ],
    "applies_to": "메인보드 ASUS TUF Gaming X870E-PLUS WIFI7 대원씨티에스 (몰 상품번호 128278)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128278_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128278_600.jpg",
-   "mall_name": "ASUS TUF Gaming X870E-PLUS WIFI7 대원씨티에스"
+   "mall_name": "ASUS TUF Gaming X870E-PLUS WIFI7 대원씨티에스",
+   "delivered_png_sha256": "60cd89fa30518281e7ec4a81b79a67ef29b4c9c9478c59b79c2c205521bf4b49"
   },
   {
    "file": "assets/images/parts/mall-128453.webp",
-   "sha256": "0370074afad395aec5968faf6f8f16d6eea0089635356a405e5127cf578c287a",
-   "bytes": 8730,
+   "sha256": "b60ab3e45f0e126120168441d46fb5535fd6e8d95d2764f6befea93425564abd",
+   "bytes": 14722,
    "size": [
-    407,
-    123
+    600,
+    181
    ],
    "applies_to": "초고속(SSD) Western Digital WD Blue SN5100 M.2 NVMe (2TB) (몰 상품번호 128453)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128453_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128453_600.jpg",
-   "mall_name": "Western Digital WD Blue SN5100 M.2 NVMe (2TB)"
+   "mall_name": "Western Digital WD Blue SN5100 M.2 NVMe (2TB)",
+   "delivered_png_sha256": "eed6a63fb5165d63a02457f40a146cab21f19fab324d26fb206df683ca25da36"
   },
   {
    "file": "assets/images/parts/mall-128834.webp",
-   "sha256": "0c0ec25f5cbebdc561f8a4f13e19fc6b20b8052e6ee697d870d42f2b9069e608",
-   "bytes": 20808,
+   "sha256": "62932b715067d4b5a0f6ff15232c2eb35bfe2718ad8095bb642bceeb806fab4d",
+   "bytes": 34274,
    "size": [
-    339,
-    408
+    499,
+    600
    ],
    "applies_to": "프로세서(CPU) AMD 라이젠7-6세대 9700X (그래니트 릿지) (벌크 정품) (몰 상품번호 128834)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128834_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128834_600.jpg",
-   "mall_name": "AMD 라이젠7-6세대 9700X (그래니트 릿지) (벌크 정품)"
+   "mall_name": "AMD 라이젠7-6세대 9700X (그래니트 릿지) (벌크 정품)",
+   "delivered_png_sha256": "4596f868555a8d597699418ed94801ca42ca4a53744ed95f6d1bdb000a082888"
   },
   {
    "file": "assets/images/parts/mall-128873.webp",
-   "sha256": "496ac90099beb7aae06235ff136503681ff3ebf233afcf87d52390cdbd6e9f2b",
-   "bytes": 42192,
+   "sha256": "609b3081cc357b707fb5030b58118cc4166a70579c05734431f928b331b71405",
+   "bytes": 51260,
    "size": [
-    538,
-    448
+    600,
+    500
    ],
    "applies_to": "파워 마이크로닉스 Classic II 풀체인지 500W 80PLUS실버 ATX3.1 (몰 상품번호 128873)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128873_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128873_600.jpg",
-   "mall_name": "마이크로닉스 Classic II 풀체인지 500W 80PLUS실버 ATX3.1"
+   "mall_name": "마이크로닉스 Classic II 풀체인지 500W 80PLUS실버 ATX3.1",
+   "delivered_png_sha256": "492874e13726786876207690e2665cee28355d33366b6e276f1cc87f79dc688a"
   },
   {
    "file": "assets/images/parts/mall-128928.webp",
-   "sha256": "1e45ecad144b8e10c37c927ae1fa28368de970bf7a99194defb0aa1a6005813d",
-   "bytes": 10838,
+   "sha256": "e4fbedc2d242397e702cdee110637f9e49dfcd2bc20e1f6a67b469d84a9d1fac",
+   "bytes": 13002,
    "size": [
-    528,
-    250
+    600,
+    284
    ],
    "applies_to": "그래픽(VGA) NVIDIA RTX PRO 5000 Blackwell D7 48GB (병행수입) (몰 상품번호 128928)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128928_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128928_600.jpg",
-   "mall_name": "NVIDIA RTX PRO 5000 Blackwell D7 48GB (병행수입)"
+   "mall_name": "NVIDIA RTX PRO 5000 Blackwell D7 48GB (병행수입)",
+   "delivered_png_sha256": "b828aea14911f28a6dee5963f0d9b50cf9449c1f02718178ff5e74783ca2b35f"
   },
   {
    "file": "assets/images/parts/mall-128932.webp",
-   "sha256": "c186b65a3ebc4e29aed46a333280e6f23b8e907210da6024120d7d6c4cae1ef4",
-   "bytes": 9998,
+   "sha256": "c368295adbb2ee5d6ef0674abe719b0fd09ba15d5ef4b4c74f283ea0768cb1fb",
+   "bytes": 11308,
    "size": [
-    580,
-    274
+    600,
+    283
    ],
    "applies_to": "그래픽(VGA) NVIDIA RTX PRO 6000 Blackwell 워크스테이션 에디션 D7 96GB (병행수입) (몰 상품번호 128932)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/128/128932_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/128/128932_600.jpg",
-   "mall_name": "NVIDIA RTX PRO 6000 Blackwell 워크스테이션 에디션 D7 96GB (병행수입)"
+   "mall_name": "NVIDIA RTX PRO 6000 Blackwell 워크스테이션 에디션 D7 96GB (병행수입)",
+   "delivered_png_sha256": "063ea2f5a99e7b3fdbaa6819a9259c105487038fcfd4c046dc033bbacc934490"
   },
   {
    "file": "assets/images/parts/mall-129322.webp",
-   "sha256": "9b7c2435a421aca51e3a3ff55a2c1a0f3606fec64542598e2bb23cf2497a2020",
-   "bytes": 30904,
+   "sha256": "81020ca0546d4f596ed016e38ecbbdd50ee5eea1cf4652622be81ae159d2bc3a",
+   "bytes": 50988,
    "size": [
-    431,
-    248
+    600,
+    345
    ],
    "applies_to": "메인보드 [ASUS] PRIME A620AM-K (몰 상품번호 129322)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/129/129322_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/129/129322_600.jpg",
-   "mall_name": "[ASUS] PRIME A620AM-K"
+   "mall_name": "[ASUS] PRIME A620AM-K",
+   "delivered_png_sha256": "1736839a7b639267e24694851098e2e1be04b462c73fb30823955cc52b690859"
   },
   {
    "file": "assets/images/parts/mall-129346.webp",
-   "sha256": "b236fc56593415ed5f064526a785b1038713fa28a8e8682157e7acf734bc5adb",
-   "bytes": 84720,
+   "sha256": "30418886f7f31be545a02dcfa1e72e573cd7d7eb8fd7997ef30d5c1c4c6f6379",
+   "bytes": 90208,
    "size": [
-    479,
-    593
+    485,
+    600
    ],
    "applies_to": "CPU쿨러 DEEPCOOL AG400 G2 (몰 상품번호 129346)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/129/129346_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/129/129346_600.jpg",
-   "mall_name": "DEEPCOOL AG400 G2"
+   "mall_name": "DEEPCOOL AG400 G2",
+   "delivered_png_sha256": "854f2d34fb39aa8d8fbb6c0096fd5218027712411f23766cc75a400dbde13039"
   },
   {
    "file": "assets/images/parts/mall-129441.webp",
-   "sha256": "5f26583af3732e7d0dda3882a184c3f9f4cf373dfeff4208748d857f61031d0b",
-   "bytes": 100806,
+   "sha256": "13336885f102b958efe1caa12eca2d09cbc6f63ca6e2094cd97e06a7c72e4742",
+   "bytes": 113416,
    "size": [
-    560,
-    568
+    592,
+    600
    ],
    "applies_to": "CPU쿨러 DEEPCOOL AG620 G2 (몰 상품번호 129441)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/129/129441_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/129/129441_600.jpg",
-   "mall_name": "DEEPCOOL AG620 G2"
+   "mall_name": "DEEPCOOL AG620 G2",
+   "delivered_png_sha256": "86a404c8ba7fb1beeb2d71892266184a2a0c65b8d4342cd6aa8d9944e9f021b7"
   },
   {
    "file": "assets/images/parts/mall-129687.webp",
-   "sha256": "a5d6690b746ea8bd84279b71beff018ef71e0c570ecbeecc215a8d5449e1e187",
-   "bytes": 12654,
+   "sha256": "744ffaf76e5c600654e9fb806f619e68b5f2729e657d28dff0a36b1096ea3a83",
+   "bytes": 19338,
    "size": [
-    554,
-    153
+    600,
+    166
    ],
    "applies_to": "메모리(RAM) 마이크론 Crucial DDR5-6400 CL40 PRO OC Gaming Edition White 대원씨티에스 (32GB) * 2개 (몰 상품번호 129687)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/129/129687_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/129/129687_600.jpg",
-   "mall_name": "마이크론 Crucial DDR5-6400 CL40 PRO OC Gaming Edition White 대원씨티에스 (32GB) * 2개"
+   "mall_name": "마이크론 Crucial DDR5-6400 CL40 PRO OC Gaming Edition White 대원씨티에스 (32GB) * 2개",
+   "delivered_png_sha256": "9d32c9e91189b16c9b2f61000ccdf0edd467364e4281791cb4d4bc28af9bda42"
   },
   {
    "file": "assets/images/parts/mall-129849.webp",
-   "sha256": "1d6e45426be22d2e2cee306089aa87ad42f611949d23dc5e9880e3859f49dae0",
-   "bytes": 42988,
+   "sha256": "44aca9fd9b71e2cd4c3ed5656fab12b7bbe82b5651076a7cb62ed2b7571954b1",
+   "bytes": 56720,
    "size": [
-    532,
-    324
+    600,
+    365
    ],
    "applies_to": "메인보드 ASUS PRIME B650EM-A WIFI-CSM 대원씨티에스 (몰 상품번호 129849)",
-   "match": "same mall product; white background removed and trimmed (2026-10-21)",
+   "match": "same mall product; background removed, long side 600 (Codex batch-01 review, 2026-10-21)",
    "source_page": "https://www.popcornpc.co.kr/data/pimg/129/129849_600.jpg",
    "source_url": "https://www.popcornpc.co.kr/data/pimg/129/129849_600.jpg",
-   "mall_name": "ASUS PRIME B650EM-A WIFI-CSM 대원씨티에스"
+   "mall_name": "ASUS PRIME B650EM-A WIFI-CSM 대원씨티에스",
+   "delivered_png_sha256": "9f84c7dd089da7ee332ed692888f3dc8cc0992a3b0d7213cb024f4b92e044ffb"
   }
  ],
  "note2": "mall-{번호}.webp: 팝콘PC몰 부품 사진의 흰 배경만 걷고 여백을 자른 사본. 몰 원본보다 먼저 쓴다(api/customer_pc_registered.mall_photo)."

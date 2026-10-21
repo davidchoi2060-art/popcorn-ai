@@ -64,6 +64,9 @@ class FactBook:
     calls: list[dict] = field(default_factory=list)         # [{name, status}] -- 응답 meta 용
     request_text: str | None = None                       # 이 턴 실제 고객 문장(개인정보 마스킹 후)
     screen_action: dict | None = None                     # 저장/주문이 아닌 화면 이동 안내
+    # 용도를 모를 때 고루 찾을 용도 라벨(사무 라벨, 게임 라벨) -- talk_agent 가 어휘에서 정한다. 비면 고루 찾지 않는다.
+    spread_labels: tuple = ()
+    usage_unknown: bool = False                           # 손님이 이 대화에서 용도·게임을 한 번도 말하지 않았다(서버 판정)
 
     def add_item(self, it: dict) -> str:
         for ref, old in self.items.items():
@@ -438,6 +441,8 @@ def find_pcs(args: dict, book: FactBook) -> dict:
     units = args.get("units")
     if units is not None and (type(units) is not int or not 1 <= units <= 500):
         return _invalid("units 는 1~500 사이 정수(PC 대수)여야 한다")
+    if _spread_wanted(usages, games, args, book):
+        return _find_spread(args, book, budget, prefs, units)
     asked = {"usages": usages, "budget_won": budget, "budget_bound": args.get("budget_bound"), "games": games,
              "resolution": args.get("resolution"), "platform": args.get("platform"), "prefs": prefs}
     raw = {"usages": usages, "budget_won": budget, "budget_bound": args.get("budget_bound"),
@@ -481,6 +486,11 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                       "resolution": res.get("game_resolution"), "platform": res.get("platform")}
     book.anchor_code = res.get("anchor_code") or book.anchor_code
     book.state, book.nav = raw, nav
+    # 예산을 풀어 찾았으면 엔진은 예산 없이 판정해 over_budget 이 모두 거짓이다 -- 손님이 말한 예산으로 다시 잰다.
+    # 150만원 이하라고 했는데 262만원 PC가 «예산 초과» 표시 없이 오른쪽 카드에 섰다(2026-10-21 외부 재검증 P2-1).
+    asked_cap = budget if budget is not None and asked["budget_bound"] != "이상" and raw.get("budget_won") is None else None
+    if asked_cap is not None:
+        book.condition["asked_budget_won"] = asked_cap   # 답의 예산 안내(budget_note)도 손님이 말한 예산으로 잰다
     sets = []
     for cs in res.get("card_sets") or []:
         items = (cs.get("items") or [])[:MAX_ITEMS_PER_SET]
@@ -488,6 +498,8 @@ def find_pcs(args: dict, book: FactBook) -> dict:
         for it in items:
             if type(it.get("product_code")) is not int:
                 continue
+            if asked_cap is not None and type(it.get("price")) is int:
+                it = {**it, "over_budget": it["price"] > asked_cap}
             ref = book.add_item(it)
             if ref not in book.found:
                 book.found.append(ref)
@@ -504,6 +516,74 @@ def find_pcs(args: dict, book: FactBook) -> dict:
                 needs=res.get("needs") or [], assumed=res.get("assumed") or [],
                 dropped=[{"field": d.get("field"), "reason": d.get("reason")} for d in res.get("dropped") or []],
                 notes=res.get("talk_notes") or [], sets=sets)
+
+
+# ── 용도를 모를 때 고루 찾기 (2026-10-21 중헌 님 「70만원만 입력하면 무조건 게임용으로만 소개함」) ──────────────
+# 예산만 말한 손님에게 AI 가 「가장 흔한 용도」로 게임을 넣어 찾았고, 70만원 안 게임 PC 가 없어 넘는 게임 PC 한 대만
+# 「게임용 PC가 없습니다」와 함께 보였다. 손님이 용도·게임을 말한 적이 없으면 게임으로 단정하지 않는다 -- 사무·인강과
+# 가벼운 게임(롤 같은) 기준으로 예산 안 판매 PC 를 고루 찾고, 최신 게임(FHD)은 몇 원부터인지만 함께 준다.
+SPREAD_NOTE = ("손님이 용도를 말하지 않아 서버가 용도별로 고루 찾았다. 게임용으로 단정하지 않는다. 예산 안 PC를 용도별로 "
+               "보여 주고(사무·인강용인지 가벼운 게임용인지 PC마다 밝힌다), 예산 안에 없는 용도는 empty_reason 의 「○원부터」로 "
+               "말한다. 끝에 주로 쓰실 용도를 하나 묻고 예: 사무·인강 / 롤 같은 가벼운 게임 / 최신 게임 / 영상편집 을 든다.")
+SPREAD_CASUAL = "캐주얼 게임"
+
+
+def _is_game_label(label: str) -> bool:
+    from .sold_reco import fit_usage     # 순수 함수지만 sold_reco 가 DB 적재 모듈을 끌어오므로 쓸 때만 읽는다
+    return fit_usage(label) == "게임"
+
+
+def _spread_wanted(usages: list[str], games: list[str], args: dict, book: FactBook) -> bool:
+    """용도를 비워 불렀거나, 손님이 용도를 말한 적 없는데 AI 가 게임만 넣었으면 고루 찾는다(게임 이름·해상도를 말했으면 아니다)."""
+    if len(book.spread_labels) != 2 or games or args.get("resolution") or args.get("nav"):
+        return False
+    return not usages or (book.usage_unknown and all(_is_game_label(u) for u in usages))
+
+
+def _find_spread(args: dict, book: FactBook, budget, prefs, units) -> dict:
+    from . import grid_public as GP
+
+    office, game = book.spread_labels
+    base = {"budget_won": budget, "budget_bound": args.get("budget_bound"), "platform": args.get("platform"), "prefs": prefs}
+    book.units = units if units and units >= 2 else book.units
+    wants = {"units": book.units} if book.units else None
+    light = GP.recommend(GP.RecommendBody(state={**base, "usages": [office, game],
+                                                "game": {"names": [SPREAD_CASUAL], "resolution": None}}, wants=wants))
+    fhd = GP.recommend(GP.RecommendBody(state={**base, "usages": [game]}, wants=wants))
+    raw_sets = []
+    for cs in sorted(light.get("card_sets") or [], key=lambda c: _is_game_label(c.get("usage") or "")):   # 사무·인강 먼저
+        raw_sets.append((cs, "가벼운 게임(롤 같은)" if _is_game_label(cs.get("usage") or "") else cs.get("usage")))
+    for cs in (fhd.get("card_sets") or [])[:1]:
+        raw_sets.append((cs, "최신 게임(FHD)"))
+    any_within = any(not it.get("over_budget") and type(it.get("product_code")) is int
+                     for cs, _ in raw_sets for it in cs.get("items") or [])
+    sets, seen = [], set()
+    for cs, label in raw_sets:
+        out = []
+        for it in (cs.get("items") or [])[:MAX_ITEMS_PER_SET]:
+            code = it.get("product_code")
+            # 예산 안 PC 가 하나라도 있으면 예산 넘는 PC 는 카드 후보에서 뺀다 -- 그 용도는 「○원부터」로만 말한다.
+            if type(code) is not int or code in seen or (any_within and it.get("over_budget")):
+                continue
+            seen.add(code)
+            ref = book.add_item(it)
+            if ref not in book.found:
+                book.found.append(ref)
+            out.append({"ref": ref, **_compact_item(it)})
+        sets.append({"usage": label, "min_level": cs.get("min_level"), "min_level_work": cs.get("min_level_work"),
+                     "items": out, "demand": (cs.get("demand") or {}).get("notes") or [],
+                     "empty_reason": cs.get("empty_note") or cs.get("empty_reason")})
+    res = light if light.get("card_sets") else fhd
+    book.condition = {"usages": [office, game], "budget_won": res.get("budget_won"), "budget_bound": res.get("budget_bound"),
+                      "games": [], "game_grade": None, "resolution": None, "platform": res.get("platform"),
+                      "usage_unknown": True}
+    book.anchor_code = res.get("anchor_code") or book.anchor_code
+    # 화면에 넘기는 조건에는 용도를 넣지 않는다 -- 다음 턴에도 「용도 모름」이 이어지고, 화면에 「게임」 칩이 붙지 않는다.
+    book.state, book.nav = {**base, "usages": []}, None
+    found = sum(len(s["items"]) for s in sets)
+    return _res("ok" if found else "empty", snapshot_id=book.snapshot_id, as_of=book.as_of, condition=book.condition,
+                usage_unknown=True, note=SPREAD_NOTE, needs=[], assumed=[], dropped=[],
+                notes=(light.get("talk_notes") or [])[:4], sets=sets)
 
 
 # ── 이름으로 판매 PC 찾기 (2026-10-20 대표 신고 「추천한 골드 상품이 팝콘PC 원상품과 연동이 안 된다」) ──────
