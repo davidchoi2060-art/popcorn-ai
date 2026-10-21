@@ -133,6 +133,9 @@
       return get(CATALOG).then(function (res) {
         if (res.status !== 200 || !res.body || !Array.isArray(res.body.items)) throw new Error('catalog_' + res.status);
         P.catalogProducts = res.body.items.map(toProduct);
+        // 용도 수준표(팝콘 기준 · 실측 아님) — 찜목록 성능 비교가 수준 이름·순서·작업 설명을 읽는다. 판정 조건은 서버가 내지 않는다.
+        P.fitLevels = Array.isArray(res.body.levels) ? res.body.levels.filter(function (l) { return l && typeof l.usage === 'string' && typeof l.level === 'string' && typeof l.rank === 'number'; }) : [];
+        P.fitLevelsBasis = typeof res.body.levels_basis === 'string' ? res.body.levels_basis : '';
         P.live.state = P.catalogProducts.length ? 'ready' : 'empty';
         return P.catalogProducts;
       }).catch(function (err) { P.catalogProducts = []; P.live.state = 'error'; P.live.error = err; throw err; });

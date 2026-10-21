@@ -11,7 +11,7 @@ class Illustration(unittest.TestCase):
     def test_decorative_image_in_welcome_only(self):
         js = (MVP4 / 'assets/js/design-conversation.js').read_text(encoding='utf-8')
         self.assertIn('<img class="dc-welcome-art" src="assets/images/pc-finder-core-v3.webp" width="618" height="496" alt="" aria-hidden="true"', js)
-        for kept in ('어떤 PC가 필요하세요?', '하고 싶은 일부터 편하게 이야기해 주세요.', 'placeholder="용도와 예산을 편하게 알려주세요."', '/ 10,000자 · Shift+Enter 줄바꿈'):
+        for kept in ('어떤 PC가 필요하세요?', '하고 싶은 일부터 편하게 이야기해 주세요.', "'용도와 예산을 편하게 알려주세요.'", '/ 10,000자 · Shift+Enter 줄바꿈'):
             self.assertIn(kept, js)
         css = (MVP4 / 'assets/css/design-conversation.css').read_text(encoding='utf-8')
         self.assertIn('pointer-events:none', css[css.index('.dc-welcome>.dc-welcome-art'):])

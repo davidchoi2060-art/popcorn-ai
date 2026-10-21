@@ -53,8 +53,8 @@ class OrdinaryPurchase(unittest.TestCase):
     def test_answer_cards_selection_compare_link_the_mall(self):
         self.assertIn("type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy'", src("chat-answer.js"))
         c = src("design-conversation.js")
-        self.assertEqual(c.count("buyButton("), 5)                          # 정의 + 선택 + 비교 + 사람 상담 옆 + 코발트 추천 패널
-        self.assertIn("P.mallBuyLink(p, 'dc-mall-buy'", c)                  # 오른쪽 추천 카드
+        self.assertEqual(c.count("buyButton("), 2)                          # 정의 + 사람 상담 옆 (추천 카드는 찜하기·자세히 보기만 — 2026-10-21 1번 시안)
+        self.assertIn("P.mallBuyLink(r.p, 'cmp-buy', '팝콘PC몰에서 바로 구매')", src("wishlist-compare.js"))   # 성능 비교에서 바로 구매
         self.assertNotIn("선택 상품 견적 확인", c)
         self.assertNotIn("'consult', 'normal', { id:", c)                    # 일반 PC 를 상품 상담으로 넘기지 않는다
         self.assertNotIn("buttonLink('사람 상담 신청하기', 'consult', 'normal', model.selected", c)
@@ -100,7 +100,7 @@ class Assets(unittest.TestCase):
     def test_pages_load_new_versions(self):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
-            for a in ("configuration-concept.js?v=20261021-cb2", "chat-answer.js?v=20261021-cb2", "design-conversation.js?v=20261021-fx1",
+            for a in ("configuration-concept.js?v=20261021-cb2", "chat-answer.js?v=20261021-wish1", "design-conversation.js?v=20261021-wish1",
                       "live-checkout.js?v=20261021-cb2"):  # live-catalog 버전은 사진 반영이 계속 올린다
                 self.assertIn(a, t, page)
 

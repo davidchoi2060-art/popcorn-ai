@@ -83,7 +83,7 @@
     var canSave = !stopped && price(p) !== null;
     return '<div class="sc-buy-actions" data-sc-buy-panel>' + main +
       '<div class="sc-sub-actions"><button type="button" class="btn sc-sub" data-sc-save' + (canSave ? '' : ' disabled') + '>' + icon('bookmark-simple') + '견적에 저장</button>' +
-      '<button type="button" class="btn sc-sub" data-sc-compare>' + icon('arrows-left-right') + 'AI로 비교하기</button></div>' +
+      (P.wishButton ? P.wishButton({ kind: 'ai_device', id: p.id, name: p.name, cls: 'btn sc-sub sc-wish' }) : '') + '</div>' + (P.wishLink ? '<p class="sc-wish-row">' + P.wishLink({ cls: 'sc-wish-link' }) + '</p>' : '') +
       '<p class="sc-action-status" data-sc-status role="status" aria-live="polite"></p></div>' +
       '<div class="sc-buy-foot"><p class="sc-price-caption">장비 구매 가격입니다. AI 설치·교육·업무 구축은 별도 상담합니다.<br>부품 가격 변동으로 판매 금액이 달라질 수 있습니다.' + (canSave ? '' : ' 가격이 확인된 상품만 견적에 저장할 수 있습니다.') + '</p>' +
       (stopped ? '<a class="sc-inline-link" data-sc-action="quote" href="' + h(route('quote')) + '">장비 입고 문의 ' + icon('arrow-right') + '</a>' : '<a class="sc-inline-link sc-adoption-link" data-sc-action="adoption" href="' + h(route('adoption')) + '">AI 설치·구축 상담 ' + icon('arrow-right') + '</a>') + '</div>';
@@ -150,9 +150,8 @@
     });
     app.querySelector('[data-sc-minus]').addEventListener('click', function () { changeQuantity(q - 1); });
     app.querySelector('[data-sc-plus]').addEventListener('click', function () { changeQuantity(q + 1); });
-    var saveBtn = app.querySelector('[data-sc-save]'), cmpBtn = app.querySelector('[data-sc-compare]');
+    var saveBtn = app.querySelector('[data-sc-save]');
     if (saveBtn) saveBtn.addEventListener('click', function () { save(saveBtn); });
-    if (cmpBtn) cmpBtn.addEventListener('click', compare);
     if (focusModel) { var selected = app.querySelector('[name="sc-model"]:checked'); if (selected) selected.focus({ preventScroll: true }); }
   }
   function status(html, bad) { var el = app.querySelector('[data-sc-status]'); if (!el) return; el.innerHTML = html; el.classList.toggle('is-bad', !!bad); }
@@ -180,11 +179,6 @@
     }, function (e) {
       if (want === id && wantQ === q) status(h(P.savedQuotes.message(e, '저장하지 못했어요. 선택은 그대로예요. 다시 눌러 저장해 주세요.')), true);
     }).then(function () { saving = false; var b = app.querySelector('[data-sc-save]'); if (b) { b.disabled = price(product) === null || product.saleState === 'stopped'; b.removeAttribute('aria-busy'); } });
-  }
-  // AI로 비교하기: 상품번호만 AI로 PC 찾기의 관심·비교상품으로 넘긴다. 이 화면을 떠나지 않는다(선택·수량 유지).
-  function compare() {
-    var ok = P.compareCarry && P.compareCarry.add('ai_device', id);
-    status(ok ? 'AI로 PC 찾기 관심·비교상품에 담았어요. 질문은 보내지 않았어요. <a href="./?screen=chat" target="_blank" rel="noopener">AI로 PC 찾기에서 보기 ↗</a>' : '이 브라우저에서는 비교 목록으로 넘길 수 없어요. 저장소 설정을 확인해 주세요.', !ok);
   }
   function changeQuantity(next) {
     q = Math.min(10, Math.max(1, next)); var p = product;

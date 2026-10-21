@@ -39,7 +39,7 @@
       if (!cs || cs.kind !== 'sold') return;
       (Array.isArray(cs.items) ? cs.items : []).forEach(function (it) {
         var code = it && it.product_code; if (!Number.isSafeInteger(code) || seen[code]) return;
-        seen[code] = true; if (P.getCatalogProduct(String(code))) out.push({ id: String(code), overBudget: it.over_budget === true });
+        seen[code] = true; if (P.getCatalogProduct(String(code))) out.push({ id: String(code), overBudget: it.over_budget === true, reason: Array.isArray(it.reasons) && typeof it.reasons[0] === 'string' ? it.reasons[0].slice(0, 160) : '' });
       });
     });
     return out;

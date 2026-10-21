@@ -31,7 +31,7 @@
       '<div class="tp-body"><h3>' + esc(c.name) + '</h3><small>상품번호 ' + esc(c.id) + '</small>' + (c.specs ? '<p class="tp-specs">' + esc(c.specs) + '</p>' : '') +
       '<p class="tp-price">' + (stopped ? '판매 중지' : price ? esc(price.toLocaleString('ko-KR')) + '원' : '가격 확인 필요') + (price && c.priceAt ? '<small>' + esc(c.priceAt) + ' 기준 · 팝콘AI 표시 금액</small>' : '') + '</p>' +
       '<p class="tp-why"><b>선정 이유</b> ' + esc(c.why) + '</p><ul class="tp-cond">' + c.conditions.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' + (c.limits ? '<p class="tp-limit"><b>제한</b> ' + esc(c.limits) + '</p>' : '') + (c.photoNote ? '<p class="tp-limit">' + esc(c.photoNote) + '</p>' : '') +
-      '<div class="tp-actions"><a class="btn btn-outline" href="' + detail + '">상품 상세</a>' + buy + '<button type="button" class="btn tp-compare" data-tp-compare>' + i('arrows-left-right') + 'AI 비교에 담기</button></div><p class="tp-status" role="status" aria-live="polite"></p></div></article>';
+      '<div class="tp-actions"><a class="btn btn-outline" href="' + detail + '">상품 상세</a>' + buy + (P.wishButton ? P.wishButton({ kind: c.kind, id: c.id, name: c.name, cls: 'btn tp-compare' }) : '') + '</div><p class="tp-status" role="status" aria-live="polite"></p></div></article>';
   }
   function section(use) {
     var t = TASKS[use]; if (!t) return '';
@@ -50,12 +50,7 @@
   }
   function bind() {
     var root = document.getElementById('task-pc'); if (!root || root.dataset.bound) return; root.dataset.bound = '1';
-    root.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-tp-compare]'); if (!b) return;
-      var c = b.closest('[data-tp-id]'), st = c.querySelector('.tp-status');
-      var ok = P.compareCarry && P.compareCarry.add(c.dataset.tpKind, c.dataset.tpId);
-      st.innerHTML = ok ? 'AI로 PC 찾기 관심·비교상품에 담았어요. 질문은 보내지 않았어요. <a href="./?screen=chat" target="_blank" rel="noopener">AI로 PC 찾기에서 보기 ↗</a>' : '이 브라우저에서는 비교 목록으로 넘길 수 없어요.';
-    });
+    // 찜하기는 wish-ui.js 가 처리한다(2026-10-21 찜하기·찜목록 확정 — 별도 비교 전달을 두지 않는다).
   }
   // 설명 본문의 설치·구축 상담 구획(ls-cta · mg-cta · rp-cta) 바로 앞에 끼운다. 그 구획이 없으면 본문 끝에 둔다.
   function insert(html, use) {
