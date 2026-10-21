@@ -496,9 +496,17 @@ def budget_note(cards: list[dict], budget_won: int | None, reply: str, bound: st
     # 조건으로 먼저 등록돼 over_budget=False 로 남고(같은 상품은 처음 값을 유지), 새 예산 150만원에 1,625,800원이
     # 초과로 안 세어져 「2대 중 1대 · 207,400원 초과」가 나갔다(2026-10-20 외부 검증 M2 -- 실제는 2대 모두 · 125,800원).
     over = [c for c in cards if isinstance(c.get("price"), int) and c["price"] > budget_won]
-    if not over or any(says_budget_over(x) for x in _sentences(reply)):
+    if not over:
         return None
     gap = min(c["price"] for c in over) - budget_won
+    # 「150만 원 이하 PC는 현재 없습니다」처럼 넘는다는 말만 하고 금액이 없으면 초과액을 붙인다(2026-10-21 외부 재검증 P2-3).
+    # 넘는다는 말에 카드 판매가나 초과액이 함께 있을 때만 붙이지 않는다.
+    amounts = {f"{gap:,}", *(f"{c['price']:,}" for c in over)}
+    if any(says_budget_over(x) for x in _sentences(reply)):
+        if any(a in (reply or "") for a in amounts):
+            return None
+        # 넘는다는 말은 이미 했으니 되풀이하지 않고 금액만 붙인다(R08 이중 안내 방지).
+        return f"예산을 넘는 PC 중 가장 가까운 것은 {gap + budget_won:,}원으로 예산보다 {gap:,}원 높습니다."
     if len(over) == len(cards):
         head = "보여 드린 PC는 모두" if len(cards) > 1 else "보여 드린 PC는"
         return f"{head} 예산 {budget_won:,}원보다 높습니다(가장 적게 넘는 것이 {gap:,}원 초과)." if len(cards) > 1 \
@@ -741,6 +749,7 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         # 모델 URL을 고객에게 넘기지 않는다. 금액/약속 등 기존 사실 검사는 아래에서 그대로 거친다.
         reply = _free_build_action_reply(reply)
     budget = (book.condition or {}).get("budget_won")
+    budget_for_note = budget or (book.condition or {}).get("asked_budget_won")
     said = " ".join(m["text"] for m in msgs if m.get("role") == "user")
     clean, dropped = verify(reply, book, budget, said)
     cards = _cards(book) if book.shown else []
@@ -751,8 +760,8 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         clean = REPLY_NO_TRANSACTION
     # 예산 안내는 AI 설명만 보고 정한다 -- 서버 파워 줄의 「권장 기준은 넘지만」을 예산 안내로 읽지 않는다(코덱스 P2 F1).
     bound = (book.condition or {}).get("budget_bound")
-    lead = budget_lead(cards, budget, clean, bound) if status != "failed" and cards else None
-    note = budget_note(cards, budget, clean, bound) if status != "failed" and cards and not lead else None
+    lead = budget_lead(cards, budget_for_note, clean, bound) if status != "failed" and cards else None
+    note = budget_note(cards, budget_for_note, clean, bound) if status != "failed" and cards and not lead else None
     if not clean and reply.strip() and not any(d["reason"] in HARD_DROPS for d in dropped):
         # 걸러 낸 문장뿐이라 남은 답이 없으면 정해 둔 「잘 정리하지 못했어요」 대신 AI 답을 내보낸다
         # (2026-10-16 중헌 님 「우리가 준비못한 답변은 LLM의 답변을 그대로 내보내도 돼」). 거래가 된 척하는 말·약속은
