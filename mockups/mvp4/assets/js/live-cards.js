@@ -72,8 +72,58 @@
     if (used && !data.sourceNote && product.liveDetail !== 'pending') data.sourceNote = '상품 사양 요약 · 정확한 부품 구성은 상세에서 확인';
     return data;
   }
+  // 상품명(몰 제목)의 [CPU/메모리/SSD/그래픽] 이 기준이다(2026-10-21 대표 「제목이 틀리긴 힘드니까 그걸 기준으로」).
+  // 몰 구성이나 요약 사양이 제목과 다른 칸만 제목 값으로 바꾼다. 같거나 제목에 없는 칸은 그대로 둔다.
+  var TITLE_RE = /\[\s*([^\[\]\/]+?)\s*\/\s*(\d+)\s*G(?:B)?\s*\/\s*([^\/\]]+?)\s*\/\s*([^\]]+?)\s*(?:\]|$)/i;
+  function titleSpec(product) {
+    var m = String(product.officialName || product.name || '').match(TITLE_RE);
+    if (!m) return null;
+    var ssd = m[3].split('+')[0].trim(), gpu = m[4].replace(/\s*\*\s*\d+\s*EA\s*$/i, '').trim();
+    return { CPU: m[1].trim(), RAM: Number(m[2]), SSD: ssd, GPU: gpu };
+  }
+  function gbOf(text) {
+    var m = String(text || '').match(/(\d+(?:\.\d+)?)\s*(TB|GB|G)(?![A-Za-z0-9])/i);
+    return m ? Math.round(Number(m[1]) * (/^T/i.test(m[2]) ? 1000 : 1)) : null;
+  }
+  // 메모리 총량: 구성 줄(용량 × 개수 · 「* N개」)을 더한다. 읽지 못한 줄이 하나라도 있으면 모른다(null).
+  function ramTotal(product) {
+    var rows = (product.specs || []).filter(function (s) { return String(s.slot || '').toUpperCase() === 'RAM'; });
+    if (!rows.length) {
+      var sum = (product.summarySpecs || []).find(function (r) { return r.slot === 'RAM'; });
+      return sum ? gbOf(sum.value) : null;
+    }
+    var total = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var gb = gbOf(rows[i].value);
+      if (gb === null) return null;
+      var kits = String(rows[i].value).match(/[*x×]\s*(\d+)\s*개/);
+      var qty = kits ? Number(kits[1]) : (Number.isInteger(rows[i].quantity) && rows[i].quantity > 0 ? rows[i].quantity : 1);
+      total += gb * qty;
+    }
+    return total;
+  }
+  function modelKey(text, slot) {
+    var t = String(text || '').toUpperCase().replace(/\s+/g, '');
+    if (slot === 'GPU') { var g = t.match(/(\d{3,4})(TI|SUPER|XT)?/); return g ? g[1] + (g[2] || '') : null; }
+    var c = String(text || '').toUpperCase().match(/(?:^|[^0-9A-Z])(\d{3,5}[A-Z0-9]{0,4})(?![0-9A-Z])/); return c ? c[1] : null;
+  }
+  function withTitle(product, data) {
+    var t = titleSpec(product);
+    if (!t) return data;
+    data.specs = data.specs.map(function (cell) {
+      var shown = cell.lines.join(' '), want = null;
+      if (cell.slot === 'RAM') { var have = ramTotal(product); if (cell.pending || (have !== null && have !== t.RAM)) want = t.RAM + 'GB'; }
+      else if (cell.slot === 'SSD') { var a = gbOf(t.SSD); if (a !== null && (cell.pending || gbOf(shown) !== a)) want = t.SSD.replace(/G$/i, 'GB'); }
+      else if (cell.slot === 'CPU' || cell.slot === 'GPU') {
+        var k = modelKey(t[cell.slot], cell.slot);
+        if (k && (cell.pending || modelKey(shown, cell.slot) !== k)) want = t[cell.slot];
+      }
+      return want ? { label: cell.label, slot: cell.slot, lines: [want], pending: false } : cell;
+    });
+    return data;
+  }
   function cardB(product) {
-    var data = withSummary(product, P.catalogCardDataV12(product));
+    var data = withTitle(product, withSummary(product, P.catalogCardDataV12(product)));
     return '<article class="cc-card cc-card-b" data-card-product="' + h(data.id) + '"><div class="cc-card-top"><div class="cc-card-copy"><span class="cc-category">' + h(data.category || '조립 PC') + '</span>' + title(data) + '<strong class="cc-price">' + h(data.priceLabel) + '</strong><span class="cc-status">' + P.icon('tag') + h(data.saleLabel) + '</span></div>' + photo(data) + '</div><div class="cc-card-lower">' + quickSpecs(data) + (data.sourceNote ? '<p class="cc-source-note">' + h(data.sourceNote) + '</p>' : '') + parts(product, data) + '<p class="cc-card-caption">주요 부품부터, 전체 구성을 확인하세요.</p><div class="cc-card-actions"><a class="btn btn-primary" href="' + h(data.detailHref) + '">상품 자세히 보기' + P.icon('arrow-right') + '</a><a class="btn btn-outline" href="' + h(data.chatHref) + '">' + P.icon('chat-circle') + 'AI에게 물어보기</a></div></div></article>';
   }
   P.catalogCardRenderer = function (p) { return cardB(p); };
