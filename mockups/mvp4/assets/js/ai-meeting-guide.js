@@ -42,10 +42,13 @@
   var MARKUP =
     '<div class="mg-page" id="pop-meeting-guide" lang="ko" data-use="meetings">' +
     '<section class="mg-hero">' +
+    '  <div class="mg-hero-copy">' +
     '  <div class="mg-kicker">회사 맞춤 AI · 회의록 정리</div>' +
     '  <h1>회의가 끝나면,<br>할 일이 분명해지도록.</h1>' +
     '  <p class="mg-lead">긴 대화에서 결정과 할 일을 나누고,<br>누가 언제까지 할지, 아직 정하지 않은 것은 무엇인지 확인합니다.</p>' +
     '  <div class="mg-pills"><span class="mg-pill"><img class="icon mg-icon" src="assets/icons/shield.svg" alt="" aria-hidden="true" width="24" height="24">내부 전용 구축 목표</span><span class="mg-pill">우리 회사 회의록 양식</span></div>' +
+    '  </div>' +
+    '  <figure class="mg-hero-art" aria-hidden="true"><img class="mg-hero-art-img" src="assets/images/business/meeting-miniature.png" alt="" width="2048" height="768" decoding="async"></figure>' +
     '  <p class="mg-hero-note">회사 자료·입력 방식·검토 절차에 맞춰 구성하는 업무 예시입니다. 내부 전용 적용 범위는 구축과 실제 통신 점검 후 확정합니다.</p>' +
     '</section>' +
     '<section class="mg-section" aria-labelledby="mg-example-title">' +
