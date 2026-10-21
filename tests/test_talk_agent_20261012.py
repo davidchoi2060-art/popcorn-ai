@@ -788,6 +788,8 @@ class CodexP2Budget(unittest.TestCase):
                          "예산 150만원을 넘는 PC만 있어요. 게임 PC A를 보세요.", [OVER], psu=650)
         self.assertNotIn("보여 드린 PC는", out["reply"])
         self.assertEqual(out["reply"].count("넘는 PC만"), 1)
+        # 금액이 없으면 초과액만 덧붙인다(2026-10-21 외부 재검증 P2-3).
+        self.assertIn("124,400원 높습니다", out["reply"])
 
     def test_f2_subset_never_claims_global_absence(self):            # R04 + 선택 대조
         for refs, has_lead, has_note in ((["P2"], True, False), (["P1"], False, False), (["P1", "P2"], False, True)):
