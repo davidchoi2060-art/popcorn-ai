@@ -45,7 +45,7 @@ LIMIT_MESSAGES = {
 }
 # /mvp4 AI 슈퍼컴퓨터(고정 완제품) 문의의 주제 — 일반 상담 주제 목록(TOPICS)에는 넣지 않는다(0165).
 FIXED_TOPICS = {'quote': 'AI 슈퍼컴퓨터 견적', 'adoption': 'AI 도입 상담'}
-# /mvp4 기업 AI 업무개선 컨설팅 신청 화면만 쓰는 주제(0173). 일반 상담 주제 목록(TOPICS)에는 넣지 않고, 상품·견적을 함께 받지 않는다.
+# /mvp4 기업 AI 업무개선 컨설팅 신청 화면만 쓰는 주제(0174). 일반 상담 주제 목록(TOPICS)에는 넣지 않고, 상품·견적을 함께 받지 않는다.
 SERVICE_TOPICS = ('기업 AI 업무개선 컨설팅',)
 PURPOSES = {'local-llm': '로컬 AI 모델 실행', 'documents': '사내 문서 검색·업무 활용',
             'development': 'AI 개발·연구', 'other': '그 밖의 용도·아직 미정'}

@@ -38,7 +38,7 @@
     if (span) { span.appendChild(document.createTextNode(P.inquiryConsentText + ' ')); var b = document.createElement('b'); b.className = 'required'; b.textContent = '필수'; span.appendChild(b); }
   }
   // 30인 이하 기업 AI 업무개선 컨설팅(2026-10-21 승인). 개인 업무 AI 도입 상담과 섞이지 않게 첫 줄에 서비스 이름을 따로 적고,
-  // 개인 업무(관심 기능)·구성 방식은 넣지 않는다. 서버 주제는 「기업 AI 업무개선 컨설팅」(0173)으로 따로 저장한다.
+  // 개인 업무(관심 기능)·구성 방식은 넣지 않는다. 서버 주제는 「기업 AI 업무개선 컨설팅」(0174)으로 따로 저장한다.
   var COMPANY_FROM = { P: '업무형 소개', D: '사내 문서 검색 설명', M: '회의록 정리 설명', R: '고객 답변 초안 설명' };
   function companyMessage(p) {
     var lines = ['[기업 AI 업무개선 컨설팅] 30인 이하 기업 대상'];

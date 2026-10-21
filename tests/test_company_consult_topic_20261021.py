@@ -1,4 +1,4 @@
-"""기업 AI 업무개선 컨설팅 상담은 고유 주제로 저장한다 (0173, 2026-10-21 대표)."""
+"""기업 AI 업무개선 컨설팅 상담은 고유 주제로 저장한다 (0174, 2026-10-21 대표)."""
 import pathlib
 import unittest
 
@@ -26,9 +26,9 @@ class CompanyTopic(unittest.TestCase):
                 PI._clean(body(**extra))
 
     def test_migration_adds_value_and_keeps_old(self):
-        m = (ROOT / 'db/migrations/versions/0173_purchase_inquiry_company_consulting.py').read_text(encoding='utf-8')
-        self.assertIn("revision = '0173'", m)
-        self.assertIn("down_revision = '0172'", m)
+        m = (ROOT / 'db/migrations/versions/0174_purchase_inquiry_company_consulting.py').read_text(encoding='utf-8')
+        self.assertIn("revision = '0174'", m)
+        self.assertIn("down_revision = '0173'", m)
         self.assertIn("'AI 도입 상담','기업 AI 업무개선 컨설팅'", m)
         self.assertIn('RAISE EXCEPTION', m)   # 새 주제 행이 있으면 되돌리지 않는다
 
