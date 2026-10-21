@@ -18,7 +18,7 @@ def test_company_page_exists_and_loads_its_assets():
     assert 'data-page="ai-company"' in html
     assert "30인 이하" in html
     for asset in ("ai-company.css?v=20261021-co1", "company-routes.js?v=20261021-co1",
-                  "ai-company.js?v=20261021-co1", "ai.js?v=20261021-co1"):
+                  "ai-company.js?v=20261021-co1", "ai.js?v=20261021-ip1"):
         assert asset in html, asset
 
 
