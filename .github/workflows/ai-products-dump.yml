@@ -11,7 +11,12 @@
 name: 팝콘AI 상품 덤프
 
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      extra:
+        description: '목록에 없어도 몰 등록 구성을 읽어 볼 상품번호 범위 (예: 130569-130679)'
+        required: false
+        default: ''
 
 concurrency:
   group: popcorn-ai-products-dump
@@ -28,12 +33,24 @@ jobs:
         shell: bash
         env:
           BASE: https://popcornai.co.kr
+          EXTRA: ${{ inputs.extra }}
         run: |
           set -euo pipefail
           mkdir -p out/offers out/registered
           curl -fsS "$BASE/api/customer/pc-catalog" -o out/pc_catalog.json
           python3 -c "import json;print('\n'.join(str(i['product_code']) for i in json.load(open('out/pc_catalog.json'))['items']))" > out/codes.txt
           echo "목록 $(wc -l < out/codes.txt)건"
+          if [ -n "$EXTRA" ]; then
+            mkdir -p out/extra
+            for range in ${EXTRA//,/ }; do
+              for code in $(seq "${range%-*}" "${range#*-}"); do
+                curl -sS "$BASE/api/customer/pc-registered/$code" -o "out/extra/$code.json" -w "$code %{http_code}\n" >> out/extra_status.txt || true
+                sleep 0.2
+              done
+            done
+            python3 -c "import json,os;json.dump({f[:-5]:json.load(open('out/extra/'+f)) for f in os.listdir('out/extra')},open('out/extra_registered.json','w'),ensure_ascii=False)"
+            rm -rf out/extra
+          fi
           while read -r code; do
             curl -sS "$BASE/api/customer/pc-offers/$code" -o "out/offers/$code.json" -w "$code %{http_code}\n" >> out/offer_status.txt || echo "$code fail" >> out/offer_status.txt
             curl -sS "$BASE/api/customer/pc-registered/$code" -o "out/registered/$code.json" -w "$code %{http_code}\n" >> out/registered_status.txt || echo "$code fail" >> out/registered_status.txt
