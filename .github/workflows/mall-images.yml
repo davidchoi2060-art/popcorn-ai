@@ -29,6 +29,10 @@ on:
         description: '상세 페이지 안 사진 주소도 모은다'
         type: boolean
         default: true
+      keep_pages:
+        description: '부품 상세 페이지(product_detail) 원문도 남긴다'
+        type: boolean
+        default: false
 
 concurrency:
   group: popcorn-mall-images
@@ -48,6 +52,7 @@ jobs:
           AI_CODES: ${{ inputs.ai_codes }}
           PATHS: ${{ inputs.paths }}
           DETAIL: ${{ inputs.detail }}
+          KEEP: ${{ inputs.keep_pages }}
         run: |
           set -uo pipefail
           rm -rf out; mkdir -p out/mall out/ai out/html
@@ -65,6 +70,12 @@ jobs:
               curl -sS -A "$UA" "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=$code" -o "out/html/$code.html" || true
               grep -oiE '(src|data-src)="[^"]+\.(jpe?g|png|gif|webp)[^"]*"' "out/html/$code.html" 2>/dev/null \
                 | sed -E 's/^[^"]*"//; s/"$//' | sort -u | sed "s|^|$code |" >> out/detail_images.txt || true
+            fi
+            if [ "$KEEP" = "true" ]; then
+              mkdir -p out/pages
+              curl -sS -A "$UA" "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=$code" -o "out/pages/$code.html" || true
+              grep -oiE '(src|data-src)="[^"]+\.(jpe?g|png|gif|webp)[^"]*"' "out/pages/$code.html" 2>/dev/null \
+                | sed -E 's/^[^"]*"//; s/"$//' | sort -u | sed "s|^|$code |" >> out/page_images.txt || true
             fi
             sleep 0.2
           done
