@@ -23,7 +23,7 @@
     if (!href) return '';
     var attrs = ' data-mall-buy="' + esc(o.id) + '" data-mall-name="' + esc(o.name || '') + '"' + (o.model ? ' data-mall-model="' + esc(o.model) + '"' : '') +
       (o.quantity ? ' data-mall-qty="' + esc(o.quantity) + '"' : '') + (typeof o.price === 'number' && o.price > 0 ? ' data-mall-price="' + esc(o.price) + '"' : '') + (o.image ? ' data-mall-img="' + esc(o.image) + '"' : '');
-    return '<a class="' + esc(o.cls || 'btn btn-primary') + '" href="' + esc(href) + '" target="_blank" rel="noopener"' + attrs + '>' + esc(o.label || '팝콘PC몰에서 구매하기') + ' <span aria-hidden="true">↗</span></a>';
+    return '<a class="' + esc(o.cls || 'btn btn-primary') + '" href="' + esc(href) + '" target="_blank" rel="noopener"' + attrs + '>' + esc(o.label || '팝콘PC몰에서 바로 구매') + ' <span aria-hidden="true">↗</span></a>';
   };
   function money(n) { return Number(n).toLocaleString('ko-KR') + '원'; }
   var dialog = null, opener = null;

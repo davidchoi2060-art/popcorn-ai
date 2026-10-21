@@ -63,7 +63,7 @@
   // 2026-10-20 승인 「구매 경로 분리」 -- 일반 완제품은 팝콘PC몰 구매가 주 행동이다. 견적 보관·구매 상담 CTA 를 두지 않고,
   // 구매 전에 연락처·동의를 받지 않는다(AI 패키지·AI 슈퍼컴퓨터의 보관·상담은 각자의 전용 화면에 그대로 있다).
   function purchase(p, q) {
-    var issue = pending(p), buy = P.mallBuyLink ? P.mallBuyLink(p, 'btn btn-primary cf-mall-buy', issue ? '팝콘PC몰에서 상품 확인하기' : '팝콘PC몰에서 구매하기') : '';
+    var issue = pending(p), buy = P.mallBuyLink ? P.mallBuyLink(p, 'btn btn-primary cf-mall-buy', issue ? '팝콘PC몰에서 상품 확인하기' : '팝콘PC몰에서 바로 구매') : '';
     return '<aside class="cf-purchase" aria-labelledby="cf-purchase-title"><h2 id="cf-purchase-title">이 PC 구매</h2><div class="cf-total"><span>PC 합계</span><strong data-cf-total>' + h(amount(p, q)) + '</strong></div><div class="cf-unit"><span>PC 본체 단가</span><span>' + h(amount(p, 1)) + '</span></div><div class="cf-quantity-row"><span id="cf-quantity-label">수량</span><div class="cf-quantity" role="group" aria-labelledby="cf-quantity-label"><button type="button" data-cf-minus aria-label="PC 수량 1대 줄이기"' + (q === 1 ? ' disabled' : '') + '>−</button><output id="cf-quantity" aria-live="polite">' + q + '<span>대</span></output><button type="button" data-cf-plus aria-label="PC 수량 1대 늘리기"' + (q === 10 ? ' disabled' : '') + '>+</button></div></div><p class="cf-delivery">옵션·최종 가격·재고·배송은 팝콘PC몰에서 확인합니다.</p><div class="cf-purchase-actions">' +
       (buy || '<button class="btn btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>') +
       '</div><p class="cf-consent-note">팝콘PC몰 상품 페이지가 새 창으로 열립니다.<br>구매 전에 견적 보관이나 연락처 입력은 필요 없습니다.</p></aside>';

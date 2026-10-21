@@ -53,7 +53,7 @@ class OrdinaryPurchase(unittest.TestCase):
     def test_answer_cards_selection_compare_link_the_mall(self):
         self.assertIn("type === 'pc' && p && P.mallBuyLink ? P.mallBuyLink(p, 'pa-mall-buy'", src("chat-answer.js"))
         c = src("design-conversation.js")
-        self.assertEqual(c.count("buyButton("), 4)                          # 정의 + 선택 + 비교 + 사람 상담 옆
+        self.assertEqual(c.count("buyButton("), 5)                          # 정의 + 선택 + 비교 + 사람 상담 옆 + 코발트 추천 패널
         self.assertIn("P.mallBuyLink(p, 'dc-mall-buy'", c)                  # 오른쪽 추천 카드
         self.assertNotIn("선택 상품 견적 확인", c)
         self.assertNotIn("'consult', 'normal', { id:", c)                    # 일반 PC 를 상품 상담으로 넘기지 않는다
@@ -78,7 +78,7 @@ class OrdinaryPurchase(unittest.TestCase):
         s = src("live-checkout.js")
         self.assertIn("P.savedQuotes.list()", s)  # 기존 보관 기록 조회는 그대로(요청은 saved-quotes-client.js)
         self.assertIn("call('GET', '/api/mvp3/saved-quotes?limit=20'", src("saved-quotes-client.js"))
-        self.assertIn("buy(live, '팝콘PC몰에서 구매하기')", s)
+        self.assertIn("buy(live, '팝콘PC몰에서 바로 구매')", s)
         self.assertIn("mallLink(p, '팝콘PC에서 부품 변경하기')", s)
         self.assertIn("팝콘PC에서 부품 옵션 변경하기", src("live-cards.js"))
 
@@ -100,8 +100,8 @@ class Assets(unittest.TestCase):
     def test_pages_load_new_versions(self):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
-            for a in ("configuration-concept.js?v=20261021-acc2", "chat-answer.js?v=20261021-buy1", "design-conversation.js?v=20261021-buy1",
-                      "live-catalog.js?v=20261021-photo10", "live-checkout.js?v=20261021-buy1"):
+            for a in ("configuration-concept.js?v=20261021-cb2", "chat-answer.js?v=20261021-cb2", "design-conversation.js?v=20261021-cb2",
+                      "live-checkout.js?v=20261021-cb2"):  # live-catalog 버전은 사진 반영이 계속 올린다
                 self.assertIn(a, t, page)
 
 
