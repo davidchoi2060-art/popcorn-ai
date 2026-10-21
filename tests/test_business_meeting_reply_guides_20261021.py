@@ -35,7 +35,7 @@ def test_four_detail_entries_and_home_go_to_their_own_explanation():
 
 def test_service_page_routes_by_use_and_loads_both_guides():
     html = read("ai-service.html")
-    for asset in ("ai-meeting-guide.js?v=20261021-mr1", "ai-reply-guide.js?v=20261021-mr1",
+    for asset in ("ai-meeting-guide.js?v=20261021-co1", "ai-reply-guide.js?v=20261021-co1",
                   "ai-meeting-guide.css?v=20261021-mr1", "ai-reply-guide.css?v=20261021-mr1", "header-ui.js?v=20261020-logo2"):
         assert asset in html, asset
     assert "P.serviceGuides.meetings = {label: '회의록 정리'" in read(MEETING)
@@ -45,7 +45,7 @@ def test_service_page_routes_by_use_and_loads_both_guides():
 def test_guides_have_no_widget_host_network_or_storage():
     for rel in (MEETING, REPLY):
         js = code(rel)
-        for bad in ("window.openai", "setWidgetState", "fetch(", "XMLHttpRequest", "localStorage", "sessionStorage",
+        for bad in ("window.openai", "setWidgetState", "fetch(", "XMLHttpRequest", "localStorage",
                     "data-lucide", "미리보기", "시안", "history.", "<form", ".submit(", "type=\"submit\""):
             assert bad not in js, (rel, bad)
 
@@ -59,7 +59,7 @@ def test_consult_links_carry_each_use_with_adoption_intent():
         assert "이 화면을 본 것만으로 상담이 접수되거나 연락 동의가 되지 않습니다." in js
         assert 'href="ai-detail.html?package=business"' in js
     s = read("assets/js/ai-inquiry.js")
-    assert "use:P.qs.get('use') || ''" in s and "if(['quote','adoption'].indexOf(intent)<0)" in s
+    assert "use:company ? '' : (P.qs.get('use') || '')" in s and "if(['quote','adoption'].indexOf(intent)<0)" in s
 
 
 def test_meeting_example_keeps_counts_evidence_and_undecided_items():

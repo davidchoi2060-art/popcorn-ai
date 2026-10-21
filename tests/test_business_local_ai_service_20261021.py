@@ -34,7 +34,7 @@ def test_business_use_entries_go_to_their_explanation():
 def test_explanation_page_uses_site_shell_and_its_own_body_only():
     html = read("ai-service.html")
     assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261020-logo2" in html
-    assert "ai-local-service.js?v=20261021-mr1" in html and "ai-local-service.css?v=20261021-svc1" in html
+    assert "ai-local-service.js?v=20261021-co1" in html and "ai-local-service.css?v=20261021-svc1" in html
     js = code("assets/js/ai-local-service.js")
     assert "window.openai" not in js and "setWidgetState" not in js and "fetch(" not in js and "localStorage" not in js
     assert "P.serviceGuides.documents = {label: '사내 문서 검색', body: body, mount: mount};" in js
@@ -70,13 +70,13 @@ def test_preview_became_real_consult_link_without_submitting_anything():
 
 def test_consult_form_preselects_use_from_url_and_skips_gate_for_adoption():
     s = read("assets/js/ai-inquiry.js")
-    assert "use:P.qs.get('use') || ''" in s
+    assert "use:company ? '' : (P.qs.get('use') || '')" in s
     assert "if(['quote','adoption'].indexOf(intent)<0)" in s       # 목적 재선택은 intent 가 없을 때만
 
 
 def test_ai_pages_load_new_ai_js():
     for page in ("ai-detail.html", "ai-consult.html", "ai-packages.html", "ai-result.html", "ai-service.html"):
-        assert "ai.js?v=20261021-mr1" in read(page), page
+        assert "ai.js?v=20261021-co1" in read(page), page
 
 
 def test_home_business_card_documents_also_goes_to_the_explanation():

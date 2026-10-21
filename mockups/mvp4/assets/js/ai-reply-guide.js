@@ -120,6 +120,18 @@
     var q = function (sel) { return root.querySelector(sel); };
     function each(sel, fn) { Array.prototype.forEach.call(root.querySelectorAll(sel), fn); }
     var selected = 'setup', tone = 'detail', source = 0, step = 1, checked = [];
+    var KEY = 'pai-guide-replies';
+    // 기업 컨설팅 설명에서 「돌아가기」나 브라우저 뒤로로 돌아왔을 때만 보던 사례·말투·근거·단계 을 되살린다(이 탭의 sessionStorage, 업무별 칸).
+    function returning() { try { var nav = performance.getEntriesByType('navigation')[0]; return (nav && nav.type === 'back_forward') || location.hash === '#company-link'; } catch (e) { return false; } }
+    function remember() { try { sessionStorage.setItem(KEY, JSON.stringify({selected: selected, tone: tone, source: source, step: step})); } catch (e) { /* 저장 못 해도 화면은 그대로 쓴다 */ } }
+    function recall() { try { return returning() ? JSON.parse(sessionStorage.getItem(KEY) || 'null') : null; } catch (e) { return null; } }
+    var saved = recall();   // 검토 체크는 되살리지 않는다 -- 체험용 표시라 돌아오면 처음부터
+    if (saved && cases[saved.selected]) {
+      selected = saved.selected;
+      if (saved.tone === 'brief' || saved.tone === 'detail') tone = saved.tone;
+      if (saved.source >= 0 && saved.source < 3) source = saved.source;
+      if (saved.step >= 0 && saved.step < 4) step = saved.step;
+    }
     function renderSource() {
       var c = cases[selected], s = c.sources[source];
       each('[data-source]', function (b) { b.textContent = c.sources[Number(b.dataset.source)][0]; b.setAttribute('aria-pressed', String(Number(b.dataset.source) === source)); });
@@ -174,6 +186,7 @@
       else if (b.dataset.tone) { tone = b.dataset.tone === 'brief' ? 'brief' : 'detail'; resetReview(); renderDraft(); renderReview(); }
       else if (b.dataset.step !== undefined) { step = Number(b.dataset.step); renderStep(); }
       else if (b.id === 'rp-copy') { copyDraft(); }
+      remember();
     });
     root.addEventListener('change', function (e) {
       if (!e.target.matches('#rp-checks input')) return;

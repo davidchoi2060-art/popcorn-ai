@@ -1,0 +1,17 @@
+/* 30인 이하 기업 컨설팅 진입부 (2026-10-21 승인 정본 1번의 위쪽 구분만) — 업무형 상세의 개인/기업 구분과 세 업무 설명 하단 보조 링크. */
+.ai-choice{margin:34px 0 8px;padding:34px clamp(18px,4vw,44px);border:1px solid #e4ddf0;border-radius:20px;background:#fff;scroll-margin-top:80px}
+.ai-choice h2{font-size:clamp(24px,2.8vw,34px);line-height:1.32;letter-spacing:-.03em;word-break:keep-all;margin:0}.ai-choice h2 em{font-style:normal;color:#6742cc}
+.ai-choice-lead{color:#5f5d70;margin:8px 0 0}
+.ai-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;margin-top:24px}
+.ai-choice-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:6px 28px 6px 0}
+.ai-choice-company{padding:6px 0 6px 28px;border-left:1px solid #e4ddf0}
+.ai-choice-tag{font-size:13px;font-weight:700;border-radius:999px;padding:3px 12px;background:#f4efff;color:#6742cc}
+.ai-choice-company .ai-choice-tag{background:#fff2c2;color:#5c4300}
+.ai-choice-card h3{font-size:22px;letter-spacing:-.02em;margin:4px 0 0}.ai-choice-card p{margin:0;color:#4f4d60}
+.ai-choice-note{font-size:13px;color:#6b6980!important}
+.ai-choice-card .text-link{margin-top:6px}
+.svc-company{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:22px 0 10px;padding:22px 26px;border:1px solid #e4ddf0;border-radius:16px;background:#faf9fc;scroll-margin-top:80px}
+.svc-company h2{font-size:19px;letter-spacing:-.02em;margin:6px 0 4px;word-break:keep-all}.svc-company p{font-size:14px;color:#5f5d70;margin:0}
+.svc-company-tag{font-size:12px;font-weight:700;color:#5c4300;background:#fff2c2;border-radius:999px;padding:2px 10px}
+.svc-company .text-link{white-space:nowrap;flex:0 0 auto}
+@media(max-width:640px){.ai-choice{padding:24px 16px}.ai-choice-grid{grid-template-columns:1fr;gap:22px}.ai-choice-card,.ai-choice-company{padding:0;border-left:0}.ai-choice-company{border-top:1px solid #e4ddf0;padding-top:22px}.ai-choice-card p br{display:none}.svc-company{flex-direction:column;align-items:flex-start;padding:18px 16px}}

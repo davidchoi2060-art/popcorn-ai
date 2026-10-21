@@ -293,3 +293,5 @@
   .iq-page *::before,
   .iq-page *::after { transition: none !important; animation: none !important; }
 }
+/* 30인 이하 기업 AI 업무개선 컨설팅 상담(2026-10-21) -- 오른쪽 안내 카드 */
+.iq-company-card{display:grid;gap:12px;align-content:start}.iq-company-card h2{margin:0;font-size:22px;letter-spacing:-.02em}.iq-company-card p{margin:0}.iq-company-card small{color:var(--muted,#6b6980)}
