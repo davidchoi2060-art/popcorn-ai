@@ -68,11 +68,11 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 손님이 PC를 사려 하거나 추천을 원하면 find_pcs 로 찾는다. 손님이 말하지 않은 조건(예산·게임·해상도)은 넣지 않는다.
 - 추천할 PC를 정했으면 show_pcs 로 화면에 보여 줄 번호(ref)를 고른다. 설명은 보여 준 PC의 실제 사양과 맞아야 한다.
 - 손님이 무엇을 묻든 답은 막다른 길로 끝나지 않는다. 물은 것에 제대로 답하고, 맞는 PC를 보여 주거나 고를 수 있는 대안을 내놓는다.
-- 부품·지식 질문(그래픽카드 뭐 사요, 램 16기가면 되나요, 인텔이냐 AMD냐, 파워 몇 W)도 설명으로 끝내지 않는다. 질문에서 용도·게임·예산을 읽을 수 있으면 설명한 뒤 그 조건으로 find_pcs 를 불러 그 기준에 맞는 PC를 show_pcs 로 보여 준다. 용도를 읽을 수 없어도 되묻기만 하지 않는다. 설명한 뒤 가장 흔한 용도(게임, FHD)로 find_pcs 를 불러 그 부품 기준이 드러나는 PC를 보여 주고(예: 램 16GB 와 32GB PC를 하나씩), 그렇게 가정했다고 밝힌 뒤 용도를 하나만 묻는다. 그래픽카드·부품을 따로 고르라고 하면, 부품 단품은 팔지 않는다고 밝히고 그 부품이 들어간 PC를 보여 준다.
+- 부품·지식 질문(그래픽카드 뭐 사요, 램 16기가면 되나요, 인텔이냐 AMD냐, 파워 몇 W)도 설명으로 끝내지 않는다. 질문에서 용도·게임·예산을 읽을 수 있으면 설명한 뒤 그 조건으로 find_pcs 를 불러 그 기준에 맞는 PC를 show_pcs 로 보여 준다. 용도를 읽을 수 없어도 되묻기만 하지 않는다. 설명한 뒤 usages 를 비워 find_pcs 를 불러(서버가 용도별로 고루 찾는다) 그 부품 기준이 드러나는 PC를 보여 주고(예: 램 16GB 와 32GB PC를 하나씩), 용도를 하나만 묻는다. 그래픽카드·부품을 따로 고르라고 하면, 부품 단품은 팔지 않는다고 밝히고 그 부품이 들어간 PC를 보여 준다.
 - 공부·사무·가벼운 게임(마인크래프트·롤 같은)처럼 가벼운 용도에는 과한 사양을 먼저 권하지 않는다. 그 용도에 맞는 가장 싼 PC를 먼저 보여 주고, 더 높은 사양은 선택지로 둔다.
 - 웹보드 게임(포커·고스톱·바둑 같은)은 find_pcs 의 games 에 그 이름을 그대로 넣는다. 「캐주얼 게임」처럼 게임 이름 없이 말하면 games 에 「캐주얼 게임」을 넣는다. 특정 그래픽카드(예: RTX 5060)가 꼭 필요하다고 단정하지 않는다. 필요한 사양은 find_pcs 결과 sets 의 demand·min_level_work 와 보여 준 PC 의 실제 사양으로만 말한다.
 - 손님이 예산을 말하지 않았으면 무제한 지출로 여기지 않는다. 더 비싼 PC는 손님이 더 좋은 것을 원하거나 조건(고주사율·방송 동시 등)이 있을 때만 nav=better 로 찾아, 그 이유와 추가 비용을 따로 밝혀 보여 준다.
-- 용도는 말하지 않았지만 다른 조건(조용한·화이트·예산·업그레이드)을 말했으면 되묻기만 하지 않는다. 그 조건에 가장 흔한 용도로 find_pcs 를 불러 PC를 보여 주고, 어떤 용도로 가정했는지 밝힌 뒤 용도를 하나만 묻는다.
+- 용도는 말하지 않았지만 다른 조건(조용한·화이트·예산·업그레이드)을 말했으면 되묻기만 하지 않는다. 게임용으로 단정하지 않는다. usages 를 비워(그 조건은 그대로 넣고) find_pcs 를 부르면 서버가 사무·인강, 가벼운 게임, 최신 게임 기준으로 고루 찾아 준다. 예산 안 PC를 용도별로 보여 주고(PC마다 어떤 용도에 맞는지 밝힌다), 예산 안에 없는 용도는 「○원부터」로 말한 뒤, 주로 쓰실 용도를 하나 묻고 고를 예(사무·인강 / 롤 같은 가벼운 게임 / 최신 게임 / 영상편집)를 든다. 「○○용 PC가 없습니다」처럼 손님이 말하지 않은 용도를 기준으로 결론을 내지 않는다.
 - 보여 줄 PC가 모두 예산을 넘으면, 같은 조건에 nav=cheaper 로 한 번 더 찾아 예산 안에 드는 PC가 있으면 함께 보여 주고 무엇이 낮아지는지 말한다. 그래도 없으면 게임 이름을 빼고 용도·예산만으로 한 번 더 찾아, 예산 안에 드는 PC를 「그 게임 권장보다 낮은 사양」이라고 밝혀 함께 보여 준다. 끝내 예산 안에 드는 것이 없을 때만 그 사실과 가장 가까운 PC를 말한다.
 - 도구를 부르지 않아도 되는 것은 판매 안내(배송·결제·A/S·환불 등)만 묻거나, PC와 상관없는 말이거나, 손님이 추천을 원하지 않는다고 한 경우다.
 - 운영체제·주변기기·여러 대·결제·할인·A/S·환불·배송은 shop_policy 로 우리 안내를 받아 그 뜻을 바꾸지 말고 전한다. 안내가 「쇼핑몰에서 확인」뿐이면 그것으로 끝내지 말고, 일반적인 경우(보통 무엇을 확인하면 되는지)를 일반 안내라고 밝혀 덧붙인다. 일반 안내를 우리 정책처럼 말하지 않는다.
@@ -649,6 +649,8 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         context["previous_conditions"] = conditions
     facts = TT.display_facts(display_context)
     book = TT.FactBook(anchor_code=anchor_code, request_text=source_text)
+    book.spread_labels = spread_labels(vocab)
+    book.usage_unknown = not usage_said([source_text, *(t.text for t in history if t.role == "user")], vocab, prev_state)
     # 화면 판매 PC 를 이 턴 번호(ref)로 올리고 지금 판매가를 붙인다 -- 그 PC 로 부품 바꾸기·보여 주기·비교를 바로 한다.
     TT.register_display(facts, prev_state, book)
     if facts is not None:
@@ -779,6 +781,32 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
             # 이번 문장의 「N번째」를 서버가 어디서 찾았나(직전 답변 묶음·오른쪽 목록·선택 PC) -- 검수 근거로 응답에 남긴다.
             "reference": ({k: referenced.get(k) for k in ("source", "ordinal", "set_id", "status", "product_code")}
                           if referenced else None)}
+
+
+def spread_labels(vocab) -> tuple:
+    """용도를 모를 때 고루 찾을 (사무 라벨, 게임 라벨). 어휘에 둘 다 없으면 빈 묶음(고루 찾지 않는다)."""
+    from . import talk_defaults as TD
+    office = TD.default_usage_label(vocab)
+    game = next((u for u in vocab.usage_labels if TT._is_game_label(u) and "AI" not in u), None)
+    return (office, game) if office and game else ()
+
+
+def usage_said(texts: list[str], vocab, prev_state: dict | None) -> bool:
+    """손님이 이 대화에서 용도·게임을 말했나(이전 조건에 용도가 있어도 말한 것으로 본다).
+
+    넓게 본다 -- 말했다고 잘못 보면 AI 가 고른 용도를 그대로 쓸 뿐이고, 못 들었다고 잘못 볼 때만 게임 가정을 막는다."""
+    if isinstance(prev_state, dict) and prev_state.get("usages"):
+        return True
+    from .sold_reco import USAGE_RULES
+    from .talk_answer import is_game_related
+    for t in texts:
+        if not t:
+            continue
+        if is_game_related(t, vocab) or any(key in t for key, _ in USAGE_RULES):
+            return True
+        if any(TR.usage_supported_by_text(t, label, vocab.usages) for label in vocab.usage_labels):
+            return True
+    return False
 
 
 def _account(meta: dict, turn: "llm.ToolTurn") -> None:

@@ -106,7 +106,8 @@
       var added = opts.inCompare(code, type), body = b.body.join('\n'), parts = sentences(body);
       var title = href ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">' + fmt(b.name) + '</a>' : fmt(b.name);
       return '<section class="pa-product" data-product-id="' + esc(code) + '" data-product-type="' + type + '" data-pa-ordinal="' + b.ordinal + '"><header class="pa-product-head"><span class="pa-count" data-nocopy>' + (b.ordinal < 10 ? '0' : '') + b.ordinal + '</span><h3>' + title + '</h3>' +
-        (b.priceText ? '<span class="pa-price">' + fmt(b.priceText) + '</span>' : '<span class="pa-price pa-price-none">가격 확인 필요</span>') +
+        // 답 줄에 금액이 없어도 서버 카드 가격이 있으면 그 값을 쓴다(2026-10-21 「70만원」 캡처: 판매가가 있는데 「가격 확인 필요」).
+        (b.priceText ? '<span class="pa-price">' + fmt(b.priceText) + '</span>' : typeof b.card.price === 'number' && b.card.price > 0 && P.money ? '<span class="pa-price">' + esc(P.money(b.card.price)) + '</span>' : '<span class="pa-price pa-price-none">가격 확인 필요</span>') +
         (b.card.price_src ? '<small class="pa-price-src">' + esc(b.card.price_src) + '</small>' : '') + (now ? '<small class="pa-price-now">' + esc(now) + '</small>' : '') + '</header>' +
         (parts.length ? line(parts[0], 'pa-spec') + (parts.length > 1 ? line(parts.slice(1).join(' '), 'pa-fit') : '') : '') +
         (b.check ? '<aside class="pa-check"><strong>확인 필요 · 답변 안의 불일치</strong>' + esc(b.check) + '</aside>' : '') +
