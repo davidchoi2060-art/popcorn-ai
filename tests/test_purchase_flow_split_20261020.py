@@ -101,7 +101,7 @@ class Assets(unittest.TestCase):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
             for a in ("configuration-concept.js?v=20261021-acc2", "chat-answer.js?v=20261021-buy1", "design-conversation.js?v=20261021-buy1",
-                      "live-catalog.js?v=20261021-photo8", "live-checkout.js?v=20261021-buy1"):
+                      "live-catalog.js?v=20261021-photo9", "live-checkout.js?v=20261021-buy1"):
                 self.assertIn(a, t, page)
 
 
