@@ -30,25 +30,27 @@ jobs:
           BASE: https://popcornai.co.kr
         run: |
           set -euo pipefail
-          mkdir -p out/offers
+          mkdir -p out/offers out/registered
           curl -fsS "$BASE/api/customer/pc-catalog" -o out/pc_catalog.json
           python3 -c "import json;print('\n'.join(str(i['product_code']) for i in json.load(open('out/pc_catalog.json'))['items']))" > out/codes.txt
           echo "목록 $(wc -l < out/codes.txt)건"
           while read -r code; do
             curl -sS "$BASE/api/customer/pc-offers/$code" -o "out/offers/$code.json" -w "$code %{http_code}\n" >> out/offer_status.txt || echo "$code fail" >> out/offer_status.txt
+            curl -sS "$BASE/api/customer/pc-registered/$code" -o "out/registered/$code.json" -w "$code %{http_code}\n" >> out/registered_status.txt || echo "$code fail" >> out/registered_status.txt
             sleep 0.2
           done < out/codes.txt
           python3 - <<'PY'
           import json, os
-          d = {}
-          for f in os.listdir('out/offers'):
-              try:
-                  d[f[:-5]] = json.load(open('out/offers/' + f))
-              except Exception as e:
-                  d[f[:-5]] = {'parse_error': str(e)}
-          json.dump(d, open('out/pc_offers.json', 'w'), ensure_ascii=False)
+          for src, dst in (('offers', 'pc_offers'), ('registered', 'pc_registered')):
+              d = {}
+              for f in os.listdir('out/' + src):
+                  try:
+                      d[f[:-5]] = json.load(open('out/' + src + '/' + f))
+                  except Exception as e:
+                      d[f[:-5]] = {'parse_error': str(e)}
+              json.dump(d, open('out/' + dst + '.json', 'w'), ensure_ascii=False)
           PY
-          rm -rf out/offers
+          rm -rf out/offers out/registered
           cut -d' ' -f2 out/offer_status.txt | sort | uniq -c
 
       - name: 결과를 데이터 가지에 올린다
