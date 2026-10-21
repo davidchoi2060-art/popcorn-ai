@@ -227,6 +227,33 @@ def spec_text_swap(conn, code):
     return 'swapped'
 
 
+def customer_view(conn, code, writing=False):
+    """고객 화면과 같은 판정. writing=True 면 커밋 전 같은 트랜잭션에서 본다 — 고객 읽기는
+    «읽기 전용 REPEATABLE READ» 를 요구하는데, 반영 직전 검사는 쓰기 트랜잭션 안이라
+    그 한 조건(read_only)만 이 호출 동안 빼고 나머지(격리 수준·트랜잭션 동일성)는 그대로 둔다."""
+    from api import customer_sold_offer_read as sold
+    from api.customer_pc_offer import _public_offer
+    original = sold._snapshot
+
+    def lenient(c, expected=None):
+        from sqlalchemy import text
+        if c.in_transaction() is not True or c.in_nested_transaction():
+            raise RuntimeError('snapshot_required')
+        t = c.get_transaction()
+        if c.execute(text('SHOW transaction_isolation')).scalar_one() not in ('repeatable read', 'serializable'):
+            raise RuntimeError('snapshot_isolation')
+        if expected is not None and t is not expected:
+            raise RuntimeError('snapshot_changed')
+        return t
+    if writing:
+        sold._snapshot = lenient
+    try:
+        view = _public_offer(conn, code)
+    finally:
+        sold._snapshot = original
+    return view[0] if isinstance(view, tuple) else view
+
+
 def configuration(conn, code, actor, rights, image_reader, storage, mrow, msha, uploads):
     from sqlalchemy import text
     from api import pc_customer_publication as publication
@@ -334,10 +361,8 @@ def configuration(conn, code, actor, rights, image_reader, storage, mrow, msha, 
     out['after'] = {k: after[k] for k in ('revision', 'state', 'event_seq', 'reason')}
     if not after['allowed']:
         raise RuntimeError(f"publication_not_allowed_after {after['state']} {after.get('reason')}")
-    # 6. 고객 화면 판정(같은 스냅샷)
-    from api.customer_pc_offer import _public_offer
-    view = _public_offer(conn, code)
-    view = view[0] if isinstance(view, tuple) else view
+    # 6. 고객 화면 판정(같은 스냅샷 — 쓰기 트랜잭션이라 읽기 전용 표시만 이 호출 동안 면제)
+    view = customer_view(conn, code, writing=True)
     pc = view.get('public_configuration') or {}
     cool = [p for p in pc.get('parts', []) if p.get('slot') == 'COOLER']
     out['customer'] = dict(photo=view.get('photo', {}).get('state'), cooler=[p.get('name') for p in cool],
@@ -415,6 +440,17 @@ def run(engine, apply=False, image_reader=None, storage=None, only=None):
                 item['result'] = 'committed' if apply else 'would_commit'
                 if apply:
                     trans.commit()
+                    rc = engine.connect().execution_options(isolation_level='REPEATABLE READ')
+                    try:
+                        with rc.begin():
+                            rc.execute(text('SET TRANSACTION READ ONLY'))
+                            v = customer_view(rc, code)
+                            item['customer_after_commit'] = dict(photo=(v.get('photo') or {}).get('state'),
+                                                                 url=(v.get('photo') or {}).get('url'))
+                    except Exception as error:
+                        item['customer_after_commit'] = f'{type(error).__name__}: {error}'
+                    finally:
+                        rc.close()
                 else:
                     trans.rollback()
             except Exception as error:
