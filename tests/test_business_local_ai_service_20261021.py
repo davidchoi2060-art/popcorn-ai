@@ -20,9 +20,11 @@ def code(rel):
     return s[s.index("(function () {"):]
 
 
-def test_only_business_documents_entries_go_to_the_explanation():
+def test_business_use_entries_go_to_their_explanation():
     s = read("assets/js/ai.js")
-    assert "p.id === 'business' && u.id === 'documents' ? 'ai-service.html?package=business&amp;use=documents'" in s
+    # 2026-10-21 회의록 정리·고객 답변 초안 승인으로 업무형 세 업무가 각자의 설명 화면으로 간다(test_business_meeting_reply_guides_20261021)
+    assert "var SERVICE_USES = {documents: 1, meetings: 1, replies: 1};" in s
+    assert "p.id === 'business' && SERVICE_USES[u.id] ? 'ai-service.html?package=business&amp;use=' + u.id" in s
     assert "useHref(p, u)" in s and "link('ai-consult', {package:p.id, use:u.id})" in s     # 다른 업무·패키지는 기존 상담 그대로
     # 상단 타일과 아래 활용 카드가 같은 uses() 를 쓴다
     detail = s[s.index("P.pages['ai-detail']"):s.index("P.pages['ai-consult']")]
@@ -32,10 +34,11 @@ def test_only_business_documents_entries_go_to_the_explanation():
 def test_explanation_page_uses_site_shell_and_its_own_body_only():
     html = read("ai-service.html")
     assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261020-logo2" in html
-    assert "ai-local-service.js?v=20261021-svc1" in html and "ai-local-service.css?v=20261021-svc1" in html
+    assert "ai-local-service.js?v=20261021-mr1" in html and "ai-local-service.css?v=20261021-svc1" in html
     js = code("assets/js/ai-local-service.js")
     assert "window.openai" not in js and "setWidgetState" not in js and "fetch(" not in js and "localStorage" not in js
-    assert "P.qs.get('package') === 'business' && P.qs.get('use') === 'documents'" in js
+    assert "P.serviceGuides.documents = {label: '사내 문서 검색', body: body, mount: mount};" in js
+    assert "P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use)" in js
 
 
 def test_approved_content_is_kept():
@@ -73,12 +76,12 @@ def test_consult_form_preselects_use_from_url_and_skips_gate_for_adoption():
 
 def test_ai_pages_load_new_ai_js():
     for page in ("ai-detail.html", "ai-consult.html", "ai-packages.html", "ai-result.html", "ai-service.html"):
-        assert "ai.js?v=20261021-svc1" in read(page), page
+        assert "ai.js?v=20261021-mr1" in read(page), page
 
 
 def test_home_business_card_documents_also_goes_to_the_explanation():
     """홈 업무형 카드의 사내 문서 검색도 같은 설명 화면으로 (승인 원문 「사내문서 검색을 누르면 … 먼저 보여주고」)."""
     s = read("assets/js/design-home.js")
-    assert "(f[2] === 'documents' ? 'ai-service.html?package=business&amp;use=documents' : 'ai-consult.html?package=business&amp;use=' + f[2])" in s
+    assert "(/^(documents|meetings|replies)$/.test(f[2]) ? 'ai-service.html?package=business&amp;use=' + f[2] : 'ai-consult.html?package=business&amp;use=' + f[2])" in s
     for page in ("index.html", "review-flows.html"):
-        assert "design-home.js?v=20261021-svc2" in read(page), page
+        assert "design-home.js?v=20261021-mr1" in read(page), page
