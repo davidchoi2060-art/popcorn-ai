@@ -50,6 +50,15 @@ table.pf-items th,table.pf-items td{border-bottom:1px solid var(--outline-varian
 table.pf-items td.price{text-align:right;font-family:var(--font-num);white-space:nowrap}
 .note{color:var(--on-variant)}
 .warn{color:var(--state-fail)}
+/* 상세 소개(ABOUT THIS PC) 수정 — 승인 구성이 없는 PC 의 소개(0171 pc_registered_about) */
+.pf-about-btn{margin-top:4px;padding:2px 8px;font:500 11px/1.6 var(--font);border:1px solid var(--outline-variant);border-radius:6px;background:var(--card);cursor:pointer}
+dialog.pf-about{width:min(720px,94vw);border:1px solid var(--outline-variant);border-radius:10px;padding:16px;font:400 13px/1.5 var(--font)}
+dialog.pf-about label{display:block;margin:10px 0 4px;font-weight:600}
+dialog.pf-about input,dialog.pf-about textarea{width:100%;font:inherit;padding:6px 8px;border:1px solid var(--outline-variant);border-radius:6px}
+dialog.pf-about .ben{display:grid;grid-template-columns:1fr auto;gap:4px 6px;margin-bottom:8px}
+dialog.pf-about .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+dialog.pf-about .acts button,dialog.pf-about .add{padding:6px 12px;border:1px solid var(--outline-variant);border-radius:6px;background:var(--card);cursor:pointer}
+dialog.pf-about .acts .save{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
 /* 전수 점검 L69 — PC 칸 안 「최저 1,878,400원부/터」처럼 낱말이 끊기던 것: 낱말 단위로만 줄바꿈 */
 table.pf td{word-break:keep-all;overflow-wrap:break-word;min-width:96px}
 /* 왼쪽 「용도 · 수준」 열을 고정 — 옆으로 밀어도 어느 줄인지 보인다 */
@@ -65,7 +74,7 @@ table.pf thead th:first-child{left:0;z-index:2}
 {% endblock %}
 
 {% block header_extra %}
-<span class="a2-badge">조회 전용</span>
+<span class="a2-badge">조회 · 상세 소개 수정</span>
 {% endblock %}
 
 {% block content %}
@@ -79,6 +88,7 @@ table.pf thead th:first-child{left:0;z-index:2}
   </div>
   <div class="card pf-wrap"><table class="pf" data-bind="grid"><tbody><tr><td>불러오는 중</td></tr></tbody></table></div>
   <div class="card pf-detail" data-bind="detail" hidden></div>
+  <dialog class="pf-about" data-bind="about" aria-label="상세 소개 수정"></dialog>
 </div>
 {% endblock %}
 
@@ -141,7 +151,7 @@ table.pf thead th:first-child{left:0;z-index:2}
       if (p.includes) notes.push('가격에 ' + p.includes + ' 포함');
       if (p.dominated_by) notes.push('더 싼 ' + p.dominated_by + ' 이 모든 용도에서 같거나 높음');
       if (p.balance) notes.push(p.balance);
-      h += '<tr><td>' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.code) + '</a>' : esc(p.code)) + '<br>' + esc(p.name) + '</td>' +
+      h += '<tr><td>' + (p.url ? '<a href="' + esc(p.url) + '" target="_blank" rel="noopener">' + esc(p.code) + '</a>' : esc(p.code)) + '<br>' + esc(p.name) + '<br><button type="button" class="pf-about-btn" data-about="' + esc(p.code) + '">상세 소개 수정</button></td>' +
         '<td>' + esc([s.cpu, s.gpu, s.ram_gb ? s.ram_gb + 'GB' : null, s.ssd_gb ? s.ssd_gb + 'GB SSD' : null].filter(Boolean).join(' · ')) + '</td>' +
         '<td class="price">' + num(p.price) + '<br><span class="note">' + esc(p.price_src) + '</span></td>' +
         '<td class="' + (p.dominated_by ? 'warn' : 'note') + '">' + esc(notes.join(' / ')) + '</td></tr>';
@@ -149,6 +159,54 @@ table.pf thead th:first-child{left:0;z-index:2}
     el.innerHTML = h + '</tbody></table>';
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
+
+  // 상세 소개(ABOUT THIS PC) — 승인 구성이 없는 PC 의 소개. 저장하면 고객 상세에 바로 반영되고, 고치기 전 글은 서버 이력에 남는다.
+  var about = { code: null, c: null };
+  function aboutForm(msg) {
+    var c = about.c;
+    var h = '<h3>상세 소개 수정 · ' + esc(about.code) + '</h3><p class="note">승인 구성이 없는 PC 의 상세 하단 「ABOUT THIS PC」입니다. 승인 구성이 있는 PC 는 조립PC 제품군의 설명이 먼저 보입니다.</p>' +
+      '<label>제목</label><input data-f="title" maxlength="200" value="' + esc(c.title) + '">' +
+      '<label>소개</label><textarea data-f="intro" rows="3" maxlength="3000">' + esc(c.intro) + '</textarea>' +
+      '<label>사용 상황</label><textarea data-f="scene" rows="2" maxlength="3000">' + esc(c.scene) + '</textarea>' +
+      '<label>특징</label>' + (c.benefits || []).map(function (b, i) {
+        return '<div class="ben"><input data-b="' + i + '.0" maxlength="200" value="' + esc(b[0]) + '" aria-label="특징 ' + (i + 1) + ' 제목">' +
+          '<button type="button" class="add" data-del="' + i + '" aria-label="특징 ' + (i + 1) + ' 삭제">삭제</button>' +
+          '<textarea data-b="' + i + '.1" rows="2" maxlength="3000" aria-label="특징 ' + (i + 1) + ' 설명">' + esc(b[1]) + '</textarea></div>';
+      }).join('') + '<button type="button" class="add" data-add>특징 추가</button>' +
+      '<p class="' + (msg && msg.err ? 'warn' : 'note') + '" role="status">' + esc(msg ? msg.text : '') + '</p>' +
+      '<div class="acts"><button type="button" data-close>닫기</button><button type="button" class="save" data-save>저장</button></div>';
+    $('about').innerHTML = h;
+  }
+  function aboutRead() {
+    var d = $('about'), c = about.c;
+    d.querySelectorAll('[data-f]').forEach(function (x) { c[x.getAttribute('data-f')] = x.value; });
+    d.querySelectorAll('[data-b]').forEach(function (x) { var k = x.getAttribute('data-b').split('.'); c.benefits[+k[0]][+k[1]] = x.value; });
+  }
+  $('about').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.hasAttribute('data-close')) { $('about').close(); return; }
+    aboutRead();
+    if (b.hasAttribute('data-add')) { about.c.benefits.push(['', '']); aboutForm(); return; }
+    if (b.hasAttribute('data-del')) { about.c.benefits.splice(+b.getAttribute('data-del'), 1); aboutForm(); return; }
+    if (b.hasAttribute('data-save')) {
+      var body = { title: about.c.title, intro: about.c.intro, scene: about.c.scene || '',
+        benefits: about.c.benefits.filter(function (x) { return x[0].trim(); }) };
+      b.disabled = true;
+      fetch('/api/admin/registered-about/' + encodeURIComponent(about.code), { method: 'PUT', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : '입력 내용을 확인해 주세요.'); return j; }); })
+        .then(function (j) { about.c = j.content; aboutForm({ text: '저장했습니다. 고객 상세에 바로 반영됩니다.' }); })
+        .catch(function (err) { aboutForm({ text: '저장하지 못했습니다 — ' + err.message, err: true }); });
+    }
+  });
+  $('detail').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-about]'); if (!b) return;
+    about.code = b.getAttribute('data-about');
+    fetch('/api/admin/registered-about/' + encodeURIComponent(about.code), { credentials: 'same-origin' })
+      .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(typeof j.detail === 'string' ? j.detail : '오류 ' + r.status); return j; }); })
+      .then(function (j) { about.c = j.content; about.c.benefits = (about.c.benefits || []).map(function (x) { return [x[0], x[1]]; }); aboutForm(j.saved ? null : { text: '아직 저장된 소개가 없어 자동으로 만든 글을 보여 줍니다. 저장하면 이 글이 쓰입니다.' }); $('about').showModal(); })
+      .catch(function (err) { alert('소개를 불러오지 못했습니다 — ' + err.message); });
+  });
 
   $('grid').addEventListener('click', function (e) {
     var td = e.target.closest('td.hit'); if (!td) return;

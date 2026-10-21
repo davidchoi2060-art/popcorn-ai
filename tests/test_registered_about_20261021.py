@@ -49,3 +49,10 @@ class Wiring(unittest.TestCase):
         m = (ROOT / "db/migrations/versions/0171_registered_about.py").read_text(encoding="utf-8")
         self.assertIn('revision = "0171"', m)
         self.assertIn("from api.registered_about import build", m)
+
+
+class AdminEditor(unittest.TestCase):
+    def test_product_fit_page_edits_about(self):
+        t = (ROOT / "templates/admin/product_fit.html.j2").read_text(encoding="utf-8")
+        self.assertIn("/api/admin/registered-about/", t)
+        self.assertIn("method: 'PUT'", t)
