@@ -97,11 +97,16 @@ var stages=[
       '</div>';
   }
   function unknown() {
-    return '<div class="ls-page"><section class="ls-unknown"><div class="ls-eyebrow">AI 패키지</div><h1>이 업무의 설명 화면은 준비 중입니다.</h1><p class="ls-lead">업무형 패키지의 사내 문서 검색 설명만 이 화면에서 볼 수 있습니다.</p><p style="margin-top:18px"><a class="text-link" href="ai-detail.html?package=business">업무형 패키지 보기 ' + i('arrow-right') + '</a></p></section></div>';
+    return '<div class="ls-page"><section class="ls-unknown"><div class="ls-eyebrow">AI 패키지</div><h1>이 업무의 설명 화면은 준비 중입니다.</h1><p class="ls-lead">업무형 패키지의 사내 문서 검색·회의록 정리·고객 답변 초안 설명만 이 화면에서 볼 수 있습니다.</p><p style="margin-top:18px"><a class="text-link" href="ai-detail.html?package=business">업무형 패키지 보기 ' + i('arrow-right') + '</a></p></section></div>';
   }
+  // 업무별 설명은 P.serviceGuides 에 모인다(회의록 정리 = ai-meeting-guide.js, 고객 답변 초안 = ai-reply-guide.js).
+  // 화면은 주소의 use 만 보고 고른다 -- 새로고침·뒤로·앞으로·직접 주소가 모두 같은 업무를 연다.
+  P.serviceGuides = P.serviceGuides || {};
+  P.serviceGuides.documents = {label: '사내 문서 검색', body: body, mount: mount};
   P.pages['ai-service'] = function () {
-    var ok = P.qs.get('package') === 'business' && P.qs.get('use') === 'documents';
-    return {html: '<div class="container">' + crumb(ok ? '사내 문서 검색' : '업무 설명') + (ok ? body() : unknown()) + '</div>', mount: ok ? mount : null};
+    var use = P.qs.get('use'), g = P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use) ? P.serviceGuides[use] : null;
+    if (g && g.label) document.title = '회사 맞춤 내부 AI 구축 · ' + g.label + ' | 팝콘AI';
+    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? g.body() : unknown()) + '</div>', mount: g ? g.mount : null};
   };
   function mount() {
     var root = document.getElementById('pop-local-service');

@@ -7,7 +7,10 @@
   function model(p) { return '<figure class="ai-scene"><img src="' + P.image(p.detailModel || p.model) + '" alt="' + h(p.modelAlt || 'PC를 활용하는 모습') + '"></figure>'; }
   // 2026-10-21 대표 승인 「사내문서 검색을 누르면 업무 예시랑 … 구축해주는 과정을 먼저 보여주고, 그다음 상담으로」 --
   // 업무형의 사내 문서 검색(상단 타일·아래 활용 카드)만 설명 화면으로 간다. 다른 업무·패키지는 기존 상담 연결 그대로.
-  function useHref(p, u) { return p.id === 'business' && u.id === 'documents' ? 'ai-service.html?package=business&amp;use=documents' : link('ai-consult', {package:p.id, use:u.id}); }
+  // 2026-10-21 같은 날 승인 「회의록 정리랑 고객답변 초안을 누르면 각각 업무 예시와 … 구축하는 과정을 먼저 보여주고 상담으로」 --
+  // 업무형의 세 업무(사내 문서 검색·회의록 정리·고객 답변 초안)가 각자의 설명 화면으로 간다. 다른 패키지는 기존 상담 연결 그대로.
+  var SERVICE_USES = {documents: 1, meetings: 1, replies: 1};
+  function useHref(p, u) { return p.id === 'business' && SERVICE_USES[u.id] ? 'ai-service.html?package=business&amp;use=' + u.id : link('ai-consult', {package:p.id, use:u.id}); }
   function uses(p, compact) { return '<div class="ai-use-grid' + (compact ? ' compact' : '') + '">' + p.uses.map(function (u) { return '<a class="ai-use" href="' + useHref(p, u) + '"><span class="ai-icon">' + i(u.icon) + '</span><div><h3>' + h(u.title) + '</h3>' + (compact ? '' : '<p>' + h(u.text) + '</p>') + '</div>' + i('caret-right') + (!compact && p.id==='business' ? demo(u.id) : '') + '</a>'; }).join('') + '</div>'; }
   function demo(id) {
     var content={documents:'<div class="demo-query">'+i('magnifying-glass')+'휴가 규정 알려줘</div><div class="demo-paper">'+i('file-text')+'<strong>사내 복지 규정.pdf</strong><p>필요한 내용을 찾고<br>참고 원문을 함께 확인합니다.</p></div>',meetings:'<div class="demo-paper"><strong>회의록 초안</strong><p>주요 논의 · 일정 조정<br>할 일 · 자료 준비<br>확인할 내용 · 담당자 검토</p></div>',replies:'<div class="demo-paper"><strong>답변 초안</strong><p>안녕하세요.<br>문의하신 내용을 확인했습니다.<br>안내할 내용을 검토한 뒤<br>고객에게 직접 보냅니다.</p></div>'};
