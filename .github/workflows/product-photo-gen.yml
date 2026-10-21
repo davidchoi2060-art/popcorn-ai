@@ -1,0 +1,80 @@
+# 새 판매 PC 대표 사진(AI 조립 예시)을 만든다 — 손으로 부르는 전용 (2026-10-21 사장님 「이미지 작업은 좀 멋지게」).
+#
+# 기존 대표 사진(api/pc_media.py)과 같은 모델·지시문. 부품·참고 사진은 몰 등록 구성에서 읽는다.
+#
+# 이 워크플로가 «하지 않는» 것:
+#   · sudo·DB 를 쓰지 않는다.
+#   · main 에 쓰지 않는다 — 결과 PNG 는 data/product-photos 가지에 덮어쓴다. 화면 반영은 따로 한다.
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다.
+name: 새 상품 대표 사진 만들기
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: '점검(열쇠만 확인) 또는 만들기'
+        type: choice
+        default: 점검
+        options: [점검, 만들기]
+      codes:
+        description: '몰 상품번호 (쉼표·범위, 예: 130569-130679)'
+        required: false
+        default: ''
+
+concurrency:
+  group: popcorn-product-photo-gen
+  cancel-in-progress: false
+
+jobs:
+  gen:
+    runs-on: [self-hosted, popcorn-vm]
+    permissions:
+      contents: write
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 준비
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/pv"
+          "$RUNNER_TEMP/pv/bin/pip" install -q --disable-pip-version-check requests pillow
+          rm -rf out; mkdir -p out
+          git fetch -q origin 'refs/heads/data/mall-fetch:refs/remotes/origin/data/mall-fetch' -f
+          git show origin/data/mall-fetch:mall_builtpc.json > out/mall_builtpc.json
+
+      - name: 실행
+        shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
+          CODES: ${{ inputs.codes }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          set -o pipefail
+          if [ "$MODE" = "점검" ]; then
+            "$RUNNER_TEMP/pv/bin/python" tools/product_photo_gen.py --probe | tee out/probe.txt
+          else
+            "$RUNNER_TEMP/pv/bin/python" tools/product_photo_gen.py --codes "$CODES" --out out/photos | tee out/run.txt
+          fi
+          rm -f out/mall_builtpc.json
+          { echo '## 결과'; echo '```'; cat out/probe.txt out/run.txt 2>/dev/null | tail -n 150; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 결과를 데이터 가지에 올린다
+        if: always()
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          [ -d out ] || exit 0
+          tmp=$(mktemp -d)
+          cp -r out/. "$tmp"/
+          cd "$tmp"
+          git init -q
+          git config user.name 'popcorn-runner'
+          git config user.email 'runner@popcornai.local'
+          git add -A
+          git commit -qm "새 상품 대표 사진 (run $RUN_ID)"
+          git push -q --force "https://x-access-token:$TOKEN@github.com/$REPO" HEAD:refs/heads/data/product-photos
