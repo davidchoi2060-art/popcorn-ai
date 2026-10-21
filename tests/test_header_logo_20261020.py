@@ -31,7 +31,7 @@ def test_pages_bumped():
     for p in ROOT.glob("*.html"):
         t = p.read_text(encoding="utf-8")
         if "assets/js/core.js" in t:
-            assert "core.js?v=20261020-logo3" in t, p.name
+            assert "core.js?v=20261021-ip1" in t, p.name  # 2026-10-21 하단 회사정보·정책 링크
         if "assets/css/header-ui.css" in t:
             assert "header-ui.css?v=20261020-logo1" in t, p.name
 

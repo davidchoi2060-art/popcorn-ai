@@ -1,0 +1,86 @@
+/* 회사정보 · 정책 읽기 화면 (2026-10-21 대표 확정 디자인 05·06). 코발트 · 네이비 · 연한 파란 배경. */
+.ip-page{--ip-cobalt:#1f4fd6;--ip-navy:#101b3f;--ip-bg:#eef4fc;--ip-line:#e3e8f1;--ip-soft:#f3f6fc;background:var(--ip-bg);padding:44px 0 56px}
+body[data-page=company] .site-footer,body[data-page=terms] .site-footer,body[data-page=privacy] .site-footer,body[data-page=purchase-support] .site-footer{margin-top:0}
+.ip-head h1{font-size:48px;font-weight:850;color:var(--ip-navy);letter-spacing:-.05em}
+.ip-title-row{display:flex;align-items:center;flex-wrap:wrap;gap:14px}
+.ip-badge{display:inline-flex;align-items:center;min-height:34px;padding:4px 14px;border-radius:8px;background:#dfe9fb;color:var(--ip-cobalt);font-size:15px;font-weight:700}
+.ip-lead{margin-top:10px;font-size:17px;color:#4b5468}
+.ip-meta{margin:-6px 0 12px;font-size:14px;color:#6a7385;text-align:right}
+.ip-tabs{display:flex;flex-wrap:wrap;align-items:center;margin:26px 0 22px;font-size:17px}
+.ip-tabs a{position:relative;display:inline-flex;align-items:center;min-height:46px;padding:0 22px;color:#3c4558}
+.ip-tabs a+a::before{content:"";position:absolute;left:0;top:50%;width:1px;height:14px;margin-top:-7px;background:#c5ccda}
+.ip-tabs a[aria-current=page]{color:var(--ip-cobalt);font-weight:700}
+.ip-tabs a[aria-current=page]::after{content:"";position:absolute;left:12px;right:12px;bottom:0;height:3px;border-radius:2px;background:var(--ip-cobalt)}
+.ip-tabs a:hover{color:var(--ip-cobalt)}
+.ip-card{background:#fff;border-radius:18px;box-shadow:0 10px 40px rgb(16 27 63 / .06);padding:40px 46px}
+.ip-company{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:0}
+.ip-co{padding-right:40px;border-right:1px solid var(--ip-line)}
+.ip-co h2{font-size:38px;font-weight:850;color:var(--ip-navy)}
+.ip-sub{margin-top:6px;color:#6a7385;font-size:16px}
+.ip-rows{margin:22px 0 0;border-top:1px solid var(--ip-line)}
+.ip-row{display:grid;grid-template-columns:200px 1fr;gap:16px;padding:14px 2px;border-bottom:1px solid var(--ip-line);font-size:17px}
+.ip-row dt{color:#5b6477}.ip-row dd{margin:0;color:var(--ip-navy);font-family:Pretendard,system-ui,sans-serif}
+.ip-roles{padding-left:40px}
+.ip-roles h2{font-size:27px;font-weight:800;color:var(--ip-navy)}
+.ip-roles ul{list-style:none;margin-top:18px}
+.ip-roles li{display:flex;align-items:center;gap:22px;padding:20px 0;border-bottom:1px solid var(--ip-line)}
+.ip-role-icon{display:flex;align-items:center;justify-content:center;flex:0 0 68px;height:68px;border-radius:16px;background:var(--ip-soft)}
+.ip-role-icon .icon{width:34px;height:34px}
+.ip-roles strong{display:block;font-size:22px;color:var(--ip-navy);letter-spacing:-.03em}
+.ip-roles li p{margin-top:4px;color:#4b5468;font-size:16px}
+.ip-note{display:flex;align-items:center;gap:10px;margin-top:22px;color:#3c4558;font-size:16px}
+.ip-more{display:inline-flex;align-items:center;gap:8px;margin:14px 0 0 34px;color:var(--ip-cobalt);font-weight:700;text-decoration:underline;text-underline-offset:5px}
+.ip-more .icon{width:18px;height:18px}
+.ip-phone{display:flex;align-items:center;gap:10px;width:fit-content;margin:22px 0 0 auto;padding:12px 22px;border:1.5px solid var(--ip-cobalt);border-radius:10px;color:var(--ip-cobalt);font-size:16px}
+.ip-roles .ip-phone strong{display:inline;font-size:16px;color:inherit;font-weight:700;letter-spacing:0}
+.ip-doc{display:grid;grid-template-columns:300px minmax(0,1fr);gap:0;padding:34px 40px}
+.ip-toc{position:sticky;top:110px;align-self:start;padding-right:28px;border-right:1px solid var(--ip-line)}
+.ip-toc summary{list-style:none;font-size:26px;font-weight:800;color:var(--ip-navy);cursor:default}
+.ip-toc summary::-webkit-details-marker{display:none}
+.ip-toc ol{list-style:none;margin-top:16px;max-height:calc(100vh - 220px);overflow:auto}
+.ip-toc a{display:block;padding:11px 16px;border-left:3px solid transparent;border-radius:6px;color:#3c4558;font-size:16px}
+.ip-toc a[aria-current=true]{border-left-color:var(--ip-cobalt);background:#eef3fd;color:var(--ip-cobalt);font-weight:700}
+.ip-body{min-width:0;overflow-wrap:anywhere;word-break:keep-all;padding-left:44px;font-size:17px;line-height:1.85;color:#2c3446}
+.ip-body>p{margin-bottom:14px}
+.ip-sec{padding:6px 0 26px;border-bottom:1px solid var(--ip-line);margin-bottom:26px;scroll-margin-top:110px}
+.ip-sec:last-child{border-bottom:0}
+.ip-sec h2{margin-bottom:12px;font-size:28px;font-weight:850;color:var(--ip-navy)}
+.ip-sec h3{margin:16px 0 6px;font-size:19px;font-weight:750;color:var(--ip-navy)}
+.ip-sec p+p{margin-top:10px}
+.ip-marked{list-style:none}
+.ip-marked li{display:flex;gap:12px;margin-top:8px}
+.ip-mark{flex:0 0 auto;min-width:26px;color:var(--ip-navy);font-weight:600}
+.ip-circ{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;min-width:26px;margin-top:3px;border:1.5px solid #9aa4b8;border-radius:50%;font-size:13px;line-height:1}
+.ip-table{display:grid;gap:12px;margin-top:12px}
+.ip-table-row{margin:0;padding:14px 18px;border:1px solid var(--ip-line);border-radius:10px;background:#fafcff}
+.ip-table-row>div{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:3px 0}
+.ip-table-row dt{color:#5b6477;font-size:15px}.ip-table-row dd{margin:0}
+.ip-top{position:fixed;right:24px;bottom:24px;display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border:1px solid var(--ip-line);border-radius:10px;background:#fff;box-shadow:0 6px 20px rgb(16 27 63 / .1);color:#3c4558;font-size:14px;z-index:20}
+.ip-top .ip-up{width:16px;height:16px;transform:rotate(180deg)}
+.ip-pending p{font-size:17px;color:#2c3446}.ip-pending .ip-sub{margin-top:12px;font-size:15px}
+@media(max-width:860px){
+  .ip-page{padding:28px 0 40px}
+  .ip-head h1{font-size:34px}.ip-lead{font-size:15px}
+  .ip-tabs{flex-wrap:nowrap;overflow-x:auto;margin:18px -16px 16px;padding:0 6px;font-size:15px;scrollbar-width:none}
+  .ip-tabs::-webkit-scrollbar{display:none}
+  .ip-tabs a{flex:0 0 auto;padding:0 14px;white-space:nowrap}
+  .ip-meta{text-align:left;margin:0 0 12px}
+  .ip-card{padding:24px 18px;border-radius:14px}
+  .ip-company{grid-template-columns:1fr}
+  .ip-co{padding:0 0 24px;border-right:0;border-bottom:1px solid var(--ip-line)}
+  .ip-co h2{font-size:27px}
+  .ip-row{grid-template-columns:118px 1fr;gap:10px;font-size:15px}
+  .ip-roles{padding:24px 0 0}.ip-roles h2{font-size:22px}
+  .ip-role-icon{flex-basis:54px;height:54px}.ip-roles strong{font-size:19px}.ip-roles li p{font-size:15px}
+  .ip-more{margin-left:0}.ip-phone{margin:20px 0 0}
+  .ip-doc{grid-template-columns:1fr;padding:18px}
+  .ip-toc{position:static;padding:0 0 14px;border-right:0;border-bottom:1px solid var(--ip-line)}
+  .ip-toc summary{display:flex;align-items:center;justify-content:space-between;min-height:44px;font-size:20px;cursor:pointer}
+  .ip-toc summary::after{content:"펼치기";font-size:14px;font-weight:600;color:var(--ip-cobalt)}
+  .ip-toc[open] summary::after{content:"접기"}
+  .ip-toc ol{max-height:none;overflow:visible}
+  .ip-body{padding:18px 0 0;font-size:16px;line-height:1.8}
+  .ip-sec h2{font-size:22px}
+  .ip-table-row>div{grid-template-columns:1fr;gap:2px}
+  .ip-top{right:14px;bottom:14px}
+}
