@@ -1,0 +1,59 @@
+# 기존 승인 25개 쿨러 교체(tools/remake25_cooler.py)의 «상태 조회·연습 실행» — 손으로 부르는 전용, 임시(2026-10-21).
+#
+# 같은 VM 의 API(127.0.0.1:8000)만 부른다. 연습 실행은 모든 DB 쓰기를 되돌린다.
+# 실제 반영은 이 워크플로가 하지 않는다 — 배포 때 마이그레이션이 한 번 한다.
+# sudo 를 쓰지 않는다. 결과는 data/remake25-report 가지에 덮어쓴다.
+#
+# ⚠ pull_request 트리거는 절대 넣지 않는다.
+name: 25개 쿨러 교체 점검
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'status 또는 dry'
+        required: true
+        default: 'status'
+
+concurrency:
+  group: popcorn-remake25
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: [self-hosted, popcorn-vm]
+    permissions:
+      contents: write
+    timeout-minutes: 30
+    steps:
+      - name: 내부 경로 부르기
+        shell: bash
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -uo pipefail
+          case "$MODE" in status|dry) ;; *) echo "mode 는 status|dry"; exit 1;; esac
+          mkdir -p out
+          curl -sS --max-time 1500 "http://127.0.0.1:8000/api/internal/remake25?mode=$MODE" \
+            -o "out/$MODE.json" -w "%{http_code}\n" > out/http.txt || echo fail >> out/http.txt
+          cat out/http.txt
+          head -c 3000 "out/$MODE.json" || true
+
+      - name: 결과를 데이터 가지에 올린다
+        if: always()
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          ls out/* >/dev/null 2>&1 || { echo '올릴 결과가 없습니다'; exit 0; }
+          tmp=$(mktemp -d)
+          cp out/* "$tmp"/
+          cd "$tmp"
+          git init -q
+          git config user.name 'popcorn-runner'
+          git config user.email 'runner@popcornai.local'
+          git add -A
+          git commit -qm "25개 쿨러 교체 점검 (run $RUN_ID)"
+          git push -q --force "https://x-access-token:$TOKEN@github.com/$REPO" HEAD:refs/heads/data/remake25-report
