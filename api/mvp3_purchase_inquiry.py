@@ -45,6 +45,8 @@ LIMIT_MESSAGES = {
 }
 # /mvp4 AI 슈퍼컴퓨터(고정 완제품) 문의의 주제 — 일반 상담 주제 목록(TOPICS)에는 넣지 않는다(0165).
 FIXED_TOPICS = {'quote': 'AI 슈퍼컴퓨터 견적', 'adoption': 'AI 도입 상담'}
+# /mvp4 기업 AI 업무개선 컨설팅 신청 화면만 쓰는 주제(0173). 일반 상담 주제 목록(TOPICS)에는 넣지 않고, 상품·견적을 함께 받지 않는다.
+SERVICE_TOPICS = ('기업 AI 업무개선 컨설팅',)
 PURPOSES = {'local-llm': '로컬 AI 모델 실행', 'documents': '사내 문서 검색·업무 활용',
             'development': 'AI 개발·연구', 'other': '그 밖의 용도·아직 미정'}
 CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다. '
@@ -89,6 +91,9 @@ def _clean(body: InquiryBody):
             raise HTTPException(422, 'AI 슈퍼컴퓨터 모델을 다시 선택해 주세요.')
         if body.quote_id is not None or body.configuration_id is not None or body.free_build is not None:
             raise HTTPException(422, '슈퍼컴퓨터 문의에는 다른 견적을 함께 보낼 수 없어요.')
+    elif body.topic in SERVICE_TOPICS:
+        if body.product_code is not None or body.quote_id is not None or body.configuration_id is not None or body.free_build is not None:
+            raise HTTPException(422, '기업 컨설팅 상담에는 상품이나 견적을 함께 보낼 수 없어요.')
     elif body.topic not in TOPICS:
         raise HTTPException(422, '문의 주제를 골라 주세요.')
     if body.consent is not True:
