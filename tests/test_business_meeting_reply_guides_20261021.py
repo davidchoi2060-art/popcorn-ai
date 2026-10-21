@@ -59,7 +59,7 @@ def test_consult_links_carry_each_use_with_adoption_intent():
         assert "이 화면을 본 것만으로 상담이 접수되거나 연락 동의가 되지 않습니다." in js
         assert 'href="ai-detail.html?package=business"' in js
     s = read("assets/js/ai-inquiry.js")
-    assert "use:P.qs.get('use') || ''" in s and "if(['quote','adoption'].indexOf(intent)<0)" in s
+    assert "use:company ? '' : (P.qs.get('use') || '')" in s and "if(['quote','adoption'].indexOf(intent)<0)" in s
 
 
 def test_meeting_example_keeps_counts_evidence_and_undecided_items():

@@ -70,7 +70,7 @@ def test_preview_became_real_consult_link_without_submitting_anything():
 
 def test_consult_form_preselects_use_from_url_and_skips_gate_for_adoption():
     s = read("assets/js/ai-inquiry.js")
-    assert "use:P.qs.get('use') || ''" in s
+    assert "use:company ? '' : (P.qs.get('use') || '')" in s
     assert "if(['quote','adoption'].indexOf(intent)<0)" in s       # 목적 재선택은 intent 가 없을 때만
 
 
