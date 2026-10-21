@@ -16,6 +16,11 @@
   var REGISTERED = '/api/customer/pc-registered/';
   // 승인 대표 사진이 없으면 팝콘PC 몰에 올린 그 상품의 대표 사진을 쓴다(2026-10-20 대표 「이미지도 만들어」).
   function mallImage(code) { var n = Number(code); return Number.isSafeInteger(n) && n > 0 ? 'https://www.popcornpc.co.kr/data/pimg/' + Math.floor(n / 1000) + '/' + n + '_600.jpg' : null; }
+  // 새 판매 PC 대표 사진(AI 조립 예시, 2026-10-21 대표 「이미지 작업은 좀 멋지게」) — 저장소 자산 assets/images/products/{상품번호}.webp.
+  // 서버 승인 사진이 없을 때 몰 사진보다 먼저 쓴다. 번호 목록은 여기 하나(출처·해시 = 그 폴더 SOURCES.json).
+  var LOCAL_PHOTOS = {};
+  var LOCAL_NOTICE = 'AI 조립 예시 이미지 · 실제 출고 외형과 다를 수 있음';
+  function localImage(code) { return LOCAL_PHOTOS[String(code)] === 1 ? 'assets/images/products/' + Number(code) + '.webp' : null; }
   // 몰은 일부 상품 대표 사진을 .gif 로만 둔다(2026-10-20 실측 122081·122083·121112·121114·121115 — _600.jpg 404, _600.gif 있음).
   // 다른 사진 대체(아이콘·「사진 준비 중」)보다 먼저 받아 .gif 로 한 번 더 읽는다. .gif 도 없으면 원래 대체가 그대로 돈다.
   window.addEventListener('error', function (event) {
@@ -65,7 +70,9 @@
     return {
       id: String(it.product_code), productCode: it.product_code, name: it.name, officialName: typeof it.official_name === 'string' && it.official_name.trim() ? it.official_name.trim() : it.name,
       price: typeof it.price === 'number' && it.price > 0 ? it.price : null, priceBasis: it.price_basis || '',
-      image: it.photo_hint ? it.image_url : mallImage(it.product_code), mediaStatus: it.photo_hint ? 'ready' : 'mall',
+      image: it.photo_hint ? it.image_url : localImage(it.product_code) || mallImage(it.product_code),
+      mediaStatus: it.photo_hint || localImage(it.product_code) ? 'ready' : 'mall',
+      photoNotice: !it.photo_hint && localImage(it.product_code) ? LOCAL_NOTICE : '',
       summary: summary.map(function (s) { return s.value; }).join(' · '), summarySpecs: summary,
       specs: [], status: it.sale_status, saleStatus: it.sale_status, isSelling: it.sale_status === '판매중',
       recommendable: it.sale_status === '판매중', reviewRequired: false, purchasable: it.sale_status === '판매중',
@@ -97,6 +104,8 @@
     var photo = body && body.photo;
     if (photo && photo.state === 'available' && typeof photo.url === 'string' && photo.url.indexOf('/api/customer/products/' + p.id + '/') === 0) {
       p.image = photo.url; p.mediaStatus = 'ready'; p.photoNotice = photo.notice || '';
+    } else if (localImage(p.id)) {
+      p.image = localImage(p.id); p.mediaStatus = 'ready'; p.photoNotice = LOCAL_NOTICE;
     } else { p.image = mallImage(p.id); p.mediaStatus = 'mall'; }
     p.liveDetail = 'public';
   }

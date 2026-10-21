@@ -17,9 +17,11 @@
 """
 from __future__ import annotations
 
+import json
 import re
 import threading
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Response
 from sqlalchemy import text
@@ -175,6 +177,33 @@ _STATIC_PHOTO = [
 ]
 
 
+# 몰 부품 사진을 배경 정리한 저장소 사본(투명 배경·여백 자름, 2026-10-21 대표 「이미지 작업은 좀 멋지게」).
+# 파일 이름이 몰 상품번호다(mall-{번호}.webp). 있으면 같은 번호의 몰 원본보다 먼저 쓴다. 출처 = 같은 폴더 SOURCES.json.
+_PARTS_DIR = Path(__file__).resolve().parents[1] / "mockups" / "mvp4" / "assets" / "images" / "parts"
+_CLEAN = frozenset(int(f.stem[5:]) for f in _PARTS_DIR.glob("mall-*.webp") if f.stem[5:].isdigit())
+
+
+def _clean_by_key() -> dict:
+    """{비교 키: 몰 번호} — 상품 DB 에 아직 없는 새 부품도 몰 옵션 문구 그대로면 정리본을 붙인다."""
+    try:
+        images = json.loads((_PARTS_DIR / "SOURCES.json").read_text(encoding="utf-8"))["images"]
+    except (OSError, ValueError, KeyError):
+        return {}
+    out = {}
+    for e in images:
+        m = re.search(r"mall-(\d+)\.webp$", e.get("file") or "")
+        if m and int(m.group(1)) in _CLEAN and e.get("mall_name"):
+            out[key(_QTY.sub(" ", e["mall_name"]))] = int(m.group(1))
+    return out
+
+
+def mall_photo(code: int) -> str:
+    return f"assets/images/parts/mall-{code}.webp" if code in _CLEAN else MALL_IMG.format(d=code // 1000, c=code)
+
+
+_CLEAN_KEYS = _clean_by_key()
+
+
 def lexicon(conn) -> dict:
     """{(슬롯, 비교 키): 부품 설명 코드} — 공개 승인된 구성의 오퍼 상품 원문과 구성 부품을 맞대어 만든다."""
     now = time.time()
@@ -238,7 +267,9 @@ def registered(code: int, response: Response):
         photo = f"/api/product-images/{c}/detail" if e and e["photo"] else None
         role = (e["role"] or e["summary"]) if e else None
         if photo is None and m:
-            photo = MALL_IMG.format(d=m // 1000, c=m)
+            photo = mall_photo(m)
+        if photo is None and x["key"] in _CLEAN_KEYS:
+            photo = mall_photo(_CLEAN_KEYS[x["key"]])
         if photo is None:
             hit = next((s for s in _STATIC_PHOTO if s[0] == x["slot"] and s[1].search(x["name"])), None)
             if hit:

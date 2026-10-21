@@ -122,3 +122,20 @@ class Endpoint(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CleanPartPhotos(unittest.TestCase):
+    """2026-10-21 새 부품 35개 — 몰 사진 배경 정리본(mall-{번호}.webp)을 몰 원본보다 먼저 쓴다."""
+
+    def test_clean_copy_first_then_mall(self):
+        self.assertEqual(R.mall_photo(126066), "assets/images/parts/mall-126066.webp")
+        self.assertEqual(R.mall_photo(124852), "https://www.popcornpc.co.kr/data/pimg/124/124852_600.jpg")
+
+    def test_every_clean_file_is_listed_with_mall_name(self):
+        self.assertEqual(len(R._CLEAN), 35)
+        self.assertEqual(sorted(R._CLEAN_KEYS.values()), sorted(R._CLEAN))
+
+    def test_option_text_without_db_row_finds_clean_copy(self):
+        parts, _ = R.rows("그래픽(VGA)@@<strong>[PALIT]</strong> 지포스 RTX 5070 Ti GAMINGPRO-S D7 16GB ,"
+                          "@@메모리(RAM)@@HIKSEMI DDR5-5600 CL46 HIKER (16GB) * 2개 ,@@")
+        self.assertEqual([R._CLEAN_KEYS.get(p["key"]) for p in parts], [126066, 127590])
