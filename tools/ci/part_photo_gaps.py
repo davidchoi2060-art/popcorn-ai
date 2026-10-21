@@ -81,11 +81,14 @@ def main():
     items = get('/api/customer/pc-catalog').get('items') or []
     reg_gap, off_gap = collections.Counter(), collections.Counter()
     reg_n = reg_ph = off_n = off_ph = 0
-    no_mall = []
+    no_mall, about, no_about = [], [], []
     for it in items:
         c = it['product_code']
         if it.get('configuration_public'):
-            for slot, name, ok in offer_parts(get(f'/api/customer/pc-offers/{c}')):
+            body = get(f'/api/customer/pc-offers/{c}')
+            # 상세 「ABOUT THIS PC」는 승인 구성의 description 이 있을 때만 나온다(live-cards.js intro)
+            about.append(c) if ((body.get('public_configuration') or {}).get('description')) else no_about.append(c)
+            for slot, name, ok in offer_parts(body):
                 off_n += 1
                 off_ph += ok
                 if not ok:
@@ -106,6 +109,8 @@ def main():
     print(f'### 판매 PC {len(items)}대')
     print(f'- 몰 등록 구성: 부품 {reg_n}개 중 사진 {reg_ph}개, 빈칸 {reg_n - reg_ph}개(문구 {len(reg_gap)}종)')
     print(f'- 승인 구성: 부품 {off_n}개 중 사진 {off_ph}개, 빈칸 {off_n - off_ph}개(문구 {len(off_gap)}종)')
+    print(f'- 상세 소개(ABOUT THIS PC) 있음 {len(about)}대 · 승인 구성인데 소개 없음 {len(no_about)}대'
+          f'{(" (" + ",".join(map(str, no_about)) + ")") if no_about else ""} · 승인 구성 없음 {len(items) - len(about) - len(no_about)}대')
     print(f'- 공개 사진 없고 몰 대표 사진(.jpg·.gif)도 없는 PC: {len(no_mall)}대')
     for title, gap in (('몰 등록 구성 빈칸', reg_gap), ('승인 구성 빈칸', off_gap)):
         print(f'\n#### {title}\n```')
