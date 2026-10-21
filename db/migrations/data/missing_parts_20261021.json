@@ -1,0 +1,951 @@
+{
+ "observed": "2026-10-21T13:41Z",
+ "note": "판매 PC 322개 몰 구성 부품 중 /api/part-explanations/{code} 가 404 였던 것(121846 제외)",
+ "parts": [
+  {
+   "code": 51188,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[인텔] UHD Graphics"
+  },
+  {
+   "code": 98086,
+   "cate": "파워",
+   "mall_name": "[SuperFlower] SF-2000F14HP LEADEX PLATINUM HIT * 2개"
+  },
+  {
+   "code": 101309,
+   "cate": "CPU쿨러",
+   "mall_name": "[AMD] 라이젠 프로세서에 포함"
+  },
+  {
+   "code": 102780,
+   "cate": "대용량(HDD)",
+   "mall_name": "Seagate 4TB Barracuda ST4000DM004 (SATA3/5400/256M) HIT * 2개"
+  },
+  {
+   "code": 107106,
+   "cate": "대용량(HDD)",
+   "mall_name": "Seagate 8TB BarraCuda ST8000DM004 (SATA3/5400/256M) * 2개"
+  },
+  {
+   "code": 107547,
+   "cate": "CPU쿨러",
+   "mall_name": "인텔/AMD 정품 쿨러"
+  },
+  {
+   "code": 108035,
+   "cate": "CPU쿨러",
+   "mall_name": "[3RSystem] Socoool RC100 RGB 실버 [높이:130mm, TDP:95W, 인텔15세대]"
+  },
+  {
+   "code": 108696,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 750W 80PLUS GOLD 230V EU 풀모듈러 HIT 할인 -3000"
+  },
+  {
+   "code": 108743,
+   "cate": "케이스",
+   "mall_name": "Fractal Design Meshify 2 XL Light 강화유리"
+  },
+  {
+   "code": 109138,
+   "cate": "메모리(RAM)",
+   "mall_name": "[마이크론] Crucial DDR4-3200 CL22 16GB"
+  },
+  {
+   "code": 109667,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 1050W 80PLUS GOLD 230V EU 풀모듈러 HIT 할인 -5000"
+  },
+  {
+   "code": 109753,
+   "cate": "메모리(RAM)",
+   "mall_name": "[삼성전자] DDR4-3200 ECC/REG 32G PC4-25600 * 2개"
+  },
+  {
+   "code": 110674,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[AMD] Radeon Graphics"
+  },
+  {
+   "code": 110966,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i7 12세대 12700 [Turbo 4.9GHz, 8+4코어/16+4쓰레드, UHD 770]™"
+  },
+  {
+   "code": 111065,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠7 버미어 5700X [Turbo 4.6GHz, 8코어/16쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 112556,
+   "cate": "메인보드",
+   "mall_name": "[AMD X670] [GIGABYTE] X670 AORUS ELITE AX [라이젠 AM5 / ATX / 128GB]"
+  },
+  {
+   "code": 112665,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i5 12세대 12600KF [Turbo 4.9GHz, 6+4코어/12+4쓰레드, VGA 미탑재]™"
+  },
+  {
+   "code": 112780,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i7 12세대 12700K [Turbo 5.0GHz, 8+4코어/16+4쓰레드, UHD 770]™"
+  },
+  {
+   "code": 112864,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i5 13세대 13500 [Turbo 4.8GHz, 6+8코어/12+8쓰레드, UHD 770]™"
+  },
+  {
+   "code": 112983,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠7 라파엘 7700 [Turbo 5.3GHz, 8코어/16쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 112984,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠9 라파엘 7900 [Turbo 5.4GHz, 12코어/24쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 113132,
+   "cate": "메모리(RAM)",
+   "mall_name": "삼성전자 DDR5-5600 (8GB) PC5-44800 * 2개"
+  },
+  {
+   "code": 113146,
+   "cate": "메모리(RAM)",
+   "mall_name": "[TeamGroup] DDR5-5600 CL46 Elite 16GB"
+  },
+  {
+   "code": 113481,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠 스레드리퍼 PRO 3955WX [Turbo 4.3GHz, 16코어/32쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 113484,
+   "cate": "케이스",
+   "mall_name": "[Phanteks] ENTHOO PRO 2 TG"
+  },
+  {
+   "code": 113485,
+   "cate": "CPU쿨러",
+   "mall_name": "[NZXT] KRAKEN 360"
+  },
+  {
+   "code": 113499,
+   "cate": "CPU쿨러",
+   "mall_name": "[NOCTUA] NH-U14S TR4-SP3"
+  },
+  {
+   "code": 113508,
+   "cate": "메인보드",
+   "mall_name": "[ASRock] Rack ROMED8-2T"
+  },
+  {
+   "code": 113511,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD EPYC 7313P [Turbo 3.7GHz, 16코어/32쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 113566,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[사파이어] 라데온 RX 7600 PULSE OC D6 8GB"
+  },
+  {
+   "code": 113568,
+   "cate": "파워",
+   "mall_name": "[SuperFlower] SF-1300F14XG LEADEX VII GOLD ATX 3.1"
+  },
+  {
+   "code": 113743,
+   "cate": "메인보드",
+   "mall_name": "[GIGABYTE] A520M K V2"
+  },
+  {
+   "code": 113744,
+   "cate": "초고속(SSD)",
+   "mall_name": "[삼성전자] 990 PRO M.2 NVMe 2TB"
+  },
+  {
+   "code": 113829,
+   "cate": "케이스",
+   "mall_name": "[ABKO] G21M 니트"
+  },
+  {
+   "code": 113884,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠 스레드리퍼 PRO 5955WX [Turbo 4.5GHz, 16코어/32쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 113888,
+   "cate": "메모리(RAM)",
+   "mall_name": "[삼성전자] DDR4-3200 ECC/REG 64G [32G x 2]"
+  },
+  {
+   "code": 113945,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠9 라파엘 7900X [Turbo 5.6GHz, 12코어/24쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 114155,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] COOLMAX FOCUS II 900W ETA SILVER PCIE5 [회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 114363,
+   "cate": "메인보드",
+   "mall_name": "[ASUS] PRO WS WRX80E-SAGE SE WIFI"
+  },
+  {
+   "code": 114455,
+   "cate": "케이스",
+   "mall_name": "리안리 LANCOOL III RGB (Black)"
+  },
+  {
+   "code": 114514,
+   "cate": "CPU쿨러",
+   "mall_name": "[DARKFLASH] NEBULA DN-240 ARGB 블랙"
+  },
+  {
+   "code": 114635,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠5 라파엘 7600X [Turbo 5.3GHz, 6코어/12쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 114636,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠5-4세대 5600 (버미어) (정품)[회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 114641,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠 스레드리퍼 PRO 5975WX [Turbo 4.5GHz, 32코어/64쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 114725,
+   "cate": "CPU쿨러",
+   "mall_name": "[발키리] E360 LOKI ARGB 블랙"
+  },
+  {
+   "code": 115248,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[MSI] 지포스 RTX 3050 벤투스 2X XS OC D6 8GB"
+  },
+  {
+   "code": 115583,
+   "cate": "케이스",
+   "mall_name": "JONSBO C6 White (미니타워)"
+  },
+  {
+   "code": 115726,
+   "cate": "파워",
+   "mall_name": "[NEWZEN] SKULL 750SM MODULAR ATX 3.0 80PLUS GOLD 화이트"
+  },
+  {
+   "code": 115829,
+   "cate": "메모리(RAM)",
+   "mall_name": "[삼성전자] DDR5-4800 ECC/REG 64GB * 2개"
+  },
+  {
+   "code": 115830,
+   "cate": "메모리(RAM)",
+   "mall_name": "[GeIL]GeIL DDR5-5600 CL46 PRISTINE V (16GB) * 2개"
+  },
+  {
+   "code": 115837,
+   "cate": "메모리(RAM)",
+   "mall_name": "마이크론 Crucial DDR5-5600 CL46 (8GB) * 2개"
+  },
+  {
+   "code": 115973,
+   "cate": "메모리(RAM)",
+   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (16GB) * 2개"
+  },
+  {
+   "code": 115974,
+   "cate": "메모리(RAM)",
+   "mall_name": "HIKSEMI DDR4-3200 CL18 HIKER (8GB) * 2개"
+  },
+  {
+   "code": 116537,
+   "cate": "메인보드",
+   "mall_name": "[ASRock] B650 PG Lightning"
+  },
+  {
+   "code": 117060,
+   "cate": "CPU쿨러",
+   "mall_name": "Thermalright AXP120-X67"
+  },
+  {
+   "code": 117375,
+   "cate": "파워",
+   "mall_name": "[SuperFlower] SF-600R12ST MEGA 80PLUS STANDARD 230V EU"
+  },
+  {
+   "code": 117460,
+   "cate": "CPU쿨러",
+   "mall_name": "3RSYS TEAMMOST RC800 ARGB"
+  },
+  {
+   "code": 118524,
+   "cate": "메인보드",
+   "mall_name": "GIGABYTE TRX50 AERO D [피씨디렉트/제이씨현]"
+  },
+  {
+   "code": 119214,
+   "cate": "초고속(SSD)",
+   "mall_name": "[Western Digital] WD BLACK SN850X M.2 NVMe 4TB"
+  },
+  {
+   "code": 119230,
+   "cate": "초고속(SSD)",
+   "mall_name": "[마이크론] Crucial T500 M.2 NVMe 2TB"
+  },
+  {
+   "code": 119276,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i7 14세대 14700 [Turbo 5.4GHz, 8+12코어/16+12쓰레드, UHD 770]™"
+  },
+  {
+   "code": 119305,
+   "cate": "케이스",
+   "mall_name": "마이크로닉스 ML-420 BTF 화이트 (빅타워)"
+  },
+  {
+   "code": 119448,
+   "cate": "케이스",
+   "mall_name": "[DARKFLASH] DS900 ARGB 강화유리 블랙"
+  },
+  {
+   "code": 119606,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] i7 14세대 14700F [Turbo 5.4GHz, 8+12코어/16+12쓰레드, VGA 미탑재]™"
+  },
+  {
+   "code": 119754,
+   "cate": "파워",
+   "mall_name": "SuperFlower SF-1200F14XP LEADEX VII PRO PLATINUM BLACK ATX 3.1 (PCIE5) [회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 119779,
+   "cate": "케이스",
+   "mall_name": "[1stPlayer] T7-P 블랙"
+  },
+  {
+   "code": 119845,
+   "cate": "메인보드",
+   "mall_name": "[MSI] MAG B760M 박격포 II"
+  },
+  {
+   "code": 119863,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠 스레드리퍼 7975WX [Turbo 5.3GHz, 32코어/64쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 119864,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠 스레드리퍼 7995WX [Turbo 5.1GHz, 96코어/192쓰레드, VGA 미탑재]"
+  },
+  {
+   "code": 119931,
+   "cate": "케이스",
+   "mall_name": "[마이크로닉스] ML-420 View BTF 화이트"
+  },
+  {
+   "code": 119988,
+   "cate": "케이스",
+   "mall_name": "앱코 SUITMASTER U3000M 갤러리 미니 리버스 ARGB BTF 블랙 (미니타워)"
+  },
+  {
+   "code": 120008,
+   "cate": "초고속(SSD)",
+   "mall_name": "[마이크론] Crucial T500 M.2 NVMe 1TB HIT"
+  },
+  {
+   "code": 120285,
+   "cate": "메인보드",
+   "mall_name": "[ASUS]] PRO WS WRX90E-SAGE SE"
+  },
+  {
+   "code": 120857,
+   "cate": "케이스",
+   "mall_name": "[3Rsystem] T3000 Quiet"
+  },
+  {
+   "code": 120865,
+   "cate": "케이스",
+   "mall_name": "[3Rsystem] S402 Quiet 리버스 BTF 블랙"
+  },
+  {
+   "code": 120873,
+   "cate": "파워",
+   "mall_name": "마이크로닉스 Classic II 풀체인지 600W 80PLUS BRONZE ATX 3.1 (PCIE5.1) 화이트"
+  },
+  {
+   "code": 120901,
+   "cate": "케이스",
+   "mall_name": "[마이크로닉스] ML-420 View BTF 블랙"
+  },
+  {
+   "code": 120977,
+   "cate": "케이스",
+   "mall_name": "BRAVOTEC 트레저 X80 EDGE 타이탄 글래스 블랙 (미들타워)"
+  },
+  {
+   "code": 121065,
+   "cate": "케이스",
+   "mall_name": "마이크로닉스 COOLMAX 버디 (미들타워)"
+  },
+  {
+   "code": 121111,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[NVIDIA] 테슬라 H100 NVL 188GB 제조사OEM * 2개"
+  },
+  {
+   "code": 121279,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 풀체인지 800W 80PLUS BRONZE ATX3.1 화이트"
+  },
+  {
+   "code": 121359,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠5 세잔 5500GT [Turbo 4.4GHz, 6코어/12쓰레드, Radeon 7]"
+  },
+  {
+   "code": 121481,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 750W 80PLUS골드 풀모듈러 ATX3.1 화이트"
+  },
+  {
+   "code": 121699,
+   "cate": "케이스",
+   "mall_name": "마이크로닉스 COOLMAX 레디 (미들타워)"
+  },
+  {
+   "code": 121725,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스]Classic II 750W 80PLUS골드 풀모듈러 ATX3.1"
+  },
+  {
+   "code": 121803,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠9 그래니트 릿지 9900X [Turbo 5.6GHz, 12코어/24쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 121806,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠7 그래니트 릿지 9700X [Turbo 5.5GHz, 8코어/16쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 121808,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠9 그래니트 릿지 9950X [Turbo 5.7GHz, 16코어/32쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 121827,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 1050W 80PLUS골드 풀모듈러 ATX3.1"
+  },
+  {
+   "code": 121921,
+   "cate": "대용량(HDD)",
+   "mall_name": "Western Digital Ultrastar DC HC580 7200/512M (WUH722424ALE6L4, 24TB)"
+  },
+  {
+   "code": 121944,
+   "cate": "메모리(RAM)",
+   "mall_name": "[마이크론] Crucial DDR4-3200 CL22 32GB [16G x 2]"
+  },
+  {
+   "code": 122002,
+   "cate": "케이스",
+   "mall_name": "DARKFLASH DB330M RGB 강화유리 화이트 (미니타워)"
+  },
+  {
+   "code": 122038,
+   "cate": "메인보드",
+   "mall_name": "[ASUS] ROG MAXIMUS Z790 APEX ENCORE"
+  },
+  {
+   "code": 122049,
+   "cate": "케이스",
+   "mall_name": "Antec C7 MESH ARGB BTF 화이트 (미들타워)"
+  },
+  {
+   "code": 122117,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠5 피닉스 8500G [Turbo 5.0GHz, 6코어/12쓰레드, AMD Radeon 740M]"
+  },
+  {
+   "code": 122148,
+   "cate": "메인보드",
+   "mall_name": "[ASUS] ProArt X870E-CREATOR WIFI"
+  },
+  {
+   "code": 122186,
+   "cate": "케이스",
+   "mall_name": "[ABKO] UD50 블루웨일 ARGB BTF 화이트"
+  },
+  {
+   "code": 122226,
+   "cate": "메모리(RAM)",
+   "mall_name": "마이크론 Crucial DDR5-5600 CL46 대원씨티에스 (8GB)[회원가입 -2.5% 현금할인] * 2개"
+  },
+  {
+   "code": 122306,
+   "cate": "메인보드",
+   "mall_name": "[ASRock] Z890 Pro RS WiFi 화이트"
+  },
+  {
+   "code": 122324,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[인텔] Xe Graphics"
+  },
+  {
+   "code": 122350,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] Classic II 1050W 80PLUS골드 풀모듈러 ATX3.1 화이트"
+  },
+  {
+   "code": 122413,
+   "cate": "파워",
+   "mall_name": "SuperFlower SF-1000F14GE LEADEX III GOLD UP ATX3.1 [회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 123014,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠5 피닉스 8600G [Turbo 5.0GHz, 6코어/12쓰레드, AMD Radeon 760M]"
+  },
+  {
+   "code": 123027,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] 15세대 코어 울트라5 225F [Turbo 4.9GHz, 10코어(6+4), VGA 미탑재]™"
+  },
+  {
+   "code": 123121,
+   "cate": "CPU쿨러",
+   "mall_name": "[DARKFLASH]BIT-360 ARGB 픽셀 블랙"
+  },
+  {
+   "code": 123197,
+   "cate": "CPU쿨러",
+   "mall_name": "발키리 B360 LCD ARGB (블랙)"
+  },
+  {
+   "code": 123450,
+   "cate": "케이스",
+   "mall_name": "MSI MAG PANO 100R 프로젝트 제로 블랙 (미들타워)"
+  },
+  {
+   "code": 123558,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠 스레드리퍼 PRO 7955WX (스톰 픽) (정품)[회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 123636,
+   "cate": "파워",
+   "mall_name": "쿨러마스터 MWE GOLD 850 V3 ATX3.1 블랙 [회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 123697,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[사파이어] 라데온 RX 9070 PULSE D6 16GB"
+  },
+  {
+   "code": 123699,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[사파이어] 라데온 RX 9070 PURE OC D6 16GB"
+  },
+  {
+   "code": 123854,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠5 그래니트 릿지 9600 [Turbo 5.2GHz, 6코어/12쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 123857,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠7 피닉스 8700G [Turbo 5.1GHz, 8코어/16쓰레드, AMD Radeon 780M]"
+  },
+  {
+   "code": 123904,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[AMD] 라이젠9 그래니트 릿지 9950X3D [Turbo 5.7GHz, 16코어/32쓰레드, AMD Radeon Graphics]"
+  },
+  {
+   "code": 123914,
+   "cate": "메인보드",
+   "mall_name": "[MSI] MAG B860M 박격포 WIFI"
+  },
+  {
+   "code": 123937,
+   "cate": "메모리(RAM)",
+   "mall_name": "PATRIOT DDR5-6000 CL30 VIPER Elite 5 RGB 패키지 (32GB(16Gx2))"
+  },
+  {
+   "code": 123940,
+   "cate": "케이스",
+   "mall_name": "[DARKFLASH] DF4100 MESH ARGB BTF 블랙"
+  },
+  {
+   "code": 123967,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[ZOTAC] GAMING 지포스 RTX 5080 SOLID OC White D7 16GB"
+  },
+  {
+   "code": 124004,
+   "cate": "파워",
+   "mall_name": "쿨러마스터 MWE GOLD 850 V3 ATX3.1 화이트 [회원가입 계좌이체 맞춤할인 -2.5%]"
+  },
+  {
+   "code": 124010,
+   "cate": "CPU쿨러",
+   "mall_name": "DEEPCOOL LE360 V2 ARGB"
+  },
+  {
+   "code": 124011,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[이엠텍] 지포스 RTX 5070 MIRACLE WHITE D7 12GB"
+  },
+  {
+   "code": 124474,
+   "cate": "케이스",
+   "mall_name": "마이크로닉스 WIZMAX 우드리안 MAX (빅타워)"
+  },
+  {
+   "code": 124497,
+   "cate": "CPU쿨러",
+   "mall_name": "DARKFLASH WAVE DH-360D ARGB (화이트)"
+  },
+  {
+   "code": 124567,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[PALIT] 지포스 RTX 5060 Ti Infinity 3 D7 16GB"
+  },
+  {
+   "code": 124576,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[ZOTAC] GAMING 지포스 RTX 5060 Ti Twin Edge OC D7 16GB"
+  },
+  {
+   "code": 124903,
+   "cate": "메인보드",
+   "mall_name": "[MSI] PRO B860M-A WIFI"
+  },
+  {
+   "code": 124967,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[이엠텍] 지포스 RTX 5060 Ti MIRACLE WHITE D7 16GB"
+  },
+  {
+   "code": 125143,
+   "cate": "케이스",
+   "mall_name": "[DARKFLASH] DMO11 화이트"
+  },
+  {
+   "code": 126045,
+   "cate": "그래픽(VGA)",
+   "mall_name": "SAPPHIRE 라데온 RX 9060 XT PULSE OC D6 16GB"
+  },
+  {
+   "code": 126066,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S D7 16GB"
+  },
+  {
+   "code": 126178,
+   "cate": "초고속(SSD)",
+   "mall_name": "삼성전자 9100 PRO M.2 NVMe (4TB)"
+  },
+  {
+   "code": 126179,
+   "cate": "초고속(SSD)",
+   "mall_name": "삼성전자 9100 PRO M.2 NVMe (2TB)"
+  },
+  {
+   "code": 126223,
+   "cate": "초고속(SSD)",
+   "mall_name": "마이크론 Crucial P310 M.2 NVMe 대원씨티에스 (1TB)"
+  },
+  {
+   "code": 126231,
+   "cate": "초고속(SSD)",
+   "mall_name": "Western Digital WD BLUE SN5000 M.2 NVMe (1TB)"
+  },
+  {
+   "code": 126860,
+   "cate": "그래픽(VGA)",
+   "mall_name": "ASRock 라데온 RX 9060 XT CHALLENGER OC D6 16GB 대원씨티에스"
+  },
+  {
+   "code": 126922,
+   "cate": "메인보드",
+   "mall_name": "[ASRock] A620AM-HVS"
+  },
+  {
+   "code": 127157,
+   "cate": "CPU쿨러",
+   "mall_name": "be quiet SILENT LOOP 3 360"
+  },
+  {
+   "code": 127182,
+   "cate": "메모리(RAM)",
+   "mall_name": "[TeamGroup] DDR5-5600 CL46 Elite 128GB [32G x 4]"
+  },
+  {
+   "code": 127201,
+   "cate": "프로세서(CPU)",
+   "mall_name": "[인텔] 15세대 코어 울트라7 265 [Turbo 5.3GHz, 20코어(8+12), 인텔 Xe Graphics]™"
+  },
+  {
+   "code": 127203,
+   "cate": "메인보드",
+   "mall_name": "[GIGABYTE] B860M AORUS ELITE"
+  },
+  {
+   "code": 127255,
+   "cate": "메모리(RAM)",
+   "mall_name": "G.SKILL DDR5-6000 CL34 FLARE X5 J 패키지 (128GB(64Gx2))[회원가입 -2.5% 현금할인]"
+  },
+  {
+   "code": 127344,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[NVIDIA] RTX PRO 6000 Blackwell MAX-Q 워크스테이션 에디션 D7 96GB"
+  },
+  {
+   "code": 127355,
+   "cate": "메인보드",
+   "mall_name": "GIGABYTE B850M FORCE 피씨디렉트"
+  },
+  {
+   "code": 127444,
+   "cate": "파워",
+   "mall_name": "[MSI] MAG A1000GLS 80PLUS골드 풀모듈러 ATX3.1"
+  },
+  {
+   "code": 127471,
+   "cate": "그래픽(VGA)",
+   "mall_name": "PALIT 지포스 RTX 5060 Ti WHITE OC D7 16GB 이엠텍[회원가입 -2.5% 현금할인]"
+  },
+  {
+   "code": 127562,
+   "cate": "CPU쿨러",
+   "mall_name": "DARKFLASH 아쿠아루믹 DL-360 ARGB (블랙)"
+  },
+  {
+   "code": 127590,
+   "cate": "메모리(RAM)",
+   "mall_name": "HIKSEMI DDR5-5600 CL46 HIKER (16GB) * 2개"
+  },
+  {
+   "code": 127596,
+   "cate": "메모리(RAM)",
+   "mall_name": "ADATA DDR5-5600 CL46 LANCER BLADE 화이트 파인인포 (32GB) * 2개"
+  },
+  {
+   "code": 127644,
+   "cate": "CPU쿨러",
+   "mall_name": "JIUSHARK JF150RS Lily ARGB (화이트)"
+  },
+  {
+   "code": 127658,
+   "cate": "메인보드",
+   "mall_name": "ASUS TUF Gaming B850M-E WIFI 대원씨티에스 / STCOM"
+  },
+  {
+   "code": 127674,
+   "cate": "메인보드",
+   "mall_name": "ASUS B850M MAX GAMING WIFI 대원씨티에스"
+  },
+  {
+   "code": 127679,
+   "cate": "파워",
+   "mall_name": "[SuperFlower] SF-650Z12DB Zillion DB ETA실버 ATX3.1"
+  },
+  {
+   "code": 127687,
+   "cate": "파워",
+   "mall_name": "마이크로닉스 Classic II 1200W 80PLUS골드 풀모듈러 ATX3.1"
+  },
+  {
+   "code": 127752,
+   "cate": "CPU쿨러",
+   "mall_name": "JIUSHARK JF550 Elite ARGB (블랙)"
+  },
+  {
+   "code": 127768,
+   "cate": "CPU쿨러",
+   "mall_name": "JIUSHARK JF550 Elite ARGB (화이트)"
+  },
+  {
+   "code": 127838,
+   "cate": "CPU쿨러",
+   "mall_name": "NZXT KRAKEN ELITE V2 360 (블랙)"
+  },
+  {
+   "code": 127891,
+   "cate": "메인보드",
+   "mall_name": "[ASUS] PRIME B650EM-A"
+  },
+  {
+   "code": 127946,
+   "cate": "CPU쿨러",
+   "mall_name": "DARKFLASH ELLSWORTH S31 (블랙)"
+  },
+  {
+   "code": 127969,
+   "cate": "메모리(RAM)",
+   "mall_name": "Apacer DDR5-5600 CL46 (16GB) * 2개"
+  },
+  {
+   "code": 128026,
+   "cate": "초고속(SSD)",
+   "mall_name": "SK하이닉스 PC801 M.2 NVMe 벌크 (1TB)"
+  },
+  {
+   "code": 128082,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[NVIDIA] RTX PRO 2000 Blackwell D7 16GB"
+  },
+  {
+   "code": 128135,
+   "cate": "CPU쿨러",
+   "mall_name": "PCCOOLER CPS RT620 PRO ARGB 카본스틸 (화이트)"
+  },
+  {
+   "code": 128269,
+   "cate": "메인보드",
+   "mall_name": "GIGABYTE B850 EAGLE ICE 피씨디렉트"
+  },
+  {
+   "code": 128274,
+   "cate": "메인보드",
+   "mall_name": "MSI PRO B850M-P"
+  },
+  {
+   "code": 128278,
+   "cate": "메인보드",
+   "mall_name": "ASUS TUF Gaming X870E-PLUS WIFI7 대원씨티에스"
+  },
+  {
+   "code": 128453,
+   "cate": "초고속(SSD)",
+   "mall_name": "Western Digital WD Blue SN5100 M.2 NVMe (2TB)"
+  },
+  {
+   "code": 128501,
+   "cate": "CPU쿨러",
+   "mall_name": "[MAXTILL] MAX600 ARGB 블랙"
+  },
+  {
+   "code": 128646,
+   "cate": "케이스",
+   "mall_name": "[3Rsystem] R370 RGB 블랙"
+  },
+  {
+   "code": 128650,
+   "cate": "케이스",
+   "mall_name": "DAVEN D7 Mesh 세븐팬 (화이트)"
+  },
+  {
+   "code": 128654,
+   "cate": "메모리(RAM)",
+   "mall_name": "[킹스톤] FURY DDR5-5600 CL46 Beast RGB 블랙 64GB [32G x 2]"
+  },
+  {
+   "code": 128733,
+   "cate": "메모리(RAM)",
+   "mall_name": "PATRIOT DDR5-6000 CL30 SIGNATURE PREMIUM EVO 블랙 (16GB) * 2개"
+  },
+  {
+   "code": 128804,
+   "cate": "메모리(RAM)",
+   "mall_name": "OLOy DDR5-6000 CL36 BLADE BLACK 패키지 올로코리아 (32GB(16Gx2))"
+  },
+  {
+   "code": 128827,
+   "cate": "메인보드",
+   "mall_name": "[GIGABYTE] H810M K GEN5"
+  },
+  {
+   "code": 128834,
+   "cate": "프로세서(CPU)",
+   "mall_name": "AMD 라이젠7-6세대 9700X (그래니트 릿지) (벌크 정품)"
+  },
+  {
+   "code": 128873,
+   "cate": "파워",
+   "mall_name": "마이크로닉스 Classic II 풀체인지 500W 80PLUS실버 ATX3.1"
+  },
+  {
+   "code": 128928,
+   "cate": "그래픽(VGA)",
+   "mall_name": "NVIDIA RTX PRO 5000 Blackwell D7 48GB (병행수입)"
+  },
+  {
+   "code": 128932,
+   "cate": "그래픽(VGA)",
+   "mall_name": "NVIDIA RTX PRO 6000 Blackwell 워크스테이션 에디션 D7 96GB (병행수입)"
+  },
+  {
+   "code": 128942,
+   "cate": "메인보드",
+   "mall_name": "ASRock B860M-X Gen5 에즈윈"
+  },
+  {
+   "code": 129255,
+   "cate": "파워",
+   "mall_name": "[마이크로닉스] WIZMAX G-1650W 80PLUS골드 ATX3.1 * 2개"
+  },
+  {
+   "code": 129288,
+   "cate": "그래픽(VGA)",
+   "mall_name": "[PALIT] 지포스 RTX 5070 Ti GAMINGPRO-S OC D7 16GB"
+  },
+  {
+   "code": 129322,
+   "cate": "메인보드",
+   "mall_name": "[ASUS] PRIME A620AM-K"
+  },
+  {
+   "code": 129332,
+   "cate": "그래픽(VGA)",
+   "mall_name": "Colorful 지포스 RTX 5060 Ti BATTLE AX DUO D7 16GB 도우정보"
+  },
+  {
+   "code": 129346,
+   "cate": "CPU쿨러",
+   "mall_name": "DEEPCOOL AG400 G2"
+  },
+  {
+   "code": 129441,
+   "cate": "CPU쿨러",
+   "mall_name": "DEEPCOOL AG620 G2"
+  },
+  {
+   "code": 129571,
+   "cate": "메모리(RAM)",
+   "mall_name": "[삼성전자] DDR5-5600 ECC/REG 128GB [64G x 2]"
+  },
+  {
+   "code": 129573,
+   "cate": "메모리(RAM)",
+   "mall_name": "[삼성전자] DDR5-5600 ECC/REG 512GB [64G x 8]"
+  },
+  {
+   "code": 129687,
+   "cate": "메모리(RAM)",
+   "mall_name": "마이크론 Crucial DDR5-6400 CL40 PRO OC Gaming Edition White 대원씨티에스 (32GB) * 2개"
+  },
+  {
+   "code": 129849,
+   "cate": "메인보드",
+   "mall_name": "ASUS PRIME B650EM-A WIFI-CSM 대원씨티에스"
+  },
+  {
+   "code": 130506,
+   "cate": "케이스",
+   "mall_name": "[MSI] MPG VIXTA 300R PZ 블랙"
+  }
+ ]
+}
