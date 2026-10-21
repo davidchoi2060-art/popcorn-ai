@@ -121,6 +121,8 @@
         image: typeof x.photo === 'string' && (/^\/api\/product-images\/\d+\/detail$/.test(x.photo) || /^https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600\.jpg$/.test(x.photo) || /^assets\/images\/parts\/[a-z0-9-]+\.(jpg|png|webp)$/.test(x.photo)) ? x.photo : '' };
     });
     p.service = body && typeof body.service === 'string' ? body.service : '';
+    // 상세 소개(ABOUT THIS PC): 승인 구성이 없는 PC 는 서버 표(pc_registered_about · 관리자 수정 가능)의 소개를 쓴다.
+    p.description = body && body.description && typeof body.description === 'object' ? body.description : null;
     p.bomStatus = p.specs.length ? 'registered' : 'missing';
     p.liveDetail = 'registered';
   }
