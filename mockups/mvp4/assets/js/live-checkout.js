@@ -10,43 +10,8 @@
 (function () {
   'use strict';
   var P = window.PAI, h = P.h;
-  var KEY = 'popcorn-mvp3-guest-access-v1', KEY_RE = /^[A-Za-z0-9_-]{32,128}$/;
-
-  // ── 서버 요청 ──────────────────────────────────────────────────────────
-  function accessKey() {
-    try {
-      var k = window.localStorage.getItem(KEY);
-      if (k && KEY_RE.test(k)) return k;
-      var b = new Uint8Array(32); window.crypto.getRandomValues(b);
-      k = Array.from(b, function (x) { return x.toString(16).padStart(2, '0'); }).join('');
-      window.localStorage.setItem(KEY, k);
-      return window.localStorage.getItem(KEY) === k ? k : null;
-    } catch (e) { return null; }
-  }
-  function call(method, path, body, withKey) {
-    var headers = { Accept: 'application/json', 'X-Popcorn-Surface': 'mvp4' };
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
-    if (withKey) { var k = accessKey(); if (!k) return Promise.reject(err('storage', 0, '이 브라우저에 견적 보관 키를 저장할 수 없어요. 브라우저 설정을 확인해 주세요.')); headers['X-Access-Key'] = k; }
-    var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 30000);
-    return fetch(path, { method: method, credentials: 'same-origin', cache: 'no-store', headers: headers, body: body === undefined ? undefined : JSON.stringify(body), signal: ctrl.signal })
-      .then(function (r) {
-        clearTimeout(timer);
-        return r.json().catch(function () { return null; }).then(function (data) {
-          if (r.ok && data && data.ok === true) return data;
-          var d = data && data.detail, sentence = typeof d === 'string' ? d : d && typeof d.detail === 'string' ? d.detail : '';
-          var code = d && typeof d === 'object' && typeof d.error === 'string' ? d.error : '';
-          throw err(r.status >= 500 ? 'unknown' : code || 'http', r.status, sentence, d);
-        });
-      }, function () { clearTimeout(timer); throw err('unknown', 0, ''); });
-  }
-  function err(kind, status, message, detail) { var e = new Error(message || kind); e.kind = kind; e.status = status; e.detail = detail; e.sentence = message; return e; }
-  function uuid() { if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID(); var b = new Uint8Array(16); window.crypto.getRandomValues(b); b[6] = b[6] & 15 | 64; b[8] = b[8] & 63 | 128; var x = Array.from(b, function (v) { return v.toString(16).padStart(2, '0'); }).join(''); return x.slice(0, 8) + '-' + x.slice(8, 12) + '-' + x.slice(12, 16) + '-' + x.slice(16, 20) + '-' + x.slice(20); }
-  function message(e, fallback) {
-    if (e.status === 429) return '요청이 잠시 많아요. 잠시 후 다시 시도해 주세요.';
-    if (e.status === 403) return '이 브라우저의 견적 보관 기록에 접근할 수 없어요. 견적을 보관했던 브라우저에서 확인해 주세요.';
-    if (e.sentence && e.sentence.length <= 200) return e.sentence;
-    return fallback;
-  }
+  // 서버 요청·보관 키는 saved-quotes-client.js 한곳에 있다(2026-10-21).
+  var Q = P.savedQuotes, call = Q.call, uuid = Q.uuid, message = Q.message;
 
   // ── 화면 조각 (design-checkout 과 같은 모양) ──────────────────────────
   function steps(active) { return '<nav class="ds-step" aria-label="견적 단계">' + ['상품 선택', '구성 확인', '견적 보관', '구매 상담'].map(function (t, i) { return (i ? P.icon('caret-right') : '') + (i === active ? '<b aria-current="step">' : '<span>') + t + (i === active ? '</b>' : '</span>'); }).join('') + '</nav>'; }
@@ -105,23 +70,72 @@
   };
 
   // ── 내 견적 ──────────────────────────────────────────────────────────
+  // 개별 삭제(2026-10-21 구매 1번 승인 「내 견적에서 삭제하는 버튼」): 누르면 서버가 이 브라우저의 그 견적만 목록에서 숨긴다
+  // (행은 남는다 — 이 견적으로 신청한 상담·인계 기록은 그대로다). 삭제한 자리에 「되돌리기」를 남기고, 되돌리면 서버가 실제로 되살린 뒤
+  // 같은 자리에 다시 그린다. 서버가 실패하면 카드를 지우지 않는다. 전체 비우기는 두지 않는다.
+  function savedCard(q) {
+    var s = q.product || {}, n = sets(s.sets), device = s.kind === 'ai_device';
+    var live = device ? null : P.getCatalogProduct(String(s.product_code));
+    var title = (s.name || (device ? '보관한 AI 슈퍼컴퓨터' : '보관한 PC')) + (device && s.model_label && String(s.name || '').indexOf(s.model_label) < 0 ? ' · ' + s.model_label : '');
+    var status = device ? '' : !live ? P.designNotice('현재 판매 여부를 확인할 수 없어요', '보관 당시 견적은 남아 있습니다. 대체 PC를 살펴봐 주세요.', 'bad') : live.price !== s.price && !(s.build) ? P.designNotice('보관 이후 가격이 달라졌어요', '보관한 금액과 현재 금액을 나누어 확인해 주세요.', 'bad') : '';
+    var actions = device
+      ? '<a class="btn btn-outline" href="supercomputer.html?id=' + encodeURIComponent(String(s.product_code)) + '&amp;quantity=' + n + '">현재 상품 확인</a>' + (P.mallBuyAnchor ? P.mallBuyAnchor({ id: s.product_code, url: s.mall_url, name: s.name, model: s.model_label, quantity: n, price: null, cls: 'btn btn-primary', label: '팝콘PC몰에서 구매하기' }) : '')
+      : (live ? P.designLink('현재 상품 확인', 'product', 'normal', { id: live.id }, 'btn-outline') + P.designLink('AI와 이어서 대화', 'chat', 'product', { id: live.id }, 'btn-outline') : P.designLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-outline')) + (live ? buy(live, '팝콘PC몰에서 구매하기') : '');
+    return '<section class="ds-panel ds-saved-card" data-quote="' + h(q.id) + '" style="margin-top:16px">' + status +
+      '<div class="ds-saved-head"><small class="ds-muted">' + h(q.saved_at ? new Date(q.saved_at).toLocaleString('ko-KR') + ' 보관' : '') + (device ? ' · AI 슈퍼컴퓨터' : '') + '</small>' +
+      '<button type="button" class="ds-saved-delete" data-saved-delete="' + h(q.id) + '" data-saved-name="' + h(title) + '" aria-label="' + h(title) + ' 내 견적에서 삭제">' + P.icon('x') + '삭제</button></div>' +
+      '<h2>' + h(title) + '</h2>' +
+      '<div class="ds-price-line"><span>' + (device ? '보관 당시 표시 금액' : '보관한 PC 금액') + '</span><b>' + h(typeof s.price === 'number' ? P.money(s.price) : '확인 필요') + (n > 1 ? ' × ' + n + '대' : '') + '</b></div>' +
+      (live ? '<div class="ds-price-line"><span>현재 금액</span><span>' + h(P.catalogMoney(live)) + '</span></div>' : '') +
+      (device ? '<p class="ds-muted">최종 가격과 구성은 팝콘PC몰에서 확인해 주세요. 보관만으로 상담이 신청되지는 않습니다.</p>' : '') +
+      '<p class="ds-saved-error" role="alert" hidden></p><div class="ds-actions">' + actions + '</div></section>';
+  }
   P.designScreens.saved = function () {
     return { html: P.designWrap('내 견적', '보관한 PC를 다시 살펴보고 다음 단계를 이어가세요.', '<div id="ds-saved">' + loading('보관한 견적을 불러오고 있어요', '견적을 보관한 브라우저인지 확인합니다.') + '</div>'), mount: function () {
-      var box = document.getElementById('ds-saved');
-      call('GET', '/api/mvp3/saved-quotes?limit=20', undefined, true).then(function (res) {
+      var box = document.getElementById('ds-saved'), byId = Object.create(null), busy = Object.create(null);
+      var EMPTY = '<div data-saved-empty>' + P.designEmpty('보관한 견적이 없어요', '일반 완제품은 팝콘PC몰 상품 페이지에서 바로 구매할 수 있어요.') + '<div class="ds-actions"><a class="btn btn-outline" href="supercomputers.html">AI 슈퍼컴퓨터 보기</a></div></div>';
+      function syncEmpty() {
+        var left = box.querySelectorAll('.ds-saved-card').length, empty = box.querySelector('[data-saved-empty]');
+        if (!left && !empty) box.insertAdjacentHTML('beforeend', EMPTY);
+        if (left && empty) empty.remove();
+      }
+      function fail(node, text) { var el = node.querySelector('.ds-saved-error'); if (el) { el.textContent = text; el.hidden = false; } }
+      P.savedQuotes.list().then(function (res) {
         var quotes = Array.isArray(res.quotes) ? res.quotes : [];
-        if (!quotes.length) { box.innerHTML = P.designEmpty('보관한 견적이 없어요', '일반 완제품은 팝콘PC몰 상품 페이지에서 바로 구매할 수 있어요.'); return; }
-        box.innerHTML = P.designNotice('내 속도에 맞게 결정하세요', '보관한 견적은 그대로 남아 있어요. 구매는 팝콘PC몰 상품 페이지에서 진행해요.') + quotes.map(function (q) {
-          var s = q.product || {}, live = P.getCatalogProduct(String(s.product_code)), n = sets(s.sets);
-          var status = !live ? P.designNotice('현재 판매 여부를 확인할 수 없어요', '보관 당시 견적은 남아 있습니다. 대체 PC를 살펴봐 주세요.', 'bad') : live.price !== s.price && !(s.build) ? P.designNotice('보관 이후 가격이 달라졌어요', '보관한 금액과 현재 금액을 나누어 확인해 주세요.', 'bad') : '';
-          return '<section class="ds-panel" style="margin-top:16px">' + status + '<small class="ds-muted">' + h(q.saved_at ? new Date(q.saved_at).toLocaleString('ko-KR') + ' 보관' : '') + '</small><h2>' + h(s.name || '보관한 PC') + '</h2>' +
-            '<div class="ds-price-line"><span>보관한 PC 금액</span><b>' + h(typeof s.price === 'number' ? P.money(s.price) : '확인 필요') + (n > 1 ? ' × ' + n + '대' : '') + '</b></div>' +
-            (live ? '<div class="ds-price-line"><span>현재 금액</span><span>' + h(P.catalogMoney(live)) + '</span></div>' : '') +
-            '<div class="ds-actions">' + (live ? P.designLink('현재 상품 확인', 'product', 'normal', { id: live.id }, 'btn-outline') + P.designLink('AI와 이어서 대화', 'chat', 'product', { id: live.id }, 'btn-outline') : P.designLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-outline')) + (live ? buy(live, '팝콘PC몰에서 구매하기') : '') + '</div></section>';
-        }).join('');
+        quotes.forEach(function (q) { byId[q.id] = q; });
+        box.innerHTML = (quotes.length ? P.designNotice('내 속도에 맞게 결정하세요', '보관한 견적은 그대로 남아 있어요. 구매는 팝콘PC몰 상품 페이지에서 진행해요.') : '') + quotes.map(savedCard).join('');
+        syncEmpty();
       }, function (e) {
         box.innerHTML = P.designNotice('내 견적을 불러오지 못했어요', message(e, '보관한 견적이 삭제된 것은 아닙니다. 잠시 후 다시 확인해 주세요.'), 'bad') + '<div class="ds-actions"><button class="btn btn-primary" type="button" data-ds-retry>다시 확인</button></div>';
         box.querySelector('[data-ds-retry]').addEventListener('click', function () { location.reload(); });
+      });
+      box.addEventListener('click', function (e) {
+        var del = e.target.closest('[data-saved-delete]'), undo = e.target.closest('[data-saved-undo]');
+        if (del) {
+          var qid = del.dataset.savedDelete, card = del.closest('.ds-saved-card'), name = del.dataset.savedName;
+          if (busy[qid]) return; busy[qid] = true; del.disabled = true; del.setAttribute('aria-busy', 'true');
+          P.savedQuotes.remove(qid).then(function () {
+            var bar = document.createElement('div');
+            bar.className = 'ds-saved-undo'; bar.dataset.quote = qid; bar.setAttribute('role', 'status'); bar.style.marginTop = '16px';
+            bar.innerHTML = '<p><b>' + h(name) + '</b>을(를) 내 견적에서 삭제했어요. 상담·주문 기록은 그대로예요.</p><button type="button" class="btn btn-outline btn-small" data-saved-undo="' + h(qid) + '">' + P.icon('arrow-counter-clockwise') + '되돌리기</button><p class="ds-saved-error" role="alert" hidden></p>';
+            card.replaceWith(bar); syncEmpty(); bar.querySelector('[data-saved-undo]').focus();
+          }, function (err2) {
+            fail(card, message(err2, '삭제하지 못했어요. 견적은 그대로 있어요. 다시 눌러 주세요.'));
+            del.disabled = false; del.removeAttribute('aria-busy');
+          }).then(function () { busy[qid] = false; });
+        }
+        if (undo) {
+          var uid = undo.dataset.savedUndo, bar2 = undo.closest('.ds-saved-undo');
+          if (busy[uid]) return; busy[uid] = true; undo.disabled = true;
+          P.savedQuotes.restore(uid).then(function (r) {
+            var q = r.quote || byId[uid]; byId[uid] = q;
+            var wrap = document.createElement('div'); wrap.innerHTML = savedCard(q);
+            var card2 = wrap.firstChild; bar2.replaceWith(card2); syncEmpty();
+            var d = card2.querySelector('[data-saved-delete]'); if (d) d.focus();
+          }, function (err3) {
+            fail(bar2, message(err3, '되돌리지 못했어요. 다시 눌러 주세요.')); undo.disabled = false;
+          }).then(function () { busy[uid] = false; });
+        }
       });
     } };
   };

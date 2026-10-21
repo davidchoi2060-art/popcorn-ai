@@ -21,6 +21,7 @@
   function recommendations() { return products().filter(function (p) { return p.isSelling === true && p.recommendable === true && p.reviewRequired !== true && typeof p.price === 'number' && isFinite(p.price) && p.price > 0; }); }
   function purchaseIssue(p) {
     if (!p) return '상품 확인 필요';
+    if (p.kind === 'ai_device') return deviceIssue(p);
     if (p.source && p.source.kind === 'historical') return '현재 판매 여부 확인 필요';
     if (p.isSelling !== true) return p.saleStatus === '품절' ? '품절 · 판매 여부 확인 필요' : '판매 여부 확인 필요';
     if (p.statusKey === 'oos' || p.stockQty === 0) return '재고·판매 상태 확인 필요';
@@ -35,17 +36,36 @@
     if (typeof P.getCatalogProduct === 'function') { try { return P.getCatalogProduct(String(id)) || null; } catch (error) { return null; } }
     return products().find(function (p) { return String(p.id) === String(id); }) || null;
   }
+  // AI 장비(AI 슈퍼컴퓨터 카테고리) — 2026-10-21 구매 1번 승인으로 관심·비교상품에 함께 담는다.
+  // 상품번호로 서버 상세를 읽은 값만 쓴다(이름·배열로 정하지 않는다). 사양 칸은 장비 사양 그대로이고,
+  // 장비 메모리를 그래픽카드 전용 메모리와 같은 숫자로 놓지 않는다(같은 기준이 아니라고 칸에 적는다).
+  function deviceOf(d) {
+    return d ? { kind: 'ai_device', id: String(d.id), name: d.name + (d.modelLabel && d.models && d.models.length > 1 && d.name.indexOf(d.modelLabel) < 0 ? ' · ' + d.modelLabel : ''), modelLabel: d.modelLabel, price: d.price, saleState: d.saleState,
+      processor: d.processor, accelerator: d.accelerator, memory: d.memory, storage: d.storage, image: d.image, mallUrl: d.mallUrl } : null;
+  }
+  function deviceIssue(d) { return d.saleState === 'stopped' ? '판매 중지' : d.saleState !== 'on_sale' ? '가격 확인 필요' : ''; }
+  function deviceHref(d) { return 'supercomputer.html?id=' + encodeURIComponent(d.id); }
+  function deviceBuy(d) { return d.saleState === 'stopped' ? '<button class="btn btn-small btn-primary" disabled>판매 중지</button>' : (P.mallBuyAnchor && P.mallBuyAnchor({ id: d.id, url: d.mallUrl, name: d.name, price: d.saleState === 'on_sale' ? d.price : null, image: d.image, cls: 'btn btn-small btn-primary', label: '팝콘PC몰에서 구매하기' })) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
+  function deviceSpec(d, row) {
+    if (row.key === 'price') return d.saleState === 'stopped' ? '판매 중지' : typeof d.price === 'number' && d.price > 0 ? P.money(d.price) : '가격 확인 필요';
+    if (row.key === 'cpu') return d.processor || '정보 확인 필요';
+    if (row.key === 'gpu') return d.accelerator ? d.accelerator + ' (AI 가속기)' : '정보 확인 필요';
+    if (row.key === 'ram') return d.memory ? d.memory + ' (장비 메모리 · 그래픽카드 전용 메모리와 같은 기준 아님)' : '정보 확인 필요';
+    if (row.key === 'ssd') return d.storage || '정보 확인 필요';
+    return '정보 확인 필요';
+  }
   function url(screen, state, values) { return typeof P.designHref === 'function' ? P.designHref(screen, state, values || {}) : '#'; }
   function money(p) { return p && typeof P.catalogMoney === 'function' ? P.catalogMoney(p) : '가격 확인 필요'; }
   function photograph(p, cls) {
-    var source = p && typeof P.catalogImage === 'function' ? P.catalogImage(p) : null;
+    var source = p && p.kind === 'ai_device' ? (typeof p.image === 'string' && /^(assets\/|\/api\/product-images\/)/.test(p.image) ? p.image : null) : p && typeof P.catalogImage === 'function' ? P.catalogImage(p) : null;
     return source ? '<img class="' + h(cls || '') + '" src="' + h(source) + '" alt="' + h(p.name) + '" loading="lazy">' : '<span class="dc-photo-placeholder">' + icon('computer-tower') + '<small>상품 사진 준비 중</small></span>';
   }
   // 2026-10-20 승인 「구매 경로 분리」 -- 선택·비교한 일반 완제품의 다음 행동은 그 상품의 팝콘PC몰 페이지다(견적 보관·상담 아님).
-  function buyButton(p, unsure) { return (P.mallBuyLink && P.mallBuyLink(p, 'btn btn-small btn-primary', unsure ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 구매하기')) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
+  function buyButton(p, unsure) { if (p && p.kind === 'ai_device') return deviceBuy(p); return (P.mallBuyLink && P.mallBuyLink(p, 'btn btn-small btn-primary', unsure ? '팝콘PC몰에서 상품 확인' : '팝콘PC몰에서 구매하기')) || '<button class="btn btn-small btn-primary" disabled>팝콘PC몰 구매 링크 확인 필요</button>'; }
   function buttonLink(label, screen, state, values, style) { return '<a class="btn ' + (style || 'btn-outline') + '" href="' + h(url(screen, state, values)) + '">' + h(label) + icon('caret-right') + '</a>'; }
   function normalize(value) { return String(value || '').toLowerCase().replace(/[\s·:()_-]/g, ''); }
   function spec(p, row) {
+    if (p && p.kind === 'ai_device') return deviceSpec(p, row);
     if (row.key === 'price') return money(p);
     if (p.bomStatus === 'mismatch') return '상품과 구성표 일치 확인 필요';
     var list = Array.isArray(p.specs) ? p.specs : [];
@@ -105,15 +125,20 @@
     function selection() {
       if (!model.selected) return empty('아직 선택한 PC가 없어요.', '상품의 구성을 비교하고 마음에 드는 PC를 골라보세요.');
       var p = model.selected, blocked = purchaseIssue(p);
-      return '<div class="dc-chosen"><div class="dc-chosen-top">' + photograph(p) + '<div><strong>' + h(p.name) + '</strong><p>' + h(money(p)) + '</p></div></div>' + (blocked ? '<p class="dc-unavailable-label" role="status">' + h(blocked) + '</p>' : '') + '<div class="dc-chosen-links">' + buttonLink('선택 PC 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, !!blocked) + '</div></div>';
+      return '<div class="dc-chosen"><div class="dc-chosen-head"><small>선택한 PC</small><button type="button" class="dc-chosen-clear" data-dc-unselect aria-label="' + h(p.name) + ' 선택 해제">' + icon('x') + '선택 해제</button></div><div class="dc-chosen-top">' + photograph(p) + '<div><strong>' + h(p.name) + '</strong><p>' + h(money(p)) + '</p></div></div>' + (blocked ? '<p class="dc-unavailable-label" role="status">' + h(blocked) + '</p>' : '') + '<div class="dc-chosen-links">' + buttonLink('선택 PC 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, !!blocked) + '</div></div>';
     }
-    function inCompare(id) { return model.compare.some(function (c) { return c.id === String(id); }); }
+    function kindOf(k) { return k === 'ai_device' ? 'ai_device' : 'pc'; }
+    function inCompare(id, kind) { kind = kindOf(kind); return model.compare.some(function (c) { return c.id === String(id) && c.kind === kind; }); }
     // 관심·비교상품(2026-10-20 대표 승인): 답변 카드의 「비교에 담기」가 여기에 쌓인다. 저장하지 않는다(새 대화·새로고침이면 비운다).
     function compareTray() {
-      var items = model.compare.map(function (c) { var p = product(c.id); return p ? { c: c, p: p } : null; }).filter(Boolean);
+      var items = model.compare.map(function (c) { var p = c.kind === 'ai_device' ? c.device : product(c.id); return p ? { c: c, p: p } : null; }).filter(Boolean);
+      var pcs = items.filter(function (x) { return x.c.kind === 'pc'; }).map(function (x) { return x.p.id; }), devs = items.filter(function (x) { return x.c.kind === 'ai_device'; }).map(function (x) { return x.p.id; });
       return '<section class="dc-side-panel pa-interest" aria-label="관심·비교상품"><h2>' + icon('list') + '관심·비교상품 <span data-pa-count>' + items.length + '</span></h2>' +
-        (items.length ? '<ul>' + items.map(function (x) { return '<li><a href="' + h(url('product', 'normal', { id: x.p.id })) + '" target="_blank" rel="noopener">' + h(x.p.name) + '</a><button type="button" class="pa-copy" data-pa-remove="' + h(x.p.id) + '" aria-label="' + h(x.p.name) + ' 비교에서 빼기">빼기</button></li>'; }).join('') + '</ul>' : '<p class="pa-interest-empty">추천 답변에서 비교할 상품을 담아보세요.</p>') +
-        (items.length >= 2 ? '<a class="pa-open-compare" href="' + h(url('compare', 'normal', { ids: items.map(function (x) { return x.p.id; }).join(',') })) + '" target="_blank" rel="noopener">선택 상품 비교하기 ↗</a>' : '') + '</section>';
+        (items.length ? '<ul>' + items.map(function (x) {
+          var dev = x.c.kind === 'ai_device', href = dev ? deviceHref(x.p) : url('product', 'normal', { id: x.p.id });
+          return '<li><div><a href="' + h(href) + '" target="_blank" rel="noopener">' + (dev ? '<span class="pa-kind">AI 장비</span>' : '') + h(x.p.name) + '</a><small>상품번호 ' + h(x.p.id) + '</small></div><button type="button" class="pa-copy pa-remove" data-pa-remove="' + h(x.p.id) + '" data-pa-kind="' + x.c.kind + '" aria-label="' + h(x.p.name) + ' 비교에서 빼기">비교에서 빼기</button></li>';
+        }).join('') + '</ul>' : '<p class="pa-interest-empty">추천 답변이나 AI 슈퍼컴퓨터 상세에서 비교할 상품을 담아보세요. 대화와 입력 중인 문장은 그대로예요.</p>') +
+        (items.length >= 2 ? '<a class="pa-open-compare" href="' + h(url('compare', 'normal', { ids: pcs.join(','), ai: devs.join(',') })) + '" target="_blank" rel="noopener">선택 상품 비교하기 ↗</a>' : '') + '</section>';
     }
     function markup() {
       var cards = candidates(), isLoading = model.state === 'loading';
@@ -190,14 +215,43 @@
       });
     }
     // 비교에 담기·빼기: 예산·용도·대화는 건드리지 않는다. 담은 순서는 답변의 순번을 바꾸지 않는다(묶음은 답변이 들고 있다).
-    function toggleCompare(id, turn) {
-      id = String(id); var p = product(id), entry = turn ? entryOf(turn) : null, msg;
-      if (inCompare(id)) { model.compare = model.compare.filter(function (c) { return c.id !== id; }); msg = '비교에서 뺐어요.'; }
-      else if (!p) msg = '지금 목록에서 확인할 수 없는 상품이라 담지 못했어요.';
+    // 비교에서 빼기는 그 상품만 목록에서 뺀다 — 대화·추천 이력·입력 중인 문장·선택한 PC·내 견적은 그대로다.
+    // 같은 상품(종류+번호)은 한 번만 담긴다. 세 대가 차 있으면 다른 상품을 빼지 않고 안내만 한다.
+    function addDevice(id, turn, quiet) {
+      var have = P.aiDevices && P.aiDevices.data && Array.isArray(P.aiDevices.data.items) ? P.aiDevices.data.items.find(function (d) { return String(d.id) === String(id); }) : null;
+      var got = have ? Promise.resolve(have) : P.aiDevices ? P.aiDevices.detail(id) : Promise.reject(new Error('no source'));
+      return got.then(function (d) {
+        if (inCompare(id, 'ai_device')) return '이미 비교에 담긴 상품이에요.';
+        if (model.compare.length >= COMPARE_MAX) return '비교는 세 대까지 담을 수 있어요. 하나를 뺀 뒤 담아 주세요.';
+        model.compare.push({ id: String(d.id), kind: 'ai_device', turn: turn || null, device: deviceOf(d) });
+        return 'AI 장비를 비교에 담았어요. 지금 ' + model.compare.length + '대';
+      }, function () { return quiet ? '' : '지금 확인할 수 없는 AI 장비라 담지 못했어요.'; });
+    }
+    function toggleCompare(id, turn, kind) {
+      id = String(id); kind = kindOf(kind); var entry = turn ? entryOf(turn) : null, msg;
+      function done(text) { if (entry) entry.answer.copy = { status: text, fallback: '' }; else if (text) model.notice = text; render(); }
+      if (inCompare(id, kind)) { model.compare = model.compare.filter(function (c) { return !(c.id === id && c.kind === kind); }); return done('비교에서 뺐어요. 다시 담을 수 있어요.'); }
+      if (kind === 'ai_device') { addDevice(id, turn).then(done); return; }
+      var p = product(id);
+      if (!p) msg = '지금 목록에서 확인할 수 없는 상품이라 담지 못했어요.';
       else if (model.compare.length >= COMPARE_MAX) msg = '비교는 세 대까지 담을 수 있어요. 하나를 뺀 뒤 담아 주세요.';
-      else { model.compare.push({ id: id, turn: turn || null }); msg = '비교에 담았어요. 지금 ' + model.compare.length + '대' + (window.matchMedia('(max-width: 800px)').matches ? ' · 추천 PC 탭에서 볼 수 있어요.' : ' · 오른쪽 관심·비교상품에서 볼 수 있어요.'); }
-      if (entry) entry.answer.copy = { status: msg, fallback: '' };
-      render();
+      else { model.compare.push({ id: id, kind: 'pc', turn: turn || null }); msg = '비교에 담았어요. 지금 ' + model.compare.length + '대' + (window.matchMedia('(max-width: 800px)').matches ? ' · 추천 PC 탭에서 볼 수 있어요.' : ' · 오른쪽 관심·비교상품에서 볼 수 있어요.'); }
+      done(msg);
+    }
+    // 다른 화면(AI 슈퍼컴퓨터 상세·업무별 PC 칸)의 「AI로 비교하기」가 넘긴 상품을 받는다. 질문을 보내지 않는다.
+    function takeCarried(list) {
+      var chain = Promise.resolve(), notes = [];
+      (list || []).forEach(function (x) {
+        chain = chain.then(function () {
+          if (inCompare(x.id, x.kind)) { notes.push('이미 비교에 담긴 상품이 있어요.'); return; }
+          if (x.kind === 'ai_device') return addDevice(x.id, null, false).then(function (t) { if (t) notes.push(t); });
+          var p = product(x.id);
+          if (!p) notes.push('지금 목록에서 확인할 수 없는 상품이 있어 담지 못했어요.');
+          else if (model.compare.length >= COMPARE_MAX) notes.push('비교는 세 대까지 담을 수 있어요. 하나를 뺀 뒤 담아 주세요.');
+          else { model.compare.push({ id: String(x.id), kind: 'pc', turn: null }); notes.push('비교에 담았어요. 지금 ' + model.compare.length + '대'); }
+        });
+      });
+      chain.then(function () { if (notes.length) { model.notice = notes[notes.length - 1]; render(); } });
     }
     function send(retry) {
       var text = retry ? model.question : model.draft;
@@ -229,6 +283,7 @@
     }
     return { html: '<section class="container dc-chat" data-dc-chat>' + markup() + '</section>', mount: function () {
       root = document.querySelector('[data-dc-chat]'); if (!root || root.dataset.mounted) return; root.dataset.mounted = 'true';
+      if (P.compareCarry) { takeCarried(P.compareCarry.take()); P.compareCarry.listen(takeCarried); }
       if (model.selected && P.live && P.live.loadDetail && model.selected.liveDetail === 'pending') P.live.loadDetail(model.selected.id).then(render);
       // 메인 입력의 원문 한 번 전달(앞뒤 공백·줄바꿈·기호 그대로). 고객이 이미 「AI로 PC 찾기」를 눌렀으니 바로 보낸다.
       var carried = null;
@@ -246,8 +301,11 @@
       root.addEventListener('click', function (event) {
         var node = event.target.closest('button'); if (!node || node.disabled) return;
         if (node.hasAttribute('data-pa-copy')) { copy(node); return; }
-        if (node.hasAttribute('data-pa-add')) { toggleCompare(node.dataset.paAdd, node.dataset.paTurn); return; }
-        if (node.hasAttribute('data-pa-remove')) { toggleCompare(node.dataset.paRemove, null); return; }
+        if (node.hasAttribute('data-pa-add')) { toggleCompare(node.dataset.paAdd, node.dataset.paTurn, node.dataset.paKind); return; }
+        if (node.hasAttribute('data-pa-remove')) { toggleCompare(node.dataset.paRemove, null, node.dataset.paKind); return; }
+        // 선택 해제: 지금 고른 PC만 비운다 — 대화·입력 중인 문장·추천 조건·비교 목록·내 견적은 그대로다.
+        if (node.hasAttribute('data-dc-unselect')) { var was = model.selected; model.selected = null; model.notice = was ? was.name + ' 선택을 해제했어요. 다른 PC를 다시 고를 수 있어요.' : ''; render(); var back = [root.querySelector('[data-dc-select="' + (was ? was.id : '') + '"]'), root.querySelector('#dc-question'), root.querySelector('.dc-selected-panel h2')].filter(function (n) { return n && n.getClientRects().length; })[0];   // 모바일 탭에서는 입력창이 숨어 있어 선택 영역 제목으로 돌린다
+          if (back) { if (back.tagName === 'H2') back.setAttribute('tabindex', '-1'); back.focus({ preventScroll: true }); } return; }
         if (node.hasAttribute('data-dc-tab')) { model.mobile = node.dataset.dcTab; render(); return; }
         if (node.hasAttribute('data-dc-draft')) { model.draft = model.draft ? model.draft + '\n' + node.dataset.dcDraft : node.dataset.dcDraft; render(); root.querySelector('textarea').focus(); return; }
         if (node.hasAttribute('data-dc-select')) { var p = product(node.dataset.dcSelect); if (p) { model.selected = p; model.notice = p.name + '을 선택했어요. 상세 구성과 견적을 이어서 확인해보세요.'; render(); if (p.liveDetail === 'pending' && P.live) P.live.loadDetail(p.id).then(render); } return; }
@@ -272,19 +330,25 @@ P.designScreens.compare = function (ctx) {
     var rawIds = param(ctx, 'ids'), seen = Object.create(null);
     var chosen = rawIds !== null && rawIds !== undefined ? String(rawIds).split(',').slice(0, 3).map(product).filter(Boolean) : recommendations().slice(0, 3);
     chosen = chosen.filter(function (p) { var id = String(p.id); if (seen[id]) return false; seen[id] = true; return true; });
+    // AI 장비(ai=상품번호,…): 서버 상세를 읽은 뒤 열에 더한다(세 대 한도 안에서). 못 읽으면 열을 만들지 않고 알린다.
+    var rawAi = param(ctx, 'ai');
+    if (rawAi && (rawIds === null || rawIds === undefined)) chosen = [];   // AI 장비만 고른 비교에 추천 PC를 끼워 넣지 않는다
+    var aiIds = rawAi ? String(rawAi).split(',').filter(function (x) { return /^\d{1,18}$/.test(x); }).slice(0, 3) : [], aiMissing = 0;
+    function isDev(p) { return p && p.kind === 'ai_device'; }
     if (state === 'empty') chosen = [];
     if (state === 'one') chosen = chosen.slice(0, 1);
     var unavailableId = state === 'unavailable' && chosen.length ? String(chosen[0].id) : null;
     var differences = false, mobileIndex = 0, root = null;
     function visibleRows() { return ROWS.filter(function (row) { return !differences || chosen.length < 2 || new Set(chosen.map(function (p) { return normalize(spec(p, row)); })).size > 1; }); }
-    function actions(p) { return '<div class="dc-compare-actions">' + buttonLink('상품 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, String(p.id) === unavailableId || !!purchaseIssue(p)) + '</div>'; }
-    function productHead(p) { var note = purchaseIssue(p) || (String(p.id) === unavailableId ? '구매 가능 여부 확인 중' : ''); return '<div class="dc-compare-product">' + photograph(p) + '<h2>' + h(p.name) + '</h2>' + (note ? '<p class="dc-unavailable-label">' + h(note) + '</p>' : '') + '<button class="dc-compare-remove" type="button" data-dc-remove="' + h(p.id) + '" aria-label="' + h(p.name) + ' 비교에서 제거">' + icon('x') + '제거</button></div>'; }
+    function actions(p) { if (isDev(p)) return '<div class="dc-compare-actions"><a class="btn btn-small btn-outline" href="' + h(deviceHref(p)) + '">상품 상세' + icon('caret-right') + '</a>' + deviceBuy(p) + '</div>'; return '<div class="dc-compare-actions">' + buttonLink('상품 상세', 'product', 'normal', { id: p.id }, 'btn-small btn-outline') + buyButton(p, String(p.id) === unavailableId || !!purchaseIssue(p)) + '</div>'; }
+    function productHead(p) { var note = isDev(p) ? deviceIssue(p) : purchaseIssue(p) || (String(p.id) === unavailableId ? '구매 가능 여부 확인 중' : ''); return '<div class="dc-compare-product">' + photograph(p) + '<h2>' + h(p.name) + '</h2>' + (note ? '<p class="dc-unavailable-label">' + h(note) + '</p>' : '') + (isDev(p) ? '<span class="pa-kind">AI 장비</span>' : '') + '<button class="dc-compare-remove" type="button" data-dc-remove="' + h(p.id) + '" data-dc-kind="' + (isDev(p) ? 'ai_device' : 'pc') + '" aria-label="' + h(p.name) + ' 비교에서 빼기">' + icon('x') + '제거</button></div>'; }
     function markup() {
       var rows = visibleRows();
       var content = '';
-      if (!chosen.length) content = empty('비교할 PC를 골라주세요.', '최대 세 대까지 구성과 가격을 나란히 살펴볼 수 있어요.', buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-primary'));
+      if (aiMissing) content += '<div class="dc-compare-notice dc-compare-warning">' + icon('warning-circle') + '<p>확인할 수 없는 AI 장비 ' + aiMissing + '대는 비교에서 뺐어요.</p></div>';
+      if (!chosen.length) content += empty('비교할 PC를 골라주세요.', '최대 세 대까지 구성과 가격을 나란히 살펴볼 수 있어요.', buttonLink('PC 둘러보기', 'catalog', 'normal', {}, 'btn-primary'));
       else {
-        content = (chosen.length === 1 ? '<div class="dc-compare-notice">' + icon('info') + '<p>PC를 한 대 더 고르면 서로 다른 구성을 비교할 수 있어요.</p>' + buttonLink('PC 더 고르기', 'catalog', 'normal', { ids: chosen.map(function(p){return p.id;}).join(',') }, 'btn-small btn-outline') + '</div>' : '') +
+        content += (chosen.length === 1 ? '<div class="dc-compare-notice">' + icon('info') + '<p>PC를 한 대 더 고르면 서로 다른 구성을 비교할 수 있어요.</p>' + buttonLink('PC 더 고르기', 'catalog', 'normal', { ids: chosen.map(function(p){return p.id;}).join(',') }, 'btn-small btn-outline') + '</div>' : '') +
           (chosen.some(function (p) { return purchaseIssue(p) || String(p.id) === unavailableId; }) ? '<div class="dc-compare-notice dc-compare-warning">' + icon('warning-circle') + '<p>일부 상품은 판매 상태나 구성표 확인이 필요해요. 상품명 요약은 부품 구성표와 별도로 표시하며, 견적 진행은 확인 뒤에 이어갑니다.</p></div>' : '') +
           '<div class="dc-compare-table-wrap"><table class="dc-compare-table"><caption class="visually-hidden">선택한 PC의 CPU, 그래픽카드, 메모리, 저장장치와 가격 비교</caption><thead><tr><th scope="col">비교 항목</th>' + chosen.map(function (p) { return '<th scope="col">' + productHead(p) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.map(function (row) { return '<tr><th scope="row">' + h(row.label) + '</th>' + chosen.map(function (p) { return '<td' + (row.key === 'price' ? ' class="dc-compare-price"' : '') + '>' + h(spec(p, row)) + '</td>'; }).join('') + '</tr>'; }).join('') + (rows.length ? '' : '<tr><td colspan="' + (chosen.length + 1) + '" class="dc-no-difference">확인된 항목에서 서로 다른 정보가 없어요.</td></tr>') + '</tbody><tfoot><tr><th scope="row">선택</th>' + chosen.map(function (p) { return '<td>' + actions(p) + '</td>'; }).join('') + '</tr></tfoot></table></div>' +
           '<div class="dc-compare-mobile"><nav class="dc-slide-nav" aria-label="비교할 PC 전환"><button type="button" class="icon-button" data-dc-slide="previous" aria-label="이전 PC"' + (mobileIndex === 0 ? ' disabled' : '') + '>' + icon('arrow-left') + '</button><span aria-live="polite">' + (mobileIndex + 1) + ' / ' + chosen.length + '</span><button type="button" class="icon-button" data-dc-slide="next" aria-label="다음 PC"' + (mobileIndex === chosen.length - 1 ? ' disabled' : '') + '>' + icon('arrow-right') + '</button></nav><article class="dc-compare-mobile-card">' + productHead(chosen[mobileIndex]) + '<dl>' + rows.map(function (row) { return '<div><dt>' + h(row.label) + '</dt><dd>' + h(spec(chosen[mobileIndex], row)) + '</dd></div>'; }).join('') + '</dl>' + (rows.length ? '' : '<p class="dc-no-difference">확인된 항목에서 서로 다른 정보가 없어요.</p>') + actions(chosen[mobileIndex]) + '</article></div>';
@@ -294,10 +358,14 @@ P.designScreens.compare = function (ctx) {
     function render() { mobileIndex = Math.max(0, Math.min(mobileIndex, chosen.length - 1)); if (root) root.innerHTML = markup(); }
     return { html: '<section class="container dc-compare" data-dc-compare>' + markup() + '</section>', mount: function () {
       root = document.querySelector('[data-dc-compare]'); if (!root || root.dataset.mounted) return; root.dataset.mounted = 'true';
+      if (aiIds.length && P.aiDevices) Promise.all(aiIds.map(function (x) { return P.aiDevices.detail(x).then(deviceOf, function () { aiMissing += 1; return null; }); })).then(function (list) {
+        list.forEach(function (d) { if (d && chosen.length < 3 && !chosen.some(function (c) { return isDev(c) && c.id === d.id; })) chosen.push(d); });
+        render();
+      });
       root.addEventListener('change', function (event) { if (event.target.hasAttribute('data-dc-differences')) { differences = event.target.checked; render(); root.querySelector('[data-dc-differences]').focus(); } });
       root.addEventListener('click', function (event) {
         var node = event.target.closest('button'); if (!node || node.disabled) return;
-        if (node.hasAttribute('data-dc-remove')) { chosen = chosen.filter(function (p) { return String(p.id) !== node.dataset.dcRemove; }); if (chosen.length < 2) differences = false; render(); }
+        if (node.hasAttribute('data-dc-remove')) { chosen = chosen.filter(function (p) { return !(String(p.id) === node.dataset.dcRemove && (isDev(p) ? 'ai_device' : 'pc') === (node.dataset.dcKind || 'pc')); }); if (chosen.length < 2) differences = false; render(); }
         if (node.hasAttribute('data-dc-slide')) { mobileIndex += node.dataset.dcSlide === 'next' ? 1 : -1; render(); var next = root.querySelector('[data-dc-slide="' + node.dataset.dcSlide + '"]'); if (next && !next.disabled) next.focus(); }
       });
     } };

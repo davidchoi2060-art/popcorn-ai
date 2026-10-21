@@ -1,0 +1,26 @@
+/* 팝콘PC몰 구매 전 가격 안내 (2026-10-21 구매 1번 승인 — 시안 하단 「구매 클릭 후 · 가격 변동 안내」) */
+.mb-open{overflow:hidden}
+.mb-guide{border:0;padding:0;background:transparent;max-width:min(560px,calc(100% - 32px));width:100%;color:var(--ink)}
+.mb-guide::backdrop{background:rgb(20 20 20 / .45)}
+.mb-box{background:#fff;border-radius:16px;padding:22px 24px 24px;box-shadow:var(--shadow)}
+.mb-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.mb-head h2{font-size:20px;line-height:1.35;letter-spacing:-.03em}
+.mb-x{flex:0 0 auto;width:40px;height:40px;margin:-8px -10px 0 0;border:0;background:none;font-size:26px;line-height:1;color:var(--muted);border-radius:10px}
+.mb-product{display:grid;grid-template-columns:auto 1fr auto;gap:14px;align-items:center;margin-top:16px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mb-product img{width:96px;height:64px;object-fit:contain;border-radius:8px;background:var(--soft)}
+.mb-product strong{display:block;font-size:16px;line-height:1.4;word-break:keep-all;overflow-wrap:anywhere}
+.mb-product small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.mb-price{text-align:right}.mb-price b{display:block;font-size:20px;letter-spacing:-.02em;white-space:nowrap}.mb-price .mb-unknown{font-size:16px}
+.mb-warn{display:flex;gap:10px;margin-top:16px;padding:12px 14px;background:#fff8dd;border:1px solid #f3dc8a;border-radius:12px;font-size:14px;line-height:1.6}
+.mb-warn strong{color:#7a4b00}
+.mb-warn-mark{flex:0 0 22px;height:22px;border-radius:50%;background:#f0a500;color:#fff;font-weight:800;font-size:14px;display:grid;place-items:center;margin-top:1px}
+.mb-qty{margin-top:12px;color:var(--muted);font-size:14px}
+.mb-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.mb-actions .btn{min-height:48px;justify-content:center}
+.mb-go{background:var(--ink);color:#fff;border:1px solid var(--ink)}
+@media(max-width:640px){
+  .mb-box{padding:18px 16px 18px}
+  .mb-product{grid-template-columns:auto 1fr}.mb-product img{width:72px;height:52px}
+  .mb-price{grid-column:1 / -1;text-align:left;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .mb-actions{grid-template-columns:1fr}.mb-actions .mb-go{order:-1}
+}

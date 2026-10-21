@@ -35,7 +35,7 @@ class SurfaceOf(unittest.TestCase):
 class ScreensSendTheirOwnName(unittest.TestCase):
     """요청 함수마다 자기 화면 이름을 싣는다 — 남의 이름을 실으면 관리자 표가 거짓을 말한다."""
     FILES = {'mockups/mvp3/api-client.js': 'mvp3', 'mockups/mvp3/new-pcs.js': 'mvp3',
-             'mockups/mvp4/assets/js/live-checkout.js': 'mvp4',
+             'mockups/mvp4/assets/js/saved-quotes-client.js': 'mvp4',
              'mockups/mvp4/assets/js/service-adapters.js': 'mvp4'}
 
     def test_each_wrapper(self):

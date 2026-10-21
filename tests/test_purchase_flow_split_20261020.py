@@ -20,9 +20,11 @@ def src(name):
 
 
 def mall_url(product):
+    # 2026-10-21: 주소 검사는 mall-buy-guide.js(P.mallUrlFor) 한곳에 있고 live-catalog 의 P.mallBuyUrl 이 그것을 부른다.
     s = src("live-catalog.js")
     fn = s[s.index("  P.mallBuyUrl = function"):s.index("  P.mallBuyLink = function")]
-    code = "var P={};" + fn + ";console.log(JSON.stringify(P.mallBuyUrl(" + json.dumps(product) + ")))"
+    code = ("var window={},document={addEventListener:function(){}};" + src("mall-buy-guide.js") + ";var P=window.PAI;" + fn +
+            ";console.log(JSON.stringify(P.mallBuyUrl(" + json.dumps(product) + ")))")
     return json.loads(subprocess.run(["node", "-e", code], capture_output=True, text=True, check=True).stdout)
 
 
@@ -74,7 +76,8 @@ class OrdinaryPurchase(unittest.TestCase):
 
     def test_saved_records_and_option_link_stay(self):
         s = src("live-checkout.js")
-        self.assertIn("call('GET', '/api/mvp3/saved-quotes?limit=20'", s)  # 기존 보관 기록 조회는 그대로
+        self.assertIn("P.savedQuotes.list()", s)  # 기존 보관 기록 조회는 그대로(요청은 saved-quotes-client.js)
+        self.assertIn("call('GET', '/api/mvp3/saved-quotes?limit=20'", src("saved-quotes-client.js"))
         self.assertIn("buy(live, '팝콘PC몰에서 구매하기')", s)
         self.assertIn("mallLink(p, '팝콘PC에서 부품 변경하기')", s)
         self.assertIn("팝콘PC에서 부품 옵션 변경하기", src("live-cards.js"))
@@ -84,19 +87,21 @@ class AiFlowsUntouched(unittest.TestCase):
     def test_ai_package_and_supercomputer_keep_their_own_inquiry(self):
         self.assertIn("ai-consult.html?package=", src("ai.js"))
         d = src("supercomputer-detail.js")
+        # 2026-10-21 구매 1번 승인: 슈퍼컴퓨터 주 버튼은 팝콘PC몰 구매로 바뀌었다. 설치·구축 상담과 판매 중지 상품의 입고 문의는 그대로다.
         self.assertIn("data-sc-action=\"quote\"", d)
-        self.assertIn("장비 견적 문의", d)
+        self.assertIn("장비 입고 문의", d)
+        self.assertIn("data-sc-action=\"adoption\"", d)
         self.assertIn("qs.get('intent') === 'adoption' ? 'adoption' : 'quote'", src("supercomputer-inquiry.js"))
         self.assertIn("supercomputer.html?id=", src("chat-answer.js"))
-        self.assertNotIn("mallBuy", src("supercomputer-detail.js") + src("ai-inquiry.js") + src("supercomputer-inquiry.js"))
+        self.assertNotIn("mallBuy", src("ai-inquiry.js") + src("supercomputer-inquiry.js"))
 
 
 class Assets(unittest.TestCase):
     def test_pages_load_new_versions(self):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
-            for a in ("configuration-concept.js?v=20261021-acc2", "chat-answer.js?v=20261020-buy1", "design-conversation.js?v=20261020-buy1",
-                      "live-catalog.js?v=20261020-buy1", "live-checkout.js?v=20261020-buy1"):
+            for a in ("configuration-concept.js?v=20261021-acc2", "chat-answer.js?v=20261021-buy1", "design-conversation.js?v=20261021-buy1",
+                      "live-catalog.js?v=20261021-buy1", "live-checkout.js?v=20261021-buy1"):
                 self.assertIn(a, t, page)
 
 
