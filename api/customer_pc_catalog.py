@@ -113,12 +113,32 @@ def item_of(p, public, media) -> dict:
     }
 
 
-def catalog() -> list[dict]:
-    _levels, products = load()
+# 용도 수준표의 공개 투영 — 찜목록 성능 차이 안내용(2026-10-21 대표 확정 「찜하기·찜목록」).
+# 내는 것: 용도·수준 이름·서열·그 수준이 뜻하는 작업 설명. 내지 않는 것: 판정 조건(내부 지수 문턱값).
+# 이 수준은 사양 지수로 판정한 팝콘 기준표이고 실측이 아니다 — 화면은 %·FPS·시간으로 바꾸지 않는다.
+LEVELS_BASIS = "팝콘 용도 기준표(부품 사양으로 판정) · 실측 아님"
+
+
+def public_levels(levels) -> list[dict]:
+    out = []
+    for lv in levels or []:
+        usage, level, rank, work = lv.get("usage"), lv.get("level"), lv.get("level_rank"), lv.get("work")
+        if not (isinstance(usage, str) and usage and isinstance(level, str) and level and type(rank) is int and rank > 0):
+            continue
+        out.append({"usage": usage, "level": level, "rank": rank, "work": work if isinstance(work, str) else None})
+    return out
+
+
+def _build():
+    levels, products = load()
     public, media = public_codes(), _media_hints()
     items = [item_of(p, public, media) for p in products.values() if p.get("status") == "판매중"]
     items.sort(key=lambda it: (it["price"] is None, it["price"] or 0, it["product_code"]))
-    return items
+    return levels, items
+
+
+def catalog() -> list[dict]:
+    return _build()[1]
 
 
 def sold_item(code) -> dict | None:
@@ -147,6 +167,7 @@ def sold_item(code) -> dict | None:
 @router.get(CATALOG_PATH)
 def read_catalog(response: Response):
     response.headers["Cache-Control"] = "no-store"
-    items = catalog()
+    levels, items = _build()
     return {"ok": True, "items": items, "count": len(items), "categories": list(CATEGORIES),
+            "levels": public_levels(levels), "levels_basis": LEVELS_BASIS,
             "note": "가격은 쇼핑몰 판매가 기준이며 구매할 때 다시 확인합니다. 분류는 용도 평가로 나눈 안내용입니다."}
