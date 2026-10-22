@@ -59,7 +59,7 @@ jobs:
       - name: 화면 캡처
         shell: bash
         env:
-          BASE: https://popcornai.co.kr
+          BASE: https://dev.popcornai.co.kr
           CASES: ${{ inputs.cases || '배그롤150=배그와 롤 150만원으로 추천해줘|롤150=롤 150만원으로 추천해줘|사무용100=사무용 100만원으로 추천해줘' }}
           OUT: ${{ runner.temp }}/mvp3-captures
           PAGES: ${{ inputs.pages || 'talk' }}

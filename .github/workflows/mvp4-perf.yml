@@ -63,7 +63,7 @@ jobs:
           cp tools/perf/*.mjs "$RUNNER_TEMP/pw/"
           extra=""
           [ "$EVENT" = pull_request ] && extra="--override $GITHUB_WORKSPACE/mockups/mvp4/assets/js"
-          node "$RUNNER_TEMP/pw/mvp4_part_images.mjs" --base https://popcornai.co.kr/mvp4/ --samples "$SAMPLES" $extra --out "$OUT/result.json"
+          node "$RUNNER_TEMP/pw/mvp4_part_images.mjs" --base https://dev.popcornai.co.kr/mvp4/ --samples "$SAMPLES" $extra --out "$OUT/result.json"
           node "$RUNNER_TEMP/pw/mvp4_part_images_report.mjs" "$OUT/result.json" | tee "$OUT/report.md" >> "$GITHUB_STEP_SUMMARY"
       - name: 결과 올리기
         if: always()

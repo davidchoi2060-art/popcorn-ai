@@ -36,7 +36,7 @@ def test_four_detail_entries_and_home_go_to_their_own_explanation():
 def test_service_page_routes_by_use_and_loads_both_guides():
     html = read("ai-service.html")
     for asset in ("ai-meeting-guide.js?v=20261021-mm3", "ai-reply-guide.js?v=20261021-mm3",
-                  "ai-meeting-guide.css?v=20261021-mm3", "ai-reply-guide.css?v=20261021-mm3", "header-ui.js?v=20261021-wish1"):
+                  "ai-meeting-guide.css?v=20261021-mm3", "ai-reply-guide.css?v=20261021-mm3", "header-ui.js?v=20261022-pat1"):
         assert asset in html, asset
     assert "P.serviceGuides.meetings = {label: '회의록 정리'" in read(MEETING)
     assert "P.serviceGuides.replies = {label: '고객 답변 초안'" in read(REPLY)

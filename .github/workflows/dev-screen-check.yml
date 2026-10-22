@@ -43,7 +43,7 @@ jobs:
       - name: 추천 API 점검
         shell: bash
         env:
-          BASE: https://popcornai.co.kr
+          BASE: https://dev.popcornai.co.kr
           TEXT: ${{ inputs.text || '배그와 롤, 150만원으로 추천해줘' }}
           PROBES: ${{ inputs.probes || '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1' }}
         run: python3 tools/ci/dev_screen_check.py | tee -a "$GITHUB_STEP_SUMMARY"
@@ -51,7 +51,7 @@ jobs:
         if: inputs.gaps
         shell: bash
         env:
-          BASE: https://popcornai.co.kr
+          BASE: https://dev.popcornai.co.kr
         run: |
           python3 tools/ci/part_photo_gaps.py > /tmp/gaps.md
           cat /tmp/gaps.md >> "$GITHUB_STEP_SUMMARY"
