@@ -15,12 +15,7 @@
   var TABS = [['company', '회사정보', 'company.html'], ['terms', '이용약관', 'terms.html'],
     ['privacy', '개인정보처리방침', 'privacy.html'], ['purchase-support', '구매·배송·A/S 안내', 'purchase-support.html']];
 
-  var COMPANY = {
-    name: '주식회사 팝콘컴퓨터',
-    rows: [['대표자', '이미숙'], ['사업자등록번호', '794-81-00671'],
-      ['주소', '서울특별시 용산구 원효로 188, 5층\n(원효로2가, JM빌딩)'], ['대표번호', '02)1644-0249'],
-      ['팩스', '070-8610-0100'], ['웹팩스', '0303-3442-0249'], ['개인정보보호책임자', '이미숙']]
-  };
+  var COMPANY = P.COMPANY;   // 값은 core.js 한 곳(하단 사업자 표기와 같이 쓴다)
 
   function tabs(active) {
     return '<nav class="ip-tabs" aria-label="회사정보와 정책">' + TABS.map(function (t) {

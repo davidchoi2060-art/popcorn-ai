@@ -1,0 +1,8 @@
+{
+ "file": "assets/images/og/og-default.jpg",
+ "kind": "공유 썸네일(og:image) 1200x630 -- 승인 메인 배너(#321 v11) 이미지를 높이 630으로 줄이고 가로 360~1560을 자른 것. 글자·로고 추가 없음",
+ "source": "carousel/hero-tv-commercial-clean.png",
+ "source_sha256": "3a633f6ccf6d0a269d8964c79524418a56ad6d31fd1c4e16c8852efcc241e556",
+ "sha256": "47ad3224ed4ee5e506e99837da870ff53c6a56a3235670773cc9a357fea259f5",
+ "made": "2026-10-22 Claude (Pillow LANCZOS, JPEG q86)"
+}
