@@ -81,12 +81,12 @@ jobs:
           done
           for code in ${AI_CODES//,/ }; do
             curl -sS -o "out/ai/${code}_card.webp" -w "$code card %{http_code} %{size_download}\n" \
-              "https://popcornai.co.kr/api/customer/products/$code/representative-image?size=card" >> out/ai_status.txt || true
+              "https://dev.popcornai.co.kr/api/customer/products/$code/representative-image?size=card" >> out/ai_status.txt || true
           done
           for path in ${PATHS//,/ }; do
             case "$path" in /api/product-images/*|/api/customer/products/*|/api/part-explanations/*) ;; *) continue;; esac
             name=$(echo "$path" | tr -c 'a-zA-Z0-9\n' '_')
-            curl -sS -o "out/ai/$name" -w "$path %{http_code} %{size_download} %{content_type}\n" "https://popcornai.co.kr$path" >> out/ai_status.txt || true
+            curl -sS -o "out/ai/$name" -w "$path %{http_code} %{size_download} %{content_type}\n" "https://dev.popcornai.co.kr$path" >> out/ai_status.txt || true
           done
           # 상세 HTML 은 크고 쓸 데가 주소 목록뿐이라 올리지 않는다.
           rm -rf out/html

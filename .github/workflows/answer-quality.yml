@@ -116,7 +116,7 @@ jobs:
       - run: pip install 'anthropic~=0.122'
       - name: 질문 던지기 · 채점
         env:
-          BASE: https://popcornai.co.kr
+          BASE: https://dev.popcornai.co.kr
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python tools/quality/compare.py run --subset "${{ needs.plan.outputs.subset }}" --shard "${{ matrix.shard }}" --out out
       - id: name
