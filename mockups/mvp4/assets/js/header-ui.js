@@ -32,7 +32,9 @@
     return '<a class="' + (className || '') + '" href="' + h(href) + '"' + (current ? ' data-nh-nav="' + h(current) + '"' : '') + '>' + label + '</a>';
   }
   function header(brand) {
-    return '<header class="site-header nh-header"><div class="container nh-top">' + brand +
+    // 2026-10-22 대표 확정(시안 2번): 로고 바로 아래 특허 출원 표시. 등록·인증 표현은 쓰지 않는다(출원 10-2026-0151699, 2026-08-13).
+    return '<header class="site-header nh-header"><div class="container nh-top"><div class="nh-brand-block">' + brand +
+      '<p class="nh-patent"><span class="nh-patent-title">AI 견적 기술 · 특허 출원</span><span class="nh-patent-no"><span class="visually-hidden">출원번호 </span>10-2026-0151699</span></p></div>' +
       '<form class="nh-search" data-nh-search role="search" action="./" method="get"><label class="visually-hidden" for="nh-search-input">상품명, CPU 또는 그래픽카드 검색</label><div class="nh-search-field"><input id="nh-search-input" name="q" type="search" placeholder="상품명, CPU, 그래픽카드 검색" autocomplete="off" maxlength="120" aria-describedby="nh-search-error"><button type="submit" aria-label="상품 검색">' + icon('magnifying-glass') + '</button></div><p class="nh-search-error" id="nh-search-error" role="alert" hidden>검색어를 입력해 주세요.</p></form>' +
       '<div class="nh-tools"><a class="nh-tool" href="' + h(route('saved')) + '" data-nh-nav="saved">' + icon('clipboard-text') + '<span>내 견적</span></a><a class="nh-tool nh-support-tool" href="support.html" data-nh-nav="support">' + icon('headset') + '<span>고객지원</span></a>' + menuButton('nh-mobile-menu', '전체 메뉴') + '</div></div>' +
       '<div class="nh-menu-bar"><nav class="container nh-service-nav" aria-label="주요 메뉴"><div class="nh-primary-links">' +
