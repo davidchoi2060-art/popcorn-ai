@@ -32,7 +32,7 @@ jobs:
       - name: 고객 목록과 상품별 구성 읽기
         shell: bash
         env:
-          BASE: https://popcornai.co.kr
+          BASE: https://dev.popcornai.co.kr
           EXTRA: ${{ inputs.extra }}
         run: |
           set -euo pipefail

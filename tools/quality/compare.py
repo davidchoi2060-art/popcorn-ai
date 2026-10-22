@@ -23,7 +23,7 @@
 쓰는 법
   python tools/quality/compare.py run --subset all --shard 1/3 --out out/s1
   python tools/quality/compare.py combine out/s1 out/s2 out/s3 --report report.md --gate
-환경변수: BASE(기본 https://popcornai.co.kr) · ANTHROPIC_API_KEY · QUALITY_MODEL(선택)
+환경변수: BASE(기본 https://dev.popcornai.co.kr) · ANTHROPIC_API_KEY · QUALITY_MODEL(선택)
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 QUESTIONS = Path(__file__).with_name("questions.json")
-BASE = os.environ.get("BASE", "https://popcornai.co.kr").rstrip("/")
+BASE = os.environ.get("BASE", "https://dev.popcornai.co.kr").rstrip("/")
 CALL_GAP_SEC = 13            # 분당 5회 한도 아래로
 UA = "popcorn-answer-quality/1"
 
