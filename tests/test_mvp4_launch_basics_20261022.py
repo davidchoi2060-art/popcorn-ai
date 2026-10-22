@@ -59,7 +59,7 @@ class FooterBusiness(unittest.TestCase):
         for p in M.glob("*.html"):
             s = p.read_text(encoding="utf-8")
             if "assets/js/core.js" in s:
-                self.assertIn("core.js?v=20261022-biz1", s, p.name)
+                self.assertIn("core.js?v=20261022-biz2", s, p.name)
 
 
 class Robots(unittest.TestCase):
@@ -93,3 +93,21 @@ class Robots(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScriptsParse(unittest.TestCase):
+    """2026-10-22 사고: core.js 문자열 안의 \n 이 실제 줄바꿈으로 들어가 /mvp4 전체가 흰 화면이 됐다(글자만 보는 검사는 못 잡았다).
+    mvp4 스크립트 전부를 node --check 로 문법 검사한다(node 가 없는 환경은 건너뛴다)."""
+
+    def test_all_mvp4_scripts_parse(self):
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node 없음")
+        bad = []
+        for js in sorted((M / "assets" / "js").glob("*.js")):
+            r = subprocess.run([node, "--check", str(js)], capture_output=True, text=True)
+            if r.returncode:
+                bad.append((js.name, (r.stderr or "").strip().splitlines()[:3]))
+        self.assertEqual(bad, [])
