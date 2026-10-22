@@ -58,14 +58,12 @@
   PAI.COMPANY = {
     name: '주식회사 팝콘컴퓨터',
     rows: [['대표자', '이미숙'], ['사업자등록번호', '794-81-00671'],
-      ['주소', '서울특별시 용산구 원효로 188, 5층
-(원효로2가, JM빌딩)'], ['대표번호', '02)1644-0249'],
+      ['주소', '서울특별시 용산구 원효로 188, 5층\n(원효로2가, JM빌딩)'], ['대표번호', '02)1644-0249'],
       ['팩스', '070-8610-0100'], ['웹팩스', '0303-3442-0249'], ['개인정보보호책임자', '이미숙']]
   };
   // 하단 사업자 표기(2026-10-22 오픈 전 점검 -- 하단에 링크만 있고 상호·대표자·사업자번호·주소·연락처가 없었다).
   function footerBusiness() {
-    var c = PAI.COMPANY, get = function (k) { var r = c.rows.filter(function (x) { return x[0] === k; })[0]; return r ? r[1].replace(/
-/g, ' ') : ''; };
+    var c = PAI.COMPANY, get = function (k) { var r = c.rows.filter(function (x) { return x[0] === k; })[0]; return r ? r[1].replace(/\n/g, ' ') : ''; };
     var items = [c.name, '대표 ' + get('대표자'), '사업자등록번호 ' + get('사업자등록번호'), get('주소'),
       '대표번호 ' + get('대표번호'), '개인정보보호책임자 ' + get('개인정보보호책임자')];
     return '<p class="footer-business">' + items.map(function (t) { return '<span>' + PAI.h(t) + '</span>'; }).join('') + '</p>';
