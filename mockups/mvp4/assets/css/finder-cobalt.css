@@ -25,12 +25,18 @@ body[data-finder=chat] .dc-chat-main,body[data-finder=chat] .dc-side-panel,body[
 body[data-finder=chat] .dc-chat-main{border-radius:18px}
 body[data-finder=chat] .dc-welcome-mark{background:#e9f0ff;border-color:#d6e2ff}
 body[data-finder=chat] .dc-welcome-mark .icon{filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
-body[data-finder=chat] .dc-welcome-prompts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-body[data-finder=chat] .dc-welcome-prompts>button{flex-direction:column;align-items:flex-start;gap:6px;padding:16px 18px;border:1px solid var(--fc-line);border-radius:14px;background:#fbfcff;color:var(--fc-ink);font-size:16px;min-height:96px;text-align:left}
+/* 첫 질문 화면(2026-10-22 대표 승인): 소개를 낮게, 용도 버튼은 넓은 3열 — 「영상편집용」 같은 낱말이 중간에서 쪼개지지 않게 낱말 단위로만 줄바꿈 */
+body[data-finder=chat] .dc-welcome{padding:0 0 6px;container-type:inline-size}
+body[data-finder=chat] .dc-welcome-mark{width:40px;height:40px;border-radius:11px;margin-bottom:14px}
+body[data-finder=chat] .dc-welcome-mark .icon{width:23px;height:23px}
+body[data-finder=chat] .dc-welcome>p{margin-top:8px;line-height:1.7}
+body[data-finder=chat] .dc-welcome-prompts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}
+body[data-finder=chat] .dc-welcome-prompts>button{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:8px;row-gap:4px;padding:13px 14px;border:1px solid var(--fc-line);border-radius:14px;background:#fbfcff;color:var(--fc-ink);font-size:16px;min-height:0;text-align:left;word-break:keep-all;overflow-wrap:normal}
+body[data-finder=chat] .dc-welcome-prompts>button b{line-height:1.4}
 body[data-finder=chat] .dc-welcome-prompts>button:hover{border-color:#5778ff;background:#f4f7ff}
 body[data-finder=chat] .dc-welcome-prompts>button b{font-weight:750}
 body[data-finder=chat] .dc-welcome-prompts .icon{width:24px;height:24px;filter:invert(24%) sepia(93%) saturate(3700%) hue-rotate(228deg) brightness(97%) contrast(97%)}
-body[data-finder=chat] .dc-prompt-hint{font-size:12px;font-weight:600;color:var(--fc-muted)}
+body[data-finder=chat] .dc-prompt-hint{grid-column:1/-1;font-size:13px;font-weight:600;line-height:1.4;color:var(--fc-muted)}
 body[data-finder=chat] .dc-draft-chip{border-color:var(--fc-line);background:#fff;color:#2d3a5c}
 body[data-finder=chat] .dc-message-user>p{background:#e6eeff;border-color:#d6e2ff;color:var(--fc-ink)}
 body[data-finder=chat] .dc-composer{border-color:#9fb4f5;box-shadow:0 6px 22px rgb(28 60 139 / .07)}
@@ -82,10 +88,31 @@ body[data-finder=product] .cf-description .cf-desc-title{font-size:19px;font-wei
 @media(max-width:800px){
   body[data-finder=chat] .dc-heading h1{font-size:29px;max-width:none}
   body[data-finder=chat] .dc-heading>div>p.dc-lede{font-size:14px}
-  body[data-finder=chat] .dc-welcome-prompts{grid-template-columns:1fr}
-  body[data-finder=chat] .dc-welcome-prompts>button{min-height:0;flex-direction:row;align-items:center;justify-content:flex-start;gap:10px;padding:13px 16px}
-  body[data-finder=chat] .dc-prompt-hint{margin-left:auto}
+  body[data-finder=chat] .dc-welcome{padding:4px 0 6px}
+  body[data-finder=chat] .dc-welcome h2{font-size:25px}
+  body[data-finder=chat] .dc-welcome>p{font-size:15px;margin-top:6px}
+  body[data-finder=chat] .dc-welcome-prompts{grid-template-columns:1fr;gap:8px;margin-top:16px}
+  body[data-finder=chat] .dc-welcome-prompts>button{display:flex;min-height:50px;align-items:center;justify-content:flex-start;gap:10px;padding:10px 14px}
+  body[data-finder=chat] .dc-prompt-hint{margin-left:auto;white-space:nowrap}
   body[data-finder=chat] .dc-feature-actions .dc-feature-buy{font-size:17px}
   body[data-finder=chat] .dc-feature-pair .btn{font-size:14px;padding:10px 8px}
   body[data-finder=chat] .dc-feature-body{grid-template-columns:96px minmax(0,1fr)}
+}
+
+/* 첫 질문 화면은 대화 상자 높이를 내용에 맞춘다 — 소개 때문에 안쪽 스크롤이 생기거나 입력창이 아래로 밀리지 않게. 대화가 시작되면 원래 고정 높이·안쪽 스크롤로 돌아간다 */
+body[data-finder=chat] .dc-chat-main.is-welcome{height:auto;min-height:0}
+body[data-finder=chat] .dc-chat-main.is-welcome>.dc-chat-log{flex:none;overflow:visible;padding-bottom:4px}
+body[data-finder=chat] .dc-chat-main.is-welcome .dc-composer textarea{min-height:64px;height:64px}
+/* 말풍선 표시는 빼서 높이를 줄인다(PC 는 오른쪽 위 그림이 대신, 모바일은 용도 버튼·입력창이 먼저 보이게) */
+body[data-finder=chat] .dc-welcome>.dc-welcome-mark{display:none}
+@media(min-width:801px){body[data-finder=chat] .dc-chat-main.is-welcome{padding-top:20px}}
+/* 중간 폭 PC 창: 대화 상자가 조금 좁으면 아이콘을 글자 위로 올려 3열을 지키고, 더 좁으면 한 줄짜리 가로 버튼 3개로 바꾼다. 글씨 크기는 그대로 */
+@container (max-width:512px){
+  body[data-finder=chat] .dc-welcome-prompts>button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:12px}
+}
+@container (max-width:440px){
+  body[data-finder=chat] .dc-welcome-prompts{grid-template-columns:1fr;gap:8px}
+  body[data-finder=chat] .dc-welcome-prompts>button{flex-direction:row;min-height:48px;align-items:center;gap:10px;padding:10px 14px}
+  body[data-finder=chat] .dc-prompt-hint{margin-left:auto;white-space:nowrap}
+  body[data-finder=chat] .dc-welcome>.dc-welcome-art{width:104px}
 }

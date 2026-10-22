@@ -100,7 +100,7 @@ class Assets(unittest.TestCase):
     def test_pages_load_new_versions(self):
         for page in ("index.html", "review-flows.html"):
             t = (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8")
-            for a in ("configuration-concept.js?v=20261021-cb2", "chat-answer.js?v=20261021-wish1", "design-conversation.js?v=20261021-wish1",
+            for a in ("configuration-concept.js?v=20261021-cb2", "chat-answer.js?v=20261021-wish1", "design-conversation.js?v=20261022-ask1",
                       "live-checkout.js?v=20261021-cb2"):  # live-catalog 버전은 사진 반영이 계속 올린다
                 self.assertIn(a, t, page)
 
