@@ -373,6 +373,21 @@ def power_order(options, picks, specs, advice):
     return [o for o in options if ok(o)] + [o for o in options if not ok(o)]
 
 
+# 상급 CPU(인텔 i7·i9·울트라 7·9·K 모델, AMD 라이젠 7·9·X3D) 에 보급형 칩셋 보드(H610·A620 등)를 «가장 싸서» 먼저 붙이지 않는다.
+# 호환은 되지만 전원부가 약하고 K 모델 성능을 다 못 쓴다(2026-10-22 오픈 전 엣지 점검: 「i7-14700K + AMD B650」을
+# 바로잡으며 GIGABYTE H610M K D4 를 자동으로 골랐다). 보급형 보드는 뒤로 보낼 뿐이고, 그것밖에 없으면 그대로 쓴다.
+HIGH_CPU = re.compile(r'i[79]-\d|울트라\s*[79](?!\d)|ultra\s*[79](?!\d)|\d{4,5}KF?(?![A-Za-z])|라이젠\s*[79](?!\d)|ryzen\s*[79](?!\d)|X3D', re.I)
+ENTRY_BOARD = re.compile(r'(?<![A-Za-z0-9])(H310|H410|H510|H610|A320|A520|A620)', re.I)
+
+
+def mb_order(options, picks):
+    """메인보드 후보 순서 -- 상급 CPU 면 보급형 칩셋 보드를 뒤로(가격 순서는 그 안에서 그대로)."""
+    cpu = picks.get('CPU')
+    if not cpu or not HIGH_CPU.search(cpu.get('name') or ''):
+        return options
+    return [o for o in options if not ENTRY_BOARD.search(o.get('name') or '')] +            [o for o in options if ENTRY_BOARD.search(o.get('name') or '')]
+
+
 def fill(cands, specs, rules, gpu_optional=False, advice=None):
     """자리마다 싼 것부터, 앞 자리와 호환되는 첫 조합을 찾는다(깊이 우선 · 판정 NODE_CAP 회까지).
 
@@ -396,6 +411,8 @@ def fill(cands, specs, rules, gpu_optional=False, advice=None):
             options = options + [None]      # 맞는 쿨러를 못 찾으면 비우고 알린다
         elif slot == 'POWER':
             options = power_order(options, picks, specs, advice)
+        elif slot == 'MB':
+            options = mb_order(options, picks)
         tried = 0
         for o in options:
             if budget[0] <= 0:
