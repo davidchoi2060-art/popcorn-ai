@@ -198,13 +198,14 @@ class BuildTests(unittest.TestCase):
         by = {l['slot']: l for l in res['lines']}
         self.assertEqual(by['CPU']['product_code'], 1)
         self.assertEqual(by['GPU']['product_code'], 30)
-        self.assertEqual(by['MB']['product_code'], 12)          # 소켓이 맞는 보드 중 가장 싼 DDR4 보드
-        self.assertEqual((by['RAM']['product_code'], by['RAM']['quantity']), (22, 2))  # 그 보드에 맞는 DDR4 16GB × 2
+        # 2026-10-22: i9(상급 CPU)에는 가장 싼 H610 보드를 먼저 붙이지 않는다(mb_order) -- 소켓이 맞는 B760 DDR5 보드
+        self.assertEqual(by['MB']['product_code'], 10)
+        self.assertEqual((by['RAM']['product_code'], by['RAM']['quantity']), (20, 2))  # 그 보드에 맞는 DDR5 16GB × 2
         self.assertEqual(by['POWER']['product_code'], 71)       # 500W 는 650W 그래픽카드를 못 받는다
         self.assertEqual(by['SSD']['product_code'], 60)         # 말하지 않으면 500GB 이상 중 싼 것
         self.assertTrue(by['CPU']['from_request'] and by['GPU']['from_request'] and by['RAM']['from_request'])
         self.assertFalse(by['MB']['from_request'])
-        expected = 700000 + 90000 + 40000 * 2 + 600000 + 50000 + 30000 + 60000 + 90000 + ASSEMBLY_FEE
+        expected = 700000 + 150000 + 60000 * 2 + 600000 + 50000 + 30000 + 60000 + 90000 + ASSEMBLY_FEE
         self.assertEqual(res['total'], expected)
 
     def test_no_part_price_in_lines(self, *_):
@@ -261,7 +262,7 @@ class BuildTests(unittest.TestCase):
         models = [row(204, 'CPU', '인텔 코어i9-14900', 100000), row(205, 'CPU', '인텔 코어 Ultra7 265', 200000)]
         with patch(__name__ + '.ROWS', ROWS + models), patch.dict(SPECS, {204: dict(SPECS[1]), 205: dict(SPECS[1])}):
             for request, cpu_code, other_slot, other_code in (
-                    ('i9 14900 RAM 32GB', 204, 'RAM', 22),
+                    ('i9 14900 RAM 32GB', 204, 'RAM', 20),      # 상급 CPU 라 B760 DDR5 보드 -> DDR5 16GB × 2 (2026-10-22 mb_order)
                     ('i9 14900 RTX 5060 Ti', 204, 'GPU', 30),
                     ('Ultra7 265 SSD 1TB', 205, 'SSD', 61)):
                 with self.subTest(request=request):
@@ -283,7 +284,7 @@ class BuildTests(unittest.TestCase):
         self.assertTrue(cpu['from_request'])
 
     def test_ssd_quantity_respects_known_board_capacity(self, *_):
-        res = self.start(cpu='i9')
+        res = self.start(cpu='14400F')        # 보급형 CPU -- 가장 싼 H610(12) 보드가 그대로 붙는 구성으로 슬롯 수를 본다
         parts = [F.Pick(slot=l['slot'], product_code=l['product_code'], quantity=2 if l['slot'] == 'SSD' else l['quantity'])
                  for l in res['lines'] if l['product_code']]
         for kind, key in (('M.2', 'm2_slots'), ('2.5 SATA', 'sata_ports')):

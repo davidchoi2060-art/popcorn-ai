@@ -741,6 +741,20 @@ def psu_line(chip: str, watt: int, recommended: int | None) -> str | None:
     return "%s 권장 파워는 %dW라 %dW 파워면 여유 있게 쓸 수 있어요." % (chip, recommended, watt)
 
 
+# 작은 케이스 + 큰 그래픽카드 (2026-10-22 오픈 전 엣지 점검: 「ITX 케이스 + RTX 4080 SUPER 3팬 + 500W」에 파워 부족만 말하고
+# 그래픽카드가 케이스에 들어가지 않을 수 있다는 말은 없었다). 판정이 아니라 확인 안내다 -- 실제 길이는 상품마다 다르다.
+_SMALL_CASE = re.compile(r"(?<![A-Za-z])m?-?ITX(?![A-Za-z])|미니\s*ITX|초소형|미니\s*타워|소형\s*케이스|SFF", re.I)
+_BIG_GPU = re.compile(r"3\s*팬|트리플\s*팬|RTX\s*\d0[89]0|RX\s*\d{4}\s*XTX?|(?<!\d)[45]0[89]0(?!\d)", re.I)
+NOTE_CASE_FIT = ("작은 케이스(ITX·초소형)는 그래픽카드 길이와 쿨러 높이에 제한이 있어, 3팬·상급 그래픽카드는 들어가지 않을 수 있어요."
+                 " 케이스의 그래픽카드 장착 가능 길이(mm)와 그래픽카드 길이를 꼭 맞춰 보세요.")
+
+
+def case_fit_note(sentence: str) -> str | None:
+    """작은 케이스와 큰 그래픽카드를 함께 말했으면 확인 안내 한 줄. 아니면 None."""
+    t = sentence or ""
+    return NOTE_CASE_FIT if _SMALL_CASE.search(t) and _BIG_GPU.search(t) else None
+
+
 def psu_note(conn, sentence: str) -> tuple[str, int] | None:
     """그래픽카드 권장 파워 대조 한 줄 -> (문장, 고객이 말한 와트). 칩을 표에서 못 찾으면 None(지어내지 않는다)."""
     q = psu_question(sentence)
@@ -1010,6 +1024,9 @@ def advise(conn_factory, sentence: str, labels: list[str], res, *, history=None,
         if psu:
             # 「충분하다고 단정하기 어려워요」 같은 같은 용량 문장은 걷고, 우리 자료로 낸 판정을 맨 앞에 둔다(권고 7).
             body = (psu[0] + "\n" + drop_watt_sentences(body, psu[1])).strip()
+        fit = case_fit_note(sentence)
+        if fit and fit not in body:
+            body = (body + "\n" + fit).strip()
         res.answer = body
         res.filter_report = {"kept": len(TF.split_sentences(body)), "replaced": [],
                              "dropped": dropped, "gate_hit": False}

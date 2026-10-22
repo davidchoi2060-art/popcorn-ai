@@ -541,6 +541,9 @@ def _pc_checks(reply: str, sentence: str, cards: list[dict], budget_won: int | N
     if psu:
         line, watt = psu
         out = PA.drop_watt_sentences(out, watt)
+    fit = PA.case_fit_note(sentence)        # 작은 케이스 + 큰 그래픽카드 -- 서버 안내 줄에 붙인다
+    if fit and fit not in out:
+        line = (line + "\n" + fit) if line else fit
     prices = [c["price"] for c in cards if isinstance(c.get("price"), int) and c["price"] > 0]
     if budget_won and prices and min(prices) > budget_won:
         out, _n = PA.drop_budget_yes(out, sentence)
