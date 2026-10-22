@@ -53,6 +53,24 @@
     }).join('') + '</nav>';
   }
 
+  // 회사정보 확정값(2026-10-21 대표 확정, 00-design-handoff.txt) -- 하단 사업자 표기와 회사정보 화면(info-pages.js)이 같이 쓴다.
+  // 통신판매업 신고번호·이메일은 확정값이 없어 싣지 않는다(지어내지 않는다). 대표번호는 착신 확인 전이라 tel: 링크 없이 표기만.
+  PAI.COMPANY = {
+    name: '주식회사 팝콘컴퓨터',
+    rows: [['대표자', '이미숙'], ['사업자등록번호', '794-81-00671'],
+      ['주소', '서울특별시 용산구 원효로 188, 5층
+(원효로2가, JM빌딩)'], ['대표번호', '02)1644-0249'],
+      ['팩스', '070-8610-0100'], ['웹팩스', '0303-3442-0249'], ['개인정보보호책임자', '이미숙']]
+  };
+  // 하단 사업자 표기(2026-10-22 오픈 전 점검 -- 하단에 링크만 있고 상호·대표자·사업자번호·주소·연락처가 없었다).
+  function footerBusiness() {
+    var c = PAI.COMPANY, get = function (k) { var r = c.rows.filter(function (x) { return x[0] === k; })[0]; return r ? r[1].replace(/
+/g, ' ') : ''; };
+    var items = [c.name, '대표 ' + get('대표자'), '사업자등록번호 ' + get('사업자등록번호'), get('주소'),
+      '대표번호 ' + get('대표번호'), '개인정보보호책임자 ' + get('개인정보보호책임자')];
+    return '<p class="footer-business">' + items.map(function (t) { return '<span>' + PAI.h(t) + '</span>'; }).join('') + '</p>';
+  }
+
   PAI.shell = function (content) {
     return '<a class="skip-link" href="#main-content">본문으로 건너뛰기</a>' +
       '<header class="site-header"><div class="container header-inner">' + brand('header') + navigation('desktop-nav') +
@@ -62,7 +80,7 @@
       '<main id="main-content" class="page-main" tabindex="-1">' + content + '</main>' +
       '<footer class="site-footer"><div class="container footer-inner"><div class="footer-brand-row">' + brand() +
       '<nav class="footer-links" aria-label="회사정보 및 정책"><a href="company.html">회사정보</a><a href="terms.html">이용약관</a><a href="privacy.html">개인정보처리방침</a><a href="purchase-support.html">구매·배송·A/S 안내</a><a href="' + PAI.href('support') + '">고객지원</a></nav></div>' +
-      '<p class="footer-caption">좋은 PC에서, 쓸모 있는 AI까지.</p></div></footer>' +
+      '<p class="footer-caption">좋은 PC에서, 쓸모 있는 AI까지.</p>' + footerBusiness() + '</div></footer>' +
       '<dialog class="site-dialog search-dialog" id="site-search" aria-labelledby="search-dialog-title"><div class="dialog-content"><div class="dialog-heading"><h2 id="search-dialog-title">어떤 PC를 찾으세요?</h2><button class="icon-button" type="button" data-close-dialog aria-label="검색 닫기">' + PAI.icon('x') + '</button></div>' +
       '<form class="search-form" action="pcs.html" method="get" data-search-form><label class="visually-hidden" for="site-search-input">상품명 또는 용도</label><div class="search-input-row">' + PAI.icon('magnifying-glass') + '<input id="site-search-input" name="q" type="search" placeholder="상품명, 부품명, 용도로 찾아보세요" autocomplete="off" maxlength="120" aria-describedby="search-error"><button class="btn btn-primary" type="submit">검색</button></div><p class="error" id="search-error" hidden>검색어를 입력해 주세요.</p></form>' +
       '<div class="search-suggestions"><span>이런 PC를 찾으시나요?</span><a class="chip" href="' + PAI.href('pcs', { purpose: 'gaming' }) + '">게이밍 PC</a><a class="chip" href="' + PAI.href('pcs', { purpose: 'office' }) + '">사무용 PC</a><a class="chip" href="' + PAI.href('pcs', { form: 'mini' }) + '">미니 PC</a></div></div></dialog>' +

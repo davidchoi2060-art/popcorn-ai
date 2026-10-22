@@ -18,10 +18,14 @@ class InfoPages(unittest.TestCase):
             self.assertIn("assets/css/info-pages.css", html)
 
     def test_company_values_are_the_confirmed_ones(self):
+        # 2026-10-22: 값은 core.js 의 PAI.COMPANY 한 곳으로 옮겼다(하단 사업자 표기와 회사정보 화면이 같이 쓴다).
+        core = (M / "assets/js/core.js").read_text(encoding="utf-8")
         for v in ("주식회사 팝콘컴퓨터", "이미숙", "794-81-00671", "서울특별시 용산구 원효로 188, 5층",
                   "02)1644-0249", "070-8610-0100", "0303-3442-0249"):
-            self.assertIn(v, JS)
+            self.assertIn(v, core)
+        self.assertIn("var COMPANY = P.COMPANY;", JS)
         self.assertNotIn("tel:", JS)
+
 
     def test_draft_policy_text_is_not_shipped(self):
         shipped = "".join(p.read_text(encoding="utf-8", errors="ignore")
