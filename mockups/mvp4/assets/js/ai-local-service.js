@@ -21,7 +21,10 @@ var stages=[
   support:{title:'고객에게 설치 준비 사항을 안내할 때',setup:'설치 안내서와 고객 응대 지침을 지정합니다. 준비 사항을 찾는 기능과 실제 설치 일정을 조회하는 기능은 구분하고, 일정 시스템 연동은 별도 검토합니다.',question:'고객이 다음 주 설치 전에 무엇을 준비해야 하냐고 물었어. 안내할 내용을 정리해줘.',answer:'<strong>가상 안내서의 <mark>사전 준비 사항</mark>입니다.</strong><ul><li>설치 공간과 전원 위치를 확인합니다.</li><li>네트워크 연결 가능 여부를 확인합니다.</li><li>당일 함께 확인할 담당자를 정합니다.</li></ul><p><mark>다음 주 설치 가능 여부는 문서에서 확인되지 않습니다.</mark></p>',sourceLabel:'가상 설치 사전 안내서 p.3 · 내부 원문 보기',source:'<strong>내부 문서 발췌 · 가상 예시</strong><p>“설치 공간, 전원, 네트워크 연결 여부를 확인한다. 현장 담당자를 지정한다.”</p><p>응대 지침: “일정 담당자의 확인을 받은 뒤 설치 일정을 안내한다.”</p>',outcome:'담당자가 초안을 검토한 뒤 고객에게 회신합니다.',detail:'내부 AI는 안내 자료와 초안 작성을 돕습니다. 고객 회신은 직원이 선택하는 별도 업무이며, ‘AI 내부 처리’가 모든 외부 연락의 금지를 뜻하지는 않습니다.'}
  };
 
-  function crumb(label) { return '<nav class="breadcrumb" aria-label="현재 위치"><a href="index.html">홈</a>' + i('caret-right') + '<a href="ai-packages.html">AI 패키지</a>' + i('caret-right') + '<a href="ai-detail.html?package=business">업무형</a>' + i('caret-right') + '<span>' + h(label) + '</span></nav>'; }
+  // 패키지마다 이 화면이 설명하는 업무. 업무형은 업무 이름이 키(이 파일·회의록·답변 가이드), 기본형·고급형은 '패키지:업무' 키(ai-task-guides.js).
+  var PACKAGE_NAME = {business: '업무형', basic: '기본형', advanced: '고급형'};
+  var PACKAGE_USES = {business: ['documents', 'meetings', 'replies'], basic: ['study', 'summary', 'writing'], advanced: ['image', 'code']};
+  function crumb(label, pkg) { return '<nav class="breadcrumb" aria-label="현재 위치"><a href="index.html">홈</a>' + i('caret-right') + '<a href="ai-packages.html">AI 패키지</a>' + i('caret-right') + (pkg ? '<a href="ai-detail.html?package=' + pkg + '">' + PACKAGE_NAME[pkg] + '</a>' + i('caret-right') : '') + '<span>' + h(label) + '</span></nav>'; }
   function body() {
     return '<div class="ls-page" id="pop-local-service" data-use="documents">' +
       '<section class="ls-hero">' +
@@ -100,7 +103,7 @@ var stages=[
       '</div>';
   }
   function unknown() {
-    return '<div class="ls-page"><section class="ls-unknown"><div class="ls-eyebrow">AI 패키지</div><h1>이 업무의 설명 화면은 준비 중입니다.</h1><p class="ls-lead">업무형 패키지의 사내 문서 검색·회의록 정리·고객 답변 초안 설명만 이 화면에서 볼 수 있습니다.</p><p style="margin-top:18px"><a class="text-link" href="ai-detail.html?package=business">업무형 패키지 보기 ' + i('arrow-right') + '</a></p></section></div>';
+    return '<div class="ls-page"><section class="ls-unknown"><div class="ls-eyebrow">AI 패키지</div><h1>이 업무의 설명 화면은 준비 중입니다.</h1><p class="ls-lead">AI 패키지에서 사용할 업무를 골라 주세요. 기본형·업무형·고급형의 업무별 설명을 볼 수 있습니다.</p><p style="margin-top:18px"><a class="text-link" href="ai-packages.html">AI 패키지 보기 ' + i('arrow-right') + '</a></p></section></div>';
   }
   // 업무별 설명은 P.serviceGuides 에 모인다(회의록 정리 = ai-meeting-guide.js, 고객 답변 초안 = ai-reply-guide.js).
   // 화면은 주소의 use 만 보고 고른다 -- 새로고침·뒤로·앞으로·직접 주소가 모두 같은 업무를 연다.
@@ -112,11 +115,19 @@ var stages=[
     return '<aside class="svc-company" id="company-link" aria-labelledby="svc-company-title"><div><span class="svc-company-tag">30인 이하 기업 대상 · 별도 컨설팅</span><h2 id="svc-company-title">여러 담당자가 함께하는 회사 업무라면</h2><p>이 화면의 회사 맞춤은 담당자 한 사람이 맡은 업무의 자료·양식·규칙에 맞추는 범위입니다. 여러 담당자·부서에 걸친 업무 흐름은 기업 AI 업무개선 컨설팅에서 따로 살펴봅니다.</p></div><a class="text-link" id="svc-company-link" href="ai-company.html?from=' + COMPANY_FROM[use] + '">30인 이하 기업 컨설팅 ' + i('arrow-right') + '</a></aside>';
   }
   P.pages['ai-service'] = function () {
-    var use = P.qs.get('use'), g = P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use) ? P.serviceGuides[use] : null;
-    if (g && g.label) document.title = '회사 맞춤 내부 AI 구축 · ' + g.label + ' | 팝콘AI';
+    var has = Object.prototype.hasOwnProperty, pkg = P.qs.get('package'), use = P.qs.get('use');
+    var known = has.call(PACKAGE_USES, pkg) && PACKAGE_USES[pkg].indexOf(use) >= 0, key = pkg === 'business' ? use : pkg + ':' + use;
+    var g = known && has.call(P.serviceGuides, key) ? P.serviceGuides[key] : null;
+    if (!g) return {html: '<div class="container">' + crumb('업무 설명') + unknown() + '</div>', mount: null};
+    // 2026-10-23 승인 -- 기본형·고급형 다섯 업무는 설명 본문 안에 PC 확인·기업 컨설팅 안내가 함께 있다(ai-task-guides.js).
+    if (pkg !== 'business') {
+      document.title = g.title;
+      return {html: '<div class="container">' + crumb(g.label, pkg) + g.body() + '</div>', mount: g.mount};
+    }
+    document.title = '회사 맞춤 내부 AI 구축 · ' + g.label + ' | 팝콘AI';
     // 2026-10-21 구매 1번 승인 -- 구축 과정 뒤·설치 상담 앞에 「이 업무에 사용할 PC」 칸(ai-task-pc.js)을 끼운다.
-    var main = g ? (P.taskPc ? P.taskPc.insert(g.body(), use) : g.body()) : '';
-    return {html: '<div class="container">' + crumb(g ? g.label : '업무 설명') + (g ? main + companyLink(use) : unknown()) + '</div>', mount: g ? function () { if (g.mount) g.mount(); if (P.taskPc) P.taskPc.bind(); } : null};
+    var main = P.taskPc ? P.taskPc.insert(g.body(), use) : g.body();
+    return {html: '<div class="container">' + crumb(g.label, pkg) + main + companyLink(use) + '</div>', mount: function () { if (g.mount) g.mount(); if (P.taskPc) P.taskPc.bind(); }};
   };
   function mount() {
     var root = document.getElementById('pop-local-service');

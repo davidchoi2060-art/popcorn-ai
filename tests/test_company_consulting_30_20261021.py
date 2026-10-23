@@ -17,8 +17,8 @@ def test_company_page_exists_and_loads_its_assets():
     html = read("ai-company.html")
     assert 'data-page="ai-company"' in html
     assert "30인 이하" in html
-    for asset in ("ai-company.css?v=20261021-co1", "company-routes.js?v=20261021-co1",
-                  "ai-company.js?v=20261021-co1", "ai.js?v=20261021-ip1"):
+    for asset in ("ai-company.css?v=20261021-co1", "company-routes.js?v=20261023-tg1",
+                  "ai-company.js?v=20261021-co1", "ai.js?v=20261023-tg1"):
         assert asset in html, asset
 
 
@@ -32,8 +32,9 @@ def test_target_is_30_including_30_and_not_other_definitions():
 
 def test_return_allowlist_is_fixed_keys_only():
     s = read("assets/js/company-routes.js")
-    keys = re.findall(r"\b([PDMR])\s*:\s*\{href:\s*'", s)
-    assert sorted(keys) == ["D", "M", "P", "R"]
+    keys = re.findall(r"\b([A-Z])\s*:\s*\{href:\s*'", s)
+    # 2026-10-23 기본형·고급형 업무 설명 하단(T/U/W/G/C)이 더해졌다
+    assert sorted(keys) == ["C", "D", "G", "M", "P", "R", "T", "U", "W"]
     for href in re.findall(r"href:\s*'([^']+)'", s):
         assert not href.startswith(("http", "//", "/")), href
         assert href.startswith(("ai-detail.html", "ai-service.html")), href

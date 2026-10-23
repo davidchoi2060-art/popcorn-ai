@@ -1,0 +1,257 @@
+/* 2026-10-23 대표 승인 기본형·고급형 업무 상세 5개(popcorn-basic-advanced-task-design-20261023.zip prototype/src/styles.css)의 본문 스타일.
+   시안의 클래스를 .tg- 접두사로 바꿔 .tg-page 범위에 가뒀다. 시안의 헤더·업무 전환 막대·상담 미리보기·메뉴 모달·푸터 스타일은 옮기지 않는다
+   (헤더·메뉴·푸터는 사이트 공통 셸 그대로). 글꼴은 사이트 본문 글꼴을 따르고, 시안의 10~11px 글자는 12px 이상으로 올렸다. */
+.tg-page{--tp:#6849ec;--ti:#192034;--tm:#626e83;--tt:#f4efff;--tl:#e5e1ef;color:var(--ti);margin:6px 0 10px}
+.tg-page *{box-sizing:border-box}
+.tg-page h1,.tg-page h2,.tg-page h3,.tg-page h4,.tg-page p{margin:0}
+.tg-page ol{list-style:none;margin:0;padding:0}
+.tg-page button{color:inherit;cursor:pointer}
+.tg-page button:focus-visible,.tg-page a:focus-visible,.tg-page summary:focus-visible,.tg-page [role=tabpanel]:focus-visible{outline:3px solid var(--tp);outline-offset:3px}
+.tg-page .icon{width:20px;height:20px}
+.tg-article{border:1px solid var(--tl);border-radius:24px;overflow:clip;background:#fff}
+.tg-eyebrow{color:var(--tp);font-size:13px;line-height:1.5;font-weight:750;letter-spacing:-.015em;margin-bottom:16px}
+/* 업무 소개 */
+.tg-hero{background:var(--tt);display:grid;grid-template-columns:1fr 1fr;align-items:center;min-height:440px;padding:44px 40px 38px;gap:14px}
+.tg-hero h1{font-size:40px;line-height:1.28;letter-spacing:-.048em;font-weight:820}
+.tg-hero-desc{color:var(--tm);line-height:1.8;margin-top:20px;font-size:16px}
+.tg-hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.tg-hero-tags span{display:inline-flex;align-items:center;gap:6px;font-size:12px;background:#fff;border:1px solid #e3dcf4;border-radius:30px;padding:7px 11px;color:#61518e}
+.tg-hero-tags .icon{width:15px;height:15px}
+.tg-hero-actions{display:flex;align-items:center;gap:18px;margin-top:24px}
+.tg-primary,.tg-outline{display:inline-flex;align-items:center;justify-content:center;gap:14px;border-radius:9px;padding:14px 18px;font-size:15px;font-weight:750;min-height:48px;border:1px solid transparent;text-decoration:none}
+.tg-primary{background:var(--tp);color:#fff}
+.tg-primary .icon{filter:brightness(0) invert(1);width:20px;height:20px}
+.tg-primary:hover{background:#5136c3}
+.tg-outline{border-color:#cec2f2;background:#fff;color:#5036ad}
+.tg-outline:hover{background:#f7f3ff}
+.tg-textlink{display:inline-flex;align-items:center;gap:4px;font-size:14px;font-weight:650}
+.tg-textlink .icon{width:16px;height:16px}
+.tg-hero-foot{margin-top:18px;font-size:12px;line-height:1.7;color:#727288}
+.tg-hero-art{height:360px;display:flex;align-items:center;justify-content:center}
+.tg-hero-art>img{width:100%;height:100%;object-fit:contain}
+.tg-section-nav{display:flex;justify-content:center;gap:46px;border-bottom:1px solid var(--tl);padding:0 24px;background:#fff}
+.tg-section-nav a{padding:22px 3px;font-weight:650;font-size:14px;white-space:nowrap}
+.tg-section-nav a:hover{color:var(--tp)}
+/* 공통 구획 */
+.tg-section{padding:60px 40px;border-bottom:1px solid #eeebf3}
+.tg-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:40px;margin-bottom:28px}
+.tg-heading h2,.tg-local h2,.tg-consult h2,.tg-faq h2{font-size:29px;line-height:1.4;letter-spacing:-.04em;font-weight:780}
+.tg-heading .tg-eyebrow{margin-bottom:11px}
+.tg-side{max-width:360px;color:var(--tm);font-size:14px;line-height:1.8}
+.tg-side strong{color:#5c4e82;font-weight:650}
+/* 01 가상 예시 */
+.tg-disclaimer{display:flex;align-items:flex-start;gap:10px;font-size:12px;line-height:1.7;color:#756d57;background:#fffae9;border-radius:9px;padding:13px 16px;margin-bottom:20px}
+.tg-disclaimer .icon{width:17px;height:17px;margin-top:2px}
+.tg-workspace{border:1px solid var(--tl);border-radius:16px;display:grid;grid-template-columns:.88fr 1.12fr;overflow:hidden}
+.tg-input{padding:27px;background:#faf9fd;border-right:1px solid var(--tl)}
+.tg-result{padding:27px;min-width:0}
+.tg-pane-label{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.tg-pane-label h3{font-size:16px;font-weight:730}
+.tg-step-number{font-size:12px;font-weight:750;color:var(--tp);background:#eee8fe;padding:4px 7px;border-radius:5px}
+.tg-input h4{font-size:17px;line-height:1.6;font-weight:730;margin-bottom:18px}
+.tg-files{display:grid;gap:8px}
+.tg-files>div{display:flex;align-items:center;gap:9px;background:#fff;border:1px solid #e9e6ef;border-radius:7px;padding:12px;font-size:13px;color:#596579}
+.tg-prompt{margin-top:22px}
+.tg-prompt>span{font-size:12px;color:#70627c;font-weight:650}
+.tg-prompt p{margin-top:8px;background:#eee8fb;padding:16px 18px;border-radius:0 12px 12px 12px;font-size:14px;color:#3a3450;line-height:1.85}
+.tg-source-button{margin-top:18px;background:transparent;border:0;padding:8px 0;display:flex;align-items:center;gap:6px;font-size:13px;color:#605176;font-weight:650;min-height:44px}
+.tg-source-button .icon{width:15px;height:15px}
+.tg-draft{margin-left:auto;background:#f7f3ff;color:#796391;border-radius:5px;font-size:12px;padding:3px 7px;white-space:nowrap}
+.tg-tabs{display:flex;gap:16px;border-bottom:1px solid #e6e1ef;margin-bottom:20px;overflow-x:auto;scrollbar-width:none}
+.tg-tabs button{border:0;border-bottom:2px solid transparent;background:none;padding:0 2px 11px;font-size:14px;color:#6b7280;font-weight:650;white-space:nowrap;min-height:40px}
+.tg-tabs button[aria-selected=true]{color:var(--tp);border-color:var(--tp)}
+.tg-document h4{font-size:19px;font-weight:760;line-height:1.45;margin-bottom:20px}
+.tg-document ol{display:grid;gap:16px}
+.tg-document li{display:flex;align-items:flex-start;gap:12px}
+.tg-document li>span{font-size:12px;color:#8063b9;line-height:2.1;font-weight:750}
+.tg-document li>p{font-size:14px;line-height:1.8;color:#424d60}
+.tg-reference{font-size:12px;color:#78678e;line-height:1.6;border-top:1px dashed #e0dbea;margin-top:22px;padding-top:15px;display:flex;align-items:center;gap:7px}
+.tg-reference .icon{width:15px;height:15px}
+.tg-review{display:flex;gap:10px;margin-top:20px;background:#f5f7fc;padding:14px;border-radius:8px}
+.tg-review>.icon{width:18px;height:18px;margin-top:2px}
+.tg-review strong{font-size:13px}
+.tg-review p{font-size:13px;color:#626e83;line-height:1.7;margin-top:5px}
+/* 02 5단계 흐름 */
+.tg-workflow{display:flex;gap:9px;margin:32px 0 18px!important}
+.tg-workflow li{display:flex;align-items:center;gap:9px;flex:1;min-width:0}
+.tg-workflow li>button{flex:1;display:flex;min-width:0;flex-direction:column;align-items:flex-start;background:#fff;border:1px solid var(--tl);border-radius:10px;padding:18px 15px;gap:6px;text-align:left;min-height:125px}
+.tg-workflow li>.icon{width:16px;height:16px;opacity:.4}
+.tg-flow-count{font-size:12px;color:#8b78ae;font-weight:750;margin-bottom:4px}
+.tg-workflow strong{font-size:16px}
+.tg-workflow small{font-size:12px;color:#748093;line-height:1.5}
+.tg-workflow button.is-active{background:#f4efff;border-color:#9b81ee}
+.tg-flow-detail{display:flex;gap:20px;background:#faf9fd;padding:24px;border-radius:12px}
+.tg-flow-detail>span{font-size:26px;font-weight:750;color:#ad99df}
+.tg-flow-detail h3{font-size:17px;margin-bottom:7px}
+.tg-flow-detail p{font-size:14px;color:#637086;line-height:1.85}
+/* 로컬 실행 설명 */
+.tg-local{display:grid;grid-template-columns:.85fr 1.15fr;background:#f6f3fc;padding:45px 40px;gap:46px;border-bottom:1px solid #eeebf3}
+.tg-local h2{font-size:27px}
+.tg-local-explainer>p{font-size:14px;line-height:1.85;color:#565a70}
+.tg-local-flow{display:flex;align-items:center;gap:12px;margin:23px 0;flex-wrap:wrap}
+.tg-local-flow>span{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:650;white-space:nowrap}
+.tg-local-flow>.icon{opacity:.4;width:15px;height:15px}
+.tg-local-explainer .tg-fineprint{font-size:12px;line-height:1.8;color:#757789}
+/* 03 구축·제외 범위 */
+.tg-scope-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:32px}
+.tg-scope-item{padding:0 22px 0 0;border-right:1px solid #e5dfef}
+.tg-scope-item:last-child{border:0}
+.tg-scope-number{font-size:24px;color:#c1afd9;font-weight:750;display:block;margin-bottom:17px}
+.tg-scope-item h3{font-size:20px;margin-bottom:12px}
+.tg-scope-item p{font-size:14px;line-height:1.85;color:#637086}
+.tg-boundary{margin-top:30px;background:#f8f8fb;border-radius:10px;padding:20px 22px}
+.tg-boundary strong{font-size:14px}
+.tg-boundary p{font-size:13px;line-height:1.85;color:#72798a;margin-top:5px}
+.tg-timeline{margin-top:34px}
+.tg-timeline h3{font-size:16px}
+.tg-timeline ol{display:flex;margin-top:20px!important;gap:12px}
+.tg-timeline li{flex:1;display:flex;gap:9px;align-items:center;white-space:nowrap;font-size:13px;color:#5e6275}
+.tg-timeline b{color:#8060b4}
+.tg-timeline .icon{width:13px;height:13px;margin-left:auto;opacity:.4}
+/* 04 기존 PC / 새 PC */
+.tg-pc-layout{display:grid;grid-template-columns:1fr 1fr;gap:45px}
+.tg-pc-layout>div>p{font-size:14px;line-height:1.85;color:#657185}
+.tg-hardware{display:flex;flex-wrap:wrap;gap:10px;margin-top:25px}
+.tg-hardware button{background:#fff;border:1px solid #ddd7e8;border-radius:8px;padding:12px 14px;display:flex;align-items:center;gap:8px;color:#5b6173;font-size:14px;font-weight:650;min-height:44px}
+.tg-hardware button[aria-pressed=true]{background:#f3edff;border-color:#9d81e5;color:#6342ad}
+.tg-pc-layout .tg-hardware-help{font-size:13px;margin-top:12px}
+.tg-pc-empty{background:#f9f8fc;border:1px solid #e7e2ef;border-radius:12px;padding:27px}
+.tg-pc-empty>.icon{width:32px;height:32px;margin-bottom:14px}
+.tg-pc-empty h3{font-size:18px;line-height:1.5;margin-bottom:10px}
+.tg-pc-empty p{font-size:13px;line-height:1.8;color:#657185}
+.tg-pc-empty .tg-outline{font-size:14px;margin-top:20px;min-height:44px}
+/* FAQ */
+.tg-faq h2{margin-bottom:25px}
+.tg-faq details{border-top:1px solid #e6e1ed}
+.tg-faq summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:20px;cursor:pointer;padding:21px 0;font-size:15px;font-weight:650;line-height:1.6}
+.tg-faq summary::-webkit-details-marker{display:none}
+.tg-faq summary .icon{width:16px;height:16px;transition:transform .2s}
+.tg-faq details[open] summary .icon{transform:rotate(90deg)}
+.tg-faq details>p{padding:0 28px 22px 0;font-size:14px;line-height:1.85;color:#657185}
+/* 해당 업무 도입 상담 */
+.tg-consult{padding:45px 40px;background:#f1eafa;display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+.tg-consult>div>p:not(.tg-eyebrow){font-size:14px;color:#655776;margin:18px 0}
+.tg-consult .tg-primary{margin:3px 0 12px;min-width:245px}
+.tg-consult small{display:block;font-size:12px;color:#7a6f86}
+.tg-consult .tg-back{margin-top:16px;font-size:14px;color:#5036ad}
+.tg-prepare{background:#ffffffc0;border:1px solid #e7ddef;border-radius:12px;padding:27px}
+.tg-prepare h3{font-size:16px;line-height:1.5;margin-bottom:20px}
+.tg-prepare ol{display:grid;gap:14px}
+.tg-prepare li{display:flex;align-items:center;gap:12px;font-size:14px;color:#655776}
+.tg-prepare li span{color:#8a6cb1;font-weight:750}
+.tg-prepare p{font-size:13px;line-height:1.8;border-top:1px solid #e6dceb;padding-top:14px;margin-top:20px;color:#655776}
+.tg-company{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:28px 40px}
+.tg-company span{font-size:14px;font-weight:650}
+.tg-company p{font-size:13px;color:#7b7d8b;margin-top:4px}
+.tg-company a{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:650;white-space:nowrap;min-height:44px}
+.tg-company a .icon{width:18px;height:18px}
+/* 가상 원문 */
+.tg-dialog{width:min(660px,calc(100vw - 32px));max-height:calc(100dvh - 40px);border:1px solid #ddd5ed;border-radius:16px;padding:0;box-shadow:0 18px 80px #20103933;color:var(--ti)}
+.tg-dialog::backdrop{background:#20203066}
+.tg-dialog-inside{padding:36px}
+.tg-dialog-close{position:absolute;right:18px;top:18px;border:0;background:#f5f3f9;width:40px;height:40px;border-radius:50%;display:grid;place-items:center}
+.tg-dialog-close .icon{width:18px;height:18px}
+.tg-dialog h2{font-size:28px;line-height:1.35;margin-bottom:18px;padding-right:40px}
+.tg-dialog-sub{font-size:13px;color:#798090;margin-bottom:24px}
+.tg-source-excerpt{border:1px solid #e9e1f2;background:#faf9fc;padding:20px;border-radius:10px;margin:16px 0}
+.tg-source-excerpt h3{font-size:14px;color:#80639f;margin-bottom:12px}
+.tg-source-excerpt p{font-size:14px;line-height:1.85}
+.tg-dialog .tg-primary{margin-top:16px;width:100%}
+@media(max-width:1100px){
+  .tg-hero{padding:34px 28px;min-height:410px}
+  .tg-hero h1{font-size:34px}
+  .tg-hero-art{height:310px}
+  .tg-hero-actions{gap:10px;flex-wrap:wrap}
+  .tg-section{padding:42px 28px}
+  .tg-heading{gap:25px}
+  .tg-heading h2{font-size:26px}
+  .tg-side{max-width:270px;font-size:13px}
+  .tg-input,.tg-result{padding:21px}
+  .tg-workflow li>button{padding:14px 11px}
+  .tg-workflow strong{font-size:14px}
+  .tg-local{padding:35px 28px;gap:25px}
+  .tg-local-flow{gap:8px}
+  .tg-local-flow>span{font-size:12px}
+  .tg-timeline ol{gap:7px}
+  .tg-timeline li{font-size:12px;gap:5px}
+  .tg-consult{padding:35px 28px}
+  .tg-company{padding:26px 28px}
+}
+@media(max-width:760px){
+  .tg-article{border-radius:17px}
+  .tg-hero{display:flex;flex-direction:column;gap:7px;padding:27px 22px 10px;align-items:stretch;min-height:0}
+  .tg-eyebrow{font-size:12px;margin-bottom:14px}
+  .tg-hero h1{font-size:29px;line-height:1.35}
+  .tg-hero-desc{font-size:14px;line-height:1.85;margin-top:15px}
+  .tg-hero-tags{gap:6px;margin-top:16px}
+  .tg-hero-tags span{font-size:12px;padding:6px 9px}
+  .tg-hero-actions{margin-top:19px;gap:14px}
+  .tg-hero-actions .tg-primary{font-size:14px;padding:12px;gap:8px;min-height:44px}
+  .tg-textlink{font-size:13px;min-height:44px}
+  .tg-hero-foot{font-size:12px;margin-top:12px}
+  .tg-hero-art{height:210px;margin:-3px -5px 0}
+  .tg-section-nav{gap:24px;justify-content:flex-start;padding:0 20px;overflow-x:auto;scrollbar-width:none}
+  .tg-section-nav a{font-size:13px;padding:17px 0}
+  .tg-section{padding:33px 20px}
+  .tg-heading{display:block;margin-bottom:21px}
+  .tg-heading h2,.tg-local h2,.tg-consult h2,.tg-faq h2{font-size:24px;line-height:1.45}
+  .tg-side{font-size:13px;max-width:none;margin-top:15px}
+  .tg-disclaimer{padding:11px;gap:7px}
+  .tg-workspace{display:block;border-radius:12px}
+  .tg-input{border-right:0;border-bottom:1px solid var(--tl);padding:20px 17px}
+  .tg-result{padding:20px 17px}
+  .tg-pane-label{margin-bottom:18px;gap:8px}
+  .tg-pane-label h3{font-size:15px}
+  .tg-input h4{font-size:15px}
+  .tg-files>div{padding:10px}
+  .tg-prompt p{padding:13px;line-height:1.9}
+  .tg-document h4{font-size:17px}
+  .tg-document ol{gap:14px}
+  .tg-review{padding:12px}
+  .tg-workflow{display:grid;grid-template-columns:1fr;margin:23px 0 15px!important;gap:7px}
+  .tg-workflow li{display:block}
+  .tg-workflow li>.icon{display:none}
+  .tg-workflow li>button{display:grid;grid-template-columns:30px 1fr;gap:3px 9px;width:100%;padding:13px 15px;min-height:0;align-items:center}
+  .tg-flow-count{grid-row:1/3;margin:0}
+  .tg-workflow strong{font-size:14px}
+  .tg-flow-detail{padding:17px;gap:13px}
+  .tg-flow-detail h3{font-size:15px}
+  .tg-local{display:block;padding:30px 20px}
+  .tg-local-explainer{margin-top:20px}
+  .tg-local-flow{gap:6px}
+  .tg-local-flow>span{font-size:12px;gap:4px;white-space:normal}
+  .tg-local-flow>.icon{width:10px}
+  .tg-scope-grid{display:block;margin-top:24px}
+  .tg-scope-item{border:0;border-bottom:1px solid #e6dfef;padding:0 0 21px;margin-bottom:22px}
+  .tg-scope-item:last-child{border-bottom:0;margin-bottom:0}
+  .tg-scope-number{font-size:18px;margin-bottom:10px}
+  .tg-scope-item h3{font-size:18px}
+  .tg-boundary{padding:16px;margin-top:20px}
+  .tg-timeline ol{display:grid;gap:13px}
+  .tg-timeline li{font-size:13px;gap:14px;white-space:normal}
+  .tg-timeline .icon{display:none}
+  .tg-pc-layout{display:block}
+  .tg-hardware{gap:8px;margin-top:18px}
+  .tg-hardware button{font-size:13px;padding:11px;gap:6px}
+  .tg-hardware .icon{width:18px;height:18px}
+  .tg-pc-empty{margin-top:22px;padding:20px}
+  .tg-pc-empty h3{font-size:16px}
+  .tg-pc-empty .tg-outline{font-size:13px;width:100%;padding:10px;gap:6px}
+  .tg-faq summary{font-size:14px;padding:18px 0}
+  .tg-faq details>p{padding-right:0}
+  .tg-consult{display:block;padding:30px 20px}
+  .tg-consult>div>p:not(.tg-eyebrow){line-height:1.8;margin:14px 0}
+  .tg-consult .tg-primary{width:100%;min-width:0;font-size:14px}
+  .tg-prepare{padding:19px;margin-top:25px}
+  .tg-prepare h3{font-size:15px}
+  .tg-prepare li{align-items:flex-start}
+  .tg-company{display:block;padding:25px 20px}
+  .tg-company a{margin-top:12px}
+  .tg-dialog-inside{padding:30px 22px 22px}
+  .tg-dialog h2{font-size:25px}
+  .tg-source-excerpt{padding:16px}
+  /* 모바일 본문은 14px, 보조 문구는 13px, 가장 작은 안내는 12px 아래로 내리지 않는다(시안 design-qa 보정). */
+  .tg-hero-desc,.tg-input h4,.tg-prompt p,.tg-document li>p,.tg-flow-detail p,.tg-local-explainer>p,.tg-scope-item p,.tg-pc-layout>div>p,.tg-faq details>p,.tg-source-excerpt p{font-size:14px;line-height:1.85}
+  .tg-files>div,.tg-review p,.tg-pc-layout .tg-hardware-help,.tg-pc-empty p,.tg-boundary p,.tg-consult>div>p:not(.tg-eyebrow),.tg-prepare li,.tg-prepare p,.tg-company p{font-size:13px;line-height:1.8}
+  .tg-local-explainer .tg-fineprint,.tg-disclaimer,.tg-reference,.tg-workflow small,.tg-consult small{font-size:12px}
+}
