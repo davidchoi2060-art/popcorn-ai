@@ -9,7 +9,10 @@
     // 개인 업무(documents·meetings·replies)나 장비 견적 값을 기본으로 넣지 않는다. 진입 출처(from)는 company-routes.js 의 다섯 값만 받는다.
     var CR = P.companyRoute, company = !!CR && P.qs.get('service') === CR.SERVICE, from = company ? CR.from() : '';
     var intent = company ? 'adoption' : P.qs.get('intent');
-    var draft = {use:company ? '' : (P.qs.get('use') || ''),setup:'unsure',budget:'',quantity:'',people:'',environment:'',name:'',company:'',request:'',method:'phone',phone:'',email:'',contactRequested:false,privacy:false};
+    // 2026-10-23 승인 -- 기본형·고급형 업무 설명에서 고른 PC 방향(pc=existing|new)을 이어받는다. 그 밖의 값은 버리고 「아직 모르겠어요」로 둔다.
+    var PC_PLANS = {existing:'existing', 'new':'bundle'}, pcArg = P.qs.get('pc');
+    var pcPlan = !company && Object.prototype.hasOwnProperty.call(PC_PLANS, pcArg) ? PC_PLANS[pcArg] : '';
+    var draft = {use:company ? '' : (P.qs.get('use') || ''),setup:pcPlan || 'unsure',budget:'',quantity:'',people:'',environment:'',name:'',company:'',request:'',method:'phone',phone:'',email:'',contactRequested:false,privacy:false};
     var phase = 'form', receipt = null, submitted = null, requestKey = null, sequence = 0, errors = {}, review = false;
     var fixture = P.inquiryPreview || null;
     var locked = function () { return ['sending','unknown','checking','still-unknown','received','forbidden'].indexOf(phase) >= 0; };
@@ -28,7 +31,7 @@
     function packageCard() {return '<aside class="iq-aside"><div class="iq-package"><figure class="iq-model"><img src="'+P.image(p.detailModel||p.model)+'" alt="업무용 AI 패키지를 소개하는 모습"></figure><div class="iq-package-body"><span class="eyebrow">선택한 AI 패키지</span><div class="iq-product"><div><h2>'+h(p.name)+'</h2><p>'+h(p.description)+'</p></div><img src="'+P.image(p.image)+'" alt="'+h(p.type)+' PC"></div><div class="iq-features">'+p.uses.map(function(u){return '<span>'+icon(u.icon)+h(u.title)+'</span>';}).join('')+'</div><a class="text-link" href="ai-detail.html?package='+h(id)+'">패키지 자세히 보기 '+icon('arrow-right')+'</a></div></div><div class="iq-help"><h3>필요한 것부터, 차근차근.</h3><div class="iq-progress"><span>'+icon('chat-circle')+'업무와 사용 환경 확인</span><span>'+icon('computer-tower')+'필요한 구성·비용 안내</span><span>'+icon('users')+'설치·사용 안내 범위 협의</span></div><p>아직 정해지지 않은 내용은<br>상담하면서 함께 확인할 수 있어요.</p></div></aside>';}
     function formMarkup() {
       var useChoices=p.uses.map(function(u){return [u.id,u.title,u.icon];}).concat([['unsure','아직 모르겠어요','question']]);
-      var goal=intent==='quote' ? radios('setup',[['bundle','PC와 AI 함께','computer-tower'],['existing','보유 PC에 AI 설치','monitor'],['unsure','아직 모르겠어요','question']])+'<div class="iq-grid">'+field('budget','생각 중인 예산','정해진 경우에만 알려주세요')+field('quantity','필요한 수량','예: PC 2대')+'</div>' : radios('use',useChoices)+'<div class="iq-grid">'+field('people','함께 사용할 인원','예: 5명')+field('environment','현재 사용 환경','예: 사무실 PC, 윈도우')+'</div>';
+      var goal=intent==='quote' ? radios('setup',[['bundle','PC와 AI 함께','computer-tower'],['existing','보유 PC에 AI 설치','monitor'],['unsure','아직 모르겠어요','question']])+'<div class="iq-grid">'+field('budget','생각 중인 예산','정해진 경우에만 알려주세요')+field('quantity','필요한 수량','예: PC 2대')+'</div>' : radios('use',useChoices)+(pcPlan?'<fieldset class="iq-pc-plan"><legend>사용할 PC <span class="muted">선택</span></legend>'+radios('setup',[['existing','기존 PC 활용 우선','monitor'],['bundle','새 PC도 검토','computer-tower'],['unsure','아직 모르겠어요','question']])+'</fieldset>':'')+'<div class="iq-grid">'+field('people','함께 사용할 인원','예: 5명')+field('environment','현재 사용 환경','예: 사무실 PC, 윈도우')+'</div>';
       if(intent==='quote'&&draft.setup==='existing') goal+=field('environment','현재 PC 정보','알고 계신 사양이나 모델명');
       var contactError=errors.contact?'<p class="iq-error" id="iq-contact-error">'+h(errors.contact)+'</p>':'<p class="iq-error" id="iq-contact-error" hidden></p>';
       var consentError=errors.consent?'<p class="iq-error" id="iq-consent-error">'+h(errors.consent)+'</p>':'<p class="iq-error" id="iq-consent-error" hidden></p>';

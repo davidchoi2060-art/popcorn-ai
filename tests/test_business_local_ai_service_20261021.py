@@ -34,11 +34,14 @@ def test_business_use_entries_go_to_their_explanation():
 def test_explanation_page_uses_site_shell_and_its_own_body_only():
     html = read("ai-service.html")
     assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261022-pat1" in html
-    assert "ai-local-service.js?v=20261021-mm3" in html and "ai-local-service.css?v=20261021-mm3" in html
+    # 2026-10-23 기본형·고급형 업무 상세 라우팅으로 ai-local-service.js 버전만 올렸다(test_mvp4_basic_advanced_task_guides_20261023)
+    assert "ai-local-service.js?v=20261023-tg1" in html and "ai-local-service.css?v=20261021-mm3" in html
     js = code("assets/js/ai-local-service.js")
     assert "window.openai" not in js and "setWidgetState" not in js and "fetch(" not in js and "localStorage" not in js
     assert "P.serviceGuides.documents = {label: '사내 문서 검색', body: body, mount: mount};" in js
-    assert "P.qs.get('package') === 'business' && Object.prototype.hasOwnProperty.call(P.serviceGuides, use)" in js
+    # 업무형은 세 업무 이름만, 기본형·고급형은 '패키지:업무' 키만 연다(허용 목록 밖의 package·use 는 준비 중 안내)
+    assert "var PACKAGE_USES = {business: ['documents', 'meetings', 'replies'], basic: ['study', 'summary', 'writing'], advanced: ['image', 'code']};" in js
+    assert "has.call(PACKAGE_USES, pkg) && PACKAGE_USES[pkg].indexOf(use) >= 0, key = pkg === 'business' ? use : pkg + ':' + use" in js
 
 
 def test_approved_content_is_kept():
@@ -76,7 +79,7 @@ def test_consult_form_preselects_use_from_url_and_skips_gate_for_adoption():
 
 def test_ai_pages_load_new_ai_js():
     for page in ("ai-detail.html", "ai-consult.html", "ai-packages.html", "ai-result.html", "ai-service.html"):
-        assert "ai.js?v=20261021-ip1" in read(page), page
+        assert "ai.js?v=20261023-tg1" in read(page), page
 
 
 def test_home_business_card_documents_also_goes_to_the_explanation():

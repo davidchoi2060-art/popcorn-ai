@@ -14,8 +14,11 @@
   'use strict';
   var P = window.PAI = window.PAI || {};
   var PACKAGES = { basic: '기본형', business: '업무형', advanced: '고급형' };
-  var USES = { documents: '사내 문서 검색', meetings: '회의록 정리', replies: '고객 답변 초안', unsure: '아직 정하지 않음' };
+  var USES = { documents: '사내 문서 검색', meetings: '회의록 정리', replies: '고객 답변 초안', study: '학습 자료 정리', summary: '자료 요약', writing: '글쓰기 초안',
+    image: '이미지 제작', code: '개발 보조', unsure: '아직 정하지 않음' };
   var SETUP = { bundle: 'PC와 함께 구성', existing: '보유 PC에 설치', unsure: '아직 정하지 않음' };
+  // 도입 상담의 PC 방향(기본형·고급형 업무 설명에서 고른 값, 2026-10-23). 고르지 않았으면(unsure) 적지 않는다.
+  var PC_PLAN = { existing: '기존 PC 활용 우선', bundle: '새 PC도 검토' };
   var KEY_RE = /^[A-Za-z0-9_-]{6,64}$/;
 
   function call(method, path, body) {
@@ -39,7 +42,8 @@
   }
   // 30인 이하 기업 AI 업무개선 컨설팅(2026-10-21 승인). 개인 업무 AI 도입 상담과 섞이지 않게 첫 줄에 서비스 이름을 따로 적고,
   // 개인 업무(관심 기능)·구성 방식은 넣지 않는다. 서버 주제는 「기업 AI 업무개선 컨설팅」(0174)으로 따로 저장한다.
-  var COMPANY_FROM = { P: '업무형 소개', D: '사내 문서 검색 설명', M: '회의록 정리 설명', R: '고객 답변 초안 설명' };
+  var COMPANY_FROM = { P: '업무형 소개', D: '사내 문서 검색 설명', M: '회의록 정리 설명', R: '고객 답변 초안 설명',
+    T: '학습 자료 정리 설명', U: '자료 요약 설명', W: '글쓰기 초안 설명', G: '이미지 제작 설명', C: '개발 보조 설명' };
   function companyMessage(p) {
     var lines = ['[기업 AI 업무개선 컨설팅] 30인 이하 기업 대상'];
     var meta = [['진입', COMPANY_FROM[p.from] || '직접 방문'], ['회사', p.company]]
@@ -52,7 +56,7 @@
     if (p.service === 'company') return companyMessage(p);
     var kind = p.intent === 'quote' ? '견적 문의' : '도입 상담';
     var lines = ['[AI 패키지 ' + kind + '] ' + (PACKAGES[p.packageId] || p.packageId || '')];
-    var meta = [['관심 기능', USES[p.use] || p.use], ['구성 방식', p.intent === 'quote' ? SETUP[p.setup] || p.setup : ''], ['예산', p.budget], ['수량', p.quantity], ['사용 인원', p.people], ['환경', p.environment], ['회사', p.company]]
+    var meta = [['관심 기능', USES[p.use] || p.use], ['구성 방식', p.intent === 'quote' ? SETUP[p.setup] || p.setup : ''], ['PC 방향', p.intent === 'quote' ? '' : PC_PLAN[p.setup] || ''], ['예산', p.budget], ['수량', p.quantity], ['사용 인원', p.people], ['환경', p.environment], ['회사', p.company]]
       .filter(function (x) { return x[1] && String(x[1]).trim(); }).map(function (x) { return x[0] + ': ' + String(x[1]).trim(); });
     if (meta.length) lines.push(meta.join(' / '));
     var head = lines.join('\n');

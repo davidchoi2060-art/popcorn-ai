@@ -1,0 +1,36 @@
+{
+ "kind": "기본형·고급형 업무 상세 미니어처 5종 -- 승인 시안 ZIP(popcorn-basic-advanced-task-design-20261023.zip, SHA256 1f800d3b…b577b) prototype/public/assets/images 의 PNG 를 1200x800 webp(투명 유지, q82)로 줄였다. 자르기·보정·내용 변경 없음",
+ "made": "2026-10-23 Claude (Pillow LANCZOS)",
+ "files": [
+  {
+   "file": "assets/images/task-guides/study.webp",
+   "source": "prototype/public/assets/images/study.png",
+   "source_sha256": "39b056591671e1186afe8f5c83a161adc2d211901dc6f8507779489879720c9f",
+   "sha256": "64206c3aba4f304271a2b5af3c6eb68db294aca1988dba50d05a7b96d30b9125"
+  },
+  {
+   "file": "assets/images/task-guides/summary.webp",
+   "source": "prototype/public/assets/images/summary.png",
+   "source_sha256": "f9c192814336860532ee9533e3100c2c75007ab389c6ea47c7153c45aa018fad",
+   "sha256": "5b29829d3f34301dc36d729357ac975e3fdbc2169cac66e3a301691d62ac5f02"
+  },
+  {
+   "file": "assets/images/task-guides/writing.webp",
+   "source": "prototype/public/assets/images/writing.png",
+   "source_sha256": "544b6adb6048feb101db0056fa6e237996732f07fa786bff2c53697345dbd775",
+   "sha256": "1c0a8ebe4bac35a5ac9594938b6154023b53819b20b0518ec57132e057b6a4aa"
+  },
+  {
+   "file": "assets/images/task-guides/image.webp",
+   "source": "prototype/public/assets/images/image.png",
+   "source_sha256": "f405be6f0479af57999c90f144fba62fcb2239eda8a705ed29681536e1c71a2f",
+   "sha256": "bb790120c4dbaca8a98dafb6e8fce2f71ed70c3b662c0cfb9ec82dc1268c246c"
+  },
+  {
+   "file": "assets/images/task-guides/code.webp",
+   "source": "prototype/public/assets/images/code.png",
+   "source_sha256": "418ccc40c28305a2aeb70df2021f128466b00f66e9e5e0b46f0dc33833c4e5b4",
+   "sha256": "37fc1e7f04b819b8c5fce2796d5cb3f13b28d4bdc1e882ffab58a01968a8a06d"
+  }
+ ]
+}

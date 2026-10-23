@@ -51,6 +51,7 @@
 .iq-options,
 .iq-contact-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .iq-section fieldset.iq-contact-options { display: block; margin-top: 22px; }
+.iq-section fieldset.iq-pc-plan { display: block; margin-top: 22px; }
 .iq-contact-options > .iq-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .iq-option {
   display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 14px;
@@ -79,7 +80,8 @@
 .iq-contact-options + .iq-field,
 .iq-field + .iq-grid,
 .iq-field + .iq-field,
-.iq-options + .iq-grid { margin-top: 22px; }
+.iq-options + .iq-grid,
+.iq-pc-plan + .iq-grid { margin-top: 22px; }
 .iq-grid > .iq-field { margin-top: 0; }
 .iq-field { display: flex; flex-direction: column; gap: 9px; }
 .iq-field > label { font-size: 15px; font-weight: 700; line-height: 1.5; }
