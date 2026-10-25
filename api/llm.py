@@ -238,7 +238,7 @@ class LLMBlockedError(LLMError):
 
     def __init__(self, message: str, *, kind: str, provider: str):
         super().__init__(message)
-        self.kind = kind          # "cost" | "rate_minute" | "rate_day" | ("cost_global" 예약)
+        self.kind = kind          # "cost" | "rate_minute" | "rate_day" | "cost_task"(작업별 한도 -- 폴백 안 함) | ("cost_global" 예약)
         self.provider = provider
 
 
@@ -418,13 +418,62 @@ def _check_caps(conn, provider_key: str, task_key: str | None, customer_facing: 
         log.warning("[llm] %s: %s", provider_key, reason)
 
     if task_key:
-        sub = conn.execute(text("SELECT daily_usd FROM cost_thresholds WHERE key = :k"),
-                            {"k": f"{provider_key}:{task_key}"}).mappings().first()
-        if sub and sub["daily_usd"] is not None:
-            log.info(
-                "[llm] %s:%s has a sub-limit ($%.2f) but api_cost_logs has no task-key"
-                " column yet - only the provider-level limit is actually enforced",
-                provider_key, task_key, float(sub["daily_usd"]))
+        _check_task_cap(conn, provider_key, task_key, lo_day)
+
+
+# 작업별 하루 비용 상한 코드 기본값(2026-10-25). DB `cost_thresholds` 에 `{provider}:{task_key}` 행이 있으면 그 행이 이긴다.
+# 공개 고객 화면에서 부르는 작업만 둔다 -- 프로바이더 한도(`cost_thresholds.{provider}`)가 사실상 무제한으로 잡혀 있어도
+# (2026-10-25 개발 DB 실측: 3사 모두 $100,000 · warn) 이 작업 하나가 하루 비용을 다 쓰지 못하게 한다.
+# 고객 PC 구성 상담 1회 ≈ 입력 4천·출력 1천 토큰(gpt-5.6-luna 기준 약 $0.002).
+TASK_DAILY_CAP_USD: dict[str, float] = {
+    "task.pc_builder": 3.0,
+}
+_TASK_COLUMN: list[bool] = []      # api_cost_logs.task_key(0141) 유무 -- 프로세스에서 한 번만 본다
+
+
+def _has_task_column(conn) -> bool:
+    if not _TASK_COLUMN:
+        try:
+            _TASK_COLUMN.append(any(c["name"] == "task_key" for c in sa_inspect(conn).get_columns("api_cost_logs")))
+        except Exception:
+            log.exception("[llm] could not inspect api_cost_logs columns")
+            return False
+    return _TASK_COLUMN[0]
+
+
+def _check_task_cap(conn, provider_key: str, task_key: str, lo_day: datetime) -> None:
+    """작업별 부분 한도를 실제로 막는다(2026-10-25 보완 -- 그 전에는 로그만 남겼다).
+    0141 이후 `api_cost_logs.task_key` 로 작업별 실사용을 다시 잴 수 있다.
+
+    - DB `{provider}:{task_key}` 행: 그 프로바이더에서 이 작업이 오늘 쓴 비용 >= 한도면 막는다.
+    - 그 행이 없고 `TASK_DAILY_CAP_USD` 에 기본값이 있으면: 모든 프로바이더에서 이 작업이 오늘 쓴 합계로 막는다.
+    막히면 kind="cost_task" -- 같은 작업 예산이라 다른 프로바이더로 넘기지 않는다(`_is_fallback_eligible`).
+    task_key 컬럼이 없는 DB(0141 미적용)에서는 잴 수 없어 경고만 남긴다(옛 동작).
+    """
+    sub = conn.execute(text("SELECT daily_usd FROM cost_thresholds WHERE key = :k"),
+                        {"k": f"{provider_key}:{task_key}"}).mappings().first()
+    db_limit = float(sub["daily_usd"]) if sub and sub["daily_usd"] is not None else None
+    code_limit = TASK_DAILY_CAP_USD.get(task_key) if db_limit is None else None
+    if db_limit is None and code_limit is None:
+        return
+    if not _has_task_column(conn):
+        log.warning("[llm] %s:%s has a sub-limit but api_cost_logs.task_key is missing (0141) - not enforced",
+                    provider_key, task_key)
+        return
+    if db_limit is not None:
+        spent = conn.execute(text(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM api_cost_logs"
+            " WHERE provider = :p AND task_key = :t AND created_at >= :lo"),
+            {"p": provider_key, "t": task_key[:48], "lo": lo_day}).scalar_one()
+        limit, where = db_limit, f"{provider_key}:{task_key}"
+    else:
+        spent = conn.execute(text(
+            "SELECT COALESCE(SUM(cost_usd), 0) FROM api_cost_logs WHERE task_key = :t AND created_at >= :lo"),
+            {"t": task_key[:48], "lo": lo_day}).scalar_one()
+        limit, where = code_limit, f"{task_key} (all providers, code default)"
+    if float(spent) >= limit:
+        raise LLMBlockedError(f"[{where}] task daily spend ${float(spent):.4f} >= limit ${limit:.4f}",
+                              kind="cost_task", provider=provider_key)
 
 
 # ============================================================================
@@ -693,6 +742,9 @@ TASK_DEFAULTS: dict[str, tuple[str, str]] = {
     # 도구 상담(2026-10-12 · api/talk_agent, 개발 서버 전용 스위치). 모델은 아직 사장님 결정 전이라
     # 지금 고객 답(task.talk_answer)과 같은 값으로 둔다 -- 비교 실측 뒤 ai_task_assignments 에서 바꾼다.
     "task.talk_agent": ("codex", "gpt-5.6-luna"),
+    # 고객 PC 구성 부품 상담·나머지 채우기(2026-10-25 · api/pc_builder_advisor). 서버가 고른 후보 안에서 고르고
+    # 설명만 쓴다(후보·가격·호환은 서버 계산). 고객이 기다리는 자리라 속도·비용이 실측된 talk 과 같은 모델에서 시작한다.
+    "task.pc_builder": ("codex", "gpt-5.6-luna"),
 }
 for _tk, (_pk, _md) in TASK_DEFAULTS.items():
     assert _pk in PROVIDERS, f"TASK_DEFAULTS[{_tk}]: unknown provider {_pk!r}"

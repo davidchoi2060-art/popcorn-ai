@@ -91,6 +91,8 @@ test('static output contains only the client package and preserves preview bound
   assert.ok(!script.includes('https://dev.popcornai.co.kr'));
   assert.ok(script.includes('구성 미리보기'));
   assert.ok(script.includes('새로고침하면 임시 구성이 사라져요.'));
-  assert.ok(script.includes('실제 LLM 연결 전'));
+  assert.ok(script.includes('서버가 확인한 후보 안에서 추천'));
+  assert.ok(script.includes('/api/pc-builder/'));
+  assert.ok(!script.includes('실제 LLM 연결 전'));
   assert.ok(script.includes('실재고·주문 미연동'));
 });

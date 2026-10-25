@@ -3,3 +3,15 @@
 @media(max-width:350px){.pa-header h2{font-size:17px}.pa-demo{font-size:9px}.pa-header,.pa-context,.pa-conversation,.pa-recommendations{padding-left:12px;padding-right:12px}.pa-card-top{grid-template-columns:50px minmax(0,1fr)}.pa-card-top img{width:50px;height:50px}.pa-card-actions{gap:5px}.pa-choose{gap:5px;padding:9px 8px}.pa-followups button,.pa-starters button{padding:7px}.pa-price>div{gap:4px}}
 @media(prefers-reduced-motion:reduce){.part-advisor *{scroll-behavior:auto!important;transition:none!important}}
 .pa-evidence{padding:0;margin:6px 0 0;list-style:none;display:grid;gap:4px}.pa-evidence li{font-size:10px;color:#6b587c;line-height:1.65;overflow-wrap:anywhere}.pa-evidence li::before{content:'·';margin-right:6px;color:#9975c3}
+/* 실제 AI 상담(2026-10-25) — 불러오는 중·오류·서버 안내·예산 판단 */
+.pa-spin{animation:pa-spin 1s linear infinite;vertical-align:-2px}@keyframes pa-spin{to{transform:rotate(360deg)}}
+.pa-loading p{display:flex;align-items:center;gap:7px;color:#7d6d93}
+.pa-message.error p{background:#fff8ec;border-color:#f1dcb7;color:#87571b}
+.pa-retry{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;margin:0 0 6px;padding:7px 10px;border:1px solid #e3c99f;border-radius:7px;background:#fff;color:#8a5d1d;font-size:11px}
+.pa-ai-note{display:flex;gap:7px;align-items:flex-start;padding:10px 12px;margin:0 0 12px;border-radius:9px;background:#fff8ec;color:#87571b;font-size:11px;line-height:1.6}.pa-ai-note svg{flex:0 0 auto;margin-top:2px}
+.pa-warn{color:#a0611e;font-weight:650}
+.pa-ai-reason{font-size:12px!important;color:#4b3f5c!important;margin:6px 0 4px!important;line-height:1.7}
+.pa-evidence{margin:6px 0 0;padding-left:16px;font-size:10px;color:#7e7090;line-height:1.6}
+.pa-relax{margin-top:12px;padding:10px 12px;border:1px dashed #e0c79f;border-radius:9px;background:#fffcf6;font-size:11px;color:#7a5a2c;line-height:1.6}.pa-relax ul{margin:5px 0;padding-left:16px}.pa-relax small{color:#9a7d55}
+.pa-excluded{font-size:11px!important;margin-top:6px!important}
+@media(max-width:700px){.pa-ai-reason{font-size:12px!important}.pa-evidence{font-size:10px}}
