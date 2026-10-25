@@ -93,3 +93,7 @@ body{min-width:0}
   .intent-jump strong{color:#fff}.intent-jump small{color:#EDE4FF}
   .intent-jump>svg:first-child{color:#FFE878}
 }
+/* 예산 초과 구성 선택(2026-10-25) — 초과 금액 안내, 모바일 제안 창 버튼의 긴 문구 줄바꿈, 최종 구성 요약의 예산 문장 */
+.proposal-footer-total .footer-over{color:#a56e35;font-weight:700}
+.review-budget{text-align:left;margin:4px 0 12px}
+@media(max-width:760px){.proposal-dialog>.dialog-footer>button{white-space:normal;line-height:1.3;height:auto}.proposal-footer-total small{min-width:0}.proposal-footer-total strong{white-space:nowrap}}
