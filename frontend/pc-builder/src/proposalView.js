@@ -19,5 +19,14 @@ export function optionView(proposal, optionId) {
     budgetAdvice: isAi ? pr.budgetAdvice || null : null,
     budgetLine,
     over: bud && opt.total > bud ? opt.total - bud : null,
+    ...applyRule(opt.total, bud),
   };
+}
+
+// 적용 가능 여부 -- 예산은 고객이 정한 상한이다(2026-10-25 E2E-04). 예산을 넘는 구성은 비교·대안으로만 보여 주고,
+// 예산을 직접 올리거나 부품을 바꾼 뒤 다시 채워 적용한다. 버튼과 적용 처리 함수가 같은 판정을 쓴다.
+export function applyRule(total, bud) {
+  if (!bud || total <= bud) return {canApply: true, blockReason: null};
+  return {canApply: false,
+          blockReason: `이 구성은 전체 예산 ${won(bud)}보다 ${won(total - bud)} 많아 바로 적용할 수 없어요. 예산을 올리거나 부품을 바꾼 뒤 다시 채워 주세요.`};
 }

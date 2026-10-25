@@ -56,3 +56,27 @@ test('AI 설명이 없거나 예산이 없으면 AI 글·예산 문장을 붙이
   for (const id of ['opt1', 'opt2', 'opt3']) assert.equal(optionView(failed, id).summary, null);
   assert.equal(optionView({...proposal, budgetTotal: null}, 'opt1').budgetLine, null);
 });
+
+// E2E-04 회귀 — 예산(고객이 정한 상한)을 넘는 구성은 비교로만 보이고 적용은 막힌다. 버튼과 적용 처리가 같은 판정(applyRule)을 쓴다.
+test('예산을 넘는 탭은 적용할 수 없고, 예산 안 탭과 예산이 없을 때는 적용할 수 있다', async () => {
+  const {applyRule} = await import('../src/proposalView.js');
+  const low = {...proposal, budgetTotal: 100000};
+  for (const id of ['opt1', 'opt2', 'opt3']) {
+    const v = optionView(low, id);
+    assert.equal(v.canApply, false, id);
+    assert.ok(v.blockReason.includes('100,000원') && v.blockReason.includes('예산을 올리거나 부품을 바꾼 뒤'), id);
+  }
+  assert.equal(optionView(low, 'opt1').blockReason, '이 구성은 전체 예산 100,000원보다 1,656,600원 많아 바로 적용할 수 없어요. 예산을 올리거나 부품을 바꾼 뒤 다시 채워 주세요.');
+  assert.equal(optionView(proposal, 'opt1').canApply, true);           // 2,000,000원 예산 안
+  assert.equal(optionView(proposal, 'opt2').canApply, false);          // 2,036,500원은 예산 초과
+  assert.equal(optionView({...proposal, budgetTotal: null}, 'opt2').canApply, true);
+  // 적용 직전 다시 계산한 가격이 예산을 넘으면 막는다(처리 함수 쪽)
+  assert.equal(applyRule(2000001, 2000000).canApply, false);
+  assert.equal(applyRule(2000000, 2000000).canApply, true);
+});
+
+test('예산을 올린 뒤 다시 받은 제안은 적용할 수 있다(390 회복 흐름)', () => {
+  const raised = {...proposal, budgetTotal: 1500000, proposal: {...proposal.proposal, options: [
+    {id: 'opt1', kind: 'min', total: 1491200, within: true, changed: [], selection: {}}]}};
+  assert.equal(optionView(raised, 'opt1').canApply, true);
+});

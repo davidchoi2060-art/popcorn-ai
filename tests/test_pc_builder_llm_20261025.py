@@ -805,7 +805,7 @@ class CustomerE2ETests(unittest.TestCase):
         self.assertIn('금액 숫자는 쓰지 않는다', A.FILL_FORMAT)
         self.assertNotIn('부족액과 대안을 budget_advice', A.FILL_FORMAT)
 
-    def test_e2e02_proposal_tabs_node_regression(self):
+    def test_e2e02_e2e04_proposal_node_regression(self):
         import shutil
         import subprocess
         from pathlib import Path
@@ -816,4 +816,5 @@ class CustomerE2ETests(unittest.TestCase):
         r = subprocess.run([node, '--test', str(root / 'tests' / 'proposal-view.test.mjs')], capture_output=True, text=True,
                            encoding='utf-8', cwd=root)
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
-        self.assertIn('# pass 3', r.stdout)
+        self.assertIn('# fail 0', r.stdout)
+        self.assertIn('# pass 5', r.stdout)                                       # 탭 3 + E2E-04 예산 초과 적용 차단 2
