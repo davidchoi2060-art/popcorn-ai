@@ -15,3 +15,4 @@
 .pa-relax{margin-top:12px;padding:10px 12px;border:1px dashed #e0c79f;border-radius:9px;background:#fffcf6;font-size:11px;color:#7a5a2c;line-height:1.6}.pa-relax ul{margin:5px 0;padding-left:16px}.pa-relax small{color:#9a7d55}
 .pa-excluded{font-size:11px!important;margin-top:6px!important}
 @media(max-width:700px){.pa-ai-reason{font-size:12px!important}.pa-evidence{font-size:10px}}
+.pa-complete{display:block;margin-top:3px;color:#5f4f74!important;font-weight:600}

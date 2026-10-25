@@ -64,7 +64,9 @@ SYSTEM = """너는 팝콘PC 고객용 「내 PC 구성」 화면의 부품 상�
 
 [반드시 지킬 것]
 1. 상품은 [자료]에 있는 product_code 만 고른다. 자료에 없는 상품·모델·번호를 만들거나 권하지 않는다.
-2. 금액은 [자료]에 적힌 숫자를 그대로 쓴다(예: 778,100원). 합계·차액도 자료에 있는 값만 쓴다. 어림한 금액을 새로 만들지 않는다.
+2. 금액 숫자(원·만원·가격·합계·차액·부족액)를 글에 쓰지 않는다. 가격과 합계는 화면이 서버 값으로 따로 보여 준다.
+   예산은 「예산 안」「예산을 넘음」처럼 [자료]의 판정(within_part_budget · within_total_budget)만 말로 옮긴다.
+   selected_total 은 빈 자리를 뺀 부분 합계라 「전체 합계」로 부르지 않는다. 전체 예산 판정은 complete_min_total(빈 자리까지 호환 부품으로 채운 완성 최소) 기준이다.
 3. 자료에 없는 성능 수치(FPS·벤치마크·온도·소음 수치), 재고·배송·할인, 「무조건 호환」「완벽 호환」「최저가」「성능 보장」 같은 확정 표현을 쓰지 않는다.
    호환은 자료의 판정(ok / 확인 필요)만 말하고, 규격 근거가 없으면 「확인 필요」라고 말한다.
 4. 부품 역할·용도별로 중요한 점 같은 일반 지식은 「일반적으로」라고 밝히고 짧게 쓴다.
@@ -80,9 +82,9 @@ ADVISE_FORMAT = """다음 JSON 하나로만 답하라.
  "recommendations": [{"product_code": 정수, "label": "추천" | "저렴한 대안" | "상위 대안" | "비교", "reason": "왜 이 고객 조건에 맞는지 1~2문장", "tradeoff": "선택 시 장점·제약 또는 다른 후보와의 차이 1문장"}],
  "follow_up_questions": ["고객이 이어서 물어볼 만한 짧은 질문", "..."]}
 - recommendations 는 [자료].candidates 의 product_code 중 1~3개. 첫 항목이 가장 권하는 것. 후보가 둘 이상이면 비교할 대안(더 저렴한 것, 한 단계 위, 다른 제조사)을 함께 넣는다.
-- 부품 예산(partBudget)이 있으면 그 안의 후보를 먼저 권하고, 예산을 조금 넘는 다음 후보가 있으면 「비교」로 넣어 초과 금액(over_part_budget_by)을 밝힌다.
-- 부품 예산 안의 후보가 없으면 그 사실과 가장 가까운 후보·초과 금액을 말한다.
-- 부품 예산 초과(over_part_budget_by)와 전체 예산 초과(over_total_budget_by_with_cheapest_rest = 이 후보 + 이미 고른 부품 + 빈 자리를 가장 싸게 채운 합계 기준)는 다른 숫자다. 섞지 않는다.
+- 부품 예산(partBudget)이 있으면 그 안의 후보를 먼저 권하고, 부품 예산을 조금 넘는 다음 후보가 있으면 「비교」로 넣어 부품 예산을 넘는다는 사실을 밝힌다(금액 숫자 없이).
+- 부품 예산 안의 후보가 없으면 그 사실과 가장 가까운 후보를 말한다.
+- 부품 예산 판정(within_part_budget)과 전체 예산 판정(within_total_budget)은 다른 기준이다. 섞지 않는다.
 - 이유에는 이 고객의 용도·예산·이미 고른 부품과 연결되는 근거(자료의 규격·가격·판정)를 쓴다.
 - follow_up_questions 는 고객이 다음에 정할 만한 것 2~3개(예: 해상도, 저장 용량, 다른 제조사 비교)."""
 
@@ -90,7 +92,7 @@ FILL_FORMAT = """다음 JSON 하나로만 답하라.
 {"choice": "options 의 id 하나", "summary": "이 구성을 권하는 이유 2~4문장(고정 부품은 유지했다는 점 포함)",
  "slot_reasons": {"바뀌는 자리 분류(cpu|board|memory|gpu|storage|cooler|case|power)": "그 부품을 넣은 이유 1문장"},
  "constraints": ["적용 전 고객이 알아야 할 제약·확인 필요 사항"],
- "budget_advice": "예산에 대한 안내 1~3문장(예산이 없으면 null)",
+ "budget_advice": "예산에 대한 안내 1~3문장(금액 숫자 없이 판정과 방법만, 예산이 없으면 null)",
  "follow_up_questions": ["짧은 후속 질문"]}
 - 예산 안(within=true)의 option 이 있으면 그중에서 고른다. 모두 예산을 넘으면 가장 싼 option 을 고르고 부족액과 대안을 budget_advice 에 쓴다.
 - slot_reasons 는 그 option 의 changed 자리만."""
@@ -274,7 +276,8 @@ def amount_ok(v: int, allowed: set[int]) -> bool:
     return False
 
 
-def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str], codes: frozenset = frozenset()) -> tuple[str, int]:
+def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str], codes: frozenset = frozenset(),
+               no_money: bool = False) -> tuple[str, int]:
     """자료에 없는 금액·목록 밖 모델·금지 표현이 든 문장을 지운다 -> (남은 글, 지운 문장 수). 지운 문장은 서버 로그에만 남긴다."""
     if not text_:
         return '', 0
@@ -283,8 +286,10 @@ def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str], co
         s = sent.strip()
         if not s:
             continue
+        found = money_in(s)
         bad = (BANNED.search(s)
-               or any(not amount_ok(v, allowed_amounts) and (currency or v not in codes) for v, currency in money_in(s))
+               or (no_money and any(currency or v not in codes for v, currency in found))   # 고객 화면: 금액 문장은 서버만 쓴다
+               or any(not amount_ok(v, allowed_amounts) and (currency or v not in codes) for v, currency in found)
                or any(_core(m.group(0)) not in known_models for m in MODEL_RX.finditer(s)))
         if bad:
             dropped += 1
@@ -399,11 +404,13 @@ def _part_brief(p: D.Part) -> dict:
 
 
 def _cand_brief(c: dict) -> dict:
+    # 금액마다 역할이 하나다: selected_total = 이미 고른 부품 + 이 후보(빈 자리 제외, 부분 합계) ·
+    # complete_min_total = 빈 자리까지 호환 부품으로 채운 완성 최소(전체 합계, 미확정이면 None) · within_total_budget = 그 완성 최소 기준 판정.
     return {'product_code': int(c['id']), 'name': c['shortName'], 'price': c['price'], 'facts': c['facts'],
-            'price_diff_vs_current': c['priceDiff'], 'total_after_choose': c['totalAfter'],
-            'within_part_budget': c['withinPartBudget'], 'within_total_budget_with_cheapest_rest': c['withinTotalBudget'],
-            'over_part_budget_by': c['overPartBudget'],
-            'over_total_budget_by_with_cheapest_rest': c['overTotalBudget'],
+            'price_diff_vs_current': c['priceDiff'], 'selected_total': c['selectedTotal'],
+            'complete_min_total': c['completeMin'], 'complete_state': c['completeState'],
+            'within_part_budget': c['withinPartBudget'], 'within_total_budget': c['withinTotalBudget'],
+            'over_part_budget_by': c['overPartBudget'], 'over_total_budget_by': c['overTotalBudget'],
             'compat': '확인 필요: ' + ', '.join(c['checks']) if c['state'] == 'unknown' else '서버 호환 판정 통과',
             'notes': c['notes']}
 
@@ -420,10 +427,10 @@ def _feas_brief(f: dict) -> dict:
     return out
 
 
-MONEY_KEYS = {'price', 'price_diff_vs_current', 'total_after_choose', 'totalBudget', 'partBudget', 'otherSelectedTotal',
-              'cheapestRestOfEmptySlots', 'budget', 'minTotal', 'minTotalFree', 'shortfall', 'headroom', 'currentPrice',
+MONEY_KEYS = {'price', 'price_diff_vs_current', 'selected_total', 'complete_min_total', 'over_total_budget_by',
+              'totalBudget', 'partBudget', 'otherSelectedTotal', 'emptySlotsLowerBound', 'budget', 'minTotal', 'minTotalFree', 'shortfall', 'headroom', 'currentPrice',
               'saving', 'total', 'over_budget_by', 'left_in_budget', 'over_part_budget_by', 'foundTotal',
-              'over_total_budget_by_with_cheapest_rest'}
+              }
 
 
 def _allowed_amounts(context: dict) -> set[int]:
@@ -530,7 +537,8 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
 
     context = {'category': label, 'purpose': D.PURPOSES[body.purpose],
                'budget': {'totalBudget': total_budget, 'partBudget': cond['partBudget'],
-                          'otherSelectedTotal': cands['otherTotal'], 'cheapestRestOfEmptySlots': cands['restMin']},
+                          'otherSelectedTotal': cands['otherTotal'], 'emptySlotsLowerBound': cands['restMin'],
+                          'emptySlotsLowerBound_note': '이 자리를 뺀 빈 자리를 최저가로 채운 하한(호환 확인 전). 전체 합계가 아니다.'},
                'current': _part_brief(sel[cat]) if cat in sel else None,
                'selected': {D.LABEL[c]: _part_brief(p) for c, p in sel.items() if c != cat},
                'candidates': [_cand_brief(c) for c in cands['ok']],
@@ -564,7 +572,7 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
     codes = frozenset(pool.parts)          # 답 글의 상품번호는 금액으로 세지 않는다
     amounts = _allowed_amounts(context)
     dropped = 0
-    answer, n = clean_text(data.get('answer') or '', amounts, known, codes)
+    answer, n = clean_text(data.get('answer') or '', amounts, known, codes, no_money=True)
     dropped += n
     recs, seen = [], set()
     for r in data['recommendations'][:3]:
@@ -572,8 +580,8 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
         if code in seen:
             continue
         seen.add(code)
-        reason, n1 = clean_text(r.get('reason') or '', amounts, known, codes)
-        trade, n2 = clean_text(r.get('tradeoff') or '', amounts, known, codes)
+        reason, n1 = clean_text(r.get('reason') or '', amounts, known, codes, no_money=True)
+        trade, n2 = clean_text(r.get('tradeoff') or '', amounts, known, codes, no_money=True)
         dropped += n1 + n2
         lab = r.get('label') if r.get('label') in ('추천', '저렴한 대안', '상위 대안', '비교') else '비교'
         if recs and ((lab == '저렴한 대안' and allowed[code]['price'] >= recs[0]['price'])
@@ -582,7 +590,7 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
         recs.append(dict(allowed[code], label=lab, reason=reason or None, tradeoff=trade or None))
     follow = []
     for q in (data.get('follow_up_questions') or [])[:3]:
-        q2, n = clean_text(str(q)[:80], amounts, known, codes)
+        q2, n = clean_text(str(q)[:80], amounts, known, codes, no_money=True)
         dropped += n
         if q2:
             follow.append(q2)
@@ -703,22 +711,22 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
     codes = frozenset(pool.parts)          # 답 글의 상품번호는 금액으로 세지 않는다
     amounts = _allowed_amounts(context)
     dropped = 0
-    summary, n = clean_text(data.get('summary') or '', amounts, known, codes); dropped += n
-    advice, n = clean_text(data.get('budget_advice') or '', amounts, known, codes); dropped += n
+    summary, n = clean_text(data.get('summary') or '', amounts, known, codes, no_money=True); dropped += n
+    advice, n = clean_text(data.get('budget_advice') or '', amounts, known, codes, no_money=True); dropped += n
     reasons = {}
     for c, r in (data.get('slot_reasons') or {}).items():
         if c in view['changed']:
-            r2, n = clean_text(str(r), amounts, known, codes); dropped += n
+            r2, n = clean_text(str(r), amounts, known, codes, no_money=True); dropped += n
             if r2:
                 reasons[c] = r2
     constraints = []
     for x in (data.get('constraints') or [])[:5]:
-        x2, n = clean_text(str(x), amounts, known, codes); dropped += n
+        x2, n = clean_text(str(x), amounts, known, codes, no_money=True); dropped += n
         if x2:
             constraints.append(x2)
     follow = []
     for q in (data.get('follow_up_questions') or [])[:3]:
-        q2, n = clean_text(str(q)[:80], amounts, known, codes); dropped += n
+        q2, n = clean_text(str(q)[:80], amounts, known, codes, no_money=True); dropped += n
         if q2:
             follow.append(q2)
     if ai['status'] == 'ok':

@@ -186,6 +186,10 @@ class PoolTests(unittest.TestCase):
         by = {x['id']: x for x in c['ok']}
         self.assertTrue(by['401']['withinPartBudget'])
         self.assertEqual(by['402']['overPartBudget'], 700)
+        # 부품 상한 초과(700)와 전체 예산 판정(완성 최소 기준)은 다른 금액이다
+        self.assertEqual(by['402']['selectedTotal'], 100_000 + 80_000 + 800_700)
+        self.assertEqual(by['402']['completeState'], 'exact')
+        self.assertEqual(by['402']['overTotalBudget'], by['402']['completeMin'] - 1_000_000)
         self.assertNotEqual(by['402']['overTotalBudget'], by['402']['overPartBudget'])
 
 
@@ -282,8 +286,10 @@ class AdviseTests(unittest.TestCase):
         r, _ = self.run_adv(adv(), {
             'answer': 'RTX 3050은 380,000원이에요. 이 카드는 FHD에서 144fps가 나와요. RTX 4060은 450,000원이에요. 재고가 충분해요. 최저가예요.',
             'recommendations': [{'product_code': 401, 'label': '추천', 'reason': '예산 안이에요.', 'tradeoff': '-'}]})
-        self.assertEqual(r['answer'], 'RTX 3050은 380,000원이에요.')
-        self.assertEqual(r['ai']['droppedSentences'], 4)
+        # 고객 화면의 AI 글에서는 금액 문장을 모두 지운다(금액은 서버 필드로만 -- E2E-01). 근거 없는 FPS·모델·재고·최저가도 지운다.
+        self.assertNotIn('원', r['answer'])
+        self.assertEqual(r['ai']['droppedSentences'], 5)
+        self.assertEqual(r['recommendations'][0]['reason'], '예산 안이에요.')
 
     def test_no_compatible_candidates_is_explained_without_ai(self):
         # LGA1700 CPU + DDR5 메모리를 고르면 H610(DDR4)·B650(AM5) 둘 다 불가 -> 통과 후보 0건이면 AI 를 부르지 않고 판정 결과로 설명한다
@@ -699,3 +705,102 @@ class AntigravityReviewTests(unittest.TestCase):
             r = A.fill_core(p, A.FillBody(selection={'cpu': '101', 'board': '202', 'memory': '301'}, budgetTotal=2_000_000), None, FakeChecker())
         self.assertIsNone(r['proposal'])
         self.assertEqual(calls, [])
+
+
+# ── 고객 E2E(2026-10-25, pc-builder-customer-e2e-20261025) E2E-01 · E2E-02 ──────────────────────
+def brute_complete_min(pool_, checker, fixed):
+    """후보 전부를 다 조합해 본 완성 최소 합계(독립 계산 -- min_build 와 대조용)."""
+    import itertools
+    cats = [c for c in D.CATEGORIES]
+    choices = [[fixed[c]] if c in fixed else pool_.by_category(c) for c in cats]
+    best = None
+    for combo in itertools.product(*choices):
+        sel = dict(zip(cats, combo))
+        if checker.full(sel)[0] == 'ok':
+            t = sum(p.price for p in combo)
+            best = t if best is None or t < best else best
+    return best
+
+
+class CustomerE2ETests(unittest.TestCase):
+    """E2E-01: CPU 만 고르고 그래픽카드 상담 -- 남은 자리 비용에 상담 자리 최저가가 한 번 더 들어가던 중복과
+    부분 합계를 전체 합계로 설명하던 의미 오류. E2E-02: 채우기 탭을 바꿔도 AI 설명이 남던 문제(프런트 node 테스트를 함께 돌린다)."""
+
+    def setUp(self):
+        self.pool, self.ck = pool(), FakeChecker()
+
+    def test_e2e01_rest_cost_excludes_advised_slot(self):
+        sel = D.resolve(self.pool, {'cpu': '102'})
+        c = D.slot_candidates(self.pool, self.ck, sel, 'gpu', None, 2_000_000)
+        cheapest = {cat: self.pool.by_category(cat)[0].price for cat in D.CATEGORIES}
+        six = sum(cheapest[cat] for cat in ('board', 'memory', 'storage', 'cooler', 'case', 'power'))
+        self.assertEqual(c['restMin'], six)                                     # 7개(그래픽카드 최저가 포함)가 아니라 6개
+        self.assertEqual(D.min_rest_cost(self.pool, {'cpu', 'gpu'}), six)
+        self.assertEqual(D.min_rest_cost(self.pool, {'cpu'}), six + cheapest['gpu'])
+
+    def test_e2e01_amount_roles_are_consistent(self):
+        sel = D.resolve(self.pool, {'cpu': '102'})
+        budget = 2_000_000
+        c = D.slot_candidates(self.pool, self.ck, sel, 'gpu', None, budget)
+        for item in c['ok']:
+            gpu = self.pool.get(item['id'])
+            with self.subTest(gpu=item['shortName']):
+                self.assertEqual(item['selectedTotal'], 300_000 + gpu.price)        # 부분 합계: CPU + 이 그래픽카드
+                expect = brute_complete_min(self.pool, self.ck, {'cpu': sel['cpu'], 'gpu': gpu})
+                self.assertEqual(item['completeMin'], expect)                      # 완성 최소: 호환 확인한 전체 합계
+                self.assertGreaterEqual(item['completeMin'], item['selectedTotal'] + c['restMin'])
+                if expect <= budget:
+                    self.assertEqual((item['withinTotalBudget'], item['totalHeadroom'], item['overTotalBudget']), (True, budget - expect, None))
+                else:
+                    self.assertEqual((item['withinTotalBudget'], item['overTotalBudget'], item['totalHeadroom']), (False, expect - budget, None))
+
+    def test_e2e01_ai_money_sentences_removed_and_roles_named(self):
+        bad = '가장 저렴한 나머지 부품을 더한 기준 전체 합계가 1,038,400원으로 예산을 33,000원 초과해요.'
+        fake, calls = answers({'answer': f'MSI 를 비교해 보세요. {bad}',
+                               'recommendations': [{'product_code': 402, 'label': '추천', 'reason': f'길이가 짧아요. {bad}', 'tradeoff': bad}],
+                               'follow_up_questions': ['예산을 33,000원 늘릴까요?', '해상도는요?']})
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.advise_core(self.pool, adv(selection={'cpu': '102'}), None, FakeChecker())
+        self.assertEqual(r['answer'], 'MSI 를 비교해 보세요.')
+        rec = r['recommendations'][0]
+        self.assertEqual((rec['reason'], rec['tradeoff']), ('길이가 짧아요.', None))
+        self.assertEqual(r['followUps'], ['해상도는요?'])
+        self.assertIn('selected_total', calls[0]['prompt'])
+        self.assertIn('complete_min_total', calls[0]['prompt'])
+        self.assertNotIn('total_after_choose', calls[0]['prompt'])
+        self.assertNotIn('with_cheapest_rest', calls[0]['prompt'])
+        self.assertIn('금액 숫자', A.SYSTEM)
+
+    def test_e2e01_fill_texts_drop_money(self):
+        fake, _ = answers(llm.LLMProviderError('x', transient=True))
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r0 = A.fill_core(self.pool, A.FillBody(budgetTotal=2_000_000), None, FakeChecker())
+        first = r0['proposal']['options'][0]['id']
+        fake, _ = answers({'choice': first, 'summary': '부품 합계 1,997,000원으로 예산에서 3,000원 남아요. 균형 잡힌 구성이에요.',
+                           'budget_advice': '예산에서 3,000원 남아요.', 'slot_reasons': {'storage': '1TB 로 넉넉해요.'}})
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.fill_core(self.pool, A.FillBody(budgetTotal=2_000_000), None, FakeChecker())
+        self.assertEqual(r['proposal']['summary'], '균형 잡힌 구성이에요.')
+        self.assertIsNone(r['proposal']['budgetAdvice'])
+
+    def test_e2e01_regressions_kept(self):
+        # 정상 가격·상품번호 처리(검증 모드)는 그대로
+        self.assertEqual(A.clean_text('가격은 800,700원이에요.', {800_700}, set(), frozenset({128424}))[1], 0)
+        self.assertEqual(A.clean_text('상품번호 128424 제품이에요.', {800_700}, set(), frozenset({128424}))[1], 0)
+        self.assertEqual(A.clean_text('이 제품의 가격은 128424입니다.', {800_700}, set(), frozenset({128424}))[1], 1)
+        # 고객 화면 모드: 상품번호 표기와 규격 숫자는 남고 금액 문장만 빠진다
+        self.assertEqual(A.clean_text('상품번호 128424, VRAM 8GB, 길이 281mm예요.', {800_700}, set(), frozenset({128424}), no_money=True)[1], 0)
+        self.assertEqual(A.clean_text('가격은 800,700원이에요.', {800_700}, set(), frozenset(), no_money=True)[1], 1)
+
+    def test_e2e02_proposal_tabs_node_regression(self):
+        import shutil
+        import subprocess
+        from pathlib import Path
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('node 없음')
+        root = Path(__file__).resolve().parents[1] / 'frontend' / 'pc-builder'
+        r = subprocess.run([node, '--test', str(root / 'tests' / 'proposal-view.test.mjs')], capture_output=True, text=True,
+                           encoding='utf-8', cwd=root)
+        self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
+        self.assertIn('# pass 3', r.stdout)

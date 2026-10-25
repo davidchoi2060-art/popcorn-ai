@@ -39,3 +39,6 @@ body{min-width:0}
 .relax-list,.constraint-list{margin:8px 0 0;padding-left:18px;font-size:12px;line-height:1.7;color:#5f566d}
 .constraint-list{margin:12px 0 0}
 @media(max-width:760px){.option-switch{grid-template-columns:1fr}.budget-help{font-size:12px}}
+/* 최종 구성 버튼(2026-10-25 E2E-03): 320px 에서 글자가 세 줄로 넘쳐 고정 높이 밖으로 잘렸다 -- 높이는 내용에 맞추고, 아주 좁은 폭에서만 세로로 쌓는다 */
+.quote-actions>.primary-button,.quote-actions>.secondary-button{height:auto;min-height:42px;padding-top:9px;padding-bottom:9px}
+@media(max-width:370px){.quote-actions{grid-template-columns:1fr}}

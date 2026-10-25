@@ -378,7 +378,9 @@ def slot_candidates(pool: Pool, checker: Checker, sel: dict, category: str, part
     others = {c: p for c, p in sel.items() if c != category}
     other_total = total_of(others)
     current = sel.get(category)
-    rest_min = min_rest_cost(pool, {**others, category: None})       # 아직 비어 있는 다른 자리의 최소 비용
+    # 이 자리와 이미 고른 자리를 뺀 빈 자리의 최저가 합(호환 무시 하한). 이 자리는 후보 가격으로 한 번만 더한다
+    # (2026-10-25 E2E-01: 이 자리를 None 으로 넘겨 이 자리 최저가를 한 번 더 더하던 중복을 고침).
+    rest_min = min_rest_cost(pool, set(others) | {category})
     safe = checker.psu_safe_watt(others) if category == 'power' else None
     out = dict(ok=[], check=[], fail=[], excluded=[])
     for part in pool.by_category(category, usable_only=False):
@@ -396,29 +398,56 @@ def slot_candidates(pool: Pool, checker: Checker, sel: dict, category: str, part
                 notes.append(f'고른 파워 {have}W가 권장 여유 {need}W보다 낮아요')
         item = dict(part.public(), state=state, checks=labels, notes=notes,
                     priceDiff=(part.price - current.price) if current else None,
-                    totalAfter=other_total + part.price,
+                    selectedTotal=other_total + part.price,                     # 부분 합계: 이미 고른 부품 + 이 후보(빈 자리 제외)
                     withinPartBudget=(part.price <= part_cap) if part_cap else None,
                     overPartBudget=(part.price - part_cap) if part_cap and part.price > part_cap else None,
-                    withinTotalBudget=(other_total + part.price + rest_min <= budget_total) if budget_total and rest_min is not None else None,
-                    overTotalBudget=(other_total + part.price + rest_min - budget_total)
-                    if budget_total and rest_min is not None and other_total + part.price + rest_min > budget_total else None)
+                    **complete_with(pool, checker, others, category, part, state, budget_total))
         out['ok' if state == 'ok' else 'check' if state == 'unknown' else 'fail'].append(item)
     out.update(otherTotal=other_total, restMin=rest_min, current=str(current.code) if current else None,
                psuSafeWatt=safe)
     return out
 
 
-def min_rest_cost(pool: Pool, sel: dict) -> int | None:
-    """비어 있는 자리(값이 None 이거나 없는 분류)를 각자 가장 싼 판매 가능 후보로 채울 때의 합(호환 무시 하한)."""
+def min_rest_cost(pool: Pool, filled) -> int | None:
+    """filled(이미 정해진 분류들) 밖의 자리를 각자 가장 싼 판매 가능 후보로 채울 때의 합 -- 호환을 보지 않은 하한이다.
+    완성 합계로 부르지 않는다(완성 합계는 complete_with 의 호환 탐색 값)."""
     total = 0
     for c in CATEGORIES:
-        if sel.get(c) is not None:
+        if c in filled:
             continue
         cands = pool.by_category(c)
         if not cands:
             return None
         total += cands[0].price
     return total
+
+
+def complete_with(pool: Pool, checker: Checker, others: dict, category: str, part: Part, state: str,
+                  budget_total: int | None) -> dict:
+    """이 후보를 넣고 빈 자리를 호환 부품으로 채운 완성 구성의 최소 합계와 전체 예산 판정(min_build -- 금액 역할이 하나).
+    completeMin   = 탐색을 끝까지 마친 완성 최소 합계(전체 합계). 탐색 한도로 못 마치면 None, 찾은 값은 completeFound.
+    withinTotalBudget = 완성 최소 기준 예산 안(True)/밖(False). 최소를 확정 못 했고 찾은 값이 예산 밖이면 None.
+    overTotalBudget = 완성 최소 - 전체 예산(확정일 때만). totalHeadroom = 전체 예산 - 완성 합계(최소 미확정이면 「적어도」 값)."""
+    # completeState: exact(최소 확정) · found(찾았으나 최소 미확정) · none(호환 완성 구성 없음 확인) · unknown(탐색 한도로 못 찾음) · skip(판정 미통과 후보)
+    res = dict(completeState='skip', completeMin=None, completeFound=None, withinTotalBudget=None,
+               overTotalBudget=None, totalHeadroom=None)
+    if state != 'ok':
+        return res
+    mb = min_build(pool, checker, {**others, category: part})
+    if mb is None:
+        res['completeState'] = 'none'
+        return res
+    if not mb.get('sel'):
+        res['completeState'] = 'unknown'
+        return res
+    exact = not mb['exhausted']
+    res.update(completeState='exact' if exact else 'found', completeFound=mb['total'], completeMin=mb['total'] if exact else None)
+    if budget_total:
+        if mb['total'] <= budget_total:
+            res.update(withinTotalBudget=True, totalHeadroom=budget_total - mb['total'])
+        elif exact:
+            res.update(withinTotalBudget=False, overTotalBudget=mb['total'] - budget_total)
+    return res
 
 
 # ── 최소 구성 · 채우기 ────────────────────────────────────────────────────
