@@ -39,6 +39,10 @@ log = logging.getLogger(__name__)
 router = APIRouter(prefix='/api/pc-builder', tags=['pc-builder'])
 
 TASK_KEY = 'task.pc_builder'
+# 주 제공자(codex)가 일시 장애일 때 넘어갈 곳. DB 배정(ai_task_assignments)에 fallback_order 가 없으면 llm 기본 순서는
+# gemini → claude 인데, gemini 프로젝트는 결제가 꺼져 있어(2026-10-23 확인) 4xx 로 사슬이 끊기고 claude 까지 가지 못한다.
+# 그래서 이 작업은 claude 로만 넘긴다. DB 에 이 작업의 fallback_order 를 저장하면 그 값이 이긴다(_fallback_order).
+FALLBACK_DEFAULT = ('claude',)
 POLICY_KEY = 'visitor.pc_builder'
 PER_MINUTE, PER_DAY = 8, 150                 # rate_limit_policies 에 visitor.pc_builder 행이 없을 때
 CALL_TIMEOUT_SEC = 20
@@ -281,6 +285,18 @@ class AIFailure(Exception):
         self.status, self.attempts = status, attempts
 
 
+def _fallback_order():
+    """DB 배정에 이 작업의 fallback_order 가 있으면 None(llm 이 그 값을 읽는다), 없거나 못 읽으면 FALLBACK_DEFAULT."""
+    try:
+        with engine.connect() as conn:
+            row = llm._load_task_assignment(conn, TASK_KEY)
+        if row and row['fallback_order']:
+            return None
+    except Exception:
+        log.exception('[pc-builder] could not read ai_task_assignments - using default fallback')
+    return list(FALLBACK_DEFAULT)
+
+
 def ask_ai(prompt: str, validate, request: Request | None):
     """한 번 묻고, 응답이 규칙에 맞지 않으면 문제를 알려 한 번 더 묻는다. (검증된 값, LLMResult, 시도 횟수)."""
     if request is not None:
@@ -294,7 +310,7 @@ def ask_ai(prompt: str, validate, request: Request | None):
         if remaining < 6:
             raise AIFailure('unavailable', attempt - 1)
         try:
-            last = llm.call(prompt + feedback, task_key=TASK_KEY, system=SYSTEM, customer_facing=True,
+            last = llm.call(prompt + feedback, task_key=TASK_KEY, system=SYSTEM, customer_facing=True, fallback_order=_fallback_order(),
                             max_output_tokens=MAX_OUTPUT_TOKENS, timeout_sec=int(min(CALL_TIMEOUT_SEC, remaining)))
         except llm.LLMNotConfiguredError:
             raise AIFailure('unconfigured', attempt)
