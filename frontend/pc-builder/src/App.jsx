@@ -4,7 +4,7 @@ import BrandHeader from './BrandHeader.jsx';
 import PartAdvisor from './PartAdvisor.jsx';
 import {BRAND_LOGO_URL, CATALOG_URL, CUSTOMER_BASE, normalizeCatalog} from './paths.js';
 import {ApiError, budgetValue, fill as fillApi, getPool, mergePool, quote as quoteApi, selectionKey} from './api.js';
-import {optionView} from './proposalView.js';
+import {applyDecision, optionView} from './proposalView.js';
 
 const CATS=[
   {id:'cpu',name:'CPU',hint:'PC의 처리 능력을 결정해요',icon:Cpu},
@@ -94,10 +94,13 @@ export function App(){
   async function applyProposal(confirmed=false){
     if(!proposal||applying)return;const opt=proposal.proposal.options.find(o=>o.id===proposal.option);if(!opt)return;
     if(selectionKey(selection)!==proposal.baseKey){setProposal(null);setMessage('제안을 받은 뒤 구성이 바뀌어 적용하지 않았어요. 다시 채워보세요.');return;}
+    const rule=optionView(proposal,opt.id);if(!rule.canApply){setProposal(p=>({...p,applyError:rule.blockReason}));return;}   // 버튼이 막혀 있어도 처리 함수에서 한 번 더 막는다
     setApplying(true);
     try{
       const q=await quoteApi({selection:opt.selection});
-      if(!confirmed&&q.priceKey!==opt.priceKey){setProposal(p=>({...p,priceChanged:{total:q.total,priceBasis:q.priceBasis}}));return;}
+      const d=applyDecision({quoteTotal:q.total,quotePriceKey:q.priceKey,optionPriceKey:opt.priceKey,budget:proposal.budgetTotal,confirmed});
+      if(d.action==='block'){setProposal(p=>({...p,priceChanged:{option:opt.id,total:q.total,priceBasis:q.priceBasis},applyError:d.reason}));return;}
+      if(d.action==='confirm'){setProposal(p=>({...p,priceChanged:{option:opt.id,total:q.total,priceBasis:q.priceBasis}}));return;}
       remember();setSelection(opt.selection);setOrigins(s=>({...s,...Object.fromEntries(opt.changed.map(c=>[c,'ai']))}));setLocked(s=>({...s,...Object.fromEntries(opt.changed.map(c=>[c,false]))}));
       const kept=CATS.length-opt.changed.length;setMessage(`${kept?`선택한 ${kept}개는 유지하고, `:''}${opt.changed.length}개 부품을 채웠어요. 마음에 드는 부품은 ‘유지’를 눌러 고정해보세요.`);setProposal(null);setToast('제안한 구성을 구성표에 적용했어요.');
     }catch(e){
@@ -139,15 +142,16 @@ export function App(){
         {pr.options.length>1&&<div className="option-switch" role="group" aria-label="제안 구성 고르기">{pr.options.map(o=><button key={o.id} type="button" aria-pressed={o.id===opt.id} className={o.id===opt.id?'active':''} onClick={()=>setProposal(p=>({...p,option:o.id,priceChanged:null,applyError:null}))}><span>{o.label}{o.id===pr.chosen&&aiOk?' · AI 추천':''}</span><strong>{won(o.total)}</strong>{!o.within&&<small>예산 초과</small>}</button>)}</div>}
         {v.summary&&<div className="proposal-context"><Sparkles size={18}/><p>{v.summary}</p></div>}
         <div className="review-items">{reviewRows(opt.selection,opt.changed,v.slotReasons)}</div>
-        <div className="review-total"><span>적용 후 부품 합계</span><strong>{won(opt.total)}</strong></div>
-        {bud&&!opt.within&&<div className="notice-box"><AlertCircle size={18}/><div><strong>예산을 {won(opt.total-bud)} 초과해요.</strong><p>{f?.status==='over'?`${f.scope}으로 고른 부품을 유지한 최소 구성은 ${won(f.minTotal)}이에요(예산보다 ${won(f.shortfall)} 부족).`:f?.status==='unknown'&&f.foundTotal?`가능한 조합을 모두 살펴보지 못해 최소 금액은 확정하지 못했어요. 지금까지 찾은 가장 싼 구성은 ${won(f.foundTotal)}이에요.`:''}{v.budgetAdvice?` ${v.budgetAdvice}`:''}</p>{f?.relax?.length>0&&<ul className="relax-list">{f.relax.slice(0,3).map(r=><li key={r.category}>{r.label} {r.current} → {r.replacement}로 바꾸면 {r.exact===false?'찾은 구성':'최소'} {won(r.minTotal)}{r.fits?' (예산 안)':''}</li>)}</ul>}<p className="meta-note">예산을 올리거나, 용도·목표를 조정하거나, 고정한 부품을 직접 바꿔 다시 채울 수 있어요. 고정 부품은 자동으로 바꾸지 않아요.</p></div></div>}
+        <div className="review-total"><span>적용 후 부품 합계{v.repriced?' (다시 계산)':''}</span><strong>{won(v.total)}</strong></div>
+        {v.over&&<div className="notice-box"><AlertCircle size={18}/><div><strong>예산을 {won(v.over)} 초과해요.</strong><p>{f?.status==='over'?`${f.scope}으로 고른 부품을 유지한 최소 구성은 ${won(f.minTotal)}이에요(예산보다 ${won(f.shortfall)} 부족).`:f?.status==='unknown'&&f.foundTotal?`가능한 조합을 모두 살펴보지 못해 최소 금액은 확정하지 못했어요. 지금까지 찾은 가장 싼 구성은 ${won(f.foundTotal)}이에요.`:''}{v.budgetAdvice?` ${v.budgetAdvice}`:''}</p>{f?.relax?.length>0&&<ul className="relax-list">{f.relax.slice(0,3).map(r=><li key={r.category}>{r.label} {r.current} → {r.replacement}로 바꾸면 {r.exact===false?'찾은 구성':'최소'} {won(r.minTotal)}{r.fits?' (예산 안)':''}</li>)}</ul>}<p className="meta-note">예산을 올리거나, 용도·목표를 조정하거나, 고정한 부품을 직접 바꿔 다시 채울 수 있어요. 고정 부품은 자동으로 바꾸지 않아요.</p></div></div>}
         {v.budgetLine&&<p className="meta-note option-budget-line">{v.budgetLine}</p>}
-        {opt.within&&v.budgetAdvice&&<p className="meta-note">{v.budgetAdvice}</p>}
+        {v.canApply&&v.budgetAdvice&&<p className="meta-note">{v.budgetAdvice}</p>}
         {v.constraints.length>0&&<ul className="constraint-list">{v.constraints.map(c=><li key={c}>{c}</li>)}</ul>}
-        {proposal.priceChanged&&<div className="notice-box"><AlertCircle size={18}/><p>제안을 받은 뒤 가격이나 판매 상태가 바뀌었어요. 다시 계산한 합계는 {won(proposal.priceChanged.total)}이에요. 확인한 뒤 적용해주세요.</p></div>}
-        {proposal.applyError&&<div className="notice-box"><AlertCircle size={18}/><p>{proposal.applyError}</p></div>}
+        {v.repriced&&<div className="notice-box"><AlertCircle size={18}/><p>제안을 받은 뒤 가격이나 판매 상태가 바뀌었어요. 다시 계산한 합계는 {won(v.total)}이에요. {v.canApply?'확인한 뒤 적용해주세요.':'예산을 넘어 이대로는 적용할 수 없어요.'}</p></div>}
+        {!v.canApply&&<div className="notice-box" id="apply-block-reason"><AlertCircle size={18}/><p>{v.blockReason}</p></div>}
+        {proposal.applyError&&proposal.applyError!==v.blockReason&&<div className="notice-box"><AlertCircle size={18}/><p>{proposal.applyError}</p></div>}
         <p className="meta-note">모든 제안은 서버 호환 판정을 통과한 구성이에요. {f?.priceBasis?`가격 갱신 ${f.priceBasis.slice(0,10)} · `:''}{proposal.priceNote} · 실재고·상세 장착 공간은 구매 전 확인이 필요해요.</p></div>
-      <footer className="dialog-footer actions"><div className="proposal-footer-total"><small>부품 합계</small><strong>{won(proposal.priceChanged?.total??opt.total)}</strong></div><button className="secondary-button" onClick={()=>setProposal(null)}>다시 고를게요</button><button className="primary-button" disabled={applying} onClick={()=>applyProposal(!!proposal.priceChanged)}>{applying?'확인 중…':proposal.priceChanged?'바뀐 가격으로 적용':'이 구성 적용하기'}<Check size={17}/></button></footer></Modal>;})()}
+      <footer className="dialog-footer actions"><div className="proposal-footer-total"><small>부품 합계</small><strong>{won(v.total)}</strong></div>{v.canApply?<button className="secondary-button" onClick={()=>setProposal(null)}>다시 고를게요</button>:<button className="secondary-button" onClick={()=>{setProposal(null);setMessage('전체 예산을 올리거나 부품을 바꾼 뒤 다시 채워 주세요.');setTimeout(()=>{const el=document.getElementById('budget');el?.scrollIntoView({block:'center'});el?.focus();},50);}}>예산 조정하기</button>}<button className="primary-button" disabled={applying||!v.canApply} aria-describedby={v.canApply?undefined:'apply-block-reason'} onClick={()=>applyProposal(v.repriced)}>{applying?'확인 중…':!v.canApply?'예산 초과 · 적용 불가':v.repriced?'바뀐 가격으로 적용':'이 구성 적용하기'}<Check size={17}/></button></footer></Modal>;})()}
     {help&&<Modal label={help==='checkout'?'구매 연결 안내':'이용 방법'} onClose={()=>setHelp(false)} className="review-dialog"><header className="dialog-header"><h2>{help==='checkout'?'팝콘PC 구매 연결 안내':'이렇게 내 PC를 만들어보세요.'}</h2><button className="icon-button" onClick={()=>setHelp(false)} aria-label="안내 닫기"><X size={22}/></button></header><div className="dialog-content help-content">{help==='checkout'?<><p>완성한 구성은 부품별 상품번호와 수량을 담은 견적으로 팝콘PC에 전달할 예정입니다.</p><ol><li>최신 판매가격과 실재고 확인</li><li>변경된 금액이나 부품이 있다면 다시 확인</li><li>같은 구성으로 팝콘PC 구매·결제 진행</li></ol><div className="notice-box"><Info size={18}/><p>현재는 연결 흐름을 보여주는 시안입니다. 구매·상담 요청은 전송되지 않습니다.</p></div></>:<><ol><li><strong>직접 고르거나 AI에게 물어보기</strong><p>각 부품의 ‘AI에게 추천받기’에서 조건을 묻고, 추천 이유와 대안을 확인한 뒤 선택하세요. 질문만으로 구성은 바뀌지 않아요.</p></li><li><strong>AI로 나머지 채우기</strong><p>용도와 전체 예산을 정하면 선택한 부품을 유지한 제안을 볼 수 있어요. 예산으로 안 되면 부족액과 바꿀 수 있는 방법을 알려드려요.</p></li><li><strong>확인하고 임시 구성함에 보관</strong><p>부품을 더 바꾸거나 현재 페이지에 구성을 임시 보관할 수 있어요. 새로고침하면 사라집니다.</p></li></ol><div className="notice-box"><Info size={18}/><p>조사 상품 {catalog.parts.length}개를 서버 DB 판매가·판매 상태로 다시 확인해 사용해요. AI 상담과 채우기는 실제 AI가 서버가 확인한 후보·호환 판정 안에서 제안하고, 가격·합계는 서버가 계산해요. 실제 창고재고·결제는 확인 전이에요.</p></div></>}</div><footer className="dialog-footer actions"><button className="primary-button" onClick={()=>setHelp(false)}>확인했어요</button></footer></Modal>}
     {toast&&screen==="builder"&&!picker&&!advisor&&!proposal&&!replacement&&!help&&<div className="toast" role="status"><CheckCircle2 size={18}/>{toast}</div>}
   </>;
