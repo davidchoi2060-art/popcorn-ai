@@ -62,5 +62,5 @@ def test_pages_load_new_versions():
         t = read(page)
         for a in ("home-carousel.css?v=20261020-edge1", "home-carousel.js?v=20261020-edge1",
                   "configuration-concept.css?v=20261020-acc1", "configuration-concept.js?v=20261021-cb2",
-                  "core.js?v=20261022-biz2", "header-ui.js?v=20261022-pat1"):
+                  "core.js?v=20261022-biz2", "header-ui.js?v=20261025-builder1"):
             assert a in t, (page, a)
