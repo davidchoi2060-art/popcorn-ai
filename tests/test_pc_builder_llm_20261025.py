@@ -818,3 +818,148 @@ class CustomerE2ETests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
         self.assertIn('# fail 0', r.stdout)
         self.assertIn('# pass 7', r.stdout)                                       # 탭 3 + E2E-04 4(버튼·재조회 합계·재계산 표시)
+
+
+
+# ── 자유 입력 카드(pc-builder-intent-input-20261025) ─────────────────────────────────────────
+class IntentInputTests(unittest.TestCase):
+    """입력창 원문은 지우지 않고 그대로 보낸다. 글을 쓴 뒤 예산 칸·용도 버튼을 바꾸면 그때의 글(pin)을 함께 보내고,
+    지금 글이 말하는 금액·용도가 그때와 같으면 나중에 바꾼 칸 값이 이긴다. 확인 질문의 답은 원문과 따로 받는다."""
+    TEXT = '프리미어로 영상 편집하고 가끔 게임도 해요.\n조용했으면 좋겠고, 본체 예산은 100만원이에요.'
+
+    def setUp(self):
+        self.pool = pool()
+        self.fb = patch.object(A, '_fallback_order', lambda: ['claude'])
+        self.fb.start()
+
+    def tearDown(self):
+        self.fb.stop()
+
+    def fill(self, **kw):
+        fake, calls = answers(llm.LLMProviderError('x', transient=True))
+        with patch.object(llm, 'call', side_effect=fake):
+            r = A.fill_core(self.pool, A.FillBody(**kw), None, FakeChecker())
+        return r, (calls[0]['prompt'] if calls else None)
+
+    def test_request_text_reaches_llm_with_newlines(self):
+        r, prompt = self.fill(requestText=self.TEXT, purpose='gaming', budgetTotal=2_000_000)
+        self.assertEqual((r['purpose'], r['budgetTotal'], r['purposeFrom'], r['budgetFrom']), ('creator', 1_000_000, 'text', 'text'))
+        self.assertIn('[고객 요청]\n' + self.TEXT + '\n\n', prompt)               # 줄바꿈까지 원문 그대로 AI 에게 간다
+        self.assertNotIn('화면에서 조건을 바꿨다', prompt)
+        self.assertIsNone(r['note'])
+
+    def test_text_budget_then_close_and_raise_field_then_rerecommend(self):
+        # ① 글의 100만원으로 추천 -> 화면 예산 칸이 1,000,000 이 된다
+        r1, _ = self.fill(requestText=self.TEXT, budgetTotal=2_000_000)
+        self.assertEqual((r1['budgetTotal'], r1['budgetFrom']), (1_000_000, 'text'))
+        # ② 제안을 닫고 예산 칸을 2,000,000 으로 올림(그때 글이 표식) -> 같은 글로 다시 추천: 칸 값이 이긴다
+        r2, prompt = self.fill(requestText=self.TEXT, budgetTotal=2_000_000, budgetPin=self.TEXT)
+        self.assertEqual((r2['budgetTotal'], r2['budgetFrom']), (2_000_000, 'field'))
+        self.assertEqual(r2['note'], '예산은 적어 주신 100만원 대신 예산 칸의 2,000,000원으로 추천했어요.')
+        self.assertIn('[고객 요청]\n' + self.TEXT, prompt)                         # 원문은 지우지 않고 그대로
+        self.assertIn('전체 예산 → 2,000,000원', prompt)
+        self.assertIn('"totalBudget": 2000000', prompt)
+        self.assertEqual(r2['purpose'], 'creator')                                 # 글의 용도는 그대로 읽는다
+        # ③ 금액은 그대로 두고 말만 덧붙이거나 띄어쓰기만 바꿔도 칸 값 유지
+        more = self.TEXT.replace('100만원', '100 만원') + ' 흰색 케이스면 좋겠어요.'
+        r3, _ = self.fill(requestText=more, budgetTotal=2_000_000, budgetPin=self.TEXT)
+        self.assertEqual((r3['budgetTotal'], r3['budgetFrom']), (2_000_000, 'field'))
+        # ④ 글의 금액을 고쳐 쓰면(나중에 바꾼 쪽이 글) 글이 이긴다
+        r4, _ = self.fill(requestText=self.TEXT.replace('100만원', '150만원'), budgetTotal=2_000_000, budgetPin=self.TEXT)
+        self.assertEqual((r4['budgetTotal'], r4['budgetFrom']), (1_500_000, 'text'))
+
+    def test_both_scope_spacing_keeps_pin_but_real_change_releases(self):
+        # Codex 재현: 전체·부품 금액을 나눠 받은 정상 해석은 원 단위 값으로 비교한다(띄어쓰기만 바꾸면 표식 유지)
+        pin = 'PC 전체 100만원, 그래픽카드 80만원'
+        r, _ = self.fill(requestText=pin, budgetTotal=2_000_000, budgetPin=pin)
+        self.assertEqual((r['budgetTotal'], r['budgetFrom']), (2_000_000, 'field'))
+        r, _ = self.fill(requestText='PC 전체 100 만원, 그래픽카드 80 만원', budgetTotal=2_000_000, budgetPin=pin)
+        self.assertEqual((r['kind'], r['budgetTotal'], r['budgetFrom']), ('proposal', 2_000_000, 'field'))
+        # 대조: 전체 금액을 150만원으로 실제로 바꾸면 표식이 풀리고 글의 금액(전체 150만원)을 쓴다
+        r, _ = self.fill(requestText='PC 전체 150만원, 그래픽카드 80만원', budgetTotal=2_000_000, budgetPin=pin)
+        self.assertEqual((r['budgetTotal'], r['budgetFrom']), (1_500_000, 'text'))
+        self.assertIn('800,000원', r['note'])                                     # 부품 금액은 부품 상담에서 반영한다는 안내
+        # 해석하지 못한 금액(단위 없음)은 원문으로 비교 -- 띄어쓰기는 같은 말, 숫자를 바꾸면 다시 묻는다
+        r, _ = self.fill(requestText='본체 150', budgetTotal=1_500_000, budgetPin='본체  150 ')
+        self.assertEqual((r['kind'], r['budgetTotal']), ('proposal', 1_500_000))
+        r, _ = self.fill(requestText='본체 200', budgetTotal=1_500_000, budgetPin='본체 150')
+        self.assertEqual(r['kind'], 'clarify')
+
+    def test_purpose_button_after_text_wins_until_text_changes(self):
+        r, _ = self.fill(requestText='영상 편집 위주로 써요', purpose='gaming')
+        self.assertEqual((r['purpose'], r['purposeFrom']), ('creator', 'text'))
+        r, prompt = self.fill(requestText='영상 편집 위주로 써요', purpose='gaming', purposePin='영상 편집 위주로 써요')
+        self.assertEqual((r['purpose'], r['purposeFrom']), ('gaming', 'field'))
+        self.assertIn('「게임」', r['note'])
+        self.assertIn('용도 → 게임', prompt)
+        r, _ = self.fill(requestText='영상 편집 위주로 써요', purpose='gaming', purposePin='')    # 버튼을 먼저 누르고 글을 씀
+        self.assertEqual(r['purpose'], 'creator')
+
+    def test_empty_budget_field_after_text(self):
+        r, _ = self.fill(requestText='본체 100만원', budgetTotal=None, budgetPin='본체 100만원')
+        self.assertEqual((r['budgetTotal'], r['budgetFrom']), (None, 'field'))
+        self.assertIn('예산 칸을 비워', r['note'])
+
+    def test_clarify_answer_keeps_original_context(self):
+        # Codex 재현: 「영상 편집용, 전체80」 -> 단위 확인 -> 「전체 80만원 이하」. 답만 보내면 용도·원문이 사라졌다.
+        text = '영상 편집용, 전체80'
+        q, _ = self.fill(requestText=text, purpose='gaming')
+        self.assertEqual(q['kind'], 'clarify')
+        answer = q['choices'][0]
+        self.assertEqual(answer, '전체 80만원 이하')
+        r, prompt = self.fill(requestText=text, answer=answer, purpose='gaming', budgetTotal=2_000_000)
+        self.assertEqual((r['kind'], r['purpose'], r['purposeFrom']), ('proposal', 'creator', 'text'))   # 원문의 용도
+        self.assertEqual((r['budgetTotal'], r['budgetFrom']), (800_000, 'answer'))                       # 답의 예산
+        self.assertIn('[고객 요청]\n' + text, prompt)                                # AI 가 원문을 받는다
+        self.assertIn('확인 질문에 고객이 고른 답: 전체 80만원 이하', prompt)
+        self.assertIsNone(r['note'])
+        # 답한 뒤 같은 원문을 다시 보내면(화면이 원문을 답에 묶은 표식) 다시 묻지 않고 답한 예산을 쓴다
+        r, _ = self.fill(requestText=text, purpose='creator', budgetTotal=800_000, budgetPin=text)
+        self.assertEqual((r['kind'], r['budgetTotal']), ('proposal', 800_000))
+
+    def test_fields_limits(self):
+        A.FillBody(requestText='가' * 300, budgetPin='가' * 300, purposePin='가' * 300, answer='가' * 100)
+        for k, n in (('requestText', 301), ('budgetPin', 301), ('purposePin', 301), ('answer', 101)):
+            with self.subTest(k=k), self.assertRaises(Exception):
+                A.FillBody(**{k: '가' * n})
+
+    def test_route_accepts_intent_fields(self):
+        app = FastAPI()
+        app.include_router(A.router)
+
+        @contextmanager
+        def fake_connect():
+            yield None
+        fake, _ = answers(llm.LLMProviderError('x', transient=True))
+        with patch.object(A.engine, 'connect', fake_connect), patch.object(D, 'load_pool', lambda conn, src=None: pool()), \
+                patch.object(D, 'Checker', FakeChecker), patch.object(A.access_gate, 'check_rate', lambda *a, **k: 'v'), \
+                patch.object(llm, 'call', side_effect=fake):
+            r = TestClient(app).post('/api/pc-builder/fill', json={
+                'selection': {}, 'locked': {}, 'mode': 'fill', 'purpose': 'gaming', 'budgetTotal': 2_000_000,
+                'requestText': self.TEXT, 'answer': None, 'budgetPin': self.TEXT, 'purposePin': None})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()['budgetTotal'], r.json()['budgetFrom']), (2_000_000, 'field'))
+
+    def test_built_bundle_has_intent_card(self):
+        from pathlib import Path
+        assets = Path(__file__).resolve().parents[1] / 'mockups' / 'mvp4' / 'pc-builder' / 'assets'
+        js = '\n'.join(p.read_text(encoding='utf-8') for p in assets.glob('*.js'))
+        for s in ('어떤 PC가 필요하세요?', '용도와 원하는 조건을 편하게 적어 주세요.', '사용할 용도와 원하는 조건', '용도를 빠르게 고르려면',
+                  '이 내용으로 PC 추천받기', '선택한 부품 유지하고 추천받기', '원하는 PC 설명하기', 'budgetPin', 'purposePin'):
+            self.assertIn(s, js)
+        for gone in ('원하는 조건을 말로 입력하기', 'AI로 빈칸 채우기', '모든 조건', '완벽하게', '100% 반영'):
+            self.assertNotIn(gone, js)
+
+    def test_intent_node_regression(self):
+        import shutil
+        import subprocess
+        from pathlib import Path
+        node = shutil.which('node')
+        if not node:
+            self.skipTest('node 없음')
+        root = Path(__file__).resolve().parents[1] / 'frontend' / 'pc-builder'
+        r = subprocess.run([node, '--test', str(root / 'tests' / 'intent.test.mjs')], capture_output=True, text=True,
+                           encoding='utf-8', cwd=root)
+        self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
+        self.assertIn('# fail 0', r.stdout)
+        self.assertIn('# pass 5', r.stdout)

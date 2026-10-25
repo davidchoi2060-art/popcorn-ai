@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test tests/subpath.test.mjs tests/proposal-view.test.mjs"
+    "test": "node --test tests/subpath.test.mjs tests/proposal-view.test.mjs tests/intent.test.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.4",

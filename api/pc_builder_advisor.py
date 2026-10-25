@@ -136,6 +136,13 @@ class FillBody(SelectionBody):
     purpose: Purpose = 'gaming'
     budgetTotal: StrictInt | None = Field(default=None, ge=-10**12, le=10**12)
     requestText: str | None = Field(default=None, max_length=300)
+    # 고객이 예산 칸·용도 버튼을 바꿀 때 입력창에 있던 글. 지금 글이 말하는 금액·용도가 그때와 같으면
+    # 글은 그대로 두고 나중에 바꾼 칸 값을 따른다(글의 금액을 다시 고쳐 쓰면 그 글이 이긴다).
+    budgetPin: str | None = Field(default=None, max_length=300)
+    purposePin: str | None = Field(default=None, max_length=300)
+    # 서버 확인 질문에 고객이 고른 답(예: 「전체 80만원 이하」). 원문(requestText)과 합치지 않고 따로 받아
+    # 예산은 이 답으로, 용도와 AI 에게 넘기는 고객 요청은 원문으로 읽는다.
+    answer: str | None = Field(default=None, max_length=100)
 
 
 # ── 공통 ────────────────────────────────────────────────────────────────
@@ -635,38 +642,75 @@ def _option_view(o: dict, sel: dict) -> dict:
             'priceKey': D.price_key(o['sel']), 'priceBasis': D.price_basis(o['sel'])}
 
 
+def _text_purpose(text_in: str) -> str | None:
+    return next((key for key, rx in PURPOSE_WORDS if rx.search(text_in)), None)
+
+
+def _budget_said(text_in: str):
+    """글이 말하는 예산을 비교할 수 있는 모양으로. 해석된 금액(전체·부품 나눠 받은 경우 포함)은 원 단위 값으로만 비교해
+    띄어쓰기·표기만 다른 글은 같은 말로 본다. 해석하지 못한 금액(단위 없음·여러 금액 등)만 공백을 뺀 원문으로 비교한다."""
+    b = D.parse_budget(text_in)
+    if not b:
+        return None
+    if b['problem'] is None:
+        return ('won', b['scope'], b['won'], b.get('total'), b.get('part'))
+    return ('raw', b['scope'], b['problem'], re.sub(r'\s+', '', b['raw'] or ''))
+
+
+def _pinned(pin: str | None, now, read) -> bool:
+    """칸을 바꿀 때의 글과 지금 글이 같은 조건을 말하면(둘 다 말하지 않는 경우 제외) 나중에 바꾼 칸이 이긴다."""
+    return pin is not None and now is not None and read(mask(pin.strip())[0]) == now
+
+
 def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=None) -> dict:
     sel = D.resolve(pool, body.selection)
     checker = checker or D.Checker(pool)
     purpose, budget, part_note = body.purpose, body.budgetTotal, None
+    purpose_from = budget_from = 'field'
+    pinned = []                              # 글보다 나중에 칸에서 바꾼 조건(고객에게 어느 값을 썼는지 알린다)
     text_in, masked = mask((body.requestText or '').strip())
+    answer_in, masked_answer = mask((body.answer or '').strip())
+    masked = masked or masked_answer
     if text_in:
-        for key, rx in PURPOSE_WORDS:
-            if rx.search(text_in):
-                purpose = key
-                break
+        said = _text_purpose(text_in)
+        if _pinned(body.purposePin, said, _text_purpose):
+            pinned.append((f'용도는 적어 주신 내용 대신 고르신 「{D.PURPOSES[purpose]}」으로 추천했어요.', f'용도 → {D.PURPOSES[purpose]}'))
+        elif said:
+            purpose, purpose_from = said, 'text'
+    b = D.parse_budget(answer_in) if answer_in else None
+    if b:
+        budget_from = 'answer'               # 확인 답이 원문의 금액을 대신한다(원문 금액과 겹쳐 「여러 금액」이 되지 않게)
+    elif text_in:
         b = D.parse_budget(text_in)
+        if b and _pinned(body.budgetPin, _budget_said(text_in), _budget_said):
+            pinned.append((f'예산은 적어 주신 {b["raw"]} 대신 예산 칸의 {D.won(budget)}으로 추천했어요.', f'전체 예산 → {D.won(budget)}')
+                          if budget else (f'예산 칸을 비워 두셔서 적어 주신 {b["raw"]} 없이 추천했어요.', '전체 예산 → 없음'))
+            b = None
         if b:
-            problem = _budget_problem(b)
-            if problem:
-                return _clarify(problem, _unit_choices(b, None))
-            if b['scope'] == 'part':
-                return _clarify(f'{D.won(b["won"])}은 한 부품 예산처럼 들려요. 부품 하나의 예산이면 그 부품의 「AI에게 추천받기」에서 물어봐 주세요. '
-                                'PC 전체 부품 예산이면 「전체」를 붙여 다시 적어 주세요.', [f'PC 전체 {D.won(b["won"])}'])
-            if b['scope'] == 'both':
-                budget, part_note = b['total'], (f'부품 하나의 예산({D.won(b["part"])})은 그 부품의 「AI에게 추천받기」에서 반영해요. '
-                                                 f'여기서는 전체 예산 {D.won(b["total"])}으로 채웠어요.')
-            else:
-                budget = b['won']
+            budget_from = 'text'
+    if b:
+        problem = _budget_problem(b)
+        if problem:
+            return _clarify(problem, _unit_choices(b, None))
+        if b['scope'] == 'part':
+            return _clarify(f'{D.won(b["won"])}은 한 부품 예산처럼 들려요. 부품 하나의 예산이면 그 부품의 「AI에게 추천받기」에서 물어봐 주세요. '
+                            'PC 전체 부품 예산이면 「전체」를 붙여 다시 적어 주세요.', [f'PC 전체 {D.won(b["won"])}'])
+        if b['scope'] == 'both':
+            budget, part_note = b['total'], (f'부품 하나의 예산({D.won(b["part"])})은 그 부품의 「AI에게 추천받기」에서 반영해요. '
+                                             f'여기서는 전체 예산 {D.won(b["total"])}으로 채웠어요.')
+        else:
+            budget = b['won']
     problem = D.budget_check(budget)
     if problem:
         return _clarify(problem)
     fixed = sel if body.mode == 'fill' else {c: p for c, p in sel.items() if body.locked.get(c)}
     options = D.fill_options(pool, checker, fixed, purpose, budget)
     feas = D.feasibility(pool, checker, fixed, budget)
+    pin_note = ' '.join(say for say, _ in pinned) or None
     base = {'ok': True, 'kind': 'proposal', 'purpose': purpose, 'budgetTotal': budget, 'mode': body.mode,
             'fixed': sorted(fixed), 'selectionKey': D.selection_key(sel), 'feasibility': feas, 'masked': masked,
-            'priceNote': D.PRICE_NOTE, 'note': part_note}
+            'priceNote': D.PRICE_NOTE, 'note': ' '.join(x for x in (pin_note, part_note) if x) or None,
+            'purposeFrom': purpose_from, 'budgetFrom': budget_from}
     if not options:
         if feas['status'] == 'unknown':
             summary = '확인된 후보가 많아 정해진 시간 안에 호환 구성을 다 살펴보지 못했어요. 부품을 몇 개 더 고른 뒤 다시 채워 보세요.'
@@ -689,7 +733,11 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
                             'parts': {c: _part_brief(o['sel'][c]) for c in D.CATEGORIES}} for o, v in zip(options, views)],
                'feasibility': _feas_brief(feas), 'price_rule': D.PRICE_NOTE,
                'data_note': f'{pool.as_of} 조사 표본 상품번호를 DB 판매가·판매 상태로 다시 확인한 후보. 실보유 수량·실시간 가격 아님.'}
-    prompt = f'[자료]\n{json.dumps(context, ensure_ascii=False)}\n\n[고객 요청]\n{text_in or "(빈칸 채우기 버튼)"}\n\n{FILL_FORMAT}'
+    told = (f'\n(고객이 이 글을 쓴 뒤 화면에서 조건을 바꿨다: {" · ".join(hint for _, hint in pinned)}. 글 속 그 조건보다 자료의 purpose·totalBudget 을 따른다.)'
+            if pinned else '')
+    if answer_in:
+        told += f'\n(확인 질문에 고객이 고른 답: {answer_in}. 글 속 같은 조건보다 이 답과 자료의 totalBudget 을 따른다.)'
+    prompt = f'[자료]\n{json.dumps(context, ensure_ascii=False)}\n\n[고객 요청]\n{text_in or "(빈칸 채우기 버튼)"}{told}\n\n{FILL_FORMAT}'
     any_within = any(o['within'] for o in options)
 
     def validate(data):
