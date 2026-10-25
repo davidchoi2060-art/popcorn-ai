@@ -817,7 +817,7 @@ class CustomerE2ETests(unittest.TestCase):
                            encoding='utf-8', cwd=root)
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
         self.assertIn('# fail 0', r.stdout)
-        self.assertIn('# pass 7', r.stdout)                                       # 탭 3 + E2E-04 4(버튼·재조회 합계·재계산 표시)
+        self.assertIn('# pass 11', r.stdout)                                      # 탭 3 + 예산 초과 선택 6(대표님 정정으로 E2E-04 차단 검사 대체) + 가격 표시 일치 2
 
 
 
@@ -939,6 +939,22 @@ class IntentInputTests(unittest.TestCase):
         self.assertIsNone(A._text_purpose('그냥 작업용으로 조용하게'))
         r, _ = self.fill(requestText='그냥 작업용으로 조용하게', purpose='office', budgetTotal=2_000_000)
         self.assertEqual((r['purpose'], r['purposeFrom']), ('office', 'field'))
+
+    def test_budget_is_advice_not_ceiling_in_prompts(self):
+        # 대표님 정정(2026-10-25): 예산은 추천·경고 기준. AI 가 「예산을 넘어 적용할 수 없다」고 말하지 않게 한다.
+        self.assertIn('예산을 넘는 option 도 고객이 초과 금액을 확인하고 직접 적용할 수 있다', A.FILL_FORMAT)
+        self.assertIn('예산 안(within=true)의 option 이 있으면 그중에서 고른다', A.FILL_FORMAT)       # 예산 안 추천 우선은 유지
+        self.assertIn('예산은 추천·경고 기준이다', A.SYSTEM)
+
+    def test_option_prices_match_total(self):
+        # 가격 표시 일치: 옵션마다 부품별 서버 판매가를 싣고, 그 합이 옵션 합계다(화면 행 합 = 합계)
+        r, _ = self.fill(selection={'cpu': '102'}, budgetTotal=100_000)
+        for o in r['proposal']['options']:
+            with self.subTest(o=o['id']):
+                self.assertEqual(set(o['prices']), set(o['selection']))
+                self.assertEqual(sum(o['prices'].values()), o['total'])
+                self.assertEqual(o['prices']['cpu'], 300_000)
+        self.assertFalse(any(o['within'] for o in r['proposal']['options']))       # 10만원이면 모두 초과 -- 그래도 후보는 돌려준다
 
     def test_fields_limits(self):
         A.FillBody(requestText='가' * 300, budgetPin='가' * 300, purposePin='가' * 300, answer='가' * 100)

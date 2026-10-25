@@ -62,6 +62,21 @@ export function budgetValue(value) {
 }
 
 // 서버가 다시 확인한 판매가·판매 가능 여부를 조사 카탈로그에 덮는다. 서버 응답이 없으면 조사 가격을 그대로 둔다.
+// 서버 견적(quote)에 나온 부품만 그 판매가로 맞춘다. 견적은 고른 부품 줄만 오므로 나머지 부품은 그대로 둔다
+// (일부 줄로 mergePool 처럼 전체 목록을 덮으면 고르지 않은 부품이 「서버 확인 목록에 없음」이 된다).
+export function applyQuotePrices(catalog, lines) {
+  if (!catalog || !Array.isArray(lines) || !lines.length) return catalog;
+  const by = Object.fromEntries(lines.filter(l => l && Number.isSafeInteger(l.price) && l.price > 0).map(l => [String(l.id), l]));
+  let changed = false;
+  const parts = catalog.parts.map(p => {
+    const l = by[p.id];
+    if (!l || l.price === p.price) return p;
+    changed = true;
+    return {...p, price: l.price, updatedAt: l.updatedAt ?? p.updatedAt};
+  });
+  return changed ? {...catalog, parts} : catalog;
+}
+
 export function mergePool(catalog, pool) {
   if (!pool) return catalog;
   const byId = Object.fromEntries((pool.parts || []).map(p => [p.id, p]));

@@ -75,6 +75,7 @@ SYSTEM = """너는 팝콘PC 고객용 「내 PC 구성」 화면의 부품 상�
 7. 전체 부품 예산과 부품 1개 예산을 섞지 않는다. 예산으로 안 되면 「안 됩니다」로 끝내지 말고 [자료]의 예산 판단(부족 여부·고정 부품 변경 대안)을 근거로
    예산 조정·용도 조정·고정 부품 변경(고객 동의 후) 같은 실행 가능한 방법을 안내한다. 필수 부품이나 파워 여유를 빼서 맞추라고 하지 않는다.
    예산이 넉넉해도 전부 쓰라고 권하지 않는다. 용도에 충분한지와 추가 지출이 무엇을 바꾸는지만 설명한다.
+   예산은 추천·경고 기준이다. 고객은 예산을 넘는 부품·구성도 금액을 확인하고 직접 고를 수 있으니 「예산을 넘어 선택(적용)할 수 없다」고 쓰지 않는다.
 8. 출력은 요청한 JSON 객체 하나뿐이다. 앞뒤에 다른 글·코드 블록 표시를 붙이지 않는다."""
 
 ADVISE_FORMAT = """다음 JSON 하나로만 답하라.
@@ -95,6 +96,7 @@ FILL_FORMAT = """다음 JSON 하나로만 답하라.
  "budget_advice": "예산에 대한 안내 1~3문장(금액 숫자 없이 판정과 방법만, 예산이 없으면 null)",
  "follow_up_questions": ["짧은 후속 질문"]}
 - 예산 안(within=true)의 option 이 있으면 그중에서 고른다. 모두 예산을 넘으면 가장 싼 option 을 고르고, 예산이 부족하다는 사실과 조정 방법(예산 조정·용도 조정·고정 부품 변경)을 budget_advice 에 쓴다. 금액 숫자는 쓰지 않는다(화면이 서버 값으로 보여 준다).
+- 예산을 넘는 option 도 고객이 초과 금액을 확인하고 직접 적용할 수 있다. 「적용할 수 없다」고 쓰지 말고, 넘는다는 사실과 선택지(그대로 적용·예산 조정·더 싼 구성)를 알린다.
 - slot_reasons 는 그 option 의 changed 자리만."""
 
 
@@ -641,6 +643,7 @@ def _default_choice(options: list[dict], purpose: str) -> dict:
 def _option_view(o: dict, sel: dict) -> dict:
     return {'id': o['id'], 'kind': o['kind'], 'label': o['label'], 'total': o['total'], 'within': o['within'],
             'selection': {c: str(p.code) for c, p in o['sel'].items()},
+            'prices': {c: p.price for c, p in o['sel'].items()},          # 화면 행 가격도 이 옵션 합계와 같은 서버 값
             'changed': [c for c in D.CATEGORIES if c not in sel or sel[c].code != o['sel'][c].code],
             'priceKey': D.price_key(o['sel']), 'priceBasis': D.price_basis(o['sel'])}
 
