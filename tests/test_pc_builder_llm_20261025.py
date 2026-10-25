@@ -497,6 +497,125 @@ class BuiltScreenTests(unittest.TestCase):
         self.assertIsNone(re.search(r'sk-[A-Za-z0-9_-]{20,}', js))        # 키 모양 문자열이 번들에 없다
 
 
+
+# ── Codex 독립 재검수(codex-fix-request-20261025.txt, 기준 36971267) 잔여 P2 4건 ──────────────
+class CodexRecheckTests(unittest.TestCase):
+    """재현 입력을 그대로 고정하고, 정상 상품번호·정상 소수 금액·정상 형식 응답·탐색 완료 구성도 함께 본다."""
+
+    def test_p2_1_code_used_as_currency_is_checked(self):
+        self.assertEqual(A.clean_text('이 제품의 가격은 128424원이에요.', {800_700}, set(), frozenset({128424})), ('', 1))
+        self.assertEqual(A.clean_text('이 제품의 가격은 12만 8,424원이에요.', {800_700}, set(), frozenset({128424}))[1], 1)
+        self.assertEqual(A.clean_text('상품번호 128424 제품이에요.', {800_700}, set(), frozenset({128424}))[1], 0)   # 상품번호 표기는 남는다
+        self.assertEqual(A.clean_text('가격은 800,700원이에요.', {800_700}, set(), frozenset({128424}))[1], 0)
+
+    def test_p2_2_decimal_man_won(self):
+        self.assertEqual(A.money_in('이 제품의 가격은 65.5만원이에요.'), [(655_000, True)])
+        self.assertEqual(A.clean_text('이 제품의 가격은 65.5만원이에요.', {800_700}, set(), frozenset({128424})), ('', 1))
+        self.assertEqual(A.clean_text('이 제품의 가격은 65.5만원이에요.', {655_000}, set())[1], 0)
+        self.assertEqual(A.money_in('차이는 0.5만원이에요.'), [(5_000, True)])
+        for spec in ('DDR5-5600 16GB 키트예요.', '2.5인치 SSD와 1.5TB 저장장치예요.', '정격 750W·길이 281mm예요.', 'i5-14400F와 RTX 5060 Ti예요.'):
+            with self.subTest(spec=spec):
+                self.assertEqual(A.money_in(spec), [])
+
+    def test_p2_3_malformed_fields_are_validation_failures(self):
+        self.assertIn('choice', A.shape_problem({'choice': []}, A.FILL_SHAPE))
+        for bad in ({'choice': {}}, {'choice': None}, {'choice': 3}, {'choice': 'opt1', 'slot_reasons': ['x']},
+                    {'choice': 'opt1', 'constraints': 'x'}, {'choice': 'opt1', 'summary': 5}, {'choice': 'opt1', 'follow_up_questions': [1]}):
+            with self.subTest(bad=bad):
+                self.assertIsNotNone(A.shape_problem(bad, A.FILL_SHAPE))
+        self.assertIsNone(A.shape_problem({'choice': 'opt1', 'slot_reasons': {'gpu': '이유'}, 'constraints': ['a']}, A.FILL_SHAPE))
+        for bad in ({'recommendations': []}, {'recommendations': [1]}, {'recommendations': [{'product_code': True}]},
+                    {'recommendations': [{'product_code': 401, 'reason': 5}]}, {'recommendations': [{'product_code': 401}], 'answer': []}):
+            with self.subTest(bad=bad):
+                self.assertIsNotNone(A.shape_problem(bad, A.ADVISE_SHAPE))
+        self.assertIsNone(A.shape_problem({'recommendations': [{'product_code': '401', 'label': '추천'}]}, A.ADVISE_SHAPE))
+
+    def test_p2_3_fill_malformed_twice_is_invalid_with_server_proposal(self):
+        fake, calls = answers({'choice': []}, {'choice': {'id': 'opt1'}, 'slot_reasons': []})
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.fill_core(pool(), A.FillBody(selection={'gpu': '402'}, budgetTotal=2_000_000), None, FakeChecker())
+        self.assertEqual((r['ai']['status'], len(calls)), ('invalid', 2))
+        self.assertIn('choice 의 형식이 틀렸다', calls[1]['prompt'])
+        chosen = next(o for o in r['proposal']['options'] if o['id'] == r['proposal']['chosen'])
+        self.assertEqual(chosen['selection']['gpu'], '402')                 # 고정 부품 보존
+        self.assertEqual(r['proposal']['slotReasons'], {})
+
+    def test_p2_3_malformed_then_valid_advise(self):
+        fake, calls = answers({'recommendations': [{'product_code': [401]}]},
+                              {'answer': '좋아요.', 'recommendations': [{'product_code': 401, 'label': '추천', 'reason': 'r', 'tradeoff': 't'}]})
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.advise_core(pool(), adv(), None, FakeChecker())
+        self.assertEqual((r['ai']['status'], r['ai']['attempts']), ('ok', 2))
+
+    def test_p2_3_validator_crash_becomes_retry_not_500(self):
+        fake, calls = answers({'a': 1}, {'a': 1})
+
+        def boom(data):
+            raise KeyError('x')
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            with self.assertRaises(A.AIFailure) as e:
+                A.ask_ai('[자료]', boom, None)
+        self.assertEqual((e.exception.status, len(calls)), ('invalid', 2))
+
+    # P2-4 -- Codex codex-budget-recheck.py 와 같은 합성 32개 후보: 첫 CPU 는 비싼 파워·나머지 최저가일 때만 호환,
+    # 둘째 CPU 이상은 무엇이든 호환. 기본 탐색 한도로는 비싼 구성(1,700,000원)만 찾고 끝난다 -- 실제 최소는 900,000원.
+    def synthetic(self):
+        from types import SimpleNamespace
+        parts = []
+        for c in D.CATEGORIES:
+            prices = ([100_000, 200_000, 300_000, 400_000] if c == 'cpu' else [100_000, 110_000, 120_000, 1_000_000] if c == 'power'
+                      else [100_000, 110_000, 120_000, 130_000])
+            for price in prices:
+                parts.append(SimpleNamespace(code=len(parts) + 1, category=c, price=price, usable=True, updated_at=None, short=f'{c}{price}'))
+
+        class SynPool:
+            loaded_at = 'synthetic'
+            presets = []
+
+            def __init__(self):
+                self.parts = {p.code: p for p in parts}
+
+            def by_category(self, c, usable_only=True):
+                return sorted([p for p in parts if p.category == c], key=lambda p: p.price)
+
+        class SynChecker:
+            def slot(self, sel, category):
+                if 'power' not in sel:
+                    return 'ok', []
+                if sel['cpu'].price == 100_000:
+                    ok = sel['power'].price == 1_000_000 and all(p.price == 100_000 for c, p in sel.items() if c not in ('cpu', 'power'))
+                else:
+                    ok = True
+                return ('ok', []) if ok else ('fail', ['synthetic'])
+
+            def full(self, sel):
+                return self.slot(sel, 'power')
+        return SynPool(), SynChecker()
+
+    def test_p2_4_exhausted_search_never_claims_min_or_shortfall(self):
+        p, ck = self.synthetic()
+        self.assertEqual(D.node_cap(p), 12_800)                              # 기본 한도 그대로(임의로 낮추지 않음)
+        mb = D.min_build(p, ck, {})
+        self.assertEqual((mb['total'], mb['exhausted']), (1_700_000, True))
+        f = D.feasibility(p, ck, {}, 1_000_000)
+        self.assertEqual((f['status'], f['minTotal'], f['shortfall'], f['foundTotal'], f['minExact']),
+                         ('unknown', None, None, 1_700_000, False))
+        f2 = D.feasibility(p, ck, {}, 2_000_000)                             # 찾은 구성이 예산 안이면 가능은 확정, 최소는 미확정
+        self.assertEqual((f2['status'], f2['minTotal'], f2['headroom'], f2['minExact']), ('feasible', None, 300_000, False))
+        opts = D.fill_options(p, ck, {}, 'gaming', 1_000_000)
+        self.assertIn('최소 여부 확인 못 함', opts[0]['label'])
+
+    def test_p2_4_complete_search_is_exact(self):
+        p, ck = self.synthetic()
+        with patch.object(D, 'node_cap', lambda pool: 10 ** 7):
+            f = D.feasibility(p, ck, {}, 1_000_000)
+        self.assertEqual((f['status'], f['minTotal'], f['minExact'], f['headroom']), ('feasible', 900_000, True, 100_000))
+
+    def test_p2_4_ai_context_marks_inexact_minimum(self):
+        b = A._feas_brief({'status': 'unknown', 'minTotal': None, 'minExact': False, 'foundTotal': 1_700_000, 'relax': []})
+        self.assertIn('최소 금액이 아니다', b['search_note'])
+        self.assertIn(1_700_000, A._allowed_amounts({'feasibility': b}))
+
 if __name__ == '__main__':
     unittest.main()
 

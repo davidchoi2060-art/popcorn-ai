@@ -204,8 +204,8 @@ def _parse_json(raw: str) -> dict | None:
 
 
 # ── 답 글 거름 ───────────────────────────────────────────────────────────
-# 금액: 「78만원」·「77만 8,100원」·「65만 정도」(원 생략)·「800,700원」, 그리고 단위 없는 큰 수(「500000」·「1,200,000」).
-MAN_RX = re.compile(r'(?<![\d.,])(\d[\d,]*)\s*만(?![족큼약일점])(?:\s*(\d[\d,]*)(?=\s*원))?\s*원?')
+# 금액: 「78만원」·「65.5만원」(소수)·「77만 8,100원」·「65만 정도」(원 생략)·「800,700원」, 그리고 단위 없는 큰 수(「500000」·「1,200,000」).
+MAN_RX = re.compile(r'(?<![\d.,])(\d[\d,]*(?:\.\d+)?)\s*만(?![족큼약일점])(?:\s*(\d[\d,]*)(?=\s*원))?\s*원?')
 WON_RX = re.compile(r'(?<![\d만])(\d[\d,]{2,})\s*원')
 BARE_RX = re.compile(r'(?<![\d.,A-Za-z-])(\d{1,3}(?:,\d{3})+|\d{5,})(?![\d,]|\s*(?:GB|TB|W\b|mm|MHz|Hz|개|명|년|%|fps|프레임|코어))', re.I)
 # 확정 표현: 어순이 바뀐 「호환성을 100% 보장합니다」와 수량을 붙인 「재고 2개 남았습니다」까지(Antigravity 검토 1).
@@ -233,27 +233,34 @@ def _core(token: str) -> str:
     return c[-1] if c else token.upper()
 
 
-def amounts_in(text_: str) -> list[int]:
-    """답 글 속 금액(원 단위). 「원」을 빠뜨린 「65만 정도」·「500000」도 센다(Antigravity 검토 2)."""
+def money_in(text_: str) -> list[tuple[int, bool]]:
+    """답 글 속 금액 -> [(원 단위 값, 통화로 썼는가)]. 「만」·「원」이 붙으면 통화, 단위 없는 큰 수(「500000」)는 통화 아님.
+    통화로 쓴 값은 상품번호와 같아도 금액으로 대조한다(Codex 재검수 P2-1). 「65.5만원」 같은 소수 만원도 읽는다(P2-2)."""
     out = []
     for m in MAN_RX.finditer(text_):
         try:
-            out.append(int(m.group(1).replace(',', '')) * 10_000 + (int(m.group(2).replace(',', '')) if m.group(2) else 0))
+            out.append((int(round(float(m.group(1).replace(',', '')) * 10_000))
+                        + (int(m.group(2).replace(',', '')) if m.group(2) else 0), True))
         except ValueError:
             pass
     rest = MAN_RX.sub(' ', text_)
     for m in WON_RX.finditer(rest):
         try:
-            out.append(int(m.group(1).replace(',', '')))
+            out.append((int(m.group(1).replace(',', '')), True))
         except ValueError:
             pass
     rest = WON_RX.sub(' ', rest)
     for m in BARE_RX.finditer(rest):
         try:
-            out.append(int(m.group(1).replace(',', '')))
+            out.append((int(m.group(1).replace(',', '')), False))
         except ValueError:
             pass
     return out
+
+
+def amounts_in(text_: str) -> list[int]:
+    """답 글 속 금액(원 단위) 값만."""
+    return [v for v, _ in money_in(text_)]
 
 
 def amount_ok(v: int, allowed: set[int]) -> bool:
@@ -273,7 +280,8 @@ def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str], co
         s = sent.strip()
         if not s:
             continue
-        bad = (BANNED.search(s) or any(a not in codes and not amount_ok(a, allowed_amounts) for a in amounts_in(s))
+        bad = (BANNED.search(s)
+               or any(not amount_ok(v, allowed_amounts) and (currency or v not in codes) for v, currency in money_in(s))
                or any(_core(m.group(0)) not in known_models for m in MODEL_RX.finditer(s)))
         if bad:
             dropped += 1
@@ -289,6 +297,41 @@ def _models_of(parts) -> set[str]:
     for p in parts:
         out.update(_cores(f'{p.name} {p.short}'))
     return out
+
+
+# ── 모델 응답 형식 ───────────────────────────────────────────────────────
+# 값의 뜻(허용 후보·option id)을 보기 전에 모양부터 본다. 틀린 모양은 예외가 아니라 「검증 실패」 문장으로 돌려
+# 재질문·서버 후보 처리로 간다(Codex 재검수 P2-3: {"choice": []} 가 TypeError 를 냈다).
+def _is_code(v) -> bool:
+    return (type(v) is int and v > 0) or (isinstance(v, str) and v.isdigit())
+
+
+SHAPES = {
+    'str': lambda v: isinstance(v, str),
+    'str?': lambda v: v is None or isinstance(v, str),
+    'str_list': lambda v: isinstance(v, list) and all(isinstance(x, str) for x in v),
+    'str_map': lambda v: isinstance(v, dict) and all(isinstance(k, str) and isinstance(x, str) for k, x in v.items()),
+    'recs': lambda v: isinstance(v, list) and bool(v) and all(
+        isinstance(r, dict) and _is_code(r.get('product_code'))
+        and all(r.get(k) is None or isinstance(r.get(k), str) for k in ('label', 'reason', 'tradeoff')) for r in v),
+}
+ADVISE_SHAPE = {'answer': ('str?', False), 'recommendations': ('recs', True), 'follow_up_questions': ('str_list', False)}
+FILL_SHAPE = {'choice': ('str', True), 'summary': ('str?', False), 'slot_reasons': ('str_map', False),
+              'constraints': ('str_list', False), 'budget_advice': ('str?', False), 'follow_up_questions': ('str_list', False)}
+
+
+def shape_problem(data, shape: dict) -> str | None:
+    """응답 JSON 이 약속한 모양인가. 틀리면 무엇이 틀렸는지 한 문장(재질문에 그대로 쓴다), 맞으면 None."""
+    if not isinstance(data, dict):
+        return 'JSON 객체가 아니다'
+    for key, (kind, required) in shape.items():
+        if key not in data or data[key] is None:
+            if required:
+                return f'{key} 가 없다'
+            continue
+        if not SHAPES[kind](data[key]):
+            return f'{key} 의 형식이 틀렸다({type(data[key]).__name__})'
+    return None
 
 
 # ── AI 호출 ──────────────────────────────────────────────────────────────
@@ -335,7 +378,11 @@ def ask_ai(prompt: str, validate, request: Request | None):
             log.exception('[pc-builder] llm call failed')
             raise AIFailure('unavailable', attempt)
         data = _parse_json(last.text)
-        problem = 'JSON 객체 하나로 답하지 않았다' if data is None else validate(data)
+        try:
+            problem = 'JSON 객체 하나로 답하지 않았다' if data is None else validate(data)
+        except Exception as e:          # 검증기가 예상 못 한 모양에 넘어지면 그것도 검증 실패다(고객 요청이 500 으로 끝나지 않게)
+            log.exception('[pc-builder] validator crashed')
+            problem = f'응답 형식을 확인하지 못했다({type(e).__name__})'
         if problem is None:
             return data, last, attempt
         log.warning('[pc-builder] ai answer rejected (attempt %d): %s', attempt, problem)
@@ -359,17 +406,20 @@ def _cand_brief(c: dict) -> dict:
 
 
 def _feas_brief(f: dict) -> dict:
-    keys = ('status', 'budget', 'minTotal', 'minTotalFree', 'shortfall', 'headroom', 'scope', 'priceBasis')
+    keys = ('status', 'budget', 'minTotal', 'minExact', 'foundTotal', 'minTotalFree', 'shortfall', 'headroom', 'scope', 'priceBasis')
     out = {k: f.get(k) for k in keys}
-    out['relax'] = [{k: r[k] for k in ('label', 'current', 'currentPrice', 'replacement', 'minTotal', 'saving', 'fits')}
+    out['relax'] = [{k: r.get(k) for k in ('label', 'current', 'currentPrice', 'replacement', 'minTotal', 'exact', 'saving', 'fits')}
                     for r in f.get('relax', [])[:3]]
     out['note'] = D.PRICE_NOTE
+    if f.get('minExact') is False:
+        out['search_note'] = ('탐색 한도 안에서 모든 조합을 다 보지 못했다. foundTotal 은 찾은 구성의 금액이지 최소 금액이 아니다. '
+                              '「최소」「부족액」이라고 단정하지 말고 「찾은 구성 기준」이라고 말한다.')
     return out
 
 
 MONEY_KEYS = {'price', 'price_diff_vs_current', 'total_after_choose', 'totalBudget', 'partBudget', 'otherSelectedTotal',
               'cheapestRestOfEmptySlots', 'budget', 'minTotal', 'minTotalFree', 'shortfall', 'headroom', 'currentPrice',
-              'saving', 'total', 'over_budget_by', 'left_in_budget', 'over_part_budget_by',
+              'saving', 'total', 'over_budget_by', 'left_in_budget', 'over_part_budget_by', 'foundTotal',
               'over_total_budget_by_with_cheapest_rest'}
 
 
@@ -490,15 +540,11 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
               f'[고객 질문]\n{question or "(질문 없음 — 이 자리에서 먼저 볼 후보를 추천해 달라는 요청)"}\n\n{ADVISE_FORMAT}')
 
     def validate(data):
-        recs = data.get('recommendations')
-        if not isinstance(recs, list) or not recs:
-            return 'recommendations 가 비어 있다'
-        for r in recs[:3]:
-            code = r.get('product_code') if isinstance(r, dict) else None
-            try:
-                code = int(code)
-            except (TypeError, ValueError):
-                return f'product_code {code!r} 가 정수가 아니다'
+        problem = shape_problem(data, ADVISE_SHAPE)
+        if problem:
+            return problem
+        for r in data['recommendations'][:3]:
+            code = int(r['product_code'])
             if code not in allowed:
                 part = pool.get(code)
                 where = f'{D.LABEL[part.category]} 상품' if part else '목록에 없는 번호'
@@ -634,7 +680,10 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
     any_within = any(o['within'] for o in options)
 
     def validate(data):
-        choice = data.get('choice')
+        problem = shape_problem(data, FILL_SHAPE)
+        if problem:
+            return problem
+        choice = data['choice']
         if choice not in by_id:
             return f'choice {choice!r} 는 options 의 id 가 아니다(허용: {", ".join(by_id)})'
         if any_within and not by_id[choice]['within']:
