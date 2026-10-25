@@ -792,6 +792,19 @@ class CustomerE2ETests(unittest.TestCase):
         self.assertEqual(A.clean_text('상품번호 128424, VRAM 8GB, 길이 281mm예요.', {800_700}, set(), frozenset({128424}), no_money=True)[1], 0)
         self.assertEqual(A.clean_text('가격은 800,700원이에요.', {800_700}, set(), frozenset(), no_money=True)[1], 1)
 
+    def test_e2e01_money_guard_short_and_cheon_units(self):
+        # E2E-01 예비검사(money-guard-wip-recheck) 잔여 2입력 + 보존 대조
+        codes, models = frozenset({128424}), {'5060'}
+        for s in ('차이는5천원이에요.', '50원남아요.', '차이는 5천 원이에요.', '3만 정도 남아요.', '1.5억이 들어요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, set(), models, codes, no_money=True), ('', 1))
+        for s in ('RTX5060 모델을 확인해 보세요.', '상품번호128424입니다.', '16GB 메모리예요.', '만족스러운 구성이에요.',
+                  'DDR5-5600 메모리와 2.5인치 SSD예요.', '정격 750W·길이 281mm예요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, set(), models, codes, no_money=True)[1], 0)
+        self.assertIn('금액 숫자는 쓰지 않는다', A.FILL_FORMAT)
+        self.assertNotIn('부족액과 대안을 budget_advice', A.FILL_FORMAT)
+
     def test_e2e02_proposal_tabs_node_regression(self):
         import shutil
         import subprocess
