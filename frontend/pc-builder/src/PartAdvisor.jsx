@@ -94,16 +94,23 @@ export default function PartAdvisor({category, byId={}, selection={}, purpose='g
   function card(p, index, isRec) {
     const part = byId[p.id], chosen = current?.id === p.id;
     const over = p.withinTotalBudget === false, overPart = p.withinPartBudget === false;
+    // 금액 역할: 선택 합계 = 이미 고른 부품 + 이 부품(빈 자리 제외) · 완성 최소 = 빈 자리까지 호환 부품으로 채운 전체 합계(서버 탐색)
+    const complete = p.completeState === 'exact' ? `빈 자리까지 호환 부품으로 채운 완성 최소 ${money(p.completeMin)}`
+      : p.completeState === 'found' ? `빈 자리까지 채운 완성 구성 ${money(p.completeFound)}(최소 금액은 확인 못 함)`
+      : p.completeState === 'none' ? '이 부품으로는 빈 자리를 호환 부품으로 채울 수 없어요'
+      : p.completeState === 'unknown' ? '빈 자리까지 채운 완성 금액을 확인하지 못했어요' : null;
+    const versus = numericBudget > 0 && p.withinTotalBudget === true ? ` · 전체 예산 안(${p.completeState === 'found' ? '적어도 ' : ''}${money(p.totalHeadroom)} 남음)`
+      : numericBudget > 0 && p.withinTotalBudget === false ? ` · 전체 예산보다 ${money(p.overTotalBudget)} 많음` : '';
     return <article key={p.id} className={`pa-card ${index===0&&isRec?'focused':''}`}>
       <div className="pa-card-top"><img src={part?.image} alt={p.shortName}/><div>
-        <div className="pa-card-tags"><span>{chosen?'현재 선택':isRec?(p.label||'추천'):'함께 볼 후보'}</span>{overPart&&<span className="over">부품 상한 초과</span>}{over&&<span className="over">전체 예산 초과 가능</span>}{p.state==='unknown'&&<span className="over">규격 확인 필요</span>}</div>
+        <div className="pa-card-tags"><span>{chosen?'현재 선택':isRec?(p.label||'추천'):'함께 볼 후보'}</span>{overPart&&<span className="over">부품 상한 초과</span>}{over&&<span className="over">완성 시 전체 예산 초과</span>}{p.state==='unknown'&&<span className="over">규격 확인 필요</span>}</div>
         <h4>{p.shortName || p.name}</h4><p className="pa-product-full">{p.name}</p>{part?.specs?.length?<p className="pa-specs">판매처 표기(조사 시점): {part.specs.join(' · ')}</p>:null}</div></div>
       <div className="pa-reason"><strong><Sparkles size={13}/> {isRec&&ai?.status==='ok'?'왜 이 후보인가요?':'서버가 확인한 근거'}</strong>
         {isRec&&p.reason?<p className="pa-ai-reason">{p.reason}</p>:null}
         <ul className="pa-evidence">{Object.entries(p.facts || {}).slice(0,4).map(([k,v]) => <li key={k}>{k}: {Array.isArray(v)?v.join(', '):String(v)}</li>)}
           <li>{p.state==='ok'?'고른 부품과 서버 호환 판정 통과':`확인 필요: ${(p.checks||[]).join(', ')}`}</li>{(p.notes||[]).map(n => <li key={n}>{n}</li>)}</ul>
         {isRec&&p.tradeoff?<small>{p.tradeoff}</small>:null}</div>
-      <div className="pa-price"><div><strong>{money(p.price)}</strong><span>{part?.unit || '1개'} 기준 · 서버 판매가</span></div><small>{p.priceDiff!=null?`지금 선택보다 ${p.priceDiff>=0?'+':''}${money(p.priceDiff)} · `:''}이 부품 적용 후 선택 합계 <b>{money(p.totalAfter)}</b></small></div>
+      <div className="pa-price"><div><strong>{money(p.price)}</strong><span>{part?.unit || '1개'} 기준 · 서버 판매가</span></div><small>{p.priceDiff!=null?`지금 선택보다 ${p.priceDiff>=0?'+':''}${money(p.priceDiff)} · `:''}고른 부품 + 이 부품 선택 합계 <b>{money(p.selectedTotal)}</b>(빈 자리 제외)</small>{complete&&<small className="pa-complete">{complete}{versus}</small>}</div>
       <div className="pa-card-actions"><button type="button" className="pa-question-button" disabled={loading} onClick={()=>ask(`${p.shortName}, 왜 이 부품을 추천하나요? 다른 후보와 비교해 주세요.`)}>이유 더 듣기</button>
         <button type="button" className="pa-choose" disabled={!part || loading} onClick={()=>onChoose(part)}>{chosen?'현재 선택 유지':'이 부품 선택'}{chosen?<Check size={16}/>:<ArrowRight size={16}/>}</button></div>
       {part?.sourceUrl&&<a className="pa-source" href={part.sourceUrl} target="_blank" rel="noreferrer">팝콘PC 원상품 {p.id}<ExternalLink size={11}/></a>}
@@ -127,7 +134,7 @@ export default function PartAdvisor({category, byId={}, selection={}, purpose='g
           {feas?.status==='feasible'&&<span>{feas.minExact===false?`고른 부품 유지 시 예산 안 구성 확인(찾은 구성 ${money(feas.foundTotal)} · 적어도 ${money(feas.headroom)} 여유, 최소 금액은 확인 못 함)`:`고른 부품 유지 시 최소 구성 ${money(feas.minTotal)} · 전체 예산에서 ${money(feas.headroom)} 여유`}</span>}
           {feas?.status==='unknown'&&<span className="pa-warn">{feas.foundTotal?`가능한 조합을 모두 살펴보지 못했어요. 찾은 구성 ${money(feas.foundTotal)} 기준이며 최소 금액·부족액은 확정하지 않았어요.`:'가능한 조합을 모두 살펴보지 못해 최소 금액을 확인하지 못했어요.'}</span>}
           {feas?.status==='no_budget'&&<span>전체 예산을 정하면 남은 금액을 함께 비교해요.</span>}
-          {result?.restMin>0&&<small>아직 고르지 않은 다른 자리를 가장 싸게 채우면 {money(result.restMin)}이 더 들어요(서버 확인 후보 기준).</small>}</div>
+          {result?.restMin>0&&<small>이 자리를 뺀 나머지 빈 자리를 가장 싼 후보로 채우면 적어도 {money(result.restMin)}이 더 들어요(호환 확인 전 하한 · 카드의 완성 금액은 호환까지 확인한 값).</small>}</div>
         {ai&&ai.status!=='ok'&&ai.message&&<div className="pa-ai-note"><AlertCircle size={16}/><p>{ai.message}</p></div>}
         <div className="pa-card-list">{recs.map((p,i)=>card(p,i,true))}{others.slice(0,Math.max(0,3-recs.length)).map((p,i)=>card(p,i+recs.length,false))}</div>
         {result&&!recs.length&&!others.length&&<div className="pa-empty"><Info size={26}/><h4>지금 조건으로 제안할 후보가 없어요.</h4><p>{result.answer}</p>{(result.excluded||[]).length>0&&<p className="pa-excluded">담을 수 없는 상품: {result.excluded.map(x=>`${x.shortName}(${x.reason})`).join(', ')}</p>}<button type="button" onClick={resetConditions}><RotateCcw size={15}/>상담 조건만 초기화</button></div>}
