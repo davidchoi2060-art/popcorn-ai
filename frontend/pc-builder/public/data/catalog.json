@@ -1,0 +1,864 @@
+{
+  "asOf": "2026-10-23",
+  "scope": "당일 조사 자료에서 구매 버튼과 양수 개별판매가를 확인한 32개 부품의 화면 시안용 목록. 실제 보유 수량·현재 주문 가능·조합 호환성 검증을 뜻하지 않습니다.",
+  "parts": [
+    {
+      "id": "119268",
+      "category": "cpu",
+      "name": "[병행] 인텔 코어i3-14세대 14100F (랩터레이크리프레시) (벌크)",
+      "shortName": "인텔 코어 i3-14100F",
+      "price": 113400,
+      "image": "/assets/parts/119268.jpg",
+      "specs": [
+        "4코어 · 8스레드",
+        "LGA1700 · 내장그래픽 없음",
+        "병행 벌크 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=119268",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "intel-ddr4"
+      ],
+      "facts": {
+        "socket": "LGA1700"
+      }
+    },
+    {
+      "id": "128419",
+      "category": "gpu",
+      "name": "PALIT 지포스 RTX 3050 STORM X D6 6GB 이엠텍",
+      "shortName": "PALIT RTX 3050 STORM X",
+      "price": 382900,
+      "image": "/assets/parts/128419.jpg",
+      "specs": [
+        "GDDR6 · 6GB",
+        "길이 162mm",
+        "권장 파워 표기 300W 이상"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128419",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "109547",
+      "category": "memory",
+      "name": "삼성전자 DDR4-3200 (16GB) PC4-25600 [8Gx2]",
+      "shortName": "삼성 DDR4 16GB 키트",
+      "price": 225800,
+      "image": "/assets/parts/109547.jpg",
+      "specs": [
+        "DDR4-3200",
+        "총 16GB · 8GB × 2개",
+        "판매단위 1키트"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=109547",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1키트 (8GB × 2)",
+      "profileTags": [
+        "intel-ddr4"
+      ],
+      "facts": {
+        "memoryType": "DDR4"
+      }
+    },
+    {
+      "id": "128462",
+      "category": "storage",
+      "name": "Western Digital WD Blue SN5100 M.2 NVMe (500GB)",
+      "shortName": "WD Blue SN5100 500GB",
+      "price": 212400,
+      "image": "/assets/parts/128462.jpg",
+      "specs": [
+        "500GB",
+        "M.2 NVMe · 2280",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128462",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "113685",
+      "category": "board",
+      "name": "GIGABYTE H610M H V2 D4 [피씨디렉트/제이씨현]",
+      "shortName": "GIGABYTE H610M H V2 D4",
+      "price": 77000,
+      "image": "/assets/parts/113685.jpg",
+      "specs": [
+        "LGA1700 · H610",
+        "DDR4 · 메모리 슬롯 2개",
+        "m-ATX"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113685",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "intel-ddr4"
+      ],
+      "facts": {
+        "socket": "LGA1700",
+        "memoryType": "DDR4"
+      }
+    },
+    {
+      "id": "121846",
+      "category": "cooler",
+      "name": "JIUSHARK JF120R Emerald RGB (블랙)",
+      "shortName": "JIUSHARK JF120R Emerald",
+      "price": 19000,
+      "image": "/assets/parts/121846.jpg",
+      "specs": [
+        "공랭 · RGB · 블랙",
+        "높이 157mm",
+        "LGA1700 · AM5 표기"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=121846",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "111146",
+      "category": "power",
+      "name": "마이크로닉스 COOLMAX VISION II 500W",
+      "shortName": "COOLMAX VISION II 500W",
+      "price": 39500,
+      "image": "/assets/parts/111146.jpg",
+      "specs": [
+        "정격 500W",
+        "ATX",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=111146",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {
+        "watts": 500
+      }
+    },
+    {
+      "id": "111087",
+      "category": "case",
+      "name": "앱코 NCORE G30 트루포스 블랙 (미들타워)",
+      "shortName": "앱코 NCORE G30 트루포스",
+      "price": 45800,
+      "image": "/assets/parts/111087.jpg",
+      "specs": [
+        "블랙 · 미들타워",
+        "GPU 최대 340mm",
+        "CPU 쿨러 최대 175mm"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=111087",
+      "sourcePcIds": [
+        "90675"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "113800",
+      "category": "cpu",
+      "name": "AMD 라이젠5-5세대 7500F (라파엘) (멀티팩(정품))",
+      "shortName": "AMD 라이젠 5 7500F",
+      "price": 169400,
+      "image": "/assets/parts/113800.jpg",
+      "specs": [
+        "6코어 · 12스레드",
+        "AM5 · 내장그래픽 없음",
+        "멀티팩 정품 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113800",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5"
+      }
+    },
+    {
+      "id": "124631",
+      "category": "gpu",
+      "name": "MSI 지포스 RTX 5060 Ti 벤투스 2X OC 플러스 D7 8GB",
+      "shortName": "MSI RTX 5060 Ti 벤투스",
+      "price": 828100,
+      "image": "/assets/parts/124631.jpg",
+      "specs": [
+        "GDDR7 · 8GB",
+        "길이 227mm",
+        "권장 파워 표기 600W 이상"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=124631",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "113850",
+      "category": "memory",
+      "name": "ESSENCORE KLEVV DDR5-5600 CL46 파인인포 (16GB)",
+      "shortName": "KLEVV DDR5 16GB",
+      "price": 354000,
+      "image": "/assets/parts/113850.jpg",
+      "specs": [
+        "DDR5-5600 · CL46",
+        "16GB 단품",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113850",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "126198",
+      "category": "storage",
+      "name": "키오시아 EXCERIA PLUS G4 M.2 NVMe (1TB)",
+      "shortName": "키오시아 EXCERIA PLUS G4 1TB",
+      "price": 380800,
+      "image": "/assets/parts/126198.jpg",
+      "specs": [
+        "1TB",
+        "M.2 NVMe · 2280",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=126198",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "123917",
+      "category": "board",
+      "name": "ASRock B650M Pro X3D 대원씨티에스/에즈윈/디앤디컴",
+      "shortName": "ASRock B650M Pro X3D",
+      "price": 148900,
+      "image": "/assets/parts/123917.jpg",
+      "specs": [
+        "AM5 · B650",
+        "DDR5 · 메모리 슬롯 4개",
+        "m-ATX"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=123917",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5",
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "128119",
+      "category": "cooler",
+      "name": "쿨러마스터 HYPER 212 SPECTRUM V3 ARGB",
+      "shortName": "쿨러마스터 HYPER 212",
+      "price": 19500,
+      "image": "/assets/parts/128119.jpg",
+      "specs": [
+        "공랭 · ARGB",
+        "높이 152mm",
+        "LGA1700 · AM5 표기"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128119",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "128870",
+      "category": "power",
+      "name": "마이크로닉스 Classic II 풀체인지 700W 80PLUS실버 ATX3.1",
+      "shortName": "Classic II 700W SILVER",
+      "price": 81600,
+      "image": "/assets/parts/128870.jpg",
+      "specs": [
+        "정격 700W",
+        "80 PLUS 실버 · ATX3.1",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128870",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {
+        "watts": 700
+      }
+    },
+    {
+      "id": "120979",
+      "category": "case",
+      "name": "마이크로닉스 COOLMAX 스테디 블랙 (미들타워)",
+      "shortName": "마이크로닉스 COOLMAX 스테디",
+      "price": 42600,
+      "image": "/assets/parts/120979.jpg",
+      "specs": [
+        "블랙 · 미들타워",
+        "GPU 최대 355mm",
+        "CPU 쿨러 최대 165mm"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120979",
+      "sourcePcIds": [
+        "129493"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "113254",
+      "category": "cpu",
+      "name": "AMD 라이젠7-5세대 7800X3D (라파엘) (멀티팩(정품))",
+      "shortName": "AMD 라이젠 7 7800X3D",
+      "price": 395400,
+      "image": "/assets/parts/113254.jpg",
+      "specs": [
+        "8코어 · 16스레드",
+        "AM5 · 3D V캐시",
+        "멀티팩 · 쿨러 없음"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113254",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5"
+      }
+    },
+    {
+      "id": "123708",
+      "category": "gpu",
+      "name": "ASRock 라데온 RX 9070 XT 스틸레전드 D6 16GB 대원씨티에스",
+      "shortName": "ASRock RX 9070 XT 스틸레전드",
+      "price": 1488500,
+      "image": "/assets/parts/123708.jpg",
+      "specs": [
+        "GDDR6 · 16GB",
+        "길이 298mm",
+        "권장 파워 표기 800W 이상"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=123708",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "127555",
+      "category": "memory",
+      "name": "ESSENCORE KLEVV DDR5-5600 CL46 32GB [16G x 2]",
+      "shortName": "KLEVV DDR5 32GB 키트",
+      "price": 680500,
+      "image": "/assets/parts/127555.jpg",
+      "specs": [
+        "DDR5-5600 · CL46",
+        "총 32GB · 16GB × 2개",
+        "판매단위 1키트"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127555",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1키트 (16GB × 2)",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "113969",
+      "category": "storage",
+      "name": "Western Digital WD BLACK SN850X M.2 NVMe (1TB)",
+      "shortName": "WD BLACK SN850X 1TB",
+      "price": 403600,
+      "image": "/assets/parts/113969.jpg",
+      "specs": [
+        "1TB",
+        "M.2 NVMe · 2280",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113969",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "127659",
+      "category": "board",
+      "name": "ASUS TUF Gaming B850M-PLUS II 대원씨티에스",
+      "shortName": "ASUS TUF B850M-PLUS II",
+      "price": 236000,
+      "image": "/assets/parts/127659.jpg",
+      "specs": [
+        "AM5 · B850",
+        "DDR5 · 메모리 슬롯 4개",
+        "m-ATX"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127659",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5",
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "121011",
+      "category": "cooler",
+      "name": "3RSYS Socoool RC1900N 솔더링 (BLACK)",
+      "shortName": "3RSYS RC1900N 솔더링",
+      "price": 76500,
+      "image": "/assets/parts/121011.jpg",
+      "specs": [
+        "RC1900N · BLACK",
+        "판매단위 1개",
+        "상세 장착 규격 미확인"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=121011",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "122119",
+      "category": "power",
+      "name": "시소닉 NEW FOCUS V4 GX-850 GOLD 풀모듈러 ATX3.1",
+      "shortName": "시소닉 FOCUS V4 GX-850",
+      "price": 209300,
+      "image": "/assets/parts/122119.jpg",
+      "specs": [
+        "정격 850W",
+        "80 PLUS GOLD · 풀모듈러",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=122119",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {
+        "watts": 850
+      }
+    },
+    {
+      "id": "123208",
+      "category": "case",
+      "name": "Antec FLUX MESH BTF 블랙 (미들타워)",
+      "shortName": "Antec FLUX MESH BTF",
+      "price": 131400,
+      "image": "/assets/parts/123208.jpg",
+      "specs": [
+        "블랙 · 미들타워",
+        "GPU 최대 408mm",
+        "CPU 쿨러 최대 180mm"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=123208",
+      "sourcePcIds": [
+        "128601"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "128699",
+      "category": "cpu",
+      "name": "AMD 라이젠5-5세대 7500X3D (라파엘) (멀티팩 정품)",
+      "shortName": "AMD 라이젠 5 7500X3D",
+      "price": 323400,
+      "image": "/assets/parts/128699.jpg",
+      "specs": [
+        "6코어 · 12스레드",
+        "AM5 · 3D V캐시",
+        "멀티팩 정품 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128699",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5"
+      }
+    },
+    {
+      "id": "128424",
+      "category": "gpu",
+      "name": "GIGABYTE 지포스 RTX 5060 Ti EAGLE MAX OC D7 8GB 피씨디렉트",
+      "shortName": "GIGABYTE RTX 5060 Ti EAGLE",
+      "price": 778100,
+      "image": "/assets/parts/128424.jpg",
+      "specs": [
+        "GDDR7 · 8GB",
+        "길이 281mm",
+        "권장 파워 표기 650W 이상"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128424",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "127917",
+      "category": "memory",
+      "name": "AGI DDR5-5600 CL46 UD238 서린 (16GB)",
+      "shortName": "AGI DDR5 16GB",
+      "price": 325200,
+      "image": "/assets/parts/127917.jpg",
+      "specs": [
+        "DDR5-5600 · CL46",
+        "16GB 단품",
+        "판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127917",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "121365",
+      "category": "storage",
+      "name": "삼성전자 PM9A1 M.2 NVMe 벌크 (1TB)",
+      "shortName": "삼성 PM9A1 1TB",
+      "price": 390000,
+      "image": "/assets/parts/121365.jpg",
+      "specs": [
+        "1TB",
+        "M.2 NVMe · 2280",
+        "벌크 · 판매단위 1개"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=121365",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "113700",
+      "category": "board",
+      "name": "GIGABYTE B650M K [피씨디렉트/제이씨현]",
+      "shortName": "GIGABYTE B650M K",
+      "price": 117900,
+      "image": "/assets/parts/113700.jpg",
+      "specs": [
+        "AM5 · B650",
+        "DDR5 · 메모리 슬롯 4개",
+        "m-ATX"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=113700",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "amd-ddr5"
+      ],
+      "facts": {
+        "socket": "AM5",
+        "memoryType": "DDR5"
+      }
+    },
+    {
+      "id": "127522",
+      "category": "cooler",
+      "name": "PCCOOLER CPS RT620 PRO 카본스틸 (블랙)",
+      "shortName": "PCCOOLER CPS RT620 PRO",
+      "price": 39900,
+      "image": "/assets/parts/127522.jpg",
+      "specs": [
+        "공랭 듀얼타워 · 블랙",
+        "높이 153mm",
+        "LGA1700 · AM5 표기"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=127522",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "120917",
+      "category": "power",
+      "name": "앱코 SETTLER 하이브리드 STH-800B ETA BRONZE 블랙 PCIE5.1",
+      "shortName": "앱코 SETTLER STH-800B",
+      "price": 64700,
+      "image": "/assets/parts/120917.jpg",
+      "specs": [
+        "STH-800B · 블랙",
+        "ETA BRONZE · PCIE5.1",
+        "정격 상세 규격 미확인"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=120917",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    },
+    {
+      "id": "128611",
+      "category": "case",
+      "name": "DAVEN D7 Mesh 세븐팬 (블랙)",
+      "shortName": "DAVEN D7 Mesh 세븐팬",
+      "price": 49600,
+      "image": "/assets/parts/128611.jpg",
+      "specs": [
+        "블랙 · 미들타워",
+        "GPU 최대 400mm",
+        "CPU 쿨러 최대 170mm"
+      ],
+      "stock": "listed",
+      "stockLabel": "판매목록 확인",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/product_detail.html?pd_no=128611",
+      "sourcePcIds": [
+        "129767"
+      ],
+      "unit": "1개",
+      "profileTags": [
+        "universal"
+      ],
+      "facts": {}
+    }
+  ],
+  "presets": [
+    {
+      "id": "office-start",
+      "name": "사무·일상 기본 구성",
+      "purpose": "office",
+      "description": "팝콘PC 90675의 8개 기본 부품을 가져온 시작 구성입니다. 16GB 키트와 RTX 3050을 포함합니다.",
+      "components": {
+        "cpu": "119268",
+        "gpu": "128419",
+        "memory": "109547",
+        "storage": "128462",
+        "board": "113685",
+        "cooler": "121846",
+        "power": "111146",
+        "case": "111087"
+      },
+      "sourcePcId": "90675",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=90675"
+    },
+    {
+      "id": "gaming-start",
+      "name": "게임용 시작 구성",
+      "purpose": "gaming",
+      "description": "팝콘PC 129493의 8개 기본 부품을 가져온 시작 구성입니다. Ryzen 7500F와 RTX 5060 Ti를 포함합니다.",
+      "components": {
+        "cpu": "113800",
+        "gpu": "124631",
+        "memory": "113850",
+        "storage": "126198",
+        "board": "123917",
+        "cooler": "128119",
+        "power": "128870",
+        "case": "120979"
+      },
+      "sourcePcId": "129493",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=129493"
+    },
+    {
+      "id": "creator-start",
+      "name": "32GB·16GB 그래픽 구성",
+      "purpose": "creator",
+      "description": "팝콘PC 128601의 8개 기본 부품을 가져온 시작 구성입니다. 용도 적합성과 최종 호환성은 확인이 필요합니다.",
+      "components": {
+        "cpu": "113254",
+        "gpu": "123708",
+        "memory": "127555",
+        "storage": "113969",
+        "board": "127659",
+        "cooler": "121011",
+        "power": "122119",
+        "case": "123208"
+      },
+      "sourcePcId": "128601",
+      "sourceUrl": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=128601"
+    }
+  ]
+}

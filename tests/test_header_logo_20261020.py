@@ -33,7 +33,7 @@ def test_pages_bumped():
         if "assets/js/core.js" in t:
             assert "core.js?v=20261022-biz2" in t, p.name  # 2026-10-21 하단 회사정보·정책 링크
         if "assets/css/header-ui.css" in t:
-            assert "header-ui.css?v=20261022-pat1" in t, p.name
+            assert "header-ui.css?v=20261025-builder1" in t, p.name
 
 
 def test_header_ui_finds_brand_with_extra_class():
