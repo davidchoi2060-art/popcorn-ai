@@ -97,3 +97,7 @@ body{min-width:0}
 .proposal-footer-total .footer-over{color:#a56e35;font-weight:700}
 .review-budget{text-align:left;margin:4px 0 12px}
 @media(max-width:760px){.proposal-dialog>.dialog-footer>button{white-space:normal;line-height:1.3;height:auto}.proposal-footer-total small{min-width:0}.proposal-footer-total strong{white-space:nowrap}}
+/* 하단 고정 바 금액 한 줄(최종 QA 2026-10-26, Antigravity 지적) — 320에서 「174,100」과 「원」이 두 줄로 나뉘었다(390도 7자리 금액에서 같음).
+   금액 칸은 줄지 않게 두고 버튼은 원래 자기 폭을 유지하되 모자라면 버튼 글자만 줄바꿈한다. 아주 좁은 폭에서만 금액 글자를 조금 줄인다 */
+@media(max-width:760px){.mobile-bottom-bar>div{flex:0 0 auto}.mobile-bottom-bar>div strong{white-space:nowrap}.mobile-bottom-bar .primary-button{flex:0 1 auto;min-width:0;max-width:none}}
+@media(max-width:370px){.mobile-bottom-bar{gap:10px}.mobile-bottom-bar>div strong{font-size:19px}.mobile-bottom-bar .primary-button{padding-inline:12px}}
