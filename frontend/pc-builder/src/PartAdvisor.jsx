@@ -124,13 +124,14 @@ export default function PartAdvisor({category, byId={}, selection={}, purpose='g
       <section className="pa-recommendations" aria-label={`${category.name} 추천 후보`}><div className="pa-section-title"><SlidersHorizontal size={17}/><h3>지금 조건의 후보</h3><span>{ai?AI_LABEL[ai.status]||'서버 확인 후보':'확인 중'}</span></div>
         <div className="pa-budget"><span>다른 선택 부품 합계 <strong>{money(otherTotal)}</strong></span>
           {feas?.status==='over'&&<span className="pa-warn">고른 부품을 유지하면 {category.name}을 포함한 최소 구성 {money(feas.minTotal)} · 전체 예산보다 {money(feas.shortfall)} 부족</span>}
-          {feas?.status==='feasible'&&<span>고른 부품 유지 시 최소 구성 {money(feas.minTotal)} · 전체 예산에서 {money(feas.headroom)} 여유</span>}
+          {feas?.status==='feasible'&&<span>{feas.minExact===false?`고른 부품 유지 시 예산 안 구성 확인(찾은 구성 ${money(feas.foundTotal)} · 적어도 ${money(feas.headroom)} 여유, 최소 금액은 확인 못 함)`:`고른 부품 유지 시 최소 구성 ${money(feas.minTotal)} · 전체 예산에서 ${money(feas.headroom)} 여유`}</span>}
+          {feas?.status==='unknown'&&<span className="pa-warn">{feas.foundTotal?`가능한 조합을 모두 살펴보지 못했어요. 찾은 구성 ${money(feas.foundTotal)} 기준이며 최소 금액·부족액은 확정하지 않았어요.`:'가능한 조합을 모두 살펴보지 못해 최소 금액을 확인하지 못했어요.'}</span>}
           {feas?.status==='no_budget'&&<span>전체 예산을 정하면 남은 금액을 함께 비교해요.</span>}
           {result?.restMin>0&&<small>아직 고르지 않은 다른 자리를 가장 싸게 채우면 {money(result.restMin)}이 더 들어요(서버 확인 후보 기준).</small>}</div>
         {ai&&ai.status!=='ok'&&ai.message&&<div className="pa-ai-note"><AlertCircle size={16}/><p>{ai.message}</p></div>}
         <div className="pa-card-list">{recs.map((p,i)=>card(p,i,true))}{others.slice(0,Math.max(0,3-recs.length)).map((p,i)=>card(p,i+recs.length,false))}</div>
         {result&&!recs.length&&!others.length&&<div className="pa-empty"><Info size={26}/><h4>지금 조건으로 제안할 후보가 없어요.</h4><p>{result.answer}</p>{(result.excluded||[]).length>0&&<p className="pa-excluded">담을 수 없는 상품: {result.excluded.map(x=>`${x.shortName}(${x.reason})`).join(', ')}</p>}<button type="button" onClick={resetConditions}><RotateCcw size={15}/>상담 조건만 초기화</button></div>}
-        {(result?.feasibility?.relax||[]).length>0&&<div className="pa-relax"><strong>고정한 부품을 바꾸면</strong><ul>{result.feasibility.relax.slice(0,2).map(r=><li key={r.category}>{r.label} {r.current} → {r.replacement}: 최소 구성 {money(r.minTotal)}{r.fits?' (예산 안)':''}</li>)}</ul><small>바꿀지는 고객이 정해요. 자동으로 바꾸지 않아요.</small></div>}
+        {(result?.feasibility?.relax||[]).length>0&&<div className="pa-relax"><strong>고정한 부품을 바꾸면</strong><ul>{result.feasibility.relax.slice(0,2).map(r=><li key={r.category}>{r.label} {r.current} → {r.replacement}: {r.exact===false?'찾은 구성':'최소 구성'} {money(r.minTotal)}{r.fits?' (예산 안)':''}</li>)}</ul><small>바꿀지는 고객이 정해요. 자동으로 바꾸지 않아요.</small></div>}
         <div className="pa-followups" aria-label="추천 부품에 추가 질문"><span>현재 조건에 대해</span>{['더 저렴한 대안이 있나요?','지금 고른 부품과 맞나요?','예산이 부족하면 어떻게 하나요?'].map(q=><button type="button" key={q} disabled={loading} onClick={()=>ask(q)}>{q}</button>)}{(conditions.partBudget||conditions.totalBudget)&&<button type="button" disabled={loading} onClick={resetConditions}>상담 조건 초기화</button>}</div></section>
     </div><footer className="pa-footer"><Info size={15}/><p>서버가 DB 판매가·판매 상태·호환 규칙으로 확인한 후보 안에서 AI가 추천해요. 2026-10-23 조사 표본 32개 기준이며 실보유 수량·실시간 가격은 확인 전이에요. 조립·배송·OS 비용은 별도예요.</p></footer>
   </div>;

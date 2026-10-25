@@ -522,7 +522,7 @@ def fill_options(pool: Pool, checker: Checker, fixed: dict, purpose: str, budget
         out.append(dict(id=f'opt{len(out) + 1}', kind=kind, label=label, key=key, sel=build['sel'], total=build['total'],
                         within=(budget_total is None or build['total'] <= budget_total)))
     base = min_build(pool, checker, fixed)
-    add('min', '확인된 후보 기준 최소 금액 구성', base)
+    add('min', '확인된 후보 기준 최소 금액 구성' if base and not base['exhausted'] else '찾은 구성 중 가장 싼 구성(최소 여부 확인 못 함)', base)
     add('preset', f'{PURPOSES.get(purpose, "")} 참고 구성', preset_build(pool, checker, fixed, purpose))
     if base and base['sel'] and budget_total and base['total'] <= budget_total:
         add('upgrade', f'예산 안에서 {PURPOSES.get(purpose, "")} 용도 자리를 올린 구성',
@@ -534,31 +534,37 @@ def feasibility(pool: Pool, checker: Checker, fixed: dict, budget_total: int | N
     """예산으로 구성이 되는가 — 확인된 후보·판매 상태·호환·고정 부품 기준. 숫자는 지금 계산한 값만 쓴다."""
     base = min_build(pool, checker, fixed)
     free = min_build(pool, checker, {}) if fixed else base
+    found = base['total'] if base and base['sel'] else None
+    exact = found is not None and not base['exhausted']      # 탐색을 끝까지 마친 최소 금액인가(Codex 재검수 P2-4)
     res = dict(scope=f'현재 확인된 후보 {sum(1 for p in pool.parts.values() if p.usable)}개 기준 (전체 시장 최저가 아님)',
                priceBasis=price_basis(pool.parts.values()), loadedAt=pool.loaded_at, budget=budget_total,
-               minTotal=base['total'] if base else None, minTotalFree=free['total'] if free else None,
+               minTotal=found if exact else None, minExact=exact if found is not None else None, foundTotal=found,
+               minTotalFree=free['total'] if free and free['sel'] and not free['exhausted'] else None,
                status=None, shortfall=None, headroom=None, relax=[], conflicts=[], note=PRICE_NOTE)
     if base is None:
         res['status'] = 'no_build'
-    elif base['sel'] is None:
-        res['status'] = 'unknown'          # 탐색 한도 -- 최소 금액을 지어내지 않는다
+    elif found is None:
+        res['status'] = 'unknown'          # 탐색 한도 -- 하나도 못 찾았다. 최소 금액을 지어내지 않는다
     elif budget_total is None:
         res['status'] = 'no_budget'
-    elif base['total'] <= budget_total:
-        res['status'] = 'feasible'
-        res['headroom'] = budget_total - base['total']
-    else:
+    elif found <= budget_total:
+        res['status'] = 'feasible'         # 예산 안 구성을 실제로 찾았으니 가능은 확정. 최소가 아니면 여유는 「적어도」 값
+        res['headroom'] = budget_total - found
+    elif exact:
         res['status'] = 'over'
-        res['shortfall'] = base['total'] - budget_total
+        res['shortfall'] = found - budget_total
+    else:
+        res['status'] = 'unknown'          # 찾은 구성은 예산 초과지만 더 싼 구성이 남았을 수 있다 -- 부족액을 단정하지 않는다
     # 고정 부품 때문에 안 되거나 비싸지는지 — 하나씩 풀어 본 최소 금액(고객 동의 후 바꿀 대안으로만 보여 준다)
-    if fixed and res['status'] in ('no_build', 'over'):
+    if fixed and res['status'] in ('no_build', 'over', 'unknown'):
         for c, part in fixed.items():
             rest = {k: v for k, v in fixed.items() if k != c}
             alt = min_build(pool, checker, rest)
-            if alt and alt['sel'] and (base is None or base['total'] is None or alt['total'] < base['total']):
+            if alt and alt['sel'] and (found is None or alt['total'] < found):
                 res['relax'].append(dict(category=c, label=LABEL[c], current=part.short, currentPrice=part.price,
                                          replacement=alt['sel'][c].short, replacementId=str(alt['sel'][c].code),
-                                         minTotal=alt['total'], saving=(base['total'] - alt['total']) if base and base['total'] else None,
+                                         minTotal=alt['total'], exact=not alt['exhausted'],
+                                         saving=(found - alt['total']) if found is not None and exact and not alt['exhausted'] else None,
                                          fits=budget_total is not None and alt['total'] <= budget_total))
         res['relax'].sort(key=lambda r: r['minTotal'])
     # 고정 부품끼리 맞지 않는 자리 -- 하나만 풀어서는 풀리지 않을 때도 무엇이 왜 막히는지 알린다(Antigravity 검토 6)
