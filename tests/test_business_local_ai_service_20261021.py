@@ -33,7 +33,7 @@ def test_business_use_entries_go_to_their_explanation():
 
 def test_explanation_page_uses_site_shell_and_its_own_body_only():
     html = read("ai-service.html")
-    assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261025-builder1" in html
+    assert 'data-page="ai-service"' in html and "boot.js" in html and "header-ui.js?v=20261025-label1" in html
     # 2026-10-23 기본형·고급형 업무 상세 라우팅으로 ai-local-service.js 버전만 올렸다(test_mvp4_basic_advanced_task_guides_20261023)
     assert "ai-local-service.js?v=20261023-tg1" in html and "ai-local-service.css?v=20261021-mm3" in html
     js = code("assets/js/ai-local-service.js")
