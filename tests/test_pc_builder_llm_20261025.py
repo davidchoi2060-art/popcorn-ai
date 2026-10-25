@@ -1002,3 +1002,30 @@ class IntentInputTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
         self.assertIn('# fail 0', r.stdout)
         self.assertIn('# pass 5', r.stdout)
+
+
+
+# ── 최종 QA(2026-10-26) R03 — 모델명 숫자를 단위 없는 금액으로 읽어 문장을 지우던 문제 ──────────────
+class FinalQaModelNumberTests(unittest.TestCase):
+    """판매 후보 모델을 띄어 쓰거나(「i3 14100F」) 모델명으로 문장을 시작하면(「14100F는」) 숫자 「14100」이 금액으로 읽혀
+    고객 화면 모드(금액 문장 제거)에서 정상 설명 문장이 지워졌다. 숫자 바로 뒤에 영문자가 붙으면 모델명으로 본다."""
+    KNOWN = {A._core(m) for m in ('i3-14100F', '라이젠 5 7500F', '라이젠 7 7800X3D', 'RTX 5060')}   # 서버가 후보 이름에서 뽑는 것과 같은 핵심
+    CODES = frozenset({128424, 113800})
+
+    def test_known_model_sentences_are_kept(self):
+        for s in ('인텔 코어 i3 14100F는 4코어예요.', '14100F는 저렴한 대안이에요.', 'i3 14100F와 7500F를 비교해 보세요.',
+                  '인텔 코어 i3-14100F는 4코어예요.', 'AMD 라이젠 7 7800X3D는 8코어예요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.money_in(s), [])
+                self.assertEqual(A.clean_text(s, set(), self.KNOWN, self.CODES, no_money=True), (s, 0))
+
+    def test_money_and_unknown_model_rules_kept(self):
+        # 금액(단위 있음·가격 문맥·단위 없는 큰 수)과 목록 밖 모델은 그대로 지운다
+        for s in ('가격은 128424입니다.', '판매가 128424', '이 제품은 14100원이에요.', '차이는 50000 정도예요.', '합계 1,141,800',
+                  'i5 14400F는 후보에 없어요.', 'i5-14400F는 6코어예요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, set(), self.KNOWN, self.CODES, no_money=True)[1], 1)
+        # 상품번호 표기·규격 숫자는 남는다
+        for s in ('상품번호 128424 제품이에요.', '정격 750W·길이 281mm예요.', 'VRAM 16GB 제품이에요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, set(), self.KNOWN, self.CODES, no_money=True)[1], 0)
