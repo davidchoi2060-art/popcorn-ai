@@ -97,7 +97,7 @@ export default function PartAdvisor({category, byId={}, selection={}, purpose='g
     return <article key={p.id} className={`pa-card ${index===0&&isRec?'focused':''}`}>
       <div className="pa-card-top"><img src={part?.image} alt={p.shortName}/><div>
         <div className="pa-card-tags"><span>{chosen?'현재 선택':isRec?(p.label||'추천'):'함께 볼 후보'}</span>{overPart&&<span className="over">부품 상한 초과</span>}{over&&<span className="over">전체 예산 초과 가능</span>}{p.state==='unknown'&&<span className="over">규격 확인 필요</span>}</div>
-        <h4>{p.shortName || p.name}</h4><p className="pa-product-full">{p.name}</p><p className="pa-specs">{part?.specs?.join(' · ')}</p></div></div>
+        <h4>{p.shortName || p.name}</h4><p className="pa-product-full">{p.name}</p>{part?.specs?.length?<p className="pa-specs">판매처 표기(조사 시점): {part.specs.join(' · ')}</p>:null}</div></div>
       <div className="pa-reason"><strong><Sparkles size={13}/> {isRec&&ai?.status==='ok'?'왜 이 후보인가요?':'서버가 확인한 근거'}</strong>
         {isRec&&p.reason?<p className="pa-ai-reason">{p.reason}</p>:null}
         <ul className="pa-evidence">{Object.entries(p.facts || {}).slice(0,4).map(([k,v]) => <li key={k}>{k}: {Array.isArray(v)?v.join(', '):String(v)}</li>)}
