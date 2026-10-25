@@ -29,3 +29,13 @@ body{min-width:0}
 
 .temporary-storage-notice{margin:18px 0 24px}.temporary-storage-notice .text-button{display:inline-flex;margin-top:10px;text-decoration:none}
 .brand-tool{text-decoration:none}
+/* 실제 AI 채우기(2026-10-25) — 예산 칸 안내·확인 선택지·제안 구성 고르기 */
+.budget-help{margin:6px 0 0;font-size:11px;line-height:1.55;color:#8b8398}
+.ai-choices{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 12px}.ai-choices .text-button{border:1px solid #ddd1ed;border-radius:7px;padding:6px 9px;font-size:12px}
+.option-switch{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:14px}
+.option-switch button{display:grid;gap:3px;text-align:left;padding:10px 12px;border:1px solid #e1d8ee;border-radius:10px;background:#fff;color:#4b4060;font-size:12px;line-height:1.45}
+.option-switch button strong{font-size:15px;color:#2e2540}.option-switch button small{color:#a0611e;font-size:11px}
+.option-switch button.active{border-color:#8f6ad6;background:#f6f1ff;box-shadow:0 0 0 1px #8f6ad6 inset}
+.relax-list,.constraint-list{margin:8px 0 0;padding-left:18px;font-size:12px;line-height:1.7;color:#5f566d}
+.constraint-list{margin:12px 0 0}
+@media(max-width:760px){.option-switch{grid-template-columns:1fr}.budget-help{font-size:12px}}
