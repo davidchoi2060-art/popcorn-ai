@@ -53,7 +53,8 @@ PURPOSES = {'gaming': '게임', 'office': '사무·일상', 'creator': '영상·
 UPGRADE_ORDER = {'gaming': ('gpu', 'cpu', 'memory', 'storage', 'power', 'case', 'cooler', 'board'),
                  'creator': ('cpu', 'memory', 'gpu', 'storage', 'board', 'power', 'cooler', 'case'),
                  'office': ('storage', 'memory', 'cpu')}
-NODE_CAP = 6000            # 최소 구성 탐색에서 호환 판정 횟수 상한
+NODE_CAP = 6000            # 최소 구성 탐색에서 호환 판정 횟수 하한 -- 후보 수에 따라 늘린다(node_cap)
+NODE_PER_PART = 400       # 후보 1개당 판정 횟수(32개 표본 = 12,800회). 다 써도 못 찾으면 「구성 불가」가 아니라 「확인 못 함」
 EXCLUDE_LABEL = {'not_found': 'DB에서 상품을 찾지 못함', 'not_on_sale': '판매중이 아님', 'no_price': '판매가 확인 안 됨',
                  'review': '상품 정보 검수 대기', 'slot_mismatch': '분류가 다름', 'used': '중고·리퍼 표시',
                  'not_real': '실데이터 아님', 'not_desktop': '데스크톱 부품이 아님'}
@@ -424,8 +425,13 @@ def min_rest_cost(pool: Pool, sel: dict) -> int | None:
 FILL_ORDER = ('cpu', 'board', 'memory', 'gpu', 'case', 'cooler', 'storage', 'power')   # mvp3_free_build.ORDER 와 같은 순서
 
 
+def node_cap(pool: Pool) -> int:
+    return max(NODE_CAP, NODE_PER_PART * sum(1 for p in pool.parts.values() if p.usable))
+
+
 def min_build(pool: Pool, checker: Checker, fixed: dict) -> dict | None:
-    """고정 부품을 유지한 8개 자리 최소 금액 호환 구성(분기 한정). 없으면 None. {'sel', 'total', 'exhausted'}"""
+    """고정 부품을 유지한 8개 자리 최소 금액 호환 구성(분기 한정 · 자리마다 싼 것부터).
+    None = 호환 구성이 없음을 끝까지 확인. {'sel': None, 'exhausted': True} = 탐색 한도 안에 찾지 못함(없다고 단정하지 않는다)."""
     choices = {}
     for c in FILL_ORDER:
         choices[c] = [fixed[c]] if fixed.get(c) is not None else pool.by_category(c)
@@ -433,7 +439,7 @@ def min_build(pool: Pool, checker: Checker, fixed: dict) -> dict | None:
             return None
     floor = {c: min(p.price for p in choices[c]) for c in FILL_ORDER}
     best = {'total': None, 'sel': None}
-    budget = [NODE_CAP]
+    budget = [node_cap(pool)]
 
     def step(i, sel, cost):
         if budget[0] <= 0:
@@ -454,7 +460,7 @@ def min_build(pool: Pool, checker: Checker, fixed: dict) -> dict | None:
             step(i + 1, trial, cost + part.price)
     step(0, {}, 0)
     if best['sel'] is None:
-        return None
+        return dict(sel=None, total=None, exhausted=True) if budget[0] <= 0 else None
     return dict(sel=best['sel'], total=best['total'], exhausted=budget[0] <= 0)
 
 
@@ -508,7 +514,7 @@ def fill_options(pool: Pool, checker: Checker, fixed: dict, purpose: str, budget
     out = []
 
     def add(kind, label, build):
-        if not build:
+        if not build or not build.get('sel'):
             return
         key = selection_key(build['sel'])
         if any(o['key'] == key for o in out):
@@ -518,7 +524,7 @@ def fill_options(pool: Pool, checker: Checker, fixed: dict, purpose: str, budget
     base = min_build(pool, checker, fixed)
     add('min', '확인된 후보 기준 최소 금액 구성', base)
     add('preset', f'{PURPOSES.get(purpose, "")} 참고 구성', preset_build(pool, checker, fixed, purpose))
-    if base and budget_total and base['total'] <= budget_total:
+    if base and base['sel'] and budget_total and base['total'] <= budget_total:
         add('upgrade', f'예산 안에서 {PURPOSES.get(purpose, "")} 용도 자리를 올린 구성',
             upgrade_build(pool, checker, base['sel'], fixed, purpose, budget_total))
     return out
@@ -531,9 +537,11 @@ def feasibility(pool: Pool, checker: Checker, fixed: dict, budget_total: int | N
     res = dict(scope=f'현재 확인된 후보 {sum(1 for p in pool.parts.values() if p.usable)}개 기준 (전체 시장 최저가 아님)',
                priceBasis=price_basis(pool.parts.values()), loadedAt=pool.loaded_at, budget=budget_total,
                minTotal=base['total'] if base else None, minTotalFree=free['total'] if free else None,
-               status=None, shortfall=None, headroom=None, relax=[], note=PRICE_NOTE)
+               status=None, shortfall=None, headroom=None, relax=[], conflicts=[], note=PRICE_NOTE)
     if base is None:
         res['status'] = 'no_build'
+    elif base['sel'] is None:
+        res['status'] = 'unknown'          # 탐색 한도 -- 최소 금액을 지어내지 않는다
     elif budget_total is None:
         res['status'] = 'no_budget'
     elif base['total'] <= budget_total:
@@ -547,12 +555,20 @@ def feasibility(pool: Pool, checker: Checker, fixed: dict, budget_total: int | N
         for c, part in fixed.items():
             rest = {k: v for k, v in fixed.items() if k != c}
             alt = min_build(pool, checker, rest)
-            if alt and (base is None or alt['total'] < base['total']):
+            if alt and alt['sel'] and (base is None or base['total'] is None or alt['total'] < base['total']):
                 res['relax'].append(dict(category=c, label=LABEL[c], current=part.short, currentPrice=part.price,
                                          replacement=alt['sel'][c].short, replacementId=str(alt['sel'][c].code),
-                                         minTotal=alt['total'], saving=(base['total'] - alt['total']) if base else None,
+                                         minTotal=alt['total'], saving=(base['total'] - alt['total']) if base and base['total'] else None,
                                          fits=budget_total is not None and alt['total'] <= budget_total))
         res['relax'].sort(key=lambda r: r['minTotal'])
+    # 고정 부품끼리 맞지 않는 자리 -- 하나만 풀어서는 풀리지 않을 때도 무엇이 왜 막히는지 알린다(Antigravity 검토 6)
+    if fixed and res['status'] == 'no_build':
+        seen = set()
+        for c, part in fixed.items():
+            state, labels = checker.slot(fixed, c)
+            if state == 'fail' and tuple(labels) not in seen:
+                seen.add(tuple(labels))
+                res['conflicts'].append(dict(category=c, label=LABEL[c], current=part.short, checks=labels))
     return res
 
 
@@ -567,39 +583,81 @@ MODEL_BEFORE = re.compile(r'(?:[A-Za-z]|RTX|GTX|RX|i[3579]|라이젠|ryzen|울�
 MAX_BUDGET = 100_000_000       # 1억 원을 넘는 부품 예산은 입력 실수로 보고 확인을 받는다
 
 
-def parse_budget(text_in: str) -> dict | None:
-    """질문 속 금액 하나를 읽는다. None = 금액 없음. 단위가 없거나(80) 둘 이상이면 해석하지 않고 문제로 돌려준다.
-    {'won', 'raw', 'unit_clear', 'scope'('total'|'part'|None), 'problem'('unit'|'nonpositive'|'too_large'|'multiple'|None)}"""
-    t = (text_in or '').replace('，', ',')
-    found = []
+def _amount_tokens(t: str) -> list[dict]:
+    """글 속 금액 조각. 「1억 5천만원」처럼 억 뒤에 바로 붙는 작은 단위는 한 금액으로 합친다(Antigravity 검토 3)."""
+    out = []
     for m in AMOUNT_RX.finditer(t):
         unit = re.sub(r'\s+', '', m.group(2) or '')
         if not unit and (NOT_MONEY_AFTER.match(t, m.end()) or MODEL_BEFORE.search(t[:m.start()])):
             continue            # 용량·전력·개수·모델 번호(RTX 5060 · i5-14400F) 같은 다른 숫자
-        found.append((m, unit))
-    if not found:
+        base = unit if unit == '원' else unit[:-1] if unit.endswith('원') else unit
+        mul = UNIT_MUL.get(base)
+        try:
+            won = int(round(float(m.group(1).replace(',', '')) * mul)) if mul else None
+        except ValueError:
+            won = None
+        tok = dict(start=m.start(), end=m.end(), raw=m.group(0).strip(), unit=base, won=won)
+        prev = out[-1] if out else None
+        if (prev and prev['unit'] == '억' and won is not None and prev['won'] is not None and base in ('천만', '백만', '만', '천')
+                and not t[prev['end']:m.start()].strip()):
+            prev.update(end=m.end(), raw=t[prev['start']:m.end()].strip(), won=prev['won'] + won, unit=base)
+            continue
+        out.append(tok)
+    return out
+
+
+def _token_problem(tok) -> str | None:
+    if tok['won'] is None:
+        return 'unit'
+    if tok['won'] <= 0:
+        return 'nonpositive'
+    if tok['won'] > MAX_BUDGET:
+        return 'too_large'
+    return None
+
+
+def _scope(ctx: str) -> str | None:
+    return 'total' if TOTAL_WORDS.search(ctx) else 'part' if PART_WORDS.search(ctx) else None
+
+
+# 금액 두 개를 나눠 받을 때만 쓰는 경계·부품 이름(「그래픽카드는 80만원, 전체 150만원」). 금액 하나일 때 부품 이름만으로 부품 예산이라 정하지 않는다.
+PAIR_SPLIT = re.compile(r'[,，;/]|이고|이며|그리고|\s하고\s|\s고\s')
+PART_NAMES = re.compile(r'그래픽\s*카드|GPU|CPU|메모리|램|SSD|저장\s*장치|파워|케이스|쿨러|메인\s*보드|보드', re.I)
+
+
+def _pair_scope(ctx: str) -> str | None:
+    return 'total' if TOTAL_WORDS.search(ctx) else 'part' if PART_WORDS.search(ctx) or PART_NAMES.search(ctx) else None
+
+
+def parse_budget(text_in: str) -> dict | None:
+    """질문 속 금액을 읽는다. None = 금액 없음. 단위가 없거나(80) 범위가 정해지지 않은 여러 금액은 해석하지 않고 문제로 돌려준다.
+    {'won', 'raw', 'unit_clear', 'scope'('total'|'part'|'both'|None), 'problem'('unit'|'nonpositive'|'too_large'|'multiple'|None)}
+    scope='both' 이면 'total' 과 'part' 에 각각 금액이 있다(「전체 150만원이고 그래픽카드는 80만원 이하」)."""
+    t = (text_in or '').replace('，', ',')
+    toks = _amount_tokens(t)
+    if not toks:
         return None
-    if len(found) > 1:
-        return dict(won=None, raw=' · '.join(f[0].group(0).strip() for f in found), unit_clear=False, scope=None,
-                    problem='multiple')
-    m, unit = found[0]
-    scope = 'total' if TOTAL_WORDS.search(t) else 'part' if PART_WORDS.search(t) else None
-    res = dict(won=None, raw=m.group(0).strip(), unit_clear=bool(unit), scope=scope, problem=None)
-    base = unit if unit == '원' else unit[:-1] if unit.endswith('원') else unit
-    mul = UNIT_MUL.get(base)
-    if mul is None:
-        res['problem'] = 'unit'
-        return res
-    try:
-        num = float(m.group(1).replace(',', ''))
-    except ValueError:
-        res['problem'] = 'unit'
-        return res
-    res['won'] = int(round(num * mul))
-    if res['won'] <= 0:
-        res['problem'] = 'nonpositive'
-    elif res['won'] > MAX_BUDGET:
-        res['problem'] = 'too_large'
+    if len(toks) == 2:
+        # 금액마다 그 앞뒤 말(다른 금액과의 경계까지)로 범위를 정한다 -- 하나는 전체, 하나는 부품일 때만 나눠 받는다
+        between = t[toks[0]['end']:toks[1]['start']]
+        cut = PAIR_SPLIT.search(between)
+        edge = toks[0]['end'] + (cut.start() if cut else len(between))
+        scopes = [_pair_scope(t[:edge]), _pair_scope(t[edge:])]
+        if sorted(s or '' for s in scopes) == ['part', 'total']:
+            for tok in toks:
+                problem = _token_problem(tok)
+                if problem:
+                    return dict(won=None, raw=tok['raw'], unit_clear=tok['won'] is not None, scope=None, problem=problem)
+            total = toks[scopes.index('total')]['won']
+            part = toks[scopes.index('part')]['won']
+            return dict(won=None, raw=' · '.join(x['raw'] for x in toks), unit_clear=True, scope='both', problem=None,
+                        total=total, part=part)
+    if len(toks) > 1:
+        return dict(won=None, raw=' · '.join(x['raw'] for x in toks), unit_clear=False, scope=None, problem='multiple')
+    tok = toks[0]
+    res = dict(won=tok['won'], raw=tok['raw'], unit_clear=tok['won'] is not None, scope=_scope(t), problem=_token_problem(tok))
+    if res['problem'] == 'unit':
+        res['won'] = None
     return res
 
 

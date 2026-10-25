@@ -499,3 +499,69 @@ class BuiltScreenTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ── Antigravity 설계 검토(design-review.md, 2026-10-25) 반영 ──────────────────
+class AntigravityReviewTests(unittest.TestCase):
+    """발견점 1~6 의 재현 입력을 그대로 고정한다."""
+
+    def test_1_banned_word_order_and_stock_counts(self):
+        for s in ('이 메인보드는 부품 간 호환성을 100% 보장합니다.', '현재 해당 그래픽카드는 재고 2개 남았습니다.',
+                  '당사에서 성능과 호환에 대해 100% 만족을 보장해 드립니다.', '완벽하게 맞아요.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, set(), set())[1], 1)
+        self.assertEqual(A.clean_text('성능을 보장하지는 않아요.', set(), set()), ('성능을 보장하지는 않아요.', 0))
+
+    def test_2_amounts_without_won(self):
+        for s in ('이 제품의 실구매 가격은 500000 입니다.', '특가 기준 약 65만 정도로 구성 가능합니다.'):
+            with self.subTest(s=s):
+                self.assertEqual(A.clean_text(s, {800_700}, set())[1], 1)
+        self.assertEqual(A.clean_text('상품번호 128424 제품이에요.', set(), set(), frozenset({128424}))[1], 0)
+        self.assertEqual(A.clean_text('16GB 두 개, 2026년 기준이에요.', set(), set())[1], 0)
+
+    def test_3_compound_and_paired_budgets(self):
+        self.assertEqual(D.parse_budget('1억 5천만원으로 견적 내줘')['won'], 150_000_000)        # 「여러 금액」이 아니라 한 금액(→ 1억 초과 확인)
+        for t in ('전체 예산은 150만원이고 그래픽카드는 80만원 이하로 추천해줘', '그래픽카드는 80만원 이하, 전체 150만원'):
+            with self.subTest(t=t):
+                b = D.parse_budget(t)
+                self.assertEqual((b['scope'], b['total'], b['part']), ('both', 1_500_000, 800_000))
+        self.assertEqual(D.parse_budget('80만원이랑 100만원')['problem'], 'multiple')
+
+    def test_3_paired_budget_in_advise_and_fill(self):
+        fake, calls = answers({'answer': '좋아요.', 'recommendations': [{'product_code': 401, 'label': '추천', 'reason': 'r', 'tradeoff': 't'}]})
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.advise_core(pool(), adv(question='전체 예산은 150만원이고 그래픽카드는 80만원 이하로 추천해줘'), None, FakeChecker())
+        self.assertEqual(r['conditions'], {'partBudget': 800_000, 'totalBudget': 1_500_000})
+        fake, _ = answers(llm.LLMProviderError('x', transient=True))
+        with patch.object(llm, 'call', side_effect=fake), patch.object(A, '_fallback_order', lambda: ['claude']):
+            r = A.fill_core(pool(), A.FillBody(requestText='게임용 전체 150만원, 그래픽카드는 80만원 이하'), None, FakeChecker())
+        self.assertEqual(r['budgetTotal'], 1_500_000)
+        self.assertIn('부품 하나의 예산', r['note'])
+
+    def test_4_condition_budget_zero_is_clarify_not_422(self):
+        fake, calls = answers()
+        with patch.object(llm, 'call', side_effect=fake):
+            r = A.advise_core(pool(), A.AdviseBody(category='gpu', conditions={'totalBudget': 0}), None, FakeChecker())
+        self.assertEqual(r['kind'], 'clarify')
+        self.assertEqual(calls, [])
+
+    def test_5_search_limit_is_not_reported_as_no_build(self):
+        with patch.object(D, 'node_cap', lambda p: 3):
+            mb = D.min_build(pool(), FakeChecker(), {})
+            self.assertEqual((mb['sel'], mb['exhausted']), (None, True))
+            f = D.feasibility(pool(), FakeChecker(), {}, 1_000_000)
+        self.assertEqual(f['status'], 'unknown')
+        self.assertIsNone(f['minTotal'])
+
+    def test_6_conflicts_named_when_single_relax_cannot_fix(self):
+        p = pool()
+        fixed = {'cpu': p.get(101), 'board': p.get(202), 'memory': p.get(301)}     # 소켓·메모리 둘 다 어긋남
+        f = D.feasibility(p, FakeChecker(), fixed, 2_000_000)
+        self.assertEqual(f['status'], 'no_build')
+        self.assertTrue(f['conflicts'])
+        self.assertTrue(any('CPU 소켓 규격 일치' in c['checks'] for c in f['conflicts']))
+        fake, calls = answers()
+        with patch.object(llm, 'call', side_effect=fake):
+            r = A.fill_core(p, A.FillBody(selection={'cpu': '101', 'board': '202', 'memory': '301'}, budgetTotal=2_000_000), None, FakeChecker())
+        self.assertIsNone(r['proposal'])
+        self.assertEqual(calls, [])

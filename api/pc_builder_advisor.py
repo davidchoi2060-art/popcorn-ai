@@ -109,8 +109,9 @@ class Turn(BaseModel):
 
 class Conditions(BaseModel):
     model_config = ConfigDict(extra='forbid')
-    partBudget: StrictInt | None = Field(default=None, ge=1, le=D.MAX_BUDGET)
-    totalBudget: StrictInt | None = Field(default=None, ge=1, le=D.MAX_BUDGET)
+    # 범위 밖 값도 받아 budget_check 가 같은 확인 질문(200)으로 답한다 -- budgetTotal 과 응답이 갈리지 않게(Antigravity 검토 4)
+    partBudget: StrictInt | None = Field(default=None, ge=-10**12, le=10**12)
+    totalBudget: StrictInt | None = Field(default=None, ge=-10**12, le=10**12)
 
 
 class SelectionBody(BaseModel):
@@ -203,11 +204,16 @@ def _parse_json(raw: str) -> dict | None:
 
 
 # ── 답 글 거름 ───────────────────────────────────────────────────────────
-MAN_RX = re.compile(r'(\d[\d,]*)\s*만\s*(\d[\d,]*)?\s*원')
+# 금액: 「78만원」·「77만 8,100원」·「65만 정도」(원 생략)·「800,700원」, 그리고 단위 없는 큰 수(「500000」·「1,200,000」).
+MAN_RX = re.compile(r'(?<![\d.,])(\d[\d,]*)\s*만(?![족큼약일점])(?:\s*(\d[\d,]*)(?=\s*원))?\s*원?')
 WON_RX = re.compile(r'(?<![\d만])(\d[\d,]{2,})\s*원')
-BANNED = re.compile(r'\d+\s*(?:fps|FPS|프레임)|최저가|재고\s*(?:가|는|도)?\s*(?:있|충분|넉넉|많)|무조건|'
-                    r'(?:100\s*%|완벽(?:하게|히)?)\s*(?:호환|맞)|(?:성능|호환|품질|속도)(?:을|를|이|가)?\s*보장(?:합니다|해요|됩니다|드려요|드립니다)|'
-                    r'당일\s*(?:배송|출고)|할인', re.I)
+BARE_RX = re.compile(r'(?<![\d.,A-Za-z-])(\d{1,3}(?:,\d{3})+|\d{5,})(?![\d,]|\s*(?:GB|TB|W\b|mm|MHz|Hz|개|명|년|%|fps|프레임|코어))', re.I)
+# 확정 표현: 어순이 바뀐 「호환성을 100% 보장합니다」와 수량을 붙인 「재고 2개 남았습니다」까지(Antigravity 검토 1).
+# 「성능을 보장하지는 않아요」 같은 부정은 남긴다 -- 보장 뒤에 긍정 어미가 올 때만 지운다.
+BANNED = re.compile(r'\d+\s*(?:fps|프레임)|최저가|당일\s*(?:배송|출고)|할인|무조건|'
+                    r'재고\s*(?:가|는|도)?\s*(?:\d+\s*개|있|충분|넉넉|많|남)|\d+\s*개\s*(?:남|밖에\s*없)|'
+                    r'(?:100\s*%|완벽)[^.!?]{0,12}(?:호환|보장|맞)|'
+                    r'보장(?:합니다|해요|됩니다|돼요|드려요|드립니다|해\s*드)', re.I)
 MODEL_RX = re.compile(r'(?:RTX|GTX|RX|ARC)\s*-?\s*\d{3,4}(?:\s*(?:Ti|XT|XTX|SUPER))?|i[3579]\s*-?\s*\d{4,5}[A-Z]*|'
                       r'(?:라이젠|Ryzen)\s*[3579]\s*\d{4}[A-Z0-9]*|\b\d{4,5}(?:X3D|KF|K|F|X)\b', re.I)
 SENT_RX = re.compile(r'(?<=[.!?。])\s+|\n+')
@@ -228,6 +234,7 @@ def _core(token: str) -> str:
 
 
 def amounts_in(text_: str) -> list[int]:
+    """답 글 속 금액(원 단위). 「원」을 빠뜨린 「65만 정도」·「500000」도 센다(Antigravity 검토 2)."""
     out = []
     for m in MAN_RX.finditer(text_):
         try:
@@ -236,6 +243,12 @@ def amounts_in(text_: str) -> list[int]:
             pass
     rest = MAN_RX.sub(' ', text_)
     for m in WON_RX.finditer(rest):
+        try:
+            out.append(int(m.group(1).replace(',', '')))
+        except ValueError:
+            pass
+    rest = WON_RX.sub(' ', rest)
+    for m in BARE_RX.finditer(rest):
         try:
             out.append(int(m.group(1).replace(',', '')))
         except ValueError:
@@ -251,7 +264,7 @@ def amount_ok(v: int, allowed: set[int]) -> bool:
     return False
 
 
-def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str]) -> tuple[str, int]:
+def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str], codes: frozenset = frozenset()) -> tuple[str, int]:
     """자료에 없는 금액·목록 밖 모델·금지 표현이 든 문장을 지운다 -> (남은 글, 지운 문장 수). 지운 문장은 서버 로그에만 남긴다."""
     if not text_:
         return '', 0
@@ -260,7 +273,7 @@ def clean_text(text_: str, allowed_amounts: set[int], known_models: set[str]) ->
         s = sent.strip()
         if not s:
             continue
-        bad = (BANNED.search(s) or any(not amount_ok(a, allowed_amounts) for a in amounts_in(s))
+        bad = (BANNED.search(s) or any(a not in codes and not amount_ok(a, allowed_amounts) for a in amounts_in(s))
                or any(_core(m.group(0)) not in known_models for m in MODEL_RX.finditer(s)))
         if bad:
             dropped += 1
@@ -424,10 +437,10 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
     checker = checker or D.Checker(pool)
     cond = {'partBudget': body.conditions.partBudget, 'totalBudget': body.conditions.totalBudget}
     total_budget = cond['totalBudget'] or body.budgetTotal
-    if body.budgetTotal is not None and not cond['totalBudget']:
-        problem = D.budget_check(body.budgetTotal)
+    for value in (cond['partBudget'], cond['totalBudget']) + ((body.budgetTotal,) if not cond['totalBudget'] else ()):
+        problem = D.budget_check(value)
         if problem:
-            return _clarify(problem, conditions=cond)
+            return _clarify(problem, conditions={'partBudget': None, 'totalBudget': None})
     question, masked = mask((body.question or '').strip())
     if question:
         b = D.parse_budget(question)
@@ -439,7 +452,10 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
                 money = D.won(b['won'])
                 return _clarify(f'{money}은 {label} 한 개 예산인가요, PC 전체 부품 예산인가요?',
                                 [f'{label}만 {money} 이하', f'PC 전체 {money}'], conditions=cond)
-            if b['scope'] == 'part':
+            if b['scope'] == 'both':
+                cond['partBudget'], cond['totalBudget'] = b['part'], b['total']
+                total_budget = b['total']
+            elif b['scope'] == 'part':
                 cond['partBudget'] = b['won']
             else:
                 cond['totalBudget'] = total_budget = b['won']
@@ -496,9 +512,10 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
                 'recommendations': [dict(c, label='서버 확인 후보', reason=None, tradeoff=None) for c in fallback],
                 'ai': _ai_meta(f.status, attempts=f.attempts)}
     known = _models_of(list(pool.parts.values()))
+    codes = frozenset(pool.parts)          # 답 글의 상품번호는 금액으로 세지 않는다
     amounts = _allowed_amounts(context)
     dropped = 0
-    answer, n = clean_text(data.get('answer') or '', amounts, known)
+    answer, n = clean_text(data.get('answer') or '', amounts, known, codes)
     dropped += n
     recs, seen = [], set()
     for r in data['recommendations'][:3]:
@@ -506,8 +523,8 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
         if code in seen:
             continue
         seen.add(code)
-        reason, n1 = clean_text(r.get('reason') or '', amounts, known)
-        trade, n2 = clean_text(r.get('tradeoff') or '', amounts, known)
+        reason, n1 = clean_text(r.get('reason') or '', amounts, known, codes)
+        trade, n2 = clean_text(r.get('tradeoff') or '', amounts, known, codes)
         dropped += n1 + n2
         lab = r.get('label') if r.get('label') in ('추천', '저렴한 대안', '상위 대안', '비교') else '비교'
         if recs and ((lab == '저렴한 대안' and allowed[code]['price'] >= recs[0]['price'])
@@ -516,7 +533,7 @@ def advise_core(pool: D.Pool, body: AdviseBody, request: Request | None, checker
         recs.append(dict(allowed[code], label=lab, reason=reason or None, tradeoff=trade or None))
     follow = []
     for q in (data.get('follow_up_questions') or [])[:3]:
-        q2, n = clean_text(str(q)[:80], amounts, known)
+        q2, n = clean_text(str(q)[:80], amounts, known, codes)
         dropped += n
         if q2:
             follow.append(q2)
@@ -562,7 +579,7 @@ def _option_view(o: dict, sel: dict) -> dict:
 def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=None) -> dict:
     sel = D.resolve(pool, body.selection)
     checker = checker or D.Checker(pool)
-    purpose, budget = body.purpose, body.budgetTotal
+    purpose, budget, part_note = body.purpose, body.budgetTotal, None
     text_in, masked = mask((body.requestText or '').strip())
     if text_in:
         for key, rx in PURPOSE_WORDS:
@@ -577,7 +594,11 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
             if b['scope'] == 'part':
                 return _clarify(f'{D.won(b["won"])}은 한 부품 예산처럼 들려요. 부품 하나의 예산이면 그 부품의 「AI에게 추천받기」에서 물어봐 주세요. '
                                 'PC 전체 부품 예산이면 「전체」를 붙여 다시 적어 주세요.', [f'PC 전체 {D.won(b["won"])}'])
-            budget = b['won']
+            if b['scope'] == 'both':
+                budget, part_note = b['total'], (f'부품 하나의 예산({D.won(b["part"])})은 그 부품의 「AI에게 추천받기」에서 반영해요. '
+                                                 f'여기서는 전체 예산 {D.won(b["total"])}으로 채웠어요.')
+            else:
+                budget = b['won']
     problem = D.budget_check(budget)
     if problem:
         return _clarify(problem)
@@ -586,11 +607,18 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
     feas = D.feasibility(pool, checker, fixed, budget)
     base = {'ok': True, 'kind': 'proposal', 'purpose': purpose, 'budgetTotal': budget, 'mode': body.mode,
             'fixed': sorted(fixed), 'selectionKey': D.selection_key(sel), 'feasibility': feas, 'masked': masked,
-            'priceNote': D.PRICE_NOTE}
+            'priceNote': D.PRICE_NOTE, 'note': part_note}
     if not options:
-        return {**base, 'proposal': None, 'summary': ('고정한 부품을 유지하면 서버 호환 판정을 통과하는 구성을 찾지 못했어요. '
-                                                      '아래 변경 대안 중 하나를 직접 바꾼 뒤 다시 채워 보세요. 고정한 부품은 바꾸지 않았어요.'),
-                'ai': _ai_meta('skipped')}
+        if feas['status'] == 'unknown':
+            summary = '확인된 후보가 많아 정해진 시간 안에 호환 구성을 다 살펴보지 못했어요. 부품을 몇 개 더 고른 뒤 다시 채워 보세요.'
+        elif feas['relax']:
+            summary = ('고정한 부품을 유지하면 서버 호환 판정을 통과하는 구성을 찾지 못했어요. '
+                       '아래 변경 대안 중 하나를 직접 바꾼 뒤 다시 채워 보세요. 고정한 부품은 바꾸지 않았어요.')
+        else:
+            why = '; '.join(f"{x['label']} {x['current']}: {', '.join(x['checks'])}" for x in feas['conflicts'][:3])
+            summary = ('고정한 부품끼리 서버 호환 판정이 맞지 않아요' + (f'({why})' if why else '') +
+                       '. 맞지 않는 부품 중 하나 이상을 직접 바꾼 뒤 다시 채워 보세요. 고정한 부품은 바꾸지 않았어요.')
+        return {**base, 'proposal': None, 'summary': summary, 'ai': _ai_meta('skipped')}
     views = [_option_view(o, sel) for o in options]
     by_id = {o['id']: o for o in options}
     context = {'purpose': D.PURPOSES[purpose], 'totalBudget': budget,
@@ -620,24 +648,25 @@ def fill_core(pool: D.Pool, body: FillBody, request: Request | None, checker=Non
         data, chosen, ai = {}, _default_choice(options, purpose), _ai_meta(f.status, attempts=f.attempts)
     view = next(v for v in views if v['id'] == chosen['id'])
     known = _models_of(list(pool.parts.values()))
+    codes = frozenset(pool.parts)          # 답 글의 상품번호는 금액으로 세지 않는다
     amounts = _allowed_amounts(context)
     dropped = 0
-    summary, n = clean_text(data.get('summary') or '', amounts, known); dropped += n
-    advice, n = clean_text(data.get('budget_advice') or '', amounts, known); dropped += n
+    summary, n = clean_text(data.get('summary') or '', amounts, known, codes); dropped += n
+    advice, n = clean_text(data.get('budget_advice') or '', amounts, known, codes); dropped += n
     reasons = {}
     for c, r in (data.get('slot_reasons') or {}).items():
         if c in view['changed']:
-            r2, n = clean_text(str(r), amounts, known); dropped += n
+            r2, n = clean_text(str(r), amounts, known, codes); dropped += n
             if r2:
                 reasons[c] = r2
     constraints = []
     for x in (data.get('constraints') or [])[:5]:
-        x2, n = clean_text(str(x), amounts, known); dropped += n
+        x2, n = clean_text(str(x), amounts, known, codes); dropped += n
         if x2:
             constraints.append(x2)
     follow = []
     for q in (data.get('follow_up_questions') or [])[:3]:
-        q2, n = clean_text(str(q)[:80], amounts, known); dropped += n
+        q2, n = clean_text(str(q)[:80], amounts, known, codes); dropped += n
         if q2:
             follow.append(q2)
     if ai['status'] == 'ok':
