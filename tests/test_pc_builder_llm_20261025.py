@@ -616,6 +616,21 @@ class CodexRecheckTests(unittest.TestCase):
         self.assertIn('최소 금액이 아니다', b['search_note'])
         self.assertIn(1_700_000, A._allowed_amounts({'feasibility': b}))
 
+
+class CodexResidualPriceContextTests(unittest.TestCase):
+    """Codex 잔여 확인(residual-context-price-recheck, 기준 900d3366) -- 단위 없는 가격 문맥의 상품번호 같은 수치."""
+
+    def test_unitless_price_context_is_checked(self):
+        codes = frozenset({128424})
+        self.assertEqual(A.clean_text('이 제품의 가격은 128424입니다.', {800_700}, set(), codes), ('', 1))
+        self.assertEqual(A.clean_text('판매가 128424', {800_700}, set(), codes), ('', 1))
+
+    def test_product_number_and_real_price_are_kept(self):
+        codes = frozenset({128424})
+        self.assertEqual(A.clean_text('상품번호 128424 제품이에요.', {800_700}, set(), codes)[1], 0)
+        self.assertEqual(A.clean_text('가격은 800,700원이에요.', {800_700}, set(), codes)[1], 0)
+        self.assertEqual(A.clean_text('판매가 800700', {800_700}, set(), codes)[1], 0)
+
 if __name__ == '__main__':
     unittest.main()
 

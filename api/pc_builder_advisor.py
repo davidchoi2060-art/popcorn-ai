@@ -207,6 +207,7 @@ def _parse_json(raw: str) -> dict | None:
 # 금액: 「78만원」·「65.5만원」(소수)·「77만 8,100원」·「65만 정도」(원 생략)·「800,700원」, 그리고 단위 없는 큰 수(「500000」·「1,200,000」).
 MAN_RX = re.compile(r'(?<![\d.,])(\d[\d,]*(?:\.\d+)?)\s*만(?![족큼약일점])(?:\s*(\d[\d,]*)(?=\s*원))?\s*원?')
 WON_RX = re.compile(r'(?<![\d만])(\d[\d,]{2,})\s*원')
+PRICE_BEFORE = re.compile(r'(?:가격|판매가|금액|비용|합계|총액|차액|예산|값)\s*(?:은|는|이|가|도|을|를|:|=)?\s*(?:약|대략|총)?\s*$')
 BARE_RX = re.compile(r'(?<![\d.,A-Za-z-])(\d{1,3}(?:,\d{3})+|\d{5,})(?![\d,]|\s*(?:GB|TB|W\b|mm|MHz|Hz|개|명|년|%|fps|프레임|코어))', re.I)
 # 확정 표현: 어순이 바뀐 「호환성을 100% 보장합니다」와 수량을 붙인 「재고 2개 남았습니다」까지(Antigravity 검토 1).
 # 「성능을 보장하지는 않아요」 같은 부정은 남긴다 -- 보장 뒤에 긍정 어미가 올 때만 지운다.
@@ -252,7 +253,9 @@ def money_in(text_: str) -> list[tuple[int, bool]]:
     rest = WON_RX.sub(' ', rest)
     for m in BARE_RX.finditer(rest):
         try:
-            out.append((int(m.group(1).replace(',', '')), False))
+            # 단위가 없어도 「가격은 128424입니다」·「판매가 128424」처럼 바로 앞이 가격 말이면 통화로 본다(Codex 잔여 확인).
+            # 「상품번호 128424」 같은 번호 표기만 상품번호 예외를 받는다.
+            out.append((int(m.group(1).replace(',', '')), bool(PRICE_BEFORE.search(rest[max(0, m.start() - 16):m.start()]))))
         except ValueError:
             pass
     return out
