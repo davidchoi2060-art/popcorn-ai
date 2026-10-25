@@ -59,6 +59,21 @@ EXCLUDE_LABEL = {'not_found': 'DB에서 상품을 찾지 못함', 'not_on_sale':
                  'not_real': '실데이터 아님', 'not_desktop': '데스크톱 부품이 아님'}
 PRICE_NOTE = '판매단위 1개 판매가의 합(부품 합계) · 조립비·배송·OS 별도'
 PSU_LABEL = '파워 권장 여유(그래픽카드 권장 파워 + 100W)'
+CPU_MEM_LABEL = 'CPU 플랫폼과 메모리 규격'
+# CPU 소켓이 받는 메모리 세대. build_check 의 메모리 규칙은 메인보드와 메모리만 비교해서, 보드를 아직 고르지 않으면
+# AM5 CPU 에 DDR4 메모리를 「통과」로 보였다(2026-10-25 개발 서버 실호출에서 발견). 소켓으로 확정되는 것만 적는다 --
+# LGA1700 은 보드에 따라 DDR4·DDR5 둘 다 되므로 막지 않는다. CPU 규격의 mem_type 한 값은 LGA1700 에서 믿을 수 없다(119268 = DDR5 로 적혀 있으나 DDR4 보드 구성).
+SOCKET_MEMORY = {'AM5': {'DDR5'}, 'LGA1851': {'DDR5'}, 'AM4': {'DDR4'}, 'LGA1200': {'DDR4'},
+                 'LGA1700': {'DDR4', 'DDR5'}}
+
+
+def cpu_memory_ok(sel: dict) -> bool:
+    cpu, mem = sel.get('cpu'), sel.get('memory')
+    if cpu is None or mem is None:
+        return True
+    allowed = SOCKET_MEMORY.get(str(cpu.facts.get('소켓') or '').upper())
+    kind = str(mem.facts.get('메모리 규격') or '').upper()
+    return not (allowed and kind and kind not in allowed)
 STOCK_NOTE = '판매중 · 실보유 수량 확인 전'
 
 
@@ -258,6 +273,8 @@ class Checker:
             bad = bad + [dict(label='메모리 슬롯·용량', state='fail')]
         if category in ('gpu', 'power') and not self.psu_margin_ok(sel):
             bad = bad + [dict(label=PSU_LABEL, state='fail')]
+        if category in ('cpu', 'memory') and not cpu_memory_ok(sel):
+            bad = bad + [dict(label=CPU_MEM_LABEL, state='fail')]
         res = _verdict(bad)
         self._cache[key] = res
         return res
@@ -276,6 +293,8 @@ class Checker:
             bad = bad + [dict(label='메모리 슬롯·용량', state='fail')]
         if not self.psu_margin_ok(sel):
             bad = bad + [dict(label=PSU_LABEL, state='fail')]
+        if not cpu_memory_ok(sel):
+            bad = bad + [dict(label=CPU_MEM_LABEL, state='fail')]
         res = _verdict(bad)
         self._cache[key] = res
         return res

@@ -189,6 +189,27 @@ class PoolTests(unittest.TestCase):
         self.assertNotEqual(by['402']['overTotalBudget'], by['402']['overPartBudget'])
 
 
+class CpuMemoryTests(unittest.TestCase):
+    """보드를 아직 고르지 않아도 CPU 소켓으로 확정되는 메모리 세대는 막는다(2026-10-25 실호출: AM5 CPU 에 DDR4 키트가 「저렴한 대안」)."""
+
+    def test_socket_memory_rule(self):
+        am5, lga1700 = part(1, 'cpu', 1, 'AM5 CPU', 소켓='AM5'), part(2, 'cpu', 1, '인텔', 소켓='LGA1700')
+        ddr4, ddr5 = part(3, 'memory', 1, 'D4', **{'메모리 규격': 'DDR4'}), part(4, 'memory', 1, 'D5', **{'메모리 규격': 'DDR5'})
+        self.assertFalse(D.cpu_memory_ok({'cpu': am5, 'memory': ddr4}))
+        self.assertTrue(D.cpu_memory_ok({'cpu': am5, 'memory': ddr5}))
+        self.assertTrue(D.cpu_memory_ok({'cpu': lga1700, 'memory': ddr4}))       # LGA1700 은 보드에 따라 둘 다 된다
+        self.assertTrue(D.cpu_memory_ok({'cpu': lga1700, 'memory': ddr5}))
+        self.assertTrue(D.cpu_memory_ok({'cpu': am5}))
+        self.assertTrue(D.cpu_memory_ok({'cpu': part(5, 'cpu', 1, '모름'), 'memory': ddr4}))   # 근거가 없으면 막지 않는다
+
+    def test_checker_uses_rule_without_board(self):
+        am5, ddr4 = part(1, 'cpu', 1, 'AM5 CPU', 소켓='AM5'), part(3, 'memory', 1, 'D4', **{'메모리 규격': 'DDR4'})
+        ck = D.Checker(pool())
+        with patch.object(D.FB, 'judge', lambda *a, **k: ([], {})), patch.object(D.FB, 'ram_fits', lambda *a, **k: True):
+            self.assertEqual(ck.slot({'cpu': am5, 'memory': ddr4}, 'memory'), ('fail', [D.CPU_MEM_LABEL]))
+            self.assertEqual(ck.slot({'cpu': am5, 'memory': ddr4}, 'gpu')[0], 'ok')
+
+
 # ── 부품 상담 ────────────────────────────────────────────────────────────
 class AdviseTests(unittest.TestCase):
     def setUp(self):
