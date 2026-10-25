@@ -25,6 +25,15 @@ export function optionView(proposal, optionId) {
 
 // 적용 가능 여부 -- 예산은 고객이 정한 상한이다(2026-10-25 E2E-04). 예산을 넘는 구성은 비교·대안으로만 보여 주고,
 // 예산을 직접 올리거나 부품을 바꾼 뒤 다시 채워 적용한다. 버튼과 적용 처리 함수가 같은 판정을 쓴다.
+// 적용 직전 판단 -- 서버 견적(quote)은 예산을 모르는 조회라 서버가 초과를 막아 주지 않는다(Codex 원인 확인).
+// 순서: ① 다시 계산한 합계가 예산을 넘으면 가격 변경 재확인 여부와 관계없이 차단 ② 가격 표식이 바뀌었고 아직 재확인 전이면 재확인 ③ 적용.
+export function applyDecision({quoteTotal, quotePriceKey, optionPriceKey, budget, confirmed}) {
+  const rule = applyRule(quoteTotal, budget);
+  if (!rule.canApply) return {action: 'block', reason: rule.blockReason};
+  if (!confirmed && quotePriceKey !== optionPriceKey) return {action: 'confirm', reason: null};
+  return {action: 'apply', reason: null};
+}
+
 export function applyRule(total, bud) {
   if (!bud || total <= bud) return {canApply: true, blockReason: null};
   return {canApply: false,

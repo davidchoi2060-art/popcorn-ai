@@ -4,7 +4,7 @@ import BrandHeader from './BrandHeader.jsx';
 import PartAdvisor from './PartAdvisor.jsx';
 import {BRAND_LOGO_URL, CATALOG_URL, CUSTOMER_BASE, normalizeCatalog} from './paths.js';
 import {ApiError, budgetValue, fill as fillApi, getPool, mergePool, quote as quoteApi, selectionKey} from './api.js';
-import {applyRule, optionView} from './proposalView.js';
+import {applyDecision, applyRule, optionView} from './proposalView.js';
 
 const CATS=[
   {id:'cpu',name:'CPU',hint:'PC의 처리 능력을 결정해요',icon:Cpu},
@@ -98,8 +98,9 @@ export function App(){
     setApplying(true);
     try{
       const q=await quoteApi({selection:opt.selection});
-      const recheck=applyRule(q.total,proposal.budgetTotal);if(!recheck.canApply){setProposal(p=>({...p,priceChanged:{total:q.total,priceBasis:q.priceBasis},applyError:recheck.blockReason}));return;}
-      if(!confirmed&&q.priceKey!==opt.priceKey){setProposal(p=>({...p,priceChanged:{total:q.total,priceBasis:q.priceBasis}}));return;}
+      const d=applyDecision({quoteTotal:q.total,quotePriceKey:q.priceKey,optionPriceKey:opt.priceKey,budget:proposal.budgetTotal,confirmed});
+      if(d.action==='block'){setProposal(p=>({...p,priceChanged:{total:q.total,priceBasis:q.priceBasis},applyError:d.reason}));return;}
+      if(d.action==='confirm'){setProposal(p=>({...p,priceChanged:{total:q.total,priceBasis:q.priceBasis}}));return;}
       remember();setSelection(opt.selection);setOrigins(s=>({...s,...Object.fromEntries(opt.changed.map(c=>[c,'ai']))}));setLocked(s=>({...s,...Object.fromEntries(opt.changed.map(c=>[c,false]))}));
       const kept=CATS.length-opt.changed.length;setMessage(`${kept?`선택한 ${kept}개는 유지하고, `:''}${opt.changed.length}개 부품을 채웠어요. 마음에 드는 부품은 ‘유지’를 눌러 고정해보세요.`);setProposal(null);setToast('제안한 구성을 구성표에 적용했어요.');
     }catch(e){

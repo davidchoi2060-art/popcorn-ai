@@ -80,3 +80,23 @@ test('예산을 올린 뒤 다시 받은 제안은 적용할 수 있다(390 회�
     {id: 'opt1', kind: 'min', total: 1491200, within: true, changed: [], selection: {}}]}};
   assert.equal(optionView(raised, 'opt1').canApply, true);
 });
+
+test('적용 직전 다시 계산한 합계가 예산을 넘으면 가격 변경 재확인 여부와 관계없이 차단한다', async () => {
+  const {applyDecision} = await import('../src/proposalView.js');
+  const base = {budget: 1500000, optionPriceKey: 'k1'};
+  // 가격이 올라 예산을 넘음 -- 재확인 전·후 모두 차단(확인 버튼을 눌러도 적용되지 않음)
+  for (const confirmed of [false, true]) {
+    const d = applyDecision({...base, quoteTotal: 1500100, quotePriceKey: 'k2', confirmed});
+    assert.equal(d.action, 'block', String(confirmed));
+    assert.ok(d.reason.includes('1,500,000원') && d.reason.includes('100원'));
+  }
+  // 가격 표식은 같아도 합계가 예산 밖이면 차단
+  assert.equal(applyDecision({...base, quoteTotal: 1756600, quotePriceKey: 'k1', confirmed: false}).action, 'block');
+  // 예산 안: 가격이 바뀌었으면 먼저 재확인, 재확인 뒤 적용
+  assert.equal(applyDecision({...base, quoteTotal: 1491200, quotePriceKey: 'k2', confirmed: false}).action, 'confirm');
+  assert.equal(applyDecision({...base, quoteTotal: 1491200, quotePriceKey: 'k2', confirmed: true}).action, 'apply');
+  // 150만원 / 1,491,200원 정상 적용(390 회복 흐름)
+  assert.equal(applyDecision({...base, quoteTotal: 1491200, quotePriceKey: 'k1', confirmed: false}).action, 'apply');
+  // 예산 없음: 예산 판정 없이 가격 표식만 본다
+  assert.equal(applyDecision({quoteTotal: 9999999, quotePriceKey: 'k1', optionPriceKey: 'k1', budget: null, confirmed: false}).action, 'apply');
+});

@@ -817,4 +817,4 @@ class CustomerE2ETests(unittest.TestCase):
                            encoding='utf-8', cwd=root)
         self.assertEqual(r.returncode, 0, r.stdout[-1500:] + r.stderr[-800:])
         self.assertIn('# fail 0', r.stdout)
-        self.assertIn('# pass 5', r.stdout)                                       # 탭 3 + E2E-04 예산 초과 적용 차단 2
+        self.assertIn('# pass 6', r.stdout)                                       # 탭 3 + E2E-04 예산 초과 적용 차단 3(재조회 합계 포함)
