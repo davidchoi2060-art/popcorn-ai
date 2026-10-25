@@ -193,6 +193,11 @@ class PoolTests(unittest.TestCase):
 class AdviseTests(unittest.TestCase):
     def setUp(self):
         self.pool = pool()
+        self.fb = patch.object(A, '_fallback_order', lambda: ['claude'])
+        self.fb.start()
+
+    def tearDown(self):
+        self.fb.stop()
 
     def run_adv(self, body, *ans):
         fake, calls = answers(*ans)
@@ -212,6 +217,7 @@ class AdviseTests(unittest.TestCase):
         self.assertIn('[자료]', calls[0]['prompt'])
         self.assertEqual(calls[0]['task_key'], A.TASK_KEY)
         self.assertTrue(calls[0]['customer_facing'])
+        self.assertEqual(calls[0]['fallback_order'], ['claude'])          # 결제 꺼진 gemini 로 넘어가 사슬이 끊기지 않게
 
     def test_out_of_list_code_is_retried_then_accepted(self):
         good = {'answer': '추천해요.', 'recommendations': [{'product_code': 401, 'label': '추천', 'reason': 'r', 'tradeoff': 't'}]}
@@ -273,6 +279,11 @@ class AdviseTests(unittest.TestCase):
 class FillTests(unittest.TestCase):
     def setUp(self):
         self.pool = pool()
+        self.fb = patch.object(A, '_fallback_order', lambda: ['claude'])
+        self.fb.start()
+
+    def tearDown(self):
+        self.fb.stop()
 
     def run_fill(self, body, *ans):
         fake, calls = answers(*ans)
@@ -326,6 +337,24 @@ class FillTests(unittest.TestCase):
         self.assertEqual(r['fixed'], ['gpu'])
 
 
+class FallbackOrderTests(unittest.TestCase):
+    """codex 다음은 claude. DB 배정에 fallback_order 가 저장되면 그 값(llm 이 읽도록 None)을 따른다."""
+
+    def run_with(self, row):
+        @contextmanager
+        def fake_connect():
+            yield None
+        with patch.object(A.engine, 'connect', fake_connect), patch.object(llm, '_load_task_assignment', lambda conn, key: row):
+            return A._fallback_order()
+
+    def test_default_skips_gemini(self):
+        self.assertEqual(self.run_with(None), ['claude'])
+        self.assertEqual(self.run_with({'providers': [], 'fallback_order': []}), ['claude'])
+
+    def test_db_assignment_wins(self):
+        self.assertIsNone(self.run_with({'providers': [], 'fallback_order': ['Gemini', 'Claude']}))
+
+
 # ── 경로 계약 ────────────────────────────────────────────────────────────
 class RouteTests(unittest.TestCase):
     def setUp(self):
@@ -337,7 +366,8 @@ class RouteTests(unittest.TestCase):
         def fake_connect():
             yield None
         self.patches = [patch.object(A.engine, 'connect', fake_connect), patch.object(D, 'load_pool', lambda conn, src=None: pool()),
-                        patch.object(D, 'Checker', FakeChecker), patch.object(A.access_gate, 'check_rate', lambda *a, **k: 'v')]
+                        patch.object(D, 'Checker', FakeChecker), patch.object(A.access_gate, 'check_rate', lambda *a, **k: 'v'),
+                        patch.object(A, '_fallback_order', lambda: ['claude'])]
         for p in self.patches:
             p.start()
 
