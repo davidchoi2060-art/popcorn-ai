@@ -917,6 +917,29 @@ class IntentInputTests(unittest.TestCase):
         r, _ = self.fill(requestText=text, purpose='creator', budgetTotal=800_000, budgetPin=text)
         self.assertEqual((r['kind'], r['budgetTotal']), ('proposal', 800_000))
 
+    def test_intent04_office_words_not_forced_to_creator(self):
+        # INTENT-04 실제 검수: CPU 7500F 고정, 이 문장이 일반어 「작업」 때문에 영상·작업으로 분류됐다
+        office = '사무용 PC가 필요해요. 엑셀과 문서 작업을 오래 해요. 조용하면 좋겠어요.'
+        r, prompt = self.fill(selection={'cpu': '102'}, requestText=office, purpose='gaming', budgetTotal=2_000_000)
+        self.assertEqual((r['purpose'], r['purposeFrom']), ('office', 'text'))
+        self.assertIn('"purpose": "사무·일상"', prompt)
+        self.assertFalse([o['label'] for o in r['proposal']['options'] if '영상·작업' in o['label']])
+        for t in ('엑셀 작업 위주예요', '문서 편집을 많이 해요', '회사 업무용', 'PPT 만들어요', '유튜브 보고 인강 들어요',
+                  '케이스 디자인이 예뻤으면 좋겠고 문서 작업용'):
+            with self.subTest(t=t):
+                self.assertEqual(A._text_purpose(t), 'office')
+        # 대조: 실제 영상·그래픽 작업 말은 영상·작업
+        for t in ('프리미어로 영상 편집하고 가끔 게임도 해요.', '렌더링 작업이 많아요', '유튜브 편집용', '3D 모델링 해요',
+                  '포토샵 디자인 작업', '애프터 이펙트 써요', '가끔 영상 편집도 하는 사무용'):
+            with self.subTest(t=t):
+                self.assertEqual(A._text_purpose(t), 'creator')
+        r, _ = self.fill(selection={'cpu': '102'}, requestText='프리미어로 영상 편집을 오래 해요. 조용하면 좋겠어요.', purpose='gaming', budgetTotal=2_000_000)
+        self.assertEqual((r['purpose'], r['purposeFrom']), ('creator', 'text'))
+        # 일반어만 있으면 용도를 정하지 않고 화면에서 고른 용도를 둔다
+        self.assertIsNone(A._text_purpose('그냥 작업용으로 조용하게'))
+        r, _ = self.fill(requestText='그냥 작업용으로 조용하게', purpose='office', budgetTotal=2_000_000)
+        self.assertEqual((r['purpose'], r['purposeFrom']), ('office', 'field'))
+
     def test_fields_limits(self):
         A.FillBody(requestText='가' * 300, budgetPin='가' * 300, purposePin='가' * 300, answer='가' * 100)
         for k, n in (('requestText', 301), ('budgetPin', 301), ('purposePin', 301), ('answer', 101)):
