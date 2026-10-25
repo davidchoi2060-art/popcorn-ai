@@ -8,18 +8,21 @@ export function optionView(proposal, optionId) {
   const opt = pr.options.find(o => o.id === optionId) || pr.options[0];
   const isAi = proposal.ai?.status === 'ok' && opt.id === pr.chosen;
   const bud = proposal.budgetTotal;
-  const budgetLine = !bud ? null : opt.total <= bud
-    ? `이 구성의 부품 합계 ${won(opt.total)} · 전체 예산 ${won(bud)}에서 ${won(bud - opt.total)} 남아요.`
-    : `이 구성의 부품 합계 ${won(opt.total)} · 전체 예산 ${won(bud)}보다 ${won(opt.total - bud)} 많아요.`;
+  // 적용 직전 서버가 다시 계산한 합계가 이 탭의 것이면 그 값이 판정 기준이다(버튼·예산 문구·합계가 처리 함수와 같은 금액을 본다).
+  const repriced = proposal.priceChanged && proposal.priceChanged.option === opt.id ? proposal.priceChanged : null;
+  const total = repriced ? repriced.total : opt.total;
+  const budgetLine = !bud ? null : total <= bud
+    ? `이 구성의 부품 합계 ${won(total)} · 전체 예산 ${won(bud)}에서 ${won(bud - total)} 남아요.`
+    : `이 구성의 부품 합계 ${won(total)} · 전체 예산 ${won(bud)}보다 ${won(total - bud)} 많아요.`;
   return {
-    opt, isAi,
+    opt, isAi, total, repriced: !!repriced,
     summary: isAi ? pr.summary || null : null,
     slotReasons: isAi ? pr.slotReasons || {} : {},
     constraints: isAi ? pr.constraints || [] : [],
     budgetAdvice: isAi ? pr.budgetAdvice || null : null,
     budgetLine,
-    over: bud && opt.total > bud ? opt.total - bud : null,
-    ...applyRule(opt.total, bud),
+    over: bud && total > bud ? total - bud : null,
+    ...applyRule(total, bud),
   };
 }
 

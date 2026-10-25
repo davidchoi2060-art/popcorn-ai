@@ -100,3 +100,23 @@ test('적용 직전 다시 계산한 합계가 예산을 넘으면 가격 변경
   // 예산 없음: 예산 판정 없이 가격 표식만 본다
   assert.equal(applyDecision({quoteTotal: 9999999, quotePriceKey: 'k1', optionPriceKey: 'k1', budget: null, confirmed: false}).action, 'apply');
 });
+
+test('다시 계산한 가격이 이 탭의 것이면 그 금액으로 버튼·예산 문구·합계를 판정한다', () => {
+  // 원래 1,756,600원(2,000,000원 예산 안)이던 opt1 이 다시 계산해 2,000,100원 -- 버튼도 막혀야 한다
+  const repriced = {...proposal, priceChanged: {option: 'opt1', total: 2000100, priceBasis: '2026-10-25'}};
+  const v = optionView(repriced, 'opt1');
+  assert.equal(v.repriced, true);
+  assert.equal(v.total, 2000100);
+  assert.equal(v.canApply, false);
+  assert.equal(v.over, 100);
+  assert.ok(v.blockReason.includes('100원'));
+  assert.equal(v.budgetLine, '이 구성의 부품 합계 2,000,100원 · 전체 예산 2,000,000원보다 100원 많아요.');
+  // 다른 탭의 재계산 값은 이 탭 판정에 쓰지 않는다
+  const other = optionView(repriced, 'opt3');
+  assert.equal(other.repriced, false);
+  assert.equal(other.total, 1997000);
+  assert.equal(other.canApply, true);
+  // 다시 계산해도 예산 안이면 「바뀐 가격으로 적용」 가능
+  const ok = optionView({...proposal, priceChanged: {option: 'opt1', total: 1760000}}, 'opt1');
+  assert.equal(ok.repriced && ok.canApply && ok.total === 1760000, true);
+});
