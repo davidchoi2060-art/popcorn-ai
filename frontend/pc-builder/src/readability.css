@@ -1,0 +1,97 @@
+/* 가독성 보정 (2026-10-26 사용자 「상세·부품 변경 화면 글자가 잘 안 보인다」 · Codex 운영 미리보기 실측 R001~R006)
+   대상: 부품 고르기 창 · 부품 변경 확인 창 · AI 제안 창(추천 이유) · 부품 AI 상담 창.
+   기준: 본문·사양 15~16px, 보조 정보 14px 이상, 글자색은 같은 색 계열에서 흰 바탕 대비 4.5:1 이상.
+   크기·색만 바꾼다 — 배치·금액·추천 로직은 그대로다. main.jsx 에서 마지막에 불러와 앞선 파일(모바일 축소 규칙 포함)을 덮는다.
+   !important 는 원래 규칙이 !important 인 자리(.review-category · .pa-ai-reason · .pa-excluded)에만 쓴다. */
+
+/* ── 부품 고르기 창 ── */
+.dialog-header p{font-size:15px;color:#5c6472;line-height:1.55}
+.category-tabs button{font-size:15px}
+.picker-ai-entry strong{font-size:16px}
+.picker-ai-entry small{font-size:14px;color:#6b5a80}
+.search-field input{font-size:16px}
+.picker-controls select{font-size:15px;color:#4f4e5a}
+.picker-filter{font-size:14px;color:#5f5668}
+.picker-filter>span{font-size:14px;color:#6b6276}
+.candidate-main h3{font-size:16px}
+.candidate-main .candidate-specs{font-size:16px;color:#4f5260;line-height:1.6}
+.candidate-main>a{font-size:14px;color:#6b5a7c}
+.candidate-main>a svg{width:14px;height:14px}
+.candidate-price small{font-size:14px;color:#635a6e;word-break:keep-all}
+/* 좁은 폭에서 가격 설명이 버튼 옆에서 세 줄로 꺾이지 않게 — 자리가 모자라면 버튼이 다음 줄 오른쪽으로 내려간다 */
+.candidate-bottom{flex-wrap:wrap}
+.candidate-price{flex:1 1 150px;min-width:0}
+.candidate-bottom>button{margin-left:auto}
+.candidate-bottom>button{font-size:15px;min-height:40px}
+.candidate-tags .tag{font-size:14px;padding:2px 7px}
+.tag.neutral{color:#586070}
+.tag.amber{color:#855a14}
+.picker-dialog .dialog-footer p{font-size:14px;color:#5f5d68}
+.empty-results{color:#5f5c68}
+/* 글자가 커지면서 한국어가 단어 중간에서 꺾이던 자리(「골라볼/까요」) — 띄어쓰기 단위로 꺾고, 긴 모델명은 넘치지 않게 */
+.dialog-header p,.picker-ai-entry strong,.picker-ai-entry small,.picker-filter label,.candidate-main .candidate-specs,.picker-dialog .dialog-footer p,
+.proposal-context,.dialog-content .meta-note,.dialog-content .notice-box,.relax-list,.constraint-list,.pa-header p,.pa-message p,.pa-reason p,.pa-ai-reason,.pa-footer p{word-break:keep-all;overflow-wrap:anywhere}
+@media(max-width:370px){.candidate-card{grid-template-columns:48px minmax(0,1fr);gap:8px 10px}.candidate-image{width:48px;height:56px}}
+/* 불가 카드: 카드 전체를 흐리지 않는다 — 사진만 흐리고 「기본 규격 불일치」 사유는 그대로 읽힌다 */
+.candidate-card.incompatible{opacity:1}
+.candidate-card.incompatible .candidate-image{opacity:.5}
+
+/* ── 부품 변경 확인 · AI 제안 창 ── */
+.diff-row{font-size:15px}
+.diff-row>span{font-size:14px;color:#6e6380}
+.diff-row>strong{font-size:16px;color:#3f3550}
+.diff-row del,.diff-row .before{font-size:14px;color:#6e6878}
+.proposal-context{font-size:15px;color:#5c4a73;line-height:1.65}
+.option-switch button{font-size:14px}
+.option-switch button small{font-size:14px;color:#8a4f12}
+/* 제안 창 부품 행만 — 구성 확인 페이지(.review-table-card)의 같은 행은 이번 범위 밖이라 건드리지 않는다 */
+.dialog-content .review-row strong{font-size:15px}
+.dialog-content .review-row small{font-size:14px!important;color:#625870;line-height:1.55}
+.dialog-content .review-row>span:last-child{font-size:15px!important}
+.dialog-content .review-category{font-size:14px!important;color:#625870;width:76px;flex-basis:76px;white-space:nowrap}
+.relax-list,.constraint-list{font-size:15px;color:#4f4760}
+.dialog-content .meta-note{font-size:14px;color:#5f6370}
+.dialog-content .review-total span{font-size:14px}
+.dialog-content .notice-box{font-size:14px;color:#6b5a33}
+.proposal-footer-total small{font-size:14px;color:#5f5468}
+.dialog-footer .primary-button,.dialog-footer .secondary-button{font-size:15px}
+
+/* ── 부품 AI 상담 창 ── */
+.pa-header p{font-size:15px;color:#5d5869}
+.pa-demo{font-size:14px}
+.pa-chips>span{font-size:14px}
+.pa-selection{font-size:14px}
+.pa-selection li span{color:#685f78}
+.pa-current{font-size:14px}
+.pa-section-title h3{font-size:16px}
+.pa-section-title>span{font-size:14px;color:#675e78}
+.pa-speaker{font-size:14px;color:#66597a}
+.pa-message p{font-size:15px;line-height:1.75}
+.pa-starters button,.pa-followups button{font-size:14px}
+.pa-input>label{font-size:14px}
+.pa-input input{font-size:16px}
+.pa-input input::placeholder{font-size:15px;color:#7a6f88}
+.pa-example-note{font-size:14px;color:#6c6180}
+.pa-budget{font-size:14px;color:#5f5470}
+.pa-budget small{font-size:14px;color:#6c6080}
+.pa-card h4{font-size:16px}
+.pa-card-tags span{font-size:14px;padding:3px 7px;color:#6c46ae}
+.pa-card-tags span.over{color:#84530f}
+.pa-product-full{font-size:14px;color:#6c6178}
+.pa-specs{font-size:14px;color:#5c5070}
+.pa-reason>strong{font-size:14px}
+.pa-reason p{font-size:15px}
+.pa-reason small{font-size:14px;color:#6c5f7a}
+.pa-ai-reason{font-size:15px!important}
+.pa-evidence,.pa-evidence li{font-size:14px;color:#625575}
+.pa-price span,.pa-price>small{font-size:14px;color:#675b75}
+.pa-question-button{font-size:14px}
+.pa-choose{font-size:15px}
+.pa-source{font-size:14px;color:#6e6080}
+.pa-followups>span{font-size:14px;color:#6c5f7a}
+.pa-empty p{font-size:15px;color:#66587a}
+.pa-empty button{font-size:14px}
+.pa-ai-note,.pa-retry,.pa-relax{font-size:14px}
+.pa-relax small{color:#7a5c2f}
+.pa-excluded{font-size:14px!important}
+.pa-footer p{font-size:14px;color:#6c6080}
