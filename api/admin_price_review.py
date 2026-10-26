@@ -79,6 +79,54 @@ def price_review():
     return {"items": items, "fee_rate": fee, "margin_rate": margin, "note": NOTE}
 
 
+# ---- ADM-H1-20261027: 상품 관리 → 가격 검토 이동 시 «선택 상품 하나»의 대상 판정 ----
+# 왜 따로 두나: 화면이 상세 API 값으로 큐 조건을 다시 조합하면 판정 술어가 JS 에 한 벌 더
+# 생긴다(같은 것을 두 벌 두지 않는다). 큐 목록에 «없다»만으로는 비대상 사유를 말할 근거가
+# 없다. 그래서 PENDING 을 그대로 써서 서버가 판정하고, 사유는 empty-breakdown 과 같은
+# 분할(검수 대기 · 잠금)로 낸다 — 빈 큐 설명과 단건 사유가 서로 다른 말을 하지 않게.
+# 읽기 전용이다: SELECT 한 번, 로그·잠금·가격 계산 없음.
+TARGET_REASON_LABELS = {
+    "in_queue": "가격 검토 대기 대상",
+    "has_price": "판매가 산정 완료 — 첫 산정 대상 아님",
+    "review_pending": "검수 대기 — 검수 완료 후 대상",
+    "price_locked": "판매가 잠금 — 제안 차단 상태",
+    "unknown": "대상 여부 판정 불가",  # 안전망 — 위 넷으로 나뉘지 않는 행(지금 스키마로는 없음)
+}
+_SALE_PRICE_LOCKED = "(p.locked_fields @> '[\"sale_price\"]'::jsonb)"
+_TARGET = text(
+    "SELECT p.product_code, p.sku, p.product_name, p.sale_price, p.status,"
+    f" ({PENDING}) IS TRUE AS in_queue,"
+    " (p.sale_price IS NOT NULL) AS has_price,"
+    " (p.review_required_yn = true) AS review_required,"
+    f" {_SALE_PRICE_LOCKED} IS TRUE AS price_locked,"
+    f" CASE WHEN {PENDING} THEN 'in_queue'"
+    "      WHEN p.sale_price IS NOT NULL THEN 'has_price'"
+    "      WHEN p.review_required_yn = true THEN 'review_pending'"
+    f"     WHEN {_SALE_PRICE_LOCKED} THEN 'price_locked'"
+    "      ELSE 'unknown' END AS reason,"
+    " now() AS checked_at"
+    " FROM products p WHERE p.product_code = :pc")
+
+
+@router.get("/price-review/target/{product_code}")
+def price_review_target(product_code: int):
+    with engine.connect() as conn:
+        r = conn.execute(_TARGET, {"pc": product_code}).mappings().first()
+    if r is None:
+        raise HTTPException(404, "상품이 없습니다")
+    reason = r["reason"] if r["reason"] in TARGET_REASON_LABELS else "unknown"
+    return {
+        "product_code": r["product_code"], "found": True,
+        "in_queue": bool(r["in_queue"]), "reason": reason,
+        "reason_label": TARGET_REASON_LABELS[reason],
+        "flags": {"has_price": bool(r["has_price"]), "review_required": bool(r["review_required"]),
+                  "price_locked": bool(r["price_locked"])},
+        "sku": r["sku"], "name": r["product_name"], "sale_price": r["sale_price"],
+        "status": r["status"],
+        "checked_at": r["checked_at"].isoformat() if r["checked_at"] else None,
+    }
+
+
 class DecideBody(BaseModel):
     action: str            # approve | keep | manual
     price: int | None = None   # manual 전용
