@@ -197,7 +197,7 @@ class TargetCodeParseTests(unittest.TestCase):
 
 
 class ReturnHrefTests(unittest.TestCase):
-    ALLOWED = {k for k, _ in UI._RET_RULES}
+    ALLOWED = {k for k, _n, _check in UI._RET_RULES}
 
     def href(self, ret):
         return UI.products_return_href(ret)
@@ -260,8 +260,58 @@ class ReturnHrefTests(unittest.TestCase):
     def test_limits(self):
         self.assertEqual(self.href("q=" + "a" * 201), "/admin2/products")
         self.assertEqual(self.href("q=" + "a" * 200), "/admin2/products?q=" + "a" * 200)
-        self.assertEqual(self.href("page=2&" + "x" * 2001), "/admin2/products")
         self.assertEqual(self.href("&".join("k%d=v" % i for i in range(61))), "/admin2/products")
+
+    # ── ADM-H1-SRV-001: 유효한 한글 상태가 총 길이 상한에 걸려 통째로 사라지던 결함 ──
+    def test_srv001_pm_repro_korean_q200_maker100_keeps_page_and_sel(self):
+        ret = "q=" + "%EA%B0%80" * 200 + "&maker=" + "%EB%82%98" * 100 + "&page=2&sel=123456"
+        self.assertEqual(len(ret), 2727, "PM 재현값 그대로")
+        out = self.href(ret)
+        self.assertSafe(out)
+        from urllib.parse import parse_qsl
+        got = dict(parse_qsl(out.split("?", 1)[1]))
+        self.assertEqual(got, {"q": "가" * 200, "maker": "나" * 100, "page": "2", "sel": "123456"})
+
+    def test_srv001_longest_valid_state_fits_and_round_trips(self):
+        """모든 키를 허용 최대 길이로 채우고 문자열은 UTF-8 4바이트 문자로 — 가장 긴 유효 상태."""
+        from urllib.parse import parse_qsl, quote, urlencode
+        four = "\U00020000"
+        state = [("q", four * 200), ("tab", "review"), ("part_type", "A" * 40), ("maker", four * 100),
+                 ("visible", "off"), ("sale_status", ",".join(UI.STATUS_OK)), ("category_id", "9" * 10),
+                 ("include_desc", "1"), ("page", "9" * 6), ("size", "500"), ("sort", "status"), ("dir", "desc"),
+                 ("sel", str(2 ** 63 - 1))]
+        for quote_via in (quote, None):                      # %20 방식 · + 방식(브라우저 URLSearchParams) 둘 다
+            ret = urlencode(state, quote_via=quote_via) if quote_via else urlencode(state)
+            with self.subTest(encoding="quote" if quote_via else "quote_plus", length=len(ret)):
+                self.assertLessEqual(len(ret), UI._RET_MAX_LEN)
+                out = self.href(ret)
+                self.assertSafe(out)
+                self.assertEqual(parse_qsl(out.split("?", 1)[1]), state)
+
+    def test_srv001_cap_still_defends_size(self):
+        ok = "page=2&" + "x" * (UI._RET_MAX_LEN - len("page=2&"))
+        self.assertEqual(len(ok), UI._RET_MAX_LEN)
+        self.assertEqual(self.href(ok), "/admin2/products?page=2", "상한 이하면 읽고 허용 키만 남긴다")
+        self.assertEqual(self.href(ok + "x"), "/admin2/products", "상한을 1자라도 넘으면 읽지 않는다")
+        self.assertLess(UI._RET_MAX_LEN, 8192, "요청 줄 버퍼(nginx 기본 8k) 안에서 의미 있는 상한")
+
+    def test_declared_max_chars_match_each_rule_boundary(self):
+        """총 길이 상한의 근거(키별 최대 글자 수)가 실제 검사 경계와 같다 — 어긋나면 상한이 유효 값을 자른다."""
+        rules = {k: (n, check) for k, n, check in UI._RET_RULES}
+        longest = {"q": "a" * 200, "tab": "review", "part_type": "A" * 40, "maker": "a" * 100, "visible": "off",
+                   "sale_status": ",".join(UI.STATUS_OK), "category_id": "9" * 10, "include_desc": "1",
+                   "page": "9" * 6, "size": "500", "sort": "status", "dir": "desc", "sel": str(2 ** 63 - 1)}
+        too_long = {"q": "a" * 201, "part_type": "A" * 41, "maker": "a" * 101, "category_id": "9" * 11,
+                    "page": "9" * 7, "sel": "1" * 20}
+        self.assertEqual(set(longest), set(rules))
+        for k, v in longest.items():
+            with self.subTest(key=k):
+                n, check = rules[k]
+                self.assertEqual(len(v), n)
+                self.assertIsNotNone(check(v))
+        for k, v in too_long.items():
+            with self.subTest(key=k, over=True):
+                self.assertIsNone(rules[k][1](v))
 
     def test_duplicate_keys_keep_first(self):
         self.assertEqual(self.href("page=2&page=9"), "/admin2/products?page=2")

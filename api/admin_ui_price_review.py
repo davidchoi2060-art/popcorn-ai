@@ -74,23 +74,30 @@ def _sale_status(v: str):
     return ",".join(picked) or None
 
 
-# 상품 관리 화면이 자기 URL 에 쓰는 상태 키(계약 D.products_url_state_keys) — 순서 그대로 다시 쓴다
+# 상품 관리 화면이 자기 URL 에 쓰는 상태 키(계약 D.products_url_state_keys) — 순서 그대로 다시 쓴다.
+# (키, 디코딩된 값의 최대 글자 수, 검사) — 최대 글자 수는 검사가 받아 주는 가장 긴 값과 같다.
 _RET_RULES = (
-    ("q", _text_upto(200)),
-    ("tab", _one_of("all", "ok", "review", "oos", "price")),
-    ("part_type", lambda v: v if re.fullmatch(r"[A-Za-z0-9_]{1,40}", v) else None),
-    ("maker", _text_upto(100)),
-    ("visible", _one_of("on", "off")),
-    ("sale_status", _sale_status),
-    ("category_id", _pos_int(10)),
-    ("include_desc", _one_of("0", "1")),
-    ("page", _pos_int(6)),
-    ("size", _one_of("50", "100", "200", "500")),
-    ("sort", _one_of("name", "cat", "spec", "stock", "price", "status")),
-    ("dir", _one_of("asc", "desc")),
-    ("sel", lambda v: v if parse_target_code(v)[0] is not None else None),
+    ("q", 200, _text_upto(200)),
+    ("tab", 6, _one_of("all", "ok", "review", "oos", "price")),
+    ("part_type", 40, lambda v: v if re.fullmatch(r"[A-Za-z0-9_]{1,40}", v) else None),
+    ("maker", 100, _text_upto(100)),
+    ("visible", 3, _one_of("on", "off")),
+    ("sale_status", len(",".join(STATUS_OK)), _sale_status),
+    ("category_id", 10, _pos_int(10)),
+    ("include_desc", 1, _one_of("0", "1")),
+    ("page", 6, _pos_int(6)),
+    ("size", 3, _one_of("50", "100", "200", "500")),
+    ("sort", 6, _one_of("name", "cat", "spec", "stock", "price", "status")),
+    ("dir", 4, _one_of("asc", "desc")),
+    ("sel", 19, lambda v: v if parse_target_code(v)[0] is not None else None),
 )
-_RET_MAX_LEN = 2000
+# 총 길이 상한은 «유효한 값의 최악의 인코딩»에서 계산한다(ADM-H1-SRV-001). 옛 상한 2,000자는
+# 한글 q 200자 + maker 100자(각자 허용 범위 안)만으로 2,727자가 되어 page·sel 까지 통째로 버렸다.
+# 한 글자는 퍼센트 인코딩으로 최대 12자(UTF-8 4바이트 × %XX)다. 그래서 키마다
+# 「키 + '=' + '&' + 최대 글자 수 × 12」를 더한 값이면 유효한 상태는 항상 들어가고, 그보다 긴 입력은
+# 처음부터 유효할 수 없으니 읽지 않고 버린다(입력 크기 방어 유지 — 지금 규칙으로 5,047자).
+_PCT_MAX_PER_CHAR = 12
+_RET_MAX_LEN = sum(len(key) + 2 + _PCT_MAX_PER_CHAR * n for key, n, _ in _RET_RULES)
 
 
 def products_return_href(ret: str | None) -> str:
@@ -106,7 +113,7 @@ def products_return_href(ret: str | None) -> str:
     for k, v in pairs:
         first.setdefault(k, v.strip())       # 같은 키가 여러 번이면 첫 값만
     kept = []
-    for key, check in _RET_RULES:
+    for key, _max_chars, check in _RET_RULES:
         v = first.get(key)
         if v is None:
             continue
