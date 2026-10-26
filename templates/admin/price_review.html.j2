@@ -55,6 +55,21 @@
 {% block head_extra %}
 <style>
 .pr-root{padding:20px 22px 32px;overflow-y:auto;flex:1;min-height:0;display:flex;flex-direction:column;gap:16px}
+.pr-target-banner{background:var(--card,#fff);border:1px solid var(--outline-variant,#ccc);border-radius:8px;padding:14px 16px;margin-bottom:4px;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.pr-target-banner.pr-tb-invalid{background:var(--rv-amber-bg,#fff8e1);border-color:var(--rv-amber-line,#ffe082)}
+.pr-tb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.pr-tb-title-wrap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pr-tb-title{font-size:13.5px;color:var(--on,#000);font-weight:700}
+.pr-tb-body{margin-top:8px;font-size:12px;color:var(--on-variant,#555);line-height:1.6}
+.pr-tb-body strong{color:var(--on,#000)}
+.pr-tb-facts{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:6px;padding:8px 12px;background:var(--container-low,#f8f9fa);border-radius:6px;font-size:11.5px}
+.pr-tb-fact{display:inline-flex;align-items:center;gap:4px}
+.pr-tb-fact .k{color:var(--on-variant,#757575)}
+.pr-tb-fact .v{font-weight:600;color:var(--on,#212121)}
+.pr-btn-return{display:inline-flex;align-items:center;padding:5px 12px;background:var(--container,#fff);border:1px solid var(--outline-variant,#ccc);border-radius:6px;font-size:12px;font-weight:600;color:var(--on,#000);text-decoration:none;white-space:nowrap;cursor:pointer}
+.pr-btn-return:hover{background:var(--container-low,#f5f5f5);color:var(--primary,#1a73e8)}
+.pr-btn-return:focus-visible{outline:2px solid var(--primary,#1a73e8);outline-offset:2px}
+.pr-row-target{background:var(--container-high,#e8f0fe)!important;outline:2px solid var(--primary,#1a73e8)}
 .pr-headnote{font:500 11.5px/1 var(--font);color:var(--on-variant)}
 
 .pr-loading{padding:48px 20px;text-align:center;color:var(--on-variant);font:400 13px/1.6 var(--font)}
@@ -187,6 +202,31 @@
 
 {% block content %}
 <div class="pr-root" data-screen-id="ADM-PRC-010" data-domain="price-review">
+  {% if pr_target_invalid %}
+  <div class="pr-target-banner pr-tb-invalid" role="alert">
+    <div class="pr-tb-head">
+      <div class="pr-tb-title-wrap">
+        <span class="pr-badge" style="background:var(--rv-amber-bg,#fff8e1);color:var(--rv-amber,#b06000)">오류</span>
+        <strong class="pr-tb-title">잘못된 상품번호입니다</strong>
+      </div>
+      <a href="{{ (pr_return_href|default('/admin2/products'))|e }}" class="pr-btn-return">&larr; 목록으로 돌아가기</a>
+    </div>
+    <div class="pr-tb-body">
+      요청한 상품번호 형식이 올바르지 않습니다. 양의 정수 형태의 product_code여야 합니다.
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="prTargetBanner" class="pr-target-banner" hidden>
+    <div class="pr-tb-head">
+      <div class="pr-tb-title-wrap">
+        <span id="prTbBadge" class="pr-badge">안내</span>
+        <strong id="prTbTitle" class="pr-tb-title"></strong>
+      </div>
+      <a href="{{ (pr_return_href|default('/admin2/products'))|e }}" id="prReturnTopLink" class="pr-btn-return">&larr; 목록으로 돌아가기</a>
+    </div>
+    <div id="prTbBody" class="pr-tb-body"></div>
+  </div>
   <div class="pr-loading" id="prLoading">불러오는 중…</div>
   <div class="pr-error" id="prError" hidden></div>
 
@@ -217,6 +257,9 @@
           <div class="pr-loading" style="padding:14px 0">불러오는 중…</div>
         </div>
         <div class="pr-reason-cond" id="prReasonCond">—</div>
+        <div style="margin-top:14px;">
+          <a href="{{ (pr_return_href|default('/admin2/products'))|e }}" class="pr-btn-return">&larr; 상품 목록으로 돌아가기</a>
+        </div>
       </div>
     </div>
     <aside class="pr-empty-aside">
@@ -248,6 +291,7 @@
     <div class="row1">
       <span class="title" id="dwTitle">—</span>
       <span class="pr-badge">첫 산정</span>
+      <a href="{{ (pr_return_href|default('/admin2/products'))|e }}" class="pr-btn-return" style="margin-left:auto;margin-right:8px;font-size:11px;padding:3px 8px;" title="상품 목록으로 돌아가기">&larr; 목록 복귀</a>
       <button type="button" class="close" data-action="pr-close-drawer" aria-label="닫기">✕</button>
     </div>
     <div class="pr-dw-meta">
@@ -314,13 +358,35 @@
 (function () {
   'use strict';
 
+  var PR_TARGET_CODE = {{ pr_target_code|tojson if pr_target_code is defined and pr_target_code is not none else 'null' }};
+  var PR_TARGET_INVALID = {{ 'true' if pr_target_invalid else 'false' }};
+  var PR_RETURN_HREF = {{ (pr_return_href|default('/admin2/products'))|tojson }};
+
+  if (PR_TARGET_CODE == null && !PR_TARGET_INVALID) {
+    var _sp = new URLSearchParams(window.location.search);
+    var _c = _sp.get("code") || _sp.get("product_code");
+    if (_c) {
+      if (/^[1-9][0-9]{0,18}$/.test(_c.trim())) {
+        PR_TARGET_CODE = parseInt(_c.trim(), 10);
+      } else {
+        PR_TARGET_INVALID = true;
+      }
+    }
+    var _ret = _sp.get("ret");
+    if (_ret && (!PR_RETURN_HREF || PR_RETURN_HREF === '/admin2/products')) {
+      if (/^[a-zA-Z0-9_=&%.-]+$/.test(_ret) && _ret.indexOf("://") < 0 && _ret.indexOf("//") < 0) {
+        PR_RETURN_HREF = '/admin2/products?' + _ret;
+      }
+    }
+  }
+
   var API_LIST = '/api/admin/price-review';
   var API_BREAKDOWN = '/api/admin/price-review/empty-breakdown';
   function API_DECIDE(code) { return '/api/admin/price-review/' + code + '/decide'; }
   function API_PRODUCT(code) { return '/api/admin/products/' + code; }
   var LOGIN_URL = '/admin2/login';
 
-  var S = { items: [], fee: null, margin: null, note: '', breakdown: null, openCode: null, suppliers: null };
+  var S = { items: [], fee: null, margin: null, note: '', breakdown: null, openCode: null, suppliers: null, targetSeq: 0, targetInfo: null };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -344,6 +410,73 @@
       : ' <button type="button" data-action="pr-retry">다시 시도</button>');
   }
 
+  function renderTargetBanner(T) {
+    var banner = $('prTargetBanner');
+    var badge = $('prTbBadge');
+    var title = $('prTbTitle');
+    var body = $('prTbBody');
+    if (!banner || !badge || !title || !body) return;
+
+    if (!T.ok) {
+      if (T.status === 401) {
+        badge.className = 'pr-badge'; badge.textContent = '세션 만료';
+        title.textContent = '세션이 만료되었습니다';
+        body.innerHTML = '인증이 만료되어 대상 상품 정보를 조회할 수 없습니다. <a href="' + LOGIN_URL + '">다시 로그인</a>해 주세요.';
+        banner.hidden = false;
+        return;
+      }
+      if (T.status === 403) {
+        badge.className = 'pr-badge'; badge.textContent = '권한 부족';
+        title.textContent = '권한이 부족합니다';
+        var d = T.body && (T.body.detail || T.body.message);
+        body.textContent = '대상 상품 가격 검토 조회 권한이 없습니다' + (d ? ' — ' + d : '') + '.';
+        banner.hidden = false;
+        return;
+      }
+      if (T.status === 404) {
+        badge.className = 'pr-badge'; badge.textContent = '상품 없음';
+        title.textContent = '상품을 찾을 수 없습니다';
+        body.innerHTML = '요청한 상품번호(<b>No.' + esc(PR_TARGET_CODE) + '</b>)가 데이터베이스에 존재하지 않거나 삭제되었습니다.';
+        banner.hidden = false;
+        return;
+      }
+      badge.className = 'pr-badge'; badge.textContent = '조회 실패';
+      title.textContent = '대상 상품 조회 중 오류가 발생했습니다';
+      body.innerHTML = '네트워크 연결 또는 서버 오류로 대상 상품(No.' + esc(PR_TARGET_CODE) + ')을 확인하지 못했습니다. <button type="button" class="pr-btn-line" data-action="pr-retry-target" style="margin-left:6px;padding:2px 8px;font-size:11px;">다시 시도</button>';
+      banner.hidden = false;
+      return;
+    }
+
+    var info = T.body;
+    if (!info) return;
+
+    var nm = Admin2Text.stripHtml(info.name || ('상품 ' + info.product_code));
+    if (info.in_queue) {
+      badge.className = 'pr-badge'; badge.style.background = 'var(--rv-green-bg, #e6f4ea)'; badge.style.color = 'var(--rv-green, #137333)'; badge.textContent = '큐 대상';
+      title.textContent = '가격 검토 대기 대상 상품입니다';
+      body.innerHTML = '<strong>' + esc(nm) + '</strong> (No.' + esc(info.product_code) + (info.sku ? ' · SKU ' + esc(info.sku) : '') + ') — 첫 판매가 산정 대상 큐에 포함되어 있습니다. 아래 목록 및 서랍에서 확인하세요.';
+      banner.hidden = false;
+    } else {
+      badge.className = 'pr-badge'; badge.style.background = 'var(--rv-amber-bg, #fef7e0)'; badge.style.color = 'var(--rv-amber, #b06000)'; badge.textContent = '큐 비대상';
+      title.textContent = '선택한 상품은 가격 검토 대기 대상이 아닙니다';
+
+      var facts = [];
+      if (info.reason_label) facts.push('<span class="pr-tb-fact"><span class="k">사유:</span> <span class="v">' + esc(info.reason_label) + '</span></span>');
+      if (info.sale_price != null) facts.push('<span class="pr-tb-fact"><span class="k">현재 판매가:</span> <span class="v">' + fmtWon(info.sale_price) + '</span></span>');
+      if (info.flags) {
+        if (info.flags.has_price) facts.push('<span class="pr-tb-fact"><span class="v">판매가 이미 확정됨</span></span>');
+        if (info.flags.review_required) facts.push('<span class="pr-tb-fact"><span class="v">상품 검수 대기 중</span></span>');
+        if (info.flags.price_locked) facts.push('<span class="pr-tb-fact"><span class="v">판매가 잠김(제안 차단)</span></span>');
+      }
+      if (info.status) facts.push('<span class="pr-tb-fact"><span class="k">판매 상태:</span> <span class="v">' + esc(info.status) + '</span></span>');
+
+      body.innerHTML = '<div><strong>' + esc(nm) + '</strong> (No.' + esc(info.product_code) + (info.sku ? ' · SKU ' + esc(info.sku) : '') + ')</div>'
+        + '<div class="pr-tb-facts">' + facts.join('') + '</div>'
+        + '<div style="margin-top:8px;color:var(--on-variant,#666);font-size:11.5px;">이 화면(/admin2/price-review)은 판매가가 비어 있고 검수가 끝난 첫 판매가 산정 대상만 처리합니다.</div>';
+      banner.hidden = false;
+    }
+  }
+
   function load() {
     $('prLoading').hidden = false;
     $('prError').hidden = true;
@@ -361,8 +494,20 @@
       });
     }).catch(function () { return { ok: false, status: 0, body: null }; });
 
-    Promise.all([listP, bdP]).then(function (results) {
-      var L = results[0], B = results[1];
+    var targetP = null;
+    if (PR_TARGET_CODE != null && !PR_TARGET_INVALID) {
+      var curSeq = ++S.targetSeq;
+      targetP = fetch('/api/admin/price-review/target/' + encodeURIComponent(PR_TARGET_CODE)).then(function (res) {
+        return res.json().catch(function () { return null; }).then(function (body) {
+          return { ok: res.ok, status: res.status, body: body, seq: curSeq };
+        });
+      }).catch(function (err) {
+        return { ok: false, status: 0, body: null, err: err, seq: curSeq };
+      });
+    }
+
+    Promise.all([listP, bdP, targetP]).then(function (results) {
+      var L = results[0], B = results[1], T = results[2];
       if (!L.ok) {
         if (L.status === 401) {
           setError('세션이 만료되었습니다 — 다시 로그인해야 합니다.', { relogin: true });
@@ -379,7 +524,40 @@
       S.breakdown = B.ok ? B.body : null;
       $('prLoading').hidden = true;
       renderHeadNote();
-      if (S.items.length === 0) { renderEmpty(); } else { renderMain(); }
+
+      if (T && T.seq === S.targetSeq) {
+        renderTargetBanner(T);
+      }
+
+      if (S.items.length === 0) {
+        renderEmpty();
+      } else {
+        renderMain();
+      }
+
+      // If target is in queue, highlight row and open drawer
+      if (T && T.ok && T.body && T.body.in_queue) {
+        var codeStr = String(PR_TARGET_CODE);
+        var inList = findItem(codeStr);
+        if (inList) {
+          openDrawer(codeStr);
+          var rowEl = document.querySelector('.pr-row[data-code="' + esc(codeStr) + '"]');
+          if (rowEl) {
+            rowEl.classList.add('pr-row-target');
+            if (rowEl.scrollIntoView) {
+              rowEl.scrollIntoView({block: 'center', behavior: 'smooth'});
+            }
+          }
+          // Focus drawer close button, NOT approve button (Rule G & AC08)
+          var closeBtn = document.querySelector('[data-action="pr-close-drawer"]');
+          if (closeBtn) closeBtn.focus();
+        } else {
+          var tbBody = $('prTbBody');
+          if (tbBody) {
+            tbBody.innerHTML += '<div style="margin-top:6px;color:var(--rv-amber,#b78103);font-weight:600;">⚠️ 조회 중 대상 상태 변경 — 목록을 다시 불러왔으나 현재 큐에 없습니다 (이미 처리되었거나 다른 상태로 변경됨).</div>';
+          }
+        }
+      }
     }, function (err) {
       setError('네트워크 오류 — ' + (err && err.message ? err.message : '서버에 연결할 수 없습니다'));
     });
@@ -445,10 +623,11 @@
     $('prMain').hidden = false;
     renderKpis();
     renderRows();
-    $('prFootnote').textContent =
+    $('prFootnote').innerHTML =
       '전체 ' + S.items.length + '건 · 직접입력은 0보다 큰 값을 요구합니다(1,000원 단위 강제 없음) · '
       + '「유지」는 값을 비운 채 「다시 제안하지 마라」는 잠금만 남깁니다 · '
-      + '되돌리기는 이 화면에 없고 활동 기록에만 남습니다.';
+      + '되돌리기는 이 화면에 없고 활동 기록에만 남습니다. '
+      + '<a href="' + esc(PR_RETURN_HREF) + '" class="pr-btn-return" style="margin-left:10px;font-size:11px;">&larr; 목록으로 돌아가기</a>';
   }
 
   function renderKpis() {
@@ -645,7 +824,7 @@
       if (act === 'pr-approve') { onApprove(); return; }
       if (act === 'pr-manual') { onManual(); return; }
       if (act === 'pr-keep') { onKeep(); return; }
-      if (act === 'pr-retry') { load(); return; }
+      if (act === 'pr-retry' || act === 'pr-retry-target') { load(); return; }
     }
     var row = e.target.closest('.pr-row');
     if (row) { openDrawer(row.getAttribute('data-code')); return; }
