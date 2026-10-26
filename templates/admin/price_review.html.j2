@@ -361,24 +361,8 @@
   var PR_TARGET_CODE = {{ pr_target_code|tojson if pr_target_code is defined and pr_target_code is not none else 'null' }};
   var PR_TARGET_INVALID = {{ 'true' if pr_target_invalid else 'false' }};
   var PR_RETURN_HREF = {{ (pr_return_href|default('/admin2/products'))|tojson }};
-
-  if (PR_TARGET_CODE == null && !PR_TARGET_INVALID) {
-    var _sp = new URLSearchParams(window.location.search);
-    var _c = _sp.get("code") || _sp.get("product_code");
-    if (_c) {
-      if (/^[1-9][0-9]{0,18}$/.test(_c.trim())) {
-        PR_TARGET_CODE = parseInt(_c.trim(), 10);
-      } else {
-        PR_TARGET_INVALID = true;
-      }
-    }
-    var _ret = _sp.get("ret");
-    if (_ret && (!PR_RETURN_HREF || PR_RETURN_HREF === '/admin2/products')) {
-      if (/^[a-zA-Z0-9_=&%.-]+$/.test(_ret) && _ret.indexOf("://") < 0 && _ret.indexOf("//") < 0) {
-        PR_RETURN_HREF = '/admin2/products?' + _ret;
-      }
-    }
-  }
+  // 대상·복귀 주소는 서버(admin_ui_price_review.py)가 정제해 준 값만 쓴다 — location.search 를 다시 읽지
+  // 않는다(계약 E-2). 서버가 ret 을 버렸으면 그건 허용 밖 값이었다는 뜻이라 화면이 되살리지 않는다.
 
   var API_LIST = '/api/admin/price-review';
   var API_BREAKDOWN = '/api/admin/price-review/empty-breakdown';
@@ -386,7 +370,7 @@
   function API_PRODUCT(code) { return '/api/admin/products/' + code; }
   var LOGIN_URL = '/admin2/login';
 
-  var S = { items: [], fee: null, margin: null, note: '', breakdown: null, openCode: null, suppliers: null, targetSeq: 0, targetInfo: null };
+  var S = { items: [], fee: null, margin: null, note: '', breakdown: null, openCode: null, suppliers: null, targetSeq: 0, targetInfo: null, loadSeq: 0, targetReloaded: false };
 
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -506,7 +490,9 @@
       });
     }
 
+    var mySeq = ++S.loadSeq;
     Promise.all([listP, bdP, targetP]).then(function (results) {
+      if (mySeq !== S.loadSeq) return;            // 다시 시도가 겹쳤으면 늦게 온 이전 결과는 버린다
       var L = results[0], B = results[1], T = results[2];
       if (!L.ok) {
         if (L.status === 401) {
@@ -551,14 +537,21 @@
           // Focus drawer close button, NOT approve button (Rule G & AC08)
           var closeBtn = document.querySelector('[data-action="pr-close-drawer"]');
           if (closeBtn) closeBtn.focus();
+        } else if (!S.targetReloaded) {
+          // 판정은 대상인데 먼저 받은 목록에 없다 — 그 사이 상태가 바뀌었을 수 있으니 목록을 한 번만 다시 받는다
+          S.targetReloaded = true;
+          load();
+          return;
         } else {
           var tbBody = $('prTbBody');
           if (tbBody) {
-            tbBody.innerHTML += '<div style="margin-top:6px;color:var(--rv-amber,#b78103);font-weight:600;">⚠️ 조회 중 대상 상태 변경 — 목록을 다시 불러왔으나 현재 큐에 없습니다 (이미 처리되었거나 다른 상태로 변경됨).</div>';
+            tbBody.innerHTML += '<div style="margin-top:6px;color:var(--rv-amber,#b78103);font-weight:600;">조회 중 대상 상태 변경 — 목록을 다시 불러왔으나 현재 큐에 없습니다(이미 처리되었거나 다른 상태로 변경됨). '
+              + '<button type="button" class="pr-btn-line" data-action="pr-retry-target" style="margin-left:6px;padding:2px 8px;font-size:11px;">다시 불러오기</button></div>';
           }
         }
       }
     }, function (err) {
+      if (mySeq !== S.loadSeq) return;
       setError('네트워크 오류 — ' + (err && err.message ? err.message : '서버에 연결할 수 없습니다'));
     });
   }

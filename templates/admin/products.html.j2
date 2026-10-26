@@ -854,9 +854,14 @@ a.pp-btn-line{color:var(--on)}
       SIZE = sz;
     }
 
-    if(sp.has("sort")){
-      sortKey = sp.get("sort");
+    // 정렬 키는 SORT_GETTERS 에 있는 것만 받는다 — 없는 키를 그대로 두면 applySort 가 undefined 를
+    // 함수로 불러 목록 그리기가 통째로 멈춘다(URL 은 사람이 고칠 수 있다).
+    var sk = sp.get("sort");
+    if(sk && Object.prototype.hasOwnProperty.call(SORT_GETTERS, sk)){
+      sortKey = sk;
       sortDir = (sp.get("dir") === "desc") ? -1 : 1;
+    } else {
+      sortKey = null; sortDir = 1;
     }
     if(sp.has("sel")){
       INITIAL_SEL_CODE = sp.get("sel");
@@ -912,9 +917,8 @@ a.pp-btn-line{color:var(--on)}
         var targetCode = String(INITIAL_SEL_CODE);
         var matched = DATA.some(function(p){ return String(p.product_code) === targetCode; });
         if(matched){
-          SEL[targetCode] = true;
-          syncBulk();
-          syncHeadCheckbox();
+          // 복귀 선택은 서랍·행 강조만 되살린다 — 일괄 선택 체크(SEL)는 켜지 않는다(계약 D.not_preserved:
+          // 사용자가 이 화면에서 고르지 않은 일괄 대상이 생기지 않게).
           openDrawer(targetCode);
           var targetEl = document.querySelector('.pp-row[data-pc="' + targetCode + '"]');
           if(targetEl){
@@ -1438,7 +1442,10 @@ a.pp-btn-line{color:var(--on)}
       if(!d || DRAWER.code !== code) return;   // 그 사이 닫혔거나 다른 상품을 열었으면 버린다
       DRAWER.data = d;
       renderDrawer();
-    }).catch(function(){});
+    }).catch(function(){
+      // 네트워크 실패를 「불러오는 중」에 묻어 두지 않는다(ADM-H1 AC06)
+      if(DRAWER.code === code) renderDrawerError("네트워크 오류 — 상품 정보를 불러오지 못했습니다. 다시 열어 주세요.");
+    });
   }
 
   function renderDrawer(){
