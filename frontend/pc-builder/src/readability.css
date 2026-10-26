@@ -45,10 +45,12 @@
 .option-switch button{font-size:14px}
 .option-switch button small{font-size:14px;color:#8a4f12}
 /* 제안 창 부품 행만 — 구성 확인 페이지(.review-table-card)의 같은 행은 이번 범위 밖이라 건드리지 않는다 */
-.dialog-content .review-row strong{font-size:15px}
+.dialog-content .review-row strong{font-size:15px;word-break:keep-all;overflow-wrap:anywhere}
 .dialog-content .review-row small{font-size:14px!important;color:#625870;line-height:1.55}
 .dialog-content .review-row>span:last-child{font-size:15px!important}
 .dialog-content .review-category{font-size:14px!important;color:#625870;width:76px;flex-basis:76px;white-space:nowrap}
+/* 좁은 폭(320 실측): 분류 칸 76px 이 부품 이름 칸을 70px 로 줄여 「AMD 라/이젠 5」로 꺾였다 — 분류를 이름 위 한 줄로 올린다 */
+@media(max-width:420px){.dialog-content .review-row{flex-wrap:wrap;row-gap:2px}.dialog-content .review-category{flex:0 0 100%;width:auto}}
 .relax-list,.constraint-list{font-size:15px;color:#4f4760}
 .dialog-content .meta-note{font-size:14px;color:#5f6370}
 .dialog-content .review-total span{font-size:14px}
