@@ -205,6 +205,13 @@ a.pp-btn-dark{color:var(--on-primary);text-decoration:none;display:inline-flex;a
          font:600 10px/1 var(--font);color:var(--rv-muted);border-bottom:1px solid rgba(0,0,0,.1)}
 .pp-row{padding:9px 13px;border-bottom:1px solid rgba(0,0,0,.06);font:400 11px/1.3 var(--font)}
 .pp-row:hover{background:var(--container-low)}
+.pp-inline-pr-link{color:var(--primary);text-decoration:none;font-weight:500;padding:1px 5px;border-radius:3px;font-size:10.5px;background:var(--container-low);border:1px solid var(--outline-variant);margin-left:4px;display:inline-flex;align-items:center}
+.pp-inline-pr-link:hover{text-decoration:underline;background:var(--container-high);color:var(--on)}
+.pp-inline-pr-link:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.pp-dr-price-review{display:inline-flex;align-items:center;padding:3px 8px;border-radius:5px;font:500 11px/1.2 var(--font);color:var(--primary);background:var(--container-low);border:1px solid var(--outline-variant);text-decoration:none}
+.pp-dr-price-review:hover{background:var(--container-high);color:var(--on)}
+.pp-dr-price-review:focus-visible{outline:2px solid var(--primary);outline-offset:1px}
+.pp-row-target{background:var(--container-high)!important;outline:2px solid var(--primary)}
 .pp-th-sort{cursor:pointer;user-select:none}
 .pp-th-sort:hover{color:var(--on)}
 .pp-right{text-align:right}
@@ -549,6 +556,8 @@ a.pp-btn-line{color:var(--on)}
       <label class="visually-hidden" for="bulkStatus">바꿀 상태</label>
       <select id="bulkStatus" class="pp-select" aria-label="바꿀 상태"></select>
       <button type="button" class="pp-btn-dark" id="btnBulk">상태 바꾸기</button>
+      <button type="button" class="pp-btn-outline" id="btnSinglePriceReview" title="선택 상품 가격 검토">선택 상품 가격 검토</button>
+      <span id="btnSinglePriceReviewHint" class="pp-bulk-note" hidden></span>
       <span class="pp-bulk-note">확인 대화상자 후 실행 · 최대 2,000건 · 잠긴 상품은 사유와 함께 건너뜀</span>
       <span class="pp-grow"></span>
       <span class="pp-bulk-result" id="bulkResult" role="status" aria-live="polite"></span>
@@ -586,6 +595,7 @@ a.pp-btn-line{color:var(--on)}
         <a class="pp-dr-mall-link" id="drMallLink" href="#" target="_blank" rel="noopener"
            data-keep="1" title="팝콘PC 쇼핑몰 관리자 · 로그인 필요" hidden>몰 관리자에서 열기</a>
         <span class="pp-badge" id="drStatusBadge" hidden></span>
+        <a class="pp-dr-price-review" id="drPriceReviewLink" href="#" data-keep="1" title="이 상품의 가격 검토 화면으로 이동" hidden>가격 검토 &rarr;</a>
         <button type="button" class="pp-dr-close" id="drClose" aria-label="닫기">✕</button>
       </div>
       <div class="pp-dr-sub" id="drSub"></div>
@@ -662,10 +672,10 @@ a.pp-btn-line{color:var(--on)}
     if(selCat){
       // ⚠ innerHTML 을 다시 쓰면 **고른 값이 풀린다.** 제조사만 갈아 끼우려고
       //   loadMeta 를 다시 부르는 경로(요청 36)가 생겨서, 되그린 뒤 선택을 돌려놓는다.
-      var keep = selCat.value;
+      var keep = (fcat && fcat !== "all") ? fcat : (selCat.value || "all");
       selCat.innerHTML = '<option value="all">분류 전체 (' + cats.length + '종)</option>'
         + cats.map(function(c){ return '<option value="' + esc(c.part_type) + '">' + esc(c.label) + '</option>'; }).join("");
-      if(keep) selCat.value = keep;
+      selCat.value = keep;
     }
     var dl = document.getElementById("fmfrList");
     if(dl) dl.innerHTML = mfrs.map(function(m){ return '<option value="' + esc(m) + '">'; }).join("");
@@ -770,6 +780,95 @@ a.pp-btn-line{color:var(--on)}
   // 불러 채운다(URL로 이름을 실어 보내면 위조·인코딩 문제가 생긴다 — 지시서 원문).
   // null이면 아직 못 불러온 것, 빈 문자열이 아니라 null로 "모름"을 구분한다.
   var catId=0, includeDesc=0, catName=null;
+  var INITIAL_SEL_CODE = null;
+
+  function getStateQueryString(extra){
+    var sp = new URLSearchParams();
+    if(q) sp.set("q", q);
+    if(cur && cur !== "all") sp.set("tab", cur);
+    if(fcat && fcat !== "all") sp.set("part_type", fcat);
+    if(fmfr && fmfr !== "all") sp.set("maker", fmfr);
+    if(visible) sp.set("visible", visible);
+    var saleList = Object.keys(saleStatusSel).filter(function(k){ return saleStatusSel[k]; });
+    if(saleList.length) sp.set("sale_status", saleList.join(","));
+    if(catId){
+      sp.set("category_id", String(catId));
+      if(includeDesc) sp.set("include_desc", "1");
+    }
+    if(PAGE > 1) sp.set("page", String(PAGE));
+    if(SIZE !== 100) sp.set("size", String(SIZE));
+    if(sortKey){
+      sp.set("sort", sortKey);
+      sp.set("dir", sortDir === -1 ? "desc" : "asc");
+    }
+    if(extra && extra.sel){
+      sp.set("sel", String(extra.sel));
+    }
+    return sp.toString();
+  }
+
+  function syncStateToUrl(extra){
+    var qs = getStateQueryString(extra);
+    var newUrl = window.location.pathname + (qs ? ("?" + qs) : "") + window.location.hash;
+    window.history.replaceState(null, "", newUrl);
+  }
+
+  function readStateFromUrl(){
+    var sp = new URLSearchParams(window.location.search);
+    q = sp.get("q") || "";
+    var qEl = document.getElementById("q"); if(qEl) qEl.value = q;
+
+    var tVal = sp.get("tab") || "all";
+    cur = STATUS_TABS.some(function(t){ return t.key === tVal; }) ? tVal : "all";
+
+    fcat = sp.get("part_type") || "all";
+    var catEl = document.getElementById("fcat"); if(catEl) catEl.value = fcat;
+
+    fmfr = sp.get("maker") || "all";
+    var mfrEl = document.getElementById("fmfr"); if(mfrEl) mfrEl.value = (fmfr === "all" ? "" : fmfr);
+
+    visible = sp.get("visible") || "";
+    var visEl = document.getElementById("fvisible"); if(visEl) visEl.value = visible;
+
+    saleStatusSel = {};
+    if(sp.has("sale_status")){
+      var sList = (sp.get("sale_status") || "").split(",");
+      sList.forEach(function(s){ var trimmed = s.trim(); if(trimmed) saleStatusSel[trimmed] = true; });
+    }
+    renderSaleStatusChecks();
+
+    var cid = parseInt(sp.get("category_id"), 10);
+    catId = (!isNaN(cid) && cid > 0) ? cid : 0;
+    includeDesc = (catId && sp.get("include_desc") === "1") ? 1 : 0;
+
+    var p = parseInt(sp.get("page"), 10);
+    PAGE = (!isNaN(p) && p > 0) ? p : 1;
+
+    var sz = parseInt(sp.get("size"), 10);
+    SIZE = ([50, 100, 200, 500].indexOf(sz) >= 0) ? sz : 100;
+
+    if(sp.has("sort")){
+      var sVal = sp.get("sort");
+      if(sVal && Object.prototype.hasOwnProperty.call(SORT_GETTERS, sVal)){
+        sortKey = sVal;
+        sortDir = (sp.get("dir") === "desc") ? -1 : 1;
+      } else {
+        sortKey = null;
+        sortDir = 1;
+      }
+    } else {
+      sortKey = null;
+      sortDir = 1;
+    }
+
+    SEL = {};
+    if(sp.has("sel")){
+      INITIAL_SEL_CODE = sp.get("sel");
+      if(INITIAL_SEL_CODE) SEL[INITIAL_SEL_CODE] = true;
+    } else {
+      INITIAL_SEL_CODE = null;
+    }
+  }
   // 2026-09-11 검색 패널 개편(A-127) — 카테고리 4단 트리. CAT_TREE_DATA는
   // GET /api/admin/categories 응답 items 그대로(전체 트리, parent_id 인접리스트,
   // API 변경 불요 — 여기서 depth를 계산한다). CAT_SEL[0..3]은 대/중/소/세분류 각 단계에서
@@ -804,6 +903,7 @@ a.pp-btn-line{color:var(--on)}
     // 요청 #28 추가(2026-09-02) — 분류 관리에서 넘어온 category_id 축. fcat(part_type)과는
     // 별개라 항상 함께 보낸다(catId=0이면 서버도 무필터로 본다 — api/admin_products.py).
     if(catId){ url += "&category_id=" + catId + "&include_desc=" + includeDesc; }
+    syncStateToUrl(DRAWER.code ? {sel: DRAWER.code} : (INITIAL_SEL_CODE ? {sel: INITIAL_SEL_CODE} : null));
     fetch(url).then(function(r){
       if(r.status===401){ STATE="fail401"; DATA=[]; renderAll(); return null; }
       if(!r.ok){
@@ -815,6 +915,24 @@ a.pp-btn-line{color:var(--on)}
       STATE="ok"; TOTAL=d.total; PAGES=Math.max(1,d.pages); SIZE=d.size; KPIS=d.kpis;
       DATA = d.items.map(fromApi);
       renderAll();
+      if(INITIAL_SEL_CODE){
+        var targetCode = String(INITIAL_SEL_CODE);
+        var matched = DATA.some(function(p){ return String(p.product_code) === targetCode; });
+        if(matched){
+          SEL[targetCode] = true;
+          syncBulk();
+          syncHeadCheckbox();
+          openDrawer(targetCode);
+          var targetEl = document.querySelector('.pp-row[data-pc="' + targetCode + '"]');
+          if(targetEl){
+            targetEl.classList.add("pp-row-target");
+            if(targetEl.scrollIntoView){
+              targetEl.scrollIntoView({block: "center", behavior: "smooth"});
+            }
+          }
+        }
+        INITIAL_SEL_CODE = null;
+      }
     }).catch(function(){
       STATE="failNet"; DATA=[]; renderAll();
     });
@@ -888,7 +1006,8 @@ a.pp-btn-line{color:var(--on)}
         + (SEL[p.product_code]?" checked":"") + ' aria-label="선택"></span>'
       + '<span class="pp-code">' + p.product_code + '</span>'
       + '<span class="pp-name-wrap"><button type="button" class="pp-name" data-open="' + p.product_code + '" title="' + esc(nm) + '">' + esc(nm) + '</button>'
-        + '<span class="pp-sku">' + skuLine + '</span></span>'
+        + '<span class="pp-sku">' + skuLine
+        + ' &middot; <a href="/admin2/price-review?code=' + p.product_code + '&ret=' + encodeURIComponent(getStateQueryString({sel: p.product_code})) + '" class="pp-inline-pr-link" data-keep="1" title="가격 검토 화면으로 이동" data-action="row-price-review" data-code="' + esc(p.product_code) + '">가격 검토 &rarr;</a></span></span>'
       + '<span class="pp-cat">' + esc(p.cat) + '</span>'
       + '<span>' + specBadge(p) + '</span>'
       + '<span class="pp-right' + (p.stock===0?" pp-stock zero":"") + '">' + p.stock + '</span>'
@@ -1155,6 +1274,27 @@ a.pp-btn-line{color:var(--on)}
     if(active) active.hidden = c===0;
     if(hint) hint.hidden = c!==0;
     var sc=document.getElementById("selCount"); if(sc) sc.textContent=c.toLocaleString("ko-KR");
+    var prBtn = document.getElementById("btnSinglePriceReview");
+    var prHint = document.getElementById("btnSinglePriceReviewHint");
+    if(prBtn){
+      if(c === 1){
+        var sCode = Object.keys(SEL)[0];
+        prBtn.disabled = false;
+        prBtn.title = "선택한 상품(No." + sCode + ")의 가격 검토로 이동";
+        if(prHint) prHint.hidden = true;
+      } else if(c === 0){
+        prBtn.disabled = true;
+        prBtn.title = "상품 1개를 선택하면 가격 검토로 이동할 수 있습니다";
+        if(prHint) prHint.hidden = true;
+      } else {
+        prBtn.disabled = true;
+        prBtn.title = "가격 검토는 한 번에 한 상품만 가능합니다 (단일 대상 규칙)";
+        if(prHint){
+          prHint.hidden = false;
+          prHint.textContent = "가격 검토는 1개만 선택 시 가능";
+        }
+      }
+    }
   }
   function setBulkResult(text, bad){
     var el=document.getElementById("bulkResult"); if(!el) return;
@@ -1269,11 +1409,15 @@ a.pp-btn-line{color:var(--on)}
     showVeilDrawer(true);
     renderDrawerLoading();
     fetchDrawerData();
+    syncStateToUrl({sel: code});
     var closeBtn=document.getElementById("drClose"); if(closeBtn) closeBtn.focus();
   }
   function closeDrawer(){
     DRAWER.code=null; DRAWER.data=null;
     showVeilDrawer(false);
+    var prLinkL = document.getElementById("drPriceReviewLink");
+    if(prLinkL){ prLinkL.hidden = true; prLinkL.removeAttribute("href"); prLinkL.onclick = null; }
+    syncStateToUrl();
   }
   function renderDrawerLoading(){
     document.getElementById("drTitle").textContent = "불러오는 중…";
@@ -1283,12 +1427,16 @@ a.pp-btn-line{color:var(--on)}
     // DRAWER.code로 다시 세운다).
     var mallLinkL = document.getElementById("drMallLink");
     if(mallLinkL){ mallLinkL.hidden = true; mallLinkL.removeAttribute("href"); }
+    var prLinkL = document.getElementById("drPriceReviewLink");
+    if(prLinkL){ prLinkL.hidden = true; prLinkL.removeAttribute("href"); prLinkL.onclick = null; }
     document.getElementById("drSub").innerHTML = "";
     document.getElementById("drTabs").innerHTML = "";
     document.getElementById("drBody").innerHTML = '<div class="pp-empty">불러오는 중…</div>';
     document.getElementById("drFoot").innerHTML = "";
   }
   function renderDrawerError(msg){
+    var prLinkL = document.getElementById("drPriceReviewLink");
+    if(prLinkL){ prLinkL.hidden = true; prLinkL.removeAttribute("href"); prLinkL.onclick = null; }
     document.getElementById("drBody").innerHTML = '<div class="pp-empty">' + esc(msg) + '</div>';
     document.getElementById("drFoot").innerHTML = '<button type="button" class="pp-btn-line" id="drCloseErr">닫기</button>';
     var b=document.getElementById("drCloseErr"); if(b) b.onclick=closeDrawer;
@@ -1318,6 +1466,19 @@ a.pp-btn-line{color:var(--on)}
     if(mallLink){
       if(DRAWER.code){ mallLink.href = mallAdminEditUrl(DRAWER.code); mallLink.hidden = false; }
       else { mallLink.hidden = true; mallLink.removeAttribute("href"); }
+    }
+    var drPrLink = document.getElementById("drPriceReviewLink");
+    if(drPrLink){
+      if(DRAWER.code){
+        var qs = getStateQueryString({sel: DRAWER.code});
+        drPrLink.href = "/admin2/price-review?code=" + encodeURIComponent(DRAWER.code) + "&ret=" + encodeURIComponent(qs);
+        drPrLink.onclick = function(){ syncStateToUrl({sel: DRAWER.code}); };
+        drPrLink.hidden = false;
+      } else {
+        drPrLink.hidden = true;
+        drPrLink.removeAttribute("href");
+        drPrLink.onclick = null;
+      }
     }
     var badge = document.getElementById("drStatusBadge");
     // 목록 배지와 같은 신호(status_key, derive_status 단일 원천) — 결함 ⓐ-3.
@@ -1978,6 +2139,7 @@ a.pp-btn-line{color:var(--on)}
       var k=el.dataset.sort;
       if(sortKey===k) sortDir=-sortDir; else { sortKey=k; sortDir=1; }
       renderTable();
+      syncStateToUrl(DRAWER.code ? {sel: DRAWER.code} : (INITIAL_SEL_CODE ? {sel: INITIAL_SEL_CODE} : null));
     }
     el.addEventListener("click", doSort);
     el.addEventListener("keydown", function(ev){ if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); doSort(); } });
@@ -1997,6 +2159,15 @@ a.pp-btn-line{color:var(--on)}
     syncBulk(); syncHeadCheckbox();
   });
   document.getElementById("rows").addEventListener("click", function(ev){
+    var pr = ev.target.closest && ev.target.closest('[data-action="row-price-review"]');
+    if(pr){
+      ev.stopPropagation();
+      var code = pr.getAttribute("data-code");
+      if(code){
+        syncStateToUrl({sel: code});
+      }
+      return;
+    }
     var t = ev.target.closest && ev.target.closest("[data-open]");
     if(t) openDrawer(t.dataset.open);
   });
@@ -2009,20 +2180,34 @@ a.pp-btn-line{color:var(--on)}
     if(e.key==="Escape"){ closeDrawer(); }
   });
   wireSaleStatusChecks();
+  var btnSinglePr = document.getElementById("btnSinglePriceReview");
+  if(btnSinglePr){
+    btnSinglePr.addEventListener("click", function(){
+      var keys = Object.keys(SEL);
+      if(keys.length === 1){
+        var code = keys[0];
+        syncStateToUrl({sel: code});
+        var qs = getStateQueryString({sel: code});
+        window.location.href = "/admin2/price-review?code=" + encodeURIComponent(code) + "&ret=" + encodeURIComponent(qs);
+      }
+    });
+  }
+  window.addEventListener("popstate", function(){
+    readStateFromUrl();
+    renderCatChip();
+    renderAll();
+    load();
+  });
 
-  // 요청 전 상태
-  renderAll();
-  renderSaleStatusChecks();
-  // 요청 #28 추가(2026-09-02) — load() 가 catId 를 읽기 전에 URL부터 반영해야 한다.
-  // renderCatChip()은 이름이 오기 전에도 "분류 #<id>"로 즉시 보여준다(폴백 우선 표시,
-  // loadCategoryName()이 끝나면 실제 이름으로 다시 그린다).
-  readCategoryFromUrl();
+  // UI-SRC-005: URL 상태를 먼저 확정한 후 필터·선택 DOM을 복원하고 API 로딩 진행
+  readStateFromUrl();
   renderCatChip();
   loadCategoryName();
   loadCategoryTree();
   loadMeta();
   loadSpecFields();
   loadSuppliers();
+  renderAll();
   load();
 })();
 {% endraw %}</script>
