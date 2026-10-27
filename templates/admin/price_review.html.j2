@@ -594,9 +594,6 @@ window.PR_CONTEXT = {
             if (S.items.length === 0) {
               renderEmpty();
             } else {
-              if (S.breakdown && S.breakdown.queue === 0) {
-                S.breakdown.queue = S.items.length;
-              }
               renderMain();
             }
 
@@ -652,7 +649,10 @@ window.PR_CONTEXT = {
     $('prError').hidden = true;
     $('prMain').hidden = true;
     $('prEmpty').hidden = false;
-    var q = (S.breakdown && S.breakdown.queue != null) ? S.breakdown.queue : S.items.length;
+    // 현재 건수는 최신 성공 목록 수로만 표시한다. 집계(empty-breakdown)는 목록과 따로 조회한 값이고 재조회 때
+    // 다시 받지 않는다 — 집계 queue 가 목록 수와 일치할 때만 사유 숫자를 쓴다(건수 정합성 확인일 뿐 최신성 보장은 아니다).
+    var q = S.items.length;
+    var bdQueueMatches = !!S.breakdown && S.breakdown.queue === q;
     $('prEmptySub').innerHTML = '판매가가 비어 있으면서 검수까지 끝난 상품이 <b>' + q +
       '건</b>입니다.<br>조회가 실패한 것이 아니라 지금 그런 상품이 없습니다.';
 
@@ -660,6 +660,9 @@ window.PR_CONTEXT = {
     if (!S.breakdown) {
       linesBox.innerHTML = '<div class="pr-reason-line"><span class="t">이유 갈래를 세지 못했습니다(집계 조회 실패) '
         + '— 큐가 ' + q + '건이라는 사실은 위 목록 조회로 이미 확인됐습니다.</span></div>';
+    } else if (!bdQueueMatches) {
+      linesBox.innerHTML = '<div class="pr-reason-line"><span class="t">이유 갈래 숫자 미표시 — 목록과 집계 건수가 일치하지 않습니다. '
+        + '큐가 ' + q + '건이라는 사실은 최신 목록 조회로 확인됐고, 다시 불러오면 목록과 집계를 함께 다시 조회합니다.</span></div>';
     } else {
       var nTotal = S.breakdown.null_total, nReview = S.breakdown.review_pending, nLocked = S.breakdown.locked_out;
       var l2 = (nTotal > 0 && nReview === nTotal)
@@ -676,7 +679,8 @@ window.PR_CONTEXT = {
         + '<div class="pr-reason-line"><span class="m">▲</span><span class="t">' + esc(l2) + '</span>'
         + '<span class="n">' + nReview + '건</span></div>'
         + '<div class="pr-reason-line"><span class="m">·</span><span class="t">' + esc(l3) + '</span>'
-        + '<span class="n">' + nLocked + '건</span></div>';
+        + '<span class="n">' + nLocked + '건</span></div>'
+        + '<div class="pr-reason-line"><span class="t">위 갈래 수는 목록과 별도로 조회한 집계 기준입니다(현재 목록과 조회 시점이 다를 수 있습니다).</span></div>';
     }
     $('prReasonCond').textContent =
       '판매가가 비어 있고 · 검수 대기가 아니며 · 판매가가 잠기지 않은 상품';
