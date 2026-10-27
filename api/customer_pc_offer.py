@@ -45,6 +45,11 @@ from .customer_bom_gaps import EVIDENCE_SQL as BOM_EVIDENCE_SQL
 from .customer_sold_offer_read import read_customer_sold_offer
 from .pc_publication_source_reader import make_source_reader
 from .part_spec_notes import derived_specs
+from .media_storage import (
+    LOGICAL_MEDIA_BUCKET,
+    get_physical_media_bucket,
+    is_valid_logical_bucket,
+)
 from .product_images import MEDIA_BUCKET, read_image
 from . import pc_media
 
@@ -241,11 +246,12 @@ def attach(products):
 
 def _representative_png(asset, job_id):
     key = f"pc-configurations/{job_id}/representative.png"
-    if asset.get("bucket") != MEDIA_BUCKET or asset.get("key") != key:
+    if not is_valid_logical_bucket(asset.get("bucket")) or asset.get("key") != key:
         raise _not_public()
     try:
+        physical_bucket = get_physical_media_bucket()
         with pc_media.cloud_session() as session:
-            r = session.get(f"https://storage.googleapis.com/storage/v1/b/{MEDIA_BUCKET}/o/"
+            r = session.get(f"https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/"
                             f"{quote(key, safe='')}?alt=media", timeout=(10, 30))
             r.raise_for_status()
             raw = r.content

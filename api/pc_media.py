@@ -26,6 +26,11 @@ from .db import engine
 from .admin_pc_builder import permission
 from .pc_configuration_review import load_review
 from .pc_configuration_copy import digest
+from .media_storage import (
+    LOGICAL_MEDIA_BUCKET,
+    get_physical_media_bucket,
+    is_valid_logical_bucket,
+)
 from .product_images import MEDIA_BUCKET, read_image
 
 router=APIRouter()
@@ -203,7 +208,8 @@ def _cloud_ready(period):
                 r=requests.get('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/scopes',headers={'Metadata-Flavor':'Google'},timeout=3)
                 r.raise_for_status()
                 if not {'https://www.googleapis.com/auth/devstorage.read_write','https://www.googleapis.com/auth/devstorage.full_control','https://www.googleapis.com/auth/cloud-platform'}.intersection(r.text.splitlines()):return False
-            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{MEDIA_BUCKET}/iam/testPermissions',params=[('permissions','storage.objects.create'),('permissions','storage.objects.get')],timeout=(5,10))
+            physical_bucket=get_physical_media_bucket()
+            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/iam/testPermissions',params=[('permissions','storage.objects.create'),('permissions','storage.objects.get')],timeout=(5,10))
             r.raise_for_status()
             return {'storage.objects.create','storage.objects.get'}.issubset(set(r.json().get('permissions',[])))
     except Exception:return False
@@ -213,10 +219,11 @@ def cloud_ready():
 
 def upload(job,raw):
     key=f"pc-configurations/{job['job_id']}/representative.png"
+    physical_bucket=get_physical_media_bucket()
     with cloud_session() as session:
-        r=session.post(f'https://storage.googleapis.com/upload/storage/v1/b/{MEDIA_BUCKET}/o',params=dict(uploadType='media',name=key,ifGenerationMatch='0'),data=raw,headers={'Content-Type':'image/png'},timeout=(10,40))
+        r=session.post(f'https://storage.googleapis.com/upload/storage/v1/b/{physical_bucket}/o',params=dict(uploadType='media',name=key,ifGenerationMatch='0'),data=raw,headers={'Content-Type':'image/png'},timeout=(10,40))
         if r.status_code==412:
-            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{MEDIA_BUCKET}/o/{quote(key,safe="")}?alt=media',timeout=(10,40))
+            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media',timeout=(10,40))
             r.raise_for_status()
             if hashlib.sha256(r.content).digest()!=hashlib.sha256(raw).digest():raise ValueError('Cloud object conflict')
         else:r.raise_for_status()
@@ -284,10 +291,11 @@ def image(identity:str,job_id:UUID):
             return Response(path.read_bytes(),media_type='image/png',headers={'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff'})
         raise HTTPException(404,'이미지 없음')
     key=f'pc-configurations/{job_id}/representative.png'
-    if asset.get('bucket')!=MEDIA_BUCKET or asset.get('key')!=key:raise HTTPException(404,'등록 이미지 경로 불일치')
+    if not is_valid_logical_bucket(asset.get('bucket')) or asset.get('key')!=key:raise HTTPException(404,'등록 이미지 경로 불일치')
     try:
+        physical_bucket=get_physical_media_bucket()
         with cloud_session() as session:
-            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{MEDIA_BUCKET}/o/{quote(key,safe="")}?alt=media',timeout=(10,30));r.raise_for_status();raw=r.content
+            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media',timeout=(10,30));r.raise_for_status();raw=r.content
         if len(raw)>20*1024*1024 or hashlib.sha256(raw).hexdigest()!=asset['sha256']:raise ValueError('Checksum')
     except Exception as e:raise HTTPException(503,'클라우드 이미지 조회 실패') from e
     return Response(raw,media_type='image/png',headers={'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff'})
