@@ -92,20 +92,22 @@ def start(identity:str,body:Generate,request:Request,background:BackgroundTasks)
 
 def read_source(asset,job):
     key=f'pc-configurations/{job}/representative.png'
-    if asset.get('bucket')!=media.MEDIA_BUCKET or asset.get('key')!=key:raise ValueError('Image path mismatch')
+    if not media.is_valid_logical_bucket(asset.get('bucket')) or asset.get('key')!=key:raise ValueError('Image path mismatch')
+    physical_bucket=media.get_physical_media_bucket()
     with media.cloud_session() as session:
-        r=session.get(f'https://storage.googleapis.com/storage/v1/b/{media.MEDIA_BUCKET}/o/{quote(key,safe="")}?alt=media',timeout=(10,30));r.raise_for_status()
+        r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media',timeout=(10,30));r.raise_for_status()
     if len(r.content)>20*1024*1024 or hashlib.sha256(r.content).hexdigest()!=asset['sha256']:raise ValueError('Image checksum')
     return r.content
 
 def upload_file(job,name,path,mime):
     raw=path.read_bytes();sha=hashlib.sha256(raw).hexdigest()
     key=f'pc-configurations/{job}/videos/{name}'
+    physical_bucket=media.get_physical_media_bucket()
     with media.cloud_session() as session:
-        r=session.post(f'https://storage.googleapis.com/upload/storage/v1/b/{media.MEDIA_BUCKET}/o',params=dict(uploadType='media',name=key,ifGenerationMatch='0'),data=raw,headers={'Content-Type':mime},timeout=(10,90))
+        r=session.post(f'https://storage.googleapis.com/upload/storage/v1/b/{physical_bucket}/o',params=dict(uploadType='media',name=key,ifGenerationMatch='0'),data=raw,headers={'Content-Type':mime},timeout=(10,90))
         if r.status_code!=412:r.raise_for_status()
         # Verify the actual object bytes before declaring completion (including retries).
-        r=session.get(f'https://storage.googleapis.com/storage/v1/b/{media.MEDIA_BUCKET}/o/{quote(key,safe="")}?alt=media',timeout=(10,90));r.raise_for_status()
+        r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media',timeout=(10,90));r.raise_for_status()
         if hashlib.sha256(r.content).hexdigest()!=sha:raise ValueError('Video cloud checksum')
     return dict(bucket=media.MEDIA_BUCKET,key=key,sha256=sha,size=len(raw),mime=mime)
 
@@ -165,10 +167,11 @@ def file(identity:str,job_id:UUID,name:str,request:Request,download:bool=False):
     with engine.connect() as c:asset=c.execute(text("SELECT asset FROM pc_video_jobs WHERE configuration_id=:id AND job_id=:j AND status='ready'"),dict(id=identity,j=job_id)).scalar()
     if not asset:raise HTTPException(404,'완료 영상 없음')
     a=asset['video' if name=='intro.mp4' else 'thumb'];key=f'pc-configurations/{job_id}/videos/{name}'
-    if a.get('bucket')!=media.MEDIA_BUCKET or a.get('key')!=key:raise HTTPException(404,'파일 경로 불일치')
+    if not media.is_valid_logical_bucket(a.get('bucket')) or a.get('key')!=key:raise HTTPException(404,'파일 경로 불일치')
     try:
+        physical_bucket=media.get_physical_media_bucket()
         with media.cloud_session() as session:
-            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{media.MEDIA_BUCKET}/o/{quote(key,safe="")}?alt=media',timeout=(10,60));r.raise_for_status();raw=r.content
+            r=session.get(f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media',timeout=(10,60));r.raise_for_status();raw=r.content
         if len(raw)>30*1024*1024 or len(raw)!=a['size'] or hashlib.sha256(raw).hexdigest()!=a['sha256']:raise ValueError('Checksum')
     except Exception as exc:raise HTTPException(503,'클라우드 영상 조회 실패') from exc
     start,end,partial=byte_range(request.headers.get('range'),len(raw))
