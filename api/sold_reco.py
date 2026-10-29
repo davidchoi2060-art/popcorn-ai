@@ -35,6 +35,7 @@
               모니터 포함을 후보에서 실제로 거르고, 못 거르면 «못 맞춘다»고 밝힌다. 「더 싸게」는 지금
               추천 구성보다 싼 것들로, 「더 좋게」는 지금 추천 구성보다 높은 것들로 같은 규칙을 다시 돈다.
   게임은 해상도가 최소 수준을 정한다(1080p=FHD · 1440p=QHD · 4K=4K).
+  게임 이름·해상도 없이 「게임용」만 말하면 캐주얼(rank 1)이 기본형이다(2026-10-29 사장님 -- game_min_rank).
   캐주얼(rank 1)은 고객이 말한 게임 «전부»가 캐주얼 수준의 대상 게임(product_fit_levels.work
   에 적힌 게임)일 때만 쓴다 — 하나라도 밖이면 가장 까다로운 쪽을 따라 해상도 수준으로 간다.
   등급(E)으로 정하지 않는 이유: E 에는 롤과 배그가 함께 있는데 캐주얼 수준은 배그를 못 돌린다
@@ -690,14 +691,22 @@ def casual_unnamed(names, label: str | None) -> bool:
 def game_min_rank(g, levels, vocab, notes, label: str | None = None) -> int:
     """게임 최소 수준 rank — 고객이 말한 게임 중 가장 까다로운 쪽이 정한다.
 
-    캐주얼(1)은 게임명이 하나 이상 있고 «전부» 캐주얼 대상 게임이며 해상도가 1080p 일 때만.
+    캐주얼(1)은 게임명이 하나 이상 있고 «전부» 캐주얼 대상 게임이며 해상도가 1080p 일 때,
+    그리고 게임 이름·해상도 없이 「게임용」만 말했을 때(2026-10-29 기본형).
     그 밖은 해상도 수준(FHD 2 · QHD 3 · 4K 4)이다 — 용도 최소 수준 밑으로 내려가지 않는다.
     """
-    res = (g.resolution if g else None) or "1080p"
+    said_res = g.resolution if g else None
+    res = said_res or "1080p"
     r = GAME_RES_RANK.get(res, 2)
     names = list(g.names) if g else []
     if res == "1080p" and casual_unnamed(names, label):
         # 「캐주얼 게임용」처럼 게임 이름 없이 캐주얼이라고만 했으면 캐주얼 수준(G01 -- 예전에는 FHD 대작 수준이었다).
+        return 1
+    real = [n for n in names if isinstance(n, str) and n.strip() and not CASUAL_WORDS.match(n) and "(통칭)" not in n]
+    if not real and said_res is None and not (label and "고사양" in label):
+        # 2026-10-29 사장님 「게임은.. 기본형은 캐주얼, 가벼운 게임으로 하고.. 그다음 구체적인 내용을 적시하면.. 맞춰서」:
+        # 게임 이름·해상도 없이 「게임용」만 말하면 캐주얼 수준이다(2026-10-09 「이름 없는 게임 = FHD」를 바꿨다).
+        # 게임 이름·해상도(FHD·QHD·4K)·「고사양」·고주사율(card_sets 의 high_fps)을 말하면 그에 맞춘다.
         return 1
     if not names or res != "1080p":
         return r

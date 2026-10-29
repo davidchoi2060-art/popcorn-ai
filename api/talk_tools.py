@@ -551,12 +551,20 @@ def _find_spread(args: dict, book: FactBook, budget, prefs, units) -> dict:
     base = {"budget_won": budget, "budget_bound": args.get("budget_bound"), "platform": args.get("platform"), "prefs": prefs}
     book.units = units if units and units >= 2 else book.units
     wants = {"units": book.units} if book.units else None
-    light = GP.recommend(GP.RecommendBody(state={**base, "usages": [office, game],
-                                                "game": {"names": [SPREAD_CASUAL], "resolution": None}}, wants=wants))
-    fhd = GP.recommend(GP.RecommendBody(state={**base, "usages": [game]}, wants=wants))
+    # 용도마다 따로 부른다 -- 한 번에 여러 용도를 넘기면 엔진이 «한 대로 모두 충족하는 PC»(2026-10-29)만 내서
+    # 예산 안 사무·인강 PC 가 빠졌다(「70만원」에 「70만원 이하 PC가 없다」). 최신 게임은 FHD 를 직접 말해 부른다
+    # -- 이름·해상도 없는 게임은 이제 캐주얼 기본형이다.
+    office_res = GP.recommend(GP.RecommendBody(state={**base, "usages": [office]}, wants=wants))
+    casual = GP.recommend(GP.RecommendBody(state={**base, "usages": [game],
+                                                 "game": {"names": [SPREAD_CASUAL], "resolution": None}}, wants=wants))
+    fhd = GP.recommend(GP.RecommendBody(state={**base, "usages": [game],
+                                              "game": {"names": [], "resolution": "1080p"}}, wants=wants))
+    light = office_res if office_res.get("card_sets") else casual
     raw_sets = []
-    for cs in sorted(light.get("card_sets") or [], key=lambda c: _is_game_label(c.get("usage") or "")):   # 사무·인강 먼저
-        raw_sets.append((cs, "가벼운 게임(롤 같은)" if _is_game_label(cs.get("usage") or "") else cs.get("usage")))
+    for cs in (office_res.get("card_sets") or [])[:1]:                   # 사무·인강 먼저
+        raw_sets.append((cs, cs.get("usage")))
+    for cs in (casual.get("card_sets") or [])[:1]:
+        raw_sets.append((cs, "가벼운 게임(롤 같은)"))
     for cs in (fhd.get("card_sets") or [])[:1]:
         raw_sets.append((cs, "최신 게임(FHD)"))
     any_within = any(not it.get("over_budget") and type(it.get("product_code")) is int
