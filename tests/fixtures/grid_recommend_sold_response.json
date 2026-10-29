@@ -24,14 +24,16 @@
   "wants": {},
   "card_sets": [
     {
-      "usage": "게임",
+      "usage": "게임 + 영상편집",
       "usage_grid": "게임",
       "kind": "sold",
-      "min_level": "FHD",
-      "min_level_work": "FHD 게임",
+      "min_level": "게임 FHD · 영상편집 기본",
+      "min_level_work": "게임: FHD 게임 / 영상편집: FHD 편집",
       "demand": {
         "light": false,
-        "notes": []
+        "notes": [
+          "말씀하신 용도(게임·영상편집)를 PC 한 대로 모두 하실 수 있게, 모든 용도의 최소 사양을 함께 충족하는 PC만 찾았어요."
+        ]
       },
       "items": [
         {
@@ -53,6 +55,7 @@
           "over_budget": false,
           "reasons": [
             "게임 FHD — FHD 게임",
+            "영상편집 기본 — FHD 편집",
             "다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.",
             "다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요."
           ],
@@ -81,6 +84,7 @@
           "over_budget": false,
           "reasons": [
             "게임 QHD — QHD 게임",
+            "영상편집 기본 — FHD 편집",
             "다음 수준을 고려한다면 그래픽 메모리 용량이 더 큰 구성을 살펴보세요."
           ],
           "photo": {
@@ -101,6 +105,10 @@
       "center_tier": null,
       "center_tier_key": null,
       "tiers_considered": [],
+      "usages": [
+        "게임",
+        "영상편집"
+      ],
       "game_context": {
         "game_name": "배틀그라운드",
         "spec_summary": "FHD 높음 옵션 기준 RTX 4060급 이상",
@@ -117,57 +125,6 @@
         "confidence": "reviewed",
         "reviewed_at": "2026-10-01T00:00:00+09:00"
       }
-    },
-    {
-      "usage": "영상편집",
-      "usage_grid": "영상편집",
-      "kind": "sold",
-      "min_level": "기본",
-      "min_level_work": "FHD 편집",
-      "demand": {
-        "light": false,
-        "notes": []
-      },
-      "items": [
-        {
-          "product_code": 1,
-          "name": "조립PC 1",
-          "price": 1200000,
-          "price_src": "현재 판매가",
-          "mall_url": "https://mall.example/1",
-          "spec": {
-            "cpu": "라이젠5 9600",
-            "gpu": "RTX 5060 Ti 8GB",
-            "ram_gb": 32,
-            "ssd_gb": 500,
-            "vram_gb": 8
-          },
-          "level": "기본",
-          "tag": "추천 구성",
-          "role": "recommended",
-          "over_budget": false,
-          "reasons": [
-            "영상편집 기본 — FHD 편집",
-            "다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요."
-          ],
-          "photo": {
-            "state": "unavailable",
-            "url": null
-          },
-          "public_configuration": null
-        }
-      ],
-      "empty_reason": null,
-      "empty_note": null,
-      "cards": [],
-      "empty_cells": [],
-      "omitted_variants": [],
-      "center_band": null,
-      "center_band_key": null,
-      "bands_considered": [],
-      "center_tier": null,
-      "center_tier_key": null,
-      "tiers_considered": []
     }
   ],
   "cards": [],

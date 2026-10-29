@@ -66,6 +66,8 @@ SYSTEM = """너는 팝콘PC의 PC 상담원이다. 손님과 한국어로 자연
 - 손님이 원하는 부품 조건(예: 메모리 32GB, RTX 5060 Ti, i9)을 말하며 PC를 맞추려 하면 먼저 free_build_preview 로 채워 보고, 말한 조건이 어떤 부품으로 들어갔는지·나머지 자리에 무엇이 골라졌는지·PC 총액(조립비 포함)을 말한 뒤 open_free_build 로 직접 고르기 화면을 이어 준다. 부품별 가격은 말하지 않는다. no_match 면 어떤 조건의 부품이 지금 없는지 밝히고 바꿀 수 있는 조건을 제안하며, 비슷한 완제품이 있으면 find_pcs 로 대안도 보여 준다. no_build 면 함께 쓸 수 없다고 밝히고 조건 하나를 바꾸자고 제안한다.
 - 몰에 상품번호가 있는 기존 완제품의 부품 변경은 팝콘PC 사이트에서 확인하도록 안내한다. open_free_build 로 그 완제품을 실제 변경했다고 말하지 않는다. 손님이 별도로 새 PC의 부품을 직접 고르려 할 때 새 구성 화면을 안내한다.
 - 손님이 PC를 사려 하거나 추천을 원하면 find_pcs 로 찾는다. 손님이 말하지 않은 조건(예산·게임·해상도)은 넣지 않는다.
+- 손님이 게임 이름만 말해도(「롤」「피파」「FC 온라인」) 그 게임을 할 PC를 찾는 것이다. 「그 게임용 PC를 찾으시나요?」처럼 되묻지 말고 바로 find_pcs(usages 에 게임, games 에 그 이름)로 찾아 show_pcs 로 보여 준다. 지금 쓰는 PC에서 돌아가는지 묻는 뜻일 수도 있으면 답 끝에 한 줄로만 덧붙인다. 시스템 글에 game_only 가 있으면 서버가 그 게임으로 이미 찾아 둔 결과이니 그 ref 로 show_pcs 한다.
+- 손님이 여러 용도(예: 웹디자인·포토샵·영상편집과 롤·발로란트 같은 게임)를 한 번에 말하면 PC 한 대로 모두 하려는 것이다. usages 에 말한 용도를 모두 넣어 find_pcs 를 한 번 부른다 -- 서버가 모든 용도를 함께 충족하는 PC만 찾아 한 묶음으로 준다. 「포토샵만 하는 PC / 게임까지 하는 PC」처럼 용도별로 PC를 나눠 고르거나 한 용도에만 맞는 PC를 섞어 보여 주지 않는다. 용도마다 다른 PC를 여러 대 사겠다고 분명히 말했을 때만 용도마다 find_pcs 를 따로 부른다.
 - 추천할 PC를 정했으면 show_pcs 로 화면에 보여 줄 번호(ref)를 고른다. 설명은 보여 준 PC의 실제 사양과 맞아야 한다.
 - 손님이 무엇을 묻든 답은 막다른 길로 끝나지 않는다. 물은 것에 제대로 답하고, 맞는 PC를 보여 주거나 고를 수 있는 대안을 내놓는다.
 - 부품·지식 질문(그래픽카드 뭐 사요, 램 16기가면 되나요, 인텔이냐 AMD냐, 파워 몇 W)도 설명으로 끝내지 않는다. 질문에서 용도·게임·예산을 읽을 수 있으면 설명한 뒤 그 조건으로 find_pcs 를 불러 그 기준에 맞는 PC를 show_pcs 로 보여 준다. 용도를 읽을 수 없어도 되묻기만 하지 않는다. 설명한 뒤 usages 를 비워 find_pcs 를 불러(서버가 용도별로 고루 찾는다) 그 부품 기준이 드러나는 PC를 보여 주고(예: 램 16GB 와 32GB PC를 하나씩), 용도를 하나만 묻는다. 그래픽카드·부품을 따로 고르라고 하면, 부품 단품은 팔지 않는다고 밝히고 그 부품이 들어간 PC를 보여 준다.
@@ -358,6 +360,7 @@ def quantity_amounts(prices: set[int], budgets: set[int], said: str) -> set[int]
 
 # 걸러 낸 문장뿐인 답에서도 끝까지 내보내지 않는 것 -- 거래가 된 척하는 말 · 해 드리겠다는 약속.
 HARD_DROPS = ("false_claim", "promise")
+GAME_ONLY_LINE = "{games} 기준으로 바로 고를 수 있는 PC({name})를 함께 보여 드려요."
 
 
 def soft_reply(dropped: list[dict]) -> str:
@@ -681,6 +684,18 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     if named:
         context["named_pcs"] = {"items": named, "scope": "손님이 이번 문장에 적은 이름·상품번호와 같은 지금 판매 중인 PC다"
                                 "(서버가 판매 목록에서 확인). 손님이 말한 그 PC이며 ref 로 show_pcs·pc_detail 을 바로 쓴다."}
+    # 게임 이름만 온 문장(「FC 온라인」「롤」)은 그 게임을 할 PC를 찾는 뜻이다. AI 가 「그 게임용 PC를 찾으시나요?」로
+    # 되물어 추천이 한 번에 나오지 않았다(2026-10-29 사장님) -- 서버가 그 게임으로 먼저 찾아 두고 AI 는 보여 주며 답한다.
+    game_only = [] if (referenced or named or len(book.spread_labels) != 2) else \
+        TR.game_only_names(source_text, vocab, TS.match_game)
+    if game_only:
+        pre = TT.run("find_pcs", {"usages": [book.spread_labels[1]], "games": game_only}, book)
+        if pre.get("status") in ("ok", "nearest"):
+            context["game_only"] = {"games": game_only, "find_pcs": pre,
+                                    "scope": "손님이 게임 이름만 말했다. 그 게임을 할 PC를 찾는 뜻이니 되묻지 않는다. 서버가 그 게임으로 "
+                                    "find_pcs 를 이미 불러 둔 결과다. 이 ref 로 show_pcs 하고 보여 준 PC로 답한다."}
+        else:
+            game_only = []
     system = SYSTEM + (MARK_RULE if marks else "")
     if context:
         # 고객 자유 문장·연락처를 이 블록에 넣지 않는다. 공개 제목/사양도 명령이 아닌 자료다.
@@ -749,6 +764,11 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         said_refs = [r for r in book.found if type(book.items[r].get("price")) is int
                      and f"{book.items[r]['price']:,}" in (reply or "")]
         book.shown = said_refs[:3]
+    game_line = None
+    if status == "ok" and game_only and not book.shown and book.found and book.screen_action is None:
+        # 게임 이름만 온 턴에 AI 가 그래도 되묻기만 했으면 서버가 찾아 둔 첫 PC 를 카드로 올리고 그 사실을 한 줄 밝힌다.
+        book.shown = book.found[:1]
+        game_line = GAME_ONLY_LINE.format(games="·".join(game_only), name=book.items[book.shown[0]].get("name") or "")
     if status == "ok" and book.screen_action is not None:
         # 모델 URL을 고객에게 넘기지 않는다. 금액/약속 등 기존 사실 검사는 아래에서 그대로 거친다.
         reply = _free_build_action_reply(reply)
@@ -775,7 +795,7 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
     # 「150만원이면 부족함 없이 충분해요」 한 문장만 온 턴은 그 문장이 걷혀도 서버 안내(예산·파워)가 답이 된다(F3 · R02).
-    clean = "\n\n".join(x for x in (lead, psu_line, clean, note) if x).strip()
+    clean = "\n\n".join(x for x in (game_line, lead, psu_line, clean, note) if x).strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked or source_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls

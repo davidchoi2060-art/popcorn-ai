@@ -759,6 +759,7 @@ def custom_items(pcs, fu, r, levels, budget_won, bound) -> list[dict]:
 
 def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None) -> list[dict]:
     """TalkState -> card_sets(kind='sold'). 한 용도에 한 set, set 마다 상품 최대 3개.
+    용도가 둘 이상이면 모든 용도를 함께 충족하는 PC 한 set 이다(_combined_set -- 2026-10-29 사장님).
 
     explore(선택) = {wants, nav, anchor_code, uhd, more} — api/reco_explore 가 읽은 고객 추가 조건.
     이 함수가 wants 를 고치고(「램 더 크게」 -> 숫자) talk_notes 를 덧붙인다. 각 set 의 `explore` 에
@@ -770,7 +771,7 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
     ex.setdefault("wants", {})
     _resolve_more(ex, products, notes)
     filters = X.build_filters(ex["wants"], products)
-    out = []
+    plans = []
     seen = set()
     customs = load_custom_pcs(notes)
     for label, fu, r in _targets(state, game_usages, other_usages, levels, vocab, notes):
@@ -797,26 +798,104 @@ def card_sets(state, game_usages, other_usages, notes, vocab=None, explore=None)
         if (fu, r) in seen:
             continue
         seen.add((fu, r))
-        res = _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=need_based)
-        if res.get("demand_note"):
-            demand.append(res["demand_note"])
-        lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
-        out.append({
-            "usage": label, "usage_grid": fu, "kind": "sold",
-            "min_level": lv["level"] if lv else None,
-            "min_level_work": ("웹보드·가벼운 게임(사무용 기본 사양 · 내장 그래픽 가능)" if light_game
-                               else lv["work"] if lv else None),
-            # 무엇을 기준으로 찾았는지(G01) -- 상담 AI 와 화면이 지어내지 않고 이 문장을 쓴다.
-            "demand": {"light": light, "notes": demand},
-            "items": res["items"],
-            "empty_reason": res.get("empty_reason"), "empty_note": res.get("empty_note"),
-            "explore": res["explore"],
-            # 옛 화면 경로가 깨지지 않게 — 조합 카드는 없다
-            "cards": [], "empty_cells": [], "omitted_variants": [],
-            "center_band": None, "center_band_key": None, "bands_considered": [],
-            "center_tier": None, "center_tier_key": None, "tiers_considered": [],
-        })
-        extra = custom_items(customs, fu, r, levels, state.budget_won, state.budget_bound) if customs else []
-        if extra:
-            out[-1]["custom_items"] = extra
+        plans.append({"label": label, "fu": fu, "r": r, "light_game": light_game, "light": light,
+                      "need_based": need_based, "demand": demand})
+    if len({p["fu"] for p in plans}) >= 2:
+        both = _combined_set(plans, state, levels, products, preferred, ex, filters, customs, notes)
+        if both is not None:
+            return [both]
+    return [_plan_set(p, state, levels, products, preferred, ex, filters, customs) for p in plans]
+
+
+LIGHT_GAME_WORK = "웹보드·가벼운 게임(사무용 기본 사양 · 내장 그래픽 가능)"
+
+
+def _plan_set(plan, state, levels, products, preferred, ex, filters, customs) -> dict:
+    """용도 하나(plan)의 set -- products 안에서만 고른다(여러 용도면 모두 충족하는 상품만 넘어온다)."""
+    fu, r, demand = plan["fu"], plan["r"], list(plan["demand"])
+    res = _explore_set(fu, r, state, levels, products, preferred, ex, filters, light=plan["need_based"])
+    if res.get("demand_note"):
+        demand.append(res["demand_note"])
+    lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
+    out = {
+        "usage": plan["label"], "usage_grid": fu, "kind": "sold",
+        "min_level": lv["level"] if lv else None,
+        "min_level_work": LIGHT_GAME_WORK if plan["light_game"] else lv["work"] if lv else None,
+        # 무엇을 기준으로 찾았는지(G01) -- 상담 AI 와 화면이 지어내지 않고 이 문장을 쓴다.
+        "demand": {"light": plan["light"], "notes": demand},
+        "items": res["items"],
+        "empty_reason": res.get("empty_reason"), "empty_note": res.get("empty_note"),
+        "explore": res["explore"],
+        # 옛 화면 경로가 깨지지 않게 — 조합 카드는 없다
+        "cards": [], "empty_cells": [], "omitted_variants": [],
+        "center_band": None, "center_band_key": None, "bands_considered": [],
+        "center_tier": None, "center_tier_key": None, "tiers_considered": [],
+    }
+    extra = custom_items(customs, fu, r, levels, state.budget_won, state.budget_bound) if customs else []
+    if extra:
+        out["custom_items"] = extra
     return out
+
+
+# ── 여러 용도 = PC 한 대 (2026-10-29 사장님 「사무용 + 게임용 뭐 이런식으로 되어야 하지 않나?」) ──────────────
+# 「웹디자인·포토샵·일러스트·동영상편집 및 롤·발로란트·리니지2 게임 컴퓨터 추천」에 용도마다 한 set 씩 나가
+# 상담 AI 가 「포토샵만 하는 PC(내장 그래픽 오피스 PC) / 게임만 하는 PC / 둘 다 하는 PC」로 나눠 보였다 -- 고객이 말한
+# 조건에서 벗어난 PC 가 추천에 섞였다. 한 문장의 여러 용도는 한 대로 다 하려는 것이다: 모든 용도의 최소 수준을 함께
+# 충족하는 판매 PC 만 후보로 두고 한 set 으로 낸다(고르기 규칙은 첫 용도 -- 게임이 있으면 게임 -- 그대로).
+# 2026-09-16 정책 ①(용도마다 card_set)을 바꾼 것이다. 모두 충족하는 판매 PC 가 하나도 없을 때만 용도별 set 으로
+# 돌아가고 그 사실을 demand 에 밝힌다.
+DEMAND_COMBINED = "말씀하신 용도({usages})를 PC 한 대로 모두 하실 수 있게, 모든 용도의 최소 사양을 함께 충족하는 PC만 찾았어요."
+DEMAND_SPLIT = "말씀하신 용도를 한 대로 모두 충족하는 판매 PC가 지금 없어, 용도별로 나눠 찾았어요."
+
+
+def _combined_set(plans, state, levels, products, preferred, ex, filters, customs, notes) -> dict | None:
+    need: dict[str, int] = {}
+    for p in plans:
+        need[p["fu"]] = max(need.get(p["fu"], 0), p["r"])
+    pool = {c: p for c, p in products.items() if p["price"] is not None
+            and all((p["fit"].get(fu) or {}).get("rank", 0) >= r for fu, r in need.items())}
+    labels = [p["label"] for p in plans]
+    if not pool:
+        notes.append(f"sold: no sold PC meets every usage {labels!r} - per-usage sets")
+        for p in plans:
+            p["demand"].append(DEMAND_SPLIT)
+        return None
+    lead, rest = plans[0], plans[1:]
+    # 가벼운 수요(캐주얼·웹보드 게임 -- 필요 수준 기준 한 장)는 나머지 용도가 사무용 기본뿐일 때만 그대로 둔다.
+    # 영상편집·디자인이 함께면 그 용도가 사양을 끌어올리므로 일반 고르기로 간다.
+    keep_light = all(p["fu"] == LIGHT_GAME_USAGE and p["r"] <= LIGHT_GAME_RANK for p in rest)
+    merged = dict(lead, label=" + ".join(labels), light=lead["light"] and keep_light,
+                  light_game=lead["light_game"] and keep_light, need_based=lead["need_based"] and keep_light,
+                  demand=[DEMAND_COMBINED.format(usages="·".join(labels)),
+                          *dict.fromkeys(n for p in plans for n in p["demand"])])
+    fits = [pc for pc in customs if _custom_meets(pc, need, levels)] if customs else []
+    out = _plan_set(merged, state, levels, pool, preferred, ex, filters, fits)
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    shown = []
+    for p in plans:
+        lv = next((l for l in levels if l["usage"] == p["fu"] and l["level_rank"] == p["r"]), None)
+        work = LIGHT_GAME_WORK if p["light_game"] else lv["work"] if lv else None
+        shown.append((p["label"], lv["level"] if lv else None, work))
+    out["usages"] = labels
+    out["min_level"] = " · ".join(f"{label} {level}" for label, level, _ in shown if level) or None
+    out["min_level_work"] = " / ".join(f"{label}: {work}" for label, _, work in shown if work) or None
+    for it in out["items"]:
+        # 카드 이유에 나머지 용도의 도달 수준도 싣는다 -- 첫 줄(첫 용도)은 그대로다.
+        prod = products.get(it["product_code"])
+        extra = []
+        for p in rest:
+            f = (prod or {}).get("fit", {}).get(p["fu"]) or {}
+            if f.get("level"):
+                extra.append(f"{p['fu']} {f['level']} — {(levels_by.get((p['fu'], f['level'])) or {}).get('work', '')}")
+        it["reasons"][1:1] = extra
+    return out
+
+
+def _custom_meets(pc, need: dict, levels) -> bool:
+    """공개 신규 PC 가 모든 용도의 최소 수준에 «모자라지» 않은가(정보 없음은 custom_items 와 같이 남긴다)."""
+    from .custom_pc_fit import judge
+    for fu, r in need.items():
+        lv = next((l for l in levels if l["usage"] == fu and l["level_rank"] == r), None)
+        if lv and judge(pc["fit_spec"], fu, lv["level"]) == "short":
+            return False
+    return True
