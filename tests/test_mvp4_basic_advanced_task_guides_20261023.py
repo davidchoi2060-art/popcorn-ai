@@ -62,7 +62,7 @@ def test_cards_open_detail_before_consult():
 
 def test_service_page_loads_guides_and_keeps_site_shell():
     html = read("ai-service.html")
-    assert 'data-page="ai-service"' in html and "header-ui.js?v=20261025-label1" in html
+    assert 'data-page="ai-service"' in html and "header-ui.js?v=20261029-cat1" in html
     assert "ai-task-guides.js?v=" + V in html and "ai-task-guides.css?v=" + V in html
     # core.js(P) 뒤, boot.js(렌더) 앞에서 등록된다
     assert html.index("core.js?v=") < html.index("ai-task-guides.js") < html.index("boot.js?v=")

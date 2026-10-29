@@ -2,12 +2,13 @@
   'use strict';
   var P = window.PAI, h = P.h;
   var arrow = function () { return P.icon('arrow-right'); };
+  // 상단 전체 카테고리(header-ui.js)와 같은 이름 -- PC 쇼핑 「용도·분류」를 따른다(2026-10-29 사장님).
   var categories = [
-    ['게이밍 PC', '게이밍 PC', 'categories/category-gaming-v14.png'],
-    ['사무용 PC', '사무·업무용', 'categories/category-office-v14.png'],
-    ['작업용 PC', '디자인·영상', 'categories/category-creator-v14.png'],
+    ['게이밍', '게이밍 PC', 'categories/category-gaming-v14.png'],
+    ['사무·업무용', '사무·업무용', 'categories/category-office-v14.png'],
+    ['디자인·영상', '디자인·영상', 'categories/category-creator-v14.png'],
     ['미니 PC', '미니 PC', 'categories/category-mini-v14.png'],
-    ['고성능 PC', 'AI·고성능 PC', 'categories/category-performance-v14.png'],
+    ['AI·고성능', 'AI·고성능 PC', 'categories/category-performance-v14.png'],
     ['주변기기', null, 'categories/category-peripherals-v14.png']
   ];
   function link(label, href, style) {
