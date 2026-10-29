@@ -3,12 +3,13 @@
   var P = window.PAI;
   if (!P || P.headerUi) return;
   var originalShell = P.shell, originalBind = P.bindShell, h = P.h, icon = P.icon;
+  // 이름은 PC 쇼핑 「용도·분류」와 같게, 「게이밍」처럼 용도로 부른다(2026-10-29 사장님). 둘째 값은 분류 키라 그대로다.
   var categories = [
-    ['게이밍 PC', '게이밍 PC', 'game-controller', '좋아하는 게임에 맞게'],
-    ['사무용 PC', '사무·업무용', 'monitor', '매일의 업무를 가볍게'],
-    ['작업용 PC', '디자인·영상', 'video-camera', '디자인부터 영상 편집까지'],
+    ['게이밍', '게이밍 PC', 'game-controller', '좋아하는 게임에 맞게'],
+    ['사무·업무용', '사무·업무용', 'monitor', '매일의 업무를 가볍게'],
+    ['디자인·영상', '디자인·영상', 'video-camera', '디자인부터 영상 편집까지'],
     ['미니 PC', '미니 PC', 'computer-tower', '작은 공간에 필요한 성능'],
-    ['고성능 PC', 'AI·고성능 PC', 'cpu', '큰 작업을 위한 구성'],
+    ['AI·고성능', 'AI·고성능 PC', 'cpu', '큰 작업을 위한 구성'],
     // AI 전용 장비 카테고리(2026-10-20) — PC 목록 필터가 아니라 전용 목록(supercomputers.html)으로 간다.
     ['AI 슈퍼컴퓨터', null, 'cpu', 'AI 전용 장비', 'supercomputers.html', 'supercomputers'],
     ['주변기기', null, 'headset', '모니터와 주변기기']
