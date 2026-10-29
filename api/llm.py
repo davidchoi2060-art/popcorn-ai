@@ -639,7 +639,7 @@ _CHECKED = date(2026, 8, 16)
 PROVIDERS: dict[str, ProviderSpec] = {
     "gemini": ProviderSpec(
         key="gemini", vendor="Gemini", env_key="GEMINI_API_KEY",
-        default_model="gemini-3.7-flash",   # 배정: 운영 도우미(ops_assist) - "이 정도로 충분"(사장님)
+        default_model="gemini-3.7-flash",   # 옛 배정: 운영 도우미(ops_assist) -- 2026-10-29 codex 로 옮김(TASK_DEFAULTS)
         pricing={
             "gemini-3.7-flash": ModelPricing(
                 price_in_per_1m=0.75, price_out_per_1m=3.75, valid_until=date(2026, 12, 31),
@@ -727,7 +727,10 @@ PROVIDERS: dict[str, ProviderSpec] = {
 TASK_DEFAULTS: dict[str, tuple[str, str]] = {
     "task.s1_parse":   ("claude", "claude-haiku-4-5-20251001"),  # 입력 파싱 - 속도
     "task.s2_explain": ("codex",  "gpt-5.6-sol"),                # 근거 설명 - 한국어 품질
-    "task.ops_assist": ("gemini", "gemini-3.7-flash"),           # 운영 도우미 - "이 정도로 충분"
+    # 운영 도우미 - 처음엔 gemini-3.7-flash("이 정도로 충분"). 2026-10-29 Gemini 키가 있던 옛 계정 프로젝트
+    # (davidchoi2060 gen-lang-client)를 삭제해 사장님 승인으로 codex luna 로 옮겼다. 다시 Gemini 를 쓰려면 새 계정에
+    # 키를 만들고 여기(또는 ai_task_assignments)에서 바꾼다.
+    "task.ops_assist": ("codex", "gpt-5.6-luna"),
     "task.spec_fill":  ("claude", "claude-opus-5"),              # 웹 사양 채움 - 정확도
     # 팝콘톡 자유 답변(2026-09-21 · talk_design_v2 §5-3). **좌표 추출(s1_parse)과 가른다** --
     # 같은 호출에 「자유롭게 답하라」와 「추측하지 마라」를 함께 두면 두 압력이 싸우고,
@@ -746,6 +749,9 @@ TASK_DEFAULTS: dict[str, tuple[str, str]] = {
     # 설명만 쓴다(후보·가격·호환은 서버 계산). 고객이 기다리는 자리라 속도·비용이 실측된 talk 과 같은 모델에서 시작한다.
     "task.pc_builder": ("codex", "gpt-5.6-luna"),
 }
+# provider·task_key 둘 다 없거나 작업 근거가 없는 호출이 쓰는 공급자(옛 하드코딩 "gemini" -- 2026-10-29 codex).
+DEFAULT_PROVIDER = "codex"
+assert DEFAULT_PROVIDER in PROVIDERS
 for _tk, (_pk, _md) in TASK_DEFAULTS.items():
     assert _pk in PROVIDERS, f"TASK_DEFAULTS[{_tk}]: unknown provider {_pk!r}"
     assert _md in PROVIDERS[_pk].pricing, (
@@ -864,7 +870,7 @@ def _resolve_task_default(task_key: str) -> tuple[str | None, str | None, str]:
       ② 코드 기본값 `TASK_DEFAULTS`(사장님 실사용 배정, 2026-08-16).
       ③ task_key가 `TASK_DEFAULTS`에도 없으면(닫힌 4종 밖의 값) `(None, None, reason)`을
          돌려준다 -- `call()`은 이걸 "이 task_key에는 아무 근거가 없다"로 해석해 원래
-         하드코딩 기본값("gemini")으로 떨어진다.
+         하드코딩 기본값(DEFAULT_PROVIDER -- 2026-10-29 까지 "gemini", 지금 "codex")으로 떨어진다.
     """
     reason = ""
     try:
@@ -1041,9 +1047,8 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
             캡ㆍ비용에 영향이 없다).
         provider: **주(primary)** 프로바이더 -- PROVIDERS의 키. **생략(None, 기본값)
             하면 task_key로 자동으로 정해진다**(`_resolve_task_default` -- 아래 참고).
-            task_key도 없거나 그 작업에 아무 근거가 없으면 옛 하드코딩 기본값 "gemini"로
-            떨어진다(하위 호환 -- provider·task_key 둘 다 생략한 옛 호출부는 동작이
-            바뀌지 않는다). **명시하면 이 값이 항상 이긴다**(task_key가 있어도
+            task_key도 없거나 그 작업에 아무 근거가 없으면 기본값 DEFAULT_PROVIDER 로
+            떨어진다(2026-10-29 까지 "gemini" -- Gemini 키 프로젝트 삭제로 "codex"). **명시하면 이 값이 항상 이긴다**(task_key가 있어도
             무시하지 않는다 -- 시험ㆍ특수 호출을 위해).
         task_key: A-35의 4종 작업 키(task.s1_parse 등). **provider=를 생략했을 때
             provider·model을 자동으로 정하는 데 쓰인다**(① `ai_task_assignments`
@@ -1108,7 +1113,8 @@ def _route(provider: str | None, task_key: str | None, model: str | None,
     if task_key and (provider is None or model is None):
         task_provider, task_model, task_reason = _resolve_task_default(task_key)
 
-    resolved_provider = provider if provider is not None else (task_provider or "gemini")
+    # 작업 근거가 없는 호출의 기본 공급자. 옛 값 "gemini" 는 2026-10-29 Gemini 키 프로젝트 삭제로 codex 로 바꿨다.
+    resolved_provider = provider if provider is not None else (task_provider or DEFAULT_PROVIDER)
     if resolved_provider not in PROVIDERS:
         raise ValueError(
             f"unknown provider: {resolved_provider} (registered: {', '.join(PROVIDERS)})")
