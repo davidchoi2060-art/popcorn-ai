@@ -361,6 +361,7 @@ def quantity_amounts(prices: set[int], budgets: set[int], said: str) -> set[int]
 # 걸러 낸 문장뿐인 답에서도 끝까지 내보내지 않는 것 -- 거래가 된 척하는 말 · 해 드리겠다는 약속.
 HARD_DROPS = ("false_claim", "promise")
 GAME_ONLY_LINE = "{games} 기준으로 바로 고를 수 있는 PC({name})를 함께 보여 드려요."
+GAME_ONLY_USAGE = "게임"
 
 
 def soft_reply(dropped: list[dict]) -> str:
@@ -689,7 +690,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     game_only = [] if (referenced or named or len(book.spread_labels) != 2) else \
         TR.game_only_names(source_text, vocab, TS.match_game)
     if game_only:
-        pre = TT.run("find_pcs", {"usages": [book.spread_labels[1]], "games": game_only}, book)
+        # 용도 라벨은 평범한 「게임」 -- 어휘 첫 게임 라벨(「고사양 게임」)을 쓰면 화면 조건에 「고사양 게임」이 보였다(2026-10-29).
+        label = GAME_ONLY_USAGE if GAME_ONLY_USAGE in vocab.usage_labels else book.spread_labels[1]
+        pre = TT.run("find_pcs", {"usages": [label], "games": game_only}, book)
         if pre.get("status") in ("ok", "nearest"):
             context["game_only"] = {"games": game_only, "find_pcs": pre,
                                     "scope": "손님이 게임 이름만 말했다. 그 게임을 할 PC를 찾는 뜻이니 되묻지 않는다. 서버가 그 게임으로 "

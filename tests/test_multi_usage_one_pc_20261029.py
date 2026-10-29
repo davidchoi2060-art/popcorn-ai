@@ -12,6 +12,7 @@ from unittest import mock
 
 from api import sold_reco as S
 from api import talk_rules as TR
+from api.talk_schema import Vocab, match_game
 
 LEVELS = [
     {'usage': '게임', 'level': '기본', 'level_rank': 1, 'work': '캐주얼 게임', 'conditions': None},
@@ -88,19 +89,13 @@ class OnePcForAllUsages(unittest.TestCase):
 
 
 class GameOnlyText(unittest.TestCase):
-    GAMES = {'FC온라인', '리그 오브 레전드', '배틀그라운드', '발로란트'}
-    ALIASES = {'fc': 'FC온라인', '피파': 'FC온라인', '롤': '리그 오브 레전드', '배그': '배틀그라운드', '발로': '발로란트'}
-
-    def match(self, raw, vocab):
-        key = raw.replace(' ', '').lower()
-        if raw in self.GAMES:
-            return raw
-        if key in self.ALIASES:
-            return self.ALIASES[key]
-        return next((g for g in self.GAMES if len(key) >= 2 and key in g.replace(' ', '').lower()), None)
+    # 실제 match_game(양방향 포함 비교)으로 본다 -- 「FC 온라인 돌아가요?」처럼 이름이 문장 안에 든 경우도 걸러야 한다.
+    VOCAB = Vocab(all_game_names=['FC온라인', '리그 오브 레전드', '배틀그라운드', '발로란트'],
+                  game_aliases={'fc': 'FC온라인', '피파': 'FC온라인', '롤': '리그 오브 레전드', '배그': '배틀그라운드',
+                                '발로': '발로란트'})
 
     def names(self, text):
-        return TR.game_only_names(text, None, self.match)
+        return TR.game_only_names(text, self.VOCAB, match_game)
 
     def test_game_name_alone_is_read(self):
         self.assertEqual(self.names('FC 온라인'), ['FC온라인'])
@@ -113,7 +108,8 @@ class GameOnlyText(unittest.TestCase):
         self.assertEqual(self.names('롤, 배그'), ['리그 오브 레전드', '배틀그라운드'])
 
     def test_other_words_leave_it_to_the_consultant(self):
-        for text in ('롤 돌아가요?', '배그 150만원', '롤 말고 배그', '게임용 PC를 찾고 있어요.', '', '영상편집'):
+        for text in ('롤 돌아가요?', 'FC 온라인 돌아가요?', 'FC온라인이랑 배그 중에 뭐가 무거워요', '배그 150만원',
+                     '롤 말고 배그', '게임용 PC를 찾고 있어요.', '', '영상편집'):
             self.assertEqual(self.names(text), [], text)
 
 

@@ -277,6 +277,42 @@ class Agent(unittest.TestCase):
         self.assertEqual(e.exception.status_code, 404)
 
 
+# ── 게임 이름만 쓴 문장 (2026-10-29 사장님 「"FC 온라인"이라고 입력하면 답변이 한번에 출력이 안됨」) ──────────
+# 실제 어휘처럼 「고사양 게임」이 「게임」보다 앞에 있다 -- 서버가 먼저 찾을 때 고사양 게임 라벨을 쓰면 화면 조건에 그대로 보였다.
+GAME_VOCAB = Vocab(usages=[("고사양 게임", []), ("게임", []), ("사무용", [])], all_game_names=["FC온라인"],
+                   game_aliases={"fc": "FC온라인"})
+
+
+class GameOnly(unittest.TestCase):
+    def _run(self, script, text="FC 온라인"):
+        from api import grid_public as GP
+        seen = []
+        def fake_reco(body):
+            seen.append(body.state)
+            return _reco(budget_won=None, budget_bound=None)
+        with patch.object(AG, "engine", _Engine()), patch.object(AG, "load_vocab", lambda c: GAME_VOCAB), \
+                patch.object(AG.llm, "call_tools", lambda msgs, tools, **kw: script.pop(0)), \
+                patch.object(GP, "recommend", fake_reco):
+            return AG.run_turn(text, []), seen
+
+    def test_server_searches_the_game_first_with_the_plain_game_label(self):
+        out, seen = self._run([_turn(calls=[{"id": "a", "name": "show_pcs", "args": {"refs": ["P1"]}}]),
+                               _turn("FC 온라인은 이 PC로 충분해요. 판매가는 1,498,000원이에요.")])
+        self.assertEqual(seen[0]["usages"], ["게임"])                 # 「고사양 게임」이 아니다
+        self.assertEqual(seen[0]["game"]["names"], ["FC온라인"])
+        self.assertEqual([c["product_code"] for c in out["cards"]], [1001])
+        self.assertEqual(out["state"]["usages"], ["게임"])
+
+    def test_cards_come_out_even_if_the_model_only_asks_back(self):
+        out, _ = self._run([_turn("FC 온라인용 PC를 찾으시나요?")])
+        self.assertEqual([c["product_code"] for c in out["cards"]], [1001])
+        self.assertTrue(out["reply"].startswith("FC온라인 기준으로 바로 고를 수 있는 PC(게임 PC A)를 함께 보여 드려요."))
+
+    def test_question_with_other_words_is_left_to_the_model(self):
+        out, seen = self._run([_turn("지금 PC 사양을 알려 주시면 확인해 드릴게요.")], text="FC 온라인 돌아가요?")
+        self.assertEqual((seen, out["cards"]), ([], []))
+
+
 # ── ④ /api/talk/parse 가 스위치 켜짐에서 도구 상담으로 넘긴다 (2026-10-14 「고객 상담을 LLM 중심으로 해」) ──
 class AsParse(unittest.TestCase):
     _run = Agent._run
