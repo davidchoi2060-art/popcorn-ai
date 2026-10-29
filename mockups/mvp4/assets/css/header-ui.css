@@ -46,7 +46,7 @@
 .nh-header .nh-purpose-tabs>a{display:flex;align-items:center;justify-content:center;flex-shrink:0;min-height:44px;padding:9px 11px;border:1px solid transparent;border-radius:9px;background:#f6f7f9;color:#606776;font-size:14px;font-weight:650;white-space:nowrap;line-height:1.4}
 .nh-header .nh-purpose-tabs>a:hover{background:#eeeff4;color:#171717}
 .nh-header .nh-purpose-tabs>a[aria-current]{background:#fff9dd;border-color:#e6c950;color:#302912;font-weight:800}
-@media(min-width:901px) and (max-width:1230px){.nh-header .nh-service-nav{flex-wrap:wrap;gap:0;padding-block:5px 8px}.nh-header .nh-primary-links{width:100%;gap:28px}.nh-header .nh-purpose-group{width:100%;border-left:0;padding-left:0;justify-content:flex-end}.nh-header .nh-primary-links>a{min-height:48px}}
+@media(min-width:901px){.nh-header .nh-service-nav{flex-wrap:wrap;gap:0;padding-block:5px 8px}.nh-header .nh-primary-links{width:100%;gap:28px}.nh-header .nh-purpose-group{width:100%;border-left:0;padding-left:0;justify-content:flex-end}.nh-header .nh-primary-links>a{min-height:48px}}
 @media(max-width:900px){.nh-header .nh-service-nav{display:grid;grid-template-columns:minmax(0,1fr);gap:0;min-height:0}.nh-header .nh-primary-links{display:grid;grid-template-columns:1fr 1fr 1.45fr;gap:8px;padding-block:5px;min-width:0}.nh-header .nh-primary-links>a{min-height:46px;font-size:16px;letter-spacing:-.04em;padding-inline:0}.nh-header .nh-primary-links>.nh-primary-ai{font-size:15px;padding:8px 5px;min-height:42px;gap:5px}.nh-header .nh-primary-ai .icon{width:18px;height:18px}.nh-header .nh-purpose-group{width:100%;gap:8px;border-left:0;border-top:1px solid #f0f1f5;padding:5px 0;margin:0}.nh-header .nh-category-compact{font-size:13px;padding:8px;gap:5px}.nh-header .nh-category-compact .icon{width:17px;height:17px}.nh-header .nh-purpose-tabs{padding-inline:3px;gap:5px;flex:1}.nh-header .nh-purpose-tabs>a{padding-inline:11px;font-size:14px}}
 @media(max-width:370px){.nh-header .nh-primary-links{gap:5px}.nh-header .nh-primary-links>a{font-size:15px}.nh-header .nh-primary-links>.nh-primary-ai{font-size:14px}.nh-header .nh-category-compact{font-size:12px;padding-inline:7px}}
 /* 2026-10-20 공통 띠 메뉴 4개(PC 쇼핑 → AI 패키지 → AI 슈퍼컴퓨터 → AI로 PC 찾기) — 모바일에서도 한 줄 */
@@ -68,3 +68,10 @@
 
 /* Approved PC builder entry: keep five service links reachable without page overflow. */
 @media(max-width:900px){.nh-header .nh-primary-links{display:flex;flex-wrap:wrap;gap:0 16px}.nh-header .nh-primary-links>a{flex:0 0 auto}.nh-header .nh-primary-links>.nh-primary-ai{margin-block:3px}}
+
+/* 2026-10-29 사장님 「전체 카테고리가 좌우 스크롤 안되게」: 카테고리를 옆으로 넘기지 않는다 -- 넓은 화면은 메뉴 아래 한 줄
+   (위 901px 이상 규칙 -- 1231px 이상에서도 모자라 7개 중 일부가 가려져 있었다), 좁은 화면은 줄을 바꿔 모두 보인다.
+   휴대폰에서는 노란 「전체 카테고리」 버튼을 감춘다 -- 오른쪽 위 ≡(nh-mobile-menu)가 같은 전체 카테고리 창을 연다. */
+.nh-header .nh-purpose-tabs{flex-wrap:wrap;overflow:visible}
+@media(max-width:600px){.nh-header .nh-purpose-group .nh-category-compact{display:none}.nh-header .nh-purpose-tabs{padding-inline:0}.nh-header .nh-purpose-tabs>a{min-height:40px;padding-block:7px}}
+@media(max-width:370px){.nh-header .nh-purpose-tabs{gap:5px}.nh-header .nh-purpose-tabs>a{padding-inline:8px;font-size:13px}}
