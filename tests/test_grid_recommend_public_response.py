@@ -112,7 +112,10 @@ class RecommendPublicResponseTest(unittest.TestCase):
     def test_card_sets_and_items_keep_contract_fields(self):
         with self.assertLogs('grid_public', level='INFO'):
             d = call_recommend()
-        self.assertEqual([s['usage_grid'] for s in d['card_sets']], ['게임', '영상편집'])  # 게임 묶음이 먼저(2026-10-12)
+        # 여러 용도는 PC 한 대 -- 모든 용도를 충족하는 상품만 한 묶음(2026-10-29 사장님). 고르기 기준은 게임(2026-10-12 게임 먼저).
+        self.assertEqual([s['usage_grid'] for s in d['card_sets']], ['게임'])
+        self.assertEqual(d['card_sets'][0]['usages'], ['게임', '영상편집'])
+        self.assertEqual(d['card_sets'][0]['usage'], '게임 + 영상편집')
         for s in d['card_sets']:
             self.assertEqual(s['kind'], 'sold')
             self.assertLessEqual(SET_KEYS, set(s))
@@ -140,13 +143,13 @@ class RecommendPublicResponseTest(unittest.TestCase):
         for internal in ('다음 수준까지는', '충족 조건', '지수', '등급 1.', '미확인', '현재 118', '현재 16,500'):
             self.assertNotIn(internal, body)
         reasons = {s['usage_grid']: s['items'][0]['reasons'] for s in d['card_sets']}
+        # 묶음은 하나 -- 이유 첫 줄은 고르기 기준(게임), 둘째 줄에 함께 충족한 용도(영상편집)의 수준.
         self.assertEqual(reasons['게임'], [
             '게임 FHD — FHD 게임',
+            '영상편집 기본 — FHD 편집',
             '다음 수준을 고려한다면 그래픽 처리 성능을 높여 보세요.',
             '다음 수준을 고려한다면 SSD 저장 용량을 늘려 보세요.'])
-        self.assertEqual(reasons['영상편집'], [
-            '영상편집 기본 — FHD 편집',
-            '다음 수준을 고려한다면 여러 작업을 함께 처리할 수 있는 CPU 성능을 높여 보세요.'])
+        self.assertNotIn('영상편집', reasons)
 
     def test_published_fixture_matches_live_response(self):
         # tests/fixtures/grid_recommend_sold_response.json is the sample the PC side builds

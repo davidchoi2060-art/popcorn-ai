@@ -282,6 +282,40 @@ def games_from_text(text: str, vocab, match_game) -> list[str]:
     return out
 
 
+# 「FC 온라인」「롤 할 컴퓨터」처럼 게임 이름만 쓴 문장 -- 그 게임을 할 PC를 찾는 뜻이다(2026-10-29 사장님
+# 「"FC 온라인"이라고 입력하면 답변이 한번에 출력이 안됨」: 상담 AI 가 「FC 온라인용 PC를 찾으시나요?」로 되물었다).
+# 게임 이름과 아래 낱말 말고 다른 말(질문·금액·조건)이 섞이면 판단하지 않는다 -- 「롤 돌아가요?」는 상담 AI 가 문맥으로 읽는다.
+_GAME_ONLY_FILLER = frozenset({
+    "게임", "게임용", "할", "하는", "하기", "할거", "할꺼", "하려고", "하려는", "할만한", "좋은", "잘", "돌릴", "돌아가는",
+    "컴퓨터", "컴", "pc", "피씨", "본체", "데스크탑", "데스크톱", "추천", "추천해", "추천해줘", "추천해주세요", "추천좀", "좀",
+    "용도", "사양", "해줘", "해주세요", "주세요"})
+_JOSA_END = re.compile(r"(으로|로|이랑|랑|하고|이요|요|은|는|이|가|을|를|와|과|만|도|용)$")
+
+
+def game_only_names(text: str, vocab, match_game) -> list[str]:
+    """게임 이름만 쓴 문장이면 그 게임들(games.name), 아니면 빈 목록. 「롤, 배그」처럼 여럿도 읽는다."""
+    if not text or len(text) > 40 or _NEGATION.search(text):
+        return []
+    out: list[str] = []
+    for part in re.split(r"[,·/]+", text):
+        raws, bares = [], []
+        for word in re.split(r"[\s?!.~]+", part.strip()):
+            bare = _JOSA_END.sub("", word)
+            if not word or word.lower() in _GAME_ONLY_FILLER or bare.lower() in _GAME_ONLY_FILLER:
+                continue
+            raws.append(word)
+            bares.append(bare or word)
+        if not raws:
+            continue
+        # 원문을 먼저 본다 -- 「발로」의 「로」를 조사로 떼면 「발」만 남는다(games_from_text 와 같은 순서).
+        m = match_game("".join(raws), vocab) or match_game(" ".join(raws), vocab) or match_game("".join(bares), vocab)
+        if not m:
+            return []
+        if m not in out:
+            out.append(m)
+    return out
+
+
 # ── ③ 게임 이름 없는 게임 질문 ─────────────────────────────────────────────
 UNNAMED_GAME_REPLY = ("즐겨 하시는 게임을 알려 주시면 "
                       "용도와 예산에 맞춰 안내하겠습니다.")

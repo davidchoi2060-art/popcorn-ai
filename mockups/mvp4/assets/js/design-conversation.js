@@ -75,11 +75,31 @@
     var selectedId = ctx.productId || param(ctx, 'id');
     var selected = selectedId ? product(selectedId) : null;
     var model = { state: entry === 'product' && selected ? 'product' : 'welcome', question: '', draft: '', outgoing: null, selected: selected, log: [], ids: [], mobile: 'chat', notice: '', handoff: false,
-      conditions: { purpose: '', budget: '', environment: '' }, dirty: {}, convo: { talk: null, chatFlow: null, history: [], pendingText: '' }, ask: [], editing: false };
+      conditions: { purpose: '', budget: '', environment: '' }, dirty: {}, convo: { talk: null, chatFlow: null, history: [], pendingText: '' }, ask: [], editing: false, purposes: [], purposeLine: '' };
     var controller = null, root = null, lastPick = null, A = P.chatAnswer;
+    // 용도 버튼(2026-10-29 사장님 「사무용 PC, 게임용 PC 버튼을 클릭하면.. 사무용 + 게임용 뭐 이런식으로」): 누를 때마다 문장을
+    // 한 줄씩 덧붙이면 「게임용 PC를 찾고 있어요.」「영상 편집에 사용할 PC가 필요해요.」가 따로 가서 상담이 용도별 PC를 나눠 골랐다.
+    // 고른 용도를 한 문장(한 대로 모두)으로 합치고, 다시 누르면 그 용도를 뺀다. 손님이 입력창에 직접 쓴 글은 건드리지 않는다.
+    function pressed(purpose) { return Array.isArray(model.purposes) && model.purposes.indexOf(purpose) >= 0 ? 'true' : 'false'; }
+    function pickPurpose(purpose, single) {
+      var before = model.purposeLine || '', draft = model.draft || '';
+      var kept = before !== '' && draft.indexOf(before) >= 0;   // 손님이 버튼 문장을 지웠거나 고쳤으면 처음부터 다시 고른다
+      var list = kept && Array.isArray(model.purposes) ? model.purposes.slice() : [];
+      var at = list.indexOf(purpose);
+      if (at >= 0) list.splice(at, 1); else list.push(purpose);
+      var line = '';
+      if (list.length > 1) line = list.join(' + ') + '용 PC를 찾고 있어요. 한 대로 모두 할 거예요.';
+      else if (list.length === 1) {   // 하나만 남으면 그 버튼의 원래 문장
+        var left = list[0] === purpose ? null : root.querySelector('[data-dc-purpose="' + list[0] + '"]');
+        line = left ? left.dataset.dcDraft || '' : single;
+      }
+      if (kept) draft = line ? draft.replace(before, line) : draft.replace(before + '\n', '').replace('\n' + before, '').replace(before, '');
+      else if (line) draft = draft ? draft + '\n' + line : line;
+      model.purposes = list; model.purposeLine = line; model.draft = draft;
+    }
     // 화면 왕복 보존(2026-10-21 검수 F1): 다른 화면(AI 슈퍼컴퓨터·내 견적·상세)을 다녀와도 대화·작성 중 질문·조건·비교·선택·스크롤이
     // 남는다. 이 탭(sessionStorage)에만 두고 서버로 보내지 않는다. 「새 대화」만 비운다.
-    var KEEP = 'pai-finder-chat-v1', SAVED = ['state', 'question', 'draft', 'outgoing', 'log', 'ids', 'mobile', 'handoff', 'conditions', 'dirty', 'convo', 'ask'], restoredScroll = null;
+    var KEEP = 'pai-finder-chat-v1', SAVED = ['state', 'question', 'draft', 'outgoing', 'log', 'ids', 'mobile', 'handoff', 'conditions', 'dirty', 'convo', 'ask', 'purposes', 'purposeLine'], restoredScroll = null;
     function remember(scroll) {
       try {
         var snap = { v: 1, selected: model.selected ? String(model.selected.id) : null };
@@ -160,7 +180,7 @@
       return '<header class="dc-heading"><div><h1>내게 맞는 <em>PC를 함께</em> 찾아요.</h1><p class="dc-lede">추천 PC를 살펴보고, 마음에 드는 상품을 찜해보세요.</p></div><div class="dc-heading-actions">' + (P.wishLink ? P.wishLink({ params: { from: 'chat' }, cls: 'dc-wish-link' }) : '') + '<button type="button" class="dc-new" data-dc-action="new">' + icon('arrow-counter-clockwise') + '새 대화</button></div></header>' +
         '<div class="dc-tabs" role="tablist" aria-label="대화와 PC"><button type="button" role="tab" id="dc-tab-chat" aria-selected="' + (model.mobile === 'chat') + '" aria-controls="dc-chat-main" tabindex="' + (model.mobile === 'chat' ? '0' : '-1') + '" data-dc-tab="chat">' + icon('chat-circle') + '대화</button><button type="button" role="tab" id="dc-tab-products" aria-selected="' + (model.mobile === 'products') + '" aria-controls="dc-chat-side" tabindex="' + (model.mobile === 'products' ? '0' : '-1') + '" data-dc-tab="products">' + icon('computer-tower') + '추천 PC <span>' + cards.length + '</span></button></div>' +
         '<div class="dc-chat-layout" data-mobile="' + model.mobile + '"><section class="dc-chat-main' + (model.state === 'welcome' && !model.log.length ? ' is-welcome' : '') + '" id="dc-chat-main" aria-label="대화"><div class="dc-chat-log" role="log" aria-live="polite">' +
-        (model.state === 'welcome' && !model.log.length ? '<div class="dc-welcome"><span class="dc-welcome-mark">' + icon('chat-circle') + '</span><h2>어떤 PC가 필요하세요?</h2><p>게임, 작업, 일상까지.<br>하고 싶은 일부터 편하게 이야기해 주세요.</p><div class="dc-welcome-prompts"><button type="button" data-dc-draft="게임용 PC를 찾고 있어요.">' + icon('game-controller') + '<b>게임용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button><button type="button" data-dc-draft="영상 편집에 사용할 PC가 필요해요.">' + icon('video-camera') + '<b>영상편집용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button><button type="button" data-dc-draft="업무에 쓸 PC가 필요해요.">' + icon('monitor') + '<b>사무·업무용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button></div><img class="dc-welcome-art" src="assets/images/pc-finder-core-v3.webp" width="618" height="496" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>' : messages()) +
+        (model.state === 'welcome' && !model.log.length ? '<div class="dc-welcome"><span class="dc-welcome-mark">' + icon('chat-circle') + '</span><h2>어떤 PC가 필요하세요?</h2><p>게임, 작업, 일상까지.<br>하고 싶은 일부터 편하게 이야기해 주세요.</p><div class="dc-welcome-prompts"><button type="button" data-dc-purpose="게임" data-dc-draft="게임용 PC를 찾고 있어요." aria-pressed="' + pressed('게임') + '">' + icon('game-controller') + '<b>게임용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button><button type="button" data-dc-purpose="영상 편집" data-dc-draft="영상 편집에 사용할 PC가 필요해요." aria-pressed="' + pressed('영상 편집') + '">' + icon('video-camera') + '<b>영상편집용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button><button type="button" data-dc-purpose="사무·업무" data-dc-draft="업무에 쓸 PC가 필요해요." aria-pressed="' + pressed('사무·업무') + '">' + icon('monitor') + '<b>사무·업무용 PC</b><small class="dc-prompt-hint">이 용도로 질문하기</small></button></div><img class="dc-welcome-art" src="assets/images/pc-finder-core-v3.webp" width="618" height="496" alt="" aria-hidden="true" loading="lazy" decoding="async"></div>' : messages()) +
         stateNotice() + (model.notice ? '<p class="dc-local-notice" role="status">' + h(model.notice) + '</p>' : '') + '</div>' +
         '<form class="dc-composer" data-dc-form>' + composerChips() + '<label class="visually-hidden" for="dc-question">PC에 대해 질문하기</label><textarea id="dc-question" rows="3" placeholder="' + (model.log.length ? '더 궁금한 점을 물어보세요.' : '용도와 예산을 편하게 알려주세요.') + '"' + (isLoading ? ' readonly' : '') + '>' + h(model.draft) + '</textarea><div><small><span data-dc-count>' + model.draft.length.toLocaleString('ko-KR') + '</span> / 10,000자 · Shift+Enter 줄바꿈</small><button class="btn btn-primary" type="submit"' + (isLoading ? ' disabled' : '') + '>보내기' + icon('paper-plane-tilt') + '</button></div></form><p class="dc-chat-note">모르는 사양은 비워 두셔도 괜찮아요. 구매 전 상세 구성과 가격을 확인해 주세요.</p></section>' +
         '<aside class="dc-chat-side" id="dc-chat-side" aria-label="추천 PC">' + side() + '</aside></div>';
@@ -280,9 +300,9 @@
         // 질문 대상 해제: 질문 대상만 비운다 — 대화·입력 중인 문장·추천 조건·찜목록·내 견적은 그대로다.
         if (node.hasAttribute('data-dc-unselect')) { var was = model.selected; model.selected = null; model.notice = was ? '질문 대상(' + was.name + ')을 해제했어요.' : ''; render(); var ta0 = root.querySelector('#dc-question'); if (ta0 && ta0.getClientRects().length) ta0.focus({ preventScroll: true }); return; }
         if (node.hasAttribute('data-dc-tab')) { model.mobile = node.dataset.dcTab; render(); return; }
-        if (node.hasAttribute('data-dc-draft')) { model.draft = model.draft ? model.draft + '\n' + node.dataset.dcDraft : node.dataset.dcDraft; render(); root.querySelector('textarea').focus(); return; }
+        if (node.hasAttribute('data-dc-draft')) { pickPurpose(node.dataset.dcPurpose, node.dataset.dcDraft); render(); root.querySelector('textarea').focus(); return; }
         var action = node.dataset.dcAction;
-        if (action === 'new') { stop(); restoredScroll = null; model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.ask = []; model.editing = false; lastPick = null; model.mobile = 'chat'; render(); }
+        if (action === 'new') { stop(); restoredScroll = null; model.state = 'welcome'; model.question = ''; model.draft = ''; model.outgoing = null; model.selected = null; model.log = []; model.ids = []; model.notice = ''; model.handoff = false; model.conditions = { purpose: '', budget: '', environment: '' }; model.dirty = {}; model.convo = { talk: null, chatFlow: null, history: [], pendingText: '' }; model.ask = []; model.editing = false; model.purposes = []; model.purposeLine = ''; lastPick = null; model.mobile = 'chat'; render(); }
         if (action === 'retry') send(true);
         if (action === 'conditions') { model.state = 'clarify'; model.mobile = 'products'; model.editing = true; render(); var b = root.querySelector('[data-dc-condition="budget"]'); if (b) b.focus(); }
         if (action === 'edit-conditions') { model.editing = !model.editing; render(); var e1 = root.querySelector(model.editing ? '[data-dc-condition="purpose"]' : '[data-dc-action="edit-conditions"]'); if (e1) e1.focus(); }

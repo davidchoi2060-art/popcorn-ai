@@ -21,6 +21,8 @@
   · 사장님 확정 정책 3항목(설계서 §6)을 이 파일이 구현한다:
       ① 용도가 둘 이상 → usages[] 마다 격자 조회, card_sets[] 로 전부 돌려준다.
         게임 계열 용도가 여럿(게임+고사양 게임)이면 게임 카드는 한 벌만.
+        ※ 2026-10-29 사장님: 판매 PC 추천(RECO_SOURCE=sold)은 여러 용도를 PC 한 대로 본다 -- 모든 용도를
+          함께 충족하는 상품만 한 set(api/sold_reco._combined_set). 그런 상품이 없을 때만 용도별 set.
       ② 목록 밖 게임(grade_src="ai_estimate") → 추정 등급으로 바로 카드 + 응답
         ai_estimated[] 로 화면 배지. 그 시점에 talk_game_estimates(0093) 에 한 행.
       ③ 해상도 null → 1080p 로 카드를 내고 assumed:["game.resolution=1080p"].
