@@ -1,0 +1,218 @@
+{
+  "base": "https://dev.popcornai.co.kr",
+  "taken_at": "2026-10-29T02:04:01.244Z",
+  "results": [
+    {
+      "name": "배그롤150-대화",
+      "text": "배그와 롤 150만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "알뜰 구성",
+          "name": null,
+          "fit": "게임 FHD 최신 대작 FHD 높음 옵션 60fps 이상",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/배그롤150-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: 150만 원 이하에는 배그와 롤 조건에 맞는 PC가 없어, 가장 가까운 ",
+        "카드"
+      ],
+      "buttons": [
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 98149,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 98149,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        }
+      ],
+      "qty_panel": null,
+      "sets_panel": "PC 대수 − 1대 +"
+    },
+    {
+      "name": "롤150-대화",
+      "text": "롤 150만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "추천 구성",
+          "name": null,
+          "fit": "게임 캐주얼 롤·발로란트·피파·메이플 FHD",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/롤150-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: 롤용으로 150만 원 이하에서 가장 알맞은 PC는 아래 제품입니다. FH",
+        "카드"
+      ],
+      "buttons": [
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 93454,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 93454,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        }
+      ],
+      "qty_panel": null,
+      "sets_panel": "PC 대수 − 1대 +"
+    },
+    {
+      "name": "사무용100-대화",
+      "text": "사무용 100만원으로 추천해줘",
+      "cards": [
+        {
+          "tag": "알뜰 구성",
+          "name": null,
+          "fit": "사무용 기본 문서·웹·화상회의 (한글·오피스·크롬 탭 몇 개)",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "추천 구성",
+          "name": null,
+          "fit": "사무용 쾌적 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "part_photos": [],
+          "broken_images": 0
+        },
+        {
+          "tag": "더 높은 사양",
+          "name": null,
+          "fit": "사무용 쾌적 대용량 엑셀·다중 창·탭 수십 개·듀얼 모니터",
+          "part_photos": [],
+          "broken_images": 0
+        }
+      ],
+      "errors": [],
+      "shots": [
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-모바일.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-수량-PC.png",
+        "/home/runner/work/_temp/mvp3-captures/사무용100-대화-수량-모바일.png"
+      ],
+      "alert": null,
+      "order": [
+        "손님",
+        "AI: 사무용 100만 원 이하로는 아래 두 대가 적합합니다.\n\n- 오피스 초슬",
+        "카드"
+      ],
+      "buttons": [
+        "더 싼 PC",
+        "더 높은 사양",
+        "조건 바꾸기"
+      ],
+      "overflow_px": 0,
+      "quantity": [
+        {
+          "code": 113835,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 2,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113835,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113836,
+          "slot": "RAM",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 메모리 슬롯 2개 · 최대 64GB 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 113836,
+          "slot": "SSD",
+          "quantity": 1,
+          "limit": {
+            "min": 1,
+            "max": 1,
+            "basis": "메인보드 M.2 슬롯 1개 기준이에요.",
+            "known": true
+          }
+        },
+        {
+          "code": 120221,
+          "bom": false
+        }
+      ],
+      "qty_panel": null,
+      "sets_panel": "PC 대수 − 1대 +"
+    }
+  ]
+}
