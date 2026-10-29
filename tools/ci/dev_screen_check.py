@@ -12,7 +12,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = os.environ.get('BASE', 'https://popcornai.co.kr').rstrip('/')
+BASE = os.environ.get('BASE', 'https://dev.popcornai.co.kr').rstrip('/')
 TEXT = os.environ.get('TEXT', '배그와 롤, 150만원으로 추천해줘')
 # 추가 확인(GET 경로:반복 횟수, 쉼표 구분). 승인 구성 응답 시간과 부품 사진 응답을 본다.
 PROBES = os.environ.get('PROBES', '/api/customer/pc-offers/97909:2,/api/product-images/111066/detail:1')
