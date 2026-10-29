@@ -72,7 +72,7 @@ class FakeEngine:
         yield SimpleNamespace()
 
 
-def call_recommend(game_context=None, state=None, needs=()):
+def call_recommend(game_context=None, state=None, needs=(), public=frozenset()):
     state = state or TalkState(usages=['게임', '영상편집'], budget_won=2000000, budget_bound='이하',
                                game=GameState(names=['배틀그라운드'], grade='C', grade_src='ai_estimate'))
     dropped = [{'field': 'game.resolution', 'value': '8K', 'reason': 'not in vocab'}]
@@ -85,7 +85,7 @@ def call_recommend(game_context=None, state=None, needs=()):
          patch.object(G, '_game_context', lambda conn, names, vocab: game_context), \
          patch.object(G, '_record_estimate', lambda st: (False, DB_ERROR)), \
          patch.object(S, 'load', lambda: (LEVELS, PRODUCTS)), \
-         patch.object(S, 'public_codes', lambda: frozenset()), \
+         patch.object(S, 'public_codes', lambda: public), \
          patch.object(G._PC_OFFER, 'public_item', lambda code: dict(NOT_PUBLIC_ITEM)):
         return G.recommend(G.RecommendBody(state={'usages': ['게임', '영상편집']}))
 
@@ -165,20 +165,24 @@ class RecommendPublicResponseTest(unittest.TestCase):
 
 
 class GameWithoutGradeTest(unittest.TestCase):
-    """2026-10-09 조정 결정: 판매 경로는 등급 없이도 추천한다 — 「게임용 250만원」이 0장이었다."""
+    """2026-10-09 조정 결정: 판매 경로는 등급 없이도 추천한다 — 「게임용 250만원」이 0장이었다.
+    2026-10-29 사장님: 이름·해상도 없는 게임의 기본형은 캐주얼(가벼운 게임) -- 예산을 채우지 않는다."""
 
     def run_state(self, game):
         state = TalkState(usages=['게임'], budget_won=2500000, budget_bound='이하', game=game)
         with self.assertLogs('grid_public', level='INFO'):
-            return call_recommend(state=state, needs=['game.grade'])
+            return call_recommend(state=state, needs=['game.grade'], public=frozenset({1, 2}))
 
-    def test_game_without_names_or_grade_gets_fhd_cards(self):
+    def test_game_without_names_or_grade_gets_casual_cards(self):
         for game in (None, GameState()):
             d = self.run_state(game)
             self.assertEqual(len(d['card_sets']), 1)
             cs = d['card_sets'][0]
-            self.assertEqual((cs['usage_grid'], cs['min_level']), ('게임', 'FHD'))
-            self.assertEqual([i['product_code'] for i in cs['items']], [1, 2])
+            self.assertEqual((cs['usage_grid'], cs['min_level']), ('게임', '기본'))      # 캐주얼 수준
+            # 캐주얼에 딱 맞는 PC 가 없어 한 단계 위 중 가장 싼 한 장 -- 예산(250만원)을 채우지 않는다.
+            self.assertEqual([i['product_code'] for i in cs['items']], [1])
+            self.assertTrue(cs['demand']['light'])
+            self.assertIn(S.LIGHT_ABOVE_NOTE, cs['demand']['notes'])
             self.assertEqual(d['needs'], ['game.grade'])
             self.assertEqual(d['assumed'], ['game.resolution=1080p'])
             self.assertEqual(d['ai_estimated'], [])
@@ -382,10 +386,12 @@ class GameMinRankTest(unittest.TestCase):
         self.assertEqual(self.rank(['메이플'], grade='L'), 1)
         self.assertEqual(self.rank(['배그']), 2)
 
-    def test_resolution_beats_casual_and_no_names_never_casual(self):
+    def test_resolution_beats_casual_and_no_names_is_casual_by_default(self):
         self.assertEqual(self.rank(['롤'], resolution='1440p'), 3)
-        self.assertEqual(self.rank([]), 2)
-        self.assertEqual(S.game_min_rank(None, self.LV, self.VOCAB, []), 2)
+        # 2026-10-29 사장님: 이름·해상도 없는 게임의 기본형은 캐주얼(2026-10-09 「이름 없는 게임 = FHD」를 바꿨다).
+        self.assertEqual(self.rank([]), 1)
+        self.assertEqual(self.rank([], resolution='1080p'), 2)      # 해상도를 말하면 그 해상도 수준
+        self.assertEqual(S.game_min_rank(None, self.LV, self.VOCAB, []), 1)   # 게임 정보가 없어도 캐주얼 기본형
         # 게임명을 대조할 어휘가 없으면 캐주얼로 내리지 않는다.
         self.assertEqual(S.game_min_rank(GameState(names=['롤'], grade='E'), self.LV, None, []), 2)
 

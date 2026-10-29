@@ -88,6 +88,30 @@ class OnePcForAllUsages(unittest.TestCase):
         self.assertNotIn('usages', sets[0])
 
 
+class GameDefaultCasual(unittest.TestCase):
+    """2026-10-29 사장님 「게임은.. 기본형은 캐주얼, 가벼운 게임으로 하고.. 그다음 구체적인 내용을 적시하면.. 맞춰서」."""
+
+    VOCAB = Vocab(all_game_names=['리그 오브 레전드', '배틀그라운드'])
+
+    def rank(self, names=(), resolution=None, label='게임'):
+        g = SimpleNamespace(names=list(names), resolution=resolution)
+        with mock.patch.object(S, '_casual_games', lambda levels, vocab, notes: {'리그 오브 레전드'}):
+            return S.game_min_rank(g, [], self.VOCAB, [], label)
+
+    def test_plain_game_without_details_is_casual(self):
+        self.assertEqual(self.rank(), 1)
+        self.assertEqual(S.game_min_rank(None, [], None, [], '게임'), 1)
+        self.assertEqual(self.rank(['스팀 인디(통칭)']), 1)          # 장르 통칭은 이름 없는 게임과 같다
+
+    def test_details_raise_the_level(self):
+        self.assertEqual(self.rank(resolution='1080p'), 2)           # 해상도를 말하면 그 해상도 수준
+        self.assertEqual(self.rank(resolution='1440p'), 3)
+        self.assertEqual(self.rank(resolution='4K'), 4)
+        self.assertEqual(self.rank(label='고사양 게임'), 2)            # 「고사양」이라고 하면 FHD 대작 수준
+        self.assertEqual(self.rank(['배틀그라운드']), 2)              # 캐주얼 목록 밖 게임 이름
+        self.assertEqual(self.rank(['리그 오브 레전드']), 1)          # 캐주얼 게임 이름은 그대로 캐주얼
+
+
 class GameOnlyText(unittest.TestCase):
     # 실제 match_game(양방향 포함 비교)으로 본다 -- 「FC 온라인 돌아가요?」처럼 이름이 문장 안에 든 경우도 걸러야 한다.
     VOCAB = Vocab(all_game_names=['FC온라인', '리그 오브 레전드', '배틀그라운드', '발로란트'],

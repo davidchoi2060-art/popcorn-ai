@@ -21,9 +21,11 @@ def _fake_recommend(seen):
     def fake(body):
         st = body.state
         seen.append(st)
+        assert len(st.get("usages") or []) <= 1, "용도마다 따로 부른다(여러 용도는 엔진이 한 대로 합친다)"
         if st.get("game") and st["game"].get("names") == [TT.SPREAD_CASUAL]:
-            sets = [{"usage": "게임", "items": [CASUAL_OVER], "empty_note": "이 작업은 890,000원부터 가능합니다."},
-                    {"usage": "사무·인강", "items": [OFFICE, OFFICE2]}]
+            sets = [{"usage": "게임", "items": [CASUAL_OVER], "empty_note": "이 작업은 890,000원부터 가능합니다."}]
+        elif st.get("usages") == ["사무·인강"]:
+            sets = [{"usage": "사무·인강", "items": [OFFICE, OFFICE2]}]
         elif st.get("usages") == ["게임"]:
             sets = [{"usage": "게임", "items": [FHD_OVER], "empty_note": "이 작업은 1,090,000원부터 가능합니다."}]
         else:
@@ -49,8 +51,11 @@ class Spread(unittest.TestCase):
             _turn(calls=[{"id": "b", "name": "show_pcs", "args": {"refs": ["P1", "P2"]}}]),
             _turn("70만원이면 사무·인강용 오피스 PC가 529,000원이에요. 어디에 주로 쓰실 건가요?"),
         ])
-        self.assertEqual(len(seen), 2)                                      # 가벼운 쪽 + 최신 게임(FHD)
-        self.assertEqual(seen[0]["usages"], ["사무·인강", "게임"])
+        # 사무·인강 · 가벼운 게임 · 최신 게임(FHD) 을 따로 부른다(2026-10-29 -- 한 번에 부르면 «한 대로 모두»로 합쳐졌다).
+        self.assertEqual(len(seen), 3)
+        self.assertEqual(seen[0]["usages"], ["사무·인강"])
+        self.assertEqual(seen[1]["game"]["names"], [TT.SPREAD_CASUAL])
+        self.assertEqual(seen[2]["game"], {"names": [], "resolution": "1080p"})   # 이름 없는 게임은 캐주얼 기본형 -- FHD 는 직접 말한다
         self.assertEqual([c["product_code"] for c in out["cards"]], [2001, 2002])
         self.assertEqual(out["state"]["usages"], [])                        # 화면에 「게임」 조건을 넘기지 않는다
         self.assertEqual(out["state"]["budget_won"], 700_000)
