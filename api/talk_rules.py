@@ -308,12 +308,23 @@ def game_only_names(text: str, vocab, match_game) -> list[str]:
         if not raws:
             continue
         # 원문을 먼저 본다 -- 「발로」의 「로」를 조사로 떼면 「발」만 남는다(games_from_text 와 같은 순서).
-        m = match_game("".join(raws), vocab) or match_game(" ".join(raws), vocab) or match_game("".join(bares), vocab)
-        if not m:
+        # match_game 은 이름이 문장 안에 들어 있어도 찾는다(양방향 포함) -- 「FC 온라인 돌아가요?」도 FC온라인이 된다.
+        # 게임 이름만 쓴 문장인지는 반대 방향(쓴 말이 게임 이름 안에 다 들어가거나 별칭)으로만 본다.
+        aliases = getattr(vocab, "game_aliases", None) or {}
+        for key in ("".join(raws), " ".join(raws), "".join(bares)):
+            m = match_game(key, vocab)
+            if m and (_name_key(key) in _name_key(m) or aliases.get(_name_key(key)) == m):
+                break
+        else:
             return []
         if m not in out:
             out.append(m)
     return out
+
+
+def _name_key(s: str) -> str:
+    """talk_schema._norm_name 과 같은 정규화(공백·구분 기호 제거 + casefold) -- 별칭 표의 키 모양."""
+    return "".join(ch for ch in s if ch not in " \t·:-_.,()[]'\"").casefold()
 
 
 # ── ③ 게임 이름 없는 게임 질문 ─────────────────────────────────────────────
