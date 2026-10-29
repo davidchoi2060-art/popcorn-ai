@@ -20,6 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 MOCKUPS = ROOT / "mockups"
 BASE = "/mvp4/pc-builder/"
 BUILD = MOCKUPS / "mvp4" / "pc-builder"
+# 사이트 공용 스크립트(빌더 묶음 밖) -- 운영 미리보기 로그인 만료 안내(2026-10-29). 묶음 자산 검사에서 빼고
+# 공용 경로에서 실제로 내려오는지만 따로 본다.
+SHARED_SCRIPTS = ("/mvp4/assets/js/session-expired.js",)
 
 
 class _EntryAssets(HTMLParser):
@@ -80,6 +83,12 @@ class PCBuilderStaticIntegrationTests(unittest.TestCase):
         self.assertTrue(self.assets.styles, "Built HTML has no stylesheet")
         for script in self.assets.scripts:
             with self.subTest(script=script):
+                shared = urlsplit(script).path
+                if shared in SHARED_SCRIPTS:
+                    response = self.client.get(shared, follow_redirects=False)
+                    self.assertEqual(response.status_code, 200, script)
+                    self.assertIn("javascript", response.headers["content-type"])
+                    continue
                 response = self.asset(script)
                 self.assertIn("javascript", response.headers["content-type"])
         for style in self.assets.styles:
