@@ -15,7 +15,9 @@ from fastapi import Request
 
 HEADER = "x-popcorn-surface"
 SURFACES = ("mvp3", "mvp4")
-LABELS = {"mvp3": "기존 화면(mvp3)", "mvp4": "새 메인(mvp4)"}
+# 2026-10-31: /mvp3 는 더 쓰지 않는다(사장님 「mvp3는 이미 버렸어」). 옛 기록의 값은 그대로 남으므로 라벨만 「이전 화면」으로 둔다.
+# 다음 고객 화면이 생기면 SURFACES 와 이 표에 한 줄씩 더한다 — 관리자 거르기(api/admin_purchase_inquiries)는 여기서 선택지를 만든다.
+LABELS = {"mvp3": "이전 화면(mvp3)", "mvp4": "현재 화면(mvp4)"}
 
 
 def surface_of(request: Request) -> str | None:

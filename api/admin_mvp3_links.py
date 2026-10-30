@@ -76,6 +76,10 @@ def kind(snapshot=None, configuration_id=None, free_build=None, fixed_product=No
     if free_build:
         return 'free_build', '부품 직접 고르기'
     if isinstance(snapshot, dict):
+        # /mvp4 AI 슈퍼컴퓨터 「견적에 저장」(2026-10-21 #373 · api/mvp3_saved_quotes.save_device) — 연락처 없이 장비만 보관한다.
+        # 2026-10-31 전에는 이 표시를 읽지 않아 「쇼핑몰 완제품」으로 잘못 보였다(관리자단 개선 PR-1).
+        if snapshot.get('kind') == 'ai_device':
+            return 'ai_device', 'AI 슈퍼컴퓨터 장비'
         if snapshot.get('ai_composed') is True:
             return 'ai_composed', '팝콘AI 구성'
         return 'mall', '쇼핑몰 완제품'

@@ -27,8 +27,8 @@ class SurfaceOf(unittest.TestCase):
         self.assertIsNone(cs.surface_of(req((b'referer', b'https://popcornai.co.kr/mvp4/index.html'))))
 
     def test_label(self):
-        self.assertEqual(cs.label('mvp3'), '기존 화면(mvp3)')
-        self.assertEqual(cs.label('mvp4'), '새 메인(mvp4)')
+        self.assertEqual(cs.label('mvp3'), '이전 화면(mvp3)')     # 2026-10-31 사장님 「mvp3는 이미 버렸어」
+        self.assertEqual(cs.label('mvp4'), '현재 화면(mvp4)')
         self.assertEqual(cs.label(None), '알 수 없음')
 
 

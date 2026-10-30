@@ -1,11 +1,21 @@
 """구매 상담 신청(ADM-ORD-012 · 가칭) — 관리자 데이터 API.
 
-고객이 지금 고객 화면(mvp3)에서 남긴 구매 상담 신청(`purchase_inquiries`, 0139 ·
+고객이 고객 화면(/mvp4 등 — 화면은 바뀌어도 접수 표는 하나다)에서 남긴 구매 상담 신청(`purchase_inquiries`, 0139 ·
 `api/mvp3_purchase_inquiry.py`)을 보고 처리한다.
 
 ■ 할 수 있는 일
-  목록(상태별) · 상세 · 상태 바꾸기(대기 · 처리 중 · 완료) · 내가 맡기 · 메모.
+  목록(상태 · 문의 종류 · 주제 · 고객 화면 · 연결 · 보관 기한) · 상세 · 상태 바꾸기(대기 · 처리 중 · 완료) · 내가 맡기 · 메모.
+  거르기 선택지는 이 모듈이 응답(`filters`)에 싣는다 — 화면이 박지 않는다(주제가 늘면 서버 상수만 는다).
   같은 방문자의 문의 · 보관 견적은 「고객 문의 · 보관 견적」 화면으로 잇는다(방문자 키).
+
+■ 문의 종류 (2026-10-31 관리자단 개선 PR-1 — 고객 화면이 10월에 주제를 늘렸다: 0165 AI 슈퍼컴퓨터 · 0174 기업 컨설팅)
+  fixed       AI 슈퍼컴퓨터 상세에서 온 견적 · 도입 상담 — `fixed_product` 가 있다(0165)
+  service     기업 AI 업무개선 컨설팅 — 주제가 곧 종류다(0174)
+  ai_package  /mvp4 AI 패키지 문의 — 저장된 표시가 없다. 화면(mvp4/assets/js/service-adapters.js `message()`)이
+              주제 「기타」에 본문 머리글 「[AI 패키지 」를 붙여 보내므로 그것으로 가른다. 보관 기한이 지나 본문이
+              비워진 신청은 가를 수 없어 일반 상담으로 세고, 행에는 「알 수 없음」을 밝힌다.
+  general     나머지(여러 대 구매 · 할인 · 세금계산서 · 주문 희망 · 기타)
+  SQL 조건(KINDS)과 inquiry_kind() 는 같은 판정이어야 한다 — tests/test_admin_improve_20261031.py 가 대조한다.
 
 ■ 개인정보
   연락처는 운영자 이상에게만 그대로 보인다. 조회 권한은 가운데를 가린다.
@@ -27,6 +37,7 @@ from sqlalchemy import text
 
 from . import admin_mvp3_links as L
 from . import customer_surface
+from . import mvp3_purchase_inquiry as PI
 from .auth import current_operator
 from .admin_raw_text import NOTICE as RAW_NOTICE, expired
 from .db import engine
@@ -46,6 +57,49 @@ DUES = {"soon": "i.purge_at > now() AND i.purge_at <= now() + make_interval(days
 MEMO_MAX = 1000
 IS_TEST = ("(i.data_origin <> 'real' OR COALESCE(i.contact_name, '') ILIKE 'QA-%'"
            " OR COALESCE(i.message, '') ILIKE 'QA-%')")
+
+# 문의 종류 — 머리말 docstring 「문의 종류」. 선택지 순서가 화면의 순서다.
+INQUIRY_KINDS = (("general", "일반 상담"), ("fixed", "AI 슈퍼컴퓨터 견적 · 도입 상담"),
+                 ("ai_package", "AI 패키지 문의"), ("service", "기업 AI 업무개선 컨설팅"))
+KIND_LABEL = dict(INQUIRY_KINDS)
+AI_PACKAGE_TOPIC = "기타"            # 화면이 AI 패키지 문의에 붙이는 주제(mvp4/assets/js/service-adapters.js)
+AI_PACKAGE_HEAD = "[AI 패키지 "       # 같은 화면이 본문 맨 앞에 붙이는 머리글 — 저장된 표시가 없어 이것으로 가른다
+KIND_NOTE = ("AI 패키지 문의는 저장된 표시가 없어 본문 머리글(「" + AI_PACKAGE_HEAD.strip() + "」)로 구분합니다. "
+             "보관 기한이 지나 본문이 비워진 신청은 일반 상담으로 셉니다.")
+# 주제 선택지 — 고객 접수 모듈의 상수 그대로(일반 · AI 슈퍼컴퓨터 · 기업 컨설팅). 여기 따로 적지 않는다.
+TOPIC_CHOICES = tuple(PI.TOPICS) + tuple(PI.FIXED_TOPICS.values()) + tuple(PI.SERVICE_TOPICS)
+# 고객 화면 선택지 — api/customer_surface.SURFACES + 「알 수 없음」(0162 이전 기록 · 머리글 없는 요청 = NULL)
+SURFACE_UNKNOWN = "unknown"
+SURFACE_CHOICES = tuple(customer_surface.SURFACES) + (SURFACE_UNKNOWN,)
+# SQL 판정 — 값은 전부 서버 상수다(입력값이 아니다). COALESCE 로 NULL 본문을 거짓으로 만들어 NOT 이 행을 떨어뜨리지 않게 한다.
+_SERVICE_SQL = "(i.topic IN (%s))" % ", ".join("'%s'" % t for t in PI.SERVICE_TOPICS)
+_PACKAGE_SQL = "(i.topic = '%s' AND COALESCE(i.message, '') LIKE '%s%%')" % (AI_PACKAGE_TOPIC, AI_PACKAGE_HEAD)
+KINDS = {"fixed": "i.fixed_product IS NOT NULL",
+         "service": f"(i.fixed_product IS NULL AND {_SERVICE_SQL})",
+         "ai_package": f"(i.fixed_product IS NULL AND {_PACKAGE_SQL})",
+         "general": f"(i.fixed_product IS NULL AND NOT {_SERVICE_SQL} AND NOT {_PACKAGE_SQL})"}
+
+
+def inquiry_kind(topic, message=None, fixed_product=None, purged=False):
+    """문의 종류 — KINDS(SQL)와 같은 판정. (key, 라벨).
+    본문이 비워진(보관 기한 경과) 「기타」는 AI 패키지인지 알 수 없다 — 일반 상담으로 세되 라벨에 밝힌다."""
+    if isinstance(fixed_product, dict):
+        return "fixed", KIND_LABEL["fixed"]
+    if topic in PI.SERVICE_TOPICS:
+        return "service", KIND_LABEL["service"]
+    if topic == AI_PACKAGE_TOPIC and (message or "").startswith(AI_PACKAGE_HEAD):
+        return "ai_package", KIND_LABEL["ai_package"]
+    if topic == AI_PACKAGE_TOPIC and purged and not message:
+        return "general", KIND_LABEL["general"] + " · 본문이 비워져 AI 패키지 문의인지 알 수 없음"
+    return "general", KIND_LABEL["general"]
+
+
+def filter_choices() -> dict:
+    """거르기 선택지 — 서버 상수에서만 만든다(화면이 박지 않는다)."""
+    return {"kinds": [{"key": k, "label": v} for k, v in INQUIRY_KINDS],
+            "topics": list(TOPIC_CHOICES),
+            "surfaces": [{"key": s, "label": customer_surface.label(s)} for s in customer_surface.SURFACES]
+                        + [{"key": SURFACE_UNKNOWN, "label": customer_surface.label(None)}]}
 
 
 def _can_write(me) -> bool:
@@ -80,9 +134,12 @@ def _row(r, full: bool) -> dict:
     gone = expired(r["purge_at"])
     kind_key, kind_label = L.kind(r.get("quote_snapshot"), r.get("configuration_id"), r.get("free_build"),
                                 r.get("fixed_product"))
+    # 문의 종류는 가리기 전 본문으로 판정한다(머리글만 본다 · 본문 자체는 아래 규칙대로만 내보낸다).
+    ik, ik_label = inquiry_kind(r["topic"], r["message"], r.get("fixed_product"), purged=gone)
     return {
         "inquiry_id": r["inquiry_id"], "inquiry_no": r["inquiry_no"], "at": iso(r["created_at"]),
         "topic": r["topic"], "status": r["status"],
+        "inquiry_kind": ik, "inquiry_kind_label": ik_label,
         "name": None if gone else r["contact_name"],
         "phone": None if gone else (r["contact_phone"] if full else _mask_phone(r["contact_phone"])),
         "email": None if gone else (r["contact_email"] if full else _mask_email(r["contact_email"])),
@@ -146,7 +203,8 @@ _SELECT = f"""
 
 @router.get("/purchase-inquiries")
 def list_inquiries(offset: int = 0, status: str | None = None, include_test: bool = False,
-                   visitor: str | None = None, link: str | None = None, due: str | None = None):
+                   visitor: str | None = None, link: str | None = None, due: str | None = None,
+                   kind: str | None = None, topic: str | None = None, surface: str | None = None):
     me = current_operator()
     offset = max(0, offset)
     if status is not None and status not in STATUSES:
@@ -155,6 +213,12 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
         raise HTTPException(400, "알 수 없는 연결 조건입니다")
     if due is not None and due not in DUES:
         raise HTTPException(400, "알 수 없는 기한 조건입니다")
+    if kind is not None and kind not in KINDS:
+        raise HTTPException(400, "알 수 없는 문의 종류입니다")
+    if topic is not None and topic not in TOPIC_CHOICES:
+        raise HTTPException(400, "알 수 없는 주제입니다")
+    if surface is not None and surface not in SURFACE_CHOICES:
+        raise HTTPException(400, "알 수 없는 고객 화면입니다")
     where = ["TRUE" if include_test else f"NOT {IS_TEST}"]
     params: dict = {"lim": LIMIT, "off": offset}
     if status:
@@ -163,12 +227,23 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
         where.append(LINKS[link])
     if due:
         where.append(DUES[due])
+    if kind:
+        where.append(KINDS[kind])
+    if topic:
+        where.append("i.topic = :tp"); params["tp"] = topic
+    if surface == SURFACE_UNKNOWN:
+        where.append("i.surface IS NULL")
+    elif surface:
+        where.append("i.surface = :sf"); params["sf"] = surface
     if visitor:
         if not (visitor.startswith("u") and visitor[1:].isdigit()):
             raise HTTPException(400, "방문자 표시가 올바르지 않습니다")
         where.append("i.user_id = :u"); params["u"] = int(visitor[1:])
     w = " AND ".join(where)
     test_w = "TRUE" if include_test else f"NOT {IS_TEST}"
+    # 종류별 건수 — 목록 조건과 무관하게 상태 건수와 같은 범위(시험 신청만 뺀 전체)를 같은 KINDS 로 센다.
+    kind_sql = ("SELECT " + ", ".join(f"COUNT(*) FILTER (WHERE {KINDS[k]}) AS {k}" for k, _ in INQUIRY_KINDS)
+                + f" FROM purchase_inquiries i WHERE {test_w}")
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
         rows = conn.execute(text(f"{_SELECT} WHERE {w} ORDER BY i.created_at DESC, i.inquiry_id DESC"
                                  " LIMIT :lim OFFSET :off"), params).mappings().all()
@@ -176,12 +251,16 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
                              params).scalar_one()
         counts = dict(conn.execute(text(f"SELECT i.status, COUNT(*) FROM purchase_inquiries i"
                                         f" WHERE {test_w} GROUP BY i.status")).all())
+        kind_counts = conn.execute(text(kind_sql)).mappings().one()
         excluded = 0 if include_test else conn.execute(text(
             f"SELECT COUNT(*) FROM purchase_inquiries i WHERE {IS_TEST}")).scalar_one()
     full = _can_write(me)
     return {"ok": True, "items": [_row(r, full) for r in rows], "total": int(total),
             "offset": offset, "limit": LIMIT,
             "counts": {s: int(counts.get(s, 0)) for s in STATUSES},
+            "kind_counts": {k: int(kind_counts[k]) for k, _ in INQUIRY_KINDS},
+            "kind": kind, "topic": topic, "surface": surface,
+            "filters": filter_choices(), "kind_note": KIND_NOTE,
             "test_excluded": int(excluded), "include_test": include_test,
             "contact_masked": not full, "can_write": full, "raw_notice": RAW_NOTICE,
             "link": link, "due": due, "due_soon_days": DUE_SOON_DAYS}
