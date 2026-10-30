@@ -96,6 +96,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import text
 
 from . import admin_mvp3_links as L
+from .admin_funnel import MVP4_HANDOFF_NOTE     # 2026-10-31 PR-3 — /mvp4 몰 구매 이동은 기록되지 않는다는 문장(한 곳에서만 정의)
 from .admin_ui_common import render
 from .admin_nav import NAV
 from .auth import COOKIE, resolve_session
@@ -294,6 +295,8 @@ def _load(limit: int, offset: int) -> dict:
             "quoted_sum": {"sum": quoted_sum, "sample": total},
         },
         "rows": rows,
+        # 화면 상단 안내 — 서버가 준 문장을 textContent 로만 보인다(2026-10-31 PR-3).
+        "notices": [MVP4_HANDOFF_NOTE],
         "nav": _nav_links(),
     }
 

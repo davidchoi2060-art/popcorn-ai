@@ -275,6 +275,9 @@ a.hl-navbtn{color:var(--rv-canvas)}
     <div class="hl-notice">
       <b>인계를 취소하거나 되돌리는 기능은 없습니다</b>(그런 경로가 코드에 없다는 사실을 짚어 둡니다) · 회원 귀속은 없습니다(익명 방문자 키만) — 실 인증 이전이라 정상입니다 · <b>인계 이후 결제 여부는 유입 성과에서도 알 수 없습니다.</b>
     </div>
+
+    <!-- 서버가 준 안내(data.notices) — 2026-10-31 PR-3: /mvp4 몰 구매 이동은 기록되지 않는다. 문장은 api/admin_funnel.MVP4_HANDOFF_NOTE 한 곳. -->
+    <div class="hl-notice" id="hlServerNotice" hidden></div>
   </div>
 </div>
 
@@ -529,6 +532,8 @@ a.hl-navbtn{color:var(--rv-canvas)}
     renderKpis(d);
     renderRows(d);
     renderDrawer();
+    var sn = $('hlServerNotice');
+    if (sn) { var notes = Array.isArray(d.notices) ? d.notices : []; sn.textContent = notes.join(' '); sn.hidden = !notes.length; }
   }
 
   document.addEventListener('click', function (e) {
