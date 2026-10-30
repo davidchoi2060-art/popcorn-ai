@@ -3,7 +3,7 @@
 // 실제 브라우저(Playwright Chromium)로 공개 사이트를 열고 CDP 네트워크 이벤트를 그대로 센다.
 // 「요청이 보였다」와 「바이트가 다시 왔다」를 나눈다 — memory/disk 캐시·304·실제 전송 bytes 를 따로 적는다.
 //
-//   node tools/perf/mvp4_part_images.mjs [--base https://popcornai.co.kr/mvp4/] [--samples 3]
+//   node tools/perf/mvp4_part_images.mjs [--base https://dev.popcornai.co.kr/mvp4/] [--samples 3]
 //        [--override <dir>]   <dir>/live-cards.js 처럼 같은 이름 파일로 /mvp4/assets/js/* 를 바꿔 끼운 «after» 를
 //                             배포본 «before» 와 번갈아 잰다(같은 머신·같은 시간대 비교). 없으면 배포본만 잰다.
 //        [--profiles pc1440,m390] [--noslow]   빠른 점검용으로 줄인다
@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const args = Object.fromEntries(process.argv.slice(2).reduce((a, v, i, all) => (v.startsWith('--') ? a.concat([[v.slice(2), all[i + 1] && !all[i + 1].startsWith('--') ? all[i + 1] : '1']]) : a), []));
-const BASE = args.base || 'https://popcornai.co.kr/mvp4/';
+const BASE = args.base || 'https://dev.popcornai.co.kr/mvp4/';
 const SAMPLES = Number(args.samples || 3);
 const OVERRIDE = args.override ? path.resolve(args.override) : null;
 const OUT = args.out || `mvp4-part-images-${Date.now()}.json`;
