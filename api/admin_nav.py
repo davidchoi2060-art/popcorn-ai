@@ -604,7 +604,7 @@ def new_admin_nav(current_path=''):
         ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
-        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/ai-device-profiles')),
+        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries', '/admin2/retention', '/admin2/payment-records')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members', '/admin2/member-reviews')),

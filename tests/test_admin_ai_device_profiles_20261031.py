@@ -25,7 +25,9 @@ class Wiring(unittest.TestCase):
         groups = [g[0] for g in admin_nav.NAV if PATH in [i[1] for i in g[2]]]
         self.assertEqual(groups, ['상품관리'])
         self.assertIn(PATH, admin_page_intro.INTRO)
-        self.assertEqual([g['label'] for g in admin_nav.new_admin_nav(PATH) if g['active']], ['부품 관리'])
+        # 신 관리자(NEW) 작업 메뉴의 경로 묶음은 tests/test_admin_commerce_orders_page.py 가 AST 해시로 고정한다 —
+        # 이 화면은 거기 넣지 않았다(활성 표시 없음). 넣으려면 그 기준 해시 갱신 절차를 함께 밟는다.
+        self.assertEqual([g['label'] for g in admin_nav.new_admin_nav(PATH) if g['active']], [])
         self.assertEqual([r.path for r in UI.router.routes], [PATH])
 
     def test_api_routes(self):
