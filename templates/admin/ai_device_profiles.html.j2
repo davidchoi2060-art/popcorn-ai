@@ -1,0 +1,221 @@
+{#
+  AI 슈퍼컴퓨터 표시 정보 (ADM-PRD-060 · 가칭) — 2026-10-31 신설(관리자단 개선 PR-2)
+
+  AI 슈퍼컴퓨터 카테고리(public_key 'ai-supercomputer')에 분류된 상품의 고객 표시 정보(ai_device_profiles, 0166)를
+  보고 고친다. 데이터 = `GET /api/admin/ai-device-profiles` · 상세 `GET …/{code}` · 저장 `PUT …/{code}`
+  (`api/admin_ai_device_profiles.py` — 저장 규칙은 그 파일 docstring).
+
+  ■ 머리말은 공통 셸이 `api/admin_page_intro.py` 로 그린다.
+  ■ 팔레트는 셸 `admin2.css` 의 `--rv-*` 만 쓴다. 외부 자원 0.
+  ■ 서버가 준 문자열은 textContent / value 로만 넣는다(innerHTML 금지).
+  ■ 정직 표기: 저장값(saved) · 상품명 기준 값(derived) · 고객 화면이 지금 보이는 값(customer)을 섞지 않는다.
+    상품명 기준 값은 입력칸에 미리 넣지 않고 안내로만 보이며, 「이 값 쓰기」를 눌러야 칸에 들어간다.
+    상세 내용(detail)은 이 화면에서 고치지 않는다(보내지 않으면 서버가 기존 값을 유지한다).
+  ■ 저장은 승인 단계 없이 고객 화면에 바로 반영된다 — 저장 단추 옆에 밝힌다(문구는 서버 save_note).
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}AI 슈퍼컴퓨터 표시 정보{% endblock %}
+
+{% block head_extra %}
+<style>
+.dp-wrap{padding:16px 24px 32px;display:flex;flex-direction:column;gap:12px}
+.dp-note{font-size:12.5px;color:var(--rv-muted);margin:0}
+.dp-table{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;overflow-x:auto}
+.dp-table table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:860px}
+.dp-table th{background:var(--rv-panel);text-align:left;font-weight:600;color:var(--rv-ink-soft);padding:9px 12px;border-bottom:1px solid var(--rv-dim4);white-space:nowrap}
+.dp-table td{padding:9px 12px;border-bottom:1px solid var(--rv-panel2);vertical-align:top;color:var(--rv-ink)}
+.dp-table tbody tr{cursor:pointer}
+.dp-table tbody tr:hover,.dp-table tbody tr[aria-selected="true"]{background:var(--rv-panel2)}
+.dp-mono{font-family:var(--rv-mono);white-space:nowrap}
+.dp-sub{display:block;font-size:12px;color:var(--rv-muted)}
+.dp-warn{color:var(--rv-ink);background:var(--rv-amber-bg)}
+.dp-empty{padding:28px;text-align:center;color:var(--rv-muted)}
+.dp-drawer{position:fixed;top:0;right:0;bottom:0;width:min(600px,calc(100vw / var(--a2-zoom,1)));background:var(--rv-card);border-left:1px solid var(--rv-dim3);box-shadow:-8px 0 24px rgb(0 0 0 / .08);display:flex;flex-direction:column;z-index:40}
+.dp-drawer[hidden]{display:none}
+.dp-drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--rv-dim4)}
+.dp-drawer header h2{font-size:16px;margin:0}
+.dp-drawer button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:5px 12px;font:inherit;cursor:pointer}
+.dp-drawer button:disabled{opacity:.45;cursor:default}
+.dp-body{overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;font-size:13.5px}
+.dp-lbl{font-size:12px;color:var(--rv-muted)}
+.dp-say{background:var(--rv-panel);border-radius:6px;padding:8px 10px;margin:0;white-space:pre-wrap}
+.dp-field{display:flex;flex-direction:column;gap:3px}
+.dp-field input[type=text],.dp-field input[type=number],.dp-imgrow input{width:100%;box-sizing:border-box;font:inherit;font-size:13.5px;border:1px solid var(--rv-dim3);border-radius:6px;padding:6px 10px;background:var(--rv-card);color:var(--rv-ink)}
+.dp-imgs{display:flex;flex-direction:column;gap:6px}
+.dp-imgrow{display:grid;grid-template-columns:3fr 1.4fr 1.6fr auto auto;gap:6px;align-items:center}
+.dp-link{padding:3px 8px !important;font-size:12px !important}
+.dp-pre{font:12px/1.5 var(--rv-mono);background:var(--rv-panel);border-radius:6px;padding:8px 10px;margin:0;white-space:pre-wrap;max-height:220px;overflow:auto;color:var(--rv-ink-soft)}
+.dp-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.dp-msg{color:var(--rv-muted)}
+.dp-msg.err{color:var(--rv-red)}
+@media (max-width:768px){
+  .dp-wrap{padding:12px 16px 24px}
+  .dp-imgrow{grid-template-columns:1fr 1fr;grid-auto-rows:auto}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dp-wrap" data-keep="1">
+  <p class="dp-note" id="dpNote">불러오는 중입니다.</p>
+  <p class="dp-note" id="dpMeta" aria-live="polite"></p>
+  <div class="dp-table">
+    <table>
+      <thead><tr>
+        <th scope="col">코드</th><th scope="col">이름</th><th scope="col">모델 묶음 · 라벨</th><th scope="col">판매</th>
+        <th scope="col">비어 있는 항목</th><th scope="col">사진</th><th scope="col">진열 순위</th><th scope="col">마지막 저장</th>
+      </tr></thead>
+      <tbody id="dpRows"><tr><td colspan="8" class="dp-empty">불러오는 중입니다.</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<aside class="dp-drawer" id="dpDrawer" hidden data-keep="1" aria-label="표시 정보 편집">
+  <header><h2 id="dpDTitle">표시 정보</h2><button type="button" id="dpClose">닫기</button></header>
+  <div class="dp-body" id="dpDBody"></div>
+</aside>
+<script>
+(function(){
+  var API = '/api/admin/ai-device-profiles';
+  var st = {canWrite:false, picked:null, labels:{}};
+  var $ = function(id){ return document.getElementById(id); };
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function won(n){ return n==null ? '—' : Number(n).toLocaleString('ko-KR')+'원'; }
+  function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function saleText(x){ return x.sale_state==='on_sale' ? '판매중 · '+won(x.price) : (x.sale_state==='check' ? '판매중 · 가격 확인 필요' : '판매 중지'); }
+  function labelOf(k){ return st.labels[k] || (k==='images' ? '사진' : k); }
+  function emptyRow(msg){ var b=$('dpRows'); b.textContent=''; var tr=el('tr'); var td=el('td','dp-empty',msg); td.colSpan=8; tr.appendChild(td); b.appendChild(tr); }
+  function line(b, label, value){ b.appendChild(el('span','dp-lbl',label)); b.appendChild(el('p','dp-say',value||'—')); }
+
+  function load(focus){
+    fetch(API).then(function(r){
+      if (r.status===401) throw new Error('로그인이 필요합니다');
+      if (!r.ok) throw new Error('목록을 불러오지 못했습니다');
+      return r.json();
+    }).then(function(d){
+      st.canWrite=!!d.can_write; st.labels=d.field_labels||{};
+      $('dpNote').textContent=d.note||'';
+      $('dpMeta').textContent=(d.category ? '카테고리 「'+d.category.name+'」 · ' : '카테고리 없음 · ')
+        +'상품 '+d.items.length+'개'
+        +(d.truncated ? ' (한 번에 보이는 상한 '+d.limit+'개 — 넘는 상품은 이 목록에 없습니다)' : '')
+        +(d.can_write ? '' : ' · 조회 권한은 저장할 수 없습니다');
+      if (!d.items.length){ emptyRow(d.category ? '카테고리에 분류된 상품이 없습니다. 「상품 분류 매핑」에서 상품을 옮기면 여기 나옵니다.' : 'AI 슈퍼컴퓨터 카테고리가 없습니다.'); return; }
+      var b=$('dpRows'); b.textContent='';
+      d.items.forEach(function(it){
+        var tr=el('tr'); tr.setAttribute('data-c', it.product_code);
+        if (st.picked===it.product_code) tr.setAttribute('aria-selected','true');
+        tr.appendChild(el('td','dp-mono',String(it.product_code)));
+        var nm=el('td',null,it.name||'—');
+        if (it.official_name && it.official_name!==it.name) nm.appendChild(el('span','dp-sub','상품명 '+it.official_name));
+        tr.appendChild(nm);
+        tr.appendChild(el('td',null,[it.model_group,it.model_label].filter(Boolean).join(' · ')||'—'));
+        tr.appendChild(el('td',null,saleText(it)));
+        var miss=it.missing||[];
+        var ms=el('td',miss.length?'dp-warn':null, miss.length ? miss.map(labelOf).join(' · ') : '없음');
+        if ((it.derived||[]).length) ms.appendChild(el('span','dp-sub','상품명 기준으로 채워진 항목 '+it.derived.length+'개'));
+        tr.appendChild(ms);
+        tr.appendChild(el('td',null,String((it.images||[]).length)+'장'));
+        tr.appendChild(el('td','dp-mono',it.featured_rank!=null?String(it.featured_rank):'—'));
+        tr.appendChild(el('td',null,it.has_profile ? (when(it.saved_at)+(it.saved_by?' · '+it.saved_by:'')) : '저장된 표시 정보 없음'));
+        tr.addEventListener('click',function(){ open(it.product_code); });
+        b.appendChild(tr);
+      });
+      if (focus) open(focus);
+    }).catch(function(e){ emptyRow(e.message); });
+  }
+
+  function open(code){
+    st.picked=code;
+    Array.prototype.forEach.call(document.querySelectorAll('#dpRows tr'),function(r){ r.toggleAttribute('aria-selected', r.getAttribute('data-c')==String(code)); });
+    var b=$('dpDBody'); b.textContent=''; b.appendChild(el('p','dp-note','불러오는 중입니다.'));
+    $('dpDTitle').textContent='상품 '+code; $('dpDrawer').hidden=false;
+    fetch(API+'/'+encodeURIComponent(code)).then(function(r){ return r.json().then(function(d){ return {ok:r.ok,d:d}; }); })
+    .then(function(x){ if(!x.ok) throw new Error((x.d&&x.d.detail)||'상세를 불러오지 못했습니다'); renderForm(x.d); })
+    .catch(function(e){ b.textContent=''; b.appendChild(el('p','dp-msg err',e.message)); });
+  }
+
+  function renderForm(d){
+    var b=$('dpDBody'); b.textContent='';
+    var saved=d.saved||{}, derived=d.derived||{}, cust=d.customer||{}, canWrite=!!d.can_write;
+    $('dpDTitle').textContent=d.product_code+' · '+(cust.name||'');
+    line(b,'상품명(몰 등록명)',d.product.product_name);
+    line(b,'판매',saleText(d.product));
+    var a=el('a',null,'고객 화면에서 보기'); a.href='/mvp4/supercomputer.html?id='+encodeURIComponent(d.product_code); a.target='_blank'; a.rel='noopener'; b.appendChild(a);
+    b.appendChild(el('p','dp-note', d.derive_active
+      ? '표시 이름이 비어 있어, 상품명에서 읽은 값(상품명 기준)이 고객 화면의 빈 칸을 채우고 있습니다. 표시 이름을 저장하면 그 자동 채움이 꺼지므로 쓸 값은 「이 값 쓰기」로 칸에 옮겨 둡니다.'
+      : '표시 이름이 저장돼 있어 상품명 기준 자동 채움은 꺼져 있습니다. 빈 칸은 고객 화면에 «확인 필요»로 보입니다.'));
+    var inputs={};
+    (d.fields||[]).forEach(function(k){
+      var wrap=el('div','dp-field'); wrap.appendChild(el('label','dp-lbl',(d.field_labels&&d.field_labels[k])||k));
+      var inp=el('input'); inp.type='text'; inp.value=saved[k]||''; inp.disabled=!canWrite;
+      if (k==='model_group') inp.placeholder='영문 소문자 · 숫자 · 하이픈 2~60자 (같은 제품의 다른 모델끼리 같은 키)';
+      if (k==='model_label') inp.placeholder='예: 2TB';
+      wrap.appendChild(inp); inputs[k]=inp;
+      var hint=el('span','dp-sub');
+      if (derived[k] && !saved[k]){
+        hint.textContent='상품명 기준: '+derived[k]+(d.derive_active?' (고객 화면에 이 값이 보입니다 · 저장 안 됨)':' (저장 안 됨 · 자동 채움 꺼짐)');
+        if (canWrite){ var use=el('button','dp-link','이 값 쓰기'); use.type='button'; use.addEventListener('click',function(){ inp.value=derived[k]; }); hint.appendChild(document.createTextNode(' ')); hint.appendChild(use); }
+      } else if (!saved[k]) {
+        hint.textContent = (k==='display_name') ? '비어 있음 — 고객 화면은 몰 등록명을 보입니다' : ((k==='model_group'||k==='model_label') ? '비어 있음 — 같은 제품의 다른 모델(용량 등)을 묶을 때만 적습니다' : '비어 있음 — 고객 화면 «확인 필요»');
+      }
+      wrap.appendChild(hint); b.appendChild(wrap);
+    });
+    var fr=el('div','dp-field'); fr.appendChild(el('label','dp-lbl','진열 순위 (1~99 · 작을수록 앞 · 비우면 맨 뒤)'));
+    var rank=el('input'); rank.type='number'; rank.min='1'; rank.max='99'; rank.value=saved.featured_rank!=null?String(saved.featured_rank):''; rank.disabled=!canWrite;
+    fr.appendChild(rank); b.appendChild(fr);
+
+    b.appendChild(el('span','dp-lbl','사진 (순서대로 · 첫 장이 대표)'));
+    b.appendChild(el('p','dp-note',d.image_rule||''));
+    var images=(saved.images||[]).map(function(im){ return {src:im.src||'', label:im.label||'', alt:im.alt||''}; });
+    if (!(saved.images||[]).length && (cust.images||[]).length)
+      b.appendChild(el('p','dp-sub','저장된 사진이 없어 고객 화면은 승인된 상품 사진을 쓰고 있습니다: '+cust.images.map(function(i){ return i.src; }).join(', ')));
+    var imgBox=el('div','dp-imgs'); b.appendChild(imgBox);
+    function drawImgs(){
+      imgBox.textContent='';
+      images.forEach(function(im, idx){
+        var row=el('div','dp-imgrow');
+        [['src','경로'],['label','설명(선택)'],['alt','대체 글(선택)']].forEach(function(p){
+          var i=el('input'); i.type='text'; i.value=im[p[0]]; i.placeholder=p[1]; i.disabled=!canWrite;
+          i.addEventListener('input',function(){ im[p[0]]=i.value; }); row.appendChild(i);
+        });
+        if (canWrite){
+          var rm=el('button','dp-link','삭제'); rm.type='button'; rm.addEventListener('click',function(){ images.splice(idx,1); drawImgs(); }); row.appendChild(rm);
+          var up=el('button','dp-link','위로'); up.type='button'; up.disabled=idx===0; up.addEventListener('click',function(){ var t=images[idx-1]; images[idx-1]=images[idx]; images[idx]=t; drawImgs(); }); row.appendChild(up);
+        }
+        imgBox.appendChild(row);
+      });
+      if (!images.length) imgBox.appendChild(el('span','dp-sub','저장된 사진 없음'));
+      if (canWrite){ var add=el('button','dp-link','사진 추가'); add.type='button'; add.addEventListener('click',function(){ images.push({src:'',label:'',alt:''}); drawImgs(); }); imgBox.appendChild(add); }
+    }
+    drawImgs();
+
+    b.appendChild(el('span','dp-lbl','상세 내용(detail) — 이 화면에서는 고치지 않습니다. 저장해도 그대로 둡니다.'));
+    b.appendChild(el('pre','dp-pre',JSON.stringify(saved.detail||{},null,2)));
+
+    var save=el('button',null,'저장'); save.disabled=!canWrite;
+    var msg=el('span','dp-msg', canWrite ? (saved.updated_at ? '마지막 저장 '+when(saved.updated_at)+(saved.updated_by?' · '+saved.updated_by:'') : '저장된 표시 정보 없음') : '조회 권한은 저장할 수 없습니다.');
+    var ln=el('div','dp-row'); ln.appendChild(save); ln.appendChild(msg); b.appendChild(ln);
+    b.appendChild(el('p','dp-note',d.save_note||''));
+    save.addEventListener('click',function(){
+      var body={};
+      (d.fields||[]).forEach(function(k){ body[k]=inputs[k].value.trim()||null; });
+      body.featured_rank = rank.value==='' ? null : Number(rank.value);
+      body.images = images.filter(function(im){ return im.src.trim(); }).map(function(im){ return {src:im.src.trim(), label:im.label.trim()||null, alt:im.alt.trim()||null}; });
+      // detail 은 보내지 않는다 — 서버가 기존 값을 유지한다.
+      save.disabled=true; msg.className='dp-msg'; msg.textContent='저장하는 중입니다.';
+      fetch(API+'/'+encodeURIComponent(d.product_code),{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ return r.json().then(function(x){ return {ok:r.ok,d:x}; }); })
+      .then(function(x){
+        if (!x.ok) throw new Error((window.popcornProgress&&window.popcornProgress.errText) ? window.popcornProgress.errText(x.d) : ((x.d&&x.d.detail)||'저장하지 못했습니다'));
+        msg.textContent=x.d.verdict||'저장했습니다'; save.disabled=false; load(d.product_code);
+      })
+      .catch(function(e){ msg.className='dp-msg err'; msg.textContent=e.message; save.disabled=false; });
+    });
+  }
+
+  $('dpClose').addEventListener('click',function(){ $('dpDrawer').hidden=true; st.picked=null;
+    Array.prototype.forEach.call(document.querySelectorAll('#dpRows tr'),function(r){ r.removeAttribute('aria-selected'); }); });
+  load();
+})();
+</script>
+{% endblock %}
