@@ -6,7 +6,8 @@
   상태(대기 · 처리 중 · 완료) · 담당 · 메모를 남긴다.
   ■ 2026-10-31 관리자단 개선 PR-1: 문의 종류 · 주제 · 고객 화면 거르기와 종류별 건수. 선택지는 서버 응답
     `filters` 에서만 받는다(화면에 박지 않는다 — 주제가 늘면 서버 상수만 는다). 주소의 kind= · topic= ·
-    surface= 로도 같은 조건으로 연다. 서버가 모르는 값이면 전체로 돌아가고 그 사실을 적는다.
+    surface= 로도 같은 조건으로 연다. 서버가 모르는 값이면 그 세 조건만 빼고 다시 부르며 그 사실을 적는다(다른 조건은 그대로).
+    요청에 순번을 두어 늦게 온 응답이 목록·선택 상자를 덮지 않는다. 종류 칩은 한 번 만들고 제자리에서 갱신한다(초점 유지).
   데이터 = `GET /api/admin/purchase-inquiries` · 저장 `PUT /api/admin/purchase-inquiries/{id}`
   (`api/admin_purchase_inquiries.py` — 개인정보 규칙은 그 파일 docstring).
 
@@ -86,7 +87,7 @@
     <div class="pi-kpi"><b id="kDoing">—</b><span>처리 중</span></div>
     <div class="pi-kpi"><b id="kDone">—</b><span>완료</span></div>
   </section>
-  <div class="pi-kinds" id="piKinds" aria-label="문의 종류별 건수"></div>
+  <div class="pi-kinds" id="piKinds" role="group" aria-label="문의 종류별 건수"></div>
   <div id="piRawNotice"></div>
   <p class="pi-note" id="piNote">고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.</p>
   <p class="pi-note" id="piKindNote"></p>
@@ -156,30 +157,44 @@
     if (kindSel.options.length===1) (f.kinds||[]).forEach(function(k){ addOpt(kindSel,k.key,k.label); });
     if (topicSel.options.length===1) (f.topics||[]).forEach(function(t){ addOpt(topicSel,t,t); });
     if (surfSel.options.length===1) (f.surfaces||[]).forEach(function(s){ addOpt(surfSel,s.key,s.label); });
-    kindSel.value=d.kind||''; topicSel.value=d.topic||''; surfSel.value=d.surface||'';
-    st.fromUrl=null;
-    var ks=$('piKinds'); ks.textContent='';
+    // 주소로 연 조건은 첫 응답에서만 선택 상자로 옮긴다 — 그 뒤 응답은 사용자가 바꾼 선택을 덮지 않는다.
+    if (st.fromUrl){ kindSel.value=d.kind||''; topicSel.value=d.topic||''; surfSel.value=d.surface||''; st.fromUrl=null; }
+    // 종류 칩은 처음 한 번만 만들고 제자리에서 글자·눌림만 갱신한다 — 키보드 초점이 응답마다 사라지지 않게.
+    var ks=$('piKinds');
     (f.kinds||[]).forEach(function(k){
       var n=(d.kind_counts&&d.kind_counts[k.key]!=null)?d.kind_counts[k.key]:'—';
-      var btn=el('button','pi-chip',k.label+' '+n); btn.type='button';
+      var btn=ks.querySelector('button[data-k="'+k.key+'"]');
+      if (!btn){
+        btn=el('button','pi-chip'); btn.type='button'; btn.setAttribute('data-k',k.key);
+        btn.addEventListener('click',function(){ kindSel.value=(kindSel.value===k.key?'':k.key); $('piUrlNote').textContent=''; st.offset=0; load(); });
+        ks.appendChild(btn);
+      }
+      btn.textContent=k.label+' '+n;
       btn.setAttribute('aria-pressed', d.kind===k.key?'true':'false');
       btn.title=d.kind===k.key?'이 종류만 보는 중 · 다시 누르면 전체':'이 종류만 보기';
-      btn.addEventListener('click',function(){ kindSel.value=(kindSel.value===k.key?'':k.key); st.offset=0; load(); });
-      ks.appendChild(btn);
     });
     $('piKindNote').textContent=d.kind_note||'';
   }
+  function dropUrlFilters(){
+    // 주소에서 문의 종류·주제·고객 화면만 지운다 — status= 와 #u방문자 해시는 그대로 둔다(그 조건은 계속 적용된다).
+    var u=new URLSearchParams(location.search); Object.keys(SEL).forEach(function(k){ u.delete(k); });
+    var q=u.toString(); history.replaceState(null,'',location.pathname+(q?'?'+q:'')+location.hash);
+  }
+  var seq = 0;
   function load(){
+    var my = ++seq;                        // 늦게 온 응답은 버린다 — 선택을 바꾼 뒤 옛 요청이 목록·선택 상자를 덮지 않게
     fetch(API+qs()).then(function(r){
+      if (my!==seq) return null;
       if (r.ok) return r.json();
-      if (r.status===400 && st.fromUrl){   // 주소의 조건을 서버가 모른다 — 전체로 돌아가고 그 사실을 적는다
-        st.fromUrl=null; history.replaceState(null,'',location.pathname+location.hash);
-        $('piUrlNote').textContent='주소에 적힌 조건을 알 수 없어 전체 신청을 봅니다.'; load(); return null;
+      if (r.status===400 && st.fromUrl){   // 주소의 문의 종류·주제·고객 화면 조건을 서버가 모른다 — 그 셋만 빼고 다시 부른다
+        st.fromUrl=null; dropUrlFilters();
+        $('piUrlNote').textContent='주소에 적힌 문의 종류 · 주제 · 고객 화면 조건을 알 수 없어 빼고 봅니다. 상태 · 방문자 조건은 그대로입니다.';
+        load(); return null;
       }
       throw new Error('신청 목록을 불러오지 못했습니다');
     })
     .then(function(d){
-      if (!d) return;
+      if (!d || my!==seq) return;
       st.limit=d.limit; st.canWrite=d.can_write;
       fillFilters(d);
       $('kWait').textContent=d.counts['대기']; $('kDoing').textContent=d.counts['처리 중']; $('kDone').textContent=d.counts['완료'];
@@ -193,7 +208,11 @@
         var all=el('a',null,'전체 보기'); all.href='#'; all.addEventListener('click',function(ev){ ev.preventDefault(); history.replaceState(null,'',location.pathname); st.visitor=null; st.offset=0; load(); });
         vf.appendChild(all);
       }
-      if (!d.items.length){ emptyRow('아직 구매 상담 신청이 없습니다.'); }
+      if (!d.items.length){
+        // 상태 건수(시험 제외 전체)가 0 이면 정말 없는 것이고, 아니면 지금 조건에 맞는 것이 없는 것이다 — 칩의 전체 건수와 모순되지 않게.
+        var any=(d.counts['대기']||0)+(d.counts['처리 중']||0)+(d.counts['완료']||0);
+        emptyRow(any ? '조건에 맞는 신청이 없습니다.' : '아직 구매 상담 신청이 없습니다.');
+      }
       else {
         var b=$('piRows'); b.textContent='';
         d.items.forEach(function(it){
@@ -215,7 +234,7 @@
       var from=d.total?d.offset+1:0, to=d.offset+d.items.length;
       $('piPage').textContent='전체 '+d.total+'건 중 '+from+'–'+to;
       $('piPrev').disabled=d.offset<=0; $('piNext').disabled=to>=d.total;
-    }).catch(function(e){ emptyRow(e.message); });
+    }).catch(function(e){ if (my===seq) emptyRow(e.message); });
   }
   function line(b, label, value){ b.appendChild(el('span','pi-lbl',label)); b.appendChild(el('p','pi-say',value||'—')); }
   function open(it){
@@ -300,7 +319,7 @@
   // 「운영 현황」 카드처럼 주소에 status= 가 오면 같은 조건으로 연다(목록에 있는 값만 받는다).
   (function(){ var v=new URLSearchParams(location.search).get('status'); var sel=$('piStatus');
     if (v && Array.prototype.some.call(sel.options,function(o){ return o.value===v; })) sel.value=v; })();
-  ['piStatus','piKind','piTopic','piSurface','piLink','piDue','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  ['piStatus','piKind','piTopic','piSurface','piLink','piDue','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ $('piUrlNote').textContent=''; st.offset=0; load(); }); });
   $('piPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
   $('piNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
   load();

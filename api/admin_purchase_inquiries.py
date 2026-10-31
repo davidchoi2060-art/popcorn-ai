@@ -10,12 +10,15 @@
 
 ■ 문의 종류 (2026-10-31 관리자단 개선 PR-1 — 고객 화면이 10월에 주제를 늘렸다: 0165 AI 슈퍼컴퓨터 · 0174 기업 컨설팅)
   fixed       AI 슈퍼컴퓨터 상세에서 온 견적 · 도입 상담 — `fixed_product` 가 있다(0165)
-  service     기업 AI 업무개선 컨설팅 — 주제가 곧 종류다(0174)
+  service     기업 AI 업무개선 컨설팅 — 주제가 곧 종류다(0174). 주제가 따로 저장되기 전(2026-10-21 낮)에 들어온 신청은
+              주제 「기타」에 본문 머리글 「[기업 AI 업무개선 컨설팅]」이 붙어 있어 그것으로도 가른다.
   ai_package  /mvp4 AI 패키지 문의 — 저장된 표시가 없다. 화면(mvp4/assets/js/service-adapters.js `message()`)이
-              주제 「기타」에 본문 머리글 「[AI 패키지 」를 붙여 보내므로 그것으로 가른다. 보관 기한이 지나 본문이
-              비워진 신청은 가를 수 없어 일반 상담으로 세고, 행에는 「알 수 없음」을 밝힌다.
+              주제 「기타」에 본문 머리글 「[AI 패키지 」를 붙여 보내므로 그것으로 가른다.
   general     나머지(여러 대 구매 · 할인 · 세금계산서 · 주문 희망 · 기타)
-  SQL 조건(KINDS)과 inquiry_kind() 는 같은 판정이어야 한다 — tests/test_admin_improve_20261031.py 가 대조한다.
+  판정은 SQL 한 곳(KIND_CASE)이다 — 거르기(KINDS) · 종류별 건수(KIND_COUNT_SQL) · 행 표시(_SELECT 의 inquiry_kind)가
+  같은 조건식을 같은 순서로 쓴다. 파이썬은 라벨 글자만 고른다(inquiry_kind_label). 파기 작업이 본문을 실제로 비운
+  (contact_purged_at) 「기타」 신청은 AI 패키지였는지 알 수 없어 일반 상담으로 세고 라벨에 밝힌다.
+  tests/test_admin_improve_20261031.py 가 경계 행을 SQLite 에 넣어 KIND_CASE · KINDS · KIND_COUNT_SQL 을 행 단위로 대조한다.
 
 ■ 개인정보
   연락처는 운영자 이상에게만 그대로 보인다. 조회 권한은 가운데를 가린다.
@@ -64,34 +67,39 @@ INQUIRY_KINDS = (("general", "일반 상담"), ("fixed", "AI 슈퍼컴퓨터 견
 KIND_LABEL = dict(INQUIRY_KINDS)
 AI_PACKAGE_TOPIC = "기타"            # 화면이 AI 패키지 문의에 붙이는 주제(mvp4/assets/js/service-adapters.js)
 AI_PACKAGE_HEAD = "[AI 패키지 "       # 같은 화면이 본문 맨 앞에 붙이는 머리글 — 저장된 표시가 없어 이것으로 가른다
+SERVICE_HEAD = "[기업 AI 업무개선 컨설팅]"   # 기업 컨설팅 화면의 본문 머리글(companyMessage) — 주제가 따로 저장되기 전 신청을 가른다
 KIND_NOTE = ("AI 패키지 문의는 저장된 표시가 없어 본문 머리글(「" + AI_PACKAGE_HEAD.strip() + "」)로 구분합니다. "
-             "보관 기한이 지나 본문이 비워진 신청은 일반 상담으로 셉니다.")
+             "주제가 따로 저장되기 전(2026-10-21)에 들어온 기업 AI 업무개선 컨설팅 신청도 본문 머리글(「" + SERVICE_HEAD + "」)로 구분합니다. "
+             "파기 작업이 본문을 비운 신청은 일반 상담으로 셉니다. 종류별 건수는 시험 신청을 뺀 전체 기준이며 다른 조건과 무관합니다.")
+PURGED_SUFFIX = " · 파기 작업이 본문을 비워 AI 패키지 문의인지 알 수 없음"
 # 주제 선택지 — 고객 접수 모듈의 상수 그대로(일반 · AI 슈퍼컴퓨터 · 기업 컨설팅). 여기 따로 적지 않는다.
 TOPIC_CHOICES = tuple(PI.TOPICS) + tuple(PI.FIXED_TOPICS.values()) + tuple(PI.SERVICE_TOPICS)
 # 고객 화면 선택지 — api/customer_surface.SURFACES + 「알 수 없음」(0162 이전 기록 · 머리글 없는 요청 = NULL)
 SURFACE_UNKNOWN = "unknown"
 SURFACE_CHOICES = tuple(customer_surface.SURFACES) + (SURFACE_UNKNOWN,)
 # SQL 판정 — 값은 전부 서버 상수다(입력값이 아니다). COALESCE 로 NULL 본문을 거짓으로 만들어 NOT 이 행을 떨어뜨리지 않게 한다.
-_SERVICE_SQL = "(i.topic IN (%s))" % ", ".join("'%s'" % t for t in PI.SERVICE_TOPICS)
+_SERVICE_SQL = ("(i.topic IN (%s) OR (i.topic = '%s' AND COALESCE(i.message, '') LIKE '%s%%'))"
+                % (", ".join("'%s'" % t for t in PI.SERVICE_TOPICS), AI_PACKAGE_TOPIC, SERVICE_HEAD))
 _PACKAGE_SQL = "(i.topic = '%s' AND COALESCE(i.message, '') LIKE '%s%%')" % (AI_PACKAGE_TOPIC, AI_PACKAGE_HEAD)
 KINDS = {"fixed": "i.fixed_product IS NOT NULL",
          "service": f"(i.fixed_product IS NULL AND {_SERVICE_SQL})",
          "ai_package": f"(i.fixed_product IS NULL AND {_PACKAGE_SQL})",
          "general": f"(i.fixed_product IS NULL AND NOT {_SERVICE_SQL} AND NOT {_PACKAGE_SQL})"}
+# 행 표시용 판정 — 거르기(KINDS)·건수(KIND_COUNT_SQL)와 같은 조건식을 같은 순서로 쓴다. 행은 넷 중 정확히 하나에 들어간다.
+KIND_CASE = ("CASE WHEN %s THEN 'fixed' WHEN %s THEN 'service' WHEN %s THEN 'ai_package' ELSE 'general' END"
+             % (KINDS["fixed"], KINDS["service"], KINDS["ai_package"]))
+# 종류별 건수 — 목록 조건과 무관하게 상태 건수와 같은 범위({where} = 시험 신청만 뺀 전체)를 같은 KINDS 로 센다.
+KIND_COUNT_SQL = ("SELECT " + ", ".join(f"COUNT(*) FILTER (WHERE {KINDS[k]}) AS {k}" for k, _ in INQUIRY_KINDS)
+                  + " FROM purchase_inquiries i WHERE {where}")
 
 
-def inquiry_kind(topic, message=None, fixed_product=None, purged=False):
-    """문의 종류 — KINDS(SQL)와 같은 판정. (key, 라벨).
-    본문이 비워진(보관 기한 경과) 「기타」는 AI 패키지인지 알 수 없다 — 일반 상담으로 세되 라벨에 밝힌다."""
-    if isinstance(fixed_product, dict):
-        return "fixed", KIND_LABEL["fixed"]
-    if topic in PI.SERVICE_TOPICS:
-        return "service", KIND_LABEL["service"]
-    if topic == AI_PACKAGE_TOPIC and (message or "").startswith(AI_PACKAGE_HEAD):
-        return "ai_package", KIND_LABEL["ai_package"]
-    if topic == AI_PACKAGE_TOPIC and purged and not message:
-        return "general", KIND_LABEL["general"] + " · 본문이 비워져 AI 패키지 문의인지 알 수 없음"
-    return "general", KIND_LABEL["general"]
+def inquiry_kind_label(key, topic=None, message=None, purged=False):
+    """행에 붙는 문의 종류 라벨 — 판정(key)은 SQL(KIND_CASE)이 했고 여기서는 글자만 고른다.
+    파기 작업이 본문을 비운 「기타」 신청은 AI 패키지였는지 알 수 없다 — 일반 상담으로 두되 그 사실을 밝힌다."""
+    label = KIND_LABEL.get(key, KIND_LABEL["general"])
+    if key == "general" and topic == AI_PACKAGE_TOPIC and purged and not message:
+        label += PURGED_SUFFIX
+    return label
 
 
 def filter_choices() -> dict:
@@ -134,8 +142,10 @@ def _row(r, full: bool) -> dict:
     gone = expired(r["purge_at"])
     kind_key, kind_label = L.kind(r.get("quote_snapshot"), r.get("configuration_id"), r.get("free_build"),
                                 r.get("fixed_product"))
-    # 문의 종류는 가리기 전 본문으로 판정한다(머리글만 본다 · 본문 자체는 아래 규칙대로만 내보낸다).
-    ik, ik_label = inquiry_kind(r["topic"], r["message"], r.get("fixed_product"), purged=gone)
+    # 문의 종류는 SQL(KIND_CASE · _SELECT 의 inquiry_kind)이 가리기 전 본문으로 판정한 값이다 — 본문 자체는 아래 규칙대로만 내보낸다.
+    # 「알 수 없음」 접미는 파기 작업이 실제로 본문을 비운 행(contact_purged_at)에만 붙는다 — 기한 경과(gone)와는 다른 사실이다(A05).
+    ik = r.get("inquiry_kind") or "general"
+    ik_label = inquiry_kind_label(ik, r["topic"], r["message"], purged=bool(r.get("contact_purged_at")))
     return {
         "inquiry_id": r["inquiry_id"], "inquiry_no": r["inquiry_no"], "at": iso(r["created_at"]),
         "topic": r["topic"], "status": r["status"],
@@ -184,7 +194,7 @@ def _registered(r, full: bool):
 
 
 _SELECT = f"""
-    SELECT i.*, {IS_TEST} AS is_test,
+    SELECT i.*, {IS_TEST} AS is_test, {KIND_CASE} AS inquiry_kind,
            COALESCE(s.product_snapshot->>'name', '새로 구성된 PC · ' || (pc.content->>'title'),
                     i.fixed_product->>'name') AS product_name,
            o.name AS assignee_name, s.product_snapshot AS quote_snapshot,
@@ -241,9 +251,7 @@ def list_inquiries(offset: int = 0, status: str | None = None, include_test: boo
         where.append("i.user_id = :u"); params["u"] = int(visitor[1:])
     w = " AND ".join(where)
     test_w = "TRUE" if include_test else f"NOT {IS_TEST}"
-    # 종류별 건수 — 목록 조건과 무관하게 상태 건수와 같은 범위(시험 신청만 뺀 전체)를 같은 KINDS 로 센다.
-    kind_sql = ("SELECT " + ", ".join(f"COUNT(*) FILTER (WHERE {KINDS[k]}) AS {k}" for k, _ in INQUIRY_KINDS)
-                + f" FROM purchase_inquiries i WHERE {test_w}")
+    kind_sql = KIND_COUNT_SQL.replace("{where}", test_w)
     with engine.connect().execution_options(isolation_level="REPEATABLE READ") as conn:
         rows = conn.execute(text(f"{_SELECT} WHERE {w} ORDER BY i.created_at DESC, i.inquiry_id DESC"
                                  " LIMIT :lim OFFSET :off"), params).mappings().all()
