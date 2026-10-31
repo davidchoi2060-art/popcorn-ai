@@ -1,8 +1,13 @@
 {#
   구매 상담 신청 (ADM-ORD-012 · 가칭) — 2026-10-11 신설
 
-  고객이 지금 고객 화면(mvp3)에서 연락처와 함께 남긴 구매 상담 신청(여러 대 구매 · 할인 ·
-  세금계산서 · 주문 희망)을 보고, 상태(대기 · 처리 중 · 완료) · 담당 · 메모를 남긴다.
+  고객이 고객 화면(/mvp4 등)에서 연락처와 함께 남긴 구매 상담 신청(여러 대 구매 · 할인 · 세금계산서 ·
+  주문 희망 · AI 슈퍼컴퓨터 견적 · 도입 상담 · AI 패키지 · 기업 AI 업무개선 컨설팅)을 보고,
+  상태(대기 · 처리 중 · 완료) · 담당 · 메모를 남긴다.
+  ■ 2026-10-31 관리자단 개선 PR-1: 문의 종류 · 주제 · 고객 화면 거르기와 종류별 건수. 선택지는 서버 응답
+    `filters` 에서만 받는다(화면에 박지 않는다 — 주제가 늘면 서버 상수만 는다). 주소의 kind= · topic= ·
+    surface= 로도 같은 조건으로 연다. 서버가 모르는 값이면 그 세 조건만 빼고 다시 부르며 그 사실을 적는다(다른 조건은 그대로).
+    요청에 순번을 두어 늦게 온 응답이 목록·선택 상자를 덮지 않는다. 종류 칩은 한 번 만들고 제자리에서 갱신한다(초점 유지).
   데이터 = `GET /api/admin/purchase-inquiries` · 저장 `PUT /api/admin/purchase-inquiries/{id}`
   (`api/admin_purchase_inquiries.py` — 개인정보 규칙은 그 파일 docstring).
 
@@ -31,6 +36,9 @@
 .pi-chip{display:inline-block;border:1px solid var(--rv-dim3);border-radius:10px;padding:0 7px;margin:0 3px 3px 0;font-size:12px;color:var(--rv-ink-soft);background:var(--rv-canvas)}
 .pi-chip.flag{border-color:var(--rv-amber-line);background:var(--rv-amber-bg);color:var(--rv-ink)}
 .pi-chip.bad{border-color:var(--rv-red);color:var(--rv-red)}
+.pi-kinds{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--rv-ink-soft)}
+.pi-kinds button.pi-chip{font:inherit;font-size:12px;cursor:pointer}
+.pi-kinds button.pi-chip[aria-pressed="true"]{border-color:var(--rv-ink-soft);background:var(--rv-panel)}
 .pi-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--rv-ink-soft)}
 .pi-bar label{display:flex;gap:6px;align-items:center;cursor:pointer}
 .pi-bar select{font:inherit;border:1px solid var(--rv-dim3);border-radius:6px;padding:3px 6px;background:var(--rv-card);color:var(--rv-ink)}
@@ -79,11 +87,17 @@
     <div class="pi-kpi"><b id="kDoing">—</b><span>처리 중</span></div>
     <div class="pi-kpi"><b id="kDone">—</b><span>완료</span></div>
   </section>
+  <div class="pi-kinds" id="piKinds" role="group" aria-label="문의 종류별 건수"></div>
   <div id="piRawNotice"></div>
   <p class="pi-note" id="piNote">고객이 상담 화면에서 연락처와 함께 남긴 신청입니다. 연락처는 개인정보이므로 처리에만 씁니다.</p>
+  <p class="pi-note" id="piKindNote"></p>
+  <p class="pi-note" id="piUrlNote" aria-live="polite"></p>
   <p class="pi-note" id="piVisitor" aria-live="polite"></p>
   <div class="pi-bar">
     <label>상태 <select id="piStatus"><option value="">전체</option><option>대기</option><option>처리 중</option><option>완료</option></select></label>
+    <label>문의 종류 <select id="piKind"><option value="">전체</option></select></label>
+    <label>주제 <select id="piTopic"><option value="">전체</option></select></label>
+    <label>고객 화면 <select id="piSurface"><option value="">전체</option></select></label>
     <label>연결 <select id="piLink"><option value="">전체</option><option value="quote">보관 견적</option><option value="config">새로 구성된 PC</option><option value="none">연결 자료 없음</option></select></label>
     <label>보관 기한 <select id="piDue"><option value="">전체</option><option value="soon">곧 지남</option><option value="expired">지남</option></select></label>
     <label><input type="checkbox" id="piTest"> 시험 신청 포함</label>
@@ -111,8 +125,13 @@
 <script>
 (function(){
   var API = '/api/admin/purchase-inquiries';
+  var SEL = {kind:'piKind', topic:'piTopic', surface:'piSurface'};
   var st = {offset:0, limit:50, picked:null, canWrite:false,
-            visitor: /^#u\d{1,12}$/.test(location.hash) ? location.hash.slice(1) : null};
+            visitor: /^#u\d{1,12}$/.test(location.hash) ? location.hash.slice(1) : null,
+            // 주소로 받은 거르기 조건 — 선택지가 서버에서 오기 전까지만 여기서 읽는다(첫 응답이 선택 상자로 옮긴다)
+            fromUrl: (function(){ var u=new URLSearchParams(location.search);
+              var o={kind:u.get('kind'), topic:u.get('topic'), surface:u.get('surface')};
+              return (o.kind||o.topic||o.surface) ? o : null; })()};
   var $ = function(id){ return document.getElementById(id); };
   function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
   function won(n){ return n==null ? '—' : Number(n).toLocaleString('ko-KR')+'원'; }
@@ -125,15 +144,59 @@
     if ($('piStatus').value) p.push('status='+encodeURIComponent($('piStatus').value));
     if ($('piLink').value) p.push('link='+encodeURIComponent($('piLink').value));
     if ($('piDue').value) p.push('due='+encodeURIComponent($('piDue').value));
+    Object.keys(SEL).forEach(function(k){ var v=$(SEL[k]).value||(st.fromUrl&&st.fromUrl[k])||''; if (v) p.push(k+'='+encodeURIComponent(v)); });
     if ($('piTest').checked) p.push('include_test=true');
     if (st.visitor) p.push('visitor='+encodeURIComponent(st.visitor));
     return '?'+p.join('&');
   }
   function emptyRow(msg){ var b=$('piRows'); b.textContent=''; var tr=el('tr'); var td=el('td','pi-empty',msg); td.colSpan=7; tr.appendChild(td); b.appendChild(tr); }
+  function addOpt(sel, value, label){ var o=document.createElement('option'); o.value=value; o.textContent=label; sel.appendChild(o); }
+  function fillFilters(d){
+    // 선택지는 서버가 준다(filters). 처음 한 번만 채우고, 서버가 받아들인 조건을 선택 상자에 되돌린다 — 주소로 연 조건도 여기서 자리를 잡는다.
+    var f=d.filters||{}, kindSel=$('piKind'), topicSel=$('piTopic'), surfSel=$('piSurface');
+    if (kindSel.options.length===1) (f.kinds||[]).forEach(function(k){ addOpt(kindSel,k.key,k.label); });
+    if (topicSel.options.length===1) (f.topics||[]).forEach(function(t){ addOpt(topicSel,t,t); });
+    if (surfSel.options.length===1) (f.surfaces||[]).forEach(function(s){ addOpt(surfSel,s.key,s.label); });
+    // 주소로 연 조건은 첫 응답에서만 선택 상자로 옮긴다 — 그 뒤 응답은 사용자가 바꾼 선택을 덮지 않는다.
+    if (st.fromUrl){ kindSel.value=d.kind||''; topicSel.value=d.topic||''; surfSel.value=d.surface||''; st.fromUrl=null; }
+    // 종류 칩은 처음 한 번만 만들고 제자리에서 글자·눌림만 갱신한다 — 키보드 초점이 응답마다 사라지지 않게.
+    var ks=$('piKinds');
+    (f.kinds||[]).forEach(function(k){
+      var n=(d.kind_counts&&d.kind_counts[k.key]!=null)?d.kind_counts[k.key]:'—';
+      var btn=ks.querySelector('button[data-k="'+k.key+'"]');
+      if (!btn){
+        btn=el('button','pi-chip'); btn.type='button'; btn.setAttribute('data-k',k.key);
+        btn.addEventListener('click',function(){ kindSel.value=(kindSel.value===k.key?'':k.key); $('piUrlNote').textContent=''; st.offset=0; load(); });
+        ks.appendChild(btn);
+      }
+      btn.textContent=k.label+' '+n;
+      btn.setAttribute('aria-pressed', d.kind===k.key?'true':'false');
+      btn.title=d.kind===k.key?'이 종류만 보는 중 · 다시 누르면 전체':'이 종류만 보기';
+    });
+    $('piKindNote').textContent=d.kind_note||'';
+  }
+  function dropUrlFilters(){
+    // 주소에서 문의 종류·주제·고객 화면만 지운다 — status= 와 #u방문자 해시는 그대로 둔다(그 조건은 계속 적용된다).
+    var u=new URLSearchParams(location.search); Object.keys(SEL).forEach(function(k){ u.delete(k); });
+    var q=u.toString(); history.replaceState(null,'',location.pathname+(q?'?'+q:'')+location.hash);
+  }
+  var seq = 0;
   function load(){
-    fetch(API+qs()).then(function(r){ if(!r.ok) throw new Error('신청 목록을 불러오지 못했습니다'); return r.json(); })
+    var my = ++seq;                        // 늦게 온 응답은 버린다 — 선택을 바꾼 뒤 옛 요청이 목록·선택 상자를 덮지 않게
+    fetch(API+qs()).then(function(r){
+      if (my!==seq) return null;
+      if (r.ok) return r.json();
+      if (r.status===400 && st.fromUrl){   // 주소의 문의 종류·주제·고객 화면 조건을 서버가 모른다 — 그 셋만 빼고 다시 부른다
+        st.fromUrl=null; dropUrlFilters();
+        $('piUrlNote').textContent='주소에 적힌 문의 종류 · 주제 · 고객 화면 조건을 알 수 없어 빼고 봅니다. 상태 · 방문자 조건은 그대로입니다.';
+        load(); return null;
+      }
+      throw new Error('신청 목록을 불러오지 못했습니다');
+    })
     .then(function(d){
+      if (!d || my!==seq) return;
       st.limit=d.limit; st.canWrite=d.can_write;
+      fillFilters(d);
       $('kWait').textContent=d.counts['대기']; $('kDoing').textContent=d.counts['처리 중']; $('kDone').textContent=d.counts['완료'];
       $('piTestNote').textContent=d.include_test?'':(d.test_excluded?'시험 신청 '+d.test_excluded+'건을 뺐습니다.':'');
       $('piRawNotice').innerHTML=RawText.notice(d.raw_notice);
@@ -145,7 +208,11 @@
         var all=el('a',null,'전체 보기'); all.href='#'; all.addEventListener('click',function(ev){ ev.preventDefault(); history.replaceState(null,'',location.pathname); st.visitor=null; st.offset=0; load(); });
         vf.appendChild(all);
       }
-      if (!d.items.length){ emptyRow('아직 구매 상담 신청이 없습니다.'); }
+      if (!d.items.length){
+        // 상태 건수(시험 제외 전체)가 0 이면 정말 없는 것이고, 아니면 지금 조건에 맞는 것이 없는 것이다 — 칩의 전체 건수와 모순되지 않게.
+        var any=(d.counts['대기']||0)+(d.counts['처리 중']||0)+(d.counts['완료']||0);
+        emptyRow(any ? '조건에 맞는 신청이 없습니다.' : '아직 구매 상담 신청이 없습니다.');
+      }
       else {
         var b=$('piRows'); b.textContent='';
         d.items.forEach(function(it){
@@ -153,7 +220,7 @@
           if (st.picked===it.inquiry_id) tr.setAttribute('aria-selected','true');
           tr.appendChild(el('td','pi-at',when(it.at)));
           tr.appendChild(el('td',null,it.inquiry_no+(it.test?' (시험)':'')));
-          tr.appendChild(el('td',null,it.topic));
+          var tc=el('td',null,it.topic); tc.appendChild(el('span','pi-sub',it.inquiry_kind_label||'')); tr.appendChild(tc);
           tr.appendChild(el('td',null,contact(it)));
           var pc=el('td',it.product_name||it.product_code?null:'pi-muted',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));
           pc.appendChild(el('span','pi-sub',it.surface_label+' · '+it.kind_label+(it.handoff_no?' · 팝콘PC 이동 '+it.handoff_no:'')));
@@ -167,7 +234,7 @@
       var from=d.total?d.offset+1:0, to=d.offset+d.items.length;
       $('piPage').textContent='전체 '+d.total+'건 중 '+from+'–'+to;
       $('piPrev').disabled=d.offset<=0; $('piNext').disabled=to>=d.total;
-    }).catch(function(e){ emptyRow(e.message); });
+    }).catch(function(e){ if (my===seq) emptyRow(e.message); });
   }
   function line(b, label, value){ b.appendChild(el('span','pi-lbl',label)); b.appendChild(el('p','pi-say',value||'—')); }
   function open(it){
@@ -177,6 +244,7 @@
     var b=$('piDBody'); b.textContent='';
     line(b,'신청 시각',when(it.at));
     line(b,'신청 화면',it.surface_label);
+    line(b,'문의 종류',it.inquiry_kind_label);
     line(b,'연락처 (신청 당시)',contact(it));
     line(b,'문의 내용',it.message||(it.contact_purged?'보관 기간 지남':'적지 않음'));
     line(b,'상품',it.product_name||(it.product_code?'상품 '+it.product_code:'없음'));
@@ -251,7 +319,7 @@
   // 「운영 현황」 카드처럼 주소에 status= 가 오면 같은 조건으로 연다(목록에 있는 값만 받는다).
   (function(){ var v=new URLSearchParams(location.search).get('status'); var sel=$('piStatus');
     if (v && Array.prototype.some.call(sel.options,function(o){ return o.value===v; })) sel.value=v; })();
-  ['piStatus','piLink','piDue','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ st.offset=0; load(); }); });
+  ['piStatus','piKind','piTopic','piSurface','piLink','piDue','piTest'].forEach(function(id){ $(id).addEventListener('change',function(){ $('piUrlNote').textContent=''; st.offset=0; load(); }); });
   $('piPrev').addEventListener('click',function(){ st.offset=Math.max(0,st.offset-st.limit); load(); });
   $('piNext').addEventListener('click',function(){ st.offset+=st.limit; load(); });
   load();
