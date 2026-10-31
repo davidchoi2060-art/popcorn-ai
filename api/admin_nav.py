@@ -333,6 +333,13 @@
     뜬다(화면 49 / LNB 46). **이 화면 때문이 아니다** — 넣기 전에도 48 / 45 로 셋이
     떠 있었다(메뉴에 안 붙은 화면이 이 화면 말고도 셋 더 있다는 뜻이다). 이번
     작업의 담당 밖이라 건드리지 않았고, 사실만 여기 적는다.
+
+■ 「AI 슈퍼컴퓨터 표시 정보」 항목 신설 + href 연결 (2026-10-31, 12차 — 상품관리 그룹 · 관리자단 개선 PR-2)
+  화면 ID `ADM-PRD-060`(가칭), 경로 `/admin2/ai-device-profiles`(`api/admin_ui_ai_device_profiles.py`).
+  데이터 API `api/admin_ai_device_profiles.py`(GET/PUT)는 2026-10-20 카테고리 확장(0166) 때 생겼는데
+  화면이 없어 운영자가 고객 표시 정보(제조사 · 가속기 · 메모리 · 사진 · 진열 순위)를 고칠 수 없었다.
+  위치는 「판매 상품 용도 매트릭스」 다음 — 같은 «판매 상품의 고객 표시» 축이다. `total` 이 하나 는다.
+  확인법: `.venv/Scripts/python -c "from api.admin_nav import counts; print(counts())"`.
 """
 
 # 그룹: (제목, 아이콘, [항목])
@@ -356,6 +363,10 @@ NAV = [
         # 격자 자체가 상품 조합(견적 카드)이라 상품관리 소관이 더 맞다는 판단.
         # 2026-09-25 재설계 — 판매 중인 몰 조립PC 를 용도·단계 x 가격대에 표시(사장님 승인)
         ("판매 상품 용도 매트릭스", "/admin2/product-fit", "몰 조립PC 용도별 적합성 조회"),
+        # 2026-10-31 관리자단 개선 PR-2(ADM-PRD-060 · 가칭) — AI 슈퍼컴퓨터 카테고리 상품의 고객 표시 정보(0166).
+        #   API(api/admin_ai_device_profiles.py)는 2026-10-20 부터 있었고 화면이 없어 운영자가 고칠 수 없었다.
+        ("AI 슈퍼컴퓨터 표시 정보", "/admin2/ai-device-profiles",
+         "신설(ADM-PRD-060 · 가칭) 2026-10-31 — 고객 표시 정보 · 사진 · 진열 순위"),
         ("상품 매트릭스 관리", "/admin2/grid", "사전 생성 견적 격자 조회(구 「격자 관리」)"),
         ("용도별 상품 매트릭스", "/admin2/game-matrix", "게임·AI 작업이 성립하는 격자 칸 조회(구 「게임·AI 연계 매트릭스」)"),
         ("삭제 상품 조회", "/admin2/deleted-products", None),   # 2026-09-14 사장님 지시 — 그룹 맨 아래로 이동
@@ -593,7 +604,7 @@ def new_admin_nav(current_path=''):
         ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
-        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import')),
+        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/ai-device-profiles')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries', '/admin2/retention', '/admin2/payment-records')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members', '/admin2/member-reviews')),
