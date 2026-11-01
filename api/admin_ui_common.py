@@ -25,12 +25,21 @@ TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 
-def env_label(request: Request) -> str:
-    """헤더의 환경 표시 — 접속 주소로만 판정한다(2026-11-01 관리자 재설계 명세 §2).
+ENV_LABELS = {"prod": "운영 환경", "production": "운영 환경", "staging": "검수 환경",
+              "dev": "개발 환경", "development": "개발 환경", "local": "로컬 개발"}
 
-    운영 화면을 개발 환경으로 잘못 표시하지 않는 것이 요구라, 판정이 확실한 셋만 이름을 준다.
-    모르는 주소는 빈 문자열(표시 안 함)이다 — 지어내지 않는다.
+
+def env_label(request: Request) -> str:
+    """헤더의 환경 표시(2026-11-01 관리자 재설계 명세 §2 「실제 환경명을 서버 설정에서 표시」).
+
+    ① 서버 설정 `POPCORN_ENV`(prod · staging · dev · local)가 있으면 그것이 정본이다.
+    ② 설정이 없을 때만 접속 주소로 판정한다 — 판정이 확실한 셋만 이름을 준다.
+    모르는 값·주소는 빈 문자열(표시 안 함)이다. 운영 화면을 개발 환경으로 잘못 표시하지 않는다.
     """
+    import os
+    configured = os.environ.get("POPCORN_ENV", "").strip().lower()
+    if configured:
+        return ENV_LABELS.get(configured, "")
     host = (request.url.hostname or "").lower()
     if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost"):
         return "로컬 개발"

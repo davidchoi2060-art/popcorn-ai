@@ -99,5 +99,23 @@ class ProductsRedesignTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
 
 
+class EnvLabelConfigTests(unittest.TestCase):
+    def test_server_setting_wins_over_host(self):
+        import os
+        from unittest import mock
+        from starlette.requests import Request
+        from api.admin_ui_common import env_label
+
+        def req(host):
+            return Request(dict(type="http", method="GET", path="/admin2/", raw_path=b"/admin2/", query_string=b"",
+                                headers=[(b"host", host.encode())], scheme="https", server=(host, 443), root_path=""))
+        with mock.patch.dict(os.environ, {"POPCORN_ENV": "prod"}):
+            self.assertEqual(env_label(req("dev.popcornai.co.kr")), "운영 환경")
+        with mock.patch.dict(os.environ, {"POPCORN_ENV": "unknown-x"}):
+            self.assertEqual(env_label(req("dev.popcornai.co.kr")), "")
+        with mock.patch.dict(os.environ, {"POPCORN_ENV": ""}):
+            self.assertEqual(env_label(req("dev.popcornai.co.kr")), "개발 환경")
+
+
 if __name__ == "__main__":
     unittest.main()
