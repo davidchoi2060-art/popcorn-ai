@@ -457,8 +457,11 @@ body[data-admin-shell=simple] .a2-lnb-toggle:focus-visible{outline:3px solid var
 body[data-admin-shell=simple] .a2-lnb-toggle{border-color:var(--sn-line);color:var(--sn-muted);background:var(--sn-card)}
 body[data-admin-shell=simple] .a2-lnb-toggle:hover{color:var(--sn-ink);border-color:var(--sn-muted)}
 body[data-admin-shell=simple] .a2-lnb.collapsed .a2-sn-top .a2-t{display:none}
+/* 접힘 — 메뉴 칸(.a2-lnb-scroll)에는 글자 배율이 곱해져 실제 폭이 64px ÷ 배율이다. 항목 폭을 고정 px 로 두면
+   칸보다 넓어져 가로 스크롤 막대가 생긴다(2026-11-01 개발 서버 실측) — 칸 폭 기준으로 잡고 가로 넘침을 막는다. */
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-lnb-scroll{overflow-x:hidden}
 body[data-admin-shell=simple] .a2-lnb.collapsed .a2-lnb-g,
-body[data-admin-shell=simple] .a2-lnb.collapsed .a2-sn-top{justify-content:center;width:44px;margin:2px 10px;padding:10px 0}
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-sn-top{justify-content:center;width:calc(100% - 12px);margin:2px 6px;padding:10px 0}
 /* 헤더 — 높이 64px 목표(52px × 배율 근사) · 환경 표시 */
 body[data-admin-shell=simple] .a2-hd{min-height:56px;background:var(--sn-card);border-bottom-color:var(--sn-line)}
 .a2-hd .a2-env{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;
