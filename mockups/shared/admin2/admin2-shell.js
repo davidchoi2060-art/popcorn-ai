@@ -41,7 +41,15 @@
   }
   function initLnb() {
     if (!lnb) return;
-    try { collapsed = sessionStorage.getItem(LNB_COLLAPSE_KEY) === '1'; } catch (e) { collapsed = false; }
+    var saved = null;
+    try { saved = sessionStorage.getItem(LNB_COLLAPSE_KEY); } catch (e) { saved = null; }
+    collapsed = saved === '1';
+    // 2026-11-01 재설계 명세 §5 — 1024px 이하(좁은 화면 서랍 구간 위)에서는 처음에 접어 목록 폭을
+    // 확보한다. 운영자가 직접 펼치거나 접은 선택(saved)이 있으면 그것을 따른다.
+    if (saved === null && document.body.getAttribute('data-admin-shell') === 'simple' &&
+        window.matchMedia && window.matchMedia('(min-width:769px) and (max-width:1024px)').matches) {
+      collapsed = true;
+    }
     applyCollapse();
     var closed = readClosed();
     lnb.querySelectorAll('.a2-lnb-grp').forEach(function (g) {
@@ -72,7 +80,9 @@
   function initMobileLnb() {
     var button = document.getElementById('lnbMobileToggle');
     var menu = document.getElementById('lnbMenu');
-    if (!lnb || !button || !menu || document.body.getAttribute('data-admin-mode') !== 'new') return;
+    // 2026-11-01 기본 모드 재설계 셸(data-admin-shell=simple)도 같은 좁은 화면 서랍을 쓴다.
+    if (!lnb || !button || !menu) return;
+    if (document.body.getAttribute('data-admin-mode') !== 'new' && document.body.getAttribute('data-admin-shell') !== 'simple') return;
     var media = window.matchMedia('(max-width:768px)');
     var mobileOpen = false;
     function applyMobile() {
@@ -119,6 +129,17 @@
       if (toggle) { toggleCollapse(); return; }
       var grp = ev.target.closest('[data-action="lnb-group"]');
       if (grp) { toggleGroup(grp); }
+      // 「고급 관리」 접기(2026-11-01 재설계) — 펼침 여부는 기억하지 않는다. 지금 화면이
+      // 고급 관리에 있으면 서버가 펼친 채로 그린다(템플릿 `advanced_active`).
+      var adv = ev.target.closest('[data-action="lnb-advanced"]');
+      if (adv) {
+        var box = document.getElementById(adv.getAttribute('aria-controls'));
+        if (box) {
+          var open = adv.getAttribute('aria-expanded') === 'true';
+          adv.setAttribute('aria-expanded', String(!open));
+          box.hidden = open;
+        }
+      }
     });
     initLnb();
     initMobileLnb();

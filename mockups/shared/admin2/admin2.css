@@ -409,3 +409,75 @@ details.a2-more[open]>summary{margin-bottom:8px}
 .a2-hd a.a2-crumb:hover{text-decoration:underline}
 .a2-hd a.a2-crumb:focus-visible{outline:3px solid var(--rv-link);outline-offset:2px}
 .a2-entries{display:flex;flex-wrap:wrap;gap:8px}
+
+/* ── 관리자 재설계 셸 (2026-11-01 · Codex 확정안 「1번 기본」 · 기본 모드 전용) ──────────────
+   `body[data-admin-shell=simple]` 에만 건다 — 신 관리자 모드와 셸 밖 화면은 그대로다.
+   명세 §2: 좌측 224px · 밝은 메뉴 · 강조 초록 · 본문 16px 기준. `.a2-lnb-scroll`·`.a2-main` 은
+   위 §글자 배율(--a2-zoom)이 이미 곱해지므로 글자 값은 «목표 ÷ 배율»에 가깝게 적는다
+   (14px × 1.15 ≈ 16px · 12.5px × 1.15 ≈ 14.4px). 색은 이 블록의 토큰 한 곳에만 둔다. */
+body[data-admin-shell=simple]{
+  --sn-bg:#F7F4EE; --sn-card:#FFFFFF; --sn-ink:#26231E; --sn-muted:#6B6760; --sn-line:#E5E2DC;
+  --sn-accent:#007D65; --sn-accent-bg:#E7F3EF; --sn-warn:#B45309; --sn-warn-bg:#FFF4E5; --sn-fail:#B42318;
+}
+body[data-admin-shell=simple] .a2-lnb{width:224px;background:var(--sn-card);color:var(--sn-ink);
+  border-right:1px solid var(--sn-line);padding:18px 0 12px}
+body[data-admin-shell=simple] .a2-lnb.collapsed{width:64px}
+body[data-admin-shell=simple] .a2-lnb-brand{color:var(--sn-ink);font:800 17px/1 var(--font);padding:0 20px 18px}
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-lnb-brand{padding:0 0 18px}
+body[data-admin-shell=simple] .a2-lnb-grp{border-bottom:0}
+body[data-admin-shell=simple] .a2-lnb-g,
+body[data-admin-shell=simple] .a2-sn-top{display:flex;align-items:center;gap:11px;width:calc(100% - 20px);margin:2px 10px;
+  padding:10px 12px;border:0;border-radius:8px;background:none;color:var(--sn-ink);
+  font:600 14px/1.25 var(--font);text-decoration:none;cursor:pointer;text-align:left}
+body[data-admin-shell=simple] .a2-lnb-g:hover,
+body[data-admin-shell=simple] .a2-sn-top:hover{background:var(--sn-bg);color:var(--sn-ink)}
+body[data-admin-shell=simple] .a2-lnb-g.on,
+body[data-admin-shell=simple] .a2-sn-top.on{background:var(--sn-accent-bg);color:var(--sn-accent)}
+body[data-admin-shell=simple] .a2-lnb-g .a2-gi,
+body[data-admin-shell=simple] .a2-sn-top .a2-gi{flex:none;width:20px;height:20px;background:none;display:flex;align-items:center;justify-content:center}
+body[data-admin-shell=simple] .a2-gi img{width:18px;height:18px;filter:none;opacity:.8}
+body[data-admin-shell=simple] .a2-sn-top .a2-t{flex:1;min-width:0}
+body[data-admin-shell=simple] .a2-lnb-g .a2-x{font-size:9px;color:var(--sn-muted)}
+body[data-admin-shell=simple] .a2-lnb-b{padding:2px 0 8px}
+body[data-admin-shell=simple] .a2-lnb-b a{display:block;margin:1px 10px 1px 22px;padding:8px 12px 8px 21px;border-left:2px solid transparent;
+  border-radius:0 6px 6px 0;color:var(--sn-muted);font:500 12.5px/1.4 var(--font);text-decoration:none}
+body[data-admin-shell=simple] .a2-lnb-b a:hover{color:var(--sn-ink);background:var(--sn-bg)}
+body[data-admin-shell=simple] .a2-lnb-b a.on{color:var(--sn-accent);background:var(--sn-accent-bg);border-left-color:var(--sn-accent);font-weight:700}
+body[data-admin-shell=simple] .a2-sn-adv{display:flex;align-items:center;gap:6px;width:calc(100% - 32px);margin:6px 10px 2px 22px;
+  padding:7px 12px 7px 21px;border:0;border-top:1px dashed var(--sn-line);background:none;color:var(--sn-muted);
+  font:600 11.5px/1.3 var(--font);cursor:pointer;text-align:left}
+body[data-admin-shell=simple] .a2-sn-adv:hover{color:var(--sn-ink)}
+body[data-admin-shell=simple] .a2-sn-adv .a2-sn-n{font:500 10.5px/1 var(--font-num);padding:2px 5px;border-radius:9px;background:var(--sn-bg)}
+body[data-admin-shell=simple] .a2-sn-adv .a2-x{margin-left:auto;font-size:8px;transition:transform .15s ease}
+body[data-admin-shell=simple] .a2-sn-adv[aria-expanded=false] .a2-x{transform:rotate(-90deg)}
+body[data-admin-shell=simple] .a2-sn-advb[hidden]{display:none}
+body[data-admin-shell=simple] .a2-lnb-g:focus-visible,body[data-admin-shell=simple] .a2-sn-top:focus-visible,
+body[data-admin-shell=simple] .a2-lnb-b a:focus-visible,body[data-admin-shell=simple] .a2-sn-adv:focus-visible,
+body[data-admin-shell=simple] .a2-lnb-toggle:focus-visible{outline:3px solid var(--sn-accent);outline-offset:-2px}
+body[data-admin-shell=simple] .a2-lnb-toggle{border-color:var(--sn-line);color:var(--sn-muted);background:var(--sn-card)}
+body[data-admin-shell=simple] .a2-lnb-toggle:hover{color:var(--sn-ink);border-color:var(--sn-muted)}
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-sn-top .a2-t{display:none}
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-lnb-g,
+body[data-admin-shell=simple] .a2-lnb.collapsed .a2-sn-top{justify-content:center;width:44px;margin:2px 10px;padding:10px 0}
+/* 헤더 — 높이 64px 목표(52px × 배율 근사) · 환경 표시 */
+body[data-admin-shell=simple] .a2-hd{min-height:56px;background:var(--sn-card);border-bottom-color:var(--sn-line)}
+.a2-hd .a2-env{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border-radius:999px;
+  font:600 11px/1 var(--font);background:#E7F3EF;color:#007D65}
+.a2-hd .a2-env::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.a2-hd .a2-env[data-env="운영 환경"]{background:#FDECEA;color:#B42318}
+@media (prefers-reduced-motion:reduce){body[data-admin-shell=simple] .a2-lnb{transition:none}}
+/* 좁은 화면 — 메뉴 단추 + 서랍(신 관리자 모드와 같은 동작) */
+@media(max-width:768px){
+  body[data-admin-shell=simple] .a2-lnb{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;
+    gap:0;width:100%;min-height:54px;max-height:none;padding:0 12px;transition:none;border-right:0;border-bottom:1px solid var(--sn-line)}
+  body[data-admin-shell=simple] .a2-lnb-brand{padding:0;min-width:0;line-height:1.2;text-align:left}
+  body[data-admin-shell=simple] .a2-lnb-mobile-toggle{display:inline-flex;align-items:center;justify-content:center;
+    min-height:calc(44px / var(--a2-zoom));margin:calc(5px / var(--a2-zoom)) 0;padding:8px 12px;background:var(--sn-card);color:var(--sn-ink);
+    border:1px solid var(--sn-line);border-radius:6px;cursor:pointer;font:600 var(--pc-text-standard)/1.2 var(--font);zoom:var(--a2-zoom)}
+  body[data-admin-shell=simple] .a2-lnb-mobile-toggle:focus-visible{outline:3px solid var(--sn-accent);outline-offset:2px}
+  body[data-admin-shell=simple] .a2-lnb-scroll{grid-column:1/-1;min-height:0;max-height:calc(60dvh / var(--a2-zoom));overflow-y:auto}
+  body[data-admin-shell=simple] .a2-lnb-scroll[hidden]{display:none}
+  body[data-admin-shell=simple] .a2-lnb-toggle{display:none}
+  body[data-admin-shell=simple] .a2-hd{padding:6px 12px;gap:6px;min-width:0}
+  body[data-admin-shell=simple] .a2-hd .a2-roles{max-width:100%;overflow-wrap:anywhere;line-height:1.3}
+}

@@ -25,7 +25,7 @@ NAV = ROOT / 'api/admin_nav.py'
 # 2026-10-11: 신 관리자 「회원 관리」 묶음에 「후기 관리」(/admin2/member-reviews) 추가로 기대 지문 갱신
 # 2026-10-18 관리자 정리 기획 A05: NAV 「인계 · 성과」에 「보관 기한 · 파기 이력」, 「주문 운영」 경로에
 # /admin2/retention 을 더해 갱신(CI 의 Python 3.12 로 계산). 기존 경로 동작은 위 subTest 가 그대로 대조한다.
-NAV_BASELINE_AST_SHA = '38675ce6247bcb875a144b0942c3653253b0a4077152718d2606d6b46e7d9945'
+NAV_BASELINE_AST_SHA = '8cd8365be802adf7215f7ba278a2898beb35d66baf7652e50c17bef55e27a4ec'  # 2026-11-01 관리자 재설계: SIMPLE_MENU · simple_nav() 추가(NAV 불변)
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'
