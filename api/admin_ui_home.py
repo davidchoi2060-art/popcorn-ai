@@ -389,6 +389,61 @@ def _recent_logs(dash: dict | None) -> list:
     return out
 
 
+# ── 「오늘 할 일」(2026-11-01 관리자 재설계 · Codex 확정안 §3) ────────────────────────────
+# 첫 화면 맨 위 세 줄. 숫자는 새로 세지 않고 각 업무 화면이 이미 쓰는 기준을 그대로 쓴다.
+#   상담 신청 확인   purchase_inquiries 「대기」 · 시험 신청 제외 — admin_home_overview._counts()
+#   가격 검토 대기   admin_dashboard.worklist() 의 price
+#   상품 사양 검수   admin_dashboard.worklist() 의 review
+# 링크는 그 화면이 이미 받는 조건만 붙인다(구매 상담 신청은 `?status=대기` 를 읽는다).
+# 상태는 셋으로 가른다 — ok(건수) · zero(0건 · 처리할 것 없음) · error(조회 실패 — 0으로 쓰지 않는다).
+TODAY_ROWS = (
+    ("inquiry", "상담 신청 확인", "새로 들어온 구매 상담 신청에 연락하고 처리 상태를 남깁니다.",
+     "/admin2/purchase-inquiries?status=대기", "대기 중인 신청"),
+    ("price", "가격 검토 대기", "판매가가 없어 팔 수 없는 상품의 첫 판매가를 정합니다.",
+     "/admin2/price-review", "판매가 없는 상품"),
+    ("review", "상품 사양 검수", "비어 있거나 확인이 필요한 사양 값을 확인해 반영합니다.",
+     "/admin2/reviews", "검수 대기 사양"),
+)
+
+QUICK_LINKS = (
+    ("상품 찾기", "상품을 검색하고 상세 정보를 확인합니다.", "/admin2/products"),
+    ("상품 등록", "새 상품 한 개를 등록합니다.", "/admin2/product-new"),
+    ("상담 신청 확인", "구매 상담 신청 목록을 엽니다.", "/admin2/purchase-inquiries"),
+)
+
+
+def _today_rows(counts: dict | None, err_counts, wl: dict | None, err_wl) -> list:
+    by_key = {i["key"]: i for i in (wl or {}).get("items", [])}
+    out = []
+    for key, name, why, href, unit in TODAY_ROWS:
+        if key == "inquiry":
+            value, err = (None if counts is None else counts.get("inquiry_wait")), err_counts
+        else:
+            src = by_key.get(key)
+            value, err = (None if src is None else src.get("count")), err_wl
+        if value is None:
+            # 줄 안에는 짧게 적고, 원인(조회 실패 종류)은 화면 위 안내 상자와 title 로 보인다.
+            state, shown, msg = "error", "—", "건수를 불러오지 못했습니다"
+        elif value == 0:
+            state, shown, msg = "zero", "0", "처리할 항목이 없습니다"
+        else:
+            state, shown, msg = "ok", f"{value:,}", None
+        out.append({"key": key, "name": name, "why": why, "href": href, "unit": unit,
+                    "state": state, "value": shown, "msg": msg,
+                    "reason": (err or "") if state == "error" else ""})
+    return out
+
+
+def _today_logs():
+    from . import admin_home_overview as OV
+    return OV._recent_logs(5)
+
+
+def _today_counts():
+    from . import admin_home_overview as OV
+    return OV._counts()
+
+
 @router.get("", response_class=HTMLResponse)
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
@@ -416,11 +471,14 @@ def home(request: Request) -> HTMLResponse:
 
     work_items, active_total = _work_items(wl)
     errors = [e for e in (err_dash, err_quality, err_funnel, err_worklist, err_mall_sync) if e]
+    today_counts, err_today_counts = _safe("상담 신청 대기", _today_counts)
+    today_logs, err_today_logs = _safe("최근 작업", _today_logs)
 
     return render(
         request, "admin/home.html.j2",
         screen_id="ADM-DASH-010", domain="dashboard",
-        crumb_group="대시보드", crumb_now="대시보드",
+        crumb_group="홈", crumb_now="오늘 할 일",
+        page_intro=None,  # 제목·설명은 본문 「오늘 할 일」 머리가 맡는다(2026-11-01 재설계)
         generated_at=datetime.now(KST).strftime("%H:%M"),
         errors=errors,
         work_items=work_items,
@@ -432,4 +490,8 @@ def home(request: Request) -> HTMLResponse:
         logs=_recent_logs(dash),
         dash_error=err_dash,
         mall_sync=_mall_sync_view(mall_sync, err_mall_sync),
+        today_rows=_today_rows(today_counts, err_today_counts, wl, err_worklist),
+        quick_links=[{"name": n, "desc": d, "href": h} for n, d, h in QUICK_LINKS],
+        today_logs=today_logs or [],
+        today_logs_error=err_today_logs,
     )

@@ -18,7 +18,7 @@
 #}
 {% extends "admin/_admin2_shell.html.j2" %}
 
-{% block title %}대시보드{% endblock %}
+{% block title %}오늘 할 일{% endblock %}
 
 {% block head_extra %}
 <style>
@@ -117,6 +117,67 @@
 .dash-time{font-family:var(--font-num)}
 .dash-foot{flex:none;border-top:1px solid rgba(0,0,0,.09);background:var(--container);
        padding:8px 18px;font:400 10px/1.5 var(--font);color:var(--rv-faint)}
+
+/* ── 오늘 할 일(2026-11-01 관리자 재설계 · Codex 확정안 §3) ──────────────────────────
+   먼저 확인할 일(약 2/3) + 자주 하는 작업(약 1/3) → 최근 작업 → 상태 확인 → 운영 지표(접힘).
+   색은 셸이 body 에 둔 --sn-* 토큰을 읽는다(이 파일에서 다시 선언하지 않는다). */
+.td-wrap{display:flex;flex-direction:column;gap:20px;padding:24px 28px 28px;background:var(--sn-bg,var(--rv-canvas))}
+.td-head h1{margin:0;font:800 26px/1.3 var(--font);color:var(--sn-ink,var(--rv-ink));letter-spacing:-.01em}
+.td-head p{margin:4px 0 0;font:400 14px/1.5 var(--font);color:var(--sn-muted,var(--rv-muted))}
+.td-top{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:20px;align-items:start}
+.td-card{background:var(--sn-card,#fff);border:1px solid var(--sn-line,rgba(0,0,0,.1));border-radius:12px;padding:18px 20px}
+.td-card>h2{margin:0 0 4px;font:700 16px/1.35 var(--font);color:var(--sn-ink,var(--rv-ink))}
+.td-card>.td-sub{margin:0 0 12px;font:400 12.5px/1.5 var(--font);color:var(--sn-muted,var(--rv-muted))}
+.td-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:16px;padding:14px 4px;
+  border-top:1px solid var(--sn-line,rgba(0,0,0,.08))}
+.td-row:first-of-type{border-top:0}
+.td-row .nm{font:700 15px/1.35 var(--font);color:var(--sn-ink,var(--rv-ink))}
+.td-row .why{margin-top:3px;font:400 12.5px/1.5 var(--font);color:var(--sn-muted,var(--rv-muted))}
+.td-row .cnt{text-align:right;min-width:96px}
+.td-row .cnt b{display:block;font:700 22px/1.1 var(--font-num);font-variant-numeric:tabular-nums;color:var(--sn-ink,var(--rv-ink))}
+.td-row .cnt span{font:400 11.5px/1.4 var(--font);color:var(--sn-muted,var(--rv-muted))}
+.td-row[data-state=zero] .cnt b{color:var(--sn-muted,var(--rv-muted))}
+.td-row[data-state=error] .cnt b,.td-row[data-state=error] .cnt span{color:var(--sn-fail,var(--rv-red))}
+.td-go{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 16px;border-radius:8px;
+  background:var(--sn-accent,var(--rv-green));color:#fff;font:700 13px/1 var(--font);text-decoration:none;white-space:nowrap}
+.td-go:hover{filter:brightness(.95)}
+.td-go:focus-visible,.td-quick a:focus-visible,.td-all:focus-visible{outline:3px solid var(--sn-accent,var(--rv-link));outline-offset:2px}
+.td-quick{display:flex;flex-direction:column;gap:10px}
+.td-quick a{display:block;padding:12px 14px;border:1px solid var(--sn-line,rgba(0,0,0,.1));border-radius:10px;text-decoration:none;color:inherit}
+.td-quick a:hover{border-color:var(--sn-accent,var(--rv-green))}
+.td-quick b{display:block;font:700 14px/1.35 var(--font);color:var(--sn-ink,var(--rv-ink))}
+.td-quick span{font:400 12px/1.5 var(--font);color:var(--sn-muted,var(--rv-muted))}
+.td-logs{width:100%;border-collapse:collapse;font:400 13px/1.5 var(--font)}
+.td-logs th{text-align:left;font:600 11.5px/1.3 var(--font);color:var(--sn-muted,var(--rv-muted));padding:6px 8px;border-bottom:1px solid var(--sn-line,rgba(0,0,0,.08))}
+.td-logs td{padding:8px;border-bottom:1px solid var(--sn-line,rgba(0,0,0,.06));color:var(--sn-ink,var(--rv-ink))}
+.td-logs td.at{font-family:var(--font-num);white-space:nowrap;color:var(--sn-muted,var(--rv-muted))}
+.td-cardhead{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.td-cardhead h2{margin:0;flex:1;font:700 16px/1.35 var(--font)}
+.td-all{font:600 12.5px/1 var(--font);color:var(--sn-accent,var(--rv-link));text-decoration:none}
+.td-empty{font:400 13px/1.6 var(--font);color:var(--sn-muted,var(--rv-muted));padding:6px 0}
+.td-status{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;font:400 12.5px/1.5 var(--font)}
+.td-status .lbl{font-weight:600;color:var(--sn-muted,var(--rv-muted))}
+.td-status .st{padding:3px 8px;border-radius:6px;border:1px solid var(--sn-line,rgba(0,0,0,.12))}
+.td-status .st.warn{color:var(--sn-warn,var(--rv-amber));background:var(--sn-warn-bg,#fff4e5);border-color:transparent}
+.td-status .st.error{color:var(--sn-fail,var(--rv-red))}
+details.td-more{border:1px solid var(--sn-line,rgba(0,0,0,.1));border-radius:12px;background:var(--sn-card,#fff)}
+details.td-more>summary{cursor:pointer;padding:14px 20px;font:700 14px/1.3 var(--font);color:var(--sn-ink,var(--rv-ink))}
+details.td-more>summary:focus-visible{outline:3px solid var(--sn-accent,var(--rv-link));outline-offset:-3px}
+details.td-more .dash-scroll{overflow:visible;padding:0 18px 18px}
+details.td-more .dash-row3{min-height:auto;grid-template-columns:repeat(2,minmax(240px,1fr))}
+@media (max-width:1024px){.td-top{grid-template-columns:1fr}}
+@media (max-width:768px){
+  .td-wrap{padding:16px 12px 20px;gap:14px}
+  .td-row{grid-template-columns:minmax(0,1fr) auto;row-gap:8px}
+  .td-row .td-go{grid-column:1/-1;width:100%}
+}
+@media (max-width:480px){
+  .td-row{grid-template-columns:1fr}
+  .td-row .cnt{text-align:left;display:flex;align-items:baseline;gap:8px}
+  .td-row .cnt b{display:inline}
+  .td-logs th:nth-child(4),.td-logs td:nth-child(4){display:none}
+  details.td-more .dash-row3{grid-template-columns:1fr}
+}
 @media (max-width:768px){
   .dash-root{overflow:visible;height:auto}
   .dash-scroll{overflow:visible}
@@ -134,15 +195,65 @@
 
 {% block content %}
 <div class="dash-root">
-  <div class="dash-scroll">
-
+ <div class="dash-scroll" style="padding:0;gap:0">
+  <div class="td-wrap">
+    <div class="td-head">
+      <h1>오늘 할 일</h1>
+      <p>먼저 확인할 일을 위에서부터 처리합니다. 숫자는 각 업무 화면과 같은 기준으로 서버가 센 값입니다.</p>
+    </div>
     {% if errors %}
     <div class="dash-err" role="status">
       <b>일부 항목을 불러오지 못했습니다.</b>
       {% for e in errors %}<div>{{ e }}</div>{% endfor %}
-      <div>값이 비어 있는 자리는 실제 0이 아니라 조회 실패입니다 — 각 값에 마우스를 올리면 사유가 보입니다.</div>
+      <div>값이 「—」인 자리는 0이 아니라 조회 실패입니다.</div>
     </div>
     {% endif %}
+    <div class="td-top">
+      <section class="td-card" aria-labelledby="tdFirst">
+        <h2 id="tdFirst">먼저 확인할 일</h2>
+        <p class="td-sub">{{ generated_at }} 조회 · 줄마다 처리할 화면으로 이동합니다.</p>
+        {% for r in today_rows %}
+        <div class="td-row" data-state="{{ r.state }}" data-key="{{ r.key }}">
+          <div><div class="nm">{{ r.name }}</div><div class="why">{{ r.why }}</div></div>
+          <div class="cnt"{% if r.reason %} title="{{ r.reason }}"{% endif %}><b>{{ r.value }}</b><span>{{ r.msg if r.msg else r.unit }}</span></div>
+          <a class="td-go" href="{{ r.href }}" aria-label="{{ r.name }} 확인하기">확인하기</a>
+        </div>
+        {% endfor %}
+      </section>
+      <section class="td-card" aria-labelledby="tdQuick">
+        <h2 id="tdQuick">자주 하는 작업</h2>
+        <p class="td-sub">바로 이동합니다.</p>
+        <div class="td-quick">
+          {% for q in quick_links %}<a href="{{ q.href }}"><b>{{ q.name }}</b><span>{{ q.desc }}</span></a>{% endfor %}
+        </div>
+      </section>
+    </div>
+    <section class="td-card" aria-labelledby="tdLogs">
+      <div class="td-cardhead"><h2 id="tdLogs">최근 작업</h2><a class="td-all" href="/admin2/activity-logs">전체 보기 →</a></div>
+      {% if today_logs %}
+      <table class="td-logs">
+        <thead><tr><th>시각</th><th>작업</th><th>대상</th><th>처리자</th></tr></thead>
+        <tbody>
+          {% for l in today_logs %}<tr><td class="at">{{ l.at }}</td><td>{{ l.kind }} · {{ l.action }}</td><td>{{ l.target }}</td><td>{{ l.operator }}</td></tr>{% endfor %}
+        </tbody>
+      </table>
+      {% elif today_logs_error %}
+      <div class="td-empty">최근 작업을 불러오지 못했습니다. 전체 기록은 작업 기록 화면에서 확인합니다.</div>
+      {% else %}
+      <div class="td-empty">최근 작업 기록이 없습니다.</div>
+      {% endif %}
+    </section>
+    <section class="td-card" aria-labelledby="tdStatus">
+      <h2 id="tdStatus">상태 확인</h2>
+      <p class="td-sub">자동 작업과 기록 정합 상태입니다. 중단 표시는 원인 확인이 필요하다는 뜻이며 장애로 단정하지 않습니다.</p>
+      <div class="td-status">
+        <span class="lbl">재고 기록 정합</span><span class="st {{ flow.stock.status }}" title="{{ flow.stock.reason or '' }}">{{ flow.stock.label }}</span>
+        <span class="lbl">몰 공급처·가격 자동 갱신</span><span class="st {{ mall_sync.status }}" title="{{ mall_sync.reason or '' }}">{{ mall_sync.text }}</span>
+      </div>
+    </section>
+    <details class="td-more">
+      <summary>운영 지표 더 보기 — 처리 대기 전체 · 오늘의 흐름 · 견적 품질 · 유입</summary>
+  <div class="dash-scroll">
 
     <div class="dash-todo-hd">
       <span class="t">지금 할 일</span>
@@ -205,19 +316,6 @@
       </span>
     </div>
 
-    {#
-      몰 공급처·가격 자동 갱신(tools/mall_daily_sync.py, 새벽 systemd timer · 배포
-      서버) — 2026-08-27 사장님 확인: 이 배치 결과는 작업 현황판이 아니라 이
-      대시보드가 유일한 표시 자리다. 위 "오늘의 흐름"과 같은 dash-flow 틀을 그대로
-      재사용한다(새 CSS 없음 — .stock .badge ok/warn/error 는 이미 있다).
-    #}
-    <div class="dash-flow" title="{{ mall_sync.reason or '' }}">
-      <span class="lbl">몰 공급처·가격</span>
-      <span class="stock">
-        <span class="lbl2">자동 갱신</span>
-        <span class="badge {{ mall_sync.status }}">{{ mall_sync.text }}</span>
-      </span>
-    </div>
 
     <div class="dash-row3">
       <div class="dash-panel">
@@ -255,24 +353,12 @@
         <div class="dash-foot-note">장바구니는 <b>정보 없음</b>(0건을 뜻하지 않습니다) · 몰 인계는 아직 숫자를 표시하지 않습니다.</div>
       </div>
 
-      <div class="dash-panel">
-        <div class="hd"><span>최근 운영자 활동</span><span class="link">· 전체는 <a href="/admin2/activity-logs">작업 기록</a>에서</span></div>
-        {% if logs %}
-        <div class="dash-logs">
-          {% for l in logs %}
-          <div class="row">
-            <span class="at">{{ l.at }}</span>
-            <span class="msg">{{ l.msg }}</span>
-          </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <div class="dash-empty">{{ ('최근 활동을 불러오지 못했습니다 — ' + dash_error) if dash_error else '최근 활동이 없습니다' }}</div>
-        {% endif %}
-      </div>
     </div>
 
   </div>
+    </details>
+  </div>
+ </div>
   <div class="dash-foot">서버 조회에 실패하면 사유를 밝히고 해당 값은 「—」로 표시합니다 · 로그인하지 않았으면 로그인 화면으로 보냅니다</div>
 </div>
 {% endblock %}

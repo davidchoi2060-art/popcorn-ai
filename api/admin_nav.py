@@ -654,3 +654,90 @@ def counts() -> dict:
     total = sum(len(i) for _t, _ic, i in NAV)
     new = sum(1 for _t, _ic, items in NAV for _l, n, _nt in items if n)
     return {"groups": len(NAV), "total": total, "new": new, "todo": total - new}
+
+
+# ── 2026-11-01 관리자 재설계 — 기본 모드 좌측 메뉴 6개 묶음 ────────────────────
+#
+# 근거: Codex 「관리자 재설계 확정안 — Claude 구현 인계」(공유 폴더
+# `outputs/admin-redesign-20261101/확정안_구현명세.md`, 사장님 확정 「1번 기본 + 상품 관리 2번」).
+# 메뉴를 오늘 할 일 / 상품 / 상담 / 가격·재고 / AI 관리 / 설정 여섯으로 묶고, 묶음 안에서는
+# 「기본 업무」를 먼저 보이고 나머지는 「고급 관리」로 접는다.
+#
+# ■ `NAV` 는 그대로 둔다 — 화면 수 셈(`counts()`)·운영자 매뉴얼·머리말이 `NAV` 를 정본으로 쓴다.
+#   여기는 «경로를 어느 묶음에 둘지»만 적고, 라벨은 `NAV` 에서 경로로 찾는다(라벨을 두 벌 두지 않는다).
+# ■ `NAV` 에 있는데 아래 표에 없는 경로는 「설정 › 고급 관리」에 자동으로 붙는다 — 메뉴 정리가
+#   화면을 숨기는 일이 되지 않게(테스트가 모든 `NAV` 경로가 정확히 한 번 나오는지 고정한다).
+# ■ 경로·직접 링크는 바뀌지 않는다. 메뉴에서 감추는 것은 권한 검사가 아니다(권한은 화면·API 쪽).
+SIMPLE_MENU = (
+    ("오늘 할 일", "pie-chart", ("/admin2/",), ()),
+    ("상품", "box",
+     ("/admin2/products", "/admin2/product-new", "/admin2/reviews", "/admin2/category-mapping"),
+     ("/admin2/categories-v2", "/admin2/part-explanations", "/admin2/pc-workspace",
+      "/admin2/pc-configurations", "/admin2/configuration-consultation", "/admin2/catalog-import",
+      "/admin2/product-fit", "/admin2/ai-device-profiles", "/admin2/grid", "/admin2/game-matrix",
+      "/admin2/deleted-products", "/admin2/build-map", "/admin2/spec-standard",
+      "/admin2/spec-field-defs", "/admin2/compat-rules", "/admin2/usage-floors",
+      "/admin2/part-grade", "/admin2/policy-weights", "/admin2/candidate-pool")),
+    ("상담", "eye",
+     ("/admin2/purchase-inquiries", "/admin2/mvp3-consults"),
+     ("/admin2/consult-sessions", "/admin2/swap-click-logs", "/admin2/handoff-log",
+      "/admin2/funnel-performance")),
+    ("가격·재고", "dollar-sign",
+     ("/admin2/price-review", "/admin2/sale-price", "/admin2/stock-inbound"),
+     ("/admin2/suppliers", "/admin2/sourcing", "/admin2/price-import", "/admin2/margin-policy",
+      "/admin2/price-history", "/admin2/reprice", "/admin2/mall-price", "/admin2/mall-sync")),
+    ("AI 관리", "cpu",
+     ("/admin2/shop-notices", "/admin2/talk-review", "/admin2/talk-patterns"),
+     ("/admin2/dash", "/admin2/spec-fill", "/admin2/game-copy-review", "/admin2/game-grades",
+      "/admin2/ai-task-settings", "/admin2/ai-integration", "/admin2/ai-usage-cost",
+      "/admin2/ai-response-log", "/admin2/ops-assistant")),
+    ("설정", "sliders",
+     ("/admin2/operators", "/admin2/activity-logs", "/admin2/requests"),
+     ("/admin2/ops-settings", "/admin2/retention", "/admin2/excel-exports")),
+)
+
+# 화면 경로가 아닌 고정 링크 — 「설정 › 고급 관리」 끝에 붙는다(라벨은 여기가 정본).
+SIMPLE_EXTRA = (
+    ("운영자 매뉴얼", "/admin2/manual"),
+    ("신 관리자(작업 화면)", "/admin2/?admin=new"),
+)
+
+
+def _same_path(a: str, b: str) -> bool:
+    return a.split("?")[0].rstrip("/") == b.split("?")[0].rstrip("/")
+
+
+def simple_nav(current_path: str = "") -> list:
+    """기본 모드 좌측 메뉴 — 6개 묶음. 템플릿이 그대로 그린다.
+
+    반환: [{title, icon, href, basic:[{label, href, active}], advanced:[...], active,
+            advanced_active}]. `href` 는 하위 메뉴가 없는 묶음(오늘 할 일)만 갖는다.
+    """
+    labels = {href: label for _t, _i, items in NAV for label, href, _n in items if href}
+    placed = set()
+    out = []
+    for title, icon, basic, advanced in SIMPLE_MENU:
+        def rows(paths):
+            got = []
+            for p in paths:
+                if p not in labels:
+                    continue          # NAV 에서 사라진 경로는 메뉴에도 내지 않는다
+                placed.add(p)
+                got.append({"label": labels[p], "href": p,
+                            "active": _same_path(current_path or "", p)})
+            return got
+        out.append({"title": title, "icon": icon, "basic": rows(basic), "advanced": rows(advanced)})
+    leftover = [h for _t, _i, items in NAV for _l, h, _n in items if h and h not in placed]
+    settings = out[-1]
+    for h in leftover:
+        settings["advanced"].append({"label": labels[h], "href": h,
+                                     "active": _same_path(current_path or "", h)})
+    for label, href in SIMPLE_EXTRA:
+        settings["advanced"].append({"label": label, "href": href,
+                                     "active": "?" not in href and _same_path(current_path or "", href)})
+    for g in out:
+        g["advanced_active"] = any(r["active"] for r in g["advanced"])
+        g["active"] = g["advanced_active"] or any(r["active"] for r in g["basic"])
+        # 하위 메뉴가 하나뿐인 묶음(오늘 할 일)은 묶음 자체가 링크다.
+        g["href"] = g["basic"][0]["href"] if len(g["basic"]) == 1 and not g["advanced"] else None
+    return out

@@ -17,12 +17,36 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from .admin_nav import counts as nav_counts, nav_for, new_admin_nav
+from .admin_nav import counts as nav_counts, nav_for, new_admin_nav, simple_nav
 from .admin_page_intro import back_for, entries_for, group_crumb, intro_for
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+
+
+def env_label(request: Request) -> str:
+    """헤더의 환경 표시 — 접속 주소로만 판정한다(2026-11-01 관리자 재설계 명세 §2).
+
+    운영 화면을 개발 환경으로 잘못 표시하지 않는 것이 요구라, 판정이 확실한 셋만 이름을 준다.
+    모르는 주소는 빈 문자열(표시 안 함)이다 — 지어내지 않는다.
+    """
+    host = (request.url.hostname or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1") or host.endswith(".localhost"):
+        return "로컬 개발"
+    if host.startswith("dev."):
+        return "개발 환경"
+    if host in ("popcornai.co.kr", "www.popcornai.co.kr", "admin.popcornai.co.kr"):
+        return "운영 환경"
+    return ""
+
+
+# 기본 모드 좌측 메뉴(6개 묶음)와 환경 표시는 셸이 Jinja 전역으로 부른다. `render()` 본문에
+# 넣지 않는 이유: 고정 검사(tests/test_admin_commerce_orders_page.py)가 `render()` 만 떼어
+# 정해진 이름들로 실행한다 — 거기에 새 이름을 넣으면 그 검사가 이름을 못 찾는다. 셸은
+# `simple_nav is defined` 일 때만 새 메뉴를 그리고, 아니면 기존 `nav` 를 그린다.
+templates.env.globals["simple_nav"] = simple_nav
+templates.env.globals["env_label"] = env_label
 
 
 def render(request: Request, template: str, *, screen_id: str = "", domain: str = "",

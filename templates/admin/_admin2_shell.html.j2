@@ -68,18 +68,19 @@
 <link rel="stylesheet" href="/shared/admin2/admin2.css?v=20261011-intro">
 {% block head_extra %}{% endblock %}
 </head>
-<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" data-admin-mode="{{ 'new' if new_admin else 'legacy' }}" {% block body_attrs_extra %}{% endblock %}>
+{% set simple_shell = (not new_admin) and (simple_nav is defined) %}
+<body data-screen-id="{{ screen_id }}" data-domain="{{ domain }}" data-admin-mode="{{ 'new' if new_admin else 'legacy' }}"{% if simple_shell %} data-admin-shell="simple"{% endif %} {% block body_attrs_extra %}{% endblock %}>
 <div class="a2-shell" id="shell">
 
   <nav class="a2-lnb" id="lnb" data-keep="1" aria-label="주메뉴">
     <div class="a2-lnb-brand" id="lnbBrand">팝콘 AI</div>
-    {% if new_admin %}
+    {% if new_admin or simple_shell %}
     <button type="button" class="a2-lnb-mobile-toggle" id="lnbMobileToggle"
             data-action="toggle-mobile-lnb" aria-controls="lnbMenu" aria-expanded="false"
             aria-label="메뉴 열기"><span id="lnbMobileLabel">메뉴 열기</span></button>
     {% endif %}
     <div class="a2-lnb-scroll" id="lnbMenu">
-      {% if not new_admin %}
+      {% if not new_admin and not simple_shell %}
       <a class="a2-new-entry" href="/admin2/?admin=new" title="신 관리자"><img src="/shared/icons/admin/box.svg" alt=""><span class="a2-t">신 관리자 →</span></a>
       {% endif %}
       {% if workspace_nav %}
@@ -95,6 +96,45 @@
         <a href="/admin2/new-settings" title="설정 · 자료 관리" {% if request.url.path == '/admin2/new-settings' %}aria-current="page"{% endif %}><img src="/shared/icons/admin/sliders.svg" alt=""><span class="a2-t">설정 · 자료 관리</span></a>
         <a href="/admin2/?admin=legacy" title="구 관리자"><img src="/shared/icons/admin/rotate-ccw.svg" alt=""><span class="a2-t">구 관리자</span></a>
       </div>
+      {% elif simple_shell %}
+      {#  2026-11-01 관리자 재설계(Codex 확정안 · 사장님 「1번 기본」) — 기본 모드 좌측 메뉴 6개 묶음.
+          원천 `api/admin_nav.simple_nav()`(라벨은 NAV 정본에서 경로로 찾는다). 묶음 안은
+          「기본 업무」를 먼저, 나머지는 「고급 관리」로 접는다. 지금 화면이 고급 관리에 있으면
+          그 칸을 펼친 채로 그린다(현재 메뉴와 상위 묶음을 잃지 않게). #}
+      {% for g in simple_nav(request.url.path) %}
+        {% if g.href %}
+        <a class="a2-sn-top{% if g.active %} on{% endif %}" href="{{ g.href }}" title="{{ g.title }}"
+           {% if g.active %}aria-current="page"{% endif %}>
+          <span class="a2-gi" aria-hidden="true"><img src="/shared/icons/admin/{{ g.icon }}.svg" alt=""></span>
+          <span class="a2-t">{{ g.title }}</span>
+        </a>
+        {% else %}
+        <div class="a2-lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
+          <button type="button" class="a2-lnb-g{% if g.active %} on{% endif %}" data-action="lnb-group" title="{{ g.title }}"
+                  aria-expanded="{{ 'true' if g.active else 'false' }}">
+            <span class="a2-gi" aria-hidden="true"><img src="/shared/icons/admin/{{ g.icon }}.svg" alt=""></span>
+            <span class="a2-t">{{ g.title }}</span>
+            <span class="a2-x" aria-hidden="true">▼</span>
+          </button>
+          <div class="a2-lnb-b">
+            {% for it in g.basic %}
+              <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}" {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
+            {% endfor %}
+            {% if g.advanced %}
+            <button type="button" class="a2-sn-adv" data-action="lnb-advanced"
+                    aria-controls="lnbAdv{{ loop.index }}" aria-expanded="{{ 'true' if g.advanced_active else 'false' }}">
+              <span>고급 관리</span><span class="a2-sn-n">{{ g.advanced|length }}</span><span class="a2-x" aria-hidden="true">▼</span>
+            </button>
+            <div class="a2-sn-advb" id="lnbAdv{{ loop.index }}" {% if not g.advanced_active %}hidden{% endif %}>
+              {% for it in g.advanced %}
+                <a href="{{ it.href }}" class="{% if it.active %}on{% endif %}" {% if it.active %}aria-current="page"{% endif %}>{{ it.label }}</a>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      {% endfor %}
       {% else %}
       {% for g in nav %}
       <div class="a2-lnb-grp" data-grp="{{ g.title }}" data-open="{{ 'y' if g.active else 'n' }}">
@@ -126,6 +166,7 @@
 
   <div class="a2-main" id="main">
     <header class="a2-hd">
+      {% if env_label is defined %}{% set _env = env_label(request) %}{% if _env %}<span class="a2-env" data-env="{{ _env }}">{{ _env }}</span>{% endif %}{% endif %}
       {% if crumb_href %}<a class="a2-crumb" href="{{ crumb_href }}">{{ crumb_group }}</a><span class="a2-sep" aria-hidden="true">›</span>{% else %}<span class="a2-crumb">{{ crumb_group }}</span><span class="a2-sep">/</span>{% endif %}<span class="a2-now">{{ crumb_now }}</span>
       {% block header_extra %}{% endblock %}
       <span class="a2-grow"></span>
