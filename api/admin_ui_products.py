@@ -12,4 +12,5 @@ def products(request: Request) -> HTMLResponse:
     """상품 관리(ADM-PRD-010) — 기존 `/admin/products.html` 의 대조군."""
     return render(request, "admin/products.html.j2",
                   screen_id="ADM-PRD-010", domain="product",
-                  crumb_group="상품관리", crumb_now="상품 관리")
+                  crumb_group="상품", crumb_now="상품 관리",
+                  page_intro=None)  # 제목·설명·등록 단추는 본문 머리가 맡는다(2026-11-01 재설계)
