@@ -12,8 +12,7 @@
   - 조립 PC: `customer_pc_catalog.listed_item()` — 고객 PC 목록(`catalog()`)과 같은 판정(추천 풀 ∩ listed)을
     상품 하나에만 적용한다. 고객 상세 화면은
     이 목록에 있어야 상품을 그리고(`mockups/mvp4/assets/js/design-boot.js` stateAfterLoad), 가격이
-    없으면 「가격 확인」 안내를 그린다. 이 목록은 `products.is_visible` 을 보지 않는다 — 고객 화면의
-    정책이 그렇다. 여기서 정책을 바꾸지 않는다.
+    없으면 「가격 확인」 안내를 그린다. 2026-11-02 사용자 확정에 따라 관리자 숨김도 적용한다.
   - 그 밖(부품 · 주변기기 등): 고객 단독 상세가 없다(부품은 PC 상세 안에서만 보인다). 주소 없음 + 사유.
 
 ■ 주소는 같은 환경의 상대 경로만 낸다
@@ -42,6 +41,7 @@ SALE = "판매중"
 REASON_PART = "부품·주변기기는 고객 단독 상세가 없습니다. 고객 화면에서는 PC 상세 안에서만 보입니다."
 REASON_PC_NOT_FIT = "고객 PC 목록(용도 평가 목록)에 없는 PC라 고객 상세가 없습니다."
 REASON_PC_EXCLUDED = "고객 PC 목록에서 제외된 상품이라 고객 상세가 없습니다."
+REASON_PC_HIDDEN = "노출이 꺼져 있어 고객 PC 목록과 상세에 표시되지 않습니다."
 REASON_SC_HIDDEN = "노출이 꺼져 있어 고객 AI 슈퍼컴퓨터 목록에 없습니다."
 NOTE_PRICE_CHECK = "고객 화면에는 「가격 확인」 안내로 보입니다."
 NOTE_STOPPED = "고객 화면에는 「판매 중지」로 보입니다."
@@ -53,7 +53,7 @@ def safe_url(url):
 
 
 def judge(code: int, *, part_type, status, supercomputer_item, in_supercomputer_category,
-          fit_row, pc_item) -> dict:
+          fit_row, pc_item, product_visible=True) -> dict:
     """판정만 하는 순수 함수 — 입력은 고객 화면 함수가 돌려준 값 그대로다.
 
     반환: kind(pc|supercomputer|part|none) · url(상대 경로 또는 None) · state · reason(사유/안내 문구 또는 None)
@@ -65,6 +65,8 @@ def judge(code: int, *, part_type, status, supercomputer_item, in_supercomputer_
                 "state": state, "reason": note}
     if in_supercomputer_category:
         return {"kind": "supercomputer", "url": None, "state": "hidden", "reason": REASON_SC_HIDDEN}
+    if product_visible is not True and (part_type == "PC_COMPLETE" or fit_row is not None):
+        return {"kind": "pc", "url": None, "state": "hidden", "reason": REASON_PC_HIDDEN}
     if pc_item is not None:
         price = pc_item.get("price")
         priced = isinstance(price, int) and price > 0
@@ -112,7 +114,7 @@ def part_gate_applies(conn, code, part_type) -> bool:
 @router.get("/products/{product_code}/customer-link")
 def customer_link(product_code: int):
     with engine.connect() as conn:
-        row = conn.execute(text("SELECT part_type, status FROM products WHERE product_code = :c"),
+        row = conn.execute(text("SELECT part_type, status, is_visible FROM products WHERE product_code = :c"),
                            {"c": product_code}).mappings().first()
         if row is None:
             raise HTTPException(404, "없는 상품입니다.")
@@ -121,10 +123,11 @@ def customer_link(product_code: int):
         fit = conn.execute(text("SELECT excluded FROM product_fit_products WHERE product_code = :c"),
                            {"c": product_code}).mappings().first()
     pc_item = None
-    if fit is not None and sc_item is None:
+    if fit is not None and sc_item is None and row["is_visible"] is True:
         # 고객 PC 목록과 같은 판정(추천 풀 ∩ listed)을 상품 하나에만 적용한다 — 전체 목록을 다시 만들지 않는다.
         # 캐시를 두지 않는다: 가격·판매 상태·공개는 매번 현재 값이어야 한다.
         pc_item = customer_pc_catalog.listed_item(product_code)
     out = judge(product_code, part_type=row["part_type"], status=row["status"], supercomputer_item=sc_item,
-                in_supercomputer_category=inside, fit_row=dict(fit) if fit is not None else None, pc_item=pc_item)
+                in_supercomputer_category=inside, fit_row=dict(fit) if fit is not None else None, pc_item=pc_item,
+                product_visible=row["is_visible"])
     return {"ok": True, "product_code": product_code, **out}

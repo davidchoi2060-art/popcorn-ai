@@ -49,7 +49,7 @@ import re
 
 from sqlalchemy import text
 
-from .admin_product_fit import load
+from .admin_product_fit import load as _load
 from .db import engine
 from .product_name import card_name, match_storage_shorthand   # 카드 이름에서 광고 문구를 뗀다(원천은 그대로)
 from . import reco_explore as X
@@ -57,6 +57,11 @@ from .talk_schema import match_game
 from .talk_rules import unnamed_game
 
 log = logging.getLogger("sold_reco")
+
+
+def load():
+    """고객 추천·보관·대안에도 관리자에서 숨긴 완제품을 내지 않는다."""
+    return _load(visible_only=True)
 
 # 고객 용도 라벨(usage_floors · usage_label_map) -> 평가 용도. 앞에서부터 먼저 맞는 것.
 USAGE_RULES = [

@@ -272,7 +272,7 @@ def registered(code: int, response: Response):
             "SELECT product_code, status, spec_source_text, product_name FROM products"
             " WHERE product_code = :c AND part_type = 'PC_COMPLETE' AND is_visible"), {"c": code}).mappings().first()
         if p is None:
-            raise HTTPException(404, "등록된 PC 구성을 찾을 수 없습니다.")
+            raise HTTPException(404, "등록된 PC 구성을 찾을 수 없습니다.", headers={"Cache-Control": "no-store"})
         parts, service = rows(p["spec_source_text"])
         desc = about(conn, code, p.get("product_name"))
         lex = lexicon(conn)

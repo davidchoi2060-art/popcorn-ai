@@ -201,6 +201,17 @@ class CustomerPcOfferTest(unittest.TestCase):
         self.conn.job = None
         self.assertEqual(self.image().status_code, 404)
 
+    def test_cached_etag_cannot_bypass_revoked_public_access(self):
+        first = self.image()
+        self.assertEqual(first.status_code, 200)
+        headers = {"If-None-Match": first.headers["etag"]}
+        self.result = {"status": 404, "error": "not_public"}
+        denied = self.image(**headers)
+        self.assertEqual(denied.status_code, 404)
+        self.assertEqual(denied.headers["cache-control"], "no-store")
+        self.result = {"status": 200, "data": deepcopy(OFFER)}
+        self.assertEqual(self.image(**headers).status_code, 304)
+
     def test_image_revalidation_returns_304_without_fetch(self):
         self.body = b"not fetched"
         r = self.image(**{"If-None-Match": '"' + ASSET["sha256"] + '"'})

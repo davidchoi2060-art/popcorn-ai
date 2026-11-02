@@ -72,13 +72,17 @@ def price_basis(sale_at, reason):
     return f"{day.month}월 {day.day}일 기준 {where} · {PRICE_CONFIRM}"
 
 
-def load(codes=None):
+def load(codes=None, *, visible_only=False):
     """(levels, products{code: dict}, fits{code: {usage: rank}}) — 판매 가능 상품만.
 
     `codes` 를 주면 그 상품만 읽는다(판정·변환은 같다 — 행 범위만 좁힌다). 관리자 상품 확인 창의
     고객 링크 판정(api/admin_customer_link)이 상품 하나 때문에 전체 풀을 읽지 않게 하려는 것이다.
     """
-    only = " WHERE f.product_code = ANY(:codes)" if codes is not None else ""
+    # 관리자 매트릭스는 숨김 상품도 보여 주고, 고객 원천만 노출 스위치를 적용한다.
+    conditions = (["f.product_code = ANY(:codes)"] if codes is not None else [])
+    if visible_only:
+        conditions.append("p.is_visible")
+    only = " WHERE " + " AND ".join(conditions) if conditions else ""
     only_fit = " WHERE product_code = ANY(:codes)" if codes is not None else ""
     params = {"codes": [int(c) for c in codes]} if codes is not None else {}
     with engine.connect() as conn:

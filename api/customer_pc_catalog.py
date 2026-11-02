@@ -29,7 +29,7 @@ import re
 from fastapi import APIRouter, Response
 from sqlalchemy import text
 
-from .admin_product_fit import load
+from .admin_product_fit import load as _load
 from .db import engine
 from .product_name import card_name, match_storage_shorthand
 from .sold_reco import card_spec, public_codes
@@ -127,6 +127,11 @@ def public_levels(levels) -> list[dict]:
             continue
         out.append({"usage": usage, "level": level, "rank": rank, "work": work if isinstance(work, str) else None})
     return out
+
+
+def load(codes=None):
+    """고객 목록·단일상품·보관은 관리자 노출 스위치를 같은 원천에서 적용한다."""
+    return _load(codes=codes, visible_only=True)
 
 
 def listed(p) -> bool:

@@ -116,10 +116,11 @@ def read_customer_sold_offer(conn, product_code, *, source_reader=None):
         return proofs
 
     try:
-        sold = conn.execute(text('SELECT product_code,status FROM products WHERE product_code=:code'),
+        sold = conn.execute(text('SELECT product_code,status,is_visible FROM products WHERE product_code=:code'),
                             {'code': product_code}).mappings().first()
         if (not sold or type(sold.get('product_code')) is not int
-                or sold['product_code'] != product_code or sold.get('status') != '판매중'):
+                or sold['product_code'] != product_code or sold.get('status') != '판매중'
+                or sold.get('is_visible') is not True):
             return _deny()
         bound = read_sold_offer_configuration(conn, product_code)
         _snapshot(conn, transaction)

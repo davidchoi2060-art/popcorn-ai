@@ -22,6 +22,12 @@ def j(code=101, **kw):
 
 
 class JudgeTests(unittest.TestCase):
+    def test_hidden_pc_never_links_even_with_catalog_item(self):
+        r = j(130001, part_type="PC_COMPLETE", product_visible=False,
+              fit_row={"excluded": False}, pc_item={"price": 1290000})
+        self.assertEqual((r["url"], r["state"], r["reason"]),
+                         (None, "hidden", L.REASON_PC_HIDDEN))
+
     def test_public_pc_links_to_mvp4_product(self):
         r = j(130001, part_type="PC_COMPLETE", fit_row={"excluded": False}, pc_item={"product_code": 130001, "price": 1290000})
         self.assertEqual((r["kind"], r["url"], r["state"], r["reason"]), ("pc", "/mvp4/?screen=product&id=130001", "on_sale", None))
@@ -160,10 +166,25 @@ class SingleProductPcJudgeTests(unittest.TestCase):
         with mock.patch.object(F, "engine", mock.Mock(connect=lambda: C())):
             F.load(); full = list(seen); seen.clear()
             F.load(codes=[113835])
+            scoped_admin = list(seen); seen.clear()
+            F.load(codes=[113835], visible_only=True)
+            customer = list(seen)
         self.assertNotIn("ANY(:codes)", " ".join(q for q, _ in full))
+        self.assertNotIn("p.is_visible", " ".join(q for q, _ in full + scoped_admin))
+        self.assertIn("f.product_code = ANY(:codes) AND p.is_visible", " ".join(q for q, _ in customer))
         scoped = [q for q, p in seen if p and p.get("codes") == [113835]]
         self.assertEqual(len(scoped), 2)          # 상품 행 + 용도 평가 행
         self.assertTrue(all("ANY(:codes)" in q for q in scoped))
+
+    def test_customer_readers_request_visible_only_without_changing_admin_default(self):
+        from unittest.mock import patch
+        from api import customer_pc_catalog as catalog, sold_reco
+        with patch.object(catalog, "_load", return_value=[]) as read:
+            catalog.load(codes=[113835])
+            read.assert_called_once_with(codes=[113835], visible_only=True)
+        with patch.object(sold_reco, "_load", return_value=[]) as read:
+            sold_reco.load()
+            read.assert_called_once_with(visible_only=True)
 
 
 if __name__ == "__main__":

@@ -39,7 +39,7 @@ class Connection(fixture.Connection):
         self.binding_override = {}
         self.before_latest = None
         self.failure = None
-        self.sold = dict(product_code=99413, status='판매중')
+        self.sold = dict(product_code=99413, status='판매중', is_visible=True)
         self.config['content'].update(source='기존', source_ids=['P99413', 'P10'])
         self.offers = [dict(configuration_id='P10', offer_id='P99413', price_snapshot=1000,
                             payload=dict(id='P99413', quote_only=False))]
@@ -60,7 +60,7 @@ class Connection(fixture.Connection):
             return Scalar(self.settings_isolation if q.endswith('isolation') else self.readonly)
         if '/*pc_publication:latest*/' in q and self.before_latest:
             callback = self.before_latest; self.before_latest = None; callback()
-        if q == 'SELECT product_code,status FROM products WHERE product_code=:code':
+        if q == 'SELECT product_code,status,is_visible FROM products WHERE product_code=:code':
             self.calls.append((q, deepcopy(p)))
             return fixture.Result([deepcopy(self.sold)]) if self.sold else fixture.Result()
         if 'WHERE o.offer_id=:offer' in q:
@@ -136,6 +136,14 @@ class SoldReadTests(unittest.TestCase):
 
     def read(self, **kwargs):
         return self.adapter.read_customer_sold_offer(self.conn, 99413, source_reader=kwargs.get('reader', self.reader))
+
+    def test_hidden_product_overrides_approved_bom_and_restores_on_next_read(self):
+        self.assertEqual(self.read()['status'], 200)
+        for visibility in (False, None):
+            self.conn.sold['is_visible'] = visibility
+            self.denied()
+        self.conn.sold['is_visible'] = True
+        self.assertEqual(self.read()['status'], 200)
 
     def denied(self, **kwargs):
         self.assertEqual(self.read(**kwargs), {'status':404, 'error':'not_public'})

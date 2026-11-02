@@ -129,6 +129,17 @@ def test_pc_link_follows_customer_catalog_after_edit(env):
     link = a.get(f"/api/admin/products/{pc}/customer-link").json()
     assert link["url"] == f"/mvp4/?screen=product&id={pc}"
     assert any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
+    p(pc, is_visible=False)
+    assert a.get(f"/api/admin/products/{pc}").status_code == 200
+    link = a.get(f"/api/admin/products/{pc}/customer-link").json()
+    assert link["url"] is None and link["state"] == "hidden"
+    assert not any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
+    for path in (f"/api/customer/pc-registered/{pc}", f"/api/customer/pc-offers/{pc}",
+                 f"/api/customer/products/{pc}/representative-image?size=card"):
+        assert a.get(path).status_code == 404
+    p(pc, is_visible=True)
+    assert a.get(f"/api/admin/products/{pc}/customer-link").json()["url"] is not None
+    assert any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
     p(pc, status="품절")
     link = a.get(f"/api/admin/products/{pc}/customer-link").json()
     assert link["url"] is None and "「품절」" in link["reason"]
