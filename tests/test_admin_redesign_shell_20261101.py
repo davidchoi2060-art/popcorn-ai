@@ -148,3 +148,20 @@ class TodayRowsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EveryShellPageHasTitleTests(unittest.TestCase):
+    """셸을 상속하는 화면은 탭 제목(block title)을 채운다 — 비면 「팝콘PC 관리자 ·」로 끝난다
+    (2026-11-02 Codex 개발 서버 관찰: /admin2/mall-sync)."""
+
+    def test_title_block_present(self):
+        import re as _re
+        from pathlib import Path as _P
+        root = _P(__file__).resolve().parents[1] / "templates/admin"
+        missing = []
+        for f in sorted(root.glob("*.j2")):
+            t = f.read_text(encoding="utf-8")
+            if _re.search(r'{%\s*extends\s+["\']admin/_admin2_shell\.html\.j2["\']', t) and \
+                    not _re.search(r"{%\s*block\s+title\s*%}\s*\S", t):
+                missing.append(f.name)
+        self.assertEqual(missing, [])
