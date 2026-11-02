@@ -64,6 +64,15 @@ jobs:
           python tests/scenarios/meter.py --allow-writes
           --target-label "CI 일회용 DB(마이그레이션만 · 상품 0건)"
           --out scenario-status --summary "$GITHUB_STEP_SUMMARY"
+      # MVP4 고객 화면 ↔ 관리자 연결 합성 끝단 검증(2026-11-02). 측정기 «뒤»에 돈다 — 합성 상품이
+      # 측정기의 「상품 0건」 기준을 흐리지 않게. 관리자 계정도 측정기와 따로 쓴다(첫 로그인 계정).
+      # 테스트 파일이 DATABASE_URL 이 이 일회용 DB 가 아니면 스스로 건너뛴다.
+      - name: MVP4 관리자 연결 합성 끝단 검증 (일회용 DB)
+        if: ${{ !cancelled() }}
+        env:
+          SCENARIO_E2E_DB: '1'
+          ADMIN_BOOTSTRAP_EMAILS: scenario-owner@ci.popcorn.invalid,e2e-link-owner@ci.popcorn.invalid
+        run: python -m pytest tests/scenarios/test_mvp4_admin_link_e2e.py -q -rA -p no:cacheprovider
       - uses: actions/upload-artifact@v4
         if: always()
         with:
