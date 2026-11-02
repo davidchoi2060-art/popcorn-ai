@@ -69,7 +69,10 @@ def env():
 
 @pytest.fixture(scope="module")
 def device(env):
-    code = env["register"]("AI 장비 4TB", "ETC", env["ai_cat"])
+    # 실제 슈퍼컴퓨터는 적재로 들어온 ETC 분류지만, 관리자 등록은 ETC 를 받지 않는다(register_product).
+    # 등록 로직은 그대로 두고 AI 슈퍼컴퓨터 분류가 허용하는 BAREBONE 으로 만든다 — 판정이 분류(part_type)가
+    # 아니라 카테고리로 장비를 가른다는 것도 함께 확인된다.
+    code = env["register"]("AI 장비 4TB", "BAREBONE", env["ai_cat"])
     r = env["admin"].put(f"/api/admin/ai-device-profiles/{code}", headers=ORIGIN, json={
         "display_name": "E2E 합성 AI 장비", "storage": "4TB", "model_label": "4TB"})
     assert r.status_code == 200, r.text
