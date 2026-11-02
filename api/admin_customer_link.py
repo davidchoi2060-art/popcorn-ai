@@ -9,7 +9,8 @@
 ■ 판정은 고객 화면과 «같은 함수»로 한다 — 조건을 다시 베껴 적지 않는다
   - AI 슈퍼컴퓨터: `customer_supercomputer.load(conn, (code,))` — 고객 상세 API 가 쓰는 그 함수다.
     돌려주면 고객 상세가 열린다(판매 중지·가격 확인 상태도 상세는 열린다).
-  - 조립 PC: `customer_pc_catalog.catalog()` — 고객 PC 목록 API 가 쓰는 그 함수다. 고객 상세 화면은
+  - 조립 PC: `customer_pc_catalog.listed_item()` — 고객 PC 목록(`catalog()`)과 같은 판정(추천 풀 ∩ listed)을
+    상품 하나에만 적용한다. 고객 상세 화면은
     이 목록에 있어야 상품을 그리고(`mockups/mvp4/assets/js/design-boot.js` stateAfterLoad), 가격이
     없으면 「가격 확인」 안내를 그린다. 이 목록은 `products.is_visible` 을 보지 않는다 — 고객 화면의
     정책이 그렇다. 여기서 정책을 바꾸지 않는다.
@@ -88,6 +89,26 @@ _CATEGORY_SQL = customer_supercomputer._NODES + """
 """
 
 
+def in_supercomputer_category(conn, code) -> bool:
+    """AI 슈퍼컴퓨터 카테고리(하위 포함)에 분류된 상품인가 — 노출 여부와 무관."""
+    return bool(conn.execute(text(_CATEGORY_SQL), {"key": customer_supercomputer.KEY, "code": code}).scalar())
+
+
+GATE_NOT_PART_NOTE = ("부품 견적 추천 기준(부품 분류·사양·검수)은 부품에만 적용됩니다. "
+                      "이 상품의 고객 노출은 「고객 화면 보기」에서 확인합니다.")
+
+
+def part_gate_applies(conn, code, part_type) -> bool:
+    """상품 상세의 「추천 후보」 점검(부품 견적 엔진 v_recommendation_candidates 기준)이 이 상품에 맞는가.
+
+    완제품 PC(part_type PC_COMPLETE)와 AI 슈퍼컴퓨터 카테고리 상품은 부품 견적 엔진의 후보가 될 수 없다 —
+    고객에게는 PC 목록·슈퍼컴퓨터 상세로 나간다. 그 상품에 부품 기준을 대면 늘 「추천 제외 · 부품 분류 아님」이
+    되어 목록의 판매 상태와 반대말을 한다(2026-11-02 Codex 검수: 113835 · 129774).
+    그 밖(ETC 로 잘못 들어간 부품 포함)은 지금처럼 부품 기준을 적용한다 — 분류 오류를 고칠 단서다.
+    """
+    return not (part_type == "PC_COMPLETE" or in_supercomputer_category(conn, code))
+
+
 @router.get("/products/{product_code}/customer-link")
 def customer_link(product_code: int):
     with engine.connect() as conn:
@@ -96,14 +117,14 @@ def customer_link(product_code: int):
         if row is None:
             raise HTTPException(404, "없는 상품입니다.")
         sc_item = customer_supercomputer.load(conn, (product_code,)).get(product_code)
-        inside = bool(sc_item) or bool(conn.execute(text(_CATEGORY_SQL),
-                                                    {"key": customer_supercomputer.KEY, "code": product_code}).scalar())
+        inside = bool(sc_item) or in_supercomputer_category(conn, product_code)
         fit = conn.execute(text("SELECT excluded FROM product_fit_products WHERE product_code = :c"),
                            {"c": product_code}).mappings().first()
     pc_item = None
     if fit is not None and sc_item is None:
-        # 고객 PC 목록 함수 그대로 — 무거운 전체 목록이라 용도 평가 목록에 있는 상품일 때만 부른다.
-        pc_item = next((it for it in customer_pc_catalog.catalog() if it["product_code"] == product_code), None)
+        # 고객 PC 목록과 같은 판정(추천 풀 ∩ listed)을 상품 하나에만 적용한다 — 전체 목록을 다시 만들지 않는다.
+        # 캐시를 두지 않는다: 가격·판매 상태·공개는 매번 현재 값이어야 한다.
+        pc_item = customer_pc_catalog.listed_item(product_code)
     out = judge(product_code, part_type=row["part_type"], status=row["status"], supercomputer_item=sc_item,
                 in_supercomputer_category=inside, fit_row=dict(fit) if fit is not None else None, pc_item=pc_item)
     return {"ok": True, "product_code": product_code, **out}

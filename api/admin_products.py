@@ -625,6 +625,10 @@ def get_product(product_code: int):
         in_pool = conn.execute(text(
             "SELECT 1 FROM v_recommendation_candidates WHERE product_code=:pc"
             " AND stock_qty > 0"), {"pc": product_code}).first() is not None
+        # 위 in_pool·아래 gate 는 «부품 견적 엔진»의 후보 기준이다. 완제품 PC·AI 슈퍼컴퓨터에는 맞지 않는다
+        # (2026-11-02 Codex 검수) — 판정은 api/admin_customer_link.part_gate_applies 한 곳.
+        from .admin_customer_link import part_gate_applies, GATE_NOT_PART_NOTE
+        gate_applies = part_gate_applies(conn, product_code, r["part_type"])
         # 공급처별 매입가 — 화면 표는 지금까지 마크업 하드코딩이었다(용산도매A 352,000 등).
         # 신규 등록 화면에도 그 값이 그대로 떠서 **없는 공급처가 있는 것처럼** 보였다.
         # 2026-08-26 A-114 후속: 몰 수집 칸(mall_rank·rebate_*·mall_state_raw·fetched_at)과
@@ -780,6 +784,9 @@ def get_product(product_code: int):
         "specs": r["specs"], "spec_done": done, "spec_total": total,
         "spec_row_missing": r["specs"] is None,
         "review_pending": pending, "in_pool": in_pool,
+        # False 면 화면은 부품 점검표·추천 배지 대신 목록과 같은 판매 상태와 이 안내를 보인다.
+        "gate_applies": gate_applies,
+        "gate_scope_note": None if gate_applies else GATE_NOT_PART_NOTE,
         "suppliers": [{"psp_id": s["psp_id"], "supplier_id": s["supplier_id"],
                        "supplier": s["supplier"], "cost_price": s["cost_price"],
                        "state": s["supply_state"], "state_raw": s["mall_state_raw"],
