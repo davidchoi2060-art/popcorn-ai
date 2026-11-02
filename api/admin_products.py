@@ -507,6 +507,17 @@ def _s(v, n=None):
     return (s[:n] if n else s) or None
 
 
+def _strict_bool(v):
+    """JSON true/false 만 받는다 — "false"·0·null 을 참/거짓으로 짐작하지 않는다.
+
+    `bool("false")` 는 True 라 문자열을 받아 주면 「숨김」을 눌렀는데 노출로 저장된다.
+    `0`/`1` 도 받지 않는다(파이썬에서 True == 1 이라 형식 검사를 `in (True, False)` 로 하면 통과한다).
+    """
+    if type(v) is not bool:
+        raise ValueError("boolean only")
+    return v
+
+
 EDITABLE = {
     "name": ("product_name", _s),
     "maker": ("maker", _s),
@@ -533,6 +544,14 @@ EDITABLE = {
     #   저장 전에 미리 보고 사람이 읽는 문장으로 막는다(아래 patch_product).
     "danawa_code": ("danawa_code", _s),
     "market_price": ("market_price", lambda v: None if v in ("", None) else int(v)),
+    # ── PR431 (2026-11-02 사용자 확정: 관리자 숨김을 고객 화면에도 적용) ─────────────
+    #   status(판매 가능 여부)와 별개 축이다(0081 컬럼 주석). 숨기면 고객 PC 목록·추천·
+    #   직접 상세·대표 사진에서 빠지고, 다시 노출해도 판매 상태·평가 제외·승인 구성 조건은
+    #   그대로 적용된다 — 노출은 «필요 조건»일 뿐 공개를 «강제»하지 않는다.
+    #   적재(catalog_ingest UPSERT)는 이 컬럼을 쓰지 않는다 — 잠금은 다른 필드와 같은
+    #   규약으로 남겨 두되, 적재가 이 컬럼을 쓰게 되는 날 `locked_fields ? 'is_visible'`
+    #   가드를 함께 넣어야 한다(tests/test_admin_product_visibility_20261102.py 가 지킨다).
+    "is_visible": ("is_visible", _strict_bool),
 }
 STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
 # 가격·재고는 정본 수치다 — 음수나 터무니없는 값이 들어가면 견적이 통째로 흔들린다
@@ -606,7 +625,7 @@ def get_product(product_code: int):
             "SELECT p.product_code, p.sku, p.product_name, p.maker, p.model_name, p.part_type,"
             " p.category_group, p.status, p.ai_candidate_yn, p.review_required_yn,"
             " p.purchase_price, p.sale_price, p.market_price, p.stock_qty, p.supplier,"
-            " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text,"
+            " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text, p.is_visible,"
             " p.category_id, (SELECT c.name FROM categories c WHERE c.category_id = p.category_id)"
             "   AS category_name,"
             " p.created_at, p.updated_at, to_jsonb(ps) AS specs"
@@ -779,6 +798,8 @@ def get_product(product_code: int):
         "purchase_price": r["purchase_price"], "sale_price": r["sale_price"],
         "market_price": r["market_price"], "stock_qty": r["stock_qty"],
         "supplier": r["supplier"], "danawa_code": r["danawa_code"],
+        # 고객 노출 스위치(PR431) — 목록 items[].is_visible 과 같은 컬럼. 확인 창이 상태 표시·수정에 쓴다.
+        "is_visible": r["is_visible"],
         "origin": r["data_origin"], "locked_fields": locked,
         "spec_source_text": r["spec_source_text"],
         "specs": r["specs"], "spec_done": done, "spec_total": total,
@@ -878,7 +899,7 @@ def patch_product(product_code: int, body: PatchBody):
     with engine.begin() as conn:
         cur = conn.execute(text(
             "SELECT product_code, sku, product_name, maker, supplier, purchase_price, sale_price,"
-            " stock_qty, status, model_name, danawa_code, market_price, locked_fields"
+            " stock_qty, status, model_name, danawa_code, market_price, is_visible, locked_fields"
             " FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if cur is None:
@@ -1030,6 +1051,10 @@ def undo_product_edit(log_id: int):
             values = (fromto["from"], fromto["to"])
             if k in ("sale_price", "purchase_price", "market_price", "stock_qty"):
                 if any(v is not None and type(v) is not int for v in values):
+                    raise HTTPException(409, invalid)
+            elif k == "is_visible":
+                # NOT NULL 컬럼이다 — 기록이 null·문자열이면 무엇으로 되돌릴지 모른다
+                if any(type(v) is not bool for v in values):
                     raise HTTPException(409, invalid)
             elif any(v is not None and type(v) is not str for v in values):
                 raise HTTPException(409, invalid)

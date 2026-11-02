@@ -27,7 +27,7 @@ def routes():
             nodes.append(node)
     env = dict(text=text, HTTPException=HTTPException, lock_products=lock_products,
                ProductScopeChanged=ProductScopeChanged, MergeBody=object, BulkStatusBody=object,
-               BulkUndoBody=object, _s=lambda v: v, current_operator_id=lambda: 21,
+               BulkUndoBody=object, _s=lambda v: v, _strict_bool=lambda v: v, current_operator_id=lambda: 21,
                SF=SimpleNamespace(field_cast=lambda: {'length_mm': 'integer'}))
     exec(compile(ast.fix_missing_locations(ast.Module(body=nodes, type_ignores=[])), str(source), 'exec'), env)
     return env

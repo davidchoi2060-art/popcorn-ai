@@ -1849,8 +1849,13 @@ a.pp-btn-line{color:var(--on)}
     ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"],
     ["model_name","모델명","text","model_name"],
     ["danawa_code","다나와 코드","text","danawa_code"],
-    ["market_price","시장가","number","market_price"]
+    ["market_price","시장가","number","market_price"],
+    // PR431(2026-11-02 사용자 확정) — 숨김은 고객 PC 목록·추천·상세·대표 사진에서 뺀다.
+    // 노출로 되돌려도 판매 상태·평가 제외 등 다른 공개 조건은 그대로다. 서버는 JSON true/false 만 받는다.
+    ["is_visible","고객 노출","visible","is_visible"]
   ];
+  var VISIBLE_NOTE = "숨김은 고객 PC 목록·추천·상세·대표 사진에서 제외합니다. 노출로 바꿔도 판매 상태 등 다른 공개 조건은 그대로 적용됩니다.";
+  function visibleOf(v){ return v === true || v === "true" ? true : (v === false || v === "false" ? false : null); }
   function basicTabHtml(d){
     var editing = DRAWER.editing.basic;
     // 편집 중 값은 DRAWER.editDraft.basic 버퍼에서 온다(결함 ⓐ-2) — 이 편집 회차에서
@@ -1867,7 +1872,17 @@ a.pp-btn-line{color:var(--on)}
       var raw = editing ? draft[key] : d[key];
       var lockMark = locked.indexOf(col)>=0 ? '<span class="lock" title="잠김 — 다음 적재가 덮지 않습니다">🔒 잠김</span>' : "";
       var valHtml;
-      if(editing){
+      if(type==="visible"){
+        var vis = visibleOf(raw);
+        // 서버가 boolean 을 주지 않았으면 고치게 하지 않는다 — 모르는 값을 노출/숨김으로 짐작해 저장하지 않는다.
+        if(editing && vis !== null){
+          valHtml = '<select data-f="' + key + '" aria-describedby="drVisibleNote">'
+            + '<option value="true"' + (vis ? " selected" : "") + '>노출</option>'
+            + '<option value="false"' + (vis ? "" : " selected") + '>숨김</option></select>';
+        } else {
+          valHtml = '<span class="val' + (vis === null ? " dim" : "") + '">' + (vis === null ? "확인 불가" : (vis ? "노출" : "숨김")) + '</span>';
+        }
+      } else if(editing){
         if(type==="select"){
           valHtml = '<select data-f="' + key + '">' + (d.status_options||[]).map(function(o){
             return '<option value="' + esc(o) + '"' + (o===raw?" selected":"") + '>' + esc(o) + '</option>'; }).join("") + '</select>';
@@ -1914,7 +1929,8 @@ a.pp-btn-line{color:var(--on)}
       return '<div class="pp-field"><span class="lb">' + r[0] + '</span><span class="val dim">' + esc(Admin2Text.stripHtml(r[1])) + '</span><span></span></div>';
     }).join("");
 
-    return gateHtml + rows + infoRows + '<div class="pp-dr-hint">' + (editing
+    return gateHtml + rows + '<div class="pp-dr-hint" id="drVisibleNote">' + esc(VISIBLE_NOTE) + '</div>'
+      + infoRows + '<div class="pp-dr-hint">' + (editing
       ? "고친 필드는 저장하면 잠깁니다 — 다음 적재가 덮어쓰지 않습니다."
       : "읽기 전용입니다. [수정]을 누르면 이 탭이 그 자리에서 편집으로 바뀌고, 저장하면 읽기로 복귀합니다.") + '</div>';
   }
@@ -2235,6 +2251,7 @@ a.pp-btn-line{color:var(--on)}
       var k=el.dataset.f, v=el.value;
       if(k==="sale_price" || k==="purchase_price"){ out[k] = v===""? "" : Number(v); }
       else if(k==="stock_qty"){ out[k] = v===""? 0 : Number(v); }
+      else if(k==="is_visible"){ var b = visibleOf(v); if(b !== null) out[k] = b; }   // 문자열 "false" 를 보내지 않는다
       else { out[k]=v; }
     });
     return out;

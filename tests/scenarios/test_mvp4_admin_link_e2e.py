@@ -8,6 +8,8 @@
      새 값을 낸다(캐시가 옛 값을 쥐고 있지 않다).
   ③ 상품 확인 창 판정: 완제품 PC · AI 장비는 부품 추천 기준을 적용하지 않고(gate_applies=false),
      부품은 적용한다. 고객 링크는 PC/장비/부품을 가른다.
+  ④ 관리자 노출 스위치(PR431): 숨김 → 고객 목록·링크·상세·사진 제외 · 문자열/숫자/null 거부 ·
+     되돌리기로 노출·잠금 복원 · 다시 노출해도 품절이면 여전히 제외.
 
 어디서만 도나:
   「끝까지 시나리오」 CI 작업의 일회용 PostgreSQL(마이그레이션만 적용 · 측정기 뒤)에서만 돈다.
@@ -62,6 +64,7 @@ def env():
     def patch(code, **changes):
         rr = admin.patch(f"/api/admin/products/{code}", json={"changes": changes}, headers=ORIGIN)
         assert rr.status_code == 200, rr.text
+        return rr.json()
 
     return dict(admin=admin, guest=guest, engine=engine, text=text, ai_cat=ai_cat,
                 register=register, patch=patch, tag=tag)
@@ -129,14 +132,29 @@ def test_pc_link_follows_customer_catalog_after_edit(env):
     link = a.get(f"/api/admin/products/{pc}/customer-link").json()
     assert link["url"] == f"/mvp4/?screen=product&id={pc}"
     assert any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
-    p(pc, is_visible=False)
-    assert a.get(f"/api/admin/products/{pc}").status_code == 200
+    hidden = p(pc, is_visible=False)
+    assert hidden["fields"] == ["is_visible"] and "is_visible" in hidden["locked_fields"]
+    detail = a.get(f"/api/admin/products/{pc}")
+    assert detail.status_code == 200 and detail.json()["is_visible"] is False   # 관리자는 숨김 상품도 본다
     link = a.get(f"/api/admin/products/{pc}/customer-link").json()
     assert link["url"] is None and link["state"] == "hidden"
     assert not any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
     for path in (f"/api/customer/pc-registered/{pc}", f"/api/customer/pc-offers/{pc}",
                  f"/api/customer/products/{pc}/representative-image?size=card"):
         assert a.get(path).status_code == 404
+    # 문자열·숫자·null 은 참/거짓으로 짐작하지 않는다 — 400 이고 숨김 상태 그대로
+    for bad in ("true", 1, None):
+        r = a.patch(f"/api/admin/products/{pc}", json={"changes": {"is_visible": bad}}, headers=ORIGIN)
+        assert r.status_code == 400, (bad, r.text)
+    assert a.get(f"/api/admin/products/{pc}").json()["is_visible"] is False
+    # 되돌리기 — 노출과 잠금이 함께 수정 전으로 돌아간다
+    r = a.post(f"/api/admin/products/undo/{hidden['undo_id']}", headers=ORIGIN)
+    assert r.status_code == 200, r.text
+    d = a.get(f"/api/admin/products/{pc}").json()
+    assert d["is_visible"] is True and "is_visible" not in d["locked_fields"]
+    assert any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
+    p(pc, is_visible=False)
+    assert not any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
     p(pc, is_visible=True)
     assert a.get(f"/api/admin/products/{pc}/customer-link").json()["url"] is not None
     assert any(i["product_code"] == pc for i in a.get("/api/customer/pc-catalog").json()["items"])
