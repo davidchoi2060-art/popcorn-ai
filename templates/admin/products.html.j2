@@ -457,6 +457,10 @@ a.pp-btn-line{color:var(--on)}
 .pp-dr-photo .side button{align-self:flex-start}
 .pp-dr-photo .cust{display:inline-flex;align-items:center;padding:6px 10px;border-radius:6px;border:1px solid var(--sn-line,var(--outline-variant));
   color:var(--sn-muted,var(--rv-faint));background:var(--sn-bg,var(--container-low));font:600 11.5px/1.2 var(--font);cursor:not-allowed}
+.pp-dr-photo a.cust-on{color:var(--sn-accent,#007D65);background:var(--card);border-color:var(--sn-accent,#007D65);cursor:pointer;text-decoration:none}
+.pp-dr-photo a.cust-on:hover{text-decoration:underline}
+.pp-dr-photo a.cust-on:focus-visible{outline:3px solid var(--rv-green,#007D65);outline-offset:2px}
+.pp-dr-photo .cust-note{font:400 11.5px/1.5 var(--font);color:var(--sn-muted,var(--rv-muted));overflow-wrap:anywhere}
 @media (prefers-reduced-motion:reduce){.pp-row{transition:none}}
 @media (max-width:768px){.pp-row .pp-price{text-align:left}.pp-head{padding:16px 12px 2px}.pp-quick,.pp-applied{margin-left:12px;margin-right:12px}}
 </style>
@@ -1620,7 +1624,46 @@ a.pp-btn-line{color:var(--on)}
   function photoBlockHtml(){
     return '<div class="pp-dr-photo" id="drPhoto"><div class="ph" id="drPhotoBox">사진 확인 중…</div>'
       + '<div class="side"><span id="drPhotoNote"></span>'
-      + '<span class="cust" aria-disabled="true" title="상품 정보에 고객 화면 주소가 없어 이 화면에서는 열 수 없습니다">고객 화면 보기 · 주소 정보 없음</span></div></div>';
+      + '<span class="cust" id="drCust" aria-disabled="true">고객 화면 보기 · 확인 중…</span>'
+      + '<span class="cust-note" id="drCustNote"></span></div></div>';
+  }
+  // 고객 화면 보기 — 주소는 서버가 고객 화면과 같은 함수로 판정한다(GET …/customer-link, api/admin_customer_link.py).
+  // 관리자 화면은 번호를 주소에 붙여 만들지 않는다. 받은 주소도 같은 환경의 고객 상세 상대 경로(CUST_SAFE)일 때만 링크로 만든다.
+  // 새 탭으로 열어 이 목록의 검색·조건·페이지·선택을 그대로 둔다.
+  var CUST_SAFE = /^\/mvp4\/(\?screen=product&id=[1-9][0-9]{0,17}|supercomputer\.html\?id=[1-9][0-9]{0,17})$/;
+  function loadCustomerLink(code){
+    var el=document.getElementById("drCust"), note=document.getElementById("drCustNote");
+    if(!el || !code) return;
+    function off(label, why){
+      var s=document.createElement("span"); s.className="cust"; s.id="drCust"; s.setAttribute("aria-disabled","true");
+      s.textContent = label; if(why) s.title = why;
+      var cur=document.getElementById("drCust"); if(cur) cur.replaceWith(s);
+      if(note) note.textContent = why || "";
+    }
+    fetch(API + "/products/" + encodeURIComponent(code) + "/customer-link").then(function(r){
+      if(!r.ok) throw new Error("link " + r.status);
+      return r.json();
+    }).then(function(j){
+      if(DRAWER.code !== code) return;
+      if(j && typeof j.url === "string" && CUST_SAFE.test(j.url)){
+        var a=document.createElement("a"); a.className="cust cust-on"; a.id="drCust"; a.href=j.url;
+        a.target="_blank"; a.rel="noopener noreferrer";
+        a.textContent = j.kind === "supercomputer" ? "고객 화면 보기 (AI 슈퍼컴퓨터 상세) ↗" : "고객 화면 보기 (PC 상세) ↗";
+        a.setAttribute("aria-label", a.textContent.replace(" ↗","") + " — 새 탭에서 열림");
+        var cur=document.getElementById("drCust"); if(cur) cur.replaceWith(a);
+        if(note) note.textContent = j.reason || "";
+      } else {
+        off("고객 화면 보기 · 열 수 없음", (j && j.reason) || "고객 상세 주소가 없습니다.");
+      }
+    }).catch(function(){
+      if(DRAWER.code !== code) return;
+      off("고객 화면 보기 · 확인 실패", "고객 화면 주소를 확인하지 못했습니다.");
+      if(note){
+        var b=document.createElement("button"); b.type="button"; b.className="pp-btn-outline"; b.textContent="다시 확인";
+        b.onclick=function(){ loadCustomerLink(code); };
+        note.appendChild(document.createTextNode(" ")); note.appendChild(b);
+      }
+    });
   }
   function loadDrawerPhoto(code){
     var box=document.getElementById("drPhotoBox"), note=document.getElementById("drPhotoNote");
@@ -1778,7 +1821,7 @@ a.pp-btn-line{color:var(--on)}
     else if(DRAWER.activeTab==="supplier") host.innerHTML = supplierTabHtml(d);
     else host.innerHTML = partTypeTabHtml(d);
     wireDrawerBody();
-    if(DRAWER.activeTab==="basic" && !DRAWER.editing.basic) loadDrawerPhoto(DRAWER.code);
+    if(DRAWER.activeTab==="basic" && !DRAWER.editing.basic){ loadDrawerPhoto(DRAWER.code); loadCustomerLink(DRAWER.code); }
   }
 
   // supplier(공급처 원문)는 products의 자유 텍스트 한 칸이다 — [공급처] 탭의

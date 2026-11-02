@@ -84,8 +84,9 @@ class ProductsRedesignTests(unittest.TestCase):
         self.assertIn("다시 불러오기", seg)
 
     def test_customer_link_is_not_composed(self):
+        # 화면은 고객 주소를 만들지 않는다 — 서버 판정(customer-link)만 쓴다(2026-11-02 연결).
         self.assertNotIn("/mvp4/", JS)
-        self.assertIn("고객 화면 보기 · 주소 정보 없음", JS)
+        self.assertIn('"/customer-link"', JS)
 
     def test_no_server_string_into_innerhtml_without_escape(self):
         seg = JS[JS.index("function renderApplied"):JS.index("function unsetFilter")]
