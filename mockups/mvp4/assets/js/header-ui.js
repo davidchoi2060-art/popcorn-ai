@@ -44,7 +44,10 @@
       navLink('부품 직접 고르기', '/mvp4/pc-builder/', 'pc-builder', 'nh-primary-link') +
       navLink(icon('chat-circle') + '<span>AI로 PC 찾기</span>', route('chat'), 'chat', 'nh-primary-link nh-primary-ai') + '</div>' +
       '<div class="nh-purpose-group">' + menuButton('nh-category-button nh-category-compact', '전체 카테고리') +
-      '<div class="nh-purpose-tabs" role="group" aria-label="용도별 PC와 주변기기">' + categories.map(function (c) {
+      '<div class="nh-purpose-tabs" role="group" aria-label="용도별 PC와 주변기기">' + categories.filter(function (c) {
+        // 중복된 AI 진입점은 빠른 메뉴에서만 뺀다. 전체 카테고리 창의 항목은 유지한다.
+        return c[1] !== 'AI·고성능 PC' && c[5] !== 'supercomputers';
+      }).map(function (c) {
         return navLink(c[0], catHref(c), c[5] || c[1] || 'peripherals', 'nh-purpose-tab');
       }).join('') + '</div></div></nav></div></header>';
 
