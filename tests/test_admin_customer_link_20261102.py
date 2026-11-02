@@ -82,6 +82,8 @@ class ScreenContractTests(unittest.TestCase):
         self.assertIn('a.rel="noopener noreferrer"', seg)
         self.assertIn("CUST_SAFE.test(j.url)", seg)
         self.assertIn("DRAWER.code !== code", seg)        # 늦은 응답이 다른 상품 창을 덮지 않는다
+        self.assertIn("var my = ++CUST_SEQ;", seg)          # 같은 상품 재열기(A→B→A)도 마지막 요청만
+        self.assertEqual(seg.count("my !== CUST_SEQ"), 2)
         self.assertNotIn("innerHTML", seg)                 # 서버 문구는 textContent 로만
         self.assertIn("다시 확인", seg)
 

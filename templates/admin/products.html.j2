@@ -1631,9 +1631,12 @@ a.pp-btn-line{color:var(--on)}
   // 관리자 화면은 번호를 주소에 붙여 만들지 않는다. 받은 주소도 같은 환경의 고객 상세 상대 경로(CUST_SAFE)일 때만 링크로 만든다.
   // 새 탭으로 열어 이 목록의 검색·조건·페이지·선택을 그대로 둔다.
   var CUST_SAFE = /^\/mvp4\/(\?screen=product&id=[1-9][0-9]{0,17}|supercomputer\.html\?id=[1-9][0-9]{0,17})$/;
+  // 같은 상품을 다시 열어도(A→B→A) 앞선 요청의 늦은 응답이 새 결과를 덮지 않게 호출마다 순번을 매긴다.
+  var CUST_SEQ = 0, PHOTO_SEQ = 0;
   function loadCustomerLink(code){
     var el=document.getElementById("drCust"), note=document.getElementById("drCustNote");
     if(!el || !code) return;
+    var my = ++CUST_SEQ;
     function off(label, why){
       var s=document.createElement("span"); s.className="cust"; s.id="drCust"; s.setAttribute("aria-disabled","true");
       s.textContent = label; if(why) s.title = why;
@@ -1644,7 +1647,7 @@ a.pp-btn-line{color:var(--on)}
       if(!r.ok) throw new Error("link " + r.status);
       return r.json();
     }).then(function(j){
-      if(DRAWER.code !== code) return;
+      if(my !== CUST_SEQ || DRAWER.code !== code) return;
       if(j && typeof j.url === "string" && CUST_SAFE.test(j.url)){
         var a=document.createElement("a"); a.className="cust cust-on"; a.id="drCust"; a.href=j.url;
         a.target="_blank"; a.rel="noopener noreferrer";
@@ -1656,7 +1659,7 @@ a.pp-btn-line{color:var(--on)}
         off("고객 화면 보기 · 열 수 없음", (j && j.reason) || "고객 상세 주소가 없습니다.");
       }
     }).catch(function(){
-      if(DRAWER.code !== code) return;
+      if(my !== CUST_SEQ || DRAWER.code !== code) return;
       off("고객 화면 보기 · 확인 실패", "고객 화면 주소를 확인하지 못했습니다.");
       if(note){
         var b=document.createElement("button"); b.type="button"; b.className="pp-btn-outline"; b.textContent="다시 확인";
@@ -1668,19 +1671,20 @@ a.pp-btn-line{color:var(--on)}
   function loadDrawerPhoto(code){
     var box=document.getElementById("drPhotoBox"), note=document.getElementById("drPhotoNote");
     if(!box || !code) return;
+    var my = ++PHOTO_SEQ;
     box.textContent = "사진 확인 중…"; if(note) note.textContent = "";
     fetch("/api/product-images/" + encodeURIComponent(code) + "/thumbnail").then(function(r){
-      if(DRAWER.code !== code) return null;
+      if(my !== PHOTO_SEQ || DRAWER.code !== code) return null;
       if(r.status === 404){ box.textContent = "등록된 사진 없음"; return null; }
       if(!r.ok) throw new Error("photo " + r.status);
       return r.blob();
     }).then(function(b){
-      if(!b || DRAWER.code !== code) return;
+      if(!b || my !== PHOTO_SEQ || DRAWER.code !== code) return;
       if(PHOTO_URL) URL.revokeObjectURL(PHOTO_URL);
       PHOTO_URL = URL.createObjectURL(b);
       box.innerHTML = ""; var img = document.createElement("img"); img.alt = "대표 사진"; img.src = PHOTO_URL; box.appendChild(img);
     }).catch(function(){
-      if(DRAWER.code !== code) return;
+      if(my !== PHOTO_SEQ || DRAWER.code !== code) return;
       box.textContent = "사진을 불러오지 못했습니다";
       if(note){
         note.innerHTML = "";
