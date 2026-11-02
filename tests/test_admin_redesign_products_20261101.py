@@ -117,5 +117,24 @@ class EnvLabelConfigTests(unittest.TestCase):
             self.assertEqual(env_label(req("dev.popcornai.co.kr")), "개발 환경")
 
 
+class NarrowDrawerFitTests(unittest.TestCase):
+    """좁은 화면 서랍은 스크롤바 폭만큼 왼쪽으로 밀리지 않는다(2026-11-02 Codex D-01)."""
+    CSS = (ROOT / "mockups/shared/admin2/management-dialogs.css").read_text(encoding="utf-8")
+
+    def test_drawer_width_not_from_100vw(self):
+        for m in re.finditer(r"([^{}]*\.(?:pp|cr)-drawer[^{}]*)\{([^}]*)\}", self.CSS):
+            self.assertNotRegex(m.group(2), r"(?<!max-)width:\s*calc\(100vw", m.group(1))
+            self.assertNotIn("max-width:calc(100vw", m.group(2), m.group(1))
+
+    def test_overlay_drawer_locks_background_scroll(self):
+        self.assertIn('classList.toggle("pp-scroll-lock", open && !panel)', JS)
+        self.assertIn("html.pp-scroll-lock", TPL)
+
+    def test_shared_css_cache_version_bumped_everywhere(self):
+        for name in ("compat_rules", "products", "spec_field_defs", "spec_standard"):
+            t = (ROOT / f"templates/admin/{name}.html.j2").read_text(encoding="utf-8")
+            self.assertIn("management-dialogs.css?v=20261102", t, name)
+
+
 if __name__ == "__main__":
     unittest.main()
