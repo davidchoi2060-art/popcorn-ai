@@ -1783,7 +1783,13 @@ a.pp-btn-line{color:var(--on)}
     // review_pending(검수 큐 실행 건수)은 살아있는 신호가 아니다: 신규 등록은
     // 검수행을 아예 안 만들고, 사양 편집을 되돌려도 닫힌 검수행은 안 열린다.
     // 그래서 review_pending=0인데 실제로는 검수 대기인 상품이 생긴다(실측 6건).
-    if(d.status_key === "review"){ badge.hidden=false; badge.className="pp-badge pp-badge-warn"; badge.textContent="검수 대기"; }
+    // 완제품 PC·AI 슈퍼컴퓨터(gate_applies=false)는 부품 견적 후보가 될 수 없다 — 「추천 제외」 대신
+    // 목록 배지와 같은 판매 상태를 보인다(2026-11-02 Codex 검수: 목록 「추천 가능」 ↔ 창 「추천 제외」 반대말).
+    if(d.gate_applies === false){
+      var stv = ST[d.status_key] || ST.review;
+      badge.hidden=false; badge.className="pp-badge " + stv.cls; badge.textContent=stv.label;
+    }
+    else if(d.status_key === "review"){ badge.hidden=false; badge.className="pp-badge pp-badge-warn"; badge.textContent="검수 대기"; }
     else if(d.in_pool){ badge.hidden=false; badge.className="pp-badge pp-badge-ok"; badge.textContent="추천 가능"; }
     else { badge.hidden=false; badge.className="pp-badge pp-badge-bad"; badge.textContent="추천 제외"; }
     document.getElementById("drSub").innerHTML = [d.product_code, d.sku, d.cat, d.maker||"제조사 미상"]
@@ -1882,7 +1888,9 @@ a.pp-btn-line{color:var(--on)}
     }).join("");
 
     var gate = d.gate || [];
-    var gateHtml = '<div class="pp-gate"><div class="pp-gate-note">' + esc(d.gate_note||"") + '</div>'
+    var gateHtml = d.gate_applies === false
+      ? '<div class="pp-gate pp-gate-na"><div class="pp-gate-note">' + esc(d.gate_scope_note||"") + '</div></div>'
+      : '<div class="pp-gate"><div class="pp-gate-note">' + esc(d.gate_note||"") + '</div>'
       + '<div class="pp-gate-list">' + gate.map(function(g){
           return '<div class="pp-gate-item ' + (g.ok?"ok":"bad") + '"><span class="pp-gate-dot"></span>'
             + '<span class="k">' + esc(g.label) + '</span><span class="v">' + esc(g.value) + '</span></div>';

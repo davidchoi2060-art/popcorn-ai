@@ -129,10 +129,29 @@ def public_levels(levels) -> list[dict]:
     return out
 
 
+def listed(p) -> bool:
+    """추천 풀 상품이 고객 PC 목록에 오르는가 — 목록(_build)과 단일 상품 판정(listed_item)이 같이 쓴다."""
+    return p.get("status") == "판매중"
+
+
+def listed_item(code) -> dict | None:
+    """상품 하나가 고객 PC 목록에 있는가 — 있으면 {product_code, price}, 없으면 None.
+
+    전체 목록을 만들지 않고 그 상품만 읽는다(`load(codes=...)`). 판정은 목록과 같다: 추천 풀(load) ∩ listed().
+    고객 상세 화면은 이 목록에 있어야 상품을 그리고 가격이 없으면 「가격 확인」을 그린다.
+    """
+    if type(code) is not int:
+        return None
+    p = load(codes=[code])[1].get(code)
+    if p is None or not listed(p):
+        return None
+    return {"product_code": code, "price": _price(p.get("price"))}
+
+
 def _build():
     levels, products = load()
     public, media = public_codes(), _media_hints()
-    items = [item_of(p, public, media) for p in products.values() if p.get("status") == "판매중"]
+    items = [item_of(p, public, media) for p in products.values() if listed(p)]
     items.sort(key=lambda it: (it["price"] is None, it["price"] or 0, it["product_code"]))
     return levels, items
 

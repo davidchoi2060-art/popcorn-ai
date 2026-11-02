@@ -72,8 +72,15 @@ def price_basis(sale_at, reason):
     return f"{day.month}월 {day.day}일 기준 {where} · {PRICE_CONFIRM}"
 
 
-def load():
-    """(levels, products{code: dict}, fits{code: {usage: rank}}) — 판매 가능 상품만."""
+def load(codes=None):
+    """(levels, products{code: dict}, fits{code: {usage: rank}}) — 판매 가능 상품만.
+
+    `codes` 를 주면 그 상품만 읽는다(판정·변환은 같다 — 행 범위만 좁힌다). 관리자 상품 확인 창의
+    고객 링크 판정(api/admin_customer_link)이 상품 하나 때문에 전체 풀을 읽지 않게 하려는 것이다.
+    """
+    only = " WHERE f.product_code = ANY(:codes)" if codes is not None else ""
+    only_fit = " WHERE product_code = ANY(:codes)" if codes is not None else ""
+    params = {"codes": [int(c) for c in codes]} if codes is not None else {}
     with engine.connect() as conn:
         levels = [dict(r._mapping) for r in conn.execute(text(
             "SELECT usage, level, level_rank, work, conditions FROM product_fit_levels ORDER BY sort_order"))]
@@ -85,9 +92,10 @@ def load():
             "   AND h.field = 'sale' ORDER BY h.changed_at DESC LIMIT 1) AS sale_at,"
             " (SELECT h.reason FROM product_price_history h WHERE h.product_code = f.product_code"
             "   AND h.field = 'sale' ORDER BY h.changed_at DESC LIMIT 1) AS sale_reason"
-            " FROM product_fit_products f LEFT JOIN products p ON p.product_code = f.product_code")).all()
+            " FROM product_fit_products f LEFT JOIN products p ON p.product_code = f.product_code" + only),
+            params).all()
         fit_rows = conn.execute(text(
-            "SELECT product_code, usage, level, level_rank, blocked FROM product_usage_fit")).all()
+            "SELECT product_code, usage, level, level_rank, blocked FROM product_usage_fit" + only_fit), params).all()
     products = {}
     for r in rows:
         m = dict(r._mapping)

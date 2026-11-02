@@ -72,7 +72,7 @@ class SafeUrlTests(unittest.TestCase):
     def test_client_regex_matches_server_regex(self):
         m = re.search(r"var CUST_SAFE = /(.+?)/;", JS)
         self.assertIsNotNone(m)
-        self.assertEqual(m.group(1).replace("\/", "/"), L._SAFE.pattern)
+        self.assertEqual(m.group(1).replace(chr(92) + "/", "/"), L._SAFE.pattern)
 
 
 class ScreenContractTests(unittest.TestCase):
@@ -93,6 +93,75 @@ class ScreenContractTests(unittest.TestCase):
         self.assertIn("/api/admin/products/{product_code}/customer-link", paths)
         from api.auth import required_role
         self.assertEqual(required_role("GET", "/api/admin/products/1/customer-link"), "viewer")
+
+
+class _Conn:
+    """in_supercomputer_category 가 부르는 scalar() 한 번만 흉내 낸다(DB 없음)."""
+    def __init__(self, inside): self.inside = inside
+    def execute(self, *_a, **_k): return self
+    def scalar(self): return self.inside
+
+
+class PartGateScopeTests(unittest.TestCase):
+    """완제품 PC·AI 슈퍼컴퓨터에 부품 견적 후보 기준을 대지 않는다(2026-11-02 Codex 검수 113835 · 129774)."""
+
+    def test_pc_and_supercomputer_are_not_part_gated(self):
+        self.assertFalse(L.part_gate_applies(_Conn(False), 113835, "PC_COMPLETE"))
+        self.assertFalse(L.part_gate_applies(_Conn(True), 129774, "ETC"))
+
+    def test_parts_and_misclassified_etc_keep_part_gate(self):
+        self.assertTrue(L.part_gate_applies(_Conn(False), 114634, "CPU"))
+        self.assertTrue(L.part_gate_applies(_Conn(False), 1, "ETC"))   # ETC 로 잘못 들어간 부품 — 분류 오류 단서 유지
+
+    def test_detail_api_carries_scope(self):
+        src = (ROOT / "api/admin_products.py").read_text(encoding="utf-8")
+        seg = src[src.index("def get_product(product_code: int):"):]
+        self.assertIn("gate_applies = part_gate_applies(conn, product_code, r[\"part_type\"])", seg)
+        self.assertIn('"gate_applies": gate_applies', seg)
+        self.assertIn('"gate_scope_note": None if gate_applies else GATE_NOT_PART_NOTE', seg)
+
+    def test_drawer_uses_list_status_when_not_part_gated(self):
+        i = JS.index("if(d.gate_applies === false){")
+        self.assertLess(i, JS.index('badge.textContent="추천 제외"'))      # 「추천 제외」보다 먼저 가른다
+        self.assertIn("ST[d.status_key]", JS[i:i + 300])                  # 목록 배지와 같은 표(ST)
+        self.assertIn("'<div class=\"pp-gate pp-gate-na\">", JS)
+        self.assertIn("esc(d.gate_scope_note", JS)
+
+
+class SingleProductPcJudgeTests(unittest.TestCase):
+    """PC 판정은 전체 목록을 다시 만들지 않고 같은 판정(추천 풀 ∩ listed)을 상품 하나에 적용한다."""
+
+    def test_link_uses_single_item_path_not_full_catalog(self):
+        src = (ROOT / "api/admin_customer_link.py").read_text(encoding="utf-8")
+        body = src[src.index("def customer_link("):]
+        self.assertIn("customer_pc_catalog.listed_item(product_code)", body)
+        self.assertNotIn("catalog()", body)
+
+    def test_catalog_and_single_item_share_predicate(self):
+        src = (ROOT / "api/customer_pc_catalog.py").read_text(encoding="utf-8")
+        self.assertIn("if listed(p)]", src[src.index("def _build"):])
+        self.assertIn("not listed(p)", src[src.index("def listed_item"):src.index("def _build")])
+        self.assertIn("load(codes=[code])", src)
+
+    def test_load_scope_filter_only_narrows_rows(self):
+        from unittest import mock
+        from api import admin_product_fit as F
+        seen = []
+
+        class C:
+            def __enter__(s): return s
+            def __exit__(s, *a): return False
+            def execute(s, sql, params=None):
+                seen.append((str(sql), params)); return s
+            def all(s): return []
+            def __iter__(s): return iter([])
+        with mock.patch.object(F, "engine", mock.Mock(connect=lambda: C())):
+            F.load(); full = list(seen); seen.clear()
+            F.load(codes=[113835])
+        self.assertNotIn("ANY(:codes)", " ".join(q for q, _ in full))
+        scoped = [q for q, p in seen if p and p.get("codes") == [113835]]
+        self.assertEqual(len(scoped), 2)          # 상품 행 + 용도 평가 행
+        self.assertTrue(all("ANY(:codes)" in q for q in scoped))
 
 
 if __name__ == "__main__":
