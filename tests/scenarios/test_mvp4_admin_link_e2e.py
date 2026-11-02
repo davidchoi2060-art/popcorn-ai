@@ -3,7 +3,7 @@
 무엇을 증명하나 (단위·계약 테스트가 못 하는 것):
   ① 문의 저장 → 관리자 처리함 조회: /mvp4 화면 표시(X-Popcorn-Surface)로 접수한 AI 슈퍼컴퓨터 문의가
      관리자 목록에서 상품 번호 · 모델(이름·용량·수량) · 문의 종류(fixed) · 화면(mvp4)을 그대로 갖는다.
-     연락처는 목록에서 가려진다.
+     (연락처 가림은 조회 등급 정책이라 owner 계정인 이 테스트에서는 증명하지 않는다.)
   ② 관리자 수정 → 고객 재조회: 판매가·판매 상태를 고친 «직후» 고객 API 와 관리자 고객 링크 판정이
      새 값을 낸다(캐시가 옛 값을 쥐고 있지 않다).
   ③ 상품 확인 창 판정: 완제품 PC · AI 장비는 부품 추천 기준을 적용하지 않고(gate_applies=false),
@@ -99,7 +99,9 @@ def test_inquiry_saved_and_read_back_with_context(env, device):
     assert fp["unit_price"] == 1000000 and fp["price_differs"] is False
     assert row["inquiry_kind"] == "fixed"                      # 종류
     assert row["surface"] == "mvp4"                            # 화면
-    assert row["email"] != f"e2e-{env['tag']}@example.invalid"  # 목록에서는 연락처를 가린다
+    # 연락처: 쓰기 권한(운영자 이상)에게는 전체, 조회 등급에게만 가린다(admin_purchase_inquiries: full = _can_write).
+    # 이 테스트 계정은 owner 라 전체가 보이는 것이 정책이다. 조회 등급의 가림은 여기서 증명하지 않는다.
+    assert row["email"] == f"e2e-{env['tag']}@example.invalid"
 
 
 def test_admin_edit_is_visible_to_customer_on_next_read(env, device):
