@@ -220,5 +220,82 @@ class DrawerUiTests(unittest.TestCase):
         self.assertEqual(len(re.findall(r'method *: *"(?:POST|PATCH|PUT|DELETE)"', self.TPL)), 8)
 
 
+class DrawerRoleBoundaryTests(unittest.TestCase):
+    """viewer 보완(PC2 Codex 검수 2026-11-02) — 확인 창의 쓰기 진입은 실제 세션 등급(Admin2Shell.canWrite)만 본다.
+
+    ① 판정 함수를 실제 JS 로 실행해 owner/operator 만 참, viewer·모르는 등급·등급 없음·셸 없음은 거짓(fail-closed).
+    ② 버튼을 그리는 곳: 쓰기 불가면 수정·저장·미리보기·확정 버튼 마크업에 닿기 전에 돌아간다.
+    ③ 핸들러: 서랍 안 쓰기 요청을 보내는 함수마다 첫머리에서 같은 판정을 한다(버튼이 남아도 편집·요청이 나가지 않는다).
+    """
+    TPL = (ROOT / "templates" / "admin" / "products.html.j2").read_text(encoding="utf-8")
+    SHELL = (ROOT / "mockups" / "shared" / "admin2" / "admin2-shell.js").read_text(encoding="utf-8")
+
+    def fn(self, name):
+        m = re.search(r"\n  function " + name + r"\([^)]*\)\{.*?\n  \}\n", self.TPL, re.S)
+        self.assertIsNotNone(m, name)
+        return m.group(0)
+
+    def test_writable_judgement_runs_on_real_role_and_fails_closed(self):
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node 없음 — CI(Node 22)에서 실행")
+        writable = re.search(r"function drawerWritable\(\)\{[^\n]+\}", self.TPL).group(0)
+        rank = re.search(r"var ROLE_RANK = \{[^}]+\};", self.SHELL).group(0)
+        can = re.search(r"function canWrite\(minRole\) \{.*?\n  \}", self.SHELL, re.S).group(0)
+        # 셸의 ROLE_RANK·canWrite 원문과 화면의 drawerWritable 원문을 그대로 실행한다(me 는 셸이 /auth/me 로 채우는 값)
+        js = "var me = null;\n" + rank + "\n" + can + "\n" + writable + """
+var out = {};
+var cases = {owner:{role:'owner'}, operator:{role:'operator'}, viewer:{role:'viewer'}, unknown:{role:'admin'}, empty:{}, none:null};
+Object.keys(cases).forEach(function(k){ me = cases[k]; global.window = {Admin2Shell: {canWrite: canWrite}}; out[k] = drawerWritable(); });
+me = {role:'owner'}; global.window = {}; out.noShell = drawerWritable();
+console.log(JSON.stringify(out));
+"""
+        r = subprocess.run([node, "-e", js], capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(json.loads(r.stdout), {"owner": True, "operator": True, "viewer": False,
+                                                "unknown": False, "empty": False, "none": False, "noShell": False})
+
+    def test_writable_uses_shell_session_role_not_dom(self):
+        w = re.search(r"function drawerWritable\(\)\{[^\n]+\}", self.TPL).group(0)
+        self.assertEqual(w, 'function drawerWritable(){ return !!(window.Admin2Shell && window.Admin2Shell.canWrite("operator")); }')
+        self.assertNotIn("roleBox", self.fn("renderDrawerFooter"))
+
+    def test_footer_returns_before_any_write_button(self):
+        foot = self.fn("renderDrawerFooter")
+        guard = foot.index("if(!drawerWritable()){")
+        for marker in ('id="drEdit"', 'id="drSave"', 'id="drPreview"', 'id="drConfirm"', 'id="drReselect"'):
+            self.assertGreater(foot.index(marker), guard, marker)
+        ro = foot[guard:foot.index("if(tab===", guard)]
+        self.assertIn("dropDrawerEditing();", ro)
+        self.assertIn("return;", ro)
+        self.assertNotIn("drEdit", ro)
+
+    def test_body_drops_editing_when_not_writable(self):
+        body = self.fn("renderDrawerBody")
+        self.assertLess(body.index("if(!drawerWritable()) dropDrawerEditing();"), body.index("basicTabHtml"))
+
+    def test_every_drawer_write_handler_is_guarded(self):
+        guarded = ("onDrEditClick", "onDrSaveClick", "onDrPreviewClick", "onDrConfirmClick", "supplierAdd", "supplierDelete")
+        for name in guarded:
+            src = self.fn(name)
+            first_fetch = src.find("fetch(")
+            g = src.find("if(!drawerWritable())")
+            self.assertGreater(g, -1, name)
+            if first_fetch > -1:
+                self.assertLess(g, first_fetch, name)
+        self.assertIn('e.onclick=function(){ if(!drawerWritable()) return; DRAWER.partPreview=null;', self.TPL)
+        # 서랍 영역(openDrawer 이후)의 쓰기 fetch 는 모두 위 함수 안에 있다 — 새 쓰기 경로가 생기면 여기서 걸린다
+        start = self.TPL.index("\n  function openDrawer(")
+        for m in re.finditer(r'method *: *"(?:POST|PATCH|PUT|DELETE)"', self.TPL[start:]):
+            pos = start + m.start()
+            owner = re.findall(r"\n  function (\w+)\(", self.TPL[:pos])[-1]
+            self.assertIn(owner, guarded, owner)
+
+    def test_role_rerender_after_session_known(self):
+        self.assertIn("window.Admin2Shell.meReady.then(function(){ if(DRAWER.code && DRAWER.data){ renderDrawerBody(); renderDrawerFooter(); } });", self.TPL)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1825,6 +1825,7 @@ a.pp-btn-line{color:var(--on)}
 
   function renderDrawerBody(){
     var host = document.getElementById("drBody"); if(!host) return;
+    if(!drawerWritable()) dropDrawerEditing();
     var d = DRAWER.data;
     if(DRAWER.activeTab==="basic") host.innerHTML = (DRAWER.editing.basic ? "" : photoBlockHtml()) + basicTabHtml(d);
     else if(DRAWER.activeTab==="spec") host.innerHTML = specTabHtml(d);
@@ -1854,6 +1855,26 @@ a.pp-btn-line{color:var(--on)}
     // 노출로 되돌려도 판매 상태·평가 제외 등 다른 공개 조건은 그대로다. 서버는 JSON true/false 만 받는다.
     ["is_visible","고객 노출","visible","is_visible"]
   ];
+  // PR431 보완(2026-11-02 PC2 Codex viewer 검수) — 확인 창의 쓰기 진입(수정·저장·미리보기·확정 변경·
+  // 공급처 추가/삭제)은 셸이 실제 로그인 세션(GET /api/admin/auth/me)으로 판정한 등급만 쓴다
+  // (Admin2Shell.canWrite — 다른 admin2 화면과 같은 helper). 등급을 아직 모르거나(응답 전·실패)
+  // 셸이 없으면 쓰기 불가로 둔다(fail-closed). 서버 게이트(쓰기 운영자 이상)는 그대로 — 이것은 화면이
+  // 할 수 없는 일을 내밀지 않게 하는 장치다. 버튼을 그리는 곳과 핸들러 양쪽에서 같은 판정을 쓴다.
+  function drawerWritable(){ return !!(window.Admin2Shell && window.Admin2Shell.canWrite("operator")); }
+  function drawerReadonlyNote(){
+    var me = window.Admin2Shell && window.Admin2Shell.getMe ? window.Admin2Shell.getMe() : null;
+    return me ? "조회 등급은 읽기만 할 수 있습니다 — 수정은 운영자 이상" : "로그인 등급을 확인하지 못해 읽기만 할 수 있습니다";
+  }
+  // 쓰기 권한이 없으면 편집 상태가 남아 있지 않게 한다(편집 입력·저장 버튼이 그려질 길을 닫는다).
+  function dropDrawerEditing(){
+    DRAWER.editing = {basic:false, spec:false, supplier:false, parttype:false};
+    DRAWER.editDraft = {basic:null, spec:null};
+    DRAWER.partSel = null; DRAWER.partPreview = null;
+  }
+  // 등급 응답이 오기 전에 열린 창(주소의 sel=)은 읽기 전용으로 그려졌다 — 응답이 오면 같은 판정으로 다시 그린다.
+  if(window.Admin2Shell && window.Admin2Shell.meReady){
+    window.Admin2Shell.meReady.then(function(){ if(DRAWER.code && DRAWER.data){ renderDrawerBody(); renderDrawerFooter(); } });
+  }
   var VISIBLE_NOTE = "숨김은 고객 PC 목록·추천·상세·대표 사진에서 제외합니다. 노출로 바꿔도 판매 상태 등 다른 공개 조건은 그대로 적용됩니다.";
   function visibleOf(v){ return v === true || v === "true" ? true : (v === false || v === "false" ? false : null); }
   function basicTabHtml(d){
@@ -2168,6 +2189,12 @@ a.pp-btn-line{color:var(--on)}
     // 결함 5건 수정(2026-09-11) — 서랍 내 인라인 오류. 지금 보고 있는 탭에 해당하는
     // 실패만 보여준다(다른 탭에서 난 지난 실패가 여기로 새지 않는다).
     var errHtml = DRAWER.err[tab] ? ('<div class="pp-dr-err" role="alert">' + esc(DRAWER.err[tab]) + '</div>') : "";
+    if(!drawerWritable()){
+      // 읽기 전용 — 수정·저장·미리보기·확정 변경 버튼을 만들지 않는다(가리는 것이 아니라 그리지 않는다).
+      dropDrawerEditing();
+      host.innerHTML = errHtml + '<span class="note" id="drReadonlyNote">' + esc(drawerReadonlyNote()) + '</span>' + reviewBtn;
+      return;
+    }
     if(tab==="basic" || tab==="spec"){
       if(DRAWER.editing[tab]){
         var busy = !!DRAWER.saveBusy;
@@ -2218,11 +2245,12 @@ a.pp-btn-line{color:var(--on)}
     if((e=document.getElementById("drCancel"))) e.onclick=onDrCancelClick;
     if((e=document.getElementById("drSave"))) e.onclick=onDrSaveClick;
     if((e=document.getElementById("drPreview"))) e.onclick=onDrPreviewClick;
-    if((e=document.getElementById("drReselect"))) e.onclick=function(){ DRAWER.partPreview=null; renderDrawerBody(); renderDrawerFooter(); };
+    if((e=document.getElementById("drReselect"))) e.onclick=function(){ if(!drawerWritable()) return; DRAWER.partPreview=null; renderDrawerBody(); renderDrawerFooter(); };
     if((e=document.getElementById("drConfirm"))) e.onclick=onDrConfirmClick;
   }
 
   function onDrEditClick(){
+    if(!drawerWritable()){ renderDrawerFooter(); return; }   // 버튼이 남아 있어도 편집에 들어가지 않는다
     var tab = DRAWER.activeTab;
     DRAWER.err[tab] = null;   // 결함 5건 수정 — 새 편집 회차를 시작하면 지난 실패 표시를 지운다
     if(tab==="supplier" && DRAWER.editing.supplier){ DRAWER.editing.supplier=false; }
@@ -2265,6 +2293,7 @@ a.pp-btn-line{color:var(--on)}
   function onDrSaveClick(){
     var tab = DRAWER.activeTab, code = DRAWER.code;
     if(tab!=="basic" && tab!=="spec") return;
+    if(!drawerWritable()){ renderDrawerBody(); renderDrawerFooter(); return; }
     if(DRAWER.saveBusy) return;   // 중복 클릭 — 이미 요청 중
     DRAWER.saveBusy = true; DRAWER.err[tab] = null;
     renderDrawerFooter();
@@ -2309,6 +2338,7 @@ a.pp-btn-line{color:var(--on)}
     }
   }
   function onDrPreviewClick(){
+    if(!drawerWritable()){ renderDrawerBody(); renderDrawerFooter(); return; }
     if(!DRAWER.partSel){ window.alert("분류를 선택하세요"); return; }
     if(DRAWER.previewBusy) return;   // 중복 클릭 — 이미 요청 중
     // preview:true 요청엔 공용 진행 배너가 안 뜬다(ui-progress.js가 본문을 읽고
@@ -2331,6 +2361,7 @@ a.pp-btn-line{color:var(--on)}
       }).catch(function(){ DRAWER.previewBusy = false; renderDrawerFooter(); });
   }
   function onDrConfirmClick(){
+    if(!drawerWritable()){ renderDrawerBody(); renderDrawerFooter(); return; }
     if(DRAWER.saveBusy) return;   // 중복 클릭 — 이미 요청 중
     DRAWER.saveBusy = true; DRAWER.err.parttype = null;
     renderDrawerFooter();
@@ -2354,6 +2385,7 @@ a.pp-btn-line{color:var(--on)}
       });
   }
   function supplierAdd(){
+    if(!drawerWritable()){ renderDrawerBody(); renderDrawerFooter(); return; }
     var sel=document.getElementById("supAddSel"), cost=document.getElementById("supAddCost"), st=document.getElementById("supAddState");
     if(!sel || !sel.value){ window.alert("공급처를 고르세요"); return; }
     if(!cost || cost.value===""){ window.alert("매입가를 입력하세요"); return; }
@@ -2388,6 +2420,7 @@ a.pp-btn-line{color:var(--on)}
       });
   }
   function supplierDelete(supplierId, btn){
+    if(!drawerWritable()){ renderDrawerBody(); renderDrawerFooter(); return; }
     if(!window.confirm("이 공급처 매입가를 삭제할까요?")) return;
     if(DRAWER.saveBusy || DRAWER.delBusyId!=null) return;   // 다른 쓰기가 이미 진행 중
     DRAWER.delBusyId = supplierId; DRAWER.err.supplier = null;
