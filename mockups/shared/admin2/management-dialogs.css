@@ -43,8 +43,11 @@
 
 /* Mobile shell content grows with the list. Overlays must anchor to the viewport,
    not to that scroll-height. Account for the shell zoom just as PC dialogs do. */
-:is(.pp-veil,.sd-overlay,.sd-modal,.ss-modal-overlay,.cr-overlay){position:fixed;inset:0 auto auto 0;width:calc(100vw / var(--a2-zoom,1));height:calc(100dvh / var(--a2-zoom,1));box-sizing:border-box}
-:is(.pp-drawer,.cr-drawer){position:fixed;inset:0 0 auto auto;height:calc(100dvh / var(--a2-zoom,1));max-width:calc(100vw / var(--a2-zoom,1))}
+/* 너비는 100vw 로 계산하지 않는다 — 100vw 는 세로 스크롤바 폭까지 넣어서, 좁은 화면에서 서랍이
+   그만큼(약 15px) 왼쪽으로 밀려 잘렸다(2026-11-02 Codex D-01, 390px x=-15). 좌우를 화면
+   가장자리에 붙이면 스크롤바를 뺀 실제 가용 폭을 쓴다. */
+:is(.pp-veil,.sd-overlay,.sd-modal,.ss-modal-overlay,.cr-overlay){position:fixed;inset:0 0 auto 0;width:auto;height:calc(100dvh / var(--a2-zoom,1));box-sizing:border-box}
+:is(.pp-drawer,.cr-drawer){position:fixed;inset:0 0 auto auto;height:calc(100dvh / var(--a2-zoom,1));max-width:100%}
 @media(max-width:768px){
- :is(.pp-drawer,.cr-drawer){width:calc(100vw / var(--a2-zoom,1))}
+ :is(.pp-drawer,.cr-drawer){left:0;width:auto;max-width:none}
 }

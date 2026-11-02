@@ -117,5 +117,46 @@ class EnvLabelConfigTests(unittest.TestCase):
             self.assertEqual(env_label(req("dev.popcornai.co.kr")), "개발 환경")
 
 
+class NarrowDrawerFitTests(unittest.TestCase):
+    """좁은 화면 서랍은 스크롤바 폭만큼 왼쪽으로 밀리지 않는다(2026-11-02 Codex D-01)."""
+    CSS = (ROOT / "mockups/shared/admin2/management-dialogs.css").read_text(encoding="utf-8")
+
+    def test_drawer_width_not_from_100vw(self):
+        for m in re.finditer(r"([^{}]*\.(?:pp|cr)-drawer[^{}]*)\{([^}]*)\}", self.CSS):
+            self.assertNotRegex(m.group(2), r"(?<!max-)width:\s*calc\(100vw", m.group(1))
+            self.assertNotIn("max-width:calc(100vw", m.group(2), m.group(1))
+
+    def test_overlay_drawer_locks_background_scroll(self):
+        self.assertIn('classList.toggle("pp-scroll-lock", open && !panel)', JS)
+        self.assertIn("html.pp-scroll-lock", TPL)
+
+    def test_shared_css_cache_version_bumped_everywhere(self):
+        for name in ("compat_rules", "products", "spec_field_defs", "spec_standard"):
+            t = (ROOT / f"templates/admin/{name}.html.j2").read_text(encoding="utf-8")
+            self.assertIn("management-dialogs.css?v=20261102", t, name)
+
+
+class ProductWritePermissionTests(unittest.TestCase):
+    """상품 화면이 부르는 쓰기 요청은 서버 게이트에서 «운영자 이상», 읽기는 «조회 이상»이다.
+    재설계는 이 판정·API 를 바꾸지 않았다 — 화면 문구 「조회: 모든 등급 · 쓰기: 운영자 이상」과
+    서버 판정이 같은지 DB 없이 고정한다(2026-11-02 Codex 마무리 검수 §5-3)."""
+
+    WRITES = (("POST", "/api/admin/products/bulk-status"), ("POST", "/api/admin/products/bulk-status/undo"),
+              ("PATCH", "/api/admin/products/123"), ("PATCH", "/api/admin/products/123/specs"),
+              ("POST", "/api/admin/products/123/part-type"), ("POST", "/api/admin/products/123/suppliers"),
+              ("DELETE", "/api/admin/products/123/suppliers/7"))
+
+    def test_every_write_call_in_screen_is_listed(self):
+        self.assertEqual(len(re.findall(r'method *: *"(?:POST|PATCH|PUT|DELETE)"', JS)), 8)  # part-type 미리보기·확정 2곳 포함
+
+    def test_writes_need_operator_reads_need_viewer(self):
+        from api.auth import required_role
+        for m, path in self.WRITES:
+            self.assertEqual(required_role(m, path), "operator", (m, path))
+        for path in ("/api/admin/products", "/api/admin/products/123", "/api/admin/product-meta"):
+            self.assertEqual(required_role("GET", path), "viewer", path)
+        self.assertIn("조회: 모든 등급 · 쓰기: 운영자 이상", TPL)
+
+
 if __name__ == "__main__":
     unittest.main()

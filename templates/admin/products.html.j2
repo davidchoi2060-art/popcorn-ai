@@ -259,6 +259,7 @@ a.pp-btn-dark{color:var(--on-primary);text-decoration:none;display:inline-flex;a
        border-left:1px solid rgba(0,0,0,.16);box-shadow:-22px 0 48px rgba(38,35,30,.24);
        display:flex;flex-direction:column;z-index:10}
 .pp-drawer[hidden]{display:none}
+html.pp-scroll-lock,html.pp-scroll-lock body{overflow:hidden}
 .pp-dr-head{flex:none;padding:14px 18px 0;border-bottom:1px solid rgba(0,0,0,.09)}
 .pp-dr-title-row{display:flex;align-items:center;gap:9px}
 .pp-dr-title{font:600 14px/1.35 var(--font);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
@@ -459,7 +460,7 @@ a.pp-btn-line{color:var(--on)}
 @media (prefers-reduced-motion:reduce){.pp-row{transition:none}}
 @media (max-width:768px){.pp-row .pp-price{text-align:left}.pp-head{padding:16px 12px 2px}.pp-quick,.pp-applied{margin-left:12px;margin-right:12px}}
 </style>
-<link rel="stylesheet" href="/shared/admin2/management-dialogs.css?v=20261002">
+<link rel="stylesheet" href="/shared/admin2/management-dialogs.css?v=20261102">
 {% endblock %}
 
 {% block content %}
@@ -1590,6 +1591,9 @@ a.pp-btn-line{color:var(--on)}
     if(panel) dr.removeAttribute("aria-modal"); else dr.setAttribute("aria-modal", "true");
     dr.setAttribute("aria-label", panel ? "상품 확인" : "상품 상세");
     if(veil) veil.hidden = !open || panel;
+    // 겹치는 서랍이 열려 있는 동안 뒤 목록은 스크롤하지 않는다 — 바깥·안쪽 스크롤바가 함께
+    // 보이던 문제(2026-11-02 Codex D-01). 오른쪽 패널 모드는 목록을 함께 쓰므로 잠그지 않는다.
+    document.documentElement.classList.toggle("pp-scroll-lock", open && !panel);
   }
   if(PANEL_MQ){
     var onPanelMq = function(){ syncPanelMode(); };
