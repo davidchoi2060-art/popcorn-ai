@@ -58,7 +58,7 @@
         그 축을 그대로 재사용한다(상태 탭의 "재고 없음"과 **같은 서버 판정** — 별도 정의를
         만들지 않는다. 두 원천이 같은 걸 다르게 말하면 안 된다, ④-B4 선례). "재고 있음"·
         "10개 이하"는 GET /products에 조회 조건이 없어(B-7 "신설(파라미터)") 셀렉트에
-        disabled + 사유 텍스트로 남긴다(색만으로 비활성을 표시하지 않는다).
+        disabled + 사유 텍스트로 남겼었다 → 2026-11-03 서버 stock=in|low 신설로 연결.
       · [초기화](B-12) · 페이지당 건수 선택(B-13, API size 상한 500 기존) · 페이지 번호
         버튼(B-14, 응답 page·pages 기존) · 되돌리기 [닫기](B-15) · 빈 상태 문구 2종 분리
         (B-16, total===0 여부로 판정 — 서버 값, 화면이 세지 않는다).
@@ -544,8 +544,9 @@ a.pp-btn-line{color:var(--on)}
         <select id="fstock" class="pp-select" aria-label="재고상태 필터">
           <option value="">재고상태 전체</option>
           <option value="oos">재고 없음</option>
-          <option value="instock" disabled title="현재 조회 조건에 없습니다 — 신설 예정">재고 있음(조회 기능 미연결)</option>
-          <option value="low" disabled title="현재 조회 조건에 없습니다 — 신설 예정">10개 이하(조회 기능 미연결)</option>
+          {# 2026-11-03 연결(ADMIN-REMAINING-BATCH1) — 서버 stock=in(재고 1개 이상)·stock=low(재고 10개 이하, 0 포함). #}
+          <option value="in">재고 있음</option>
+          <option value="low">10개 이하</option>
         </select>
       </div>
       <div class="pp-sbox-field">
@@ -818,6 +819,10 @@ a.pp-btn-line{color:var(--on)}
   // 다중선택(saleStatusSel: {"판매중":true,...} 형태 — 체크된 값만 키로 존재, 하나도
   // 없으면 무필터). 둘 다 서버 파라미터 이름 그대로 변수명을 맞춘다(load()에서 그대로 보낸다).
   var visible="", saleStatusSel={};
+  // 2026-11-03 — 재고상태 「재고 있음」(in)·「10개 이하」(low). 서버 파라미터 stock 과 같은 이름·값.
+  // 「재고 없음」은 여기 두지 않고 지금처럼 cur="oos"(상태 탭) 하나로 말한다 — 둘이 동시에
+  // 켜지지 않게 탭을 「재고 없음」으로 바꾸면 stockSel 을 비운다(탭 onclick).
+  var stockSel="";
   var sortKey=null, sortDir=1;
   var SEL = {};
   // 2026-09-10 개편 — 재고상태 필터(req-products.md ⑤-B B-7 "부분가능"). 서버에
@@ -825,8 +830,8 @@ a.pp-btn-line{color:var(--on)}
   // **완전히 같은 서버 판정**이므로 새 축을 만들지 않고 cur 값 자체를 공유한다("oos"이면
   // 이 select도 "oos"를 보이고, 반대로 이 select에서 "oos"를 고르면 cur를 "oos"로 바꾼다).
   // 두 컨트롤이 같은 값을 다르게 말하는 상태(④-B4가 경고하는 "한 화면 두 원천")를
-  // 구조적으로 없앤다. "재고 있음"·"10개 이하"는 서버에 조회 조건 자체가 없어(신설
-  // 대상) <option disabled>로만 두고 고를 수 없게 한다.
+  // 구조적으로 없앤다. "재고 있음"·"10개 이하"는 2026-11-03 서버 stock 파라미터가 생겨
+  // stockSel 로 연결했다(아래 선언).
   // 요청 #28 추가(2026-09-02) — 분류 관리 화면(product_category.html.j2)에서 "분류에
   // 묶인 상품 수"를 눌러 넘어올 때 쓰는 축. products.category_id(판매 분류)이고 위
   // fcat(part_type, 부품 종류)과는 다른 축이라 별개 상태로 둔다 — 섞으면 카테고리
@@ -846,6 +851,7 @@ a.pp-btn-line{color:var(--on)}
     if(visible) sp.set("visible", visible);
     var saleList = Object.keys(saleStatusSel).filter(function(k){ return saleStatusSel[k]; });
     if(saleList.length) sp.set("sale_status", saleList.join(","));
+    if(stockSel) sp.set("stock", stockSel);
     if(catId){
       sp.set("category_id", String(catId));
       if(includeDesc) sp.set("include_desc", "1");
@@ -891,6 +897,10 @@ a.pp-btn-line{color:var(--on)}
       sList.forEach(function(s){ var trimmed = s.trim(); if(trimmed) saleStatusSel[trimmed] = true; });
     }
     renderSaleStatusChecks();
+
+    var st = sp.get("stock") || "";
+    stockSel = (cur !== "oos" && (st === "in" || st === "low")) ? st : "";
+    syncStockSelect();
 
     var cid = parseInt(sp.get("category_id"), 10);
     catId = (!isNaN(cid) && cid > 0) ? cid : 0;
@@ -958,6 +968,7 @@ a.pp-btn-line{color:var(--on)}
     url += "&visible=" + encodeURIComponent(visible || "");
     var saleStatusList = Object.keys(saleStatusSel).filter(function(k){ return saleStatusSel[k]; });
     if(saleStatusList.length){ url += "&sale_status=" + encodeURIComponent(saleStatusList.join(",")); }
+    if(stockSel){ url += "&stock=" + encodeURIComponent(stockSel); }
     // 요청 #28 추가(2026-09-02) — 분류 관리에서 넘어온 category_id 축. fcat(part_type)과는
     // 별개라 항상 함께 보낸다(catId=0이면 서버도 무필터로 본다 — api/admin_products.py).
     if(catId){ url += "&category_id=" + catId + "&include_desc=" + includeDesc; }
@@ -1009,7 +1020,7 @@ a.pp-btn-line{color:var(--on)}
         + '<span>' + t.label + '</span><span class="n">' + (typeof n==="number"?n.toLocaleString("ko-KR"):n) + '</span></button>';
     }).join("") + '<span class="pp-tabs-note">탭 클릭 = 서버 재조회 — 배지와 행 수가 항상 일치합니다</span>';
     host.querySelectorAll("[data-k]").forEach(function(b){
-      b.onclick = function(){ if(cur===b.dataset.k) return; cur=b.dataset.k; PAGE=1; syncStockSelect(); load(); };
+      b.onclick = function(){ if(cur===b.dataset.k) return; cur=b.dataset.k; if(cur==="oos") stockSel=""; PAGE=1; syncStockSelect(); load(); };
     });
     syncStockSelect();
   }
@@ -1018,7 +1029,7 @@ a.pp-btn-line{color:var(--on)}
   // "재고 없음"을 보이고, 다른 탭으로 가면 select는 "전체"로 돌아간다.
   function syncStockSelect(){
     var sel = document.getElementById("fstock"); if(!sel) return;
-    sel.value = (cur==="oos") ? "oos" : "";
+    sel.value = (cur==="oos") ? "oos" : stockSel;
   }
 
   var SORT_GETTERS = {
@@ -1345,7 +1356,7 @@ a.pp-btn-line{color:var(--on)}
     // 2026-09-11 검색 패널 개편 — 신설 필터도 함께 초기화한다. qType은 서버로 안 나가는
     // 화면 표시용 값이라 여기서 리셋해도 load()에 영향은 없다(그래도 눈에 보이는 값이라
     // "초기화"가 그 값만 빼놓으면 운영자가 "안 지워졌다"고 오인한다).
-    visible=""; saleStatusSel={};
+    visible=""; saleStatusSel={}; stockSel="";
     var qEl=document.getElementById("q"); if(qEl) qEl.value="";
     var catEl=document.getElementById("fcat"); if(catEl) catEl.value="all";
     var mfrEl=document.getElementById("fmfr"); if(mfrEl) mfrEl.value="";
@@ -1389,6 +1400,7 @@ a.pp-btn-line{color:var(--on)}
     if(fcat && fcat!=="all") out.push({k:"fcat", label:"분류 " + partTypeLabel(fcat)});
     if(fmfr && fmfr!=="all") out.push({k:"fmfr", label:"제조사 " + fmfr});
     if(visible) out.push({k:"visible", label: visible==="on" ? "노출만" : "숨김만"});
+    if(stockSel) out.push({k:"stock", label: stockSel==="in" ? "재고 있음" : "재고 10개 이하"});
     Object.keys(saleStatusSel).filter(function(s){ return saleStatusSel[s]; })
       .forEach(function(s){ out.push({k:"sale:" + s, label:"판매상태 " + s}); });
     if(catId) out.push({k:"cat", label:"카테고리 " + (catName || ("#" + catId))});
@@ -1410,6 +1422,7 @@ a.pp-btn-line{color:var(--on)}
     else if(k==="fcat"){ fcat="all"; var c=document.getElementById("fcat"); if(c) c.value="all"; loadMeta(); }
     else if(k==="fmfr"){ fmfr="all"; var m=document.getElementById("fmfr"); if(m) m.value=""; }
     else if(k==="visible"){ visible=""; var v=document.getElementById("fvisible"); if(v) v.value=""; }
+    else if(k==="stock"){ stockSel=""; syncStockSelect(); }
     else if(k.indexOf("sale:")===0){ delete saleStatusSel[k.slice(5)]; renderSaleStatusChecks(); }
     else if(k==="cat"){ clearCategoryFilter(); return; }   // clearCategoryFilter 가 load() 까지 부른다
     PAGE=1; load();
@@ -2493,7 +2506,10 @@ a.pp-btn-line{color:var(--on)}
   // 그대로 쓴다(위 var 선언부 주석 참조) — 별도 파라미터를 만들지 않는다.
   document.getElementById("fstock").addEventListener("change", function(e){
     var v = e.target.value;
-    cur = (v==="oos") ? "oos" : "all";
+    // 2026-11-03 — 「재고 있음」·「10개 이하」는 stockSel(서버 stock)로, 「재고 없음」은 예전대로 cur="oos".
+    // 상태 탭이 「재고 없음」이던 때만 「전체」로 돌린다 — 다른 탭(검수 대기 등)은 그대로 두고 AND 로 묶는다.
+    if(v==="oos"){ cur="oos"; stockSel=""; }
+    else { stockSel = (v==="in" || v==="low") ? v : ""; if(cur==="oos") cur="all"; }
     markDirty();
   });
   wireDetailPanel();

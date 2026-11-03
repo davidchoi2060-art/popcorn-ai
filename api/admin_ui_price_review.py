@@ -83,6 +83,7 @@ _RET_RULES = (
     ("maker", 100, _text_upto(100)),
     ("visible", 3, _one_of("on", "off")),
     ("sale_status", len(",".join(STATUS_OK)), _sale_status),
+    ("stock", 3, _one_of("in", "low")),
     ("category_id", 10, _pos_int(10)),
     ("include_desc", 1, _one_of("0", "1")),
     ("page", 6, _pos_int(6)),

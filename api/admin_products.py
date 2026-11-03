@@ -184,6 +184,16 @@ _WHERE = """
       -- 이 _WHERE를 공유하므로 탭(status)과 체크박스(sale_status)가 항상 같은 방식으로
       -- 결합된다(예: 탭="재고 없음"+체크박스="판매중" → "판매중인데 재고 0·품절"만).
       AND (:sale_status = '' OR p.status = ANY(string_to_array(:sale_status, ',')))
+      -- 2026-11-03 재고상태 필터(ADMIN-REMAINING-BATCH1) — 「재고 있음」·「10개 이하」.
+      -- 정의는 승인 디자인(dc-product-unified-admin.html: 재고 있음 stock>0 · 10개 이하
+      -- stock<=10, 0·음수 포함) 그대로다. 「재고 없음」은 이 축이 아니라 위 status=oos
+      -- 버킷(상태 탭과 같은 판정)을 그대로 쓴다 — 같은 말을 두 정의로 하지 않는다.
+      -- stock_qty 는 NOT NULL 이지만 NULL 이 와도 비교가 NULL 이라 둘 다에서 빠진다
+      -- (미확인을 0 으로 바꿔 「10개 이하」에 넣지 않는다).
+      -- _WHERE 안에 두므로 목록·총건수·상태 탭 건수(_KPI)가 같은 조건을 쓴다.
+      AND (:stock = ''
+           OR (:stock = 'in' AND p.stock_qty > 0)
+           OR (:stock = 'low' AND p.stock_qty <= 10))
 """
 
 _QUERY = text(f"""
@@ -277,7 +287,7 @@ def spec_progress(part_type: str, specs: dict | None) -> tuple[int, int]:
 def list_products(q: str = "", part_type: str = "", status: str = "", origin: str = "",
                   maker: str = "", page: int = 1, size: int = 100,
                   category_id: int = 0, include_desc: int = 0,
-                  visible: str = "", sale_status: str = ""):
+                  visible: str = "", sale_status: str = "", stock: str = ""):
     # def(비동기 아님) — psycopg2 동기 드라이버, FastAPI 스레드풀 실행
     size = max(1, min(size, 500))     # 상한 — 브라우저가 버티는 범위
     page = max(1, page)
@@ -297,11 +307,15 @@ def list_products(q: str = "", part_type: str = "", status: str = "", origin: st
     if visible not in ("on", "off"):
         visible = ""
     sale_status = sale_status.strip()
+    # 재고상태 — 'in'(재고 있음)·'low'(10개 이하) 외 값은 visible 과 같이 무필터로 접는다.
+    stock = stock.strip().lower()
+    if stock not in ("in", "low"):
+        stock = ""
     p = {"q": q.strip(), "part_type": part_type.strip(), "status": status.strip(),
          "origin": origin.strip(), "maker": maker.strip(),
          "size": size, "offset": (page - 1) * size,
          "category_id": category_id, "include_desc": include_desc,
-         "visible": visible, "sale_status": sale_status}
+         "visible": visible, "sale_status": sale_status, "stock": stock}
     with engine.connect() as conn:
         rows = conn.execute(_QUERY, p).all()
         total_count = conn.execute(_COUNT, p).scalar_one()

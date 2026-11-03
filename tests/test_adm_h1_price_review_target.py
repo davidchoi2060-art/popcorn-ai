@@ -299,7 +299,7 @@ class ReturnHrefTests(unittest.TestCase):
         """총 길이 상한의 근거(키별 최대 글자 수)가 실제 검사 경계와 같다 — 어긋나면 상한이 유효 값을 자른다."""
         rules = {k: (n, check) for k, n, check in UI._RET_RULES}
         longest = {"q": "a" * 200, "tab": "review", "part_type": "A" * 40, "maker": "a" * 100, "visible": "off",
-                   "sale_status": ",".join(UI.STATUS_OK), "category_id": "9" * 10, "include_desc": "1",
+                   "sale_status": ",".join(UI.STATUS_OK), "stock": "low", "category_id": "9" * 10, "include_desc": "1",
                    "page": "9" * 6, "size": "500", "sort": "status", "dir": "desc", "sel": str(2 ** 63 - 1)}
         too_long = {"q": "a" * 201, "part_type": "A" * 41, "maker": "a" * 101, "category_id": "9" * 11,
                     "page": "9" * 7, "sel": "1" * 20}
