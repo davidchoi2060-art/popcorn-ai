@@ -35,6 +35,24 @@ FLOOR_FIELDS = {
 _DISPLAY_ONLY = {"vram_gb": {"label": "그래픽 메모리", "unit": "GB"}}
 
 
+def _slot_types(slot: str) -> list:
+    return ["COOLER_CPU_AIR", "COOLER_CPU_AIO"] if slot == "COOLER" else [slot]
+
+
+def _pass_count(conn, slot: str, field: str, op: str, value, active: bool) -> int:
+    """하한 «한 줄» 기준 통과 수 — 목록 pass_count · 미리보기 pass_before/after 가 이 하나를 쓴다.
+
+    견적 엔진(usage_floors)과 같은 규칙으로 센다(2026-11-03): 비활성 줄은 엔진이 아예
+    읽지 않으므로(_rows 의 WHERE active) 이 줄로는 거르지 않는다 — 슬롯 후보 전체가 통과.
+    활성이면 passes() 처럼 op(gte/lte)를 그대로 보고 값이 NULL 이면 불통과다.
+    같은 용도의 다른 하한은 세지 않는다 — 이 수는 «이 줄» 기준이다(용도 전체 견적 가능 여부 아님).
+    """
+    sql = "SELECT count(*) FROM v_recommendation_candidates WHERE stock_qty > 0 AND part_type = ANY(:pt)"
+    if active:
+        sql += f" AND {field} IS NOT NULL AND {field} {'<=' if op == 'lte' else '>='} :v"
+    return conn.execute(text(sql), {"pt": _slot_types(slot), "v": value}).scalar_one()
+
+
 def _owner():
     me = current_operator() or {}
     if me.get("role") != "owner":
@@ -52,17 +70,8 @@ def list_floors():
         # 각 하한이 실제로 몇 개를 남기는지 — 화면이 숫자를 지어내지 않게 여기서 센다
         counts = {}
         for r in rows:
-            n = conn.execute(text(
-                f"SELECT count(*) FROM v_recommendation_candidates"
-                f" WHERE stock_qty > 0 AND part_type = ANY(:pt)"
-                f"   AND {r['field']} IS NOT NULL AND {r['field']} >= :v"),
-                {"pt": (["COOLER_CPU_AIR", "COOLER_CPU_AIO"] if r["slot"] == "COOLER"
-                        else [r["slot"]]), "v": r["value"]}).scalar_one()
-            total = conn.execute(text(
-                "SELECT count(*) FROM v_recommendation_candidates"
-                " WHERE stock_qty > 0 AND part_type = ANY(:pt)"),
-                {"pt": (["COOLER_CPU_AIR", "COOLER_CPU_AIO"] if r["slot"] == "COOLER"
-                        else [r["slot"]])}).scalar_one()
+            n = _pass_count(conn, r["slot"], r["field"], r["op"], r["value"], r["active"])
+            total = _pass_count(conn, r["slot"], r["field"], r["op"], r["value"], False)
             counts[r["floor_id"]] = {"pass": n, "total": total}
 
     groups: dict = {}
@@ -103,36 +112,28 @@ def update_floor(floor_id: int, body: FloorBody):
         raise HTTPException(400, "하한은 0 이상이어야 합니다")
     with engine.begin() as conn:
         r = conn.execute(text(
-            "SELECT usage_key, usage_label, slot, field, value, label, active"
+            "SELECT usage_key, usage_label, slot, field, op, value, label, active"
             " FROM usage_floors WHERE floor_id=:i FOR UPDATE"),
             {"i": floor_id}).mappings().first()
         if r is None:
             raise HTTPException(404, "그런 하한이 없습니다")
-        pts = (["COOLER_CPU_AIR", "COOLER_CPU_AIO"] if r["slot"] == "COOLER"
-               else [r["slot"]])
-        before = conn.execute(text(
-            f"SELECT count(*) FROM v_recommendation_candidates"
-            f" WHERE stock_qty>0 AND part_type = ANY(:pt)"
-            f"   AND {r['field']} IS NOT NULL AND {r['field']} >= :v"),
-            {"pt": pts, "v": r["value"]}).scalar_one()
-        after = conn.execute(text(
-            f"SELECT count(*) FROM v_recommendation_candidates"
-            f" WHERE stock_qty>0 AND part_type = ANY(:pt)"
-            f"   AND {r['field']} IS NOT NULL AND {r['field']} >= :v"),
-            {"pt": pts, "v": body.value}).scalar_one()
-        total = conn.execute(text(
-            "SELECT count(*) FROM v_recommendation_candidates"
-            " WHERE stock_qty>0 AND part_type = ANY(:pt)"), {"pt": pts}).scalar_one()
+        # before = 지금 저장된 값·활성, after = 보낸 값·활성 — 둘 다 «이 줄» 기준(_pass_count).
+        before = _pass_count(conn, r["slot"], r["field"], r["op"], r["value"], r["active"])
+        after = _pass_count(conn, r["slot"], r["field"], r["op"], body.value, body.active)
+        total = _pass_count(conn, r["slot"], r["field"], r["op"], body.value, False)
 
         impact = {
             "usage": r["usage_label"], "slot": SLOT_KO.get(r["slot"], r["slot"]),
             "field": r["field"], "from": r["value"], "to": body.value,
+            "active_before": r["active"], "active_after": body.active,
             "pass_before": before, "pass_after": after, "slot_total": total,
             "buildable_after": after > 0,
         }
         impact["note"] = (
             f"{r['usage_label']} · {impact['slot']} 하한을 {r['value']} → {body.value}로"
             f" 바꾸면 후보가 {before}개 → {after}개가 됩니다(전체 {total}개)."
+            + ("" if body.active else
+               " 이 하한을 끄면 이 줄로는 거르지 않습니다 — 같은 용도의 다른 하한은 그대로 적용됩니다.")
             + ("" if after > 0 else
                " **후보가 0이 되어 이 용도로는 견적을 만들 수 없습니다.**"))
         if body.preview:
