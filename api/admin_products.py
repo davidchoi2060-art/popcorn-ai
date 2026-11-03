@@ -532,6 +532,22 @@ def _strict_bool(v):
     return v
 
 
+BRAND_MAX = 100          # products.brand VARCHAR(100) — 0001_initial_schema
+
+
+def _brand(v):
+    """브랜드 — 문자열 또는 null 만 받는다(숫자·참거짓을 글자로 바꿔 저장하지 않는다).
+
+    공백을 걷고 빈 칸은 NULL(지움). 길이 초과는 patch_product 가 «자르지 않고» 400 으로
+    돌려보낸다(ADMIN-BRAND-B1 — supplier 의 조용한 절단을 따르지 않는다).
+    """
+    if v is None:
+        return None
+    if type(v) is not str:
+        raise ValueError("string only")
+    return v.strip() or None
+
+
 EDITABLE = {
     "name": ("product_name", _s),
     "maker": ("maker", _s),
@@ -566,6 +582,10 @@ EDITABLE = {
     #   규약으로 남겨 두되, 적재가 이 컬럼을 쓰게 되는 날 `locked_fields ? 'is_visible'`
     #   가드를 함께 넣어야 한다(tests/test_admin_product_visibility_20261102.py 가 지킨다).
     "is_visible": ("is_visible", _strict_bool),
+    # ── ADMIN-BRAND-B1 (2026-11-03) — 제조사(maker)와 별개인 자유 텍스트. 감사·되돌리기·잠금은
+    #   다른 문자열 필드와 같은 경로를 쓴다. 적재(catalog_ingest)는 brand 를 쓰지 않는다 —
+    #   쓰게 되는 날 `locked_fields ? 'brand'` 가드를 함께 넣어야 한다(is_visible 과 같은 상태).
+    "brand": ("brand", _brand),
 }
 STATUS_OK = ("판매중", "품절", "단종", "삭제대기")
 # 가격·재고는 정본 수치다 — 음수나 터무니없는 값이 들어가면 견적이 통째로 흔들린다
@@ -639,7 +659,7 @@ def get_product(product_code: int):
             "SELECT p.product_code, p.sku, p.product_name, p.maker, p.model_name, p.part_type,"
             " p.category_group, p.status, p.ai_candidate_yn, p.review_required_yn,"
             " p.purchase_price, p.sale_price, p.market_price, p.stock_qty, p.supplier,"
-            " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text, p.is_visible,"
+            " p.danawa_code, p.data_origin, p.locked_fields, p.spec_source_text, p.is_visible, p.brand,"
             " p.category_id, (SELECT c.name FROM categories c WHERE c.category_id = p.category_id)"
             "   AS category_name,"
             " p.created_at, p.updated_at, to_jsonb(ps) AS specs"
@@ -814,6 +834,7 @@ def get_product(product_code: int):
         "supplier": r["supplier"], "danawa_code": r["danawa_code"],
         # 고객 노출 스위치(PR431) — 목록 items[].is_visible 과 같은 컬럼. 확인 창이 상태 표시·수정에 쓴다.
         "is_visible": r["is_visible"],
+        "brand": r["brand"],
         "origin": r["data_origin"], "locked_fields": locked,
         "spec_source_text": r["spec_source_text"],
         "specs": r["specs"], "spec_done": done, "spec_total": total,
@@ -908,12 +929,14 @@ def patch_product(product_code: int, body: PatchBody):
                 raise HTTPException(400, f"{k}={v} 는 허용 범위({lo}~{hi}) 밖입니다")
         if k == "name" and v is None:
             raise HTTPException(400, "상품명은 비울 수 없습니다")
+        if k == "brand" and v is not None and len(v) > BRAND_MAX:
+            raise HTTPException(400, f"브랜드는 {BRAND_MAX}자까지 입력할 수 있습니다(지금 {len(v)}자)")
         parsed[k] = (col, v)
 
     with engine.begin() as conn:
         cur = conn.execute(text(
             "SELECT product_code, sku, product_name, maker, supplier, purchase_price, sale_price,"
-            " stock_qty, status, model_name, danawa_code, market_price, is_visible, locked_fields"
+            " stock_qty, status, model_name, danawa_code, market_price, is_visible, brand, locked_fields"
             " FROM products WHERE product_code=:pc FOR UPDATE"),
             {"pc": product_code}).mappings().first()
         if cur is None:

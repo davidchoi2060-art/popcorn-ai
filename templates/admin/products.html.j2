@@ -1858,6 +1858,8 @@ a.pp-btn-line{color:var(--on)}
   //   여기서 고치면 잠기고, 그 뒤로는 적재도 검수도 덮지 않는다.
   var BASIC_FIELDS = [
     ["name","상품명","text","product_name"], ["maker","제조사","text","maker"],
+    // ADMIN-BRAND-B1(2026-11-03) — 제조사와 별개인 자유 텍스트. 빈 칸 저장 = 지움, 100자 초과는 서버가 400 으로 돌려보낸다.
+    ["brand","브랜드","text","brand"],
     ["supplier","공급처(원문)","text","supplier"],
     ["sale_price","판매가","number","sale_price"], ["purchase_price","매입가","number","purchase_price"],
     ["stock_qty","재고","number","stock_qty"], ["status","상태","select","status"],
@@ -1923,7 +1925,7 @@ a.pp-btn-line{color:var(--on)}
         } else if(type==="number"){
           valHtml = '<input type="number" data-f="' + key + '" value="' + (raw==null?"":raw) + '" min="0">';
         } else {
-          var ph = key==="supplier" ? ' placeholder="공급처 원문(선택)"' : '';
+          var ph = key==="supplier" ? ' placeholder="공급처 원문(선택)"' : (key==="brand" ? ' placeholder="브랜드(선택 · 100자 이하)"' : '');
           valHtml = '<input type="text" data-f="' + key + '" value="' + esc(raw==null?"":raw) + '"' + ph + '>';
         }
       } else {
