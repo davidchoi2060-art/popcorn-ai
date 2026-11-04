@@ -412,6 +412,7 @@
             <option value="≥">≥ (gte)</option>
             <option value="≤">≤ (lte)</option>
             <option value="포함">포함 (contains)</option>
+            <option value="속함">속함 (in)</option>
           </select>
           <span class="cr-field-label">비교 대상</span>
           <span class="cr-field-pair">
@@ -699,7 +700,7 @@
 
   // API가 미리 합쳐 준 "SLOT.field op REF.ref_field" 문자열을 표 칸으로 도로 나눈다.
   // 서버가 준 값을 그대로 쓰는 것이지 새 값을 지어내는 것이 아니다 - slot/field에는
-  // 공백이 없으므로(식별자) 공백 기준 분리가 안전하다. 연산 기호(=·≥·≤·포함)는 서버
+  // 공백이 없으므로(식별자) 공백 기준 분리가 안전하다. 연산 기호(=·≥·≤·포함·속함)는 서버
   // OP_KO가 이미 한글로 바꿔 rule 문자열에 넣어 보낸다 - 예전엔 "contains"만 OP_KO에
   // 없어(2026-08-14까지) 여기서 dispOp()로 "포함"을 보정해 땜질했는데, 2026-08-15
   // 서버 OP_KO에 "contains":"포함"이 보강돼 이제 서버가 이미 번역해 보낸다(실측:

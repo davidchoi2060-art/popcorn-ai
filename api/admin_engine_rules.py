@@ -28,7 +28,9 @@ router = APIRouter(prefix="/api/admin")
 # "contains"가 빠져 있었다(조립 호환 규칙 화면이 클라이언트에서 보정해 땜질했다 —
 # 2026-08-15 확인자·제작자 실측). DB 실측 op 4종(eq·gte·lte·contains) 전수 대조로 채웠다.
 # 의미는 recommend._cmp의 그대로다: v(다중값 목록)에 r이 있는가(쿨러 socket_list 등).
-OP_KO = {"eq": "=", "gte": "≥", "lte": "≤", "contains": "포함"}
+# "in"도 빠져 있었다(2026-11-04) — 0160 case_psu_form 이 쓰는데 원문 "in" 이 화면에 나가
+# 서랍 연산 칸이 비었다. 방향이 contains 의 반대라(v 가 r 목록에 속하는가) 다른 낱말을 쓴다.
+OP_KO = {"eq": "=", "gte": "≥", "lte": "≤", "contains": "포함", "in": "속함"}
 from .taxonomy import PART_LABELS as PART_KO   # 단일 원천(슬라이스 A)
 
 # 총액 처리 — spec-policy-weights.md 1a 표의 「총액 처리」 열과 같은 문구(UX-31).

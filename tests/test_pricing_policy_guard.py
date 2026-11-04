@@ -51,7 +51,9 @@ OWNED = {
     },
 }
 REST_AST = {
-    'api/admin_engine_rules.py': '69f9f5287102f65fa640d75f471988d5a3a460d010291a7c9ca9cea25763f8f6',
+    # 2026-11-04 ADMIN-ROW04-IN: 이 모듈의 비소유 부분에서 바뀐 것은 OP_KO 에 "in": "속함" 한 항목뿐
+    # (가격 쓰기 save_pricing 본문·잠금 호출은 그대로 — 위 OWNED 해시 불변). 이전 69f9f528…
+    'api/admin_engine_rules.py': '82b62ea6b3405de094a810e19da5a77f98f40b239c562c676d56539462c6da7f',
     'api/admin_categories.py': '811e1ad0f91ef1dccbdfd1ae81893f5e551a87f2227c834f34d29362fe58c31f',
     'api/admin_reprice.py': 'a81767ef0346ed7bee92b631f09d0f8e06dcde360f8eeca838291bdf0aa1de8e',
 }
