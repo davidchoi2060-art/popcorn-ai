@@ -266,8 +266,21 @@ code{font-family:var(--rv-mono)}
           ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
         var e = new Error(msg); e.status = res.status; e.body = j; throw e;
       }
+      // 정상 응답은 항상 tiers·budget·weights 객체를 싣는다(api/admin_engine_rules.py engine_rules).
+      // JSON이 아니거나(HTML·빈 본문) 형이 다르면 그대로 넘기지 않는다 — 넘기면 「불러오는 중」이
+      // 남거나, 없는 자료를 「0건 정상 상태」로 그리거나, 이전 조회 결과가 오류 없이 남는다.
+      if (!isRulesShape(j)) {
+        var fe = new Error('응답 형식이 올바르지 않습니다 (HTTP ' + res.status + ')'); fe.status = res.status; throw fe;
+      }
       return j;
     });
+  }
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isRulesShape(j) {
+    // 형만 본다 — 빈 배열(가중치 0행 등)은 정상이고, 행 내부 값은 검사하지 않는다.
+    return isObj(j) && isObj(j.tiers) && isObj(j.budget) && isObj(j.weights) &&
+      Array.isArray(j.tiers.rules) && Array.isArray(j.budget.alloc) &&
+      Array.isArray(j.budget.tag_scope) && Array.isArray(j.weights.rows);
   }
   function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
 

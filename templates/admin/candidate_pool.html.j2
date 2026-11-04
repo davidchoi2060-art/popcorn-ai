@@ -381,7 +381,17 @@ table.grid td.nolink{color:var(--on-variant);cursor:default}
   fetch('/api/admin/candidate-pool', {credentials: 'same-origin'})
     .then(function (r) {
       if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
-      return r.json();
+      // 정상 응답은 항상 categories·reasons·thin 배열을 싣는다(api/admin_pool.py candidate_pool).
+      // JSON이 아니거나 형이 다르면 render()가 빈 값을 「판정 대상 없음」「위험 카테고리 없음」으로
+      // 그려 정상처럼 보인다 — 형식 오류로 드러내 기존 조회 실패·다시 시도로 보낸다.
+      return r.json().catch(function () { return null; }).then(function (j) {
+        var shapeOk = j !== null && typeof j === 'object' && !Array.isArray(j) &&
+          Array.isArray(j.categories) && Array.isArray(j.reasons) && Array.isArray(j.thin);
+        if (!shapeOk) {
+          var fe = new Error('응답 형식이 올바르지 않습니다 (HTTP ' + r.status + ')'); fe.status = r.status; throw fe;
+        }
+        return j;
+      });
     })
     .then(function (j) { render(j); })
     .catch(function (err) {
