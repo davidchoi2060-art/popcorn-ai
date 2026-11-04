@@ -15,15 +15,23 @@ const m = tpl.match(/\{% block foot_extra %\}\s*\{% raw %\}\s*<script>([\s\S]*?)
 assert.ok(m, 'foot_extra <script> 블록을 찾지 못함');
 const script = m[1];
 
-// api/admin_ai_usage.py summary() 반환 객체의 모양만 따른 가짜 자료. 값은 지어낸 테스트 값이다.
+// api/admin_ai_usage.py summary() 반환 객체의 모양만 따른 가짜 자료. 금액·토큰·건수는 지어낸 테스트 값이다.
+// 키(기간 today/d7/d30/month · 업체 codex/claude/gemini · 모델명)는 정본 API 계약(PERIODS · PROVIDERS)과 같게 둔다.
+// 원천 있음(available)이면 양수 가짜 값 12.34, zero:true면 진짜 0, 원천 없음이면 API처럼 kind 'nosource' + '정보 없음'.
+const FAKE_COST = 12.34, FAKE_TOKENS = 1234;
 function fakeSummary(opts) {
   const o = Object.assign({ rows: 0, available: false, schemaMissing: false, zero: false }, opts);
-  const val = o.zero ? 0 : null;
+  const val = o.available ? (o.zero ? 0 : FAKE_COST) : null;
+  const tok = o.available ? (o.zero ? 0 : FAKE_TOKENS) : null;
   return {
     generated_at: '2026-01-01T00:00:00+09:00', period: 'today', period_label: '가짜기간',
     provider: null, model: null,
-    periods: [{ key: 'today', label: '오늘' }, { key: '7d', label: '7일' }],
-    filters: { providers: [{ key: 'codex', label: '가짜업체' }], models: [{ key: 'fake-m1', label: '가짜업체 · fake-m1' }] },
+    periods: [{ key: 'today', label: '오늘' }, { key: 'd7', label: '7일' }, { key: 'd30', label: '30일' }, { key: 'month', label: '이번 달' }],
+    filters: {
+      providers: [{ key: 'codex', label: 'Codex' }, { key: 'claude', label: 'Claude' }, { key: 'gemini', label: 'Gemini' }],
+      models: [{ key: 'gpt-5.6-sol', label: 'Codex · gpt-5.6-sol' }, { key: 'claude-opus-5', label: 'Claude · claude-opus-5' },
+               { key: 'gemini-3.7-flash', label: 'Gemini · gemini-3.7-flash' }],
+    },
     scope_note: '가짜범위설명',
     source: { api_cost_logs_rows: o.rows, cost_thresholds_rows: 0, built_at: '2026-01-01', decision_at: null,
               weeks_since_build: 1, reason: '가짜원천없음사유' },
@@ -35,7 +43,7 @@ function fakeSummary(opts) {
              points: [{ date: '2026-01-01', cost: o.available ? val : null }], note: o.available ? null : '가짜추이없음' },
     breakdowns: {
       provider: { available: o.available, source: '가짜', reason: null,
-                  rows: [{ key: 'codex', name: '가짜업체', sub: null, tokens: o.available ? val : null, cost: o.available ? val : null }] },
+                  rows: [{ key: 'codex', name: '가짜업체', sub: null, tokens: tok, cost: val }] },
       task: { available: !o.schemaMissing && o.available, schema_missing: o.schemaMissing, source: '가짜',
               reason: o.schemaMissing ? '가짜스키마없음사유' : null, rows: [] },
     },
@@ -132,6 +140,24 @@ test('정상 집계 → 형식 오류 재조회: 이전 집계를 오류 없이 
   } finally { p.done(); }
 });
 
+test('정상 양수 집계(가짜 12.34) → KPI·업체별 금액·토큰 표시, 배너·정보 없음·오류 없음', async () => {
+  const p = boot([okJson(fakeSummary({ rows: 3, available: true }))]);
+  try {
+    await p.settle();
+    const h = html(p);
+    const kpi = h.slice(h.indexOf('class="kpis"'), h.indexOf('class="gaugebox"'));
+    assert.ok(kpi.includes('class="val real">$12.34<'), 'KPI 양수 금액이 실제 값으로 보이지 않음: ' + kpi.slice(0, 300));
+    assert.ok(!kpi.includes('정보 없음'), '원천 있는 KPI에 정보 없음이 뜸');
+    const brk = h.slice(h.indexOf('class="breakdowns"'), h.indexOf('class="trendbox"'));
+    assert.ok(brk.includes('<span class="tok real">1,234</span>'), '업체별 토큰 미표시');
+    assert.ok(brk.includes('<span class="cost real">$12.34</span>'), '업체별 금액 미표시');
+    assert.ok(h.includes('tbar real'), '추이 막대 미표시');
+    assert.ok(!h.includes('srcband'));
+    assert.ok(!h.includes('조회 실패'));
+    assert.equal(p.els.refreshBtn.disabled, false);
+  } finally { p.done(); }
+});
+
 test('정상 원천 없음(rows 0) → 기록 없음 배너·정보 없음, 오류 아님', async () => {
   const p = boot([okJson(fakeSummary({ rows: 0, available: false }))]);
   try {
@@ -150,7 +176,8 @@ test('정상 진짜 0(원천 있음) → $0.00 표시, 배너·오류 없음', a
   try {
     await p.settle();
     const h = html(p);
-    assert.ok(h.includes('$0.00'), '진짜 0이 $0.00으로 보이지 않음');
+    assert.ok(h.includes('class="val real">$0.00<'), '진짜 0이 KPI $0.00 실제 값으로 보이지 않음');
+    assert.ok(!h.includes('$12.34'));
     assert.ok(!h.includes('srcband'));
     assert.ok(!h.includes('조회 실패'));
   } finally { p.done(); }
@@ -167,19 +194,33 @@ test('정상 스키마 없음 → noschema 표시, 오류 아님', async () => {
   } finally { p.done(); }
 });
 
-test('필터 선택 → 쿼리에 period·provider 반영', async () => {
-  const p = boot([okJson(fakeSummary({ rows: 1, available: true })), okJson(fakeSummary({ rows: 1, available: true })),
-                  okJson(fakeSummary({ rows: 1, available: true }))]);
+// 요청 URL을 경로 + 디코딩된 쿼리로 나눈다(인코딩 결과를 문자열로 베끼지 않고 의미로 대조).
+function parseCall(u) {
+  const url = new URL(u, 'http://fake.invalid');
+  return { path: url.pathname, q: Object.fromEntries(url.searchParams) };
+}
+
+test('필터 선택 → 쿼리에 period(d7)·provider·model 반영, 전체로 되돌리면 빠짐', async () => {
+  const ok = () => okJson(fakeSummary({ rows: 1, available: true }));
+  const p = boot([ok(), ok(), ok(), ok(), ok()]);
   try {
     await p.settle();
-    assert.ok(p.calls[0].includes('period=today'));
-    assert.ok(!p.calls[0].includes('provider='));
-    p.click('set-period', { 'data-v': '7d' });
+    let c = parseCall(p.calls[0]);
+    assert.equal(c.path, '/api/admin/ai-usage-cost/summary');
+    assert.deepEqual(c.q, { period: 'today' });
+    p.click('set-period', { 'data-v': 'd7' });
     await p.settle();
-    assert.ok(p.calls[1].includes('period=7d'));
-    p.click('set-prov', { 'data-v': 'codex' });
+    assert.deepEqual(parseCall(p.calls[1]).q, { period: 'd7' });
+    p.click('set-prov', { 'data-v': 'gemini' });
     await p.settle();
-    assert.ok(p.calls[2].includes('period=7d') && p.calls[2].includes('provider=codex'));
+    assert.deepEqual(parseCall(p.calls[2]).q, { period: 'd7', provider: 'gemini' });
+    p.click('set-model', { 'data-v': 'gemini-3.7-flash' });
+    await p.settle();
+    assert.deepEqual(parseCall(p.calls[3]).q, { period: 'd7', provider: 'gemini', model: 'gemini-3.7-flash' });
+    p.click('set-prov', { 'data-v': '' });
+    await p.settle();
+    assert.deepEqual(parseCall(p.calls[4]).q, { period: 'd7', model: 'gemini-3.7-flash' });
+    assert.ok(html(p).includes('class="kpis"'));
   } finally { p.done(); }
 });
 
