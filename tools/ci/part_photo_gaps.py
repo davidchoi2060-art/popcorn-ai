@@ -13,7 +13,7 @@ import os
 import urllib.error
 import urllib.request
 
-BASE = os.environ.get('BASE', 'https://popcornai.co.kr').rstrip('/')
+BASE = os.environ.get('BASE', 'https://dev.popcornai.co.kr').rstrip('/')
 MALL = 'https://www.popcornpc.co.kr/data/pimg/{d}/{c}_600.jpg'
 
 

@@ -24,7 +24,7 @@
 쓰는 법
   python tools/quality/recheck_condition_match.py D:/WORK/코덱스-검수/2026-10-12-1935-조건추천일치-검수-v2/case-plan.json \
       --out recheck.md [--only 10,11,13]
-환경변수: BASE(기본 https://popcornai.co.kr)
+환경변수: BASE(기본 https://dev.popcornai.co.kr)
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = os.environ.get("BASE", "https://popcornai.co.kr").rstrip("/")
+BASE = os.environ.get("BASE", "https://dev.popcornai.co.kr").rstrip("/")
 UA = "popcorn-recheck-condition-match/1"
 CALL_GAP_SEC = 13
 _last = [0.0]

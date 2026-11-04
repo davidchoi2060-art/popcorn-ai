@@ -5,7 +5,7 @@
 같은 본문으로 보낸다. 대화 화면처럼 오른쪽 카드와 고른(불러온) PC 를 display_context 로 함께 보낸다.
 결과는 GitHub 주석(::notice)과 표준 출력으로 남긴다.
 
-환경변수: BASE(기본 https://popcornai.co.kr)
+환경변수: BASE(기본 https://dev.popcornai.co.kr)
 """
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = os.environ.get("BASE", "https://popcornai.co.kr").rstrip("/")
+BASE = os.environ.get("BASE", "https://dev.popcornai.co.kr").rstrip("/")
 UA = "popcorn-screen-replay/1"
 
 
