@@ -642,9 +642,10 @@ input{font-family:var(--rv-font)}
     if (S.err) {
       loading.hidden = true; body.hidden = true; errBox.hidden = false;
       $('alErrMsg').textContent = S.err.message;
+      hideOutsideBody();
       return;
     }
-    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; return; }
+    if (!S.data) { loading.hidden = false; errBox.hidden = true; body.hidden = true; hideOutsideBody(); return; }
     loading.hidden = true; errBox.hidden = true; body.hidden = false;
 
     renderPeriods();
@@ -655,6 +656,15 @@ input{font-family:var(--rv-font)}
     renderTable();
     renderPager();
     renderDrawer();
+  }
+
+  // 헤더 범위줄(alScopeLine)과 상세 서랍(alDrawerWrap)은 본문(alBody) 밖에 있다 — 본문을
+  // 숨기는 로딩·오류 분기에서도 함께 내려야 이전 자료의 건수·상세가 로딩/오류 화면 위에 남지 않는다
+  // (기간 버튼은 data-keep 영역이라 바깥 클릭 닫기도 돌지 않는다).
+  function hideOutsideBody() {
+    S.sel = null;
+    $('alDrawerWrap').hidden = true;
+    $('alScopeLine').textContent = '';
   }
 
   function renderPeriods() {

@@ -10,6 +10,9 @@
 // 결함 ②(D2): 요청 순번이 없어 늦게 도착한 이전 기간의 정상·500·network 응답이 최신 기간
 //   화면을 덮었다(기간 버튼은 「오늘」인데 목록은 7일치).
 // 결함 ③(D3): 기간을 바꾸면 응답 전까지 새 기간 버튼 아래에 이전 기간 목록·건수가 남았다.
+// 결함 ④(E1): 본문 밖의 헤더 범위줄(alScopeLine)·상세 서랍(alDrawerWrap)은 로딩·오류 분기에서
+//   갱신되지 않아, 서랍을 연 채 기간을 바꾸면(기간 버튼은 data-keep 안) 로딩/오류 화면 위에
+//   이전 기간 서랍과 건수가 남았다. 상태(S.sel)가 아니라 실제 DOM 값으로 단정한다.
 // 기대: 형식 오류는 「조회 실패」 + 「응답 형식이 올바르지 않습니다 (HTTP 200)」 + 다시 시도.
 //   정상 0건(total 0·limit 500·items [] — unmapped_* 유무 무관)은 오류가 아니다. 가장 최근
 //   요청의 응답만 반영한다. 기간이 바뀔 때만 로딩으로 내리고, 같은 기간 새로고침·다시 시도
@@ -323,14 +326,45 @@ test('역순: 최신 요청이 실패면 늦은 이전 정상 응답이 오류�
 });
 
 test('기간 전환 대기 중: 이전 기간 자료·건수를 숨기고 로딩, 서랍 선택 해제', async () => {
+  // 기간 버튼은 실제 마크업에서 .al-filterbar[data-keep] 안이다 — 바깥 클릭 닫기가 돌지 않는 위치에서 누른다.
   const e = await boot(ok('ALL', { total: 900 }));
   e.click('open-drawer', { 'data-id': '902' }); await e.flush();
-  assert.equal(e.view().drawer, true);
-  e.click('pick-period', { 'data-period': '7d' }); await e.flush();
+  assert.equal(e.els.alDrawerWrap.hidden, false); assert.equal(e.els.alScopeLine.textContent, '원장 조건 내 900건 · 표시 3건');
+  e.click('pick-period', { 'data-period': '7d', 'data-keep': '1' }); await e.flush();
   let v = e.view();
-  assert.deepEqual([v.loading, v.err, v.body, v.drawer], [true, false, false, false]);
+  assert.deepEqual([v.loading, v.err, v.body], [true, false, false]);
+  assert.equal(e.els.alDrawerWrap.hidden, true, '대기 중 이전 기간 서랍 DOM 이 내려가야 함');
+  assert.equal(e.els.alScopeLine.textContent, '', '대기 중 헤더 범위줄에 이전 기간 건수가 남지 않아야 함');
   e.settle(e.last(), ok('7D')); await e.flush();
-  v = e.view(); assert.deepEqual(v.periodOn, ['7d']); assert.match(v.tbody, /가짜운영자7D/); assert.equal(v.drawer, false);
+  v = e.view(); assert.deepEqual(v.periodOn, ['7d']); assert.match(v.tbody, /가짜운영자7D/);
+  assert.equal(e.els.alDrawerWrap.hidden, true); assert.equal(e.els.alScopeLine.textContent, '원장 조건 내 3건 · 표시 3건');
+});
+
+test('기간 전환 → 오류: 오류 화면 위에 이전 서랍·범위줄이 남지 않고, 다시 시도 성공 시 범위줄 복원', async () => {
+  const e = await boot(ok('ALL', { total: 900 }));
+  e.click('open-drawer', { 'data-id': '903' }); await e.flush();
+  e.click('pick-period', { 'data-period': '30d', 'data-keep': '1' }); await e.flush();
+  e.settle(e.last(), [500, { detail: '가짜 오류' }]); await e.flush();
+  let v = e.view(); assert.deepEqual([v.err, v.body], [true, false]); assert.equal(v.errMsg, '가짜 오류');
+  assert.equal(e.els.alDrawerWrap.hidden, true); assert.equal(e.els.alScopeLine.textContent, '');
+  e.click('retry-boot'); await e.flush();
+  assert.equal(e.view().loading, true); assert.equal(e.els.alScopeLine.textContent, ''); assert.equal(e.els.alDrawerWrap.hidden, true);
+  e.settle(e.last(), ok('30D', { total: 40 })); await e.flush();
+  v = e.view(); assert.equal(v.body, true); assert.equal(e.els.alScopeLine.textContent, '원장 조건 내 40건 · 표시 3건');
+  assert.equal(e.els.alDrawerWrap.hidden, true, '복원 뒤 이전 선택 서랍이 다시 열리지 않음');
+});
+
+test('같은 기간 오류(서랍 열린 상태, data-keep 위치 새로고침 가정) → 서랍·범위줄 내림, 다시 시도 대기 중 기존 자료·범위줄 복귀', async () => {
+  const e = await boot(ok('ALL'));
+  e.click('open-drawer', { 'data-id': '902' }); await e.flush();
+  e.click('refresh', { 'data-keep': '1' }); await e.flush();
+  assert.equal(e.els.alDrawerWrap.hidden, false, '같은 기간 새로고침 대기는 기존 화면 유지');
+  assert.equal(e.els.alScopeLine.textContent, '원장 조건 내 3건 · 표시 3건');
+  e.settle(e.last(), 'net'); await e.flush();
+  assert.equal(e.view().err, true); assert.equal(e.els.alDrawerWrap.hidden, true); assert.equal(e.els.alScopeLine.textContent, '');
+  e.click('retry-boot', { 'data-keep': '1' }); await e.flush();
+  const v = e.view(); assert.deepEqual([v.loading, v.err, v.body], [false, false, true]);
+  assert.equal(e.els.alScopeLine.textContent, '원장 조건 내 3건 · 표시 3건'); assert.equal(e.els.alDrawerWrap.hidden, true);
 });
 
 test('필터 초기화(기간≠전체)는 기간 전환 — 대기 중 로딩, 응답 후 전체 기간·필터 해제', async () => {
