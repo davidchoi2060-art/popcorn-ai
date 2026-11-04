@@ -537,8 +537,22 @@ input{font-family:var(--rv-font)}
           ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
         var e = new Error(msg); e.status = res.status; e.body = j; throw e;
       }
+      // 정상 응답은 항상 total(정수)·limit(양의 정수)·items(객체 배열)를 싣는다 — 0건도 같다
+      // (api/admin_activity_logs.py list_activity_logs 267~281). JSON이 아니거나(HTML·빈 본문)
+      // 형이 다르면 그대로 넘기지 않는다 — 넘기면 없는 자료를 「전부 표시됨 · 0건」으로 그리거나,
+      // 행은 보이는데 건수는 0·NaN 으로 말하거나, JS 오류 원문이 오류 상자에 뜬다.
+      // unmapped_kinds·unmapped_actions 는 요구하지 않는다(화면이 읽지 않음). 행 내부 값은 보지 않는다.
+      if (!isLogsShape(j)) {
+        var fe = new Error('응답 형식이 올바르지 않습니다 (HTTP ' + res.status + ')'); fe.status = res.status; throw fe;
+      }
       return j;
     });
+  }
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isLogsShape(j) {
+    return isObj(j) && Array.isArray(j.items) && j.items.every(isObj) &&
+      Number.isInteger(j.total) && j.total >= j.items.length &&
+      Number.isInteger(j.limit) && j.limit > 0;
   }
   function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
 
@@ -566,7 +580,15 @@ input{font-family:var(--rv-font)}
   }
 
   // ── 로드 ─────────────────────────────────────────────────────────
+  // 요청 순번 — 기간을 빠르게 바꾸면 응답이 보낸 순서와 다르게 도착한다. 가장 최근
+  // loadPeriod()의 응답만 반영하고, 그보다 앞선 요청의 정상·오류 응답은 버린다(늦게 온
+  // 이전 기간 자료나 오류가 최신 기간 버튼 아래 화면을 덮지 않게).
+  var loadSeq = 0;
   function loadPeriod(period) {
+    var my = ++loadSeq;
+    // 기간이 바뀔 때만 이전 기간 자료·선택을 내려 로딩을 보인다 — 새 기간 버튼 아래에 이전
+    // 기간 목록·건수가 남지 않게. 같은 기간 새로고침·다시 시도는 기존 자료 표시를 유지한다.
+    if (period !== S.period) { S.data = null; S.sel = null; }
     S.period = period; S.err = null; S.openMenu = null;
     var r = rangeFor(period);
     var qs = [];
@@ -575,11 +597,15 @@ input{font-family:var(--rv-font)}
     renderAll();
     return apiGet('/api/admin/activity-logs' + (qs.length ? '?' + qs.join('&') : ''))
       .then(function (resp) {
-        resp.items = annotate(resp.items || []);
+        if (my !== loadSeq) return;
+        resp.items = annotate(resp.items);
         S.data = resp; S.page = 1;
         renderAll();
       })
-      .catch(function (err) { S.err = err; renderAll(); });
+      .catch(function (err) {
+        if (my !== loadSeq) return;
+        S.err = err; renderAll();
+      });
   }
 
   // ── 필터링 ───────────────────────────────────────────────────────
