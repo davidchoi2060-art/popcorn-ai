@@ -435,6 +435,37 @@ input,textarea{font-family:var(--rv-font)}
     });
   }
   function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
+
+  /* 읽기(GET) 응답 형식 검사 — HTTP 200 인데 본문이 깨졌으면(빈 객체·배열·문자열·비JSON·필수 키 누락)
+     정상 빈 상태(「종류 없음」·「모두 채워졌습니다」·「아직 매긴 등급이 없습니다」)로 그리지 않고
+     기존 「조회 실패」 + 다시 시도로 보낸다. 화면이 실제로 읽는 키만 본다 — 점수 범위·후보 규칙 같은
+     정책 검사는 하지 않고, 상품 행의 nullable 필드(가격·근거·출처·날짜 등)는 그대로 둔다.
+     공통 handle 은 PUT/DELETE 도 쓰므로 검사는 여기(GET)에만 건다. */
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isNum(v) { return typeof v === 'number' && isFinite(v); }
+  function validMeta(j) {
+    return isObj(j) && Array.isArray(j.slots)
+      && j.slots.every(function (s) { return isObj(s) && typeof s.key === 'string' && typeof s.label === 'string'; })
+      && isObj(j.scale) && isNum(j.scale.min) && isNum(j.scale.max) && typeof j.scale.note === 'string'
+      && typeof j.engine_reads === 'boolean';
+  }
+  function validGrades(j) {
+    var c = isObj(j) ? j.coverage : null;
+    return isObj(j) && Array.isArray(j.items)
+      && j.items.every(function (it) { return isObj(it) && isNum(it.product_code); })
+      && isObj(c) && isNum(c.pool) && isNum(c.pool_graded) && isNum(c.graded)
+      && isNum(j.page) && isNum(j.pages) && isNum(j.total) && typeof j.note === 'string';
+  }
+  function apiGetChecked(path, valid) {
+    return apiGet(path).then(function (j) {
+      if (!valid(j)) { var e = new Error('응답 형식이 올바르지 않습니다 (HTTP 200)'); e.status = 200; throw e; }
+      return j;
+    });
+  }
+  /* 조회 갈래별 요청 순번 — 가장 최근 요청의 응답(성공·실패)만 반영한다. 같은 슬롯·같은 쪽을 다시
+     부르거나 슬롯 A→B→A 로 돌아와도, 먼저 나간 요청이 늦게 도착하면 버린다(슬롯 비교만으로는
+     A→B→A 의 첫 A 응답을 못 거른다). 칩 수는 부팅 회차에 묶는다. */
+  var SEQ = { boot: 0, ladder: 0, ungraded: 0, queue: 0, top: 0 };
   function apiPut(path, body) {
     return fetch(path, {
       method: 'PUT', credentials: 'same-origin',
@@ -462,13 +493,13 @@ input,textarea{font-family:var(--rv-font)}
   //    JS는 실제로 engine_reads===true 인 드문 경우에만 내용을 바꾼다(방어적 — JS가
   //    실패해도 화면이 "엔진 미연결"이라는 사실 자체는 항상 보인다). ──────────────
   function renderEngineBadge() {
-    if (S.meta.engine_reads) {
+    if (S.meta.engine_reads === true) {
       var b = $('engineBadge'); b.textContent = '엔진 연결됨'; b.classList.remove('pg-badge--warn');
       $('engineCaption').textContent = '';
     }
   }
   function renderNoticeBox() {
-    if (S.meta.engine_reads) {
+    if (S.meta.engine_reads === true) {
       $('noticeBox').innerHTML = '<p><strong>엔진 연결됨</strong> — 견적 엔진이 이 값을 읽습니다.</p>';
     }
   }
@@ -491,10 +522,11 @@ input,textarea{font-family:var(--rv-font)}
     renderChips();
   }
   function loadAllChipCounts() {
+    var boot = SEQ.boot;
     S.slots.forEach(function (s) {
-      apiGet('/api/admin/grades?slot=' + encodeURIComponent(s.key) + '&size=1')
-        .then(function (res) { updateChipCount(s.key, res.coverage.pool); })
-        .catch(function () { S.chipCounts[s.key] = 'ERR'; renderChips(); });
+      apiGetChecked('/api/admin/grades?slot=' + encodeURIComponent(s.key) + '&size=1', validGrades)
+        .then(function (res) { if (boot === SEQ.boot) updateChipCount(s.key, res.coverage.pool); })
+        .catch(function () { if (boot !== SEQ.boot) return; S.chipCounts[s.key] = 'ERR'; renderChips(); });
     });
   }
 
@@ -564,7 +596,8 @@ input,textarea{font-family:var(--rv-font)}
   }
   function renderLadder() {
     var body = $('ladderBody');
-    if (S.ladderErr) { body.innerHTML = errboxHtml(S.ladderErr, 'retry-ladder'); renderLadderPager(); return; }
+    // 오류 상자 아래에 이전 쪽의 pager(「전체 N건 중 1 / M페이지」)를 남기지 않는다.
+    if (S.ladderErr) { body.innerHTML = errboxHtml(S.ladderErr, 'retry-ladder'); $('ladderPager').innerHTML = ''; return; }
     if (!S.ladder) { body.innerHTML = '<div class="pg-loading">불러오는 중…</div>'; return; }
     var items = S.ladder.items || [];
     if (!items.length) {
@@ -613,7 +646,7 @@ input,textarea{font-family:var(--rv-font)}
   }
   function renderUngraded() {
     var body = $('ungradedBody');
-    if (S.ungradedErr) { body.innerHTML = errboxHtml(S.ungradedErr, 'retry-ungraded'); renderUngradedPager(); return; }
+    if (S.ungradedErr) { body.innerHTML = errboxHtml(S.ungradedErr, 'retry-ungraded'); $('ungradedPager').innerHTML = ''; return; }
     if (!S.ungraded) { body.innerHTML = '<div class="pg-loading">불러오는 중…</div>'; return; }
     var items = S.ungraded.items || [];
     if (!items.length) {
@@ -800,56 +833,61 @@ input,textarea{font-family:var(--rv-font)}
     renderViewFilter();
     applyViewFilter();
   }
+  /* 각 갈래는 «요청한 쪽»을 기억해 다시 시도가 실패한 그 쪽을 부르게 하고(마지막 성공 쪽이 아니다),
+     SEQ 순번이 바뀌었으면 늦게 온 응답·실패를 버린다. */
   function loadLadder(page) {
-    var slot = S.slot;
-    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=' + page + '&size=' + LADDER_SIZE)
+    var slot = S.slot, my = ++SEQ.ladder;
+    S.ladderReqPage = page;
+    apiGetChecked('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=' + page + '&size=' + LADDER_SIZE, validGrades)
       .then(function (res) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.ladder || slot !== S.slot) return;
         S.ladder = res; S.ladderErr = null; S.ladderPage = page;
         updateChipCount(slot, res.coverage.pool);
         renderCards(); renderLadder();
       })
       .catch(function (err) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.ladder || slot !== S.slot) return;
         S.ladderErr = err; renderCards(); renderLadder();
       });
   }
   function loadUngraded(page) {
-    var slot = S.slot;
-    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=' + UNGRADED_SIZE)
+    var slot = S.slot, my = ++SEQ.ungraded;
+    S.ungradedReqPage = page;
+    apiGetChecked('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=' + UNGRADED_SIZE, validGrades)
       .then(function (res) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.ungraded || slot !== S.slot) return;
         S.ungraded = res; S.ungradedErr = null; S.ungradedPage = page;
         renderUngraded();
       })
       .catch(function (err) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.ungraded || slot !== S.slot) return;
         S.ungradedErr = err; renderUngraded();
       });
   }
   function loadQueue(page) {
-    var slot = S.slot;
-    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=1')
+    var slot = S.slot, my = ++SEQ.queue;
+    S.queueReqPage = page;
+    apiGetChecked('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=ungraded&page=' + page + '&size=1', validGrades)
       .then(function (res) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.queue || slot !== S.slot) return;
         S.queue = res; S.queueErr = null; S.queuePage = page;
         if (S.mode === 'queue') renderPanel();
       })
       .catch(function (err) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.queue || slot !== S.slot) return;
         S.queueErr = err;
         if (S.mode === 'queue') renderPanel();
       });
   }
   function loadLadderTop() {
-    var slot = S.slot;
-    apiGet('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=1&size=' + LADDER_SIZE)
+    var slot = S.slot, my = ++SEQ.top;
+    apiGetChecked('/api/admin/grades?slot=' + encodeURIComponent(slot) + '&only=graded&page=1&size=' + LADDER_SIZE, validGrades)
       .then(function (res) {
-        if (slot !== S.slot) return;
+        if (my !== SEQ.top || slot !== S.slot) return;
         S.ladderTop = res;
         updateBarAndPreview();
       })
-      .catch(function () { if (slot === S.slot) S.ladderTop = null; /* 미리보기 전용 — 실패해도 화면은 안 죽는다 */ });
+      .catch(function () { if (my === SEQ.top && slot === S.slot) S.ladderTop = null; /* 미리보기 전용 — 실패해도 화면은 안 죽는다 */ });
   }
 
   // ── 동작 ─────────────────────────────────────────────────────────
@@ -968,11 +1006,11 @@ input,textarea{font-family:var(--rv-font)}
       var unext = ev.target.closest('[data-action="ungraded-next"]');
       if (unext) { if (S.ungraded && S.ungraded.page < S.ungraded.pages) loadUngraded(S.ungraded.page + 1); return; }
       var retryQ = ev.target.closest('[data-action="retry-queue"]');
-      if (retryQ) { loadQueue(S.queuePage || 1); return; }
+      if (retryQ) { loadQueue(S.queueReqPage || 1); return; }
       var retryL = ev.target.closest('[data-action="retry-ladder"]');
-      if (retryL) { loadLadder(S.ladderPage || 1); return; }
+      if (retryL) { loadLadder(S.ladderReqPage || 1); return; }
       var retryU = ev.target.closest('[data-action="retry-ungraded"]');
-      if (retryU) { loadUngraded(S.ungradedPage || 1); return; }
+      if (retryU) { loadUngraded(S.ungradedReqPage || 1); return; }
       var retryB = ev.target.closest('[data-action="retry-boot"]');
       if (retryB) { boot(); return; }
     });
@@ -988,20 +1026,31 @@ input,textarea{font-family:var(--rv-font)}
     $('panelBody').innerHTML = '<div class="pg-empty">슬롯 정보를 불러오지 못해 입력 패널을 열 수 없습니다.</div>';
     $('ladderPager').innerHTML = ''; $('ungradedPager').innerHTML = '';
   }
+  function renderNoSlots() {
+    // 정상 응답인데 슬롯이 0개 — 「불러오는 중…」으로 남기지 않고 빈 상태를 끝까지 말한다.
+    $('slotBar').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없습니다.</div>';
+    $('cardFill').innerHTML = ''; $('cardView').innerHTML = '';
+    $('cardScale').innerHTML = '<div class="big num">' + S.meta.scale.min + '~' + S.meta.scale.max + '</div>'
+      + '<p class="sub">' + mdBold(S.meta.scale.note) + '</p>';
+    $('ladderBody').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없어 서열이 없습니다.</div>';
+    $('ungradedBody').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없어 목록이 없습니다.</div>';
+    $('panelBody').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없어 입력할 상품이 없습니다.</div>';
+    $('ladderPager').innerHTML = ''; $('ungradedPager').innerHTML = '';
+  }
   function boot() {
-    apiGet('/api/admin/grades/meta').then(function (meta) {
+    var my = ++SEQ.boot;
+    apiGetChecked('/api/admin/grades/meta', validMeta).then(function (meta) {
+      if (my !== SEQ.boot) return;
       S.meta = meta;
-      S.slots = meta.slots || [];
+      S.slots = meta.slots;
       renderEngineBadge();
       renderNoticeBox();
-      if (!S.slots.length) {
-        $('slotBar').innerHTML = '<div class="pg-empty">등급을 매길 수 있는 부품 종류가 없습니다.</div>';
-        return;
-      }
+      if (!S.slots.length) { renderNoSlots(); return; }
       renderChips();
       loadAllChipCounts();
       selectSlot(S.slots[0].key);
     }).catch(function (err) {
+      if (my !== SEQ.boot) return;
       renderBootError(err);
     });
   }
@@ -1009,8 +1058,11 @@ input,textarea{font-family:var(--rv-font)}
   bindEvents();
   window.Admin2Shell.meReady.then(function (me) {
     S.me = me;
-    renderLadder();       // 「고치기·삭제」 비활성 여부를 다시 계산
-    renderUngraded();     // 「등급 매기기」 비활성 여부를 다시 계산
+    // 슬롯이 정해진 뒤에만 목록을 다시 그린다 — 부팅 실패·슬롯 0개 화면을 「불러오는 중…」으로 덮지 않는다.
+    if (S.slot) {
+      renderLadder();       // 「고치기·삭제」 비활성 여부를 다시 계산
+      renderUngraded();     // 「등급 매기기」 비활성 여부를 다시 계산
+    }
     applyWritability();    // 패널 입력·저장 버튼
   });
   boot();
