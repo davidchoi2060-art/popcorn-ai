@@ -156,7 +156,9 @@
     for(const key of ['via','status'])if(state[key]!==null)params.set(key,state[key]);
     try{const data=await request('/api/admin/members/search?'+params,{signal:listController.signal});
       if(seq!==state.listSeq)return false;
-      if(data.total>0&&state.page>Math.ceil(data.total/state.size)&&!correcting){state.page=Math.ceil(data.total/state.size);persist();return loadList(keepSelection,true);}
+      // 0명이어도 마지막 페이지는 1이다 — total>0 조건이 있던 때는 0명+page5 가 「5 / 1」로 남았다.
+      const lastPage=Math.max(1,Math.ceil(data.total/state.size));
+      if(state.page>lastPage&&!correcting){state.page=lastPage;persist();return loadList(keepSelection,true);}
       state.items=data.items;state.total=data.total;state.mode=data.member_mode;state.ready=true;
       options('via',data.available_filters.via,state.via,viaLabel,'전체 경로');options('status',data.available_filters.status,state.status,statusLabel,'전체 상태');
       if(!keepSelection||state.selected===null)state.selected=state.items[0]?.id??null;
