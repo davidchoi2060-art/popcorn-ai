@@ -68,7 +68,8 @@
 .gm-col-c{flex:3 1 460px;min-width:320px;display:flex;flex-direction:column;gap:12px}
 .gm-col-r{flex:1 1 280px;max-width:340px;min-width:250px;display:flex;flex-direction:column;gap:12px}
 
-/* ── 탭(게임 / AI 작업) ── */
+/* ── 탭(게임 / AI 작업) ── 차단 배너 바깥, 좌측 열 폭에 맞춘다 */
+.gm-seg-wrap{max-width:310px;margin:12px 0}
 .gm-seg{display:inline-flex;background:var(--container);border-radius:7px;padding:3px;gap:2px;width:100%}
 .gm-seg button{flex:1;border:0;border-radius:5px;padding:7px 10px;font:600 12.5px/1 var(--font);cursor:pointer;background:transparent;color:var(--on-variant)}
 .gm-seg button[aria-selected="true"]{background:var(--card);color:var(--on);box-shadow:0 1px 2px rgba(0,0,0,.08)}
@@ -142,7 +143,7 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
 
 @media (max-width:768px){
   .gm-cols{flex-direction:column}
-  .gm-col-l,.gm-col-c,.gm-col-r{max-width:none;width:100%}
+  .gm-col-l,.gm-col-c,.gm-col-r,.gm-seg-wrap{max-width:none;width:100%}
   .gm-items{max-height:300px}
   .gm-meta{flex-direction:column;align-items:flex-start;gap:6px}
   .gm-meta .tail{margin-left:0}
@@ -172,18 +173,22 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       </span>
     </div>
 
+    {# 탭은 차단 배너·cols 바깥에 둔다 — 한쪽 분류 매핑이 0건이어도 다른 분류로 갈 길이 남는다 #}
+    <div class="gm-seg-wrap" data-keep="1">
+      <div class="gm-seg" role="tablist" aria-label="분류">
+        <button type="button" role="tab" data-action="tab" data-tab="games" aria-selected="true">게임 <span data-bind="tab-games-n">—</span></button>
+        <button type="button" role="tab" data-action="tab" data-tab="ai" aria-selected="false">AI 작업 <span data-bind="tab-ai-n">—</span></button>
+      </div>
+    </div>
+
     <div class="gm-card gm-banner" data-bind="blocked" hidden>
       <span class="ttl" data-bind="blocked-title">—</span>
       <span class="msg" data-bind="blocked-msg">—</span>
     </div>
 
     <div class="gm-cols" data-bind="cols">
-      {# ── 좌: 탭 + 목록 ────────────────────────────────────── #}
+      {# ── 좌: 목록 ─────────────────────────────────────────── #}
       <div class="gm-col-l" data-keep="1">
-        <div class="gm-seg" role="tablist" aria-label="분류">
-          <button type="button" role="tab" data-action="tab" data-tab="games" aria-selected="true">게임 <span data-bind="tab-games-n">—</span></button>
-          <button type="button" role="tab" data-action="tab" data-tab="ai" aria-selected="false">AI 작업 <span data-bind="tab-ai-n">—</span></button>
-        </div>
         <div class="gm-card gm-list">
           <h6 data-bind="list-heading">게임 목록 — 매핑 / 미매핑</h6>
           <div class="gm-items" data-bind="items">불러오는 중…</div>
@@ -615,16 +620,34 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
     return '/api/admin/game-matrix?' + p.join('&');
   }
 
+  // 선택 조회 요청 순번 — 늦게 온 이전 응답(성공·실패)은 버린다. 선택 없음·차단 탭도 순번을 올려 무효화한다.
+  var selSeq = 0;
+  // 선택 응답은 지금 고른 분류·항목의 것이고 화면이 읽는 배열이 있어야 반영한다(아니면 기존 오류 처리).
+  function checkSelection(d) {
+    var s = d && d.selection, it = s && s.item;
+    var isGame = state.tab === 'games';
+    if (!d || !Array.isArray(d.games) || !Array.isArray(d.workloads) || !s || !it ||
+        s.kind !== (isGame ? 'game' : 'workload') ||
+        (isGame ? it.game_id : it.workload_id) !== state.itemId ||
+        !Array.isArray(s.cells) || !Array.isArray(s.unmatched)) {
+      throw new Error('응답 형식이 올바르지 않습니다 (HTTP 200)');
+    }
+  }
   function loadSelection() {
+    var my = ++selSeq;
     if (state.itemId == null) { state.sel = null; renderSelection(); renderEvidence(); return; }
     getJson(selectionUrl()).then(function (d) {
+      if (my !== selSeq) return;
+      checkSelection(d);
       state.base = d;                 // 목록·요약도 최신 응답으로 갱신한다(같은 페이로드)
       state.sel = d.selection;
       state.cellId = null;
       renderMeta(); renderList(); renderSkips();
       renderSelection(); renderEvidence();
-    }).catch(failed);
+    }).catch(function (err) { if (my === selSeq) failed(err); });
   }
+  // 새 항목·탭 요청이 pending 인 동안 이전 선택의 칸·근거를 남기지 않는다.
+  function clearSelection() { state.sel = null; state.cellId = null; renderSelection(); renderEvidence(); }
 
   function pickFirst() {
     var list = items();
@@ -646,12 +669,14 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
       state.filters.level = '';
       state.cellId = null;
       renderFilters();
-      if (renderBlocked()) { renderList(); renderSkips(); state.sel = null; renderSelection(); renderEvidence(); return; }
+      clearSelection();
+      if (renderBlocked()) { selSeq++; renderList(); renderSkips(); return; }
       pickFirst(); renderList(); renderSkips(); loadSelection();
     } else if (action === 'pick') {
       var id = Number(t.getAttribute('data-id'));
       if (id === state.itemId) return;
-      state.itemId = id; state.cellId = null;
+      state.itemId = id;
+      clearSelection();
       renderList(); loadSelection();
     } else if (action === 'cell') {
       var cid = Number(t.getAttribute('data-cell-id'));
