@@ -450,8 +450,22 @@ a.ph-move{color:var(--rv-ink)}
           ? window.popcornProgress.errText(j, res.status, 'GET /api/admin/price-history') : ('오류 ' + res.status);
         var e = new Error(msg); e.status = res.status; e.body = j; throw e;
       }
+      // 정상 응답은 항상 products·items 배열과 product(객체 또는 명시적 null)를 싣는다
+      // (api/admin_price_history.py price_history — 0건 분기 137~138 · 정상 181~194).
+      // JSON이 아니거나(HTML·빈 본문) 형이 다르면 그대로 넘기지 않는다 — 넘기면 「불러오는 중」이
+      // 영원히 남거나, 없는 자료를 「정당한 빈 결과(오류가 아닙니다)」로 그린다.
+      // series·by_supplier·unmapped_reasons·note 는 요구하지 않는다(0건 분기에 없거나 화면이 읽지 않음).
+      if (!isHistoryShape(j)) {
+        var fe = new Error('응답 형식이 올바르지 않습니다 (HTTP ' + res.status + ')'); fe.status = res.status; throw fe;
+      }
       return j;
     });
+  }
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isHistoryShape(j) {
+    // 형만 본다 — 빈 배열(0건)은 정상이고, 행 내부 값은 검사하지 않는다.
+    return isObj(j) && Array.isArray(j.products) && Array.isArray(j.items) &&
+      (j.product === null || isObj(j.product));
   }
   function apiGet(path) { return fetch(path, { credentials: 'same-origin' }).then(handle); }
 
@@ -463,12 +477,21 @@ a.ph-move{color:var(--rv-ink)}
     return p.length ? ('?' + p.join('&')) : '';
   }
 
+  // 요청 순번 — 상품·기간을 빠르게 바꾸면 응답이 보낸 순서와 다르게 도착한다. 가장 최근
+  // load()의 응답만 반영하고, 그보다 앞선 요청의 정상·오류·404 응답은 버린다(늦게 온 이전
+  // 응답이 최신 선택을 덮거나, 선택을 풀고 추가 조회를 일으키지 않게).
+  var loadSeq = 0;
   function load() {
+    var my = ++loadSeq;
     S.err = null;
     renderAll();
     return apiGet('/api/admin/price-history' + qs())
-      .then(function (resp) { S.data = resp; afterLoad(); })
+      .then(function (resp) {
+        if (my !== loadSeq) return;
+        S.data = resp; afterLoad();
+      })
       .catch(function (err) {
+        if (my !== loadSeq) return;
         // 계약: 지정한 상품에 그 기간 이력이 없으면 404 — 목록에서 골랐던 선택이
         // 기간이 바뀌며 낡은 것이다. 오류로 놀라게 하지 않고 서버 기본 선택으로
         // 한 번 다시 시도한다(무한 루프 방지: productCode가 이미 null이면 재시도하지 않는다).
