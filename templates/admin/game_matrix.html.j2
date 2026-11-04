@@ -626,7 +626,10 @@ table.gm-t tbody tr[aria-selected="true"]{background:var(--primary-container);bo
   function checkSelection(d) {
     var s = d && d.selection, it = s && s.item;
     var isGame = state.tab === 'games';
-    if (!d || !Array.isArray(d.games) || !Array.isArray(d.workloads) || !s || !it ||
+    // state.base 를 이 응답으로 바꾸므로 다음 탭·필터가 읽는 축 배열 넷도 반영 전에 본다(빈 배열은 정상).
+    if (!d || !Array.isArray(d.games) || !Array.isArray(d.workloads) ||
+        !Array.isArray(d.usages) || !Array.isArray(d.platforms) ||
+        !Array.isArray(d.game_levels) || !Array.isArray(d.workload_levels) || !s || !it ||
         s.kind !== (isGame ? 'game' : 'workload') ||
         (isGame ? it.game_id : it.workload_id) !== state.itemId ||
         !Array.isArray(s.cells) || !Array.isArray(s.unmatched)) {

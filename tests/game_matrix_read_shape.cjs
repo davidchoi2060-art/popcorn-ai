@@ -366,6 +366,27 @@ test('pending: 탭 전환 즉시 이전 탭 선택·근거를 숨김', async () 
 });
 
 // ═════════════ 결함 ③(D3): 선택 응답 대상·형식 가드 ═════════════
+test('D3 축 배열: 선택 응답 usages 누락 → 반영 전 오류 패널, 다음 탭 클릭에서 미처리 예외 없음(root 재현)', async () => {
+  const b = base(); const E = await boot(b);
+  const d = gameSel(b, 0); delete d.usages;
+  await E.settle(E.calls[1], 200, d);
+  assert.ok(E.vis('load-error'), '반영 전에 오류 패널'); assert.equal(E.txt('err-title'), '매트릭스 조회 실패');
+  assert.doesNotThrow(() => E.doc.dispatch('click', E.tab('ai')), '탭 클릭이 예외를 던지면 안 됨');
+});
+
+test('D3 축 배열 보존: 선택 응답의 정상 빈 배열 넷은 그대로 반영(필터 「전체」만, 탭 전환 정상)', async () => {
+  const b = base(); const E = await boot(b);
+  const empty = (x) => Object.assign(x, { usages: [], platforms: [], game_levels: [], workload_levels: [] });
+  await E.settle(E.calls[1], 200, empty(gameSel(b, 0)));
+  assert.ok(okErr(E)); assert.equal(E.txt('sel-name'), '게임하나');
+  await E.click(E.tab('ai'));
+  assert.ok(okErr(E), '빈 축 배열로 탭 전환해도 오류 아님');
+  assert.equal(E.B('f-level').options.length, 1); assert.equal(E.B('f-usage').options.length, 1);
+  assert.equal(E.last().url, '/api/admin/game-matrix?workload_id=11');
+  await E.settle(E.last(), 200, empty(wlSel(b, 0)));
+  assert.ok(okErr(E)); assert.equal(E.txt('sel-name'), '이미지생성 · 7B');
+});
+
 test('D3: 선택 응답 selection null·다른 kind·다른 항목·배열 아님은 오류 패널', async () => {
   const cases = {
     'selection null': (b) => b,
@@ -375,6 +396,10 @@ test('D3: 선택 응답 selection null·다른 kind·다른 항목·배열 아�
     'unmatched 누락': (b) => { const d = gameSel(b, 0); delete d.selection.unmatched; return d; },
     'games 배열 아님': (b) => { const d = gameSel(b, 0); d.games = null; return d; },
   };
+  for (const k of ['usages', 'platforms', 'game_levels', 'workload_levels']) {
+    cases[k + ' 누락'] = (b) => { const d = gameSel(b, 0); delete d[k]; return d; };
+    cases[k + ' 배열 아님'] = (b) => { const d = gameSel(b, 0); d[k] = 'x'; return d; };
+  }
   for (const [name, mk] of Object.entries(cases)) {
     const b = base(); const E = await boot(b);
     await E.settle(E.calls[1], 200, mk(base()));
