@@ -254,6 +254,11 @@ button{font-family:inherit}
           ? window.popcornProgress.errText(j, res.status, '') : ('오류 ' + res.status);
         var e = new Error(msg); e.status = res.status; e.body = j; throw e;
       }
+      // 정상 응답은 항상 객체다(api/admin_ai_usage.py summary). JSON이 아니거나 null·false·0·문자열·배열이면
+      // 그대로 넘기면 render()가 조용히 끝나 「불러오는 중」/이전 집계가 남는다 — 형식 오류로 드러낸다.
+      if (j === null || typeof j !== 'object' || Array.isArray(j)) {
+        var fe = new Error('응답 형식이 올바르지 않습니다 (HTTP ' + res.status + ')'); fe.status = res.status; throw fe;
+      }
       return j;
     });
   }
