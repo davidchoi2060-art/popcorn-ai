@@ -255,6 +255,26 @@ test('미리보기 서랍: 플래그된 것만 켠 채 서랍에서 플래그 �
   e.click('toggle-flag', {}, K); await e.flush();
   const v = e.view(); assert.equal(v.rows, 0); assert.equal(v.previewEmpty, true); assert.equal(v.drawer, false); assert.equal(v.scrim, false);
 });
+// O7: 서랍의 플래그 토글 뒤 필터 바 건수(scopeNote)가 목록과 어긋났다(「플래그된 것만」 마지막 해제 → 0행인데 「1건」).
+const scopeRows = (e) => { const v = e.view(); assert.equal(v.scope, v.rows + '건 (예시) · 전문은 자르지 않습니다', '건수 표시 = 실제 목록 행 수'); return v; };
+test('미리보기 건수: 플래그된 것만 켠 채 마지막 플래그 해제 → 목록 0행·「0건 (예시)」·서랍/스크림 숨김', async () => {
+  const e = await previewOpen(0);
+  e.click('toggle-flagged', {}, K); let v = scopeRows(e); assert.equal(v.rows, 1);
+  e.click('toggle-flag', {}, K); await e.flush();
+  v = scopeRows(e); assert.equal(v.rows, 0); assert.equal(v.scope, '0건 (예시) · 전문은 자르지 않습니다');
+  assert.equal(v.previewEmpty, true); assert.equal(v.drawer, false); assert.equal(v.scrim, false);
+  e.click('toggle-flagged', {}, K); v = scopeRows(e); assert.equal(v.rows, 7);
+});
+test('미리보기 건수: 플래그된 것만 켠 채 다른 행 플래그 → 건수 증가와 목록 일치, 서랍 유지', async () => {
+  const e = await previewOpen(1);
+  e.click('toggle-flag', {}, K); await e.flush();            // idx1 플래그(전체 보기 중) → 7행 그대로
+  scopeRows(e); assert.equal(e.view().drawer, true);
+  e.click('toggle-flagged', {}, K); let v = scopeRows(e); assert.equal(v.rows, 2); assert.equal(v.drawer, true);
+  e.click('toggle-flag', {}, K); await e.flush();            // idx1 해제 → 1행, 서랍 닫힘
+  v = scopeRows(e); assert.equal(v.rows, 1); assert.equal(v.drawer, false); assert.equal(v.scrim, false);
+  assert.equal(e.calls.length, 1, '서버 요청·쓰기 0');
+});
+
 test('미리보기 서랍: 선택 행이 계속 보이는 필터 변경·플래그 토글은 서랍 유지(기존 동작)', async () => {
   const e = await previewOpen(1);
   e.click('set-task', { 'data-v': 'task.s1_parse' }, K); e.click('set-model', { 'data-v': 'claude-haiku-4-5-20251001' }, K); await e.flush();

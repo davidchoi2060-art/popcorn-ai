@@ -589,7 +589,8 @@ button{font-family:inherit}
     var row = S.demo[S.sel];
     row.flagged = !row.flagged;
     toast(row.flagged ? '플래그를 남겼습니다 — 목록에서 ⚑로 바로 보입니다(가상 데이터, 저장되지 않음)' : '플래그를 해제했습니다', 'ok');
-    renderPreview(); renderDrawer();
+    // 「플래그된 것만」이 켜져 있으면 목록 행 수가 바뀌므로 필터 바 건수도 함께 갱신한다.
+    renderFilterBar(); renderPreview(); renderDrawer();
   }
 
   // ── 이벤트 위임 ──────────────────────────────────────────────────
