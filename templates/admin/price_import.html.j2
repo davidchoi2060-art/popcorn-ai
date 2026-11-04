@@ -455,9 +455,18 @@
         renderAll();
         return;
       }
-      S.files = (r.body && r.body.files) || [];
-      S.feeRate = r.body ? r.body.fee_rate : null;
-      S.marginRate = r.body ? r.body.margin_rate : null;
+      // 정상 HTTP여도 본문이 깨졌거나(JSON 아님 · null · {}) files가 배열이 아니면 계약 위반이다
+      // (GET /api/admin/price-import는 항상 files 배열을 준다). 빈 목록으로 바꿔 「파일 없음」처럼
+      // 보이게 하지 않고, 비배열을 pickDefaultSupplier로 넘겨 로더가 멈추게 하지도 않는다.
+      // 이전에 받은 목록·선택·체크는 그대로 둔다(401·500·네트워크 실패와 같은 처리).
+      if (!r.body || !Array.isArray(r.body.files)) {
+        S.error = '단가표 목록 응답 형식이 올바르지 않습니다 (HTTP ' + r.status + ') — 페이지를 새로고침해 주세요.';
+        renderAll();
+        return;
+      }
+      S.files = r.body.files;
+      S.feeRate = r.body.fee_rate;
+      S.marginRate = r.body.margin_rate;
       if (S.selectedSupplierId == null) pickDefaultSupplier();
       S.checked = {};
       renderAll();
