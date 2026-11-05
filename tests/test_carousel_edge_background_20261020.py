@@ -12,7 +12,8 @@ JS = (ROOT / "mockups/mvp4/assets/js/home-carousel.js").read_text(encoding="utf-
 CSS = (ROOT / "mockups/mvp4/assets/css/home-carousel.css").read_text(encoding="utf-8")
 
 APPROVED = {"showcase": ("#FEFBF4", "#EEE3D6"), "gaming": ("#E1F1FD", "#A9C6E8"), "ai": ("#ECE5FD", "#E7E4F7"),
-            "people": ("#FEF7DF", "#F3F4EF"), "collection": ("#FCF7EC", "#F3E6FA"), "supercomputer": ("#FBF8F6", "#E4EDF8")}
+            "people": ("#FEF7DF", "#F3F4EF"), "collection": ("#FCF7EC", "#F3E6FA"), "supercomputer": ("#FBF8F6", "#E4EDF8"),
+            "asus": ("#0A2BC9", "#0A3DE0")}
 
 
 class EdgeBackground(unittest.TestCase):

@@ -88,6 +88,21 @@
 .hc-edge-tone[data-active]{opacity:1}
 @media(prefers-reduced-motion:reduce){.hc-edge-tone{transition:none}}
 @media(max-width:800px){.hc-edge{display:none}}
+/* 2026-11-05 ASUS AI PC 기획전 v4 진입 배너. 밝은 기존 배너는 그대로 두고 이 슬라이드만 블루로 칠한다. 글자·버튼은 HTML. */
+.hc-asus{background:#0a2bc9;color:#fff}
+.hc-asus .hc-image{object-position:right center}
+.hc-asus .hc-copy{padding-top:44px;width:46%}
+.hc-asus .hc-kicker{color:#b6f4ff;letter-spacing:0;font-size:14px}
+.hc-asus .hc-copy h2{font-size:clamp(36px,3.5vw,46px);letter-spacing:-.04em}
+.hc-asus .hc-description{max-width:420px;color:#fff;font-weight:600}
+.hc-asus .hc-actions{max-width:252px}
+.hm-home .hc-asus .hc-actions .btn{background:linear-gradient(180deg,#b6f6ff,#3fe6ff);border-color:#3fe6ff;color:#0b1740;font-weight:800}
+.hc-asus .hc-note{color:#fff;margin-top:14px;text-shadow:0 1px 4px #03157a,0 0 2px #03157a}
+.hc-asus-fields{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.hc-asus-fields span{padding:5px 10px;border:1.5px solid #8fe9ff;border-radius:8px;background:#04238666;color:#fff;font-size:13px;font-weight:700}
+.hc-carousel .hc-asus a:focus-visible{outline-color:#ffb400}
+@media(min-width:801px) and (max-width:1100px){.hc-asus .hc-copy{width:50%;padding-top:30px}.hc-asus .hc-copy h2{font-size:33px}}
+@media(max-width:800px){.hc-asus .hc-copy{width:100%;padding:20px 20px 0}.hc-asus .hc-copy h2{font-size:clamp(28px,8vw,34px)}.hc-asus .hc-kicker{margin-bottom:6px}.hc-asus .hc-description{font-size:14px;margin-top:8px}.hc-asus .hc-actions{margin-top:12px;max-width:100%}.hc-asus .hc-note{font-size:11.5px;margin-top:10px;position:relative;z-index:1}.hc-asus .hc-image{height:228px;object-position:88% bottom;-webkit-mask-image:linear-gradient(180deg,transparent,#000 16%);mask-image:linear-gradient(180deg,transparent,#000 16%)}.hc-asus-fields{margin-bottom:6px}.hc-asus-fields span{font-size:12px;padding:3px 7px}}
 /* 2026-10-20 approved AI finder CTA (option 3 + moving bubbles). Replaces the small .hc-chat entry in place.
    Scoped to .hc-finder; PC/ribbon stay still, only the two bubbles pop and rise (6s loop, 3s apart). */
 .hc-chat.hc-finder{display:grid;grid-template-columns:45% 55%;align-items:center;gap:0;position:relative;margin-top:14px;min-height:356px;padding:34px 30px 32px 50px;background:#fcfbff;border:1px solid #e1d6ff;border-radius:18px;overflow:hidden;box-shadow:0 5px 25px #6b4ce408;font-size:16px;color:#141a2a;line-height:1.5}
