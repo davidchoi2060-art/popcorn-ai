@@ -367,6 +367,9 @@ NAV = [
         #   API(api/admin_ai_device_profiles.py)는 2026-10-20 부터 있었고 화면이 없어 운영자가 고칠 수 없었다.
         ("AI 슈퍼컴퓨터 표시 정보", "/admin2/ai-device-profiles",
          "신설(ADM-PRD-060 · 가칭) 2026-10-31 — 고객 표시 정보 · 사진 · 진열 순위"),
+        # 2026-11-06(ADM-PRD-061 · 가칭) — ASUS 기획전 3종. 판매 상품이 아니라 기획 자료라 전용 표(0178)를 쓴다.
+        ("ASUS 기획전 관리", "/admin2/asus-campaign",
+         "신설(ADM-PRD-061 · 가칭) 2026-11-06 — 3종 문구 · 부품 후보 · 미확정 상태 · 기획 검토가"),
         ("상품 매트릭스 관리", "/admin2/grid", "사전 생성 견적 격자 조회(구 「격자 관리」)"),
         ("용도별 상품 매트릭스", "/admin2/game-matrix", "게임·AI 작업이 성립하는 격자 칸 조회(구 「게임·AI 연계 매트릭스」)"),
         ("삭제 상품 조회", "/admin2/deleted-products", None),   # 2026-09-14 사장님 지시 — 그룹 맨 아래로 이동
@@ -604,7 +607,7 @@ def new_admin_nav(current_path=''):
         ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
         ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
         ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
-        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/ai-device-profiles')),
+        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/ai-device-profiles', '/admin2/asus-campaign')),
         ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
         ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries', '/admin2/retention', '/admin2/payment-records')),
         ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members', '/admin2/member-reviews')),
@@ -674,7 +677,7 @@ SIMPLE_MENU = (
      ("/admin2/products", "/admin2/product-new", "/admin2/reviews", "/admin2/category-mapping"),
      ("/admin2/categories-v2", "/admin2/part-explanations", "/admin2/pc-workspace",
       "/admin2/pc-configurations", "/admin2/configuration-consultation", "/admin2/catalog-import",
-      "/admin2/product-fit", "/admin2/ai-device-profiles", "/admin2/grid", "/admin2/game-matrix",
+      "/admin2/product-fit", "/admin2/ai-device-profiles", "/admin2/asus-campaign", "/admin2/grid", "/admin2/game-matrix",
       "/admin2/deleted-products", "/admin2/build-map", "/admin2/spec-standard",
       "/admin2/spec-field-defs", "/admin2/compat-rules", "/admin2/usage-floors",
       "/admin2/part-grade", "/admin2/policy-weights", "/admin2/candidate-pool")),

@@ -1,0 +1,343 @@
+{#
+  ASUS 기획전 관리 (ADM-PRD-061 · 가칭) — 2026-11-06 신설.
+
+  ASUS 기획전 3종의 문구 · 이미지 · 추천 대상 · 활용 예시 · 부품 후보 · 상태 · 기획 검토가를 고친다.
+  데이터 = `GET /api/admin/asus-campaign` · `GET …/{id}` · `PUT …/{id}` (`api/admin_asus_campaign.py`).
+
+  ■ 원시 JSON 을 고치는 화면이 아니다. 칸마다 한국어 항목명이 있고, 저장 직전에 입력값으로 본문을 다시 만든다.
+  ■ 서버가 준 문자열은 textContent / value 로만 넣는다(innerHTML 금지).
+  ■ 정직 표기: 불러오는 중 · 실패 · 값 없음을 그대로 말한다. 실패하면 폼을 그리지 않는다(옛 값을 최신처럼 보이지 않게).
+  ■ 늦은 응답: 모델을 바꾸면 이전 요청의 결과를 버린다(seq).
+  ■ 저장 중: 폼 전체(#acForm fieldset)와 모델 전환을 잠근다. 보낸 값과 화면 값이 갈라지면 재조회가 새 입력을 지우기 때문이다.
+    fieldset 으로 잠가 칸별 읽기전용 상태(운영체제 상태 · 조회 권한)를 건드리지 않는다.
+  ■ 미저장: 고친 내용이 있으면 모델 전환 전에 묻고(화면 안 확인), 페이지를 벗어나면 브라우저가 묻는다.
+  ■ 충돌(409): 입력값을 지우지 않는다. 「최신값 불러오기」를 눌러야 입력을 버리고 새 값을 읽는다.
+#}
+{% extends "admin/_admin2_shell.html.j2" %}
+
+{% block title %}ASUS 기획전 관리{% endblock %}
+
+{% block head_extra %}
+<style>
+.ac-wrap{padding:16px 24px 96px;display:flex;flex-direction:column;gap:12px;max-width:1120px}
+.ac-note{font-size:13px;color:var(--rv-muted);margin:0;line-height:1.55}
+.ac-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.ac-tabs button{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:8px 14px;min-height:40px;font:inherit;font-size:14px;cursor:pointer;color:var(--rv-ink)}
+.ac-tabs button[aria-selected="true"]{background:var(--rv-ink);border-color:var(--rv-ink);color:var(--rv-card);font-weight:600}
+.ac-tabs button:disabled{opacity:.5;cursor:default}
+.ac-fieldset{border:0;margin:0;padding:0;min-width:0;display:flex;flex-direction:column;gap:12px}
+.ac-box{background:var(--rv-card);border:1px solid var(--rv-dim4);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.ac-box h2{font-size:15px;margin:0}
+.ac-box h3{font-size:13.5px;margin:0;color:var(--rv-ink-soft)}
+.ac-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.ac-field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ac-field.wide{grid-column:1/-1}
+.ac-field label,.ac-lbl{font-size:12px;color:var(--rv-muted)}
+.ac-field input,.ac-field select,.ac-field textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;border:1px solid var(--rv-dim3);border-radius:6px;padding:7px 10px;background:var(--rv-card);color:var(--rv-ink)}
+.ac-field textarea{min-height:64px;resize:vertical}
+.ac-field input:disabled,.ac-field select:disabled,.ac-field textarea:disabled{background:var(--rv-panel);color:var(--rv-ink-soft)}
+.ac-sub{border:1px solid var(--rv-panel2);border-radius:6px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.ac-subhead{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.ac-btn{border:1px solid var(--rv-dim3);background:var(--rv-card);border-radius:6px;padding:6px 12px;min-height:36px;font:inherit;font-size:13px;cursor:pointer;color:var(--rv-ink)}
+.ac-btn:disabled{opacity:.45;cursor:default}
+.ac-btn.primary{background:var(--rv-ink);border-color:var(--rv-ink);color:var(--rv-card);font-weight:600;padding:8px 18px;min-height:40px}
+.ac-plan{font-weight:600}
+.ac-bar{position:sticky;bottom:0;background:var(--rv-card);border:1px solid var(--rv-dim3);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 -4px 16px rgb(0 0 0 / .06)}
+.ac-msg{font-size:13px;color:var(--rv-muted);flex:1 1 240px;min-width:0}
+.ac-msg.err{color:var(--rv-red)}
+.ac-alert[hidden]{display:none}
+.ac-alert{background:var(--rv-amber-bg);border-radius:6px;padding:10px 12px;font-size:13.5px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0}
+.ac-state{padding:28px;text-align:center;color:var(--rv-muted)}
+.ac-state.err{color:var(--rv-red)}
+@media (max-width:768px){
+  .ac-wrap{padding:12px 16px 96px}
+  .ac-grid{grid-template-columns:minmax(0,1fr)}
+  .ac-tabs button{flex:1 1 100%}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ac-wrap" data-keep="1">
+  <p class="ac-note" id="acNote"></p>
+  <div class="ac-tabs" id="acTabs" role="tablist" aria-label="기획전 모델"></div>
+  <p class="ac-alert" id="acGuard" hidden></p>
+  <div id="acBody" aria-live="polite"><p class="ac-state">불러오는 중입니다.</p></div>
+</div>
+<script>
+(function(){
+  var API = '/api/admin/asus-campaign';
+  var IDS = ['business','video','local-ai'];
+  var st = {current:null, seq:0, dirty:false, saving:false, loaded:null, read:null, names:{}, names_ok:false};
+  var $ = function(id){ return document.getElementById(id); };
+  function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+  function when(s){ return s ? new Date(s).toLocaleString('ko-KR',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'; }
+  function errText(d, fallback){
+    if (window.popcornProgress && window.popcornProgress.errText) { var t=window.popcornProgress.errText(d); if (t) return t; }
+    if (d && typeof d.detail==='string') return d.detail;
+    if (d && Array.isArray(d.detail)) return d.detail.map(function(x){ return (x.loc||[]).slice(1).join('.')+': '+x.msg; }).join(' / ');
+    return fallback;
+  }
+  function getJSON(url){
+    return fetch(url,{cache:'no-store',headers:{Accept:'application/json'}}).then(function(r){
+      return r.json().catch(function(){ return null; }).then(function(d){
+        if (!r.ok) { var e=new Error(errText(d,'불러오지 못했습니다. (상태 '+r.status+')')); e.status=r.status; throw e; }
+        return d;
+      });
+    });
+  }
+  function markDirty(){ if (st.dirty) return; st.dirty=true; drawBar(); }
+
+  // ── 입력 칸 ─────────────────────────────────────────────
+  function field(parent, label, value, opts){
+    opts=opts||{};
+    var wrap=el('div','ac-field'+(opts.wide?' wide':''));
+    var id='ac-f-'+(++field.n);
+    var lb=el('label',null,label+(opts.max?' ('+opts.max+'자까지)':'')); lb.htmlFor=id; wrap.appendChild(lb);
+    var inp;
+    if (opts.options){
+      inp=el('select');
+      opts.options.forEach(function(o){ var op=el('option',null,o[1]); op.value=o[0]; inp.appendChild(op); });
+      inp.value=value==null?'':String(value);
+    } else if (opts.area){
+      inp=el('textarea'); inp.value=value==null?'':value;
+    } else {
+      inp=el('input'); inp.type=opts.number?'number':'text'; inp.value=value==null?'':value;
+      if (opts.number){ inp.min='1'; inp.step='1'; inp.inputMode='numeric'; }
+    }
+    if (opts.max) inp.maxLength=opts.max;
+    inp.id=id; inp.disabled=!!opts.locked||!st.loaded.can_write;
+    inp.addEventListener('input',markDirty); inp.addEventListener('change',markDirty);
+    wrap.appendChild(inp); parent.appendChild(wrap);
+    return inp;
+  }
+  field.n=0;
+  function str(inp){ var v=inp.value.trim(); return v===''?null:v; }
+  // 숫자 칸: 비움 = null(미정). 0 이나 소수를 몰래 고치지 않고 그대로 보내 서버가 거부하게 한다.
+  function num(inp){ if(inp.validity&&inp.validity.badInput) return '숫자 아님'; var v=inp.value.trim(); if(v==='') return null; var n=Number(v); return isFinite(n)?n:v; }
+
+  function drawOption(listBox, o, states, part){
+    var box=el('div','ac-sub'); box.setAttribute('data-option','1');
+    var g=el('div','ac-grid'); box.appendChild(g);
+    var f={};
+    f.name=field(g,'후보 이름',o.name,{max:120,wide:true});
+    f.state=field(g,'후보 상태',o.state,{options:Object.keys(states).map(function(k){ return [k,states[k]]; })});
+    f.mall=field(g,'몰 상품번호(대조용 · 고객 화면 미표시)',o.mall_no,{number:true});
+    f.price=field(g,'일반회원가(원) — 비우면 「가격 미표시」',o.price,{number:true});
+    f.premium=field(g,'프리미엄 표시가(원)',o.premium,{number:true});
+    f.note=field(g,'비고',o.note,{max:200,wide:true});
+    if (st.loaded.can_write){
+      var rm=el('button','ac-btn','후보 삭제'); rm.type='button';
+      rm.addEventListener('click',function(){ part.options.splice(part.options.indexOf(f),1); box.remove(); markDirty(); });
+      box.appendChild(rm);
+    }
+    part.options.push(f);
+    listBox.appendChild(box);
+  }
+
+  function renderForm(d){
+    st.loaded=d; st.dirty=false; field.n=0;
+    var body=$('acBody'); body.textContent='';
+    var c=d.content, states=d.states;
+    var form={uses:[],who:[],parts:[]};
+    var set=el('fieldset','ac-fieldset'); set.id='acForm'; set.setAttribute('aria-label','기획전 모델 편집'); body.appendChild(set);
+
+    var head=el('div','ac-box'); head.appendChild(el('h2',null,'기본 문구'));
+    var g=el('div','ac-grid'); head.appendChild(g);
+    form.name=field(g,'모델 이름',c.name,{max:30});
+    form.tagline=field(g,'한 줄 소개',c.tagline,{max:80});
+    var imgs=d.hero_images.map(function(x){ return [x,x]; });
+    form.hero_image=field(g,'대표 이미지',c.hero_image,{options:imgs});
+    form.hero_alt=field(g,'대표 이미지 대체 글',c.hero_alt,{max:100});
+    form.prepare=field(g,'준비 안내(선택)',c.prepare,{max:200,wide:true,area:true});
+    form.explain=field(g,'로컬 AI 설명(선택)',c.explain,{max:300,wide:true,area:true});
+    form.limit=field(g,d.id==='local-ai'?'실행 제한 안내(필수)':'실행 제한 안내(선택)',c.limit,{max:200,wide:true,area:true});
+    set.appendChild(head);
+
+    var plan=el('div','ac-box'); plan.appendChild(el('h2',null,'기획 검토가'));
+    plan.appendChild(el('p','ac-note','고객 화면 표기는 항상 「'+d.plan_label+'」입니다. 판매가가 아니며 일반 상품 가격에 반영되지 않습니다. 비우면 고객 화면에 「미정」으로 표시됩니다(0원 표시 없음).'));
+    var pg=el('div','ac-grid'); plan.appendChild(pg);
+    form.plan=field(pg,'기획 검토가(원)',d.plan_review_price,{number:true});
+    set.appendChild(plan);
+
+    var who=el('div','ac-box'); who.appendChild(el('h2',null,'추천 대상'));
+    var whoList=el('div','ac-grid'); who.appendChild(whoList);
+    function addWho(w){
+      var box=el('div','ac-sub');
+      var f={text:field(box,'추천 대상 문구',w.text,{max:40}),icon:field(box,'아이콘',w.icon,{options:d.icons.map(function(x){ return [x,x]; })})};
+      if (d.can_write){ var rm=el('button','ac-btn','삭제'); rm.type='button'; rm.addEventListener('click',function(){ form.who.splice(form.who.indexOf(f),1); box.remove(); markDirty(); }); box.appendChild(rm); }
+      form.who.push(f); whoList.appendChild(box);
+    }
+    c.for_who.forEach(addWho);
+    if (d.can_write){ var aw=el('button','ac-btn','추천 대상 추가'); aw.type='button'; aw.addEventListener('click',function(){ addWho({text:'',icon:d.icons[0]}); markDirty(); }); who.appendChild(aw); }
+    set.appendChild(who);
+
+    var uses=el('div','ac-box'); uses.appendChild(el('h2',null,'활용 예시'));
+    var useList=el('div'); useList.style.cssText='display:flex;flex-direction:column;gap:10px'; uses.appendChild(useList);
+    function addUse(u){
+      var box=el('div','ac-sub'); var ug=el('div','ac-grid'); box.appendChild(ug);
+      var f={};
+      f.title=field(ug,'제목',u.title,{max:60});
+      f.image=field(ug,'이미지',u.image,{options:d.use_images.map(function(x){ return [x,x]; })});
+      f.text=field(ug,'설명',u.text,{max:300,wide:true,area:true});
+      f.example=field(ug,'질문 예시(선택)',u.example,{max:120,wide:true});
+      f.steps=field(ug,'진행 순서(한 줄에 한 단계 · 최대 6단계 · 단계당 30자)',(u.steps||[]).join('\n'),{wide:true,area:true});
+      f.alt=field(ug,'이미지 대체 글',u.alt,{max:100,wide:true});
+      if (d.can_write){ var rm=el('button','ac-btn','활용 예시 삭제'); rm.type='button'; rm.addEventListener('click',function(){ form.uses.splice(form.uses.indexOf(f),1); box.remove(); markDirty(); }); box.appendChild(rm); }
+      form.uses.push(f); useList.appendChild(box);
+    }
+    c.uses.forEach(addUse);
+    if (d.can_write){ var au=el('button','ac-btn','활용 예시 추가'); au.type='button'; au.addEventListener('click',function(){ addUse({title:'',text:'',steps:[],image:d.use_images[0],alt:''}); markDirty(); }); uses.appendChild(au); }
+    set.appendChild(uses);
+
+    var parts=el('div','ac-box'); parts.appendChild(el('h2',null,'부품 후보와 미확정 상태'));
+    parts.appendChild(el('p','ac-note',d.price_note));
+    parts.appendChild(el('p','ac-note','항목과 순서는 고정입니다. 「공급 확인 필요」 · 「별도 문의」 후보에는 가격을 넣을 수 없고, 운영체제는 별도 문의를 유지합니다. 상단 사양 표기는 각 항목의 표시명에서 자동으로 만들어집니다.'));
+    form.basis=field(parts,'가격 기준 안내',c.price_basis,{max:400,area:true});
+    c.parts.forEach(function(p){
+      var box=el('div','ac-sub'); box.appendChild(el('h3',null,p.label));
+      var pgr=el('div','ac-grid'); box.appendChild(pgr);
+      var part={label:p.label,options:[],plain:p.status==='plain'};
+      part.head=field(pgr,'표시명',p.head,{max:80});
+      if (!part.plain){
+        part.status=field(pgr,'항목 상태',p.status,{options:Object.keys(states).map(function(k){ return [k,states[k]]; }),locked:p.label==='운영체제'});
+        var list=el('div'); list.style.cssText='display:flex;flex-direction:column;gap:8px'; box.appendChild(list);
+        p.options.forEach(function(o){ drawOption(list,o,states,part); });
+        if (d.can_write){ var ao=el('button','ac-btn','후보 추가'); ao.type='button'; ao.addEventListener('click',function(){ drawOption(list,{name:'',state:'check',note:''},states,part); markDirty(); }); box.appendChild(ao); }
+      }
+      form.parts.push(part); parts.appendChild(box);
+    });
+    set.appendChild(parts);
+
+    var bar=el('div','ac-bar'); bar.id='acBar';
+    var save=el('button','ac-btn primary','저장'); save.type='button'; save.id='acSave';
+    var view=el('a','ac-btn','고객 화면에서 보기'); view.href='/mvp4/asus-pc.html?model='+encodeURIComponent(d.id); view.target='_blank'; view.rel='noopener';
+    bar.appendChild(save); bar.appendChild(view); bar.appendChild(el('span','ac-msg')).id='acMsg';
+    body.appendChild(bar);
+    st.form=form;
+    save.addEventListener('click',submit);
+    drawBar();
+  }
+
+  function baseMsg(){
+    var d=st.loaded;
+    var meta='버전 '+d.version+' · '+(d.origin==='seed'?'초깃값(PR447)':'마지막 저장 '+when(d.updated_at)+(d.updated_by?' · '+d.updated_by:''));
+    return d.can_write ? meta : meta+' · 조회 권한은 저장할 수 없습니다';
+  }
+  function drawBar(msg, isErr){
+    if (!st.loaded || !$('acSave')) return;
+    $('acSave').disabled=!st.loaded.can_write||st.saving||!st.dirty||st.conflict;
+    $('acForm').disabled=st.saving;
+    var m=$('acMsg'); m.className='ac-msg'+(isErr?' err':'');
+    m.textContent=msg||((st.dirty?'저장하지 않은 변경이 있습니다 · ':'')+baseMsg());
+    Array.prototype.forEach.call($('acTabs').children,function(b){ b.disabled=st.saving; });
+  }
+
+  function collect(){
+    var f=st.form;
+    return {
+      expected_version: st.loaded.version,
+      plan_review_price: num(f.plan),
+      content: {
+        name: str(f.name), tagline: str(f.tagline), hero_image: f.hero_image.value, hero_alt: str(f.hero_alt),
+        prepare: str(f.prepare), explain: str(f.explain), limit: str(f.limit), price_basis: str(f.basis),
+        for_who: f.who.map(function(w){ return {text:str(w.text), icon:w.icon.value}; }),
+        uses: f.uses.map(function(u){ return {title:str(u.title), text:str(u.text), example:str(u.example), image:u.image.value, alt:str(u.alt),
+          steps:u.steps.value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean)}; }),
+        parts: f.parts.map(function(p){
+          return {label:p.label, head:str(p.head), status:p.plain?'plain':p.status.value,
+            options:p.options.map(function(o){ return {name:str(o.name), state:o.state.value, price:num(o.price), premium:num(o.premium), note:str(o.note)||'', mall_no:num(o.mall)}; })};
+        })
+      }
+    };
+  }
+
+  function submit(){
+    if (st.saving||!st.dirty||!st.loaded.can_write) return;
+    var payload=JSON.stringify(collect());
+    st.saving=true; clearGuard(); drawBar('저장하는 중입니다.');
+    var id=st.current;
+    fetch(API+'/'+encodeURIComponent(id),{method:'PUT',headers:{'Content-Type':'application/json',Accept:'application/json'},body:payload})
+    .then(function(r){ return r.json().catch(function(){ return null; }).then(function(x){ return {status:r.status,ok:r.ok,d:x}; }); })
+    .then(function(x){
+      st.saving=false;
+      if (x.status===409){ showConflict(errText(x.d,'다른 사람이 먼저 저장했습니다.')); return; }
+      if (!x.ok){ drawBar(errText(x.d,'저장하지 못했습니다. (상태 '+x.status+')')+' 입력한 내용은 그대로 있습니다.',true); return; }
+      // 저장 응답을 믿고 끝내지 않고 DB 를 다시 읽어 폼을 그린다.
+      return open(id,{force:true,after:(x.d&&x.d.verdict)||'저장했습니다.'});
+    })
+    // 응답을 못 받으면 저장됐는지 알 수 없다. 다시 눌러 중복 저장하지 않게 막고 최신값 확인으로 보낸다.
+    .catch(function(){ st.saving=false; showConflict('서버 응답을 받지 못해 저장 여부를 알 수 없습니다.'); });
+  }
+
+  function guardBox(text, buttons){
+    var g=$('acGuard'); g.textContent=''; g.appendChild(el('span',null,text));
+    buttons.forEach(function(b){ var x=el('button','ac-btn',b[0]); x.type='button'; x.addEventListener('click',b[1]); g.appendChild(x); });
+    g.hidden=false; g.scrollIntoView({block:'nearest'});
+  }
+  function clearGuard(){ $('acGuard').hidden=true; $('acGuard').textContent=''; }
+
+  function showConflict(text){
+    st.conflict=true;
+    drawBar(text,true);
+    guardBox(text+' 입력한 내용은 그대로 있습니다. 필요한 내용을 옮겨 적은 뒤 불러와 주세요.',[['최신값 불러오기',function(){ clearGuard(); st.dirty=false; open(st.current,{force:true}); }]]);
+  }
+
+  function drawTabs(){
+    var t=$('acTabs'); t.textContent='';
+    IDS.forEach(function(id){
+      var b=el('button',null,st.names[id]||id); b.type='button'; b.setAttribute('role','tab'); b.setAttribute('data-model',id);
+      b.setAttribute('aria-selected',st.current===id?'true':'false'); b.disabled=st.saving;
+      b.addEventListener('click',function(){ pick(id); });
+      t.appendChild(b);
+    });
+  }
+
+  function pick(id){
+    if (id===st.current||st.saving) return;
+    if (st.dirty){
+      guardBox('저장하지 않은 변경이 있습니다.',[['계속 편집',clearGuard],['변경 버리고 이동',function(){ clearGuard(); st.dirty=false; open(id); }]]);
+      return;
+    }
+    open(id);
+  }
+
+  function open(id, o){
+    o=o||{};
+    var seq=++st.seq;
+    st.current=id; st.conflict=false; st.loaded=null; st.dirty=false; clearGuard(); drawTabs();
+    var body=$('acBody'); body.textContent=''; body.appendChild(el('p','ac-state','불러오는 중입니다.'));
+    return getJSON(API+'/'+encodeURIComponent(id)).then(function(d){
+      if (seq!==st.seq) return;                  // 늦게 온 이전 모델 응답은 버린다
+      st.names[id]=d.content&&d.content.name||id; drawTabs();
+      $('acNote').textContent=d.save_note;
+      renderForm(d);
+      if (o.after) drawBar(o.after+' 다시 읽은 값입니다 · '+baseMsg());
+    }).catch(function(e){
+      if (seq!==st.seq) return;
+      body.textContent='';
+      body.appendChild(el('p','ac-state err',e.message));
+      var retry=el('button','ac-btn','다시 시도'); retry.type='button'; retry.addEventListener('click',function(){ open(id,o); });
+      body.appendChild(retry);
+    });
+  }
+
+  window.addEventListener('beforeunload',function(e){ if (st.dirty){ e.preventDefault(); e.returnValue=''; } });
+
+  getJSON(API).then(function(d){
+    (d.items||[]).forEach(function(i){ st.names[i.id]=i.name||i.id; });
+    $('acNote').textContent=d.save_note;
+    var start=(d.items&&d.items[0])?d.items[0].id:null;
+    drawTabs();
+    if (!start){
+      var b=$('acBody'); b.textContent=''; b.appendChild(el('p','ac-state','DB에 기획전 값이 없습니다. 초기화(마이그레이션 0178) 상태를 확인해 주세요.'));
+      return;
+    }
+    open(start);
+  }).catch(function(e){
+    var b=$('acBody'); b.textContent=''; b.appendChild(el('p','ac-state err',e.message));
+    var retry=el('button','ac-btn','다시 시도'); retry.type='button'; retry.addEventListener('click',function(){ location.reload(); }); b.appendChild(retry);
+  });
+})();
+</script>
+{% endblock %}

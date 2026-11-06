@@ -236,3 +236,10 @@
   .az-others{grid-template-columns:minmax(0,1fr)}
   .az-others img{width:92px}
 }
+
+/* 서버 값을 받기 전·실패·빈 결과 안내 (2026-11-06 DB 전환) */
+.az-load{padding:32px 20px;border-radius:12px;background:#f2f5fc;text-align:center;font-size:16px;font-weight:600;color:var(--az-ink)}
+.az-load .az-btn{margin-top:14px;cursor:pointer;border:0;font:inherit}
+.az-load-error{background:#fff4e5}
+.az-load-partial{margin-top:14px;padding:16px 20px;font-size:14.5px;background:#fff4e5}
+#az-detail-root>.az-load{margin:40px auto;width:min(720px,calc(100% - 32px))}

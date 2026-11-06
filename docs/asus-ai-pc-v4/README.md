@@ -9,7 +9,11 @@
 | 상세 3종 | `asus-pc.html?model=business`, `video`, `local-ai` |
 | 문의 | `asus-consult.html?model=...` (`model` 없으면 3종 공통 문의) |
 
-화면 값의 단일 원천은 `assets/js/asus-data.js`다. API·DB를 읽지 않는 정적 자료이며 가격은 2026-11-05 조회값이다. 소재 목록은 [ASSETS.md](ASSETS.md)에 있다.
+**2026-11-06부터 모델 값의 원천은 DB(`asus_campaign_models`, 마이그레이션 0178)다.** 고객 화면은 `GET /api/customer/asus-campaign`만 읽고, 관리자는 `/admin2/asus-campaign`에서 고친다. 실패하면 실패라고 표시하며 대신 보여 줄 값이 코드에 없다. `assets/js/asus-data.js`에는 저장으로 바꾸면 안 되는 고정값(공통 고지, 기획 검토가 표기, 상태 이름, 색조, 문의 항목 매핑)만 남았다. 초깃값은 `db/migrations/data/asus_campaign_models_20261106.json`이고 부품 가격은 2026-11-05 조회값이다. 소재 목록은 [ASSETS.md](ASSETS.md)에 있다.
+
+저장이 닿는 범위: 서브메인 · 상세 · 문의 안내. 닿지 않는 범위: 일반 상품 · 판매가 · 재고 · 추천, 홈 배너, 공통 고지.
+
+개발 DB에는 아직 적용하지 않았다. 적용 전 이 코드가 배포되면 고객 화면은 값 대신 불러오기 실패 안내를 표시하므로, 0178 적용과 코드 배포를 함께 해야 한다.
 
 ## 문의 연결
 

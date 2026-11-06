@@ -42,7 +42,7 @@ LIMIT = 500  # 초과 시 total과 함께 정직 표기("최근 500건") — 페
 KIND_LABELS = {"order": "주문", "refund": "환불", "settlement": "정산",
                "price_file": "단가표", "product_review": "검수·매입", "product": "상품",
                "member_review": "후기", "member": "회원", "stock": "재고", "sourcing": "매입 견적", "ops": "운영 전환",
-               "category": "카테고리",
+               "category": "카테고리", "asus_campaign": "ASUS 기획전",
                # 2026-08-15 추가분 — 각 kind가 실제로 어디서 쓰이는지 `_log(..., kind=...)`
                # 호출부를 코드로 직접 확인했다(추측 금지 — MAKER-CHECKLIST §4).
                "operator": "운영자",             # admin_operators.py·admin_profile.py — 운영자 계정 관리
