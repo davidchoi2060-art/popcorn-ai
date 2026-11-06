@@ -176,7 +176,10 @@ async function startChrome() {
 
 const ADMIN = '/admin2/asus-campaign';
 const INTERNAL_WORDS = /공급\s*재?확인|확인\s*필요|확인\s*전|확정\s*불가|미확정|미확인|불일치|후보/;
-const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계/;
+// 「합계 64GB」는 메모리 용량 합계라 금액이 아니다. GB가 붙지 않은 「합계」는 계속 잡는다.
+const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계(?!\s*\d+\s*GB)/;
+// 제품이 아닌 줄. 이 항목의 options 는 후보 비노출 검사 대상이 아니고, 표시 문구를 아래에서 따로 정확히 본다.
+const NON_PRODUCT_LABELS = ['그래픽 메모리', '추가 시스템팬', '운영체제'];
 const SHOW_ALL = "document.querySelectorAll('img[data-az-thumb]').forEach(i=>i.loading='eager')";
 
 // 상세 3종: 금액 · 내부 상태 없음, 사진은 API 가 준 같은 줄의 제품 사진, 사진이 안 오면 제품명만 남는다.
@@ -192,17 +195,23 @@ async function checkDetails(page, tag) {
     record(tag + ' ' + m.id + ' 상세: 내부 상태 문구 없음', !INTERNAL_WORDS.test(text), 'real', (text.match(INTERNAL_WORDS) || [])[0]);
     record(tag + ' ' + m.id + ' 상세: 가로 넘침 없음', await page.noOverflow(), 'real');
     const expected = {};
-    m.parts.forEach((p) => p.options.forEach((o) => { if (o.image) expected[o.name] = o.image; }));
-    const shown = await page.js("Array.from(document.querySelectorAll('.az-opts li')).map(li=>({name:li.querySelector('strong').textContent,img:li.querySelector('img')?li.querySelector('img').getAttribute('src'):null,alt:li.querySelector('img')?li.querySelector('img').alt:null,w:li.querySelector('img')?li.querySelector('img').naturalWidth:null}))");
-    const wrong = shown.filter((s) => s.img && (s.img !== expected[s.name] || s.alt !== s.name || !s.w));
-    record(tag + ' ' + m.id + ' 상세: 사진이 같은 줄 제품과 일치 · 깨진 그림 없음', wrong.length === 0, 'real', wrong);
+    m.build.forEach((r) => { if (r.kind === 'product') expected[r.name] = r; });
+    const shown = await page.js("Array.from(document.querySelectorAll('tr[data-az-part=product]')).map(tr=>({label:tr.querySelector('th').textContent,name:tr.querySelector('strong').textContent,qty:tr.querySelector('.az-part-qty').textContent,img:tr.querySelector('img')?tr.querySelector('img').getAttribute('src'):null,alt:tr.querySelector('img')?tr.querySelector('img').alt:null,w:tr.querySelector('img')?tr.querySelector('img').naturalWidth:null}))");
+    const roles = shown.map((s) => s.label);
+    record(tag + ' ' + m.id + ' 상세: 제품 8줄 · 같은 역할 중복 없음', shown.length === 8 && new Set(roles).size === 8, 'real', roles);
+    const wrong = shown.filter((s) => !expected[s.name] || !s.img || s.img !== expected[s.name].image || s.alt !== s.name || !s.w || s.qty !== expected[s.name].quantity);
+    record(tag + ' ' + m.id + ' 상세: 사진·수량이 같은 줄 제품과 일치 · 깨진 그림 없음', wrong.length === 0, 'real', wrong);
     const box = shown.find((s) => s.name === 'ASUS TUF Gaming GT502 BLACK');
     record(tag + ' ' + m.id + ' 상세: 케이스는 GT502 컷아웃', !!box && box.img === 'assets/images/asus/gt502-black-cutout.webp' && box.w > 0, 'real', box);
-    const noPhoto = shown.filter((s) => !expected[s.name]);
-    record(tag + ' ' + m.id + ' 상세: 확인 안 된 부품은 제품명만', noPhoto.every((s) => s.img === null), 'real', noPhoto);
     const local = shown.filter((s) => s.img && s.img.startsWith('assets/images/parts/asus-official-'));
     record(tag + ' ' + m.id + ' 상세: 공식 사진 로컬 로드', local.length > 0 && local.every((s) => s.w > 0), 'real', local);
-    record(tag + ' ' + m.id + ' 상세: 사진 없는 항목은 운영체제만', noPhoto.map((s) => s.name).join() === '정품 Windows', 'real', noPhoto.map((s) => s.name));
+    // 제품 역할 8종의 후보 중 대표가 아닌 것은 표뿐 아니라 상세 전체에 나오면 안 된다.
+    const candidates = m.parts.filter((p) => !NON_PRODUCT_LABELS.includes(p.label)).flatMap((p) => p.options.map((o) => o.name)).filter((n) => !expected[n]);
+    const leaked = candidates.filter((n) => text.includes(n));
+    record(tag + ' ' + m.id + ' 상세: 대표 아닌 후보 이름 없음', leaked.length === 0, 'real', leaked);
+    const plain = await page.js("Array.from(document.querySelectorAll('.az-table tbody tr:not([data-az-part=product])')).map(tr=>[tr.dataset.azPart,tr.querySelector('th').textContent,tr.querySelector('td').textContent.trim(),tr.querySelectorAll('img,.az-part-qty').length])");
+    const plainWant = [['spec', '그래픽 메모리', m.vram, 0], ['notice', '추가 시스템팬', '상담 시 안내', 0], ['notice', '운영체제', '정품 Windows 별도', 0]];
+    record(tag + ' ' + m.id + ' 상세: 사양·안내 줄 3개 문구 정확 · 사진·수량 없음', JSON.stringify(plain) === JSON.stringify(plainWant), 'real', plain);
     // 전체 캡처 전에 디코드를 끝낸다. decoding=async 사진은 로드됐어도 캡처에 비어 나올 수 있다.
     const undecoded = await page.js("Promise.all(Array.from(document.querySelectorAll('img[data-az-thumb]')).map(i=>i.decode().then(()=>null,()=>i.getAttribute('src')))).then(r=>r.filter(Boolean))");
     record(tag + ' ' + m.id + ' 상세: 사진 디코드 성공', undecoded.length === 0, 'real', undecoded);
@@ -216,7 +225,7 @@ async function checkDetails(page, tag) {
   await page.until("!!document.querySelector('.az-table')");
   await page.js(SHOW_ALL);
   await page.until("!document.querySelector('img[data-az-thumb][src*=\"pimg\"]')&&!document.querySelector('img[data-az-thumb][src*=\"images/parts/\"]')");
-  const after = await page.js("({names:document.querySelectorAll('.az-opts strong').length,broken:Array.from(document.images).filter(i=>i.complete&&!i.naturalWidth).length,cases:document.querySelectorAll('img[data-az-thumb][src*=\"gt502\"]').length})");
+  const after = await page.js("({names:document.querySelectorAll('.az-part-item strong').length,broken:Array.from(document.images).filter(i=>i.complete&&!i.naturalWidth).length,cases:document.querySelectorAll('img[data-az-thumb][src*=\"gt502\"]').length})");
   record(tag + ' 사진 실패: 제품명 유지 · 깨진 그림 없음', after.names > 0 && after.broken === 0 && after.cases === 1, 'intercept', after);
   page.rules = [];
   await page.send('Network.setCacheDisabled', { cacheDisabled: false });

@@ -137,7 +137,6 @@
 .az-table tbody th{width:172px;background:var(--az-tint);font-size:14.5px;font-weight:800;text-align:left;vertical-align:top;padding:12px 14px;border-top:1px solid var(--az-line)}
 .az-table td{padding:12px 14px;border-top:1px solid var(--az-line);vertical-align:top}
 .az-part-head{font-size:16px;font-weight:800;color:var(--az-navy)}
-.az-opts{display:grid;gap:8px;margin-top:8px}
 
 .az-install{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .az-install article{display:flex;gap:14px;padding:18px;border:1px solid var(--az-line);border-radius:12px;background:#fff}
@@ -228,10 +227,11 @@
 .az-load-error{background:#fff4e5}
 .az-load-partial{margin-top:14px;padding:16px 20px;font-size:14.5px;background:#fff4e5}
 #az-detail-root>.az-load{margin:40px auto;width:min(720px,calc(100% - 32px))}
-/* 상세 구성 표: 제품명 + 실제 부품 사진(2026-11-06). 사진이 없으면 이름만 남는다. */
-.az-opts li{display:flex;align-items:center;gap:14px;min-height:44px;padding:10px 0;border-top:1px solid #e6e9f2}
-.az-opts li:first-child{border-top:0}
-.az-opts strong{min-width:0;overflow-wrap:anywhere}
+/* 상세 구성 표: 항목마다 제품 1종 + 수량 + 실제 부품 사진(2026-11-06). 사진이 없으면 이름만 남는다. */
+.az-part-item{display:flex;align-items:center;gap:14px;min-height:44px}
+.az-part-text{display:grid;gap:4px;min-width:0;margin:0}
+.az-part-text strong{overflow-wrap:anywhere}
+.az-part-qty{font-size:14px;font-weight:600;color:#55607a}
 .az-opt-thumb{flex:0 0 88px;width:88px;height:88px;margin:0;display:grid;place-items:center;border-radius:8px;background:#fff}
 .az-opt-thumb img{width:100%;height:100%;object-fit:contain}
 @media(max-width:560px){.az-opt-thumb{flex-basis:64px;width:64px;height:64px}}

@@ -94,6 +94,71 @@ def part_thumbnail(mall_no, name):
     return mall_photo(mall_no) if (mall_no, name) in _THUMB_VERIFIED else None
 
 
+# ── 고객 구성표: 항목마다 대표 제품 1종 (2026-11-06) ────────────────────────────────────────────────
+# parts[].options 는 비교 후보 목록이지 구성품 목록이 아니다. 그대로 나열하면 GPU 2장 · SSD 3개처럼 읽힌다.
+# 그래서 고객 표(build)는 아래 선정표에서만 만든다. 선정 근거와 제외한 후보 = docs/asus-ai-pc-v4/PARTS-SELECTION.md.
+# 선정표는 저장값과 표시명 · 몰 번호 · 제품명이 모두 같을 때만 쓴다. 하나라도 다르면(또는 후보가 사라지거나 자료 불일치로
+# 바뀌면) 다른 후보로 넘어가지 않고 그 줄을 「상담 시 안내」로 낸다. 틀린 제품을 구성품으로 말하지 않기 위해서다.
+# 여기 없는 값은 DB 원본에 그대로 남는다. 선정은 ASUS 협의 · 실조립 확인을 대신하지 않는다.
+NEUTRAL_PART = '상담 시 안내'
+_PICK_STATES = ('sale', 'candidate', 'check', 'supply')
+_CASE_PICK = ('ASUS TUF Gaming GT502 BLACK', 126548, 'ASUS TUF Gaming GT502 BLACK', '1개')
+_COOLER_PICK = ('ASUS PRIME LC 360 ARGB', None, 'ASUS PRIME LC 360 ARGB', '1개')
+_SSD_PICK = ('2TB NVMe', 128452, 'BIWIN M350 M.2 NVMe 2TB', '1개')
+_RAM_64_PICK = ('64GB DDR5', 113590, '삼성 DDR5-5600 64GB [32G×2]', '32GB × 2개 · 합계 64GB')
+_TUF_B850_PICK = ('ASUS TUF B850 계열 구성 후보', 123726, 'ASUS TUF Gaming B850-PLUS WIFI 인텍', '1개')
+# 값 = (저장된 표시명, 몰 번호, 제품명, 수량 표기)
+BUILD_PICKS = {
+    'business': {
+        'CPU(중앙처리장치)': ('Ryzen 9 9900X', 121803, 'Ryzen 9 9900X 멀티팩 정품', '1개'),
+        'GPU(그래픽카드)': ('ASUS PRIME RTX 5070 Ti 16GB', 130847, 'ASUS PRIME RTX 5070 Ti 16GB 코잇', '1장'),
+        '메모리(RAM)': _RAM_64_PICK, 'SSD(저장장치)': _SSD_PICK, '메인보드': _TUF_B850_PICK,
+        '파워(PSU)': ('ASUS 850W 이상 구성 후보', 130851, 'ASUS ROG STRIX 850W Platinum 인텍', '1개'),
+        '케이스': _CASE_PICK, 'CPU 쿨러': _COOLER_PICK,
+    },
+    'video': {
+        'CPU(중앙처리장치)': ('Ryzen 9 9950X', 124310, 'Ryzen 9 9950X 벌크', '1개'),
+        'GPU(그래픽카드)': ('ASUS PRIME RTX 5080 16GB', None, 'ASUS PRIME RTX 5080 16GB', '1장'),
+        '메모리(RAM)': _RAM_64_PICK, 'SSD(저장장치)': _SSD_PICK, '메인보드': _TUF_B850_PICK,
+        '파워(PSU)': ('ASUS 1000W급 구성 후보', 122070, 'ASUS TUF Gaming 1000W GOLD', '1개'),
+        '케이스': _CASE_PICK, 'CPU 쿨러': _COOLER_PICK,
+    },
+    'local-ai': {
+        'CPU(중앙처리장치)': ('Ryzen 9 9950X', 124310, 'Ryzen 9 9950X 벌크', '1개'),
+        'GPU(그래픽카드)': ('ASUS TUF RTX 5090 32GB', None, 'ASUS TUF RTX 5090 32GB', '1장'),
+        '메모리(RAM)': ('128GB DDR5', 113591, '삼성 DDR5-5600 128GB [32G×4]', '32GB × 4개 · 합계 128GB'),
+        'SSD(저장장치)': _SSD_PICK,
+        '메인보드': ('ASUS ProArt X870E 계열 구성 후보', 122148, 'ASUS ProArt X870E-CREATOR WIFI 대원', '1개'),
+        '파워(PSU)': ('ASUS 1200W급 구성 후보', 128514, 'ASUS ROG STRIX 1200W Platinum', '1개'),
+        '케이스': _CASE_PICK, 'CPU 쿨러': _COOLER_PICK,
+    },
+}
+# 부품이 아닌 줄. 팬은 제품 · 수량이 미정이고, 운영체제는 구성 금액에 포함하지 않는 별도 문의다.
+_NOTICE_ROWS = {'추가 시스템팬': NEUTRAL_PART, '운영체제': '정품 Windows 별도'}
+_VRAM_HEADS = {'business': '16GB', 'video': '16GB', 'local-ai': '32GB'}
+
+
+def customer_build(model_id: str, parts: list[dict]) -> list[dict]:
+    """고객 구성표 줄 전부. 후보 목록 · 상태 · 비고 · 가격은 넣지 않는다."""
+    rows = []
+    for part in parts:
+        label = part['label']
+        row = {'label': label, 'kind': 'notice', 'name': NEUTRAL_PART, 'quantity': None, 'image': None}
+        rows.append(row)
+        if label in _NOTICE_ROWS:
+            row['name'] = _NOTICE_ROWS[label]
+        elif label == '그래픽 메모리':
+            if part['head'] == _VRAM_HEADS[model_id]:
+                row.update(kind='spec', name=part['head'])
+        else:
+            head, mall_no, name, quantity = BUILD_PICKS[model_id][label]
+            found = part['head'] == head and any(
+                o['mall_no'] == mall_no and o['name'] == name and o['state'] in _PICK_STATES for o in part['options'])
+            if found:
+                row.update(kind='product', name=name, quantity=quantity, image=part_thumbnail(mall_no, name))
+    return rows
+
+
 def _optional_line(value):
     """한 줄 글자만 받는다. 화면은 다시 이스케이프하지만, 저장 단계에서 먼저 막는다. 빈 값은 None."""
     if value is None:
@@ -239,6 +304,7 @@ def public_model(model_id: str, plan, content: dict) -> dict:
             'hero_image': c['hero_image'], 'hero_alt': c['hero_alt'],
             'for_who': c['for_who'], 'uses': c['uses'], 'prepare': c['prepare'], 'explain': c['explain'],
             'limit': c['limit'], 'price_basis': c['price_basis'], 'parts': parts,
+            'build': customer_build(model_id, c['parts']),
             'plan_review_price': plan, 'plan_label': PLAN_LABEL, 'plan_note': PLAN_NOTE,
             # 상단·카드 표기는 전체 표의 머리값과 같아야 하므로 따로 저장하지 않고 여기서 만든다.
             'cpu': _part(c, 'CPU(중앙처리장치)')['head'], 'gpu': _part(c, 'GPU(그래픽카드)')['head'],

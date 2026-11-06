@@ -8,7 +8,7 @@
  * plan = 기획 검토가(ASUS 협의 전). 판매가·소비자가 합계가 아니므로 부품 가격과 더하지 않는다. null 은 미정이고 0원이 아니다.
  *
  * 내부 검토 상태와 비고는 관리자·API 원본에 그대로 두고, 고객 화면에는 내보내지 않는다(2026-11-06 사용자 지시).
- * 자료가 어긋난 옵션(state=conflict)과 이름 자체가 내부 안내인 옵션은 표시하지 않는다. 값을 확정처럼 고쳐 쓰지 않는다.
+ * 구성 표는 서버가 고른 build(항목마다 대표 1종)만 읽는다. 비교 후보 목록(parts[].options)은 이 어댑터가 읽지 않는다.
  */
 (function () {
   'use strict';
@@ -47,18 +47,23 @@
   }
   function shown(v) { return clean(text(v)) || NEUTRAL; }
 
-  // 고객 구성 표 한 줄. 가격·상태·비고는 싣지 않는다.
-  function customerOption(o) {
-    if (text(o.state) === 'conflict' || INTERNAL.test(text(o.name)) || /미정/.test(o.name)) return null;
-    return { name: clean(o.name), image: typeof o.image === 'string' && THUMB.test(o.image) ? o.image : null };
+  // 고객 구성 표 한 줄. 제품 줄(product)만 수량과 사진을 갖는다. 내부 표현이 섞이면 제품명 대신 중립 문구를 쓴다.
+  function customerRow(r) {
+    var kind = text(r.kind);
+    if (kind !== 'product' && kind !== 'spec' && kind !== 'notice') throw new Error('shape');
+    var ok = !INTERNAL.test(text(r.name));
+    var product = kind === 'product' && ok;
+    return {
+      label: text(r.label), kind: ok ? kind : 'notice', name: ok ? r.name : NEUTRAL,
+      quantity: product ? text(r.quantity) : null,
+      image: product && typeof r.image === 'string' && THUMB.test(r.image) ? r.image : null
+    };
   }
 
   function normalize(x) {
     var meta = META[x.id];
     if (!meta) throw new Error('model');
-    var parts = list(x.parts).map(function (p) {
-      return { label: text(p.label), head: shown(p.head), options: list(p.options).map(customerOption).filter(Boolean) };
-    });
+    var parts = list(x.build).map(customerRow);
     var box = part(parts, '케이스'), cooler = part(parts, 'CPU 쿨러');
     return {
       id: x.id, tone: meta.tone, inquiry: meta.inquiry, name: shown(x.name), tagline: shown(x.tagline),
@@ -70,7 +75,7 @@
         return { title: shown(u.title), text: shown(u.text), example: clean(optional(u.example)) || null, steps: list(u.steps).map(shown), image: image(u.image), alt: clean(text(u.alt)) };
       }),
       prepare: clean(optional(x.prepare)) || null, explain: clean(optional(x.explain)) || null, limit: clean(optional(x.limit)) || null,
-      parts: parts, caseName: box.head, coolerName: cooler.head
+      parts: parts, caseName: box.name, coolerName: cooler.name
     };
   }
 
@@ -125,7 +130,7 @@
     FOOTNOTE: '디자인 시안 · 제품 이미지는 연출 · 최종 가격 ASUS 협의 후 확정 · Windows 별도',
     DETAIL_FOOTNOTE: '디자인 시안 · 제품 이미지는 연출 · Windows 별도',
     TOTAL_NOTE: '구성과 조립·배송 조건에 따라 금액이 달라 전체 합계를 표시하지 않습니다. 기획 검토가는 부품 합계가 아닙니다.',
-    PARTS_NOTE: '한 항목에 제품이 둘 이상이면 그중 하나로 구성합니다. 최종 구성은 상담에서 안내합니다.',
+    PARTS_NOTE: '항목마다 대표 제품 1종을 표시합니다. 최종 구성과 호환 범위는 상담에서 안내합니다.',
     COMPAT: 'GT502 케이스 규격: 그래픽카드 최대 400mm, 상단 라디에이터 360mm, 파워 최대 200mm.',
     INSTALL: [
       { icon: 'computer-tower', title: '본체 조립·검수', text: '부품 조립과 기본 점검 범위는 상담에서 안내합니다.' },
