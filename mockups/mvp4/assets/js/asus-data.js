@@ -17,7 +17,7 @@
   var TIMEOUT_MS = 15000;
   var IMAGE = /^[a-z0-9-]+\.webp$/;
 
-  var THUMB = /^(assets\/images\/parts\/mall-\d+\.webp|assets\/images\/asus\/gt502-black-cutout\.webp|https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600\.jpg)$/;
+  var THUMB = /^(assets\/images\/parts\/mall-\d+\.webp|assets\/images\/parts\/asus-official-[a-z0-9-]+\.webp|assets\/images\/asus\/gt502-black-cutout\.webp|https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600\.jpg)$/;
   var INTERNAL = /공급\s*재?확인|확인\s*필요|확인\s*전|확인하지\s*못|확정\s*불가|미확정|미확인|불일치|서로\s*다릅니다|선정하지\s*않|비교\s*후보/;
   var NEUTRAL = '상담 시 안내';
 
