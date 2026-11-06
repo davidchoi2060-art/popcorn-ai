@@ -31,6 +31,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StrictInt, Va
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from .customer_pc_registered import mall_photo
 from .db import engine
 
 log = logging.getLogger(__name__)
@@ -57,6 +58,27 @@ USE_IMAGES = ('use-business-1.webp', 'use-business-2.webp', 'use-business-3.webp
 _NO_PRICE_STATES = ('supply', 'separate')
 _BAD_TEXT = re.compile(r'[<>\x00-\x1f\x7f]|javascript\s*:|data\s*:\s*text|\bon[a-z]+\s*=', re.I)
 _DATA_FILE = Path(__file__).resolve().parents[1] / 'db/migrations/data/asus_campaign_models_20261106.json'
+
+# 상세 구성 표 썸네일. 사진을 눈으로 대조한 (몰 번호, 옵션 이름)만 싣는다(2026-11-06).
+# 이름을 고치거나 번호를 바꾸면 사진이 빠지고 이름만 나온다 — 다른 모델 사진이 붙는 것보다 낫다.
+# 뺀 것: 130847 · 130987 · 130851(몰 사진 404), 130703(사진에서 제조사·모델 확인 불가), 127181 · 127182(자료 불일치, 고객 화면 미표시).
+GT502_CUTOUT = 'assets/images/asus/gt502-black-cutout.webp'
+_THUMB_CASE = (126548, 'ASUS TUF Gaming GT502 BLACK')
+_THUMB_VERIFIED = frozenset({
+    (121803, 'Ryzen 9 9900X 멀티팩 정품'), (124310, 'Ryzen 9 9950X 벌크'),
+    (129630, 'ASUS PRIME RTX 5070 Ti OC 16GB 코잇'),
+    (113590, '삼성 DDR5-5600 64GB [32G×2]'), (113591, '삼성 DDR5-5600 128GB [32G×4]'),
+    (128452, 'BIWIN M350 M.2 NVMe 2TB'), (127681, '마이크론 Crucial E100 NVMe 2TB'), (128441, 'ESSENCORE KLEVV C910G NVMe 2TB'),
+    (123726, 'ASUS TUF Gaming B850-PLUS WIFI 인텍'), (122148, 'ASUS ProArt X870E-CREATOR WIFI 대원'),
+    (108213, 'ASUS ROG STRIX 850G'), (122070, 'ASUS TUF Gaming 1000W GOLD'), (128514, 'ASUS ROG STRIX 1200W Platinum'),
+})
+
+
+def part_thumbnail(mall_no, name):
+    """확인된 부품만 사진 경로를 준다. 나머지는 None(이름만 표시)."""
+    if (mall_no, name) == _THUMB_CASE:
+        return GT502_CUTOUT
+    return mall_photo(mall_no) if (mall_no, name) in _THUMB_VERIFIED else None
 
 
 def _optional_line(value):
@@ -197,7 +219,8 @@ def public_model(model_id: str, plan, content: dict) -> dict:
         raise ValueError('plan_review_price')
     c = parsed.model_dump()
     parts = [{'label': p['label'], 'head': p['head'], 'status': p['status'],
-              'options': [{k: o[k] for k in ('name', 'state', 'price', 'premium', 'note')} for o in p['options']]}
+              'options': [{**{k: o[k] for k in ('name', 'state', 'price', 'premium', 'note')},
+                           'image': part_thumbnail(o['mall_no'], o['name'])} for o in p['options']]}
              for p in c['parts']]
     return {'id': model_id, 'name': c['name'], 'tagline': c['tagline'],
             'hero_image': c['hero_image'], 'hero_alt': c['hero_alt'],

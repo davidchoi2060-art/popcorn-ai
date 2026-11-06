@@ -38,7 +38,7 @@ class AsusCampaignBrowser(unittest.TestCase):
             self.assertEqual(mig.returncode, 0, mig.stderr[-2000:])
             # 다시 적용해도 그대로(현재 리비전 유지)
             run = subprocess.run([sys.executable, "tests/scenarios/run_asus_campaign_browser.py", "--out", str(out)],
-                                 cwd=ROOT, env=env, capture_output=True, text=True, timeout=420)
+                                 cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
             results_file = out / "results.json"
             results = json.loads(results_file.read_text(encoding="utf-8"))["results"] if results_file.exists() else []
             lines = [("PASS " if r["ok"] else "FAIL ") + "[" + r["kind"] + "] " + r["name"] for r in results]

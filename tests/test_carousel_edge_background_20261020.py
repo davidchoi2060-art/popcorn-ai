@@ -11,9 +11,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 JS = (ROOT / "mockups/mvp4/assets/js/home-carousel.js").read_text(encoding="utf-8")
 CSS = (ROOT / "mockups/mvp4/assets/css/home-carousel.css").read_text(encoding="utf-8")
 
-APPROVED = {"showcase": ("#FEFBF4", "#EEE3D6"), "gaming": ("#E1F1FD", "#A9C6E8"), "ai": ("#ECE5FD", "#E7E4F7"),
-            "people": ("#FEF7DF", "#F3F4EF"), "collection": ("#FCF7EC", "#F3E6FA"), "supercomputer": ("#FBF8F6", "#E4EDF8"),
-            "asus": ("#0A2BC9", "#0A3DE0")}
+APPROVED = {"asus": ("#0A2BC9", "#0A3DE0"), "showcase": ("#FEFBF4", "#EEE3D6"), "gaming": ("#E1F1FD", "#A9C6E8"), "ai": ("#ECE5FD", "#E7E4F7"),
+            "people": ("#FEF7DF", "#F3F4EF"), "collection": ("#FCF7EC", "#F3E6FA"), "supercomputer": ("#FBF8F6", "#E4EDF8")}
 
 
 class EdgeBackground(unittest.TestCase):
@@ -25,7 +24,7 @@ class EdgeBackground(unittest.TestCase):
 
     def test_follows_existing_active_slide_without_own_timer(self):
         self.assertEqual(JS.count("setInterval"), 0)
-        self.assertEqual(JS.count("window.setTimeout(function(){show(index+1,false);},interval)"), 1)
+        self.assertEqual(JS.count("window.setTimeout(function(){show(index+1,false);},currentInterval())"), 1)
         self.assertIn("tones.forEach(function(tone,i){tone.toggleAttribute('data-active',i===index);});", JS)
         self.assertIn("var interval=3000, transitionMs=600", JS)
 

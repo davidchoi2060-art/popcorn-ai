@@ -102,7 +102,7 @@ class AsusContract(unittest.TestCase):
         self.assertIn("title:'ASUS의 강력한 성능,<br>나의 AI 작업실.'", CAROUSEL)
         import re
         keys = re.findall(r"\{key:'(\w+)',", CAROUSEL)
-        self.assertEqual(keys, ["showcase", "gaming", "ai", "people", "collection", "supercomputer", "asus"])
+        self.assertEqual(keys, ["asus", "showcase", "gaming", "ai", "people", "collection", "supercomputer"])
 
     def test_inquiry_reuses_existing_flow_without_own_transport(self):
         html = (MVP4 / "asus-consult.html").read_text(encoding="utf-8")

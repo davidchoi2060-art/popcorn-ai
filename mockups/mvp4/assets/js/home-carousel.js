@@ -8,13 +8,13 @@
   function slides() {
     var catalog = P.designHref('catalog','normal'), chat = P.designHref('chat','welcome');
     return [
+      {key:'asus', edge:['#0A2BC9','#0A3DE0'], label:'ASUS 기획전', kicker:'ASUS × 팝콘AI', title:'ASUS의 강력한 성능,<br>나의 AI 작업실.', text:'문서 정리부터 영상 편집, 내 PC에서 AI 실행까지.', note:'<span class="hc-asus-fields"><span>내 PC에서 AI 실행</span><span>영상 편집·제작</span><span>반복 업무 줄이기</span></span>제품 이미지는 연출이며 실제 구성과 다를 수 있습니다.', file:'../asus/hero-desktop.webp', alt:'ASUS TUF Gaming GT502 BLACK 케이스 연출 이미지', duration:6000, actions:action('ASUS 기획전 보기','asus.html')},
       {key:'showcase', edge:['#FEFBF4','#EEE3D6'], label:'PC & AI', kicker:'GOOD PC, USEFUL AI', title:'좋은 PC에서,<br>쓸모 있는 <br>AI까지.', text:'PC 쇼핑과 업무용 AI 패키지를 한곳에서.', file:'hero-tv-commercial-clean.png', alt:'햇빛이 가득한 쇼룸에 전시된 모니터와 다양한 PC', actions:action('PC 둘러보기',catalog)+action('AI 패키지 보기','ai-packages.html',true)},
       {key:'gaming', edge:['#E1F1FD','#A9C6E8'], label:'게이밍 PC', kicker:'PLAY YOUR WAY', title:'좋아하는 게임,<br>나답게 즐기다.', text:'나의 게임과 예산에 맞는 PC를 만나보세요.', file:'gaming-blue-clean.png', alt:'밝은 블루톤 공간에서 게이밍 PC와 함께하는 모습', actions:action('게이밍 PC 보기',P.designHref('catalog','normal',{category:'게이밍 PC'}))+action('AI와 게임 PC 찾기',chat,true)},
       {key:'ai', edge:['#ECE5FD','#E7E4F7'], label:'AI 패키지', kicker:'AI FOR YOUR WORK', title:'일에 집중하도록,<br>AI는 당신 곁에.', text:'내 자료 정리부터 우리 팀의 업무까지.', file:'ai-lavender-clean.png', alt:'밝은 사무 공간에서 업무형 PC를 소개하는 모델', actions:action('AI 패키지 보기','ai-packages.html')+action('우리 업무로 도입 상담','ai-consult.html?package=business&intent=adoption',true)},
       {key:'people', edge:['#FEF7DF','#F3F4EF'], label:'당신의 PC', kicker:'FIND YOUR EVERYDAY PC', title:'당신의 하루에,<br>딱 맞는 PC.', text:'작은 공간의 미니 PC부터 든든한 작업용 PC까지.', file:'model-showroom-clean.png', alt:'미니 PC와 화이트 PC를 소개하는 두 모델', actions:action('나에게 맞는 PC 찾기',chat)+action('모든 PC 둘러보기',catalog,true)},
       {key:'collection', edge:['#FCF7EC','#F3E6FA'], label:'용도별 쇼핑', kicker:'PC COLLECTION', title:'게임도, 일도.<br>필요한 PC를 한곳에서.', text:'쓰임에 맞게 골라보세요.', file:'category-display-clean.png', alt:'게이밍 PC, 미니 PC, 업무형 AI PC의 세 가지 전시 공간', actions:''},
-      {key:'supercomputer', edge:['#FBF8F6','#E4EDF8'], label:'AI 슈퍼컴퓨터', kicker:'AI SUPERCOMPUTER', title:'큰 AI를 다루는,<br>나만의 슈퍼컴퓨터.', text:'다양한 AI 전용 장비를 한곳에서. <br>목적에 맞는 제품을 찾아보세요.', note:'성능과 지원 환경은 제품별로 다릅니다.<br>AI 설치·교육은 별도 상담입니다.', file:'ai-supercomputer-showroom-clean.png', alt:'밝은 AI 쇼룸의 전시대에 놓인 여러 제조사의 AI 전용 장비', actions:action('AI 슈퍼컴퓨터 전체 보기','supercomputers.html')},
-      {key:'asus', edge:['#0A2BC9','#0A3DE0'], label:'ASUS 기획전', kicker:'ASUS × 팝콘AI', title:'ASUS의 강력한 성능,<br>나의 AI 작업실.', text:'문서 정리부터 영상 편집, 내 PC에서 AI 실행까지.', note:'<span class="hc-asus-fields"><span>내 PC에서 AI 실행</span><span>영상 편집·제작</span><span>반복 업무 줄이기</span></span>제품 이미지는 연출이며 실제 구성과 다를 수 있습니다.', file:'../asus/hero-desktop.webp', alt:'ASUS TUF Gaming GT502 BLACK 후보 케이스 연출 이미지', actions:action('ASUS 기획전 보기','asus.html')}
+      {key:'supercomputer', edge:['#FBF8F6','#E4EDF8'], label:'AI 슈퍼컴퓨터', kicker:'AI SUPERCOMPUTER', title:'큰 AI를 다루는,<br>나만의 슈퍼컴퓨터.', text:'다양한 AI 전용 장비를 한곳에서. <br>목적에 맞는 제품을 찾아보세요.', note:'성능과 지원 환경은 제품별로 다릅니다.<br>AI 설치·교육은 별도 상담입니다.', file:'ai-supercomputer-showroom-clean.png', alt:'밝은 AI 쇼룸의 전시대에 놓인 여러 제조사의 AI 전용 장비', actions:action('AI 슈퍼컴퓨터 전체 보기','supercomputers.html')}
     ];
   }
   function render() {
@@ -22,7 +22,7 @@
     var slideHTML = items.map(function(s,i) {
       var collection = s.key==='collection' ? '<div class="hc-collections">'+
         [['게이밍 PC',P.designHref('catalog','normal',{category:'게이밍 PC'}),'high.webp'],['미니 PC',P.designHref('catalog','normal',{category:'미니 PC'}),'mini.png'],['AI 패키지','ai-packages.html','high.png']].map(function(c){return '<a href="'+h(c[1])+'"><img class="hc-tile-image" src="assets/images/'+c[2]+'" alt="" loading="lazy"><span>'+c[0]+'</span>'+P.icon('arrow-right')+'</a>';}).join('')+'</div>' : '';
-      return '<article class="hc-slide hc-'+s.key+'" id="hc-slide-'+i+'" role="group" aria-roledescription="슬라이드" aria-label="'+(i+1)+' / '+items.length+' · '+h(s.label)+'"'+(i?' hidden inert':'')+'>'+
+      return '<article class="hc-slide hc-'+s.key+'" id="hc-slide-'+i+'"'+(s.duration?' data-hc-duration="'+s.duration+'"':'')+' role="group" aria-roledescription="슬라이드" aria-label="'+(i+1)+' / '+items.length+' · '+h(s.label)+'"'+(i?' hidden inert':'')+'>'+
         '<img class="hc-image" src="assets/images/carousel/'+s.file+'" alt="'+h(s.alt)+'" width="2006" height="784" '+(i?'loading="lazy"':'fetchpriority="high"')+' draggable="false">'+
         '<div class="hc-copy"><p class="hc-kicker">'+s.kicker+'</p><h2>'+s.title+'</h2><p class="hc-description">'+s.text+'</p><div class="hc-actions">'+s.actions+'</div>'+(s.note?'<p class="hc-note">'+s.note+'</p>':'')+'</div>'+collection+'</article>';
     }).join('');
@@ -68,7 +68,9 @@
     root.dataset.transitionStyle='slide';
     function clear(){window.clearTimeout(timer);timer=null;}
     function blocked(){return manualPaused||hover||document.hidden||!inView||root.contains(document.activeElement);}
-    function schedule(){clear();if(!blocked())timer=window.setTimeout(function(){show(index+1,false);},interval);}
+    // 슬라이드에 표시 시간이 있으면 그 값(ASUS 6초), 없으면 기본 간격(3초). 멈춤 조건은 슬라이드와 무관하게 같다.
+    function currentInterval(){return Number(panels[index].dataset.hcDuration)||interval;}
+    function schedule(){clear();if(!blocked())timer=window.setTimeout(function(){show(index+1,false);},currentInterval());}
     function paintToggle(){
       toggle.textContent=manualPaused?'재생':'정지';
       toggle.setAttribute('aria-label',manualPaused?'배너 자동 넘김 재생':'배너 자동 넘김 정지');

@@ -8,7 +8,7 @@
   'use strict';
   var P = window.PAI, h = P.h, A = P.asus;
   var existing = P.pages['ai-consult'];
-  var ART_ALT = 'ASUS 기획전 후보 케이스 연출 이미지';
+  var ART_ALT = 'ASUS 기획전 케이스 연출 이미지';
 
   function photo(src, alt) {
     return '<figure class="az-iq-photo"><img src="' + h(A.image(src)) + '" alt="' + h(alt) + '" width="800" height="800"></figure>';
