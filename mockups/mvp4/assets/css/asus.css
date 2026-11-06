@@ -1,0 +1,238 @@
+/* ASUS AI PC 기획전 v4 전용. 블루·시안 방향은 이 파일 안에서만 쓰고 .az-* 밖으로 나가지 않는다. */
+.az-page{--az-navy:#0a1f6b;--az-ink:#0b1740;--az-blue:#0a4bea;--az-deep:#062bb4;--az-cyan:#3fe6ff;--az-cyan-soft:#b6f4ff;--az-line:#d6e3fb;--az-tint:#eef5ff;--az-muted:#4a5a80;--az-warn:#8a4b00;--az-warn-bg:#fff3d9;--az-danger:#a21d2c;--az-danger-bg:#ffe9ec;color:var(--az-ink);background:#fff;overflow-wrap:anywhere;word-break:keep-all}
+.az-wrap{width:min(1240px,100%);margin-inline:auto;padding-inline:24px}
+:where(.az-page) :where(h1,h2,h3,p,ul,ol,dl,dd,figure){margin:0;padding:0}
+:where(.az-page) :where(ul,ol){list-style:none}
+:where(.az-page) :where(img){max-width:100%;height:auto}
+.az-page a:focus-visible{outline:3px solid #ffb400;outline-offset:3px;border-radius:6px}
+
+.az-brand{background:var(--az-deep);color:#fff}
+.az-brand-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:56px}
+.az-logo-link{display:inline-flex;align-items:center;gap:14px;min-height:44px;color:#fff;font-weight:700;font-size:15px;text-decoration:none}
+.az-logo-link img{width:112px;height:auto;display:block}
+.az-logo-link span{padding-left:14px;border-left:1px solid #ffffff66;white-space:nowrap}
+.az-brand-with{font-size:14px;font-weight:600;white-space:nowrap}
+.az-back{display:inline-flex;align-items:center;gap:6px;min-height:44px;color:#fff;font-size:14px;font-weight:600;text-decoration:none;white-space:nowrap}
+.az-back .icon{width:16px;height:16px;filter:brightness(0) invert(1)}
+
+.az-btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:12px 24px;border-radius:12px;font-size:17px;font-weight:800;text-decoration:none;text-align:center;transition:transform .12s ease,box-shadow .12s ease}
+.az-btn .icon{width:18px;height:18px;flex-shrink:0}
+.az-btn:hover{transform:translateY(-1px)}
+.az-btn-solid{background:linear-gradient(180deg,#0f5bff,#0737c4);color:#fff}
+.az-btn-solid .icon{filter:brightness(0) invert(1)}
+.az-btn-cyan{background:linear-gradient(180deg,#b6f6ff,#3fe6ff);color:var(--az-ink);box-shadow:0 0 22px #3fe6ff80}
+@media(prefers-reduced-motion:reduce){.az-btn{transition:none}.az-btn:hover{transform:none}}
+
+.az-hero{position:relative;color:#fff;background:var(--az-deep) url('../images/asus/bg-arcs.webp') center/cover no-repeat;overflow:hidden}
+.az-hero-main{background:#0626ad url('../images/asus/hero-desktop.webp') right center/cover no-repeat}
+.az-hero-grid{display:block;padding-block:40px 34px;min-height:calc(min(100vw,1920px)/3)}
+.az-with{font-size:15px;font-weight:700;color:var(--az-cyan-soft)}
+.az-hero h1{font-size:clamp(40px,4.3vw,60px);font-weight:900;line-height:1.14;letter-spacing:-.035em;margin-top:10px}
+.az-hero h1 span{display:block}
+.az-hero h1 em{display:block;font-style:normal;color:var(--az-cyan)}
+.az-lead{font-size:20px;font-weight:600;line-height:1.5;margin-top:16px}
+.az-lead-sub{font-size:16px;line-height:1.5;margin-top:4px;color:#e4eeff}
+.az-fields{display:flex;flex-wrap:wrap;gap:8px;margin-block:22px 26px}
+.az-fields li{padding:8px 14px;border:1.5px solid #8fe9ff;border-radius:10px;background:#04238666;font-size:15px;font-weight:700}
+.az-hero-copy{max-width:54%}
+.az-hero-caption{margin-top:14px;max-width:520px;padding:8px 12px;border-radius:9px;background:#041a78d9;font-size:13px;line-height:1.5;color:#eef5ff}
+.az-hero-caption b{display:block;font-size:14px;color:#fff}
+
+.az-products{padding-block:44px 28px;background:linear-gradient(180deg,#e3efff,#fff 340px)}
+.az-head{text-align:center}
+.az-head h2{font-size:clamp(30px,3.2vw,42px);font-weight:900;letter-spacing:-.03em;color:var(--az-navy)}
+.az-head p{font-size:18px;margin-top:6px;color:var(--az-muted)}
+.az-terms{font-size:14px;text-align:center;margin-top:10px;color:var(--az-muted)}
+.az-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:24px}
+.az-card{display:flex;flex-direction:column;background:#fff;border:1px solid var(--az-line);border-radius:16px;box-shadow:0 10px 26px #0a2d8a14;overflow:hidden}
+.az-tag{align-self:flex-start;margin:14px 0 0 14px;padding:7px 18px;border-radius:9px;background:linear-gradient(90deg,#0a4bea,#0b6df5);color:#fff;font-size:18px;font-weight:800}
+.az-card-photo{margin:10px 14px 0;padding:12px;text-align:center;border-radius:12px;background:radial-gradient(circle at 50% 40%,#1f6fff,#0a2bb5 72%)}
+.az-card-photo img{display:block;margin-inline:auto;height:236px;width:auto;object-fit:contain}
+.az-card-body{display:flex;flex-direction:column;gap:10px;flex:1;padding:12px 18px 18px}
+.az-card-tagline{font-size:15px;color:var(--az-muted);min-height:2.9em;line-height:1.45}
+.az-gpu{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+.az-gpu>span:first-child{width:100%;font-size:13px;font-weight:700;color:var(--az-muted)}
+.az-gpu strong{width:100%;font-size:20px;font-weight:900;letter-spacing:-.02em;line-height:1.25;color:var(--az-navy)}
+.az-vram{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 14px;border-radius:9px;background:linear-gradient(90deg,#d8fbff,#eefcff)}
+.az-vram span{font-size:14px;font-weight:700}
+.az-vram strong{font-size:22px;font-weight:900;color:var(--az-navy)}
+.az-specs{display:grid;gap:5px}
+.az-specs div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;align-items:center}
+.az-specs dt{padding:3px 4px;border-radius:7px;background:var(--az-navy);color:#fff;font-size:12.5px;font-weight:700;text-align:center}
+.az-specs dd{font-size:14.5px;font-weight:700;line-height:1.35}
+.az-specs small{display:block;font-size:12px;font-weight:600;color:var(--az-muted)}
+.az-plan{padding-top:10px;border-top:1px solid var(--az-line);text-align:center;margin-top:auto}
+.az-plan-label{font-size:13.5px;font-weight:700}
+.az-plan-value{font-size:30px;font-weight:900;letter-spacing:-.02em;color:#0737c4;line-height:1.25}
+.az-plan-note{font-size:12.5px;color:var(--az-muted)}
+.az-card .az-btn{width:100%}
+
+.az-state{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:800;line-height:1.5;white-space:nowrap;background:#e5eeff;color:#0a3bb0}
+.az-state-supply,.az-state-check{background:var(--az-warn-bg);color:var(--az-warn)}
+.az-state-conflict{background:var(--az-danger-bg);color:var(--az-danger)}
+.az-state-separate{background:#eef0f5;color:#39415a}
+
+.az-notice{display:grid;gap:8px;margin-top:20px;padding:14px 18px;border:1px solid var(--az-line);border-radius:12px;background:var(--az-tint)}
+.az-notice p{display:flex;gap:10px;font-size:14px;line-height:1.55}
+.az-notice .icon{width:20px;height:20px;flex-shrink:0;margin-top:1px}
+
+.az-process{padding-block:16px 40px}
+.az-process h2{font-size:24px;font-weight:900;text-align:center;color:var(--az-navy)}
+.az-process ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px;counter-reset:none}
+.az-process li{display:flex;align-items:center;justify-content:center;gap:10px;min-height:60px;padding:8px 14px;border:1px solid var(--az-line);border-radius:30px;font-size:17px;font-weight:800;background:#fff}
+.az-process b{display:inline-grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--az-tint);color:#0737c4;font-size:15px;flex-shrink:0}
+
+.az-closing{color:#fff;background:var(--az-deep) url('../images/asus/bg-arcs.webp') center/cover no-repeat}
+.az-closing-row{padding-block:36px}
+.az-closing h2{font-size:clamp(24px,2.6vw,32px);font-weight:900;letter-spacing:-.025em;line-height:1.3}
+.az-closing p{font-size:17px;margin-top:6px}
+.az-closing-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.az-footnote{padding:14px 24px;text-align:center;font-size:13px;color:var(--az-muted);line-height:1.5}
+
+/* 상세 */
+.az-hero-detail .az-detail-grid{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr) minmax(0,290px);gap:28px;align-items:center;padding-block:30px 26px}
+.az-detail-art img{display:block;margin-inline:auto;width:100%;max-width:290px}
+.az-detail-art figcaption{font-size:12.5px;line-height:1.45;margin-top:8px;text-align:center;color:#eaf3ff}
+.az-detail-art figcaption b{display:block;font-size:13px;color:#fff}
+.az-detail-copy h1{font-size:clamp(36px,3.8vw,50px);margin-top:4px}
+.az-detail-copy .az-lead{margin-top:6px;font-size:18px}
+.az-core{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-top:16px}
+.az-core li{grid-column:span 2}
+.az-core li:nth-child(2){grid-column:span 4}
+.az-core li{padding:9px 10px;border:1.5px solid #8fe9ff;border-radius:10px;background:#04238666;text-align:center}
+.az-core span{display:block;font-size:12.5px;font-weight:600;color:#def1ff}
+.az-core strong{display:block;font-size:15px;font-weight:800;line-height:1.3;margin-top:2px}
+.az-hero-flag{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:12px;font-size:13.5px}
+.az-detail-buy{display:grid;gap:12px;padding:18px;border:1px solid #ffffff55;border-radius:14px;background:#03207a99}
+.az-detail-buy .az-plan{border:0;padding:0}
+.az-detail-buy .az-plan-value{color:#fff;font-size:34px}
+.az-detail-buy .az-plan-note{color:#e4eeff}
+.az-subnav{background:#03207acc}
+.az-subnav .az-wrap{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin}
+.az-subnav a{flex:1 0 auto;min-height:46px;display:flex;align-items:center;justify-content:center;padding:0 14px;color:#fff;font-size:15px;font-weight:700;text-decoration:none;white-space:nowrap}
+.az-subnav a:focus-visible{outline-offset:-3px}
+
+.az-section{padding-block:36px;scroll-margin-top:90px}
+.az-section-tint{background:var(--az-tint)}
+.az-section h2{font-size:clamp(25px,2.6vw,32px);font-weight:900;letter-spacing:-.025em;color:var(--az-navy)}
+.az-sub{font-size:15px;color:var(--az-muted);margin-top:4px}
+.az-who{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.az-who li{display:flex;align-items:center;gap:12px;min-height:72px;padding:12px 16px;border:1px solid var(--az-line);border-radius:12px;background:#fff;font-size:17px;font-weight:700;line-height:1.35}
+.az-who .icon{width:30px;height:30px;flex-shrink:0}
+.az-explain{margin-top:14px;padding:12px 16px;border-radius:10px;background:var(--az-tint);font-size:15px;line-height:1.6}
+.az-uses{display:grid;gap:12px;margin-top:16px}
+.az-use{display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:20px;align-items:center;padding:12px;border:1px solid var(--az-line);border-radius:14px;background:#fff}
+.az-use figure{position:relative;border-radius:10px;overflow:hidden;aspect-ratio:5/2;background:#16264f}
+.az-use figure img{display:block;width:100%;height:100%;object-fit:cover}
+.az-use figcaption{position:absolute;left:8px;top:8px;padding:3px 12px;border-radius:999px;background:#07143fe6;color:#fff;font-size:12.5px;font-weight:700}
+.az-use h3{display:flex;gap:10px;align-items:flex-start;font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.3}
+.az-use h3 b{flex-shrink:0;padding:0 10px;border-radius:7px;background:linear-gradient(90deg,#0a4bea,#0b6df5);color:#fff;font-size:17px;line-height:1.6}
+.az-use-body>p{font-size:15.5px;line-height:1.55;margin-top:6px}
+.az-use-example{color:var(--az-muted);font-size:14.5px}
+.az-steps{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:10px}
+.az-steps li{position:relative;padding:5px 12px;border-radius:8px;background:#d8fbff;font-size:14px;font-weight:700;line-height:1.35}
+.az-steps li:not(:last-child)::after{content:'›';position:absolute;right:-15px;top:50%;transform:translateY(-52%);font-size:17px;font-weight:800;color:var(--az-blue)}
+.az-caution{display:flex;gap:8px;margin-top:10px;font-size:14.5px;line-height:1.55;color:#28345a}
+.az-caution .icon{width:18px;height:18px;flex-shrink:0;margin-top:2px}
+.az-caution-strong{font-weight:800;color:var(--az-navy)}
+
+.az-table-wrap{margin-top:14px;border:1px solid var(--az-line);border-radius:12px;overflow:hidden;background:#fff}
+.az-table{width:100%;border-collapse:collapse}
+.az-table thead th{background:var(--az-navy);color:#fff;font-size:14px;font-weight:700;text-align:left;padding:10px 14px}
+.az-table tbody th{width:172px;background:var(--az-tint);font-size:14.5px;font-weight:800;text-align:left;vertical-align:top;padding:12px 14px;border-top:1px solid var(--az-line)}
+.az-table td{padding:12px 14px;border-top:1px solid var(--az-line);vertical-align:top}
+.az-part-head{font-size:16px;font-weight:800;color:var(--az-navy)}
+.az-opts{display:grid;gap:8px;margin-top:8px}
+.az-opts li{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start;padding-top:8px;border-top:1px dashed var(--az-line)}
+.az-opt-main strong{font-size:14.5px;font-weight:700;margin-right:6px}
+.az-opt-main p{font-size:13px;color:var(--az-muted);line-height:1.45;margin-top:2px}
+.az-price{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:right}
+.az-price dt{font-size:12px;color:var(--az-muted)}
+.az-price dd{font-size:14.5px;font-weight:800;white-space:nowrap}
+.az-price-none{text-align:right;font-size:13.5px;font-weight:700;color:var(--az-muted)}
+
+.az-install{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.az-install article{display:flex;gap:14px;padding:18px;border:1px solid var(--az-line);border-radius:12px;background:#fff}
+.az-install .icon{width:34px;height:34px;flex-shrink:0}
+.az-install h3{font-size:18px;font-weight:800}
+.az-install p{font-size:15px;line-height:1.55;margin-top:4px}
+.az-sale-notes{margin-top:12px;display:grid;gap:4px}
+.az-sale-notes li{font-size:14.5px;line-height:1.5;padding-left:14px;position:relative}
+.az-sale-notes li::before{content:'';position:absolute;left:2px;top:.62em;width:5px;height:5px;border-radius:50%;background:var(--az-blue)}
+
+.az-others{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
+.az-others a{display:flex;gap:14px;align-items:center;padding:14px;border:1px solid var(--az-line);border-radius:12px;color:inherit;text-decoration:none;background:#fff}
+.az-others img{width:124px;height:auto;flex-shrink:0;padding:6px;border-radius:10px;background:radial-gradient(circle at 50% 40%,#1f6fff,#0a2bb5 72%)}
+.az-others strong{display:block;font-size:19px;font-weight:800;color:var(--az-navy)}
+.az-others small{display:block;font-size:13.5px;line-height:1.45;margin-top:3px;color:#28345a}
+.az-others b{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:15px;color:#0737c4}
+.az-others .icon{width:16px;height:16px}
+.az-missing{padding-block:72px;text-align:center}
+.az-missing h1{font-size:30px;font-weight:900}
+.az-missing p{margin-block:8px 18px}
+
+/* 기존 문의 화면 안의 ASUS 구성 안내 */
+.az-consult [data-iq-purpose]{display:none}
+.az-consult .iq-section:first-of-type .iq-options{display:none}
+.az-iq-photo{padding:14px 14px 0;text-align:center;background:linear-gradient(180deg,#0a3bd0,#0a2c9e);border-radius:12px 12px 0 0}
+.az-iq-photo img{height:220px;width:auto;display:inline-block}
+.az-iq-specs{margin:10px 0;padding:0;list-style:none;font-size:14px;line-height:1.6;font-weight:600}
+.az-iq-plan{font-size:14px;font-weight:800}
+.az-iq-plan small{font-size:12.5px;font-weight:500;color:#566}
+
+@media(max-width:1100px){
+  .az-hero-detail .az-detail-grid{grid-template-columns:minmax(0,220px) minmax(0,1fr)}
+  .az-detail-buy{grid-column:1/-1;grid-template-columns:1fr 1fr;align-items:center}
+  .az-opts li{grid-template-columns:minmax(0,1fr)}
+  .az-price,.az-price-none{text-align:left}
+}
+@media(max-width:900px){
+  .az-cards{grid-template-columns:minmax(0,1fr)}
+  .az-card{display:grid;grid-template-columns:minmax(0,38%) minmax(0,1fr);align-items:start}
+  .az-tag{grid-column:1/-1}
+  .az-card-photo{margin:12px 0 0 12px}
+  .az-card-photo img{height:auto;width:100%}
+  .az-card-tagline{min-height:0}
+  .az-use{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:700px){
+  .az-wrap{padding-inline:16px}
+  .az-logo-link{gap:10px;font-size:14px}.az-logo-link img{width:88px}.az-logo-link span{padding-left:10px}
+  .az-hero-main{background:#001dab url('../images/asus/hero-mobile.webp') center bottom/100% auto no-repeat}
+  .az-hero-grid{padding-block:22px calc(100vw*.98);min-height:0}
+  .az-hero-copy{max-width:none}
+  .az-hero h1{font-size:clamp(30px,9.2vw,38px)}
+  .az-lead{font-size:17px;margin-top:10px}.az-lead-sub{font-size:15px}
+  .az-fields{margin-block:14px 16px}.az-fields li{font-size:14px;padding:7px 10px}
+  .az-hero-copy .az-btn{width:100%}
+  .az-products{padding-top:32px}.az-head p{font-size:16px}
+  .az-card{grid-template-columns:minmax(0,1fr)}
+  .az-card-photo{margin:10px 14px 0}.az-card-photo img{width:auto;height:220px}
+  .az-gpu strong{font-size:19px}
+  .az-process ol{grid-template-columns:minmax(0,1fr)}
+  .az-process li{justify-content:flex-start;border-radius:14px}
+  .az-closing-actions .az-btn{width:100%}
+  .az-hero-detail .az-detail-grid{grid-template-columns:minmax(0,1fr);gap:16px;padding-block:20px}
+  .az-detail-art img{max-width:230px}
+  .az-detail-copy{order:-1}
+  .az-core{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .az-core li,.az-core li:nth-child(2){grid-column:auto}
+  .az-core li:nth-child(2){grid-column:1/-1;order:-1}
+  .az-detail-buy{grid-template-columns:minmax(0,1fr)}
+  .az-detail-buy .az-btn{width:100%}
+  .az-subnav .az-wrap{padding-inline:6px}
+  .az-subnav a{padding:0 10px;font-size:14px}
+  .az-section{padding-block:28px}
+  .az-who{grid-template-columns:minmax(0,1fr)}
+  .az-who li{min-height:60px;font-size:16px}
+  .az-use{padding:10px}
+  .az-use h3{font-size:19px}
+  .az-table thead{display:none}
+  .az-table,.az-table tbody,.az-table tr,.az-table th,.az-table td{display:block;width:100%}
+  .az-table tbody th{width:100%;padding:8px 12px;border-top:1px solid var(--az-line)}
+  .az-table td{border-top:0;padding:10px 12px 14px}
+  .az-price{grid-template-columns:1fr 1fr;text-align:left}
+  .az-install{grid-template-columns:minmax(0,1fr)}
+  .az-others{grid-template-columns:minmax(0,1fr)}
+  .az-others img{width:92px}
+}
