@@ -75,18 +75,17 @@ class CustomerCopy(unittest.TestCase):
         for model in normalize(public_all(dirty)):
             self.assertEqual(model["tagline"], "문서를 찾습니다.")
             board = next(p for p in model["parts"] if p["label"] == "메인보드")
-            self.assertEqual(board["head"], "상담 시 안내")
+            self.assertEqual((board["kind"], board["name"]), ("notice", "상담 시 안내"))
 
     def test_conflict_and_internal_options_are_not_shown_and_nothing_is_confirmed(self):
         models = {m["id"]: m for m in normalize(public_all())}
-        names = [o["name"] for m in models.values() for p in m["parts"] for o in p["options"]]
+        names = [p["name"] for m in models.values() for p in m["parts"]]
         self.assertFalse([n for n in names if "TeamGroup" in n or "미정" in n])
         fan = next(p for p in models["business"]["parts"] if p["label"] == "추가 시스템팬")
-        self.assertEqual((fan["head"], fan["options"]), ("상담 시 안내", []))
+        self.assertEqual((fan["kind"], fan["name"]), ("notice", "상담 시 안내"))
         for m in models.values():
             for p in m["parts"]:
-                for o in p["options"]:
-                    self.assertEqual(set(o), {"name", "image"})
+                self.assertEqual(set(p), {"label", "kind", "name", "quantity", "image"})
 
     def test_api_keeps_prices_and_status_for_admin_and_list(self):
         video = next(m for m in public_all() if m["id"] == "video")
@@ -102,15 +101,11 @@ class Thumbnails(unittest.TestCase):
         for code in (127181, 127182):   # 자료 불일치 옵션은 고객 화면에 나오지 않는다
             self.assertFalse([1 for c, _ in AC._THUMB_VERIFIED | set(AC._THUMB_OFFICIAL) if c == code], code)
 
-    def test_every_customer_part_has_a_photo_except_software(self):
-        # 고객 표에 나오는 물리 부품은 사진이 빠지지 않는다. 사진이 없는 것은 운영체제뿐이다.
-        missing = set()
+    def test_every_customer_part_has_a_photo(self):
+        # 고객 표의 제품 줄은 사진이 빠지지 않는다. 사양 · 안내 줄(그래픽 메모리 · 팬 · 운영체제)에는 사진이 없다.
         for model in normalize(public_all()):
             for p in model["parts"]:
-                for o in p["options"]:
-                    if not o["image"]:
-                        missing.add(p["label"])
-        self.assertEqual(missing, {"운영체제"})
+                self.assertEqual(bool(p["image"]), p["kind"] == "product", p["label"])
 
     def test_official_assets_match_manifest(self):
         doc = json.loads((MVP4 / "assets/images/parts/ASUS-OFFICIAL-SOURCES.json").read_text(encoding="utf-8"))
@@ -151,8 +146,8 @@ class Thumbnails(unittest.TestCase):
 
     def test_rejected_image_path_becomes_name_only(self):
         models = public_all()
-        models[0]["parts"][0]["options"][0]["image"] = "https://evil.example/x.png"
-        self.assertIsNone(normalize(models)[0]["parts"][0]["options"][0]["image"])
+        models[0]["build"][0]["image"] = "https://evil.example/x.png"
+        self.assertIsNone(normalize(models)[0]["parts"][0]["image"])
 
 
 class DetailScreen(unittest.TestCase):

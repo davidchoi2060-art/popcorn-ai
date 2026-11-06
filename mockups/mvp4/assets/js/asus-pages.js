@@ -105,14 +105,13 @@
 
   function footnote(text) { return '<p class="az-footnote">' + h(text || A.FOOTNOTE) + '</p>'; }
 
+  // 제품 줄은 한 줄에 제품 1종과 수량. 사양(그래픽 메모리)과 안내(팬·운영체제)는 구성품처럼 보이지 않게 글자만 쓴다.
   function partRow(part) {
-    var options = part.options.map(function (o) {
-      return '<li>' + (o.image ? '<figure class="az-opt-thumb"><img data-az-thumb src="' + h(o.image) + '" alt="' + h(o.name) + '" width="88" height="88" loading="lazy" decoding="async"></figure>' : '') +
-        '<strong>' + h(o.name) + '</strong></li>';
-    }).join('');
-    var sameName = part.options.some(function (o) { return o.name === part.head; });
-    return '<tr><th scope="row">' + h(part.label) + '</th><td>' + (sameName ? '' : '<p class="az-part-head">' + h(part.head) + '</p>') +
-      (options ? '<ul class="az-opts">' + options + '</ul>' : '') + '</td></tr>';
+    var body = part.kind === 'product'
+      ? '<div class="az-part-item">' + (part.image ? '<figure class="az-opt-thumb"><img data-az-thumb src="' + h(part.image) + '" alt="' + h(part.name) + '" width="88" height="88" loading="lazy" decoding="async"></figure>' : '') +
+        '<p class="az-part-text"><strong>' + h(part.name) + '</strong><span class="az-part-qty">' + h(part.quantity) + '</span></p></div>'
+      : '<p class="az-part-head">' + h(part.name) + '</p>';
+    return '<tr data-az-part="' + h(part.kind) + '"><th scope="row">' + h(part.label) + '</th><td>' + body + '</td></tr>';
   }
 
   // 사진을 받지 못하면 깨진 그림 대신 제품명만 남긴다. 다른 그림으로 대신하지 않는다.

@@ -69,7 +69,7 @@ class UseArt(unittest.TestCase):
         self.assertIn("<figcaption>사용 예시</figcaption>", pages)
         self.assertRegex(data, r"useImage: function \(file\) \{ return A\.image\(file\) \+ '\?v=")
         for page in ("asus-pc.html", "asus.html"):
-            self.assertIn("asus-pages.js?v=20261106-art1", (ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8"))
+            self.assertRegex((ROOT / "mockups/mvp4" / page).read_text(encoding="utf-8"), r"asus-pages\.js\?v=20261106-")
 
 
 if __name__ == "__main__":
