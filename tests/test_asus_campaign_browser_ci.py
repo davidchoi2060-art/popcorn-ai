@@ -48,7 +48,7 @@ class AsusCampaignBrowser(unittest.TestCase):
                     f.write("\n### ASUS 기획전 브라우저 끝단 검증\n```\n" + "\n".join(lines) + "\n" + run.stdout[-1500:] + "\n```\n")
             failed = [r for r in results if not r["ok"]]
             self.assertTrue(results, run.stdout[-1500:] + run.stderr[-1500:])
-            self.assertEqual(failed, [], run.stderr[-800:])
+            self.assertEqual(failed, [], "\n--- runner stdout ---\n" + run.stdout[-6000:] + "\n--- runner stderr ---\n" + run.stderr[-800:])
             self.assertEqual(run.returncode, 0, run.stdout[-1500:] + run.stderr[-800:])
         finally:
             with admin.connect() as c:

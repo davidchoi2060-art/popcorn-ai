@@ -84,9 +84,11 @@ class Page {
     throw new Error('timeout: ' + expr + ' last=' + last);
   }
   async go(url) {
-    await this.send('Page.navigate', { url: BASE + url });
-    await sleep(150);
-    await this.until("document.readyState==='complete'");
+    // 옛 문서에 표시를 남기고, 표시가 사라진 새 문서의 로드 완료를 기다린다(같은 주소를 다시 열 때도 구분된다).
+    await this.js('window.__asusOldDocument=true');
+    const nav = await this.send('Page.navigate', { url: BASE + url });
+    if (nav.errorText) throw new Error('navigate ' + url + ' :: ' + nav.errorText);
+    await this.until("!window.__asusOldDocument&&document.readyState==='complete'");
   }
   async size(w) {
     const h = w > 700 ? 900 : 844;
@@ -217,15 +219,35 @@ async function checkDetails(page, tag) {
 // 홈 배너: 실제 시간을 잰다. 1번 ASUS 6초, 나머지 3초, 멈춤 조건은 그대로.
 const WATCH = "(function(){var r=document.querySelector('[data-home-carousel]');window.__hc=[[r.dataset.activeSlide,performance.now()]];new MutationObserver(function(){var l=window.__hc[window.__hc.length-1];if(l[0]!==r.dataset.activeSlide)window.__hc.push([r.dataset.activeSlide,performance.now()]);}).observe(r,{attributes:true,attributeFilter:['data-active-slide']});return true})()";
 const ROOT = "document.querySelector('[data-home-carousel]')";
+// 자동 넘김을 막는 조건 전부. 실패 메시지와 단계 로그에 그대로 싣는다.
+const CAROUSEL_STATE = "(function(){var r=document.querySelector('[data-home-carousel]');if(!r)return {url:location.href,ready:document.readyState,root:false};var b=r.getBoundingClientRect(),a=document.activeElement;return {url:location.href,ready:document.readyState,hidden:document.hidden,visibility:document.visibilityState,hasFocus:document.hasFocus(),active:a?a.tagName+'.'+a.className:null,activeInRoot:r.contains(a),hover:r.matches(':hover'),rect:[Math.round(b.top),Math.round(b.bottom),Math.round(b.width)],scrollY:Math.round(scrollY),innerHeight:innerHeight,autoplay:r.dataset.autoplay,activeSlide:r.dataset.activeSlide,transitioning:r.dataset.transitioning,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,log:(window.__hc||[]).slice(-4).map(function(e){return [e[0],Math.round(e[1])]}),now:Math.round(performance.now())}})()";
 async function runCarousel(page) {
   await page.size(1440);
+  const state = () => page.js(CAROUSEL_STATE).catch((e) => ({ stateError: e.message }));
+  const step = async (name) => console.log('carousel step ' + name + ' state=' + JSON.stringify(await state()));
+  const pointerOutside = () => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  // 어느 단계에서 왜 멈췄는지 실패 메시지만으로 알 수 있게 한다.
+  const advanced = async (name, ms) => {
+    await step(name + ' wait ' + ms + 'ms');
+    try {
+      await page.until('window.__hc.length>1', ms);
+    } catch (e) {
+      const last = results.length ? results[results.length - 1].name : null;
+      throw new Error('step=' + name + ' waitMs=' + ms + ' lastRecord=' + last + ' state=' + JSON.stringify(await state()) + ' cause=' + e.message);
+    }
+  };
+  // 시작 기준을 같게 맞춘다: 앞 탭 · 맨 위 · 포커스 없음 · 포인터는 배너 밖.
   const openHome = async () => {
     await page.go('/mvp4/index.html');
     await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+    await page.send('Page.bringToFront');
+    await pointerOutside();
+    await page.js("window.scrollTo(0,0);document.activeElement&&document.activeElement.blur&&document.activeElement.blur()");
     await page.js(WATCH);
   };
   const quiet = async (ms) => { const n = await page.js('window.__hc.length'); await sleep(ms); return (await page.js('window.__hc.length')) === n; };
   await openHome();
+  await step('initial');
   record('배너 첫 화면이 ASUS', await page.js("!document.querySelector('.hc-asus').hidden&&" + ROOT + ".dataset.activeSlide==='1'&&document.querySelector('.hc-slide').classList.contains('hc-asus')"), 'real');
   record('배너 수는 7개, 1번 선택 표시', await page.js("document.querySelectorAll('.hc-slide').length===7&&document.querySelector('[data-hc-go=\"0\"]').getAttribute('aria-pressed')==='true'"), 'real');
   await page.shot('banner-1440-first');
@@ -240,24 +262,32 @@ async function runCarousel(page) {
   record('나머지 약 3초', others.length >= 6 && others.every((g) => g[1] > 2500 && g[1] < 3800), 'real', others);
 
   await openHome();
-  await page.js(ROOT + ".dispatchEvent(new MouseEvent('mouseenter'))");
-  record('hover 중 정지', await quiet(6800), 'real');
-  await page.js(ROOT + ".dispatchEvent(new MouseEvent('mouseleave'))");
-  await page.until("window.__hc.length>1", 7500);
+  const stage = await page.js("(function(){var b=document.querySelector('.hc-stage').getBoundingClientRect();return {x:Math.round(b.left+b.width/2),y:Math.round(b.top+b.height/2)}})()");
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: stage.x, y: stage.y });
+  await page.until(ROOT + ".matches(':hover')", 3000);
+  await page.until("window.__hc.length===1");
+  await step('hover on');
+  record('hover 중 정지', await quiet(6800), 'real', await state());
+  await pointerOutside();
+  await page.until('!' + ROOT + ".matches(':hover')", 3000);
+  await advanced('hover resume', 7500);
   record('hover 해제 후 재개', true, 'real');
 
   await openHome();
-  await page.js("document.querySelector('[data-hc-toggle]').focus()");
-  record('focus 중 정지', await quiet(6800), 'real');
+  await page.js("document.querySelector('[data-hc-toggle]').focus({preventScroll:true})");
+  await page.until(ROOT + '.contains(document.activeElement)', 3000);
+  await step('focus on');
+  record('focus 중 정지', await quiet(6800), 'real', await state());
   await page.js('document.activeElement.blur()');
-  await page.until("window.__hc.length>1", 7500);
+  await advanced('focus resume', 7500);
   record('focus 해제 후 재개', true, 'real');
 
   await openHome();
   await page.js("Object.defineProperty(document,'hidden',{value:true,configurable:true});document.dispatchEvent(new Event('visibilitychange'))");
-  record('숨은 탭에서 정지', await quiet(6800), 'real');
+  await step('hidden on');
+  record('숨은 탭에서 정지', await quiet(6800), 'real', await state());
   await page.js("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))");
-  await page.until("window.__hc.length>1", 7500);
+  await advanced('hidden resume', 7500);
   record('탭 복귀 후 재개', true, 'real');
 
   // 수동 선택은 멈추고, 재생하면 그 배너의 시간을 다시 쓴다.
@@ -265,12 +295,12 @@ async function runCarousel(page) {
   await page.js("document.querySelector('[data-hc-go=\"3\"]').click();document.activeElement&&document.activeElement.blur()");
   record('수동 선택 후 자동 넘김 멈춤', await page.js(ROOT + ".dataset.autoplay==='paused'") && await quiet(3600), 'real');
   await page.js("window.__hc.length=0;window.__hc.push([" + ROOT + ".dataset.activeSlide,performance.now()]);document.querySelector('[data-hc-toggle]').click();document.activeElement&&document.activeElement.blur()");
-  await page.until('window.__hc.length>1', 5000);
+  await advanced('manual play normal', 5000);
   const manual = await page.js('Math.round(window.__hc[1][1]-window.__hc[0][1])');
   record('수동 선택 후 재생: 일반 배너 약 3초', manual > 2500 && manual < 3800, 'real', manual);
   await page.js("document.querySelector('[data-hc-go=\"0\"]').click();document.activeElement&&document.activeElement.blur()");
   await page.js("window.__hc.length=0;window.__hc.push([" + ROOT + ".dataset.activeSlide,performance.now()]);document.querySelector('[data-hc-toggle]').click();document.activeElement&&document.activeElement.blur()");
-  await page.until('window.__hc.length>1', 8000);
+  await advanced('manual play asus', 8000);
   const manualAsus = await page.js('Math.round(window.__hc[1][1]-window.__hc[0][1])');
   record('수동 선택 후 재생: ASUS 약 6초', manualAsus > 5500 && manualAsus < 6800, 'real', manualAsus);
 
@@ -523,6 +553,7 @@ async function runWidth(page, w) {
     await page.send('Page.enable');
     await page.send('Runtime.enable');
     await page.send('Network.enable');
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/mall-*' }] });
 
     for (const w of [1440, 390]) {
