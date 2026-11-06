@@ -66,6 +66,40 @@ const mock = (add) => C.setAdapter({ origins: [O], add });
   out.timeout = await C.add('video');
   out.assignedAfterFailures = assigned.slice();
   try { C.setAdapter({ add() {} }); out.noOrigins = 'accepted'; } catch (e) { out.noOrigins = 'rejected'; }
+
+  out.badOrigins = {};
+  for (const o of ['http://shop.example.test', O + '/', O + '/cart', 'https://user:pw@shop.example.test', 'HTTPS://SHOP.EXAMPLE.TEST', 'shop.example.test', '', 1]) {
+    try { C.setAdapter({ origins: [O, o], add() {} }); out.badOrigins[String(o)] = 'accepted'; } catch (e) { out.badOrigins[String(o)] = 'rejected'; }
+  }
+  mock(() => Promise.resolve({ ok: true, url: 'http://shop.example.test/cart' }));
+  out.httpUrl = await C.add('video');
+  mock(() => Promise.resolve({ ok: true, url: 'https://user:pw@shop.example.test/cart' }));
+  out.credentialUrl = await C.add('video');
+  const R = 'https://replaced.example.test';
+  // 교체: A 의 늦은 응답은 주소가 B 허용 출처여도 버린다.
+  assigned.length = 0;
+  let releaseA;
+  mock(() => new Promise((r) => { releaseA = r; }));
+  const a = C.add('video');
+  let releaseB;
+  C.setAdapter({ origins: [R], add: () => new Promise((r) => { releaseB = r; }) });
+  const b = C.add('video');
+  releaseA({ ok: true, url: R + '/cart' });
+  out.staleReplaced = await a;
+  out.staleKeepsBusy = await C.add('video');
+  out.assignedAfterStale = assigned.slice();
+  releaseB({ ok: true, url: R + '/cart' });
+  out.currentAfterStale = await b;
+  out.assignedCurrent = assigned.slice();
+  // A 의 출처는 B 가 허용하지 않으므로 A 주소로도 가지 않는다.
+  assigned.length = 0;
+  let releaseC;
+  mock(() => new Promise((r) => { releaseC = r; }));
+  const c = C.add('video');
+  C.setAdapter(null);
+  releaseC({ ok: true, url: O + '/cart' });
+  out.staleRemoved = await c;
+  out.assignedAfterRemoved = assigned.slice();
   C.setAdapter(null);
   out.reset = await C.add('video');
   process.stdout.write(JSON.stringify(out));
@@ -107,6 +141,25 @@ class Adapter(unittest.TestCase):
             self.assertFalse(self.out[key]["ok"], key)
         self.assertEqual(self.out["timeout"]["code"], "timeout")
         self.assertEqual(self.out["assignedAfterFailures"], [])
+
+    def test_origins_must_be_canonical_https(self):
+        self.assertEqual(set(self.out["badOrigins"].values()), {"rejected"}, self.out["badOrigins"])
+        self.assertEqual(len(self.out["badOrigins"]), 8)
+
+    def test_redirect_needs_https_and_no_credentials(self):
+        self.assertEqual(self.out["httpUrl"]["code"], "bad_result")
+        self.assertEqual(self.out["credentialUrl"]["code"], "bad_result")
+
+    def test_late_response_from_replaced_adapter_is_dropped(self):
+        self.assertEqual(self.out["staleReplaced"]["code"], "stale")
+        self.assertEqual(self.out["staleKeepsBusy"]["code"], "busy")          # 새 연결의 요청 중 상태를 풀지 않는다
+        self.assertEqual(self.out["assignedAfterStale"], [])
+        self.assertTrue(self.out["currentAfterStale"]["ok"])
+        self.assertEqual(self.out["assignedCurrent"], ["https://replaced.example.test/cart"])
+
+    def test_late_response_after_removal_does_not_move(self):
+        self.assertEqual(self.out["staleRemoved"]["code"], "stale")
+        self.assertEqual(self.out["assignedAfterRemoved"], [])
 
     def test_adapter_needs_origins_and_can_be_removed(self):
         self.assertEqual(self.out["noOrigins"], "rejected")

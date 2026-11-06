@@ -13,6 +13,7 @@
   var FAILED = '장바구니에 담지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
   var adapter = null;
+  var generation = 0;   // setAdapter 마다 증가한다. 앞선 연결의 늦은 응답을 버리는 기준이다.
   var pending = {};
   var failed = {};
 
@@ -32,31 +33,45 @@
     Array.prototype.forEach.call(document.querySelectorAll('[data-az-cart]'), paint);
   }
 
-  // 판매처가 준 이동 주소가 허용한 출처일 때만 쓴다. 아니면 성공으로 치지 않는다.
-  function allowedUrl(url) {
+  // 판매처가 준 이동 주소는 https, 계정 정보 없음, 요청 당시 연결이 허용한 출처일 때만 쓴다. 아니면 성공으로 치지 않는다.
+  function allowedUrl(url, origins) {
     if (typeof url !== 'string') return null;
     try {
       var parsed = new URL(url);
-      return adapter.origins.indexOf(parsed.origin) >= 0 ? parsed.href : null;
+      if (parsed.protocol !== 'https:' || parsed.username || parsed.password) return null;
+      return origins.indexOf(parsed.origin) >= 0 ? parsed.href : null;
     } catch (e) { return null; }
+  }
+
+  // 정규 https 출처만 받는다. 경로·계정·대문자·끝 슬래시가 있으면 출처 문자열과 달라 걸러진다.
+  function isHttpsOrigin(value) {
+    if (typeof value !== 'string') return false;
+    try {
+      var parsed = new URL(value);
+      return parsed.protocol === 'https:' && parsed.origin === value;
+    } catch (e) { return false; }
   }
 
   function add(id) {
     if (!adapter) return Promise.resolve({ ok: false, code: 'not_connected' });
     if (!A.known(id)) return Promise.resolve({ ok: false, code: 'unknown_model' });
     if (pending[id]) return Promise.resolve({ ok: false, code: 'busy' });
+    var mine = adapter;
+    var issued = generation;
     pending[id] = true;
     failed[id] = false;
     refresh();
     var timer;
     var timeout = new Promise(function (resolve) { timer = setTimeout(function () { resolve({ ok: false, code: 'timeout' }); }, TIMEOUT_MS); });
     var call;
-    try { call = Promise.resolve(adapter.add({ modelId: id, quantity: QUANTITY })); } catch (e) { call = Promise.reject(e); }
+    try { call = Promise.resolve(mine.add({ modelId: id, quantity: QUANTITY })); } catch (e) { call = Promise.reject(e); }
     return Promise.race([call, timeout]).then(function (r) {
-      var url = r && r.ok === true ? allowedUrl(r.url) : null;
+      var url = r && r.ok === true ? allowedUrl(r.url, mine.origins) : null;
       return url ? { ok: true, url: url } : { ok: false, code: r && r.code || 'bad_result' };
     }, function () { return { ok: false, code: 'failed' }; }).then(function (result) {
       clearTimeout(timer);
+      // 응답 전에 연결이 바뀌거나 해제됐다. 지금 상태를 건드리지 않고 이동도 하지 않는다.
+      if (issued !== generation) return { ok: false, code: 'stale' };
       pending[id] = false;
       failed[id] = !result.ok;
       refresh();
@@ -65,10 +80,11 @@
     });
   }
 
-  // 판매처 연결 코드만 부른다. origins = 담은 뒤 이동해도 되는 출처 목록.
+  // 판매처 연결 코드만 부른다. origins = 담은 뒤 이동해도 되는 정규 https 출처 목록.
   function setAdapter(next) {
-    if (next !== null && !(next && typeof next.add === 'function' && Array.isArray(next.origins) && next.origins.length)) throw new Error('adapter');
-    adapter = next;
+    if (next !== null && !(next && typeof next.add === 'function' && Array.isArray(next.origins) && next.origins.length && next.origins.every(isHttpsOrigin))) throw new Error('adapter');
+    generation += 1;
+    adapter = next && { add: next.add, origins: next.origins.slice() };
     pending = {};
     failed = {};
     refresh();

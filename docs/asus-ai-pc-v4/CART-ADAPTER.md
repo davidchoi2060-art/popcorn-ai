@@ -21,7 +21,7 @@
 
 ```js
 PAI.asusCart.setAdapter({
-  origins: ['<담은 뒤 이동을 허용할 출처>'],
+  origins: ['<담은 뒤 이동을 허용할 https 출처>'],   // 끝 슬래시 · 경로 · 계정 없는 정규 출처만. 아니면 setAdapter 가 예외를 던진다
   add: function (request) {
     // request = { modelId: 'business' | 'video' | 'local-ai', quantity: 1 }
     // 반환: Promise<{ ok: true, url: '<이동 주소>' } | { ok: false, code: '<사유>' }>
@@ -39,7 +39,8 @@ PAI.asusCart.setAdapter({
 | 알 수 없는 모델 id | 호출 없음 |
 | 요청 중 | 그 모델 버튼 비활성 + 「담는 중」. 다시 눌러도 호출은 한 번 |
 | `ok: true` + 허용 출처 주소 | 그 주소로 이동. 화면 성공 문구는 없음 |
-| `ok: true`인데 주소 없음 · 허용 밖 | 실패로 처리 |
+| `ok: true`인데 주소 없음 · https 아님 · 계정 정보 포함 · 허용 밖 | 실패로 처리 |
+| 요청 중 `setAdapter`로 교체 · 해제 | 앞선 응답은 버림. 이동 없음, 현재 상태 변경 없음. 판정은 요청 당시 연결의 출처로 한다 |
 | `ok: false` · 오류 · 15초 초과 | 실패 안내 후 다시 누를 수 있음 |
 | 시간 초과 뒤 늦은 응답 | 무시 |
 
