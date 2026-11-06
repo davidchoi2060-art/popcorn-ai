@@ -26,21 +26,21 @@
 | hero-desktop.webp | v5 gt502-desktop-hero.png | PC1 내장 image_gen 생성 | WebP 변환만(2172x724) | 홈 배너(PC·모바일 하단), 서브메인 PC 상단 | 8AB04BBF9C31952EBA6149875D4268AB735A904B9E6F5383F1B3B78EB86CDAA3 |
 | hero-mobile.webp | v5 gt502-mobile-hero.png | PC1 내장 image_gen 생성 | WebP 변환만(1122x1402) | 서브메인 모바일 상단 | 6F58FA08DB5F3A55565AA212B4C9E226745DC44508376E2D133E603C38E03991 |
 | logo-asus-white.png | v3 pc/01-banner.png | PC1 AI 생성 시안 | 로고 영역만 추출, 흰색 단색화 | 기획전 상단 띠 | F1BDF6FBFC7FEFF711E91E273ACDF247243B2059A0DA5BB784DC76CE7EA84ADF |
-| use-ai-1.webp | v3 mobile/05-local-ai.png | PC1 AI 생성 시안 | GT302 오른쪽 모니터만 자름, 2배 확대 | 로컬 AI 활용 01 | A7D5B8D0E1DEC3CC6F3B54D1757C1A2EE62C8C9882A8883FC77585BFA14B85EA |
-| use-ai-2.webp | v3 mobile/05-local-ai.png | PC1 AI 생성 시안 | GT302 오른쪽 모니터만 자름, 2배 확대 | 로컬 AI 활용 02 | F6D5B6BFC3DD9819DE6980D8510338F792816CBFC3BE8815ADD17C78ABC9294B |
-| use-ai-3.webp | v3 mobile/05-local-ai.png | PC1 AI 생성 시안 | GT302 오른쪽 모니터만 자름, 2배 확대 | 로컬 AI 활용 03 | 46DEB0381F2F0A59FA94D1ECA20AFFF1769588FB32CD74A46B46691243F7AE68 |
-| use-business-1.webp | v3 pc/03-business.png | PC1 AI 생성 시안 | 모니터 영역 자름, 사용 예시 배지 제거, 2배 확대 | 문서·업무 활용 01 | 69F7C9D84A15C8493323EAD794269F854635650BB7B4334607FB503742680F46 |
-| use-business-2.webp | v3 pc/03-business.png | PC1 AI 생성 시안 | 모니터 영역 자름, 사용 예시 배지 제거, 2배 확대 | 문서·업무 활용 02 | C0AEC29E7006A8E1A9407D2077F522E8039A31D932030812613B9E74A34C878F |
-| use-business-3.webp | v3 pc/03-business.png | PC1 AI 생성 시안 | 모니터 영역 자름, 사용 예시 배지 제거, 2배 확대 | 문서·업무 활용 03 | 31AA8385B1C0466A944B58D45D59EA2E2200CC24AB892325B290A20A99BABFB8 |
-| use-video-1.webp | v3 mobile/04-video.png | PC1 AI 생성 시안 | GT302 왼쪽만 자름, 배지 제거, 2배 확대 | 영상·디자인 활용 01 | 4B62B84175057E0E40AFEE28B1B5983A78C9488A6A7CD50660240AF610FD69D3 |
-| use-video-2.webp | v3 mobile/04-video.png | PC1 AI 생성 시안 | GT302 왼쪽만 자름, 배지 제거, 2배 확대 | 영상·디자인 활용 02 | 575B1D7849CA9275BDAADB2BA901BCE5825775E02912A759E033EC4727AD14F5 |
-| use-video-3.webp | v3 pc/04-video.png | PC1 AI 생성 시안 | GT302 왼쪽만 자름, 배지 제거, 2배 확대 | 영상·디자인 활용 03 | 5BA758B3ECB28035070975657CF5C533FB2B0322DECA66C13DCF47F6FA5FE00A |
+| use-ai-1.webp | docs/asus-ai-pc-v4/use-art/use-ai-1.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 로컬 AI 활용 01 | 32F76058B59F475459DA9BE2CC8E445F01CDE6654BBC43921D71481139687ED1 |
+| use-ai-2.webp | docs/asus-ai-pc-v4/use-art/use-ai-2.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 로컬 AI 활용 02 | BAB73C42855BFB727A860AE6E619F21F2482A2418DA2095B6E4B2DC8660F9BEF |
+| use-ai-3.webp | docs/asus-ai-pc-v4/use-art/use-ai-3.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 로컬 AI 활용 03 | E62E0AEED8F0A83CDD01931F3913011B5E757EE75CE48A0912F3CC534C4B1796 |
+| use-business-1.webp | docs/asus-ai-pc-v4/use-art/use-business-1.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 문서·업무 활용 01 | 66B7986B5F7972D1E5B28D5BDB8A6FF237558AA4760A5398315AFAD0E798EAA0 |
+| use-business-2.webp | docs/asus-ai-pc-v4/use-art/use-business-2.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 문서·업무 활용 02 | 2AA1D2817538253F9E0F86CA6352AEA3338BF2AC3240C95F67007701E18C1F42 |
+| use-business-3.webp | docs/asus-ai-pc-v4/use-art/use-business-3.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 문서·업무 활용 03 | 6E8AEA6C2017BD6E6AE8C97FB9B171982021209305D059CC841AF7381A14021A |
+| use-video-1.webp | docs/asus-ai-pc-v4/use-art/use-video-1.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 영상·디자인 활용 01 | 48C3DAE0EC592A842C845786FC2A1F243E694804ADACDFC2110DBF24E3879FA6 |
+| use-video-2.webp | docs/asus-ai-pc-v4/use-art/use-video-2.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 영상·디자인 활용 02 | AA013A014AECCC0838C456713F6B0040204C008711C1AD822C8C031E5BD30E9F |
+| use-video-3.webp | docs/asus-ai-pc-v4/use-art/use-video-3.svg | 코드로 그린 설명 그림(`tools/asus_use_art.py`) | 1440x576 렌더, WebP 변환 | 영상·디자인 활용 03 | 160BE6901361E3EC578C0FD74E87800FD1C20F7E4C083EA4F7F18996414BC5CB |
 
 ## 사용 조건
 
 - GT502 소재는 내부가 빈 케이스 연출이다. 완제 조립 사진이나 호환성 증거가 아니다. 화면에 「제품 이미지는 연출이며 실제 구성과 다를 수 있습니다.」를 실제 글자로 표시한다.
 - 푸른 빛은 외부 조명 연출이며 RGB 부품 포함을 뜻하지 않는다. 작은 각인은 실제 제품과 다를 수 있어 확대 소개하지 않는다.
 - 공식 사진과 ASUS 상표의 외부 사용 승인은 완료되지 않았다. ASUS 로고는 v3 AI 시안에서 추출한 것이라 공식 로고 파일로 교체를 검토해야 한다. 외부 공개 전 ASUS 확인이 필요하다.
-- 사용 예시는 실측 화면이 아니라 AI 생성 예시다. GT302가 보이는 영역은 잘라내고 썼고, 인물 사진은 GT302·잘못된 배지가 섞여 쓰지 않았다.
+- 사용 예시 9장은 실측 화면이나 실제 프로그램 화면이 아니라 코드로 그린 설명 그림이다(2026-11-06, 흐릿한 AI 시안 자른 소재를 전부 교체). 수치 · 성능 지표를 넣지 않는다. 고칠 때는 `tools/asus_use_art.py`를 고쳐 다시 만든다. 글꼴은 저장소의 Pretendard(OFL)다.
 - 그래픽카드·쿨러 소재를 새로 만들지 않는다. 상세 구성 표의 부품 사진은 몰 상품번호가 같은 기존 사진을 쓰고, 그 사진이 없거나 모델을 확인할 수 없는 7종은 제조사 공식 페이지 사진을 저장소에 둔다(`api/asus_campaign.part_thumbnail`, 출처 `assets/images/parts/ASUS-OFFICIAL-SOURCES.json`, 2026-11-06 사용자 지시). 공식 사진의 외부 사용 승인 여부는 위 항목과 같이 확인되지 않았다.
 - 초기 자체 합성 소재(gt502-build-*, gpu-render, banner-home, bg-hero)는 v5 수령 후 삭제했고 커밋하지 않았다.

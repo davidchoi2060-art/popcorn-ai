@@ -141,6 +141,8 @@
     detailHref: function (id) { return 'asus-pc.html?model=' + encodeURIComponent(id); },
     inquiryHref: function (id) { return 'asus-consult.html?model=' + encodeURIComponent(id); },
     image: function (file) { return 'assets/images/asus/' + file; },
+    // 사용 예시는 파일명(DB 값)을 유지한 채 그림을 교체했으므로 주소 버전으로 옛 캐시를 피한다.
+    useImage: function (file) { return A.image(file) + '?v=20261106-art1'; },
     won: function (value) { return Number(value).toLocaleString('ko-KR') + '원'; },
     planText: function (m) { return m.plan === null ? A.PLAN_UNSET : A.won(m.plan); }
   };
