@@ -8039,3 +8039,12 @@ main 에 올릴지는 결정 대기였다(분담표 결정 ③). **2026-10-08 16
 - 함께 고친 것: 용도를 말하지 않은 상담(「70만원」)의 고루 찾기가 #413(여러 용도 = 한 대) 뒤로 사무·인강과 가벼운 게임을 한 번에 불러 «둘 다 되는 PC»만 받았다 -- 예산 안 사무용 PC가 빠지고 「70만원 이하 PC가 없다」고 답했다. 용도마다 따로 부르고 최신 게임은 FHD 를 직접 말해 부른다(`api/talk_tools._find_spread`).
 - 그대로인 것: 「FC 온라인 100만원」처럼 캐주얼 기준(외장 그래픽)에 예산이 못 미칠 때 내장 그래픽 사무용 PC를 낮은 옵션 대안으로 보여 줄지는 미정(사장님 답 없음).
 - 확인법: `grep -n "기본형은 캐주얼" api/sold_reco.py` · `tests/test_multi_usage_one_pc_20261029.py` (GameDefaultCasual) · `tests/test_talk_budget_only_spread_20261021.py`.
+
+## 2026-11-06 ASUS 기획전 3종을 DB 원천으로 옮김 (사용자 직접요청 · 0178)
+
+- 바뀐 것: 3종의 문구 · 부품 후보 · 미확정 상태 · 기획 검토가의 원천이 `asus-data.js` 상수에서 전용 표 `asus_campaign_models`로 옮겨졌다. 편집 화면 `/admin2/asus-campaign`(ADM-PRD-061 · 가칭), 읽기 API `GET /api/customer/asus-campaign`.
+- 전용 표를 고른 이유: 기획 검토가와 미확정 후보가 `products` · `sale_price` · 추천 재고에 들어가면 확정 판매 상품으로 읽힌다. 기존 표로는 이 분리를 보장할 수 없다.
+- 동시 편집: 저장소에 선례가 없어 `version` + `expected_version`(불일치 409)을 새로 뒀다.
+- 코드에 남긴 것: 공통 고지(합계 없음 · 호환 · 배송 · 조립비), 기획 검토가 표기, 문의 항목 매핑. 저장으로 고지를 지울 수 없게 하려는 의도다. 운영체제 상태와 부품 항목 목록도 저장으로 못 바꾼다.
+- 정하지 않은 것(결정 필요): 운영자가 5080 · 5090 · 쿨러를 「공급 확인 필요」에서 다른 상태로 바꾸는 것은 지금 operator 이상에게 열려 있고 감사에 남는다. owner 전용으로 좁힐지는 정책 결정이다.
+- 확인법: `grep -n "asus_campaign" api/asus_campaign.py` · `tests/test_asus_campaign_20261106.py` · `tests/scenarios/asus_campaign_browser.cjs`.

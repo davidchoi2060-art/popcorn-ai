@@ -1980,3 +1980,19 @@ CHECK: `contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL`. 기한이 �
 ### 39. 가격 확인 기록 유효 종료일 `mall_price_checks.valid_until` (2026-10-19, 0164)
 
 `mall_price_checks.valid_until`(TIMESTAMP, NULL 허용). NULL 이면 지금처럼 확인 후 `EVIDENCE_DAYS`(7일)까지 근거로 쓴다. 값이 있으면 그 시각까지 쓴다(`api/customer_bom_gaps.EVIDENCE_SQL`). 판매가가 바뀌면 그 전에도 바로 무효다. 대표 결정(2026-10-19 「이 두 개만」)으로 109547·127555 두 메모리만 2026-12-31 23:59:59 까지로 연장했다 — 표가 추가만 하므로 기존 행을 고치지 않고 새 확인 행을 하나 쌓는다(가장 최근 bom-gap 기록이 'same' 이고 그 가격이 지금 판매가와 같을 때만). downgrade 는 `valid_until` 이 있는 행이 하나라도 있으면 거부한다.
+
+## 25. ASUS 기획전 3종 기획 자료 (2026-11-06, 0178)
+
+`asus_campaign_models` — 판매 상품이 아니라 기획 자료다. 그래서 `products`에 넣지 않고 참조도 하지 않는다.
+
+| 컬럼 | 형식 | 설명 |
+|---|---|---|
+| model_id | TEXT PK | business · video · local-ai 만 허용(CHECK) |
+| plan_review_price | INTEGER NULL | 기획 검토가(ASUS 협의 전). 판매가 아님. NULL = 미정, 0 금지(CHECK) |
+| content | JSONB NOT NULL | 문구 · 이미지 · 추천 대상 · 활용 예시 · 부품 후보. 구조 규칙 = `api/asus_campaign.Content` |
+| version | INTEGER NOT NULL | 동시 편집 판정(낙관적 잠금). 저장마다 1 증가 |
+| origin | TEXT NOT NULL | seed(초깃값 그대로) · admin(관리자 저장) |
+| updated_by | BIGINT NULL FK admin_operators | 마지막 저장자. 초깃값은 NULL |
+| updated_at | TIMESTAMPTZ NOT NULL | 마지막 저장 시각 |
+
+초기화는 `INSERT ... ON CONFLICT DO NOTHING`이라 다시 적용해도 기존값을 덮어쓰지 않는다. 되돌리기는 admin 행이 있으면 멈춘다.
