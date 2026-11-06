@@ -229,7 +229,8 @@ def customer_campaign(response: Response):
             rows = read_rows(conn)
     except SQLAlchemyError:
         log.exception('[asus-campaign] customer read failed')
-        raise HTTPException(503, '기획전 정보를 불러오지 못했습니다.') from None
+        # HTTPException 은 위 response 의 헤더를 버린다. 실패 응답도 캐시되지 않게 여기서 다시 준다.
+        raise HTTPException(503, '기획전 정보를 불러오지 못했습니다.', headers={'Cache-Control': 'no-store'}) from None
     models, unavailable = [], []
     for model_id in MODEL_IDS:
         row = rows.get(model_id)

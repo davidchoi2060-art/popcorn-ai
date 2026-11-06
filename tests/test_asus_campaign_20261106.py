@@ -163,6 +163,25 @@ class Wiring(unittest.TestCase):
             self.assertNotIn(gone, DATA_JS, gone)
 
 
+class CustomerReadFailure(unittest.TestCase):
+    """DB 없이 확인한다: 연결 실패 응답도 정직한 503 이고 캐시되지 않는다(2026-11-06 CI 실패 회귀)."""
+
+    def test_503_is_not_cacheable_and_carries_no_model_values(self):
+        from sqlalchemy.exc import OperationalError
+
+        class Down:
+            def connect(self):
+                raise OperationalError("SELECT 1", {}, Exception("down"))
+
+        app = FastAPI()
+        app.include_router(AC.router)
+        with mock.patch.object(AC, "engine", Down()):
+            r = TestClient(app, raise_server_exceptions=False).get("/api/customer/asus-campaign")
+        self.assertEqual(r.status_code, 503)
+        self.assertEqual(r.headers["cache-control"], "no-store")
+        self.assertEqual(r.json(), {"detail": "기획전 정보를 불러오지 못했습니다."})
+
+
 def _db_url():
     from sqlalchemy.engine import make_url
     from sqlalchemy import create_engine, text
