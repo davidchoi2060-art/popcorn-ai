@@ -122,6 +122,56 @@ class Page {
   }
 }
 
+const CHROME_WAIT_MS = 60000;
+const CHROME_ATTEMPTS = 2;
+
+// Chrome 을 띄우고 디버그 포트가 열릴 때까지 기다린다. 실패하면 종료 코드 · 신호 · stderr 를 담아 던진다.
+async function startChromeOnce(attempt) {
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'asus-e2e-'));
+  const logPath = path.join(OUT, 'chrome-' + attempt + '.log');
+  const log = fs.openSync(logPath, 'w');
+  const began = Date.now();
+  const state = { exited: false, code: null, signal: null, error: null };
+  const finish = (ok) => { fs.closeSync(log); return ok; };
+  const describe = (why) => why + ' after ' + (Date.now() - began) + 'ms; bin=' + CHROME + '; exit=' + state.code + '; signal=' + state.signal +
+    '; spawnError=' + state.error + '; stderr=' + fs.readFileSync(logPath, 'utf8').slice(-1500);
+  let chrome;
+  const stop = () => { if (chrome && !state.exited) chrome.kill('SIGKILL'); };
+  try {
+    chrome = spawn(CHROME, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: ['ignore', 'ignore', log] });
+  } catch (e) {
+    state.error = e.message;
+    finish();
+    throw new Error(describe('chrome spawn failed'));
+  }
+  chrome.on('error', (e) => { state.error = e.message; state.exited = true; });
+  chrome.on('exit', (code, signal) => { state.exited = true; state.code = code; state.signal = signal; });
+  const portFile = path.join(profile, 'DevToolsActivePort');
+  while (Date.now() - began < CHROME_WAIT_MS) {
+    const lines = fs.existsSync(portFile) ? fs.readFileSync(portFile, 'utf8').trim().split('\n') : [];
+    if (lines.length >= 2) { finish(); return { chrome, profile, port: lines[0], wsPath: lines[1], waitedMs: Date.now() - began, stop }; }
+    if (state.exited) { finish(); throw new Error(describe('chrome exited before debug port')); }
+    await sleep(100);
+  }
+  stop();
+  finish();
+  throw new Error(describe('chrome debug port timeout'));
+}
+
+async function startChrome() {
+  const errors = [];
+  for (let attempt = 1; attempt <= CHROME_ATTEMPTS; attempt += 1) {
+    try {
+      const started = await startChromeOnce(attempt);
+      return { ...started, attempt, errors };
+    } catch (e) {
+      errors.push(e.message);
+      console.log('chrome attempt ' + attempt + ' failed: ' + e.message);
+    }
+  }
+  throw new Error('chrome did not start: ' + errors.join(' | '));
+}
+
 const ADMIN = '/admin2/asus-campaign';
 const INTERNAL_WORDS = /공급\s*재?확인|확인\s*필요|확인\s*전|확정\s*불가|미확정|미확인|불일치|후보/;
 const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계/;
@@ -459,15 +509,14 @@ async function runWidth(page, w) {
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'asus-e2e-'));
-  const chrome = spawn(CHROME, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
+  let started = null;
   let code = 1;
   try {
-    const portFile = path.join(profile, 'DevToolsActivePort');
-    for (let i = 0; i < 100 && !fs.existsSync(portFile); i += 1) await sleep(100);
-    await sleep(200);
-    const [port, wsPath] = fs.readFileSync(portFile, 'utf8').trim().split('\n');
-    const cdp = await Cdp.open('ws://127.0.0.1:' + port + wsPath);
+    started = await startChrome();
+    // 재시도로 지나간 실패도 결과에 남긴다(통과 항목으로 숨기지 않고 상세에 원문을 싣는다).
+    record('Chrome 기동', true, 'real', { attempt: started.attempt, waitedMs: started.waitedMs, earlierFailures: started.errors });
+    console.log('chrome started: attempt=' + started.attempt + ' waitedMs=' + started.waitedMs + ' earlierFailures=' + JSON.stringify(started.errors));
+    const cdp = await Cdp.open('ws://127.0.0.1:' + started.port + started.wsPath);
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const page = new Page(cdp, sessionId);
@@ -488,9 +537,11 @@ async function runWidth(page, w) {
   } finally {
     fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ base: 'CI disposable DB, real uvicorn', results }, null, 1));
     console.log(results.filter((r) => r.ok).length + ' passed, ' + results.filter((r) => !r.ok).length + ' failed');
-    chrome.kill();
-    await sleep(300);
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+    if (started) {
+      started.stop();
+      await sleep(300);
+      fs.rmSync(started.profile, { recursive: true, force: true, maxRetries: 3 });
+    }
   }
   process.exit(code);
 })();
