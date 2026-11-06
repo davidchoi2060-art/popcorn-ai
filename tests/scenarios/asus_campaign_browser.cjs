@@ -176,7 +176,10 @@ async function startChrome() {
 
 const ADMIN = '/admin2/asus-campaign';
 const INTERNAL_WORDS = /공급\s*재?확인|확인\s*필요|확인\s*전|확정\s*불가|미확정|미확인|불일치|후보/;
-const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계/;
+// 「합계 64GB」는 메모리 용량 합계라 금액이 아니다. GB가 붙지 않은 「합계」는 계속 잡는다.
+const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계(?!\s*\d+\s*GB)/;
+// 제품이 아닌 줄. 이 항목의 options 는 후보 비노출 검사 대상이 아니고, 표시 문구를 아래에서 따로 정확히 본다.
+const NON_PRODUCT_LABELS = ['그래픽 메모리', '추가 시스템팬', '운영체제'];
 const SHOW_ALL = "document.querySelectorAll('img[data-az-thumb]').forEach(i=>i.loading='eager')";
 
 // 상세 3종: 금액 · 내부 상태 없음, 사진은 API 가 준 같은 줄의 제품 사진, 사진이 안 오면 제품명만 남는다.
@@ -202,9 +205,13 @@ async function checkDetails(page, tag) {
     record(tag + ' ' + m.id + ' 상세: 케이스는 GT502 컷아웃', !!box && box.img === 'assets/images/asus/gt502-black-cutout.webp' && box.w > 0, 'real', box);
     const local = shown.filter((s) => s.img && s.img.startsWith('assets/images/parts/asus-official-'));
     record(tag + ' ' + m.id + ' 상세: 공식 사진 로컬 로드', local.length > 0 && local.every((s) => s.w > 0), 'real', local);
-    const candidates = m.parts.flatMap((p) => p.options.map((o) => o.name)).filter((n) => !expected[n]);
+    // 제품 역할 8종의 후보 중 대표가 아닌 것은 표뿐 아니라 상세 전체에 나오면 안 된다.
+    const candidates = m.parts.filter((p) => !NON_PRODUCT_LABELS.includes(p.label)).flatMap((p) => p.options.map((o) => o.name)).filter((n) => !expected[n]);
     const leaked = candidates.filter((n) => text.includes(n));
     record(tag + ' ' + m.id + ' 상세: 대표 아닌 후보 이름 없음', leaked.length === 0, 'real', leaked);
+    const plain = await page.js("Array.from(document.querySelectorAll('.az-table tbody tr:not([data-az-part=product])')).map(tr=>[tr.dataset.azPart,tr.querySelector('th').textContent,tr.querySelector('td').textContent.trim(),tr.querySelectorAll('img,.az-part-qty').length])");
+    const plainWant = [['spec', '그래픽 메모리', m.vram, 0], ['notice', '추가 시스템팬', '상담 시 안내', 0], ['notice', '운영체제', '정품 Windows 별도', 0]];
+    record(tag + ' ' + m.id + ' 상세: 사양·안내 줄 3개 문구 정확 · 사진·수량 없음', JSON.stringify(plain) === JSON.stringify(plainWant), 'real', plain);
     // 전체 캡처 전에 디코드를 끝낸다. decoding=async 사진은 로드됐어도 캡처에 비어 나올 수 있다.
     const undecoded = await page.js("Promise.all(Array.from(document.querySelectorAll('img[data-az-thumb]')).map(i=>i.decode().then(()=>null,()=>i.getAttribute('src')))).then(r=>r.filter(Boolean))");
     record(tag + ' ' + m.id + ' 상세: 사진 디코드 성공', undecoded.length === 0, 'real', undecoded);
