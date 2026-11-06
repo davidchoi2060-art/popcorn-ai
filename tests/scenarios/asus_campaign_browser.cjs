@@ -327,6 +327,7 @@ async function runWidth(page, w) {
   await page.until("document.querySelectorAll('.az-card').length===3");
   let text = await page.body();
   record(tag + ' 서브메인 3종 + 기획 검토가 표기', text.includes('문서·업무용 PC') && text.includes('3,990,000원') && text.includes('기획 검토가 · ASUS 협의 전') && !INTERNAL_WORDS.test(text), 'real');
+  record(tag + ' 서브메인 장바구니 버튼 비활성 · 준비 중 안내', await page.js("Array.from(document.querySelectorAll('.az-cart-btn')).filter(b=>b.disabled).length===3") && text.includes('장바구니 준비 중입니다.'), 'real');
   record(tag + ' 서브메인 0원 없음 · 가로 넘침 없음', !/(^|[^\d,])0원/.test(text) && await page.noOverflow(), 'real');
   await page.shot(tag + '-01-customer-home-before');
 
