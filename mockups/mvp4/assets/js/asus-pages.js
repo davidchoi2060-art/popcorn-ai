@@ -31,14 +31,15 @@
 
   function card(m) {
     return '<article class="az-card az-tone-' + h(m.tone) + '" aria-labelledby="az-card-' + h(m.id) + '">' +
-      '<h3 class="az-tag" id="az-card-' + h(m.id) + '">' + h(m.name) + '</h3>' +
-      '<figure class="az-card-photo"><img src="' + h(A.image(m.heroImage)) + '" alt="' + h(m.heroAlt) + '" width="800" height="800" loading="lazy" decoding="async"></figure>' +
+      '<h3 class="az-tag" id="az-card-' + h(m.id) + '"><a href="' + h(A.detailHref(m.id)) + '">' + h(m.name) + '</a></h3>' +
+      '<figure class="az-card-photo"><a href="' + h(A.detailHref(m.id)) + '" tabindex="-1" aria-hidden="true"><img src="' + h(A.image(m.heroImage)) + '" alt="' + h(m.heroAlt) + '" width="800" height="800" loading="lazy" decoding="async"></a></figure>' +
       '<div class="az-card-body">' +
       '<p class="az-card-tagline">' + h(m.tagline) + '</p>' +
       '<p class="az-gpu"><span>그래픽카드</span><strong>' + h(m.gpu) + '</strong></p>' +
       '<p class="az-vram"><span>그래픽 메모리</span><strong>' + h(m.vram) + '</strong></p>' +
       specRows(m) + planBlock(m) +
-      '<a class="az-btn az-btn-solid" href="' + h(A.detailHref(m.id)) + '" aria-label="' + h(m.name) + ' 자세히 보기">자세히 보기' + arrow() + '</a>' +
+      P.asusCart.html(m.id, m.name) +
+      '<a class="az-card-detail" href="' + h(A.detailHref(m.id)) + '" aria-label="' + h(m.name) + ' 상품 정보 보기">상품 정보 보기' + arrow() + '</a>' +
       '</div></article>';
   }
 
@@ -135,7 +136,7 @@
       '<div class="az-detail-copy"><p class="az-with">' + h(A.HEADLINE) + '</p><h1 id="az-title">' + h(m.name) + '</h1><p class="az-lead">' + h(m.tagline) + '</p>' +
       '<ul class="az-core">' + core.map(function (c) { return '<li><span>' + h(c[0]) + '</span><strong>' + h(c[1]) + '</strong></li>'; }).join('') + '</ul>' +
       '</div>' +
-      '<aside class="az-detail-buy" aria-label="구성 문의"><a class="az-btn az-btn-cyan" href="' + h(A.inquiryHref(m.id)) + '">PC 구성 문의하기' + arrow() + '</a></aside>' +
+      '<aside class="az-detail-buy" aria-label="구매와 문의">' + P.asusCart.html(m.id, m.name) + '<a class="az-btn az-btn-cyan" href="' + h(A.inquiryHref(m.id)) + '">PC 구성 문의하기' + arrow() + '</a></aside>' +
       '</div>' +
       '<nav class="az-subnav" aria-label="이 페이지 안내"><div class="az-wrap"><a href="#az-who">추천 대상</a><a href="#az-uses">활용 업무</a><a href="#az-parts">전체 구성</a><a href="#az-install">설치·사용 안내</a></div></nav></section>' +
 
