@@ -1,0 +1,139 @@
+{
+  "note": "ASUS 기획전 상세 구성 표 전용 부품 사진. 제조사 공식 페이지에서 받아 원본 비율로 여백 일부를 남겨 자르고 WebP로 줄였다. GPU 3종은 오른쪽 아래 NVIDIA 배지가 포함되지 않도록 아래쪽을 잘랐다. 원본 조회일 2026-11-06.",
+  "rights": "공식 사진과 상표의 외부 사용 승인 여부는 이 파일이 증명하지 않는다.",
+  "images": [
+    {
+      "file": "assets/images/parts/asus-official-prime-rtx5070ti-16g.webp",
+      "sha256": "08097d37cdce1f4ec3795860763225e0ab98021e15be7681037c5c3bd87b3b0d",
+      "bytes": 20818,
+      "size": [
+        600,
+        280
+      ],
+      "applies_to": "GPU ASUS PRIME RTX 5070 Ti 16GB 코잇 (몰 상품번호 130847)",
+      "match": "official PRIME-RTX5070TI-16G (non-OC) page main image; NVIDIA badge cropped out",
+      "source_page": "https://www.asus.com/us/motherboards-components/graphics-cards/prime/prime-rtx5070ti-16g/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/d3761a53-69f3-4d8e-aa5a-7e3c8eaf2c74/",
+      "retrieved": "2026-11-06",
+      "source_sha256": "6b5872b7548f20e69d4f7d6ff5ffc6fb7457b53a66a2e88cd9f2addef6ef7c1b",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-prime-rtx5080-16g.webp",
+      "sha256": "eaebe9cdbb56e62780401e271dbbc9eb7c1f3f61f141975a740969599aac9618",
+      "bytes": 21952,
+      "size": [
+        600,
+        282
+      ],
+      "applies_to": "GPU ASUS PRIME RTX 5080 16GB",
+      "match": "official PRIME-RTX5080-16G page main image; NVIDIA badge cropped out",
+      "source_page": "https://www.asus.com/motherboards-components/graphics-cards/prime/prime-rtx5080-16g/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/c6da0479-e4d5-4612-9556-d69427dc0a74/",
+      "retrieved": "2026-11-06",
+      "source_sha256": "d46cf0d4073a2b9b91bd0ac44e01204d300c02bfab5e9db0f606ccfcccba4462",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-tuf-rtx5090-32g-gaming.webp",
+      "sha256": "015e503348c6e993422531ed9f844bdd64e6fd635d6881ac0f63713f185f26eb",
+      "bytes": 27566,
+      "size": [
+        600,
+        282
+      ],
+      "applies_to": "GPU ASUS TUF RTX 5090 32GB",
+      "match": "official TUF-RTX5090-32G-GAMING page main image; NVIDIA badge cropped out",
+      "source_page": "https://www.asus.com/motherboards-components/graphics-cards/tuf-gaming/tuf-rtx5090-32g-gaming/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/02151c38-4d77-44c8-aa4a-24b6e7d1f4d6/",
+      "retrieved": "2026-11-06",
+      "source_sha256": "38d050083bea92cd39fe4e3211a9d577f23a7da0c82a5ed3f3b7c698406d9a3a",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-prime-lc-360-argb.webp",
+      "sha256": "f37280647226d180cf1ace9078a5d6807fa864b6914582286f545ed6774a0433",
+      "bytes": 27138,
+      "size": [
+        600,
+        278
+      ],
+      "applies_to": "CPU cooler ASUS PRIME LC 360 ARGB",
+      "match": "official Prime LC 360 ARGB page main image (not the LCD model)",
+      "source_page": "https://www.asus.com/us/motherboards-components/cooling/prime/prime-lc-360-argb/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/f730fe62-2680-4610-9af5-4818a5d7a025/",
+      "retrieved": "2026-11-06",
+      "source_sha256": "d62ce5f7e2ce17257197fa36ea9494497e795d47b7c5af8efa041d8f4d09b70a",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-tuf-gaming-b850m-e-wifi.webp",
+      "sha256": "f5bd687a73f04b5aa589dbd569c031d3f294dab4cdfe9e107b593b4ba2d6973c",
+      "bytes": 72702,
+      "size": [
+        600,
+        595
+      ],
+      "applies_to": "Mainboard ASUS TUF Gaming B850M-E WIFI 인텍 (몰 상품번호 130987)",
+      "match": "official TUF GAMING B850M-E WIFI page main image; model name readable on board",
+      "source_page": "https://www.asus.com/motherboards-components/motherboards/tuf-gaming/tuf-gaming-b850m-e-wifi/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/903de645-a7e8-4102-8d6f-b821f128a545/",
+      "retrieved": "2026-11-06",
+      "source_sha256": "c2cc8e7c5513770e63def9c073c4b27d0ed0c0f8fc04f42233ca8974375d3edf",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-rog-strix-850p-gaming.webp",
+      "sha256": "7eb78b43f357996036189c56e243a46fe9ffb980f89c03f0cbfa0414f29fabec",
+      "bytes": 43138,
+      "size": [
+        600,
+        488
+      ],
+      "applies_to": "PSU ASUS ROG STRIX 850W Platinum 인텍 (몰 상품번호 130851)",
+      "match": "official ROG STRIX 850W Platinum page main image",
+      "source_page": "https://rog.asus.com/power-supply-units/rog-strix/rog-strix-850p-gaming/",
+      "source_url": "https://dlcdnwebimgs.asus.com/gain/5C0EA6AE-B302-440D-9810-D1A8D5F12882",
+      "retrieved": "2026-11-06",
+      "source_sha256": "696b559a96ba18dd9dd6fea8c05a1ab74842507932c0ded70f84cefb1e1ab24f",
+      "source_size": [
+        2400,
+        2400
+      ]
+    },
+    {
+      "file": "assets/images/parts/asus-official-kingston-kvr56u46bd8-64.webp",
+      "sha256": "e992ee3433cbc70b4a66ea0984551efe10409d5c93a9c0b16d4065fd1ec803fd",
+      "bytes": 12664,
+      "size": [
+        600,
+        162
+      ],
+      "applies_to": "RAM 킹스톤 DDR5-5600 CL46 128GB [64G×2] (몰 상품번호 130703)",
+      "match": "official KVR56U46BD8-64 result image (64GB single module; the product is two modules). Family image, part number not readable. Page shows the -tn.png of this image",
+      "source_page": "https://www.kingston.com/en/memory/search?partid=KVR56U46BD8-64",
+      "source_url": "https://media.kingston.com/kingston/product/DDR5_Non-ECC_Unbuffered_DIMM_2R_X8_1-zm-lg.jpg",
+      "retrieved": "2026-11-06",
+      "source_sha256": "b355e3f7bde7f2792a5b8ac54e5b2fb782dcbc5dfc9cc70a87d20520a2bc1afb",
+      "source_size": [
+        2048,
+        2048
+      ]
+    }
+  ]
+}

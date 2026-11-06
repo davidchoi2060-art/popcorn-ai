@@ -200,16 +200,22 @@ async function checkDetails(page, tag) {
     record(tag + ' ' + m.id + ' 상세: 케이스는 GT502 컷아웃', !!box && box.img === 'assets/images/asus/gt502-black-cutout.webp' && box.w > 0, 'real', box);
     const noPhoto = shown.filter((s) => !expected[s.name]);
     record(tag + ' ' + m.id + ' 상세: 확인 안 된 부품은 제품명만', noPhoto.every((s) => s.img === null), 'real', noPhoto);
+    const local = shown.filter((s) => s.img && s.img.startsWith('assets/images/parts/asus-official-'));
+    record(tag + ' ' + m.id + ' 상세: 공식 사진 로컬 로드', local.length > 0 && local.every((s) => s.w > 0), 'real', local);
+    record(tag + ' ' + m.id + ' 상세: 사진 없는 항목은 운영체제만', noPhoto.map((s) => s.name).join() === '정품 Windows', 'real', noPhoto.map((s) => s.name));
+    // 전체 캡처 전에 디코드를 끝낸다. decoding=async 사진은 로드됐어도 캡처에 비어 나올 수 있다.
+    const undecoded = await page.js("Promise.all(Array.from(document.querySelectorAll('img[data-az-thumb]')).map(i=>i.decode().then(()=>null,()=>i.getAttribute('src')))).then(r=>r.filter(Boolean))");
+    record(tag + ' ' + m.id + ' 상세: 사진 디코드 성공', undecoded.length === 0, 'real', undecoded);
     await page.shot(tag + '-detail-' + m.id);
   }
   // 사진 실패 — 몰 사진을 끊는다.
   // 앞에서 받은 사진이 캐시에서 나오면 실패가 재현되지 않는다.
   await page.send('Network.setCacheDisabled', { cacheDisabled: true });
-  page.rules = [{ match: '/data/pimg/', abort: true }, { match: '/images/parts/mall-', abort: true }];
+  page.rules = [{ match: '/data/pimg/', abort: true }, { match: '/images/parts/', abort: true }];
   await page.go('/mvp4/asus-pc.html?model=local-ai');
   await page.until("!!document.querySelector('.az-table')");
   await page.js(SHOW_ALL);
-  await page.until("!document.querySelector('img[data-az-thumb][src*=\"pimg\"]')&&!document.querySelector('img[data-az-thumb][src*=\"mall-\"]')");
+  await page.until("!document.querySelector('img[data-az-thumb][src*=\"pimg\"]')&&!document.querySelector('img[data-az-thumb][src*=\"images/parts/\"]')");
   const after = await page.js("({names:document.querySelectorAll('.az-opts strong').length,broken:Array.from(document.images).filter(i=>i.complete&&!i.naturalWidth).length,cases:document.querySelectorAll('img[data-az-thumb][src*=\"gt502\"]').length})");
   record(tag + ' 사진 실패: 제품명 유지 · 깨진 그림 없음', after.names > 0 && after.broken === 0 && after.cases === 1, 'intercept', after);
   page.rules = [];
@@ -555,7 +561,7 @@ async function runWidth(page, w) {
     await page.send('Runtime.enable');
     await page.send('Network.enable');
     await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/mall-*' }] });
+    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/*' }] });
 
     for (const w of [1440, 390]) {
       try { await runWidth(page, w); } catch (e) { record(w + ' 진행 중단', false, 'real', e.message); await page.shot(w + '-99-aborted').catch(() => {}); }

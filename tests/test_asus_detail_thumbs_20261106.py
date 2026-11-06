@@ -3,6 +3,7 @@
 DB · API 가격 · 관리자 원본은 그대로다. 그래서 고객 어댑터를 Node 로 실제 실행해 나온 값을 본다.
 화면 렌더 · 사진 실패 · 실제 시간 측정은 tests/scenarios/asus_campaign_browser.cjs 가 맡는다.
 """
+import hashlib
 import json
 import os
 import re
@@ -97,9 +98,38 @@ class CustomerCopy(unittest.TestCase):
 class Thumbnails(unittest.TestCase):
     def test_only_verified_pairs_get_a_photo(self):
         seed = {(o.get("mall_no"), o["name"]) for row in AC.seed_models().values() for p in row["content"]["parts"] for o in p["options"]}
-        self.assertLessEqual(AC._THUMB_VERIFIED | {AC._THUMB_CASE}, seed)
-        for code in (130847, 130987, 130851, 130703, 127181, 127182):
-            self.assertFalse([1 for c, _ in AC._THUMB_VERIFIED if c == code], code)
+        self.assertLessEqual(AC._THUMB_VERIFIED | {AC._THUMB_CASE} | set(AC._THUMB_OFFICIAL), seed)
+        for code in (127181, 127182):   # 자료 불일치 옵션은 고객 화면에 나오지 않는다
+            self.assertFalse([1 for c, _ in AC._THUMB_VERIFIED | set(AC._THUMB_OFFICIAL) if c == code], code)
+
+    def test_every_customer_part_has_a_photo_except_software(self):
+        # 고객 표에 나오는 물리 부품은 사진이 빠지지 않는다. 사진이 없는 것은 운영체제뿐이다.
+        missing = set()
+        for model in normalize(public_all()):
+            for p in model["parts"]:
+                for o in p["options"]:
+                    if not o["image"]:
+                        missing.add(p["label"])
+        self.assertEqual(missing, {"운영체제"})
+
+    def test_official_assets_match_manifest(self):
+        doc = json.loads((MVP4 / "assets/images/parts/ASUS-OFFICIAL-SOURCES.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(doc["images"]), 7)
+        self.assertEqual({Path(e["file"]).name for e in doc["images"]},
+                         {f"asus-official-{slug}.webp" for slug in AC._THUMB_OFFICIAL.values()})
+        for e in doc["images"]:
+            data = (MVP4 / e["file"]).read_bytes()
+            self.assertEqual(hashlib.sha256(data).hexdigest(), e["sha256"], e["file"])
+            self.assertEqual(len(data), e["bytes"], e["file"])
+            self.assertEqual(e["retrieved"], "2026-11-06")
+            self.assertRegex(e["source_page"], r"^https://(www\.asus\.com|rog\.asus\.com|www\.kingston\.com)/")
+            self.assertRegex(e["source_url"], r"^https://(dlcdnwebimgs\.asus\.com|media\.kingston\.com)/")
+
+    def test_official_photos_are_local_not_hotlinked(self):
+        for pair in AC._THUMB_OFFICIAL:
+            path = AC.part_thumbnail(*pair)
+            self.assertTrue(path.startswith("assets/images/parts/asus-official-"), path)
+            self.assertTrue((MVP4 / path).is_file(), path)
 
     def test_case_uses_cutout_and_other_case_name_gets_none(self):
         self.assertEqual(AC.part_thumbnail(126548, "ASUS TUF Gaming GT502 BLACK"), "assets/images/asus/gt502-black-cutout.webp")
@@ -107,9 +137,13 @@ class Thumbnails(unittest.TestCase):
         self.assertIsNone(AC.part_thumbnail(126548, "다른 케이스"))
 
     def test_renamed_or_unknown_part_gets_no_photo_instead_of_another_model(self):
-        self.assertIsNone(AC.part_thumbnail(129630, "ASUS PRIME RTX 5070 Ti 16GB 코잇"))
-        self.assertIsNone(AC.part_thumbnail(130847, "ASUS PRIME RTX 5070 Ti 16GB 코잇"))
-        self.assertIsNone(AC.part_thumbnail(None, "ASUS PRIME RTX 5080 16GB"))
+        self.assertIsNone(AC.part_thumbnail(129630, "ASUS PRIME RTX 5070 Ti 16GB 코잇"))     # 번호만 OC
+        self.assertIsNone(AC.part_thumbnail(130847, "ASUS PRIME RTX 5070 Ti OC 16GB 코잇"))  # 이름만 OC
+        self.assertIsNone(AC.part_thumbnail(None, "ASUS PRIME RTX 5070 Ti 16GB 코잇"))       # 번호 삭제
+        self.assertIsNone(AC.part_thumbnail(999, "ASUS PRIME RTX 5080 16GB"))                # 번호 추가
+        self.assertIsNone(AC.part_thumbnail(None, "ASUS PRIME RTX 5080 OC 16GB"))
+        self.assertIsNone(AC.part_thumbnail(None, "ASUS PRIME LC 360 LCD"))
+        self.assertIsNone(AC.part_thumbnail(130703, "킹스톤 DDR5-5600 CL46 64GB"))
 
     def test_mapping_uses_same_number_photo(self):
         self.assertEqual(AC.part_thumbnail(129630, "ASUS PRIME RTX 5070 Ti OC 16GB 코잇"), "https://www.popcornpc.co.kr/data/pimg/129/129630_600.jpg")

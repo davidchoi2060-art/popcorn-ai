@@ -61,7 +61,8 @@ _DATA_FILE = Path(__file__).resolve().parents[1] / 'db/migrations/data/asus_camp
 
 # 상세 구성 표 썸네일. 사진을 눈으로 대조한 (몰 번호, 옵션 이름)만 싣는다(2026-11-06).
 # 이름을 고치거나 번호를 바꾸면 사진이 빠지고 이름만 나온다 — 다른 모델 사진이 붙는 것보다 낫다.
-# 뺀 것: 130847 · 130987 · 130851(몰 사진 404), 130703(사진에서 제조사·모델 확인 불가), 127181 · 127182(자료 불일치, 고객 화면 미표시).
+# 몰 사진이 없거나 모델을 확인할 수 없는 7종은 제조사 공식 페이지 사진을 저장소에 두고 쓴다(출처 = images/parts/ASUS-OFFICIAL-SOURCES.json).
+# 뺀 것: 127181 · 127182(자료 불일치, 고객 화면 미표시).
 GT502_CUTOUT = 'assets/images/asus/gt502-black-cutout.webp'
 _THUMB_CASE = (126548, 'ASUS TUF Gaming GT502 BLACK')
 _THUMB_VERIFIED = frozenset({
@@ -72,12 +73,24 @@ _THUMB_VERIFIED = frozenset({
     (123726, 'ASUS TUF Gaming B850-PLUS WIFI 인텍'), (122148, 'ASUS ProArt X870E-CREATOR WIFI 대원'),
     (108213, 'ASUS ROG STRIX 850G'), (122070, 'ASUS TUF Gaming 1000W GOLD'), (128514, 'ASUS ROG STRIX 1200W Platinum'),
 })
+_THUMB_OFFICIAL = {
+    (130847, 'ASUS PRIME RTX 5070 Ti 16GB 코잇'): 'prime-rtx5070ti-16g',
+    (None, 'ASUS PRIME RTX 5080 16GB'): 'prime-rtx5080-16g',
+    (None, 'ASUS TUF RTX 5090 32GB'): 'tuf-rtx5090-32g-gaming',
+    (None, 'ASUS PRIME LC 360 ARGB'): 'prime-lc-360-argb',
+    (130987, 'ASUS TUF Gaming B850M-E WIFI 인텍'): 'tuf-gaming-b850m-e-wifi',
+    (130851, 'ASUS ROG STRIX 850W Platinum 인텍'): 'rog-strix-850p-gaming',
+    (130703, '킹스톤 DDR5-5600 CL46 128GB [64G×2]'): 'kingston-kvr56u46bd8-64',
+}
 
 
 def part_thumbnail(mall_no, name):
     """확인된 부품만 사진 경로를 준다. 나머지는 None(이름만 표시)."""
     if (mall_no, name) == _THUMB_CASE:
         return GT502_CUTOUT
+    official = _THUMB_OFFICIAL.get((mall_no, name))
+    if official:
+        return f'assets/images/parts/asus-official-{official}.webp'
     return mall_photo(mall_no) if (mall_no, name) in _THUMB_VERIFIED else None
 
 
