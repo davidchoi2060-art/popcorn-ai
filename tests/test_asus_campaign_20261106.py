@@ -59,9 +59,10 @@ class Seed(unittest.TestCase):
         for name in AC.ICONS:
             self.assertTrue((ROOT / "mockups/mvp4/assets/icons" / (name + ".svg")).is_file(), name)
 
-    def test_states_match_screen_names(self):
-        for key, label in AC.STATES.items():
-            self.assertIn(f"{key}: '{label}'", DATA_JS)
+    def test_states_stay_admin_only_and_plan_label_matches_screen(self):
+        for label in AC.STATES.values():
+            if label != "별도 문의":
+                self.assertNotIn(label, DATA_JS, label)
         self.assertIn(f"PLAN_LABEL: '{AC.PLAN_LABEL}'", DATA_JS)
 
 

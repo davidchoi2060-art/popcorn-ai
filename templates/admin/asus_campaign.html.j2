@@ -122,7 +122,7 @@
     var f={};
     f.name=field(g,'후보 이름',o.name,{max:120,wide:true});
     f.state=field(g,'후보 상태',o.state,{options:Object.keys(states).map(function(k){ return [k,states[k]]; })});
-    f.mall=field(g,'몰 상품번호(대조용 · 고객 화면 미표시)',o.mall_no,{number:true});
+    f.mall=field(g,'몰 상품번호(대조 · 사진 연결용, 번호는 고객 화면 미표시)',o.mall_no,{number:true});
     f.price=field(g,'일반회원가(원) — 비우면 「가격 미표시」',o.price,{number:true});
     f.premium=field(g,'프리미엄 표시가(원)',o.premium,{number:true});
     f.note=field(g,'비고',o.note,{max:200,wide:true});

@@ -38,7 +38,7 @@ class AsusCampaignBrowser(unittest.TestCase):
             self.assertEqual(mig.returncode, 0, mig.stderr[-2000:])
             # 다시 적용해도 그대로(현재 리비전 유지)
             run = subprocess.run([sys.executable, "tests/scenarios/run_asus_campaign_browser.py", "--out", str(out)],
-                                 cwd=ROOT, env=env, capture_output=True, text=True, timeout=420)
+                                 cwd=ROOT, env=env, capture_output=True, text=True, timeout=600)
             results_file = out / "results.json"
             results = json.loads(results_file.read_text(encoding="utf-8"))["results"] if results_file.exists() else []
             lines = [("PASS " if r["ok"] else "FAIL ") + "[" + r["kind"] + "] " + r["name"] for r in results]
@@ -48,7 +48,7 @@ class AsusCampaignBrowser(unittest.TestCase):
                     f.write("\n### ASUS 기획전 브라우저 끝단 검증\n```\n" + "\n".join(lines) + "\n" + run.stdout[-1500:] + "\n```\n")
             failed = [r for r in results if not r["ok"]]
             self.assertTrue(results, run.stdout[-1500:] + run.stderr[-1500:])
-            self.assertEqual(failed, [], run.stderr[-800:])
+            self.assertEqual(failed, [], "\n--- runner stdout ---\n" + run.stdout[-6000:] + "\n--- runner stderr ---\n" + run.stderr[-800:])
             self.assertEqual(run.returncode, 0, run.stdout[-1500:] + run.stderr[-800:])
         finally:
             with admin.connect() as c:

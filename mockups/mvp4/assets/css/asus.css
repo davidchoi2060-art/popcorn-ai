@@ -67,10 +67,6 @@
 .az-plan-note{font-size:12.5px;color:var(--az-muted)}
 .az-card .az-btn{width:100%}
 
-.az-state{display:inline-block;padding:2px 8px;border-radius:6px;font-size:12px;font-weight:800;line-height:1.5;white-space:nowrap;background:#e5eeff;color:#0a3bb0}
-.az-state-supply,.az-state-check{background:var(--az-warn-bg);color:var(--az-warn)}
-.az-state-conflict{background:var(--az-danger-bg);color:var(--az-danger)}
-.az-state-separate{background:#eef0f5;color:#39415a}
 
 .az-notice{display:grid;gap:8px;margin-top:20px;padding:14px 18px;border:1px solid var(--az-line);border-radius:12px;background:var(--az-tint)}
 .az-notice p{display:flex;gap:10px;font-size:14px;line-height:1.55}
@@ -102,7 +98,6 @@
 .az-core li{padding:9px 10px;border:1.5px solid #8fe9ff;border-radius:10px;background:#04238666;text-align:center}
 .az-core span{display:block;font-size:12.5px;font-weight:600;color:#def1ff}
 .az-core strong{display:block;font-size:15px;font-weight:800;line-height:1.3;margin-top:2px}
-.az-hero-flag{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;margin-top:12px;font-size:13.5px}
 .az-detail-buy{display:grid;gap:12px;padding:18px;border:1px solid #ffffff55;border-radius:14px;background:#03207a99}
 .az-detail-buy .az-plan{border:0;padding:0}
 .az-detail-buy .az-plan-value{color:#fff;font-size:34px}
@@ -143,13 +138,6 @@
 .az-table td{padding:12px 14px;border-top:1px solid var(--az-line);vertical-align:top}
 .az-part-head{font-size:16px;font-weight:800;color:var(--az-navy)}
 .az-opts{display:grid;gap:8px;margin-top:8px}
-.az-opts li{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start;padding-top:8px;border-top:1px dashed var(--az-line)}
-.az-opt-main strong{font-size:14.5px;font-weight:700;margin-right:6px}
-.az-opt-main p{font-size:13px;color:var(--az-muted);line-height:1.45;margin-top:2px}
-.az-price{display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:right}
-.az-price dt{font-size:12px;color:var(--az-muted)}
-.az-price dd{font-size:14.5px;font-weight:800;white-space:nowrap}
-.az-price-none{text-align:right;font-size:13.5px;font-weight:700;color:var(--az-muted)}
 
 .az-install{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}
 .az-install article{display:flex;gap:14px;padding:18px;border:1px solid var(--az-line);border-radius:12px;background:#fff}
@@ -183,8 +171,6 @@
 @media(max-width:1100px){
   .az-hero-detail .az-detail-grid{grid-template-columns:minmax(0,220px) minmax(0,1fr)}
   .az-detail-buy{grid-column:1/-1;grid-template-columns:1fr 1fr;align-items:center}
-  .az-opts li{grid-template-columns:minmax(0,1fr)}
-  .az-price,.az-price-none{text-align:left}
 }
 @media(max-width:900px){
   .az-cards{grid-template-columns:minmax(0,1fr)}
@@ -231,7 +217,6 @@
   .az-table,.az-table tbody,.az-table tr,.az-table th,.az-table td{display:block;width:100%}
   .az-table tbody th{width:100%;padding:8px 12px;border-top:1px solid var(--az-line)}
   .az-table td{border-top:0;padding:10px 12px 14px}
-  .az-price{grid-template-columns:1fr 1fr;text-align:left}
   .az-install{grid-template-columns:minmax(0,1fr)}
   .az-others{grid-template-columns:minmax(0,1fr)}
   .az-others img{width:92px}
@@ -243,3 +228,10 @@
 .az-load-error{background:#fff4e5}
 .az-load-partial{margin-top:14px;padding:16px 20px;font-size:14.5px;background:#fff4e5}
 #az-detail-root>.az-load{margin:40px auto;width:min(720px,calc(100% - 32px))}
+/* 상세 구성 표: 제품명 + 실제 부품 사진(2026-11-06). 사진이 없으면 이름만 남는다. */
+.az-opts li{display:flex;align-items:center;gap:14px;min-height:44px;padding:10px 0;border-top:1px solid #e6e9f2}
+.az-opts li:first-child{border-top:0}
+.az-opts strong{min-width:0;overflow-wrap:anywhere}
+.az-opt-thumb{flex:0 0 88px;width:88px;height:88px;margin:0;display:grid;place-items:center;border-radius:8px;background:#fff}
+.az-opt-thumb img{width:100%;height:100%;object-fit:contain}
+@media(max-width:560px){.az-opt-thumb{flex-basis:64px;width:64px;height:64px}}

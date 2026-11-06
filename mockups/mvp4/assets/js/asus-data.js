@@ -1,18 +1,14 @@
 /* ASUS AI PC 기획전 화면 데이터 어댑터 (2026-11-06, DB 원천 전환).
  *
- * 모델 값(이름·문구·이미지·부품 후보·상태·표시가·기획 검토가)은 코드에 없다. GET /api/customer/asus-campaign 으로만 받는다.
+ * 모델 값(이름·문구·이미지·부품·기획 검토가)은 코드에 없다. GET /api/customer/asus-campaign 으로만 받는다.
  * 실패하면 실패라고 말한다. 대신 보여 줄 옛 값이 이 파일에 없다.
  *
  * 이 파일에 남은 것 = 저장으로 바꾸면 안 되는 고정값.
- *   공통 고지(합계 없음·호환·배송·연출 사진), 기획 검토가 표기, 상태 이름, 모델별 색조와 문의 항목 매핑(기존 접수 경로용).
+ *   공통 고지(합계 없음·호환·배송·연출 사진), 기획 검토가 표기, 모델별 색조와 문의 항목 매핑(기존 접수 경로용).
  * plan = 기획 검토가(ASUS 협의 전). 판매가·소비자가 합계가 아니므로 부품 가격과 더하지 않는다. null 은 미정이고 0원이 아니다.
  *
- * state: sale      판매중 확인
- *        candidate 판매중 확인 · 최종 모델 미확정
- *        check     판매중이나 세대·규격·표기 확인 필요
- *        conflict  자료 불일치, 확인 전 확정 불가
- *        supply    판매중 동일 상품 미확인, 공급 확인 필요
- *        separate  별도 문의, 가격 미표시
+ * 내부 검토 상태와 비고는 관리자·API 원본에 그대로 두고, 고객 화면에는 내보내지 않는다(2026-11-06 사용자 지시).
+ * 자료가 어긋난 옵션(state=conflict)과 이름 자체가 내부 안내인 옵션은 표시하지 않는다. 값을 확정처럼 고쳐 쓰지 않는다.
  */
 (function () {
   'use strict';
@@ -21,14 +17,9 @@
   var TIMEOUT_MS = 15000;
   var IMAGE = /^[a-z0-9-]+\.webp$/;
 
-  var STATES = {
-    sale: '판매중 확인',
-    candidate: '구성 후보',
-    check: '확인 필요',
-    conflict: '자료 확인 전 확정 불가',
-    supply: '공급 확인 필요',
-    separate: '별도 문의'
-  };
+  var THUMB = /^(assets\/images\/parts\/mall-\d+\.webp|assets\/images\/asus\/gt502-black-cutout\.webp|https:\/\/www\.popcornpc\.co\.kr\/data\/pimg\/\d+\/\d+_600\.jpg)$/;
+  var INTERNAL = /공급\s*재?확인|확인\s*필요|확인\s*전|확인하지\s*못|확정\s*불가|미확정|미확인|불일치|서로\s*다릅니다|선정하지\s*않|비교\s*후보/;
+  var NEUTRAL = '상담 시 안내';
 
   // 알려진 3개 모델의 화면 고정값. 값이 아니라 색조와 기존 문의 항목 연결이다.
   var META = {
@@ -48,26 +39,38 @@
     throw new Error('part');
   }
 
+  // 고객에게 보이는 문구에서 내부 검토 표현을 뺀다. 문장 단위로 지우고, 「후보」라는 말만 남은 곳은 그 말을 지운다.
+  function clean(v) {
+    if (!isText(v)) return '';
+    return v.split(/(?<=[.!?])\s+/).filter(function (s) { return !INTERNAL.test(s); }).join(' ')
+      .replace(/\s*후보/g, '').replace(/\s+/g, ' ').trim();
+  }
+  function shown(v) { return clean(text(v)) || NEUTRAL; }
+
+  // 고객 구성 표 한 줄. 가격·상태·비고는 싣지 않는다.
+  function customerOption(o) {
+    if (text(o.state) === 'conflict' || INTERNAL.test(text(o.name)) || /미정/.test(o.name)) return null;
+    return { name: clean(o.name), image: typeof o.image === 'string' && THUMB.test(o.image) ? o.image : null };
+  }
+
   function normalize(x) {
     var meta = META[x.id];
     if (!meta) throw new Error('model');
     var parts = list(x.parts).map(function (p) {
-      return { label: text(p.label), head: text(p.head), status: text(p.status), options: list(p.options).map(function (o) {
-        return { name: text(o.name), state: text(o.state), price: money(o.price), premium: money(o.premium), note: optional(o.note) || '' };
-      }) };
+      return { label: text(p.label), head: shown(p.head), options: list(p.options).map(customerOption).filter(Boolean) };
     });
     var box = part(parts, '케이스'), cooler = part(parts, 'CPU 쿨러');
     return {
-      id: x.id, tone: meta.tone, inquiry: meta.inquiry, name: text(x.name), tagline: text(x.tagline),
-      plan: money(x.plan_review_price), heroImage: image(x.hero_image), heroAlt: text(x.hero_alt),
-      gpu: text(x.gpu), gpuStatus: text(x.gpu_status), vram: text(x.vram), cpu: text(x.cpu), ram: text(x.ram), ssd: text(x.ssd),
-      forWho: list(x.for_who).map(function (w) { return text(w.text); }),
+      id: x.id, tone: meta.tone, inquiry: meta.inquiry, name: shown(x.name), tagline: shown(x.tagline),
+      plan: money(x.plan_review_price), heroImage: image(x.hero_image), heroAlt: clean(text(x.hero_alt)) || 'ASUS 케이스 연출 이미지',
+      gpu: shown(x.gpu), vram: shown(x.vram), cpu: shown(x.cpu), ram: shown(x.ram), ssd: shown(x.ssd),
+      forWho: list(x.for_who).map(function (w) { return shown(w.text); }),
       whoIcons: list(x.for_who).map(function (w) { return text(w.icon); }),
       uses: list(x.uses).map(function (u) {
-        return { title: text(u.title), text: text(u.text), example: optional(u.example), steps: list(u.steps).map(text), image: image(u.image), alt: text(u.alt) };
+        return { title: shown(u.title), text: shown(u.text), example: clean(optional(u.example)) || null, steps: list(u.steps).map(shown), image: image(u.image), alt: clean(text(u.alt)) };
       }),
-      prepare: optional(x.prepare), explain: optional(x.explain), limit: optional(x.limit), priceBasis: text(x.price_basis),
-      parts: parts, caseName: box.head, caseStatus: box.status, coolerName: cooler.head, coolerStatus: cooler.status
+      prepare: clean(optional(x.prepare)) || null, explain: clean(optional(x.explain)) || null, limit: clean(optional(x.limit)) || null,
+      parts: parts, caseName: box.head, coolerName: cooler.head
     };
   }
 
@@ -101,8 +104,8 @@
   }
 
   var A = P.asus = {
-    STATES: STATES,
     META: META,
+    normalize: normalize,
     MODELS: [],
     UNAVAILABLE: [],
     load: load,
@@ -120,14 +123,15 @@
     BUILD_NOTE: '제품 이미지는 연출이며 실제 구성과 다를 수 있습니다.',
     LIGHT_NOTE: '내부 부품 없는 케이스 연출입니다. 푸른 빛은 외부 조명으로, RGB 부품 포함을 뜻하지 않습니다.',
     FOOTNOTE: '디자인 시안 · 제품 이미지는 연출 · 최종 가격 ASUS 협의 후 확정 · Windows 별도',
-    PRICE_MEMBER: '일반회원가와 프리미엄 표시가는 적용 조건이 다르며, 회원 조건과 실제 상품 화면 적용가는 재확인이 필요합니다. 판매중 표시는 재고나 즉시 출고를 보장하지 않습니다. 배송비·조립비·부가 옵션은 포함하지 않았습니다.',
-    TOTAL_NOTE: '5080·5090·PRIME 쿨러 공급, 메모리 자료 불일치, 팬·조립·검수·배송비·운영체제가 정리되지 않아 전체 합계를 표시하지 않습니다. 기획 검토가는 부품 합계가 아닙니다.',
-    COMPAT: '표기 치수상 GT502 범위 안의 후보입니다(그래픽카드 최대 400mm, 상단 360mm 라디에이터, 파워 최대 200mm). 전원 커넥터 굽힘·유리 패널 여유·라디에이터와 메모리 간섭은 실제 조립 확인 전이라 호환 완료가 아닙니다.',
+    DETAIL_FOOTNOTE: '디자인 시안 · 제품 이미지는 연출 · Windows 별도',
+    TOTAL_NOTE: '구성과 조립·배송 조건에 따라 금액이 달라 전체 합계를 표시하지 않습니다. 기획 검토가는 부품 합계가 아닙니다.',
+    PARTS_NOTE: '한 항목에 제품이 둘 이상이면 그중 하나로 구성합니다. 최종 구성은 상담에서 안내합니다.',
+    COMPAT: 'GT502 케이스 규격: 그래픽카드 최대 400mm, 상단 라디에이터 360mm, 파워 최대 200mm.',
     INSTALL: [
-      { icon: 'computer-tower', title: '본체 조립·검수', text: '부품 조립과 기본 검수 범위는 판매 조건이 정해지면 안내합니다.' },
-      { icon: 'gear', title: '프로그램 설치·사용 안내', text: '프로그램 설치와 사용 안내는 별도 문의해 주세요. Windows, AI 프로그램 설치, 문서 검색 설정, 업무 도구 연결, 교육 비용도 별도 문의입니다.' }
+      { icon: 'computer-tower', title: '본체 조립·검수', text: '부품 조립과 기본 점검 범위는 상담에서 안내합니다.' },
+      { icon: 'gear', title: '프로그램 설치·사용 안내', text: '프로그램 설치와 사용 안내는 별도 문의해 주세요. Windows, AI 프로그램 설치, 문서 검색 설정, 업무 도구 연결, 교육도 별도 문의입니다.' }
     ],
-    SALE_NOTES: ['정확한 부품과 호환성, 가격은 공급 조건과 테스트 후 정합니다.', '배송·AS 접수처·지원 기간은 확정된 내용만 표시합니다.'],
+    SALE_NOTES: ['정확한 부품과 호환 범위는 상담에서 안내합니다.', '배송·AS 접수처·지원 기간은 확정된 내용만 표시합니다.'],
     LOADING: '기획전 정보를 불러오는 중입니다.',
     LOAD_FAILED: '기획전 정보를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.',
     find: function (id) {

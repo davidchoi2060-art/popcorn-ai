@@ -1,5 +1,6 @@
 /* ASUS AI PC 기획전: 서브메인(asus.html)과 상세 3종(asus-pc.html?model=). 제목·사양·가격·버튼은 전부 실제 HTML이다.
- * 모델 값은 서버 응답(A.load)만 쓴다. 불러오는 중·실패·빈 결과를 그대로 말하고, 금액을 더하거나 후보를 대신 고르지 않는다. */
+ * 모델 값은 서버 응답(A.load)만 쓴다. 불러오는 중·실패·빈 결과를 그대로 말하고, 금액을 더하거나 구성을 대신 고르지 않는다.
+ * 상세 3종에는 금액과 내부 검토 상태를 표시하지 않는다(2026-11-06 사용자 지시). 목록·문의의 기획 검토가 표기는 그대로다. */
 (function () {
   'use strict';
   var P = window.PAI, h = P.h, A = P.asus;
@@ -13,15 +14,6 @@
       '</div></div>';
   }
 
-  function statusBadge(state) {
-    if (!Object.prototype.hasOwnProperty.call(A.STATES, state)) return '';
-    return '<span class="az-state az-state-' + h(state) + '">' + h(A.STATES[state]) + '</span>';
-  }
-
-  function stateName(state) {
-    return Object.prototype.hasOwnProperty.call(A.STATES, state) ? A.STATES[state] : '';
-  }
-
   function headline() {
     return '<span>ASUS의 강력한 성능,</span> <em>나의 AI 작업실.</em>';
   }
@@ -33,9 +25,8 @@
   function specRows(m) {
     return '<dl class="az-specs">' +
       row('CPU', m.cpu) + row('메모리', m.ram) + row('SSD', m.ssd) +
-      row('케이스', m.caseName, stateName(m.caseStatus)) +
-      row('CPU 쿨러', m.coolerName, stateName(m.coolerStatus)) + '</dl>';
-    function row(k, v, sub) { return '<div><dt>' + h(k) + '</dt><dd>' + h(v) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</dd></div>'; }
+      row('케이스', m.caseName) + row('CPU 쿨러', m.coolerName) + '</dl>';
+    function row(k, v) { return '<div><dt>' + h(k) + '</dt><dd>' + h(v) + '</dd></div>'; }
   }
 
   function card(m) {
@@ -44,7 +35,7 @@
       '<figure class="az-card-photo"><img src="' + h(A.image(m.heroImage)) + '" alt="' + h(m.heroAlt) + '" width="800" height="800" loading="lazy" decoding="async"></figure>' +
       '<div class="az-card-body">' +
       '<p class="az-card-tagline">' + h(m.tagline) + '</p>' +
-      '<p class="az-gpu"><span>그래픽카드</span><strong>' + h(m.gpu) + '</strong>' + statusBadge(m.gpuStatus) + '</p>' +
+      '<p class="az-gpu"><span>그래픽카드</span><strong>' + h(m.gpu) + '</strong></p>' +
       '<p class="az-vram"><span>그래픽 메모리</span><strong>' + h(m.vram) + '</strong></p>' +
       specRows(m) + planBlock(m) +
       '<a class="az-btn az-btn-solid" href="' + h(A.detailHref(m.id)) + '" aria-label="' + h(m.name) + ' 자세히 보기">자세히 보기' + arrow() + '</a>' +
@@ -78,7 +69,7 @@
       '<p class="az-lead">' + h(A.INTRO) + '</p><p class="az-lead-sub">하는 일에 맞춰 ASUS PC 3종을 비교해 보세요.</p>' +
       '<ul class="az-fields" aria-label="활용 분야">' + A.FIELDS.map(function (f) { return '<li>' + h(f) + '</li>'; }).join('') + '</ul>' +
       '<a class="az-btn az-btn-cyan" href="#az-products">3종 핵심 사양 비교하기' + arrow() + '</a>' +
-      '<p class="az-hero-caption"><b>' + h(A.CASE_NAME) + ' 후보</b>' + h(A.BUILD_NOTE) + ' ' + h(A.LIGHT_NOTE) + '</p></div>' +
+      '<p class="az-hero-caption"><b>' + h(A.CASE_NAME) + '</b>' + h(A.BUILD_NOTE) + ' ' + h(A.LIGHT_NOTE) + '</p></div>' +
       '</div></section>' +
 
       '<section class="az-products" id="az-products" aria-labelledby="az-products-title"><div class="az-wrap">' +
@@ -111,20 +102,25 @@
       '<div class="az-closing-actions">' + cta + '</div></div></div></section>';
   }
 
-  function footnote() { return '<p class="az-footnote">' + h(A.FOOTNOTE) + '</p>'; }
-
-  function optionPrice(o) {
-    if (o.price === null) return '<div class="az-price-none">가격 미표시</div>';
-    return '<dl class="az-price"><div><dt>일반회원가</dt><dd>' + h(A.won(o.price)) + '</dd></div>' +
-      (o.premium === null ? '' : '<div><dt>프리미엄 표시가</dt><dd>' + h(A.won(o.premium)) + '</dd></div>') + '</dl>';
-  }
+  function footnote(text) { return '<p class="az-footnote">' + h(text || A.FOOTNOTE) + '</p>'; }
 
   function partRow(part) {
     var options = part.options.map(function (o) {
-      return '<li><div class="az-opt-main"><strong>' + h(o.name) + '</strong>' + statusBadge(o.state) + (o.note ? '<p>' + h(o.note) + '</p>' : '') + '</div>' + optionPrice(o) + '</li>';
+      return '<li>' + (o.image ? '<figure class="az-opt-thumb"><img data-az-thumb src="' + h(o.image) + '" alt="' + h(o.name) + '" width="88" height="88" loading="lazy" decoding="async"></figure>' : '') +
+        '<strong>' + h(o.name) + '</strong></li>';
     }).join('');
-    return '<tr><th scope="row">' + h(part.label) + '</th><td><p class="az-part-head">' + h(part.head) + '</p>' +
+    var sameName = part.options.some(function (o) { return o.name === part.head; });
+    return '<tr><th scope="row">' + h(part.label) + '</th><td>' + (sameName ? '' : '<p class="az-part-head">' + h(part.head) + '</p>') +
       (options ? '<ul class="az-opts">' + options + '</ul>' : '') + '</td></tr>';
+  }
+
+  // 사진을 받지 못하면 깨진 그림 대신 제품명만 남긴다. 다른 그림으로 대신하지 않는다.
+  function guardThumbs(root) {
+    root.querySelectorAll('img[data-az-thumb]').forEach(function (img) {
+      function drop() { if (img.parentNode) img.parentNode.remove(); }
+      img.addEventListener('error', drop);
+      if (img.complete && img.naturalWidth === 0 && img.getAttribute('src')) drop();
+    });
   }
 
   function missing(title, text) {
@@ -135,12 +131,11 @@
     var others = A.MODELS.filter(function (x) { return x.id !== m.id; });
     var core = [['CPU', m.cpu], ['그래픽카드', m.gpu], ['그래픽 메모리', m.vram], ['메모리', m.ram], ['SSD', m.ssd]];
     return '<section class="az-hero az-hero-detail" aria-labelledby="az-title"><div class="az-wrap az-detail-grid">' +
-      '<figure class="az-detail-art"><img src="' + h(A.image(m.heroImage)) + '" alt="' + h(m.heroAlt) + '" width="800" height="800" fetchpriority="high"><figcaption><b>' + h(m.caseName) + ' 후보</b>' + h(A.BUILD_NOTE) + ' ' + h(A.LIGHT_NOTE) + '</figcaption></figure>' +
+      '<figure class="az-detail-art"><img src="' + h(A.image(m.heroImage)) + '" alt="' + h(m.heroAlt) + '" width="800" height="800" fetchpriority="high"><figcaption><b>' + h(m.caseName) + '</b>' + h(A.BUILD_NOTE) + ' ' + h(A.LIGHT_NOTE) + '</figcaption></figure>' +
       '<div class="az-detail-copy"><p class="az-with">' + h(A.HEADLINE) + '</p><h1 id="az-title">' + h(m.name) + '</h1><p class="az-lead">' + h(m.tagline) + '</p>' +
       '<ul class="az-core">' + core.map(function (c) { return '<li><span>' + h(c[0]) + '</span><strong>' + h(c[1]) + '</strong></li>'; }).join('') + '</ul>' +
-      (m.gpuStatus === 'supply' ? '<p class="az-hero-flag">' + statusBadge('supply') + '<span>' + h(m.gpu) + '은 판매중 동일 상품을 아직 확인하지 못했습니다.</span></p>' : '') +
       '</div>' +
-      '<aside class="az-detail-buy" aria-label="가격과 문의">' + planBlock(m) + '<a class="az-btn az-btn-cyan" href="' + h(A.inquiryHref(m.id)) + '">PC 구성 문의하기' + arrow() + '</a></aside>' +
+      '<aside class="az-detail-buy" aria-label="구성 문의"><a class="az-btn az-btn-cyan" href="' + h(A.inquiryHref(m.id)) + '">PC 구성 문의하기' + arrow() + '</a></aside>' +
       '</div>' +
       '<nav class="az-subnav" aria-label="이 페이지 안내"><div class="az-wrap"><a href="#az-who">추천 대상</a><a href="#az-uses">활용 업무</a><a href="#az-parts">전체 구성</a><a href="#az-install">설치·사용 안내</a></div></nav></section>' +
 
@@ -161,10 +156,10 @@
       '</div></section>' +
 
       '<section class="az-section" id="az-parts" aria-labelledby="az-parts-title"><div class="az-wrap"><h2 id="az-parts-title">전체 부품 보기</h2>' +
-      '<p class="az-sub">모델을 확정한 표가 아닙니다. 후보와 확인이 필요한 항목을 함께 표시합니다.</p>' +
-      '<div class="az-table-wrap"><table class="az-table"><caption class="visually-hidden">' + h(m.name) + ' 부품 후보와 판매중 가격</caption><thead><tr><th scope="col">항목</th><th scope="col">구성 후보와 판매중 가격</th></tr></thead><tbody>' +
+      '<p class="az-sub">' + h(A.PARTS_NOTE) + '</p>' +
+      '<div class="az-table-wrap"><table class="az-table"><caption class="visually-hidden">' + h(m.name) + ' 부품 구성</caption><thead><tr><th scope="col">항목</th><th scope="col">제품</th></tr></thead><tbody>' +
       m.parts.map(partRow).join('') + '</tbody></table></div>' +
-      '<div class="az-notice"><p>' + P.icon('tag') + '<span>' + h(m.priceBasis) + ' ' + h(A.PRICE_MEMBER) + '</span></p><p>' + P.icon('info') + '<span><b>전체 합계 미완성.</b> ' + h(A.TOTAL_NOTE) + '</span></p><p>' + P.icon('computer-tower') + '<span>' + h(A.COMPAT) + '</span></p></div>' +
+      '<div class="az-notice"><p>' + P.icon('computer-tower') + '<span>' + h(A.COMPAT) + '</span></p></div>' +
       '</div></section>' +
 
       '<section class="az-section az-section-tint" id="az-install" aria-labelledby="az-install-title"><div class="az-wrap"><h2 id="az-install-title">설치·사용 안내</h2><div class="az-install">' +
@@ -173,8 +168,8 @@
 
       closing(m) +
       (others.length ? '<section class="az-section" aria-labelledby="az-others-title"><div class="az-wrap"><h2 id="az-others-title">다른 구성 보기</h2><div class="az-others">' +
-      others.map(function (o) { return '<a href="' + h(A.detailHref(o.id)) + '"><img src="' + h(A.image(o.heroImage)) + '" alt="" width="124" height="124" loading="lazy" decoding="async"><span><strong>' + h(o.name) + '</strong><small>추천 대상: ' + h(o.forWho.join(' / ')) + '</small><small>' + h(o.gpu) + '</small><small>' + h(A.PLAN_LABEL) + ' ' + h(A.planText(o)) + '</small><b>자세히 보기' + arrow() + '</b></span></a>'; }).join('') +
-      '</div></div></section>' : '') + footnote();
+      others.map(function (o) { return '<a href="' + h(A.detailHref(o.id)) + '"><img src="' + h(A.image(o.heroImage)) + '" alt="" width="124" height="124" loading="lazy" decoding="async"><span><strong>' + h(o.name) + '</strong><small>추천 대상: ' + h(o.forWho.join(' / ')) + '</small><small>' + h(o.gpu) + '</small><b>자세히 보기' + arrow() + '</b></span></a>'; }).join('') +
+      '</div></div></section>' : '') + footnote(A.DETAIL_FOOTNOTE);
   }
 
   function detailPage() {
@@ -190,6 +185,7 @@
         var m = A.find(id);
         if (!m) { root.innerHTML = missing('이 구성 정보를 표시할 수 없습니다.', '다른 구성을 보시거나 잠시 후 다시 확인해 주세요.'); return; }
         root.innerHTML = detailHtml(m);
+        guardThumbs(root);
         document.title = m.name + ' | ASUS 기획전 | 팝콘AI';
         if (location.hash) { var anchor = document.getElementById(location.hash.slice(1)); if (anchor) anchor.scrollIntoView(); }
       });

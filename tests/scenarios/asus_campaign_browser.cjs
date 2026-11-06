@@ -84,9 +84,11 @@ class Page {
     throw new Error('timeout: ' + expr + ' last=' + last);
   }
   async go(url) {
-    await this.send('Page.navigate', { url: BASE + url });
-    await sleep(150);
-    await this.until("document.readyState==='complete'");
+    // 옛 문서에 표시를 남기고, 표시가 사라진 새 문서의 로드 완료를 기다린다(같은 주소를 다시 열 때도 구분된다).
+    await this.js('window.__asusOldDocument=true');
+    const nav = await this.send('Page.navigate', { url: BASE + url });
+    if (nav.errorText) throw new Error('navigate ' + url + ' :: ' + nav.errorText);
+    await this.until("!window.__asusOldDocument&&document.readyState==='complete'");
   }
   async size(w) {
     const h = w > 700 ? 900 : 844;
@@ -122,7 +124,197 @@ class Page {
   }
 }
 
+const CHROME_WAIT_MS = 60000;
+const CHROME_ATTEMPTS = 2;
+
+// Chrome 을 띄우고 디버그 포트가 열릴 때까지 기다린다. 실패하면 종료 코드 · 신호 · stderr 를 담아 던진다.
+async function startChromeOnce(attempt) {
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'asus-e2e-'));
+  const logPath = path.join(OUT, 'chrome-' + attempt + '.log');
+  const log = fs.openSync(logPath, 'w');
+  const began = Date.now();
+  const state = { exited: false, code: null, signal: null, error: null };
+  const finish = (ok) => { fs.closeSync(log); return ok; };
+  const describe = (why) => why + ' after ' + (Date.now() - began) + 'ms; bin=' + CHROME + '; exit=' + state.code + '; signal=' + state.signal +
+    '; spawnError=' + state.error + '; stderr=' + fs.readFileSync(logPath, 'utf8').slice(-1500);
+  let chrome;
+  const stop = () => { if (chrome && !state.exited) chrome.kill('SIGKILL'); };
+  try {
+    chrome = spawn(CHROME, ['--headless=new', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: ['ignore', 'ignore', log] });
+  } catch (e) {
+    state.error = e.message;
+    finish();
+    throw new Error(describe('chrome spawn failed'));
+  }
+  chrome.on('error', (e) => { state.error = e.message; state.exited = true; });
+  chrome.on('exit', (code, signal) => { state.exited = true; state.code = code; state.signal = signal; });
+  const portFile = path.join(profile, 'DevToolsActivePort');
+  while (Date.now() - began < CHROME_WAIT_MS) {
+    const lines = fs.existsSync(portFile) ? fs.readFileSync(portFile, 'utf8').trim().split('\n') : [];
+    if (lines.length >= 2) { finish(); return { chrome, profile, port: lines[0], wsPath: lines[1], waitedMs: Date.now() - began, stop }; }
+    if (state.exited) { finish(); throw new Error(describe('chrome exited before debug port')); }
+    await sleep(100);
+  }
+  stop();
+  finish();
+  throw new Error(describe('chrome debug port timeout'));
+}
+
+async function startChrome() {
+  const errors = [];
+  for (let attempt = 1; attempt <= CHROME_ATTEMPTS; attempt += 1) {
+    try {
+      const started = await startChromeOnce(attempt);
+      return { ...started, attempt, errors };
+    } catch (e) {
+      errors.push(e.message);
+      console.log('chrome attempt ' + attempt + ' failed: ' + e.message);
+    }
+  }
+  throw new Error('chrome did not start: ' + errors.join(' | '));
+}
+
 const ADMIN = '/admin2/asus-campaign';
+const INTERNAL_WORDS = /공급\s*재?확인|확인\s*필요|확인\s*전|확정\s*불가|미확정|미확인|불일치|후보/;
+const MONEY_WORDS = /\d\s*원|기획 검토가|일반회원가|프리미엄 표시가|현금가|최저가|표시가|가격|합계/;
+const SHOW_ALL = "document.querySelectorAll('img[data-az-thumb]').forEach(i=>i.loading='eager')";
+
+// 상세 3종: 금액 · 내부 상태 없음, 사진은 API 가 준 같은 줄의 제품 사진, 사진이 안 오면 제품명만 남는다.
+async function checkDetails(page, tag) {
+  const api = await page.js("fetch('/api/customer/asus-campaign').then(r=>r.json())");
+  for (const m of api.models) {
+    await page.go('/mvp4/asus-pc.html?model=' + m.id);
+    await page.until("!!document.querySelector('.az-table')");
+    await page.js(SHOW_ALL);
+    await page.until("Array.from(document.querySelectorAll('img[data-az-thumb]')).every(i=>i.complete)");
+    const text = await page.body();
+    record(tag + ' ' + m.id + ' 상세: 금액 없음', !MONEY_WORDS.test(text), 'real', (text.match(MONEY_WORDS) || [])[0]);
+    record(tag + ' ' + m.id + ' 상세: 내부 상태 문구 없음', !INTERNAL_WORDS.test(text), 'real', (text.match(INTERNAL_WORDS) || [])[0]);
+    record(tag + ' ' + m.id + ' 상세: 가로 넘침 없음', await page.noOverflow(), 'real');
+    const expected = {};
+    m.parts.forEach((p) => p.options.forEach((o) => { if (o.image) expected[o.name] = o.image; }));
+    const shown = await page.js("Array.from(document.querySelectorAll('.az-opts li')).map(li=>({name:li.querySelector('strong').textContent,img:li.querySelector('img')?li.querySelector('img').getAttribute('src'):null,alt:li.querySelector('img')?li.querySelector('img').alt:null,w:li.querySelector('img')?li.querySelector('img').naturalWidth:null}))");
+    const wrong = shown.filter((s) => s.img && (s.img !== expected[s.name] || s.alt !== s.name || !s.w));
+    record(tag + ' ' + m.id + ' 상세: 사진이 같은 줄 제품과 일치 · 깨진 그림 없음', wrong.length === 0, 'real', wrong);
+    const box = shown.find((s) => s.name === 'ASUS TUF Gaming GT502 BLACK');
+    record(tag + ' ' + m.id + ' 상세: 케이스는 GT502 컷아웃', !!box && box.img === 'assets/images/asus/gt502-black-cutout.webp' && box.w > 0, 'real', box);
+    const noPhoto = shown.filter((s) => !expected[s.name]);
+    record(tag + ' ' + m.id + ' 상세: 확인 안 된 부품은 제품명만', noPhoto.every((s) => s.img === null), 'real', noPhoto);
+    await page.shot(tag + '-detail-' + m.id);
+  }
+  // 사진 실패 — 몰 사진을 끊는다.
+  // 앞에서 받은 사진이 캐시에서 나오면 실패가 재현되지 않는다.
+  await page.send('Network.setCacheDisabled', { cacheDisabled: true });
+  page.rules = [{ match: '/data/pimg/', abort: true }, { match: '/images/parts/mall-', abort: true }];
+  await page.go('/mvp4/asus-pc.html?model=local-ai');
+  await page.until("!!document.querySelector('.az-table')");
+  await page.js(SHOW_ALL);
+  await page.until("!document.querySelector('img[data-az-thumb][src*=\"pimg\"]')&&!document.querySelector('img[data-az-thumb][src*=\"mall-\"]')");
+  const after = await page.js("({names:document.querySelectorAll('.az-opts strong').length,broken:Array.from(document.images).filter(i=>i.complete&&!i.naturalWidth).length,cases:document.querySelectorAll('img[data-az-thumb][src*=\"gt502\"]').length})");
+  record(tag + ' 사진 실패: 제품명 유지 · 깨진 그림 없음', after.names > 0 && after.broken === 0 && after.cases === 1, 'intercept', after);
+  page.rules = [];
+  await page.send('Network.setCacheDisabled', { cacheDisabled: false });
+}
+
+// 홈 배너: 실제 시간을 잰다. 1번 ASUS 6초, 나머지 3초, 멈춤 조건은 그대로.
+const WATCH = "(function(){var r=document.querySelector('[data-home-carousel]');window.__hc=[[r.dataset.activeSlide,performance.now()]];new MutationObserver(function(){var l=window.__hc[window.__hc.length-1];if(l[0]!==r.dataset.activeSlide)window.__hc.push([r.dataset.activeSlide,performance.now()]);}).observe(r,{attributes:true,attributeFilter:['data-active-slide']});return true})()";
+const ROOT = "document.querySelector('[data-home-carousel]')";
+// 자동 넘김을 막는 조건 전부. 실패 메시지와 단계 로그에 그대로 싣는다.
+const CAROUSEL_STATE = "(function(){var r=document.querySelector('[data-home-carousel]');if(!r)return {url:location.href,ready:document.readyState,root:false};var b=r.getBoundingClientRect(),a=document.activeElement;return {url:location.href,ready:document.readyState,hidden:document.hidden,visibility:document.visibilityState,hasFocus:document.hasFocus(),active:a?a.tagName+'.'+a.className:null,activeInRoot:r.contains(a),hover:r.matches(':hover'),rect:[Math.round(b.top),Math.round(b.bottom),Math.round(b.width)],scrollY:Math.round(scrollY),innerHeight:innerHeight,autoplay:r.dataset.autoplay,activeSlide:r.dataset.activeSlide,transitioning:r.dataset.transitioning,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,log:(window.__hc||[]).slice(-4).map(function(e){return [e[0],Math.round(e[1])]}),now:Math.round(performance.now())}})()";
+async function runCarousel(page) {
+  await page.size(1440);
+  const state = () => page.js(CAROUSEL_STATE).catch((e) => ({ stateError: e.message }));
+  const step = async (name) => console.log('carousel step ' + name + ' state=' + JSON.stringify(await state()));
+  const pointerOutside = () => page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 1, y: 1 });
+  // 어느 단계에서 왜 멈췄는지 실패 메시지만으로 알 수 있게 한다.
+  const advanced = async (name, ms) => {
+    await step(name + ' wait ' + ms + 'ms');
+    try {
+      await page.until('window.__hc.length>1', ms);
+    } catch (e) {
+      const last = results.length ? results[results.length - 1].name : null;
+      throw new Error('step=' + name + ' waitMs=' + ms + ' lastRecord=' + last + ' state=' + JSON.stringify(await state()) + ' cause=' + e.message);
+    }
+  };
+  // 시작 기준을 같게 맞춘다: 앞 탭 · 맨 위 · 포커스 없음 · 포인터는 배너 밖.
+  const openHome = async () => {
+    await page.go('/mvp4/index.html');
+    await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+    await page.send('Page.bringToFront');
+    await pointerOutside();
+    await page.js("window.scrollTo(0,0);document.activeElement&&document.activeElement.blur&&document.activeElement.blur()");
+    await page.js(WATCH);
+  };
+  const quiet = async (ms) => { const n = await page.js('window.__hc.length'); await sleep(ms); return (await page.js('window.__hc.length')) === n; };
+  await openHome();
+  await step('initial');
+  record('배너 첫 화면이 ASUS', await page.js("!document.querySelector('.hc-asus').hidden&&" + ROOT + ".dataset.activeSlide==='1'&&document.querySelector('.hc-slide').classList.contains('hc-asus')"), 'real');
+  record('배너 수는 7개, 1번 선택 표시', await page.js("document.querySelectorAll('.hc-slide').length===7&&document.querySelector('[data-hc-go=\"0\"]').getAttribute('aria-pressed')==='true'"), 'real');
+  await page.shot('banner-1440-first');
+  await page.until("window.__hc.length>=9", 32000);
+  const log = await page.js('window.__hc');
+  const gaps = log.slice(1).map((e, i) => [log[i][0], Math.round(e[1] - log[i][1])]);
+  // 첫 간격은 측정 시작이 늦어 짧을 수 있어 한 바퀴 돈 뒤의 1번을 본다.
+  const asusGap = gaps.slice(1).find((g) => g[0] === '1');
+  record('순환: 2→…→7→1 순서', gaps.map((g) => g[0]).join('').startsWith('1234567'), 'real', gaps);
+  record('ASUS 약 6초', !!asusGap && asusGap[1] > 5500 && asusGap[1] < 6800, 'real', asusGap);
+  const others = gaps.filter((g) => g[0] !== '1');
+  record('나머지 약 3초', others.length >= 6 && others.every((g) => g[1] > 2500 && g[1] < 3800), 'real', others);
+
+  await openHome();
+  const stage = await page.js("(function(){var b=document.querySelector('.hc-stage').getBoundingClientRect();return {x:Math.round(b.left+b.width/2),y:Math.round(b.top+b.height/2)}})()");
+  await page.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: stage.x, y: stage.y });
+  await page.until(ROOT + ".matches(':hover')", 3000);
+  await page.until("window.__hc.length===1");
+  await step('hover on');
+  record('hover 중 정지', await quiet(6800), 'real', await state());
+  await pointerOutside();
+  await page.until('!' + ROOT + ".matches(':hover')", 3000);
+  await advanced('hover resume', 7500);
+  record('hover 해제 후 재개', true, 'real');
+
+  await openHome();
+  await page.js("document.querySelector('[data-hc-toggle]').focus({preventScroll:true})");
+  await page.until(ROOT + '.contains(document.activeElement)', 3000);
+  await step('focus on');
+  record('focus 중 정지', await quiet(6800), 'real', await state());
+  await page.js('document.activeElement.blur()');
+  await advanced('focus resume', 7500);
+  record('focus 해제 후 재개', true, 'real');
+
+  await openHome();
+  await page.js("Object.defineProperty(document,'hidden',{value:true,configurable:true});document.dispatchEvent(new Event('visibilitychange'))");
+  await step('hidden on');
+  record('숨은 탭에서 정지', await quiet(6800), 'real', await state());
+  await page.js("delete document.hidden;document.dispatchEvent(new Event('visibilitychange'))");
+  await advanced('hidden resume', 7500);
+  record('탭 복귀 후 재개', true, 'real');
+
+  // 수동 선택은 멈추고, 재생하면 그 배너의 시간을 다시 쓴다.
+  await openHome();
+  await page.js("document.querySelector('[data-hc-go=\"3\"]').click();document.activeElement&&document.activeElement.blur()");
+  record('수동 선택 후 자동 넘김 멈춤', await page.js(ROOT + ".dataset.autoplay==='paused'") && await quiet(3600), 'real');
+  await page.js("window.__hc.length=0;window.__hc.push([" + ROOT + ".dataset.activeSlide,performance.now()]);document.querySelector('[data-hc-toggle]').click();document.activeElement&&document.activeElement.blur()");
+  await advanced('manual play normal', 5000);
+  const manual = await page.js('Math.round(window.__hc[1][1]-window.__hc[0][1])');
+  record('수동 선택 후 재생: 일반 배너 약 3초', manual > 2500 && manual < 3800, 'real', manual);
+  await page.js("document.querySelector('[data-hc-go=\"0\"]').click();document.activeElement&&document.activeElement.blur()");
+  await page.js("window.__hc.length=0;window.__hc.push([" + ROOT + ".dataset.activeSlide,performance.now()]);document.querySelector('[data-hc-toggle]').click();document.activeElement&&document.activeElement.blur()");
+  await advanced('manual play asus', 8000);
+  const manualAsus = await page.js('Math.round(window.__hc[1][1]-window.__hc[0][1])');
+  record('수동 선택 후 재생: ASUS 약 6초', manualAsus > 5500 && manualAsus < 6800, 'real', manualAsus);
+
+  await page.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await openHome();
+  record('동작 줄이기: 자동 넘김 멈춤', await page.js(ROOT + ".dataset.autoplay==='paused'") && await quiet(6800), 'real');
+  await page.send('Emulation.setEmulatedMedia', { features: [] });
+
+  await page.size(390);
+  await page.go('/mvp4/index.html');
+  await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+  record('390 배너 첫 화면 ASUS · 가로 넘침 없음', await page.js("!document.querySelector('.hc-asus').hidden") && await page.noOverflow(), 'real');
+  await page.shot('banner-390-first');
+}
 
 async function runWidth(page, w) {
   const tag = String(w);
@@ -134,7 +326,7 @@ async function runWidth(page, w) {
   await page.go('/mvp4/asus.html');
   await page.until("document.querySelectorAll('.az-card').length===3");
   let text = await page.body();
-  record(tag + ' 서브메인 3종 + 기획 검토가 표기', text.includes('문서·업무용 PC') && text.includes('3,990,000원') && text.includes('기획 검토가 · ASUS 협의 전') && text.includes('공급 확인 필요'), 'real');
+  record(tag + ' 서브메인 3종 + 기획 검토가 표기', text.includes('문서·업무용 PC') && text.includes('3,990,000원') && text.includes('기획 검토가 · ASUS 협의 전') && !INTERNAL_WORDS.test(text), 'real');
   record(tag + ' 서브메인 0원 없음 · 가로 넘침 없음', !/(^|[^\d,])0원/.test(text) && await page.noOverflow(), 'real');
   await page.shot(tag + '-01-customer-home-before');
 
@@ -177,11 +369,12 @@ async function runWidth(page, w) {
 
   // ── 고객: 저장 후 ──
   await page.go('/mvp4/asus-pc.html?model=video');
-  await page.until("!!document.querySelector('.az-plan-value')");
+  await page.until("!!document.querySelector('.az-table')");
   text = await page.body();
   const planText = plan.toLocaleString('ko-KR') + '원';
-  record(tag + ' 상세에 저장값 반영', text.includes(tagline) && text.includes(planText) && text.includes('공급 재확인 ' + tag), 'real');
-  record(tag + ' 상세 미확정 고지 유지', ['공급 확인 필요', '기획 검토가 · ASUS 협의 전', '전체 합계 미완성', '호환 완료가 아닙니다', '가격 미표시', '자료 확인 전 확정 불가', '별도 문의'].every((x) => text.includes(x)), 'real');
+  record(tag + ' 상세에 저장 문구 반영, 저장한 비고와 금액은 미표시', text.includes(tagline) && !text.includes(planText) && !text.includes('공급 재확인'), 'real');
+  record(tag + ' 상세 이미지 연출 고지 유지', text.includes('제품 이미지는 연출이며 실제 구성과 다를 수 있습니다.') && text.includes('정품 Windows'), 'real');
+  await checkDetails(page, tag);
   record(tag + ' 상세 가로 넘침 없음 · 이미지 로드', await page.noOverflow() && await page.until("document.querySelector('.az-detail-art img').complete&&document.querySelector('.az-detail-art img').naturalWidth>0"), 'real');
   await page.shot(tag + '-05-customer-detail-after');
   await page.go('/mvp4/asus.html');
@@ -346,26 +539,27 @@ async function runWidth(page, w) {
 
 (async () => {
   fs.mkdirSync(OUT, { recursive: true });
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'asus-e2e-'));
-  const chrome = spawn(CHROME, ['--headless=new', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=0', '--user-data-dir=' + profile, 'about:blank'], { stdio: 'ignore' });
+  let started = null;
   let code = 1;
   try {
-    const portFile = path.join(profile, 'DevToolsActivePort');
-    for (let i = 0; i < 100 && !fs.existsSync(portFile); i += 1) await sleep(100);
-    await sleep(200);
-    const [port, wsPath] = fs.readFileSync(portFile, 'utf8').trim().split('\n');
-    const cdp = await Cdp.open('ws://127.0.0.1:' + port + wsPath);
+    started = await startChrome();
+    // 재시도로 지나간 실패도 결과에 남긴다(통과 항목으로 숨기지 않고 상세에 원문을 싣는다).
+    record('Chrome 기동', true, 'real', { attempt: started.attempt, waitedMs: started.waitedMs, earlierFailures: started.errors });
+    console.log('chrome started: attempt=' + started.attempt + ' waitedMs=' + started.waitedMs + ' earlierFailures=' + JSON.stringify(started.errors));
+    const cdp = await Cdp.open('ws://127.0.0.1:' + started.port + started.wsPath);
     const { targetId } = await cdp.send('Target.createTarget', { url: 'about:blank' });
     const { sessionId } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
     const page = new Page(cdp, sessionId);
     await page.send('Page.enable');
     await page.send('Runtime.enable');
     await page.send('Network.enable');
-    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }] });
+    await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/mall-*' }] });
 
     for (const w of [1440, 390]) {
       try { await runWidth(page, w); } catch (e) { record(w + ' 진행 중단', false, 'real', e.message); await page.shot(w + '-99-aborted').catch(() => {}); }
     }
+    try { await runCarousel(page); } catch (e) { record('배너 측정 중단', false, 'real', e.message); await page.shot('banner-aborted').catch(() => {}); }
     record('문의 전송 시도 0건', page.inquiryAttempts === 0, 'real', page.inquiryAttempts);
     record('화면 스크립트 예외 0건', page.exceptions.length === 0, 'real', page.exceptions.slice(0, 5));
     code = results.every((r) => r.ok) ? 0 : 1;
@@ -374,9 +568,11 @@ async function runWidth(page, w) {
   } finally {
     fs.writeFileSync(path.join(OUT, 'results.json'), JSON.stringify({ base: 'CI disposable DB, real uvicorn', results }, null, 1));
     console.log(results.filter((r) => r.ok).length + ' passed, ' + results.filter((r) => !r.ok).length + ' failed');
-    chrome.kill();
-    await sleep(300);
-    fs.rmSync(profile, { recursive: true, force: true, maxRetries: 3 });
+    if (started) {
+      started.stop();
+      await sleep(300);
+      fs.rmSync(started.profile, { recursive: true, force: true, maxRetries: 3 });
+    }
   }
   process.exit(code);
 })();
