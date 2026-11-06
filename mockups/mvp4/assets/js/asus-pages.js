@@ -146,7 +146,7 @@
 
       '<section class="az-section az-section-tint" id="az-uses" aria-labelledby="az-uses-title"><div class="az-wrap"><h2 id="az-uses-title">이렇게 쓸 수 있어요</h2><ol class="az-uses">' +
       m.uses.map(function (u, i) {
-        return '<li class="az-use"><figure><img src="' + h(A.image(u.image)) + '" alt="' + h(u.alt) + '" width="700" height="280" loading="lazy" decoding="async"><figcaption>사용 예시</figcaption></figure><div class="az-use-body"><h3><b>' + String(i + 1).padStart(2, '0') + '</b>' + h(u.title) + '</h3><p>' + h(u.text) + '</p>' +
+        return '<li class="az-use"><figure><img src="' + h(A.useImage(u.image)) + '" alt="' + h(u.alt) + '" width="700" height="280" loading="lazy" decoding="async"><figcaption>사용 예시</figcaption></figure><div class="az-use-body"><h3><b>' + String(i + 1).padStart(2, '0') + '</b>' + h(u.title) + '</h3><p>' + h(u.text) + '</p>' +
           (u.example ? '<p class="az-use-example">' + h(u.example) + '</p>' : '') +
           '<ol class="az-steps" aria-label="진행 순서">' + u.steps.map(function (s) { return '<li>' + h(s) + '</li>'; }).join('') + '</ol></div></li>';
       }).join('') + '</ol>' +
