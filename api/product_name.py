@@ -168,6 +168,25 @@ _CARD_AD_PHRASE = re.compile(r"초저가\s*가성비짱|견적왕\s*추천\s*PC"
 _CARD_INTERNAL_NO = re.compile(r"\bNO\.\s*\d+\s*\.\s*\d+[A-Z]{0,3}\b", re.I)
 
 
+_CARD_STAR = re.compile(r"★[^★\[\]]{0,20}★")
+_CARD_HASH = re.compile(r"#+")
+_CARD_GPU = re.compile(r"(?<![A-Za-z0-9])(?:RTX|GTX|RX)\s*\d{4}(?:\s*(?:Ti|SUPER|XT))?(?![A-Za-z0-9])", re.I)
+
+
+def _gpu_key(s: str) -> str:
+    return re.sub(r"\s+", "", s).upper()
+
+
+def _drop_dup_gpu(name: str) -> str:
+    """사양 대괄호 «밖»의 그래픽카드 이름이 대괄호 안에도 있으면 밖의 것을 뗀다(같은 부품을 두 번 적지 않는다)."""
+    inside = {_gpu_key(m.group(0)) for b in re.findall(r"\[[^\[\]]*/[^\[\]]*\]", name) for m in _CARD_GPU.finditer(b)}
+    if not inside:
+        return name
+    parts = re.split(r"(\[[^\[\]]*\])", name)
+    return "".join(p if p.startswith("[") else _CARD_GPU.sub(
+        lambda m: " " if _gpu_key(m.group(0)) in inside else m.group(0), p) for p in parts)
+
+
 def card_name(raw):
     """판매 조립PC 카드에 보일 이름 — 광고 대괄호·광고 문구·내부 번호를 뗀다. 못 떼면 원천 그대로."""
     base = display_name(raw)
@@ -176,6 +195,10 @@ def card_name(raw):
     cut = _CARD_AD_BRACKET.sub(" ", base)
     cut = _CARD_AD_PHRASE.sub(" ", cut)
     cut = _CARD_INTERNAL_NO.sub(" ", cut)
+    # 2026-11-07 dev 상담 작은 결함 5: 이름에 「##」 표시와 ★광고★, 사양 대괄호와 같은 그래픽카드 이름이 겹쳐 보였다.
+    cut = _CARD_STAR.sub(" ", cut)
+    cut = _CARD_HASH.sub(" ", cut)
+    cut = _drop_dup_gpu(cut)
     cut = re.sub(r"\s+", " ", cut).strip()
     cut = re.sub(r"\s+(\[)", r" \1", cut)
     return cut if len(cut) >= _MIN_LEN else base

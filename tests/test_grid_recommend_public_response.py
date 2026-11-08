@@ -251,7 +251,9 @@ class PickRuleTest(unittest.TestCase):
 
     def test_every_tag_has_a_role_and_old_tags_are_gone(self):
         self.assertEqual(set(S.ROLE_OF.values()),
-                         {'value', 'recommended', 'reference', 'premium', 'chosen'})
+                         {'value', 'recommended', 'reference', 'premium', 'chosen',
+                          # 2026-11-07: 낮춘 안(lower_options 전용 -- 카드 items 에는 나오지 않는다)
+                          'lower'})
         src = pathlib.Path(S.__file__).read_text(encoding='utf-8')
         for old in ('예산 안 최고 수준', '같은 수준 다른 구성', '가장 저렴한 선택', '한 단계 위"'):
             self.assertNotIn(old, src.split('"""', 2)[2])

@@ -84,8 +84,11 @@ TAG_VALUE, TAG_RECOMMENDED, TAG_REFERENCE = "알뜰 구성", "추천 구성", "�
 # 2026-10-11 중헌 님 「더 고급 사양을 보여준다던지 — 스펙트럼을」: 추천 구성 다음에 한 장 더.
 # 고객이 고른 카드를 보관할 때 지금 목록 밖이면(더 싸게·더 좋게로 본 카드) 「고른 구성」으로 남긴다.
 TAG_PREMIUM, TAG_CHOSEN = "더 높은 사양", "고른 구성"
+# 2026-11-07 dev 상담 결함 A·B·C: 요청 수준을 예산 안에서 못 맞출 때의 «낮춘 안». 카드(items)가 아니라 set 의
+# lower_options 로만 싣는다 -- 화면 카드 규칙(2026-10-09)은 그대로이고, 상담이 「예산 안 없음」으로 끝내지 않게 한다.
+TAG_LOWER, TAG_LOWER_NEAREST = "예산 안 낮춘 구성", "한 단계 낮춘 최저가"
 ROLE_OF = {TAG_VALUE: "value", TAG_RECOMMENDED: "recommended", TAG_REFERENCE: "reference",
-           TAG_PREMIUM: "premium", TAG_CHOSEN: "chosen"}
+           TAG_PREMIUM: "premium", TAG_CHOSEN: "chosen", TAG_LOWER: "lower", TAG_LOWER_NEAREST: "lower"}
 # 「더 높은 사양」 카드: 추천 구성보다 성능 비교값이 이만큼 높거나 수준이 위여야 한다(같은 PC 를 다시 내밀지 않게).
 PREMIUM_STEP = 1.10
 # 예산이 있으면 그 안에서 가장 높은 사양을, 없으면 예산의 이 배까지에서 가장 싼 높은 사양을 보여 준다.
@@ -299,6 +302,56 @@ def _light_pick(cands, usage, min_rank, levels_by, budget_won, bound, preferred)
     return out
 
 
+LOWER_NOTE = "예산 안에서는 요청 수준보다 낮춘 PC가 있어 lower_options 로 함께 드려요."
+MAX_LOWER = 2
+# 다음 수준 조건 중 램·저장공간만 모자란 것 -- 그래픽·CPU 는 그 수준을 채운다(늘리면 되는 구성).
+_RAM_SSD_ONLY = re.compile(r"(?:램|SSD)" + r" [\d,.]+(?:GB)? 미만(?:\(현재 [\d,.]+(?:GB)?\))?")
+
+
+def _lower_item(p, usage, min_rank, levels, budget_won, bound, tag):
+    levels_by = {(l["usage"], l["level"]): l for l in levels}
+    it = _item(p, usage, levels_by, tag, budget_won, bound)
+    f = p["fit"].get(usage) or {}
+    want = next((l["level"] for l in levels if l["usage"] == usage and l["level_rank"] == min_rank), None)
+    if not f.get("level"):
+        first = next((l["level"] for l in levels if l["usage"] == usage and l["level_rank"] == 1), None)
+        it["reasons"][0] = f"{usage} {first or '최소'} 수준에서 램·저장공간만 모자람(그래픽·CPU는 충족)"
+    it["short_of"] = f"요청하신 {usage} {want or ''} 수준보다 낮은 구성".replace("  ", " ")
+    return it
+
+
+def lower_options(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
+                  levels, products, preferred=frozenset(), ref_price: int | None = None) -> list[dict]:
+    """요청 수준(min_rank)을 예산 안에서 못 맞출 때, 같은 용도의 낮춘 안(최대 2장).
+
+    ① 예산 안에서 가장 높은 수준·성능의 낮은 수준 PC(낮은 수준 = 0 < rank < min_rank, 또는 램·저장공간만 모자란 rank 0)
+    ② 바로 아래 수준의 최저가가 예산을 넘지만 요청 수준 최저가(ref_price)보다 싸면 그 PC(「가장 가까운」 검산 -- 결함 A)
+    예산이 없거나 「이상」이면 낮출 이유가 없어 빈 목록이다. 공개 승인 구성은 같은 수준·성능일 때만 앞선다.
+    """
+    if budget_won is None or bound == "이상" or min_rank <= 0:
+        return []
+    rank = lambda p: (p["fit"].get(usage) or {}).get("rank", 0)  # noqa: E731
+
+    def near(p):
+        f = p["fit"].get(usage)
+        bl = (f or {}).get("blocked") or []
+        return f is not None and rank(p) == 0 and bool(bl) and all(
+            isinstance(b, str) and _RAM_SSD_ONLY.fullmatch(b) for b in bl)
+    cands = [p for p in products.values() if p["price"] is not None and (0 < rank(p) < min_rank or near(p))]
+    out = []
+    within = [p for p in cands if p["price"] <= budget_won]
+    if within:
+        best = max(within, key=lambda p: (rank(p), X.perf(p, usage), p["code"] in preferred, -p["price"]))
+        out.append(_lower_item(best, usage, min_rank, levels, budget_won, bound, TAG_LOWER))
+    step = [p for p in cands if rank(p) == min_rank - 1 and p["price"] > budget_won
+            and (ref_price is None or p["price"] < ref_price)]
+    if step and min_rank - 1 >= 1:
+        nearest = min(step, key=lambda p: (p["price"], p["code"] not in preferred))
+        if all(o["product_code"] != nearest["code"] for o in out):
+            out.append(_lower_item(nearest, usage, min_rank, levels, budget_won, bound, TAG_LOWER_NEAREST))
+    return out[:MAX_LOWER]
+
+
 def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
          levels, products, preferred=frozenset(), light: bool = False) -> dict:
     """한 용도 -> {items[≤2], empty_reason, empty_note}.
@@ -337,9 +390,19 @@ def pick(usage: str, min_rank: int, budget_won: int | None, bound: str | None,
     # (2026-10-12 사장님 「예산과 안맞으면 예산과 맞지 않음을 그냥 공지하고 추천PC를 제시해」 -- 예산이 최저가의
     # 절반도 안 되면 카드를 빼던 #167 규칙을 걷었다).
     if not within:
-        return {"items": [_item(ok[0], usage, levels_by, TAG_REFERENCE, budget_won, bound)],
-                "empty_reason": "예산 안 상품 없음",
-                "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
+        out = {"items": [_item(ok[0], usage, levels_by, TAG_REFERENCE, budget_won, bound)],
+               "empty_reason": "예산 안 상품 없음",
+               "empty_note": f"이 작업은 {ok[0]['price']:,}원부터 가능합니다."}
+        # 요청 수준 카드는 그대로 두고(2026-10-09 결정 -- 낮은 수준을 «추천»으로 올리지 않는다), 예산 안 낮춘 안을
+        # 따로 싣는다(2026-11-07 dev 상담 결함 A·B·C -- 예산 안 RX 7600 PC 가 있는데 「없음」으로만 답했다).
+        pool = {c: p for c, p in products.items() if not light or c in preferred}
+        alts = lower_options(usage, min_rank, budget_won, bound, levels, pool, preferred,
+                             ref_price=ok[0]["price"])
+        if alts:
+            out["lower_options"] = alts
+            if any(not a["over_budget"] for a in alts):
+                out["empty_note"] += " " + LOWER_NOTE
+        return out
     if light:
         # 가벼운 수요는 예산을 채우지 않는다 -- 예산 안에서 최소 수준을 충족하는 가장 알맞은 가격(공개 승인 우선).
         return _light_pick(within, usage, min_rank, levels_by, budget_won, bound, preferred)
@@ -845,6 +908,10 @@ def _plan_set(plan, state, levels, products, preferred, ex, filters, customs) ->
         "center_band": None, "center_band_key": None, "bands_considered": [],
         "center_tier": None, "center_tier_key": None, "tiers_considered": [],
     }
+    if res.get("lower_options"):
+        # 요청 수준을 예산 안에서 못 맞출 때의 낮춘 안 -- 카드가 아니다(상담이 「없음」으로 끝내지 않게 · 2026-11-07).
+        # 있을 때만 싣는다 -- 공개 응답 모양(tests/fixtures/grid_recommend_sold_response.json)은 그대로다.
+        out["lower_options"] = res["lower_options"]
     extra = custom_items(customs, fu, r, levels, state.budget_won, state.budget_bound) if customs else []
     if extra:
         out["custom_items"] = extra
@@ -902,6 +969,29 @@ def _combined_set(plans, state, levels, products, preferred, ex, filters, custom
             if f.get("level"):
                 extra.append(f"{p['fu']} {f['level']} — {(levels_by.get((p['fu'], f['level'])) or {}).get('work', '')}")
         it["reasons"][1:1] = extra
+    budget, bound = state.budget_won, state.budget_bound
+    if budget is not None and bound != "이상" and out["items"] \
+            and all(i["price"] > budget for i in out["items"]) and not out.get("lower_options"):
+        # 모든 용도를 함께 충족하는 PC 가 예산 안에 없으면, 용도마다 예산 안 PC 를 낮춘 안으로 함께 준다
+        # (2026-11-07 결함 C -- 롤·발로란트·인강 100만원에 인강용 5500GT 759,300원이 있는데 「없음」).
+        alts, shown_codes = [], {i["product_code"] for i in out["items"]}
+        for p in plans:
+            got = pick(p["fu"], p["r"], budget, bound, levels, products, preferred, light=p["need_based"])
+            for it in got.get("items") or []:
+                if not it["over_budget"] and it["product_code"] not in shown_codes:
+                    it = dict(it, tag=TAG_LOWER, role=ROLE_OF[TAG_LOWER],
+                              short_of=f"{p['label']} 용도만 충족 -- 말씀하신 용도 전부를 한 대로 하는 구성은 아님")
+                    alts.append(it)
+                    shown_codes.add(it["product_code"])
+                    break
+            else:
+                for it in got.get("lower_options") or []:
+                    if not it["over_budget"] and it["product_code"] not in shown_codes:
+                        alts.append(it)
+                        shown_codes.add(it["product_code"])
+                        break
+        if alts:
+            out["lower_options"] = alts[:MAX_LOWER]
     return out
 
 
