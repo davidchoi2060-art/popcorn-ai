@@ -10,7 +10,7 @@ live 는 운영 몰에 price GET 을 보낸다. 문서 예시 3개 상품만, �
 직전 호출이 비정상이면 멈추고, 사유를 적은 --resume-reason 이 있을 때만 같은 기록부에 이어 간다.
 새 기록부는 --init-ledger 를 줘야 만든다. basket 은 live 에서 선택할 수 없다.
 증거에는 허용 필드만 저장한다. 추가 필드 값과 응답 원문은 저장하지 않는다.
-비정상 응답 본문은 메모리에서만 분류하고 종류와 가린 모양만 남긴다.
+비정상 응답 본문은 메모리에서만 분류하고 고정 종류와 글자 모양만 남긴다. 본문의 단어는 어떤 형태로도 남기지 않는다.
 """
 from __future__ import annotations
 
@@ -135,7 +135,6 @@ _ALLOWLIST_WORDS = ("whitelist", "allowlist", "allowed ip", "ip not", "허용", 
 _DEBUG_WORDS = ("debug", "var_dump", "print_r", "array(", "notice:", "warning:", "fatal error", "stack trace", "sql")
 _SCAN_CHARS = 4096
 _SHAPE_MAX_CHARS = 64
-_WORD_MAX_CHARS = 16
 
 
 def _shape(text: str) -> str:
@@ -153,19 +152,6 @@ def _shape(text: str) -> str:
         else:
             out.append("가")
     return "".join(out)
-
-
-def _masked_text(text: str) -> str:
-    """짧은 비JSON 문구에서 숫자를 모두 가리고 긴 단어를 가린다. IP, 키, 금액 값이 남지 않는다."""
-    def token(match):
-        word = match.group(0)
-        if len(word) > _WORD_MAX_CHARS and not _IPV4_RE.fullmatch(word):
-            return "[long]"
-        if re.search(r"\d", word) and re.search(r"[^\W\d_]", word):    # 글자와 숫자가 섞이면 키일 수 있다
-            return "[mixed]"
-        return re.sub(r"\d", "9", word)
-
-    return re.sub(r"\S+", token, text)
 
 
 def _resolve_server_ips() -> set:
@@ -234,10 +220,10 @@ def classify_body(body: bytes) -> dict:
         result["ipv4_relation"] = _ipv4_relation(ips)
     if len(stripped) <= _SHAPE_MAX_CHARS:
         result["shape"] = _shape(stripped)
-        if not stripped.startswith(("<", "{", "[")):
-            result["text_digits_masked"] = _masked_text(stripped)
     if stripped.startswith("<"):
         result["kind"] = "html"
+    elif M.IP_ERROR_BODY_RE.fullmatch(text):
+        result["kind"] = "ip_error"     # 관측된 전체 문구와 정확히 같을 때만. 고정 라벨이라 본문을 옮기지 않는다
     elif len(kinds) == 1 and kinds[0] != "not_json":
         result["kind"] = "json_document"
     elif len(kinds) > 1 and all(k in ("dict", "list") for k in kinds):
@@ -277,8 +263,9 @@ class _Recording:
                      "bytes": len(response.body), "starts_with_brace": stripped.startswith(b"{"),
                      "ends_with_brace": stripped.endswith(b"}"), "diagnosis": diagnosis,
                      "same_body_as_seq": [e["seq"] for e in self.prior_entries if e.get("body_sha256") == digest]}
-        if diagnosis.get("ipv4_count") or diagnosis["kind"] == "classifier_error":
-            self.meta["body_sha256_withheld"] = "short body with an IPv4 can be recovered from its hash"
+        if (diagnosis.get("ipv4_count") or diagnosis["kind"] == "classifier_error"
+                or len(stripped) <= _SHAPE_MAX_CHARS):
+            self.meta["body_sha256_withheld"] = "short body can be recovered from its hash"
         else:
             self.meta["body_sha256"] = digest
         return response

@@ -322,7 +322,7 @@ def _send(transport: Any, url: str, limits: Limits, *, write: bool) -> Transport
 
 
 # 2026-11-09 실서버 관측(API-010). 가이드에 없는 응답이다. 성공으로 해석하지 않고 원인만 구분한다. IP 값은 버린다.
-_IP_ERROR_BODY_RE = re.compile(r"\s*\d{1,3}(?:\.\d{1,3}){3} IP ERROR!\s*")
+IP_ERROR_BODY_RE = re.compile(r"\s*\d{1,3}(?:\.\d{1,3}){3} IP ERROR!\s*")
 
 
 def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
@@ -353,7 +353,7 @@ def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool
         raise fail("bad_encoding") from None
     if text.lstrip().startswith("<"):
         raise fail("html_response")
-    if _IP_ERROR_BODY_RE.fullmatch(text):
+    if IP_ERROR_BODY_RE.fullmatch(text):
         raise fail("ip_rejected", http_status=status)
     try:
         document = json.loads(text, parse_float=_parse_float, parse_constant=_reject_constant,

@@ -779,7 +779,7 @@ class LiveRunnerLocal(unittest.TestCase):
             b"": "empty", b"   ": "empty", b"\xff\xfe": "non_utf8", b"<html>x": "html",
             b'{"result":"ok"}': "json_document", b'{"a":1}{"b":2}': "concatenated_json",
             b"10.1.2.3": "ipv4_only", b" 10.1.2.3\n": "ipv4_only",
-            b"10.1.2.3 is here": "ipv4_with_text",
+            b"10.1.2.3 is here": "ipv4_with_text", b"10.1.2.3 IP ERROR!": "ip_error",
             "허용되지 않은 IP".encode(): "ip_allowlist_error", b"ip not registered": "ip_allowlist_error",
             b"Access Denied": "access_denied", "접근 거부".encode(): "access_denied",
             b"var_dump output": "debug_output", b"hello there": "plain_text_other",
@@ -790,21 +790,73 @@ class LiveRunnerLocal(unittest.TestCase):
         self.assertNotIn("shape", self.runner.classify_body(b"x" * 65))
         self.assertNotIn("10.1.2.3", json.dumps(self.runner.classify_body(b"text 10.1.2.3")))
 
-    def test_masked_text_keeps_words_and_drops_every_digit_and_long_token(self):
+    def test_ip_error_is_a_fixed_label_only_on_exact_match(self):
         server = {"203.0.113.77"}
         with patch.object(self.runner, "_resolve_server_ips", return_value=server), \
                 patch.object(self.runner, "_local_ips", return_value=set()):
-            result = self.runner.classify_body(b" 203.0.113.77 is wrong!")
-        self.assertEqual(result["text_digits_masked"], "999.9.999.99 is wrong!")
+            result = self.runner.classify_body(b" 203.0.113.77 IP ERROR!")
+        self.assertEqual(result["kind"], "ip_error")
+        self.assertEqual(result["shape"], "999.9.999.99_aa_aaaaa!")
         self.assertEqual(result["ipv4_relation"], [{"is_private": True, "matches_mall_server_dns": True,
                                                     "matches_local_interface": False}])
         self.assertEqual(result["leading_whitespace"], 1)
-        self.assertNotIn("203.0.113.77", json.dumps(result))
-        secret = self.runner.classify_body(b"key abcdefghijklmnopqrstuvwxyz cost 12345")
-        self.assertEqual(secret["text_digits_masked"], "key [long] cost 99999")
-        self.assertEqual(self.runner.classify_body(b"key=abc123 no")["text_digits_masked"], "[mixed] no")
-        self.assertNotIn("text_digits_masked", self.runner.classify_body(b'{"cost_price":123'))
-        self.assertNotIn("text_digits_masked", self.runner.classify_body(b"x " * 40))
+        text = json.dumps(result)
+        self.assertNotIn("203.0.113.77", text)
+        self.assertNotIn("ERROR", text)
+        for near in (b"203.0.113.77 IP ERROR", b"x 203.0.113.77 IP ERROR!", b"203.0.113.77 ip error!",
+                     b"203.0.113.77 IP ERROR! hunter2", b"IP ERROR!"):
+            self.assertNotEqual(self.runner.classify_body(near)["kind"], "ip_error", near)
+
+    def test_secrets_reach_no_log_evidence_or_classify_result(self):
+        secrets = {
+            "short_word": "hunter",
+            "short_mixed": "hunter2",
+            "email": "someone.private@example.com",
+            "ipv6": "2001:db8:85a3::8a2e:370:7334",
+            "phrase": "open sesame please now",
+            "key_alnum": "abcdefghij0123456789",
+            "key_digits": "12345678901234567890",
+            "korean": "비밀문구 내부값",
+        }
+        bodies = dict(secrets)
+        bodies["with_ipv4"] = "203.0.113.77 hunter2 open sesame"
+        for label, secret in bodies.items():
+            with self.subTest(label):
+                body = secret.encode("utf-8")
+                ledger, out = Path(self.dir.name) / (label + ".json"), Path(self.dir.name) / (label + "_out.json")
+                self.ledger, self.out = str(ledger), str(out)
+                records = []
+                handler = logging.Handler()
+                handler.emit = lambda record: records.append(record.getMessage())
+                logging.getLogger().addHandler(handler)
+                self.addCleanup(logging.getLogger().removeHandler, handler)
+
+                class Fake:
+                    basket_write_allowed = False
+
+                    def __init__(self, **_k):
+                        pass
+
+                    def get(self, url, *, timeout, max_bytes):
+                        return R(200, body, "text/html")
+
+                stdout, stderr = io.StringIO(), io.StringIO()
+                with patch.object(self.runner.M, "LivePriceTransport", Fake), \
+                        contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+                    code = self.runner.run_live("single", self.ledger, self.out, init_ledger=True)
+                self.assertEqual(code, 1)
+                surfaces = {
+                    "ledger": ledger.read_text(encoding="utf-8"), "evidence": out.read_text(encoding="utf-8"),
+                    "stdout": stdout.getvalue(), "stderr": stderr.getvalue(), "logs": "\n".join(records),
+                    "classify": json.dumps(self.runner.classify_body(body), ensure_ascii=False),
+                }
+                digest = hashlib.sha256(body).hexdigest()
+                pieces = set(re.split(r"\s+", secret)) | {secret, digest}
+                for name, stored in surfaces.items():
+                    for piece in pieces:
+                        self.assertNotIn(piece, stored, name)
+                self.assertNotIn("body_sha256\"", surfaces["ledger"])
+                self.assertNotIn("text_digits_masked", surfaces["ledger"])
 
     def test_ip_lookup_failure_does_not_stop_classification(self):
         with patch.object(self.runner.socket, "getaddrinfo", side_effect=OSError("dns")):
