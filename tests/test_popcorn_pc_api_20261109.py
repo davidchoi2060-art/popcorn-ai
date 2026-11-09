@@ -6,6 +6,7 @@
 """
 import ast
 import contextlib
+import hashlib
 import io
 import json
 import logging
@@ -615,8 +616,9 @@ class LiveRunnerLocal(unittest.TestCase):
         self.ledger = str(Path(self.dir.name) / "ledger.json")
         self.out = str(Path(self.dir.name) / "out.json")
 
-    def run_live(self, reply, call="single"):
+    def run_live(self, reply, call="single", **options):
         made = []
+        options.setdefault("init_ledger", not Path(self.ledger).exists())
 
         class Fake:
             basket_write_allowed = False
@@ -629,7 +631,7 @@ class LiveRunnerLocal(unittest.TestCase):
                 return reply
 
         with patch.object(self.runner.M, "LivePriceTransport", Fake), contextlib.redirect_stdout(io.StringIO()):
-            code = self.runner.run_live(call, self.ledger, self.out)
+            code = self.runner.run_live(call, self.ledger, self.out, **options)
         return code, made
 
     def read(self, path):
@@ -677,25 +679,162 @@ class LiveRunnerLocal(unittest.TestCase):
                 raise failure
 
         with patch.object(self.runner.M, "LivePriceTransport", Fake), contextlib.redirect_stdout(io.StringIO()):
-            return self.runner.run_live("single", self.ledger, self.out), None
+            return self.runner.run_live("single", self.ledger, self.out, init_ledger=True), None
 
     def test_budget_and_arguments(self):
-        Path(self.ledger).write_text(json.dumps([{"outcome": "ok", "epoch": 0}] * 3), encoding="utf-8")
+        self.write_ledger([{"seq": n, "outcome": "ok", "epoch": 0} for n in range(1, 11)])
         with contextlib.redirect_stderr(io.StringIO()):
             code, made = self.run_live(ok_price([]))
         self.assertEqual((code, made), (3, []))
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(self.runner.run_live(None, self.ledger, self.out), 2)
+            self.assertEqual(self.runner.INTERNAL_RUNNER_LIVE_BUDGET, 10)
+            self.assertEqual(M.DOC_MAX_ITEMS, 50)   # 내부 호출 상한과 API 공식 상품 상한은 다른 값이다
             with self.assertRaises(SystemExit):
                 self.runner.build_parser().parse_args(["--mode", "basket"])
             with self.assertRaises(SystemExit):
                 self.runner.build_parser().parse_args(["--mode", "live", "--call", "basket"])
 
     def test_interrupted_started_entry_blocks(self):
-        Path(self.ledger).write_text(json.dumps([{"outcome": "started", "epoch": 0}]), encoding="utf-8")
+        self.write_ledger([{"seq": 1, "outcome": "started", "epoch": 0}])
         with contextlib.redirect_stderr(io.StringIO()):
             code, made = self.run_live(ok_price([]))
         self.assertEqual((code, made), (3, []))
+
+    def write_ledger(self, entries):
+        Path(self.ledger).write_text(json.dumps(entries), encoding="utf-8")
+
+    def test_ninth_and_tenth_call_allowed_only_up_to_budget(self):
+        self.write_ledger([{"seq": n, "outcome": "ok", "epoch": 0} for n in range(1, 10)])
+        code, made = self.run_live(ok_price([]))
+        self.assertEqual((code, len(made)), (0, 1))
+        self.assertEqual(len(self.read(self.ledger)), 10)
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, made = self.run_live(ok_price([]))
+        self.assertEqual((code, made), (3, []))
+
+    def test_resume_appends_with_reason_and_keeps_failed_entries(self):
+        first = {"seq": 1, "outcome": "error", "code": "bad_json", "epoch": 0, "note": "keep"}
+        self.write_ledger([first])
+        for bad in (None, "", "   ", "short"):
+            with contextlib.redirect_stderr(io.StringIO()):
+                code, made = self.run_live(ok_price([]), resume_reason=bad)
+            self.assertEqual((code, made), (3, []))
+        code, made = self.run_live(R(200, b"not json at all", "text/html"), resume_reason="API-010 cause check")
+        self.assertEqual((code, len(made)), (1, 1))
+        entries = self.read(self.ledger)
+        self.assertEqual(entries[0], first)
+        self.assertEqual(entries[1]["seq"], 2)
+        self.assertEqual(entries[1]["resume"], {"reason": "API-010 cause check", "after_seq": 1, "after_code": "bad_json"})
+
+    def test_resume_reason_rejected_when_previous_was_ok(self):
+        self.write_ledger([{"seq": 1, "outcome": "ok", "epoch": 0}])
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, made = self.run_live(ok_price([]), resume_reason="no reason to resume")
+        self.assertEqual((code, made), (3, []))
+
+    def test_new_ledger_needs_flag_and_existing_ledger_cannot_be_reinitialised(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, made = self.run_live(ok_price([]), init_ledger=False)
+        self.assertEqual((code, made), (3, []))
+        self.assertFalse(Path(self.ledger).exists())
+        self.write_ledger([{"seq": 1, "outcome": "error", "epoch": 0}])
+        with contextlib.redirect_stderr(io.StringIO()):
+            code, made = self.run_live(ok_price([]), init_ledger=True, resume_reason="try to reset the budget")
+        self.assertEqual((code, made), (3, []))
+        self.assertEqual(len(self.read(self.ledger)), 1)
+
+    def test_removed_or_reordered_entries_block(self):
+        self.write_ledger([{"seq": 2, "outcome": "ok", "epoch": 0}])
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_live(ok_price([]))
+
+    def test_diagnosis_keeps_no_ip_value_and_withholds_hash(self):
+        secret_ip = b"203.0.113.77"
+        code, _ = self.run_live(R(200, secret_ip, "text/html"))
+        self.assertEqual(code, 1)
+        entry = self.read(self.ledger)[0]
+        self.assertEqual(entry["diagnosis"]["kind"], "ipv4_only")
+        self.assertEqual(entry["diagnosis"]["shape"], "999.9.999.99")
+        self.assertNotIn("body_sha256", entry)
+        stored = Path(self.ledger).read_text(encoding="utf-8") + Path(self.out).read_text(encoding="utf-8")
+        self.assertNotIn(secret_ip.decode(), stored)
+        self.assertNotIn(hashlib.sha256(secret_ip).hexdigest(), stored)
+
+    def test_same_body_is_recognised_across_calls(self):
+        body = b"plain server words"
+        self.write_ledger([{"seq": 1, "outcome": "error", "epoch": 0, "body_sha256": hashlib.sha256(body).hexdigest()}])
+        self.run_live(R(200, body, "text/html"), resume_reason="repeat to compare")
+        self.assertEqual(self.read(self.ledger)[1]["same_body_as_seq"], [1])
+
+    def test_classifier_failure_does_not_lose_the_record(self):
+        with patch.object(self.runner, "classify_body", side_effect=RuntimeError("boom")):
+            code, _ = self.run_live(R(200, b"not json", "text/html"))
+        self.assertEqual(code, 1)
+        entry = self.read(self.ledger)[0]
+        self.assertEqual((entry["code"], entry["diagnosis"]["kind"]), ("bad_json", "classifier_error"))
+
+    def test_classify_body_kinds(self):
+        table = {
+            b"": "empty", b"   ": "empty", b"\xff\xfe": "non_utf8", b"<html>x": "html",
+            b'{"result":"ok"}': "json_document", b'{"a":1}{"b":2}': "concatenated_json",
+            b"10.1.2.3": "ipv4_only", b" 10.1.2.3\n": "ipv4_only",
+            b"10.1.2.3 is here": "ipv4_with_text",
+            "허용되지 않은 IP".encode(): "ip_allowlist_error", b"ip not registered": "ip_allowlist_error",
+            b"Access Denied": "access_denied", "접근 거부".encode(): "access_denied",
+            b"var_dump output": "debug_output", b"hello there": "plain_text_other",
+        }
+        for body, kind in table.items():
+            self.assertEqual(self.runner.classify_body(body)["kind"], kind, body)
+        self.assertEqual(self.runner.classify_body(b"999.1.1.1")["ipv4_count"], 0)
+        self.assertNotIn("shape", self.runner.classify_body(b"x" * 65))
+        self.assertNotIn("10.1.2.3", json.dumps(self.runner.classify_body(b"text 10.1.2.3")))
+
+    def test_masked_text_keeps_words_and_drops_every_digit_and_long_token(self):
+        server = {"203.0.113.77"}
+        with patch.object(self.runner, "_resolve_server_ips", return_value=server), \
+                patch.object(self.runner, "_local_ips", return_value=set()):
+            result = self.runner.classify_body(b" 203.0.113.77 is wrong!")
+        self.assertEqual(result["text_digits_masked"], "999.9.999.99 is wrong!")
+        self.assertEqual(result["ipv4_relation"], [{"is_private": True, "matches_mall_server_dns": True,
+                                                    "matches_local_interface": False}])
+        self.assertEqual(result["leading_whitespace"], 1)
+        self.assertNotIn("203.0.113.77", json.dumps(result))
+        secret = self.runner.classify_body(b"key abcdefghijklmnopqrstuvwxyz cost 12345")
+        self.assertEqual(secret["text_digits_masked"], "key [long] cost 99999")
+        self.assertEqual(self.runner.classify_body(b"key=abc123 no")["text_digits_masked"], "[mixed] no")
+        self.assertNotIn("text_digits_masked", self.runner.classify_body(b'{"cost_price":123'))
+        self.assertNotIn("text_digits_masked", self.runner.classify_body(b"x " * 40))
+
+    def test_ip_lookup_failure_does_not_stop_classification(self):
+        with patch.object(self.runner.socket, "getaddrinfo", side_effect=OSError("dns")):
+            result = self.runner.classify_body(b"10.1.2.3 no")
+        self.assertEqual(result["ipv4_relation"][0]["matches_mall_server_dns"], False)
+
+    def test_observed_ip_error_body_has_its_own_code_and_keeps_no_ip(self):
+        for body in (b" 203.0.113.77 IP ERROR!", b"203.0.113.77 IP ERROR!\n"):
+            with self.assertRaises(MallApiError) as caught:
+                M.fetch_prices(["1"], transport=ScriptedTransport(R(200, body, "text/html")))
+            self.assertEqual((caught.exception.code, caught.exception.http_status), ("ip_rejected", 200))
+            self.assertNotIn("203.0.113.77", repr(caught.exception) + str(caught.exception.detail))
+        for near in (b"203.0.113.77 IP ERROR", b"x 203.0.113.77 IP ERROR!", b'203.0.113.77 IP ERROR!{"result":"ok"}'):
+            with self.assertRaises(MallApiError) as caught:
+                M.fetch_prices(["1"], transport=ScriptedTransport(R(200, near, "text/html")))
+            self.assertEqual(caught.exception.code, "bad_json")
+
+    def test_classification_does_not_relax_the_parser(self):
+        for body in (b"10.1.2.3", b'10.1.2.3{"result":"ok","items":[]}', b'{"result":"ok","items":[]}{"a":1}'):
+            with self.assertRaises(MallApiError) as caught:
+                M.fetch_prices(["1"], transport=ScriptedTransport(R(200, body)))
+            self.assertEqual(caught.exception.code, "bad_json")
+
+    def test_request_profiles_are_get_only_and_have_no_credentials(self):
+        self.assertEqual(sorted(M.REQUEST_PROFILES), ["default", "no_custom_headers"])
+        self.assertEqual(M.REQUEST_PROFILES["no_custom_headers"], {})
+        for headers in M.REQUEST_PROFILES.values():
+            self.assertFalse({k.lower() for k in headers} & {"authorization", "cookie", "x-forwarded-for", "x-real-ip"})
+        with self.assertRaises(KeyError):
+            M.LivePriceTransport(request_profile="basket")
 
     def test_error_detail_never_contains_body(self):
         for body in (b'{"a":SECRET}', b'{"a":1} SECRET', b'{"a":"\x01SECRET"}', b'{"a":1,"a":2}'):

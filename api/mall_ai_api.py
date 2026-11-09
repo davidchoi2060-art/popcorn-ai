@@ -38,6 +38,7 @@ log = logging.getLogger("popcorn.mall_ai_api")
 ORIGIN = "https://popcornpc.co.kr"
 API_PATH = "/shop/ai_api.php"
 API_URL = ORIGIN + API_PATH
+API_HOST = "popcornpc.co.kr"
 BASKET_LINK_PATH = "/shop/order_basket_list.html"
 
 DOC_MAX_ITEMS = 50
@@ -145,6 +146,13 @@ def assert_price_only_url(url: str) -> None:
         raise MallApiError("url_not_allowed")
 
 
+# 요청 조건에 따른 응답 차이를 가르는 진단용. 둘 다 같은 price GET 이다.
+REQUEST_PROFILES = {
+    "default": {"User-Agent": "popcorn-ai/1.0 (+price read)", "Accept": "application/json", "Cache-Control": "no-cache"},
+    "no_custom_headers": {},    # 위장이 아니다. urllib 기본 헤더만 나간다
+}
+
+
 class LivePriceTransport:
     """실제 price GET 전용. basket 경로가 없고 호출 수와 간격을 강제한다."""
 
@@ -152,9 +160,10 @@ class LivePriceTransport:
 
     def __init__(self, *, max_calls: int = INTERNAL_LIVE_MAX_CALLS,
                  min_interval: float = INTERNAL_LIVE_MIN_INTERVAL_SECONDS,
-                 opener: Any = None, clock=time.monotonic, sleep=time.sleep):
+                 opener: Any = None, clock=time.monotonic, sleep=time.sleep, request_profile: str = "default"):
         if not 1 <= max_calls <= INTERNAL_LIVE_MAX_CALLS:
             raise ValueError("max_calls")
+        self._headers = dict(REQUEST_PROFILES[request_profile])
         self._max_calls = max_calls
         self._min_interval = max(float(min_interval), INTERNAL_LIVE_MIN_INTERVAL_SECONDS)
         self._opener = opener
@@ -187,9 +196,7 @@ class LivePriceTransport:
 
     def _send(self, url: str, timeout: float, max_bytes: int) -> TransportResponse:
         opener = self._opener or _build_live_opener()
-        request = urllib.request.Request(url, method="GET", headers={
-            "User-Agent": "popcorn-ai/1.0 (+price read)", "Accept": "application/json",
-            "Cache-Control": "no-cache"})
+        request = urllib.request.Request(url, method="GET", headers=self._headers)
         deadline = self._clock() + timeout
         try:
             with opener.open(request, timeout=timeout) as response:
@@ -314,6 +321,10 @@ def _send(transport: Any, url: str, limits: Limits, *, write: bool) -> Transport
     return response
 
 
+# 2026-11-09 실서버 관측(API-010). 가이드에 없는 응답이다. 성공으로 해석하지 않고 원인만 구분한다. IP 값은 버린다.
+_IP_ERROR_BODY_RE = re.compile(r"\s*\d{1,3}(?:\.\d{1,3}){3} IP ERROR!\s*")
+
+
 def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
     def fail(code: str, **kwargs):
         return MallApiError(code, outcome_unknown=write, **kwargs)
@@ -342,6 +353,8 @@ def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool
         raise fail("bad_encoding") from None
     if text.lstrip().startswith("<"):
         raise fail("html_response")
+    if _IP_ERROR_BODY_RE.fullmatch(text):
+        raise fail("ip_rejected", http_status=status)
     try:
         document = json.loads(text, parse_float=_parse_float, parse_constant=_reject_constant,
                               object_pairs_hook=_no_duplicate_keys)

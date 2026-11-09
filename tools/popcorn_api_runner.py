@@ -4,17 +4,23 @@
     python tools/popcorn_api_runner.py                      # 가짜 API 로 29개 케이스
     python tools/popcorn_api_runner.py --out result.json
     python tools/popcorn_api_runner.py --mode live --call single --ledger L.json --out E.json
+    python tools/popcorn_api_runner.py --mode live --call single --ledger L.json --out E.json --resume-reason "사유"
 
-live 는 운영 몰에 price GET 을 보낸다. 문서 예시 3개 상품만, 기록부 기준 총 3회까지, 호출 간 1초 이상,
-직전 호출이 비정상이면 중지한다. basket 은 live 에서 선택할 수 없다.
+live 는 운영 몰에 price GET 을 보낸다. 문서 예시 3개 상품만, 기록부 기준 누적 10회까지, 호출 간 1초 이상이다.
+직전 호출이 비정상이면 멈추고, 사유를 적은 --resume-reason 이 있을 때만 같은 기록부에 이어 간다.
+새 기록부는 --init-ledger 를 줘야 만든다. basket 은 live 에서 선택할 수 없다.
 증거에는 허용 필드만 저장한다. 추가 필드 값과 응답 원문은 저장하지 않는다.
+비정상 응답 본문은 메모리에서만 분류하고 종류와 가린 모양만 남긴다.
 """
 from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
+import re
+import socket
 import sys
 import time
 import unittest
@@ -30,7 +36,9 @@ from api import mall_ai_api as M    # noqa: E402
 
 LIVE_CODES = ("124401", "124407", "124409")
 LIVE_CALLS = {"single": LIVE_CODES[:1], "triple": LIVE_CODES}
-LIVE_BUDGET = 3
+# 사용자 작업용 내부 상한이다(2026-11-09 사용자 지시, 누적). API 공식 제한이 아니다. 공식 제한은 호출당 상품 50개다.
+INTERNAL_RUNNER_LIVE_BUDGET = 10
+RESUME_REASON_MIN_CHARS = 8
 KST = timezone(timedelta(hours=9))
 
 
@@ -40,6 +48,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--call", choices=tuple(LIVE_CALLS), help="live only")
     parser.add_argument("--ledger", help="live call ledger json (required for live)")
     parser.add_argument("--out", help="result json path")
+    parser.add_argument("--resume-reason", help="live only: why to continue after an abnormal call (recorded)")
+    parser.add_argument("--init-ledger", action="store_true", help="live only: create a new ledger (must not exist)")
+    parser.add_argument("--request-profile", choices=sorted(M.REQUEST_PROFILES), default="default",
+                        help="live only: request headers, to separate client effects from server behaviour")
     return parser
 
 
@@ -116,21 +128,159 @@ def run_offline(out: str | None) -> int:
 
 # ---------------------------------------------------------------- live (price only)
 
+_IPV4_RE = re.compile(r"(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\d.])")
+_DENY_WORDS = ("denied", "forbidden", "not allowed", "not permitted", "unauthorized", "blocked", "refused",
+               "접근", "거부", "차단", "권한", "불가")
+_ALLOWLIST_WORDS = ("whitelist", "allowlist", "allowed ip", "ip not", "허용", "아이피", "등록된 ip", "허가")
+_DEBUG_WORDS = ("debug", "var_dump", "print_r", "array(", "notice:", "warning:", "fatal error", "stack trace", "sql")
+_SCAN_CHARS = 4096
+_SHAPE_MAX_CHARS = 64
+_WORD_MAX_CHARS = 16
+
+
+def _shape(text: str) -> str:
+    """글자 종류만 남긴다. 숫자 9, 영문 a, 그 밖의 글자 가, 공백 _, 기호는 그대로."""
+    out = []
+    for ch in text:
+        if ch.isascii() and ch.isdigit():
+            out.append("9")
+        elif ch.isascii() and ch.isalpha():
+            out.append("a")
+        elif ch.isspace():
+            out.append("_")
+        elif ch.isascii():
+            out.append(ch)
+        else:
+            out.append("가")
+    return "".join(out)
+
+
+def _masked_text(text: str) -> str:
+    """짧은 비JSON 문구에서 숫자를 모두 가리고 긴 단어를 가린다. IP, 키, 금액 값이 남지 않는다."""
+    def token(match):
+        word = match.group(0)
+        if len(word) > _WORD_MAX_CHARS and not _IPV4_RE.fullmatch(word):
+            return "[long]"
+        if re.search(r"\d", word) and re.search(r"[^\W\d_]", word):    # 글자와 숫자가 섞이면 키일 수 있다
+            return "[mixed]"
+        return re.sub(r"\d", "9", word)
+
+    return re.sub(r"\S+", token, text)
+
+
+def _resolve_server_ips() -> set:
+    try:
+        return {info[4][0] for info in socket.getaddrinfo(M.API_HOST, 443, proto=socket.IPPROTO_TCP)}
+    except OSError:
+        return set()
+
+
+def _local_ips() -> set:
+    try:
+        return {info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None, proto=socket.IPPROTO_TCP)}
+    except OSError:
+        return set()
+
+
+def _ipv4_relation(found: list) -> list:
+    """응답의 IP 가 무엇인지 메모리에서 비교한다. 값이 아니라 관계만 돌려준다."""
+    server, local = _resolve_server_ips(), _local_ips()
+    rows = []
+    for raw in found[:4]:
+        address = ipaddress.ip_address(raw)
+        rows.append({"is_private": address.is_private, "matches_mall_server_dns": raw in server,
+                     "matches_local_interface": raw in local})
+    return rows
+
+
+def _json_values(text: str) -> list:
+    """앞에서부터 JSON 값의 종류를 읽는다. 값 자체는 돌려주지 않는다."""
+    decoder = json.JSONDecoder()
+    kinds, pos = [], len(text) - len(text.lstrip())
+    while pos < len(text) and len(kinds) < 16:
+        try:
+            value, end = decoder.raw_decode(text, pos)
+        except ValueError:
+            kinds.append("not_json")
+            break
+        kinds.append(type(value).__name__)
+        pos = end + len(text[end:]) - len(text[end:].lstrip())
+    return kinds
+
+
+def classify_body(body: bytes) -> dict:
+    """비정상 응답을 메모리에서만 분류한다. 값이 아니라 종류와 모양만 돌려준다."""
+    result = {"kind": "plain_text_other", "ipv4_count": 0, "keyword_groups": []}
+    if not body.strip():
+        result["kind"] = "empty"
+        return result
+    try:
+        text = body[3:].decode("utf-8") if body.startswith(b"\xef\xbb\xbf") else body.decode("utf-8")
+    except UnicodeDecodeError:
+        result["kind"] = "non_utf8"
+        return result
+    stripped = text.strip()
+    scan = stripped[:_SCAN_CHARS]
+    lowered = scan.lower()
+    ips = _IPV4_RE.findall(scan)
+    result["ipv4_count"] = len(ips)
+    groups = {"deny": _DENY_WORDS, "allowlist": _ALLOWLIST_WORDS, "debug": _DEBUG_WORDS}
+    result["keyword_groups"] = [g for g, words in groups.items() if any(w in lowered for w in words)]
+    kinds = _json_values(scan) if len(stripped) <= _SCAN_CHARS else []
+    result["json_value_kinds"] = kinds
+    result["leading_whitespace"] = len(text) - len(text.lstrip())
+    result["trailing_whitespace"] = len(text) - len(text.rstrip())
+    if ips:
+        result["ipv4_relation"] = _ipv4_relation(ips)
+    if len(stripped) <= _SHAPE_MAX_CHARS:
+        result["shape"] = _shape(stripped)
+        if not stripped.startswith(("<", "{", "[")):
+            result["text_digits_masked"] = _masked_text(stripped)
+    if stripped.startswith("<"):
+        result["kind"] = "html"
+    elif len(kinds) == 1 and kinds[0] != "not_json":
+        result["kind"] = "json_document"
+    elif len(kinds) > 1 and all(k in ("dict", "list") for k in kinds):
+        result["kind"] = "concatenated_json"
+    elif ips and _IPV4_RE.fullmatch(stripped):
+        result["kind"] = "ipv4_only"
+    elif "allowlist" in result["keyword_groups"]:
+        result["kind"] = "ip_allowlist_error"
+    elif "deny" in result["keyword_groups"]:
+        result["kind"] = "access_denied"
+    elif ips:
+        result["kind"] = "ipv4_with_text"
+    elif "debug" in result["keyword_groups"]:
+        result["kind"] = "debug_output"
+    return result
+
+
 class _Recording:
-    """응답 크기·해시·형식만 기록한다. 본문은 남기지 않는다."""
+    """응답 크기·해시·형식과 분류만 기록한다. 본문은 남기지 않는다."""
 
     basket_write_allowed = False
 
-    def __init__(self, inner):
+    def __init__(self, inner, prior_entries=()):
         self.inner = inner
+        self.prior_entries = prior_entries
         self.meta = {}
 
     def get(self, url, *, timeout, max_bytes):
         response = self.inner.get(url, timeout=timeout, max_bytes=max_bytes)
         stripped = response.body.strip()
+        digest = hashlib.sha256(response.body).hexdigest()
+        try:
+            diagnosis = classify_body(response.body)
+        except Exception as exc:    # 진단이 죽어 호출 기록을 잃지 않게 한다(API-011)
+            diagnosis = {"kind": "classifier_error", "error": type(exc).__name__}
         self.meta = {"http_status": response.status, "content_type": response.content_type,
-                     "bytes": len(response.body), "body_sha256": hashlib.sha256(response.body).hexdigest(),
-                     "starts_with_brace": stripped.startswith(b"{"), "ends_with_brace": stripped.endswith(b"}")}
+                     "bytes": len(response.body), "starts_with_brace": stripped.startswith(b"{"),
+                     "ends_with_brace": stripped.endswith(b"}"), "diagnosis": diagnosis,
+                     "same_body_as_seq": [e["seq"] for e in self.prior_entries if e.get("body_sha256") == digest]}
+        if diagnosis.get("ipv4_count") or diagnosis["kind"] == "classifier_error":
+            self.meta["body_sha256_withheld"] = "short body with an IPv4 can be recovered from its hash"
+        else:
+            self.meta["body_sha256"] = digest
         return response
 
 
@@ -138,17 +288,24 @@ def _read_ledger(path: Path) -> list:
     if not path.exists():
         return []
     entries = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(entries, list):
+    if not isinstance(entries, list) or not all(isinstance(e, dict) for e in entries):
         raise SystemExit("ledger format invalid")
+    if [e.get("seq") for e in entries] != list(range(1, len(entries) + 1)):
+        raise SystemExit("ledger seq broken: entries must stay in place")
     return entries
 
 
-def run_live(call: str | None, ledger: str | None, out: str | None) -> int:
+def run_live(call: str | None, ledger: str | None, out: str | None, *, resume_reason: str | None = None,
+             init_ledger: bool = False, request_profile: str = "default") -> int:
     if call not in LIVE_CALLS or not ledger or not out:
         print("live needs --call single|triple --ledger --out", file=sys.stderr)
         return 2
     codes = LIVE_CALLS[call]
     path = Path(ledger)
+    if init_ledger == path.exists():    # 없는 파일로 예산을 새로 시작하지 않는다
+        print("blocked: --init-ledger is only for a ledger that does not exist yet, and is required for one",
+              file=sys.stderr)
+        return 3
     lock = path.with_name(path.name + ".lock")
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -159,21 +316,30 @@ def run_live(call: str | None, ledger: str | None, out: str | None) -> int:
     os.close(fd)
     try:
         entries = _read_ledger(path)
-        if len(entries) >= LIVE_BUDGET:
-            print("blocked: live budget exhausted (%d)" % len(entries), file=sys.stderr)
+        if len(entries) >= INTERNAL_RUNNER_LIVE_BUDGET:
+            print("blocked: internal runner budget exhausted (%d)" % len(entries), file=sys.stderr)
             return 3
-        if entries and entries[-1].get("outcome") != "ok":
-            print("blocked: previous live call was not ok; investigate first", file=sys.stderr)
+        abnormal = bool(entries) and entries[-1].get("outcome") != "ok"
+        reason = (resume_reason or "").strip()
+        if abnormal and len(reason) < RESUME_REASON_MIN_CHARS:
+            print("blocked: previous live call was not ok; give --resume-reason to continue", file=sys.stderr)
+            return 3
+        if reason and not abnormal:
+            print("blocked: --resume-reason is only for continuing after an abnormal call", file=sys.stderr)
             return 3
         if entries:
             wait = 1.0 - (time.time() - entries[-1]["epoch"])
             if wait > 0:
                 time.sleep(wait)
         entry = {"seq": len(entries) + 1, "at": _now(), "epoch": time.time(), "api": "price",
-                 "pd_nos": list(codes), "outcome": "started"}
+                 "pd_nos": list(codes), "outcome": "started", "request_profile": request_profile,
+                 "actual_basket_calls": 0, "body_persisted": False}
+        if abnormal:
+            entry["resume"] = {"reason": reason, "after_seq": entries[-1]["seq"], "after_code": entries[-1].get("code")}
+        prior = list(entries)
         entries.append(entry)
         _write_json(str(path), entries)     # 나가기 전에 먼저 적는다. 죽어도 호출 수가 남는다
-        recording = _Recording(M.LivePriceTransport(max_calls=1))
+        recording = _Recording(M.LivePriceTransport(max_calls=1, request_profile=request_profile), prior)
         evidence = {"at": entry["at"], "seq": entry["seq"], "target": "real price GET (production mall, read only)",
                     "real_basket": "not_run", "url_masked": M.mask_url(M.build_price_url(codes)), "pd_nos": list(codes)}
         try:
@@ -183,7 +349,8 @@ def run_live(call: str | None, ledger: str | None, out: str | None) -> int:
                        "detail": exc.detail}
             entry.update(failure)
             evidence.update(failure)
-            print("live error code=%s status=%s detail=%s" % (exc.code, failure["http_status"], exc.detail))
+            print("live error code=%s status=%s detail=%s diagnosis=%s" % (
+                exc.code, failure["http_status"], exc.detail, json.dumps(recording.meta.get("diagnosis"))))
             return_code = 1
         else:
             entry.update(recording.meta)
@@ -205,11 +372,12 @@ def main(argv=None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if args.mode == "offline":
-        if args.call or args.ledger:
-            print("--call/--ledger are live only", file=sys.stderr)
+        if args.call or args.ledger or args.resume_reason or args.init_ledger or args.request_profile != "default":
+            print("--call/--ledger/--resume-reason/--init-ledger/--request-profile are live only", file=sys.stderr)
             return 2
         return run_offline(args.out)
-    return run_live(args.call, args.ledger, args.out)
+    return run_live(args.call, args.ledger, args.out, resume_reason=args.resume_reason,
+                    init_ledger=args.init_ledger, request_profile=args.request_profile)
 
 
 if __name__ == "__main__":
