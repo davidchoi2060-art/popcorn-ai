@@ -2,6 +2,7 @@
 /* ASUS 기획전 브라우저 끝단 검증 — 실제 앱 + CI 일회용 DB + Chrome(CDP, 의존성 없음).
  * run_asus_campaign_browser.py 가 부른다. 1440 · 390 각각: 관리자 편집 → 저장 → 재조회 → 고객 표시.
  * 응답을 꾸며 넣는 구간(실패 · 빈 결과 · 미정 가격 · 지연)은 결과에 kind:'intercept' 로 구분한다. 나머지는 kind:'real'.
+ * 단, 몰 사진 파일(/data/pimg/)은 전 구간에서 대역 그림이다. real 항목이 보는 것은 사진의 주소·대응·로드·디코드이고 쇼핑몰 원본이 아니다.
  * 문의 전송(purchase-inquiries)은 네트워크 단계에서 끊고, 시도가 한 번이라도 있으면 실패로 본다. */
 const fs = require('fs');
 const os = require('os');
@@ -13,6 +14,11 @@ const sessions = JSON.parse(fs.readFileSync(SECRET, 'utf8'));
 const results = [];
 const CHROME = process.env.CHROME_BIN || ['/usr/bin/google-chrome', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find((p) => fs.existsSync(p));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 몰 사진(www.popcornpc.co.kr/data/pimg/)은 실제 쇼핑몰로 내보내지 않고 저장소 그림으로 대신 응답한다(2026-11-10).
+// CI 가 쇼핑몰 응답 속도에 묶여 20초 대기를 넘기는 실패가 반복됐다(run 42179373527 · 42223691868).
+// 이 검증이 보는 것은 «받은 사진을 화면이 제대로 쓰는가» 이고, 쇼핑몰에 그 사진이 실제로 있는지는 여기서 보지 않는다.
+const MALL_PHOTO = '/data/pimg/';
+const MALL_PHOTO_STUB = fs.readFileSync(path.join(__dirname, '..', '..', 'mockups', 'mvp4', 'assets', 'images', 'asus', 'gt502-black-cutout.webp')).toString('base64');
 
 function record(name, ok, kind, detail) {
   results.push({ name, ok: !!ok, kind, detail: detail === undefined ? null : detail });
@@ -43,7 +49,7 @@ class Cdp {
 
 class Page {
   constructor(cdp, sid) {
-    this.cdp = cdp; this.sid = sid; this.rules = []; this.exceptions = []; this.inquiryAttempts = 0; this.puts = 0;
+    this.cdp = cdp; this.sid = sid; this.rules = []; this.exceptions = []; this.inquiryAttempts = 0; this.puts = 0; this.mallPhotoStubs = 0;
     cdp.handlers.push((d) => {
       if (d.sessionId !== sid) return;
       if (d.method === 'Runtime.exceptionThrown') this.exceptions.push(d.params.exceptionDetails.exception ? d.params.exceptionDetails.exception.description : d.params.exceptionDetails.text);
@@ -61,6 +67,13 @@ class Page {
       return this.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'BlockedByClient' });
     }
     const rule = this.rules.find((r) => url.includes(r.match) && (!r.method || r.method === p.request.method));
+    // 규칙(사진 실패 재현 등)이 없을 때의 몰 사진은 대역 그림으로 응답한다. 규칙이 있으면 규칙이 먼저다.
+    if (!rule && url.includes(MALL_PHOTO)) {
+      this.mallPhotoStubs += 1;
+      return this.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'image/webp' }, { name: 'Cache-Control', value: 'no-store' }],
+        body: MALL_PHOTO_STUB });
+    }
     if (!rule) return this.send('Fetch.continueRequest', { requestId: p.requestId });
     if (rule.delay) await sleep(rule.delay);
     if (rule.delay && !rule.status && !rule.abort) return this.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
@@ -577,6 +590,8 @@ async function runWidth(page, w) {
     }
     try { await runCarousel(page); } catch (e) { record('배너 측정 중단', false, 'real', e.message); await page.shot('banner-aborted').catch(() => {}); }
     record('문의 전송 시도 0건', page.inquiryAttempts === 0, 'real', page.inquiryAttempts);
+    // 몰 사진을 대역 그림으로 바꿔 응답한 횟수를 결과에 남긴다(실제 쇼핑몰 응답이 아님을 숨기지 않는다).
+    record('몰 사진은 대역 그림으로 응답(실제 쇼핑몰 미접속)', true, 'intercept', { stubbed: page.mallPhotoStubs });
     record('화면 스크립트 예외 0건', page.exceptions.length === 0, 'real', page.exceptions.slice(0, 5));
     code = results.every((r) => r.ok) ? 0 : 1;
   } catch (e) {
