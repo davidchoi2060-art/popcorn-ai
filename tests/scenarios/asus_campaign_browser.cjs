@@ -2,6 +2,7 @@
 /* ASUS 기획전 브라우저 끝단 검증 — 실제 앱 + CI 일회용 DB + Chrome(CDP, 의존성 없음).
  * run_asus_campaign_browser.py 가 부른다. 1440 · 390 각각: 관리자 편집 → 저장 → 재조회 → 고객 표시.
  * 응답을 꾸며 넣는 구간(실패 · 빈 결과 · 미정 가격 · 지연)은 결과에 kind:'intercept' 로 구분한다. 나머지는 kind:'real'.
+ * 단, 몰 사진 파일(/data/pimg/)은 전 구간에서 대역 그림이다. real 항목이 보는 것은 사진의 주소·대응·로드·디코드이고 쇼핑몰 원본이 아니다.
  * 문의 전송(purchase-inquiries)은 네트워크 단계에서 끊고, 시도가 한 번이라도 있으면 실패로 본다. */
 const fs = require('fs');
 const os = require('os');
@@ -13,6 +14,11 @@ const sessions = JSON.parse(fs.readFileSync(SECRET, 'utf8'));
 const results = [];
 const CHROME = process.env.CHROME_BIN || ['/usr/bin/google-chrome', 'C:/Program Files/Google/Chrome/Application/chrome.exe'].find((p) => fs.existsSync(p));
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 몰 사진(www.popcornpc.co.kr/data/pimg/)은 실제 쇼핑몰로 내보내지 않고 저장소 그림으로 대신 응답한다(2026-11-10).
+// CI 가 쇼핑몰 응답 속도에 묶여 20초 대기를 넘기는 실패가 반복됐다(run 42179373527 · 42223691868).
+// 이 검증이 보는 것은 «받은 사진을 화면이 제대로 쓰는가» 이고, 쇼핑몰에 그 사진이 실제로 있는지는 여기서 보지 않는다.
+const MALL_PHOTO = '/data/pimg/';
+const MALL_PHOTO_STUB = fs.readFileSync(path.join(__dirname, '..', '..', 'mockups', 'mvp4', 'assets', 'images', 'asus', 'gt502-black-cutout.webp')).toString('base64');
 
 function record(name, ok, kind, detail) {
   results.push({ name, ok: !!ok, kind, detail: detail === undefined ? null : detail });
@@ -43,7 +49,7 @@ class Cdp {
 
 class Page {
   constructor(cdp, sid) {
-    this.cdp = cdp; this.sid = sid; this.rules = []; this.exceptions = []; this.inquiryAttempts = 0; this.puts = 0;
+    this.cdp = cdp; this.sid = sid; this.rules = []; this.exceptions = []; this.inquiryAttempts = 0; this.puts = 0; this.mallPhotoStubs = 0;
     cdp.handlers.push((d) => {
       if (d.sessionId !== sid) return;
       if (d.method === 'Runtime.exceptionThrown') this.exceptions.push(d.params.exceptionDetails.exception ? d.params.exceptionDetails.exception.description : d.params.exceptionDetails.text);
@@ -61,6 +67,13 @@ class Page {
       return this.send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'BlockedByClient' });
     }
     const rule = this.rules.find((r) => url.includes(r.match) && (!r.method || r.method === p.request.method));
+    // 규칙(사진 실패 재현 등)이 없을 때의 몰 사진은 대역 그림으로 응답한다. 규칙이 있으면 규칙이 먼저다.
+    if (!rule && url.includes(MALL_PHOTO)) {
+      this.mallPhotoStubs += 1;
+      return this.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200,
+        responseHeaders: [{ name: 'Content-Type', value: 'image/webp' }, { name: 'Cache-Control', value: 'no-store' }],
+        body: MALL_PHOTO_STUB });
+    }
     if (!rule) return this.send('Fetch.continueRequest', { requestId: p.requestId });
     if (rule.delay) await sleep(rule.delay);
     if (rule.delay && !rule.status && !rule.abort) return this.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
@@ -234,6 +247,10 @@ async function checkDetails(page, tag) {
 // 홈 배너: 실제 시간을 잰다. 1번 ASUS 6초, 나머지 3초, 멈춤 조건은 그대로.
 const WATCH = "(function(){var r=document.querySelector('[data-home-carousel]');window.__hc=[[r.dataset.activeSlide,performance.now()]];new MutationObserver(function(){var l=window.__hc[window.__hc.length-1];if(l[0]!==r.dataset.activeSlide)window.__hc.push([r.dataset.activeSlide,performance.now()]);}).observe(r,{attributes:true,attributeFilter:['data-active-slide']});return true})()";
 const ROOT = "document.querySelector('[data-home-carousel]')";
+// pc-catalog 응답을 받아 상태가 정해진 시점(성공 · 빈 목록 · 실패 모두). 홈의 두 번째 그리기는 이 값이 바뀐 직후 같은 작업 안에서 끝난다.
+// 배너 노드가 문서에 나타날 때마다 기록한다(같은 노드는 한 번만). 문서 시작 전에 심어야 첫 그리기를 놓치지 않는다.
+const ROOT_TRACK = "(function(){window.__roots=[];function chk(){var r=document.querySelector('[data-home-carousel]');if(r&&window.__roots.indexOf(r)<0)window.__roots.push(r);}new MutationObserver(chk).observe(document,{childList:true,subtree:true});})()";
+const CATALOG_DONE = "!!(window.PAI&&PAI.live&&PAI.live.state!=='loading')";
 // 자동 넘김을 막는 조건 전부. 실패 메시지와 단계 로그에 그대로 싣는다.
 const CAROUSEL_STATE = "(function(){var r=document.querySelector('[data-home-carousel]');if(!r)return {url:location.href,ready:document.readyState,root:false};var b=r.getBoundingClientRect(),a=document.activeElement;return {url:location.href,ready:document.readyState,hidden:document.hidden,visibility:document.visibilityState,hasFocus:document.hasFocus(),active:a?a.tagName+'.'+a.className:null,activeInRoot:r.contains(a),hover:r.matches(':hover'),rect:[Math.round(b.top),Math.round(b.bottom),Math.round(b.width)],scrollY:Math.round(scrollY),innerHeight:innerHeight,autoplay:r.dataset.autoplay,activeSlide:r.dataset.activeSlide,transitioning:r.dataset.transitioning,reducedMotion:matchMedia('(prefers-reduced-motion: reduce)').matches,log:(window.__hc||[]).slice(-4).map(function(e){return [e[0],Math.round(e[1])]}),now:Math.round(performance.now())}})()";
 async function runCarousel(page) {
@@ -255,12 +272,35 @@ async function runCarousel(page) {
   const openHome = async () => {
     await page.go('/mvp4/index.html');
     await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+    // 홈은 pc-catalog 응답 뒤에 한 번 더 그려진다. 응답이 끝난 뒤를 기다려 측정이 응답 시점에 좌우되지 않게 한다.
+    await page.until(CATALOG_DONE, 30000);
     await page.send('Page.bringToFront');
     await pointerOutside();
     await page.js("window.scrollTo(0,0);document.activeElement&&document.activeElement.blur&&document.activeElement.blur()");
     await page.js(WATCH);
   };
   const quiet = async (ms) => { const n = await page.js('window.__hc.length'); await sleep(ms); return (await page.js('window.__hc.length')) === n; };
+  // 홈이 catalog 응답 뒤 다시 그려져도 배너는 그대로여야 한다.
+  // (1) 응답을 꾸미지 않는다(real). 문서 시작부터 배너 노드가 몇 번 바뀌는지 세고, pc-catalog 응답 처리가 끝난 뒤 센다.
+  const seen = await page.send('Page.addScriptToEvaluateOnNewDocument', { source: ROOT_TRACK });
+  await page.go('/mvp4/index.html');
+  await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+  await page.until(CATALOG_DONE, 30000);
+  const tracked = await page.js("({nodes:window.__roots.length,replaced:window.__roots.length>1,inDoc:window.__roots.every(function(n,i){return i===window.__roots.length-1||!document.contains(n)}),live:document.querySelectorAll('[data-home-carousel]').length,state:PAI.live.state})");
+  await page.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: seen.identifier });
+  record('catalog 응답 뒤에도 배너 노드가 같다(한 번만 그려짐)', tracked.nodes === 1 && tracked.live === 1, 'real', tracked);
+  // (2) 응답을 2.5초 늦춘다(실제 응답을 그대로 전달, intercept). 첫 그리기 직후 상태를 바꿔 두고 응답 처리 뒤에 이어지는지 본다.
+  // 응답을 2.5초 늦춰(실제 응답을 그대로 전달, kind:'intercept') 첫 그리기 직후에 노드·상태를 잡고, 응답 처리가 끝난 뒤 비교한다.
+  page.rules = [{ match: '/api/customer/pc-catalog', delay: 2500 }];
+  await page.go('/mvp4/index.html');
+  await page.until(ROOT + "&&" + ROOT + ".dataset.mounted==='true'");
+  const before = await page.js("(function(){var r=" + ROOT + ";window.__node0=r;var t=r.querySelector('[data-hc-toggle]');r.querySelector('[data-hc-go=\"3\"]').click();t.focus({preventScroll:true});return {loading:PAI.live.state==='loading',slide:r.dataset.activeSlide,paused:r.dataset.autoplay,focus:r.contains(document.activeElement)}})()");
+  await page.until(CATALOG_DONE, 30000);
+  const afterCatalog = await page.js("(function(){var r=" + ROOT + ";return {same:r===window.__node0,inDoc:document.contains(window.__node0),slide:r.dataset.activeSlide,paused:r.dataset.autoplay,focus:r.contains(document.activeElement),toggleFocused:document.activeElement===r.querySelector('[data-hc-toggle]'),count:document.querySelectorAll('[data-home-carousel]').length}})()");
+  page.rules = [];
+  record('배너 측정 전제: catalog 응답 전에 배너가 먼저 그려짐', before.loading === true && before.slide === '4' && before.focus === true, 'intercept', before);
+  record('catalog 응답 뒤에도 배너 노드 · 슬라이드 · 정지 · 포커스 유지', afterCatalog.same && afterCatalog.inDoc && afterCatalog.count === 1 && afterCatalog.slide === '4' && afterCatalog.paused === 'paused' && afterCatalog.toggleFocused, 'intercept', afterCatalog);
+
   await openHome();
   await step('initial');
   record('배너 첫 화면이 ASUS', await page.js("!document.querySelector('.hc-asus').hidden&&" + ROOT + ".dataset.activeSlide==='1'&&document.querySelector('.hc-slide').classList.contains('hc-asus')"), 'real');
@@ -570,13 +610,15 @@ async function runWidth(page, w) {
     await page.send('Runtime.enable');
     await page.send('Network.enable');
     await page.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/*' }] });
+    await page.send('Fetch.enable', { patterns: [{ urlPattern: '*asus-campaign*' }, { urlPattern: '*purchase-inquiries*' }, { urlPattern: '*/data/pimg/*' }, { urlPattern: '*/images/parts/*' }, { urlPattern: '*/api/customer/pc-catalog*' }] });
 
     for (const w of [1440, 390]) {
       try { await runWidth(page, w); } catch (e) { record(w + ' 진행 중단', false, 'real', e.message); await page.shot(w + '-99-aborted').catch(() => {}); }
     }
     try { await runCarousel(page); } catch (e) { record('배너 측정 중단', false, 'real', e.message); await page.shot('banner-aborted').catch(() => {}); }
     record('문의 전송 시도 0건', page.inquiryAttempts === 0, 'real', page.inquiryAttempts);
+    // 몰 사진을 대역 그림으로 바꿔 응답한 횟수를 결과에 남긴다(실제 쇼핑몰 응답이 아님을 숨기지 않는다).
+    record('몰 사진은 대역 그림으로 응답(실제 쇼핑몰 미접속)', true, 'intercept', { stubbed: page.mallPhotoStubs });
     record('화면 스크립트 예외 0건', page.exceptions.length === 0, 'real', page.exceptions.slice(0, 5));
     code = results.every((r) => r.ok) ? 0 : 1;
   } catch (e) {
