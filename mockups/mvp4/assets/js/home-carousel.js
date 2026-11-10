@@ -153,13 +153,24 @@
     if('IntersectionObserver' in window){new IntersectionObserver(function(entries){inView=entries[0].isIntersecting;schedule();},{threshold:0.15}).observe(root);}
     show(0,false);
   }
+  // 홈은 catalog 응답 뒤에 한 번 더 그려진다(design-boot). 배너 마크업은 응답과 무관하므로, 이미 붙어 있는 배너 노드를
+  // 새 마크업 자리에 도로 끼운다. 노드가 같으면 슬라이드·정지/재생·타이머·리스너·관찰자가 한 벌로 이어진다.
+  // 포커스는 노드를 떼는 순간 사라지므로 그리기 전에 기억해 두었다가 되돌린다.
+  function keepMounted(kept,keptFocus){
+    var fresh=document.querySelector('[data-home-carousel]');
+    if(!kept||!fresh||fresh===kept||kept.dataset.mounted!=='true')return;
+    fresh.replaceWith(kept);
+    if(keptFocus&&kept.contains(keptFocus))keptFocus.focus({preventScroll:true});
+  }
   P.designScreens.home=function(options){
+    var kept=document.querySelector('[data-home-carousel][data-mounted="true"]');
+    var keptFocus=kept&&kept.contains(document.activeElement)?document.activeElement:null;
     var result=original(options), oldMount=result.mount;
     var start=result.html.indexOf('<section class="hm-hero ');
     var end=result.html.indexOf('</section>',start)+10;
     if(start<0||end<10)return result;
     result.html=result.html.slice(0,start)+render()+result.html.slice(end);
-    result.mount=function(){if(oldMount)oldMount();mount();};
+    result.mount=function(){if(oldMount)oldMount();keepMounted(kept,keptFocus);mount();};
     return result;
   };
 }());

@@ -21,6 +21,8 @@
     return originalHref(page, params);
   };
 
+  // 홈은 다시 그려질 때 배너 노드를 그대로 둔다(home-carousel.js). 이미 오류 처리를 단 img 에 한 번 더 달지 않는다.
+  var errorBound = new WeakSet();
   function paint(state) {
     var renderer = P.designScreens[screen];
     var result = renderer({ state: state, productId: q.get('id'), query: q });
@@ -34,6 +36,7 @@
     var search = document.querySelector('[data-search-form]');
     if (search) { var clone = search.cloneNode(true); search.replaceWith(clone); clone.addEventListener('submit', function (e) { e.preventDefault(); location.href = P.designHref('catalog', 'normal', { q: clone.querySelector('input').value }); }); }
     document.querySelectorAll('img').forEach(function (img) {
+      if (errorBound.has(img)) return; errorBound.add(img);
       img.addEventListener('error', function () { if (img.classList.contains('icon') || img.hasAttribute('data-dp-photo') || !img.parentNode) return; img.hidden = true; var msg = document.createElement('span'); msg.className = 'ds-muted'; msg.textContent = '사진을 불러오지 못했어요'; img.parentNode.appendChild(msg); }, { once: true });
     });
   }
