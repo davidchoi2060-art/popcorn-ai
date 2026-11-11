@@ -579,6 +579,53 @@ def budget_lead(cards: list[dict], budget_won: int | None, reply: str, bound: st
             f"이 중 가장 낮은 가격은 {low:,}원으로 예산보다 {low - budget_won:,}원 높아요.")
 
 
+# 부품·PC 낱말 뒤 조사 -- 받침에 맞춘다(2026-11-07 dev 상담 작은 결함 1 「케이스을」). 낱말을 정해 둔 것만 고친다:
+# 아무 낱말에나 걸면 「가을」·「마을」 같은 낱말 자체를 바꾼다.
+_PARTICLE_NOUNS = ("케이스", "파워", "메모리", "쿨러", "모니터", "마우스", "키보드", "그래픽카드", "메인보드", "보드",
+                   "프로세서", "컴퓨터", "사양", "구성", "램", "저장공간", "그래픽", "본체", "제품", "상품")
+_PARTICLE_PAIRS = {"을": ("을", "를"), "를": ("을", "를"), "은": ("은", "는"), "는": ("은", "는"),
+                   "이": ("이", "가"), "가": ("이", "가"), "과": ("과", "와"), "와": ("과", "와")}
+_PARTICLE = re.compile("(" + "|".join(sorted(_PARTICLE_NOUNS, key=len, reverse=True)) + ")(을|를|은|는|이|가|과|와)"
+                       r"(?=[\s.,!?)」』]|$)")
+
+
+def fix_particles(text_: str) -> str:
+    """정해 둔 부품 낱말 뒤 을/를·은/는·이/가·과/와를 받침에 맞춘다. 다른 글자는 건드리지 않는다."""
+    def fix(m: re.Match) -> str:
+        noun, josa = m.group(1), m.group(2)
+        code = ord(noun[-1]) - 0xAC00
+        if not 0 <= code < 11172:
+            return m.group(0)
+        has_final = code % 28 != 0
+        pair = _PARTICLE_PAIRS[josa]
+        return noun + (pair[0] if has_final else pair[1])
+    return _PARTICLE.sub(fix, text_ or "")
+
+
+def budget_alt_line(book: TT.FactBook, reply: str, budget_won: int | None, bound: str | None = None) -> str | None:
+    """예산 안 판매 PC 가 이 턴 자료에 있는데 답이 그것을 빠뜨렸으면, 서버가 그 PC 를 한 줄로 밝힌다(검산).
+
+    2026-11-07 dev 상담 결함 A·B·C: 150만원 안 RX 7600 PC(1,152,500원·1,464,300원), 100만원 안 5500GT PC(759,300원)가
+    판매 중인데 상담이 「예산 안 없음」으로 끝났다. 근거는 서버가 이 턴에 찾은 PC(find_pcs 의 카드·낮춘 안)뿐이고,
+    금액은 그 PC 판매가 그대로다. 답이 그 PC 판매가를 이미 말했으면 붙이지 않는다.
+    낮춘 안은 늘 밝힌다. 일반 카드는 답이 «예산을 넘는다·없다»고 말했을 때만 밝힌다(예산 안 카드를 두고 그 말은 틀린 말이다).
+    """
+    if not budget_won or bound == "이상":
+        return None
+    said_over = any(says_budget_over(x) for x in _sentences(reply))
+    refs = list(book.alternatives) + ([r for r in book.found if r not in book.alternatives] if said_over else [])
+    within = [r for r in refs if type(book.items[r].get("price")) is int and book.items[r]["price"] <= budget_won]
+    if not within:
+        return None
+    if any(f"{book.items[r]['price']:,}" in (reply or "") for r in within):
+        return None
+    it = book.items[within[0]]
+    name = (it.get("name") or "").strip()[:60]
+    gap = f"({it['short_of']})" if it.get("short_of") else ""
+    return (f"예산 {budget_won:,}원 안에서는 「{name}」({it['price']:,}원)도 판매 중이에요{gap}. "
+            "원하시면 이 PC도 보여 드릴게요.")
+
+
 def _cards(book: TT.FactBook) -> list[dict]:
     refs = book.shown or []
     out = []
@@ -798,7 +845,9 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
         status = "failed" if status == "failed" or not reply else "partial"
         clean = TE.REPLY_AI_UNREADABLE
     # 「150만원이면 부족함 없이 충분해요」 한 문장만 온 턴은 그 문장이 걷혀도 서버 안내(예산·파워)가 답이 된다(F3 · R02).
-    clean = "\n\n".join(x for x in (game_line, lead, psu_line, clean, note) if x).strip()
+    alt_line = budget_alt_line(book, clean, budget_for_note, bound) if status != "failed" else None
+    clean = fix_particles(clean)
+    clean = "\n\n".join(x for x in (game_line, lead, psu_line, clean, note, alt_line) if x).strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked or source_masked) else []
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls

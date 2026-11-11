@@ -62,6 +62,7 @@ class FactBook:
     prices: set[int] = field(default_factory=set)           # 이 턴에 말해도 되는 금액(원)
     shown: list[str] = field(default_factory=list)          # show_pcs 로 고른 ref
     found: list[str] = field(default_factory=list)          # find_pcs 가 이 턴에 찾은 ref(엔진 순서)
+    alternatives: list[str] = field(default_factory=list)   # 요청 수준을 예산 안에서 못 맞출 때 서버가 준 낮춘 안 ref
     calls: list[dict] = field(default_factory=list)         # [{name, status}] -- 응답 meta 용
     request_text: str | None = None                       # 이 턴 실제 고객 문장(개인정보 마스킹 후)
     screen_action: dict | None = None                     # 저장/주문이 아닌 화면 이동 안내
@@ -423,6 +424,11 @@ def _relaxations(raw: dict, needs: list[str]) -> list[tuple[str, object]]:
     return steps
 
 
+BUDGET_ALT_RULE = ("요청 수준의 PC는 예산 안에 없지만 budget_alternatives 에 판매 중인 낮춘 안이 있다. 「예산 안 PC가 없다」고 "
+                   "단정하지 않는다. 낮춘 안의 이름·가격과 무엇이 요청보다 낮은지(short_of·reasons)를 밝혀 함께 소개하고, "
+                   "손님이 원하면 그 ref 로 show_pcs 한다. 요청 수준을 충족하는 것처럼 말하지 않는다.")
+
+
 def find_pcs(args: dict, book: FactBook) -> dict:
     from . import grid_public as GP
 
@@ -508,11 +514,26 @@ def find_pcs(args: dict, book: FactBook) -> dict:
             if ref not in book.found:
                 book.found.append(ref)
             out.append({"ref": ref, **_compact_item(it)})
-        sets.append({"usage": cs.get("usage"), "min_level": cs.get("min_level"),
-                     "min_level_work": cs.get("min_level_work"), "items": out,
-                     # 무엇을 기준으로 찾았는지(서버 문장 · G01) -- 답의 «필요 사양» 설명은 이 기준과 보여 준 PC 사양을 따른다.
-                     "demand": (cs.get("demand") or {}).get("notes") or [],
-                     "empty_reason": cs.get("empty_note") or cs.get("empty_reason")})
+        alts = []
+        for it in (cs.get("lower_options") or [])[:2]:
+            if type(it.get("product_code")) is not int:
+                continue
+            if asked_cap is not None and type(it.get("price")) is int:
+                it = {**it, "over_budget": it["price"] > asked_cap}
+            ref = book.add_item(it)
+            if ref not in book.alternatives:
+                book.alternatives.append(ref)
+            alts.append({"ref": ref, **_compact_item(it), "short_of": it.get("short_of")})
+        entry = {"usage": cs.get("usage"), "min_level": cs.get("min_level"),
+                 "min_level_work": cs.get("min_level_work"), "items": out,
+                 # 무엇을 기준으로 찾았는지(서버 문장 · G01) -- 답의 «필요 사양» 설명은 이 기준과 보여 준 PC 사양을 따른다.
+                 "demand": (cs.get("demand") or {}).get("notes") or [],
+                 "empty_reason": cs.get("empty_note") or cs.get("empty_reason")}
+        if alts:
+            # 요청 수준을 예산 안에서 못 맞췄지만 예산 안(또는 더 가까운) 낮춘 안이 있다(2026-11-07 dev 상담 결함 A·B·C).
+            entry["budget_alternatives"] = alts
+            entry["budget_alternatives_rule"] = BUDGET_ALT_RULE
+        sets.append(entry)
     found = sum(len(s["items"]) for s in sets)
     status = ("nearest" if relaxed else "ok") if found else ("needs" if res.get("needs") else "empty")
     extra = {"asked": asked, "relaxed": relaxed, "asked_needs": first_needs} if relaxed else {}

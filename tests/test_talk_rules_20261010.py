@@ -178,7 +178,7 @@ class CardNameTest(unittest.TestCase):
         self.assertEqual(card_name('골드 NO.04.90926MW [14400F/16G/250GB/RTX5060]'),
                          '골드 [14400F/16G/250GB/RTX5060]')
         self.assertEqual(card_name('엠에스파워 골드 NO.04 .123380 RTX 3050 [13500/16G/1TB/RTX3050]'),
-                         '엠에스파워 골드 RTX 3050 [13500/16G/1TB/RTX3050]')
+                         '엠에스파워 골드 [13500/16G/1TB/RTX3050]')
 
 
 class StorageShorthandTest(unittest.TestCase):
