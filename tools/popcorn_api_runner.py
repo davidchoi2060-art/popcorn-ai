@@ -8,7 +8,7 @@
 
 live 는 운영 몰에 price GET 을 보낸다. 문서 예시 3개 상품만, 기록부 기준 누적 10회까지, 호출 간 1초 이상이다.
 직전 호출이 비정상이면 멈추고, 사유를 적은 --resume-reason 이 있을 때만 같은 기록부에 이어 간다.
-새 기록부는 --init-ledger 를 줘야 만든다. basket 은 live 에서 선택할 수 없다.
+새 기록부는 --init-ledger 를 줘야 만든다. basket 은 사용자가 승인한 1회 시험(--api basket)만 있고 ok 인 price 직후에만 나간다.
 증거에는 허용 필드만 저장한다. 추가 필드 값과 응답 원문은 저장하지 않는다.
 비정상 응답 본문은 메모리에서만 분류하고 고정 종류와 글자 모양만 남긴다. 본문의 단어는 어떤 형태로도 남기지 않는다.
 """
@@ -39,6 +39,10 @@ LIVE_CALLS = {"single": LIVE_CODES[:1], "triple": LIVE_CODES}
 # 사용자 작업용 내부 상한이다(2026-11-09 사용자 지시, 누적). API 공식 제한이 아니다. 공식 제한은 호출당 상품 50개다.
 INTERNAL_RUNNER_LIVE_BUDGET = 10
 RESUME_REASON_MIN_CHARS = 8
+# 2026-11-11 사용자가 직접 승인한 실제 basket 시험. 기록부 전체에서 한 번뿐이고 주문·결제 경로는 없다.
+INTERNAL_RUNNER_BASKET_BUDGET = 1
+BASKET_APPROVAL_MIN_CHARS = 8
+_SAFE_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]{0,23}")
 KST = timezone(timedelta(hours=9))
 
 
@@ -46,6 +50,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="PopcornPC AI API test runner")
     parser.add_argument("--mode", choices=("offline", "live"), default="offline")
     parser.add_argument("--call", choices=tuple(LIVE_CALLS), help="live only")
+    parser.add_argument("--api", choices=("price", "basket"), default="price",
+                        help="live only: basket is one user-approved write to the real mall basket")
+    parser.add_argument("--basket-approval", help="basket only: the user's approval, recorded in the ledger")
+    parser.add_argument("--key-out", help="basket only: new file that receives the quote key (kept out of the ledger)")
     parser.add_argument("--ledger", help="live call ledger json (required for live)")
     parser.add_argument("--out", help="result json path")
     parser.add_argument("--resume-reason", help="live only: why to continue after an abnormal call (recorded)")
@@ -244,15 +252,17 @@ def classify_body(body: bytes) -> dict:
 class _Recording:
     """응답 크기·해시·형식과 분류만 기록한다. 본문은 남기지 않는다."""
 
-    basket_write_allowed = False
-
-    def __init__(self, inner, prior_entries=()):
+    def __init__(self, inner, prior_entries=(), *, keep_hash=True):
         self.inner = inner
         self.prior_entries = prior_entries
+        self.keep_hash = keep_hash
+        self.basket_write_allowed = getattr(inner, "basket_write_allowed", False) is True
         self.meta = {}
+        self.last_body = None       # 메모리 전용. 어디에도 쓰지 않는다
 
     def get(self, url, *, timeout, max_bytes):
         response = self.inner.get(url, timeout=timeout, max_bytes=max_bytes)
+        self.last_body = response.body
         stripped = response.body.strip()
         digest = hashlib.sha256(response.body).hexdigest()
         try:
@@ -263,7 +273,9 @@ class _Recording:
                      "bytes": len(response.body), "starts_with_brace": stripped.startswith(b"{"),
                      "ends_with_brace": stripped.endswith(b"}"), "diagnosis": diagnosis,
                      "same_body_as_seq": [e["seq"] for e in self.prior_entries if e.get("body_sha256") == digest]}
-        if (diagnosis.get("ipv4_count") or diagnosis["kind"] == "classifier_error"
+        if not self.keep_hash:
+            self.meta["body_sha256_withheld"] = "basket body carries the quote key"
+        elif (diagnosis.get("ipv4_count") or diagnosis["kind"] == "classifier_error"
                 or len(stripped) <= _SHAPE_MAX_CHARS):
             self.meta["body_sha256_withheld"] = "short body can be recovered from its hash"
         else:
@@ -354,15 +366,154 @@ def run_live(call: str | None, ledger: str | None, out: str | None, *, resume_re
         os.unlink(lock)
 
 
+class _LiveBasketOnce(M.LivePriceTransport):
+    """사용자가 승인한 시험 전용. 미리 정한 basket 주소 하나를 정확히 한 번만 보낸다. 재시도가 없다."""
+
+    def __init__(self, expected_url: str, *, opener=None):
+        super().__init__(max_calls=1, opener=opener)
+        self._expected = expected_url
+        self.basket_write_allowed = True
+
+    def get(self, url, *, timeout, max_bytes):
+        if url != self._expected or not url.startswith(M.API_URL + "?api_id=basket&") or self._calls:
+            raise M.MallApiError("basket_write_blocked")
+        self._calls += 1
+        return self._send(url, timeout, max_bytes)
+
+
+def _names(mapping) -> list:
+    return sorted(k for k in mapping if isinstance(k, str) and _SAFE_NAME_RE.fullmatch(k))
+
+
+def basket_shape(body, key: str) -> dict:
+    """basket 응답의 구조만 적는다. 키 이름과 타입, 링크가 기대와 같은지만 남기고 값은 남기지 않는다."""
+    try:
+        text = (body or b"").decode("utf-8-sig")
+        document = json.loads(text)
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return {"json": False}
+    if not isinstance(document, dict):
+        return {"json": True, "top_type": type(document).__name__}
+    shape = {"json": True, "top_keys": _names(document), "other_top_key_count": len(document) - len(_names(document)),
+             "result_type": type(document.get("result")).__name__, "result_is_ok": document.get("result") == "ok",
+             "has_error": "error" in document}
+    link = document.get("link")
+    shape["link"] = {"type": type(link).__name__}
+    if isinstance(link, str):
+        expected = M.expected_link(key)
+        shape["link"].update(equals_expected=link == expected, starts_with_origin=link.startswith(M.ORIGIN + "/"),
+                             has_basket_path=M.BASKET_LINK_PATH in link, has_key=key in link,
+                             length_delta=len(link) - len(expected))
+    items = document.get("items")
+    shape["items"] = {"type": type(items).__name__}
+    if isinstance(items, list):
+        rows = [i for i in items if isinstance(i, dict)]
+        shape["items"].update(count=len(items), dict_count=len(rows),
+                              keys=sorted({k for r in rows for k in _names(r)}),
+                              pd_no_types=sorted({type(r.get("pd_no")).__name__ for r in rows}),
+                              qty_types=sorted({type(r.get("qty")).__name__ for r in rows}))
+    return shape
+
+
+def run_live_basket(call: str | None, ledger: str | None, out: str | None, *, approval: str | None = None,
+                    key_out: str | None = None) -> int:
+    if call not in LIVE_CALLS or not ledger or not out or not key_out:
+        print("basket needs --call single|triple --ledger --out --key-out --basket-approval", file=sys.stderr)
+        return 2
+    codes = LIVE_CALLS[call]
+    path, key_path = Path(ledger), Path(key_out)
+    approval = (approval or "").strip()
+    if len(approval) < BASKET_APPROVAL_MIN_CHARS:
+        print("blocked: basket needs the user's approval text in --basket-approval", file=sys.stderr)
+        return 3
+    if not path.exists() or key_path.exists() or key_path.resolve().parent == path.resolve().parent:
+        print("blocked: basket needs the existing ledger and a new --key-out file outside the ledger folder",
+              file=sys.stderr)
+        return 3
+    lock = path.with_name(path.name + ".lock")
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        print("blocked: another live run holds the ledger lock", file=sys.stderr)
+        return 3
+    os.close(fd)
+    try:
+        entries = _read_ledger(path)
+        if len(entries) >= INTERNAL_RUNNER_LIVE_BUDGET:
+            print("blocked: internal runner budget exhausted (%d)" % len(entries), file=sys.stderr)
+            return 3
+        if sum(1 for e in entries if e.get("api") == "basket") >= INTERNAL_RUNNER_BASKET_BUDGET:
+            print("blocked: the one approved basket call is already in the ledger", file=sys.stderr)
+            return 3
+        last = entries[-1] if entries else {}
+        if not (last.get("api") == "price" and last.get("outcome") == "ok" and last.get("pd_nos") == list(codes)
+                and last.get("missing") == []):
+            print("blocked: basket runs only right after an ok price call for the same items", file=sys.stderr)
+            return 3
+        wait = 1.0 - (time.time() - last["epoch"])
+        if wait > 0:
+            time.sleep(wait)
+        key = M.new_quote_key()
+        lines = M.normalize_basket_lines(codes)
+        url = M.build_basket_url(key, lines)
+        fd = os.open(key_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(key + "\n")
+        entry = {"seq": len(entries) + 1, "at": _now(), "epoch": time.time(), "api": "basket",
+                 "pd_nos": list(codes), "qty_each": 1, "outcome": "started", "actual_basket_calls": 1,
+                 "body_persisted": False, "key_persisted_here": False, "approval": approval,
+                 "after_price_seq": last["seq"]}
+        prior = list(entries)
+        entries.append(entry)
+        _write_json(str(path), entries)     # 나가기 전에 먼저 적는다
+        recording = _Recording(_LiveBasketOnce(url), prior, keep_hash=False)
+        evidence = {"at": entry["at"], "seq": entry["seq"],
+                    "target": "real basket GET (production mall, one approved write, basket only)",
+                    "real_basket": "run_once", "url_masked": M.mask_url(url), "pd_nos": list(codes), "qty_each": 1}
+        try:
+            receipt = M.BasketClient(recording).replace(key, lines)
+        except M.MallApiError as exc:
+            failure = {"http_status": exc.http_status, **recording.meta, "outcome": "error", "code": exc.code,
+                       "outcome_unknown": exc.outcome_unknown, "detail": exc.detail,
+                       "response_shape": basket_shape(recording.last_body, key)}
+            entry.update(failure)
+            evidence.update(failure)
+            print("basket error code=%s unknown=%s status=%s shape=%s" % (
+                exc.code, exc.outcome_unknown, failure["http_status"], json.dumps(failure["response_shape"])))
+            return_code = 1
+        else:
+            done = {**recording.meta, "outcome": "ok", "lines": len(receipt.lines), "link_verified": True,
+                    "response_shape": basket_shape(recording.last_body, key)}
+            entry.update(done)
+            evidence.update(done)
+            print("basket ok lines=%d link_verified=True" % len(receipt.lines))
+            return_code = 0
+        _write_json(str(path), entries)
+        _write_json(out, evidence)
+        return return_code
+    finally:
+        os.unlink(lock)
+
+
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     if args.mode == "offline":
-        if args.call or args.ledger or args.resume_reason or args.init_ledger or args.request_profile != "default":
-            print("--call/--ledger/--resume-reason/--init-ledger/--request-profile are live only", file=sys.stderr)
+        if (args.call or args.ledger or args.resume_reason or args.init_ledger or args.request_profile != "default"
+                or args.api != "price" or args.basket_approval or args.key_out):
+            print("--call/--ledger/--resume-reason/--init-ledger/--request-profile/--api/--basket-approval/--key-out "
+                  "are live only", file=sys.stderr)
             return 2
         return run_offline(args.out)
+    if args.api == "basket":
+        if args.resume_reason or args.init_ledger or args.request_profile != "default":
+            print("basket takes no --resume-reason/--init-ledger/--request-profile", file=sys.stderr)
+            return 2
+        return run_live_basket(args.call, args.ledger, args.out, approval=args.basket_approval, key_out=args.key_out)
+    if args.basket_approval or args.key_out:
+        print("--basket-approval/--key-out are basket only", file=sys.stderr)
+        return 2
     return run_live(args.call, args.ledger, args.out, resume_reason=args.resume_reason,
                     init_ledger=args.init_ledger, request_profile=args.request_profile)
 

@@ -501,10 +501,11 @@ class Safety(Base):
             names = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
             names |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
             self.assertFalse(names & forbidden, path)
-        # 실제 코드에서 쓰기를 켜는 자리는 없다. 가짜만 켠다.
+        # 쓰기를 켜는 자리는 실행기의 사용자 승인 1회 시험용 transport 하나뿐이다. api/ 에는 없다.
         for path in list((ROOT / "api").glob("*.py")) + list((ROOT / "tools").glob("*.py")):
             text = path.read_text(encoding="utf-8", errors="replace")
-            self.assertNotRegex(text, r"basket_write_allowed\s*=\s*True", path.name)
+            allowed = 1 if path.name == "popcorn_api_runner.py" else 0
+            self.assertEqual(len(re.findall(r"basket_write_allowed\s*=\s*True", text)), allowed, path.name)
         for path in list((ROOT / "api").glob("*.py")):
             if path.name not in ("mall_ai_api.py", "mall_asus_cart.py"):
                 text = path.read_text(encoding="utf-8", errors="replace")
@@ -646,6 +647,133 @@ class LiveRunnerLocal(unittest.TestCase):
         self.assertEqual(self.read(self.out)["real_basket"], "not_run")
         self.assertEqual(self.read(self.ledger)[0]["outcome"], "ok")
         self.assertEqual(made[0].url, M.build_price_url(("124401",)))
+
+    def run_basket(self, reply_for, call="single", approval="user approved one basket", key_name="key.txt"):
+        made = []
+        key_dir = Path(self.dir.name) / "private"
+        key_dir.mkdir(exist_ok=True)
+        self.key_out = key_dir / key_name
+
+        class Fake:
+            basket_write_allowed = True
+
+            def __init__(self, expected_url, **_k):
+                self.url = expected_url
+                made.append(self)
+
+            def get(self, url, *, timeout, max_bytes):
+                self.sent = url
+                return reply_for(url)
+
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with patch.object(self.runner, "_LiveBasketOnce", Fake), \
+                contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = self.runner.run_live_basket(call, self.ledger, self.out, approval=approval,
+                                               key_out=str(self.key_out))
+        return code, made, stdout.getvalue() + stderr.getvalue()
+
+    @staticmethod
+    def basket_reply(url):
+        key = re.search(r"api_key=([A-Za-z0-9]{20})", url).group(1)
+        return ok_basket([{"pd_no": 124401, "qty": 1}], "https://popcornpc.co.kr/shop/order_basket_list.html?api_key=" + key)
+
+    def test_basket_runs_once_after_ok_price_and_keeps_key_out_of_records(self):
+        self.assertEqual(self.run_live(ok_price([product(124401)]))[0], 0)
+        code, made, printed = self.run_basket(self.basket_reply)
+        self.assertEqual(code, 0, printed)
+        key = self.key_out.read_text(encoding="utf-8").strip()
+        self.assertRegex(key, r"^[1-9][0-9]{19}$")
+        self.assertEqual(made[0].sent, M.build_basket_url(key, (M.BasketLine("124401", 1),)))
+        entry = self.read(self.ledger)[1]
+        self.assertEqual((entry["api"], entry["outcome"], entry["actual_basket_calls"], entry["lines"]),
+                         ("basket", "ok", 1, 1))
+        self.assertTrue(entry["response_shape"]["link"]["equals_expected"])
+        self.assertNotIn("body_sha256", [k for k in entry if k != "body_sha256_withheld"])
+        stored = Path(self.ledger).read_text(encoding="utf-8") + Path(self.out).read_text(encoding="utf-8") + printed
+        self.assertNotIn(key, stored)
+        self.assertNotIn(hashlib.sha256(self.basket_reply(made[0].sent).body).hexdigest(), stored)
+        self.assertEqual(self.read(self.out)["real_basket"], "run_once")
+        code, made2, _ = self.run_basket(self.basket_reply, key_name="key2.txt")     # 두 번째는 막힌다
+        self.assertEqual((code, made2), (3, []))
+        self.assertFalse((self.key_out).exists())
+        self.assertEqual(len(self.read(self.ledger)), 2)
+
+    def test_basket_blocked_without_ok_price_approval_or_safe_key_path(self):
+        code, made, _ = self.run_basket(self.basket_reply)                  # 기록부 없음
+        self.assertEqual((code, made), (3, []))
+        self.run_live(R(200, b"nope", "text/html"))                          # 직전 price 가 실패
+        code, made, _ = self.run_basket(self.basket_reply)
+        self.assertEqual((code, made), (3, []))
+        Path(self.ledger).unlink()
+        self.assertEqual(self.run_live(ok_price([product(124401)]))[0], 0)
+        for approval in (None, "", "ok", "       y       "):
+            code, made, _ = self.run_basket(self.basket_reply, approval=approval)
+            self.assertEqual((code, made), (3, []), approval)
+        code, made, _ = self.run_basket(self.basket_reply, call="triple")   # 직전 price 와 상품이 다르다
+        self.assertEqual((code, made), (3, []))
+        with contextlib.redirect_stderr(io.StringIO()):
+            code = self.runner.run_live_basket("single", self.ledger, self.out, approval="user approved one basket",
+                                               key_out=str(Path(self.dir.name) / "key.txt"))    # 기록부 폴더 안
+        self.assertEqual(code, 3)
+        self.assertEqual(len(self.read(self.ledger)), 1)
+        self.assertFalse(list(Path(self.dir.name).rglob("key*.txt")))
+
+    def test_basket_failure_records_shape_without_values_and_is_not_retried(self):
+        self.assertEqual(self.run_live(ok_price([product(124401)]))[0], 0)
+
+        def wrong(url):
+            return json_response({"result": "ok", "link": "https://www.popcornpc.co.kr/x?api_key=SECRETLINKVALUE",
+                                  "items": [{"pd_no": "124401", "qty": "1", "secret_field": "SECRETVALUE"}]})
+
+        code, made, printed = self.run_basket(wrong)
+        self.assertEqual(code, 1)
+        entry = self.read(self.ledger)[1]
+        self.assertEqual((entry["code"], entry["outcome_unknown"]), ("bad_link", True))
+        self.assertEqual(entry["response_shape"]["items"]["keys"], ["pd_no", "qty", "secret_field"])
+        self.assertFalse(entry["response_shape"]["link"]["equals_expected"])
+        stored = Path(self.ledger).read_text(encoding="utf-8") + Path(self.out).read_text(encoding="utf-8") + printed
+        self.assertNotIn("SECRETVALUE", stored)
+        self.assertNotIn("SECRETLINKVALUE", stored)
+        self.assertNotIn(self.key_out.read_text(encoding="utf-8").strip(), stored)
+        code, made2, _ = self.run_basket(self.basket_reply, key_name="key2.txt")
+        self.assertEqual((code, made2), (3, []))
+
+    def test_live_basket_transport_sends_only_the_expected_url_once(self):
+        url = M.build_basket_url(KEY, (M.BasketLine("124401", 1),))
+        opened = []
+
+        class Reply:
+            status = 200
+            headers = {"Content-Type": "application/json"}
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, _n):
+                return b"" if opened.count("read") or opened.append("read") else b"{}"
+
+        class Opener:
+            def open(self, request, timeout):
+                opened.append(request.full_url)
+                return Reply()
+
+        t = self.runner._LiveBasketOnce(url, opener=Opener())
+        for other in (M.build_price_url(("124401",)), url + "&x=1", url.replace("basket", "order"),
+                      M.build_basket_url(OTHER_KEY, (M.BasketLine("124401", 1),))):
+            with self.assertRaises(MallApiError) as caught:
+                t.get(other, timeout=1, max_bytes=10)
+            self.assertEqual(caught.exception.code, "basket_write_blocked")
+        self.assertEqual(opened, [])
+        self.assertEqual(t.get(url, timeout=1, max_bytes=10).status, 200)
+        with self.assertRaises(MallApiError):
+            t.get(url, timeout=1, max_bytes=10)
+        self.assertEqual([o for o in opened if o != "read"], [url])
+        with self.assertRaises(MallApiError):       # price 주소로 만들면 그것도 못 보낸다
+            self.runner._LiveBasketOnce(M.build_price_url(("1",)), opener=Opener()).get(
+                M.build_price_url(("1",)), timeout=1, max_bytes=10)
 
     def test_abnormal_keeps_diagnostics_without_body_and_stops_next_call(self):
         code, _ = self.run_live(R(200, b'{"result":"ok","items":[SECRET-BODY]}', "text/html"))

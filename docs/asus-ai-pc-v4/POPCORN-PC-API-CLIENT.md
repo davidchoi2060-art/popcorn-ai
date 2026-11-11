@@ -36,7 +36,7 @@ live 는 문서 예시 3개 상품, 기록부 기준 누적 10회, 호출 간 1�
 
 ## 쓰기 차단
 
-- `BasketClient`는 `basket_write_allowed`가 True인 transport에만 주소를 넘긴다. 이 값을 켠 코드는 테스트의 가짜뿐이다.
+- `BasketClient`는 `basket_write_allowed`가 True인 transport에만 주소를 넘긴다. 이 값을 켜는 곳은 테스트의 가짜와 실행기의 `--api basket`(사용자 승인 1회 시험, 2026-11-11)뿐이다. `api/` 안에는 없다.
 - `LivePriceTransport`는 `assert_price_only_url`을 지나지 않은 주소를 내보내지 않는다.
 - 실제 쓰기를 열려면 샌드박스 확인과 별도 승인이 먼저다(이슈 API-001).
 
