@@ -62,6 +62,8 @@
     var page = document.body.dataset.page || 'home';
     // AI 슈퍼컴퓨터 상세·문의는 PC 상세 화면 틀(data-page=pc-detail)을 쓰지만 메뉴에서는 AI 슈퍼컴퓨터로 표시한다.
     if (/\/supercomputer(-inquiry)?\.html$/.test(location.pathname)) page = 'supercomputers';
+    // ASUS 기획전 문의는 AI 문의 화면 틀(data-page=ai-consult)을 쓰지만 주 메뉴에서는 어느 항목도 켜지 않는다(asus.html·asus-pc.html 과 같다).
+    if (/\/asus-consult\.html$/.test(location.pathname)) page = 'asus-consult';
     var active = page === 'pcs' ? category || 'catalog' : page.indexOf('ai-') === 0 ? 'ai' : page === 'pc-finder' ? 'chat' : page;
     var pcSection = page === 'pcs' || page === 'peripherals' || page === 'pc-detail';
     document.querySelectorAll('[data-nh-nav]').forEach(function (link) {
