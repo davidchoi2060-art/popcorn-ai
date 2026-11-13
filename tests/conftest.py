@@ -50,12 +50,23 @@ def _pc_only_path(excinfo):
     # 스크립트도 만들지 않고 버전 관리에도 없다 - 2026-10 커머스 개통 작업 때 손으로 남긴
     # 변경 전 원본이라, 그 작업 폴더가 없는 PC(두 번째 개발 PC 등)에서는 대조 자체가 불가능하다.
     # 작업 폴더가 «있는데» 그 안 파일이 없으면 진짜 결함이므로 그때는 그대로 실패한다.
+    # `..` 로 저장소 안을 가리키는 경로가 우연히 skip 되지 않도록 정규화한 뒤 판정한다.
+    # outputs/ 바로 아래 파일(작업 폴더가 아님)이나 그 위쪽 경로는 대상이 아니다.
+    norm = os.path.normpath(path).replace(chr(92), '/')
     marker = PC_ONLY_OUTPUTS + '/'
-    if path.startswith(marker):
-        workdir = marker + path[len(marker):].split('/', 1)[0]
-        if not os.path.isdir(workdir):
+    if norm.startswith(marker):
+        parts = norm[len(marker):].split('/')
+        if len(parts) >= 2 and not os.path.isdir(marker + parts[0]):
             return path
     return None
+
+
+def _skip_reason(path):
+    norm = os.path.normpath(path).replace(chr(92), '/')
+    if norm.startswith(PC_ONLY_OUTPUTS + '/'):
+        return (f'저장소 밖 동결 산출물 폴더 없음: {path} - 변경 전 원본과의 대조(AST·해시)를 '
+                f'하지 못해 이 검사는 검증되지 않았다(산출물이 있는 개발 PC 에서만 검증된다)')
+    return f'개발 PC 전용 자료 없음: {path} - 이 경로를 읽는 검사는 이 환경에서 검증되지 않았다'
 
 
 @pytest.hookimpl(wrapper=True)
@@ -64,7 +75,7 @@ def pytest_runtest_makereport(item, call):
     path = _pc_only_path(call.excinfo) if report.failed else None
     if path:
         report.outcome = 'skipped'
-        report.longrepr = (str(item.path), item.location[1] or 0, f'개발 PC 전용 자료 없음: {path}')
+        report.longrepr = (str(item.path), item.location[1] or 0, _skip_reason(path))
     return report
 
 
