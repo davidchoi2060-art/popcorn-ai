@@ -158,7 +158,11 @@ def test_consult_receives_pc_intent_without_new_form():
         assert word in a, word
     for page in ("ai-consult.html", "ai-result.html", "review-ai-consult.html"):
         html = read(page)
-        assert "ai-inquiry.js?v=" + V in html and "service-adapters.js?v=" + V in html, page
+        assert "ai-inquiry.js?v=" + V in html, page
+        # service-adapters.js 는 그 뒤로도 고쳐진다(2026-11-12 동의 문구 선호출). 이 검사가 지키는 것은
+        # 「이 변경이 실린 판 이후의 캐시 버전으로 싣는다」이므로 날짜가 V 이상이면 된다.
+        m = re.search(r"service-adapters\.js\?v=(\d{8})-[\w.]+", html)
+        assert m and m.group(1) >= V[:8], page
 
 
 def test_task_images_are_light_webp_with_provenance():

@@ -87,9 +87,18 @@
     }
   };
 
-  // 문의 화면이 열리면 동의 문구를 미리 받는다(화면은 boot.js 가 그린다).
-  if (/ai-consult\.html$/.test(location.pathname)) {
-    prime().catch(function () { /* 문구를 못 받으면 동의 칸이 잠긴 채 남는다 — 제출되지 않는다 */ });
-    new MutationObserver(showConsent).observe(document.documentElement, { childList: true, subtree: true });
+  // 문의 폼(동의 칸 [name=privacyConsent])이 문서에 나타나면 동의 문구를 한 번 미리 받는다(화면은 boot.js 가 그린다).
+  // 화면 이름에 기대지 않는다 — ai-consult 뿐 아니라 같은 폼을 그리는 asus-consult 등도 같은 경로를 탄다.
+  // 동의 칸이 없는 화면에서는 호출하지 않는다(방문자 쿠키를 받지 않는다). 자동 호출은 화면당 한 번만 — 실패해도 DOM 이
+  // 바뀔 때마다 다시 부르지 않는다(제출 시 submit 이 prime() 을 다시 부르므로 복구 길은 남아 있다).
+  var autoPrimed = false;
+  function onDomChange() {
+    if (!autoPrimed && document.querySelector('[name=privacyConsent]')) {
+      autoPrimed = true;
+      prime().catch(function () { /* 문구를 못 받으면 동의 칸이 잠긴 채 남는다 — 제출되지 않는다 */ });
+    }
+    showConsent();
   }
+  new MutationObserver(onDomChange).observe(document.documentElement, { childList: true, subtree: true });
+  onDomChange();
 }());
