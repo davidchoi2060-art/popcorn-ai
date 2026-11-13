@@ -11,6 +11,7 @@ from copy import deepcopy
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
 import re
 import socket
@@ -20,17 +21,103 @@ import unittest
 from unittest.mock import patch
 
 
+# sys.addaudithook 은 한 번 걸면 프로세스가 끝날 때까지 못 뺀다. 이 모듈은 다른 테스트가
+# import 하므로(수집 때), 한 프로세스에 묶어 돌리면 상관없는 파일의 subprocess.Popen 까지
+# 막혔다(IndependentImportTests 등 - 하위 프로세스로 import 격리를 검사하는 테스트).
+# 그래서 «이 모듈을 직접이든 간접이든 import 하는 테스트 파일»을 실행하는 동안과, pytest 밖
+# (수집·직접 실행)에서만 막는다. 판정은 손으로 쓴 파일 목록이 아니라 tests/ 소스의 import
+# 관계(AST)를 따라가 이 모듈에 닿는지로 하며(결과는 캐시), 판정이 불가능하면 막는 쪽이다.
+_TESTS_DIR = Path(__file__).resolve().parent
+_OWN_STEM = 'test_admin_commerce_orders'
+_REACH_CACHE = {}
+_COMPUTING = []
+
+
+def _imported_stems(path):
+    tree = ast.parse(path.read_text(encoding='utf-8'))
+    stems = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                parts = alias.name.split('.')
+                stems.add(parts[1] if parts[0] == 'tests' and len(parts) > 1 else parts[0])
+        elif isinstance(node, ast.ImportFrom):
+            parts = (node.module or '').split('.')
+            if node.level or parts[0] == 'tests':
+                base = [x for x in parts if x and x != 'tests']
+                if base:
+                    stems.add(base[0])
+                else:
+                    stems.update(alias.name for alias in node.names)
+            else:
+                stems.add(parts[0])
+    return stems
+
+
+def _reaches_orders(stem):
+    """tests/<stem>.py 가 이 모듈을 직접·간접 import 하는가. 읽지 못하면 예외(호출자가 막는 쪽으로)."""
+    if stem in _REACH_CACHE:
+        return _REACH_CACHE[stem]
+    seen, queue = set(), [stem]
+    found = False
+    while queue and not found:
+        current = queue.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        path = _TESTS_DIR / (current + '.py')
+        if not path.is_file():
+            if current == stem:
+                raise FileNotFoundError(path)
+            continue
+        for name in _imported_stems(path):
+            if name == _OWN_STEM:
+                found = True
+                break
+            queue.append(name)
+    _REACH_CACHE[stem] = found
+    return found
+
+
+def _guard_armed(current=None):
+    current = os.environ.get('PYTEST_CURRENT_TEST') if current is None else current
+    if not current:
+        return True
+    stem = current.split('::')[0].replace(chr(92), '/').rsplit('/', 1)[-1]
+    if stem.endswith('.py'):
+        stem = stem[:-3]
+    if stem == _OWN_STEM:
+        return True
+    if stem in _REACH_CACHE:
+        return _REACH_CACHE[stem]
+    if _COMPUTING:  # 소스를 읽다 생기는 open 이벤트의 재진입 - 막는 쪽
+        return True
+    _COMPUTING.append(stem)
+    try:
+        return _reaches_orders(stem)
+    except Exception:  # 판정 불가 - 막는 쪽(fail-closed)
+        return True
+    finally:
+        _COMPUTING.pop()
+
+
 def _deny_external(event, args):
+    if event not in {'socket.connect', 'socket.connect_ex', 'socket.getaddrinfo', 'subprocess.Popen',
+                     'os.system', 'open'}:
+        return
+    if event == 'open' and not (args and isinstance(args[0], (str, bytes))
+                                and str(args[0]).replace(chr(92), '/').lower().rstrip("'").endswith('/.env')):
+        return
+    if not _guard_armed():
+        return
     fallback = getattr(socket, '_fallback_socketpair', None)
     if (event == 'socket.connect' and fallback is not None
             and sys._getframe(1).f_code is fallback.__code__
             and args[1][0] in ('127.0.0.1', '::1')):
         return
-    if event in {'socket.connect', 'socket.connect_ex', 'socket.getaddrinfo', 'subprocess.Popen', 'os.system'}:
-        raise AssertionError('external IO forbidden by isolated admin detail tests')
-    if event == 'open' and args and isinstance(args[0], (str, bytes)):
-        if str(args[0]).replace('\\', '/').lower().rstrip("'").endswith('/.env'):
-            raise AssertionError('production environment forbidden')
+    if event == 'open':
+        raise AssertionError('production environment forbidden')
+    raise AssertionError('external IO forbidden by isolated admin detail tests')
 
 
 sys.addaudithook(_deny_external)
