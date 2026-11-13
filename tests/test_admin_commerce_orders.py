@@ -11,6 +11,7 @@ from copy import deepcopy
 import hashlib
 import importlib
 import json
+import os
 from pathlib import Path
 import re
 import socket
@@ -20,7 +21,29 @@ import unittest
 from unittest.mock import patch
 
 
+# sys.addaudithook 은 한 번 걸면 프로세스가 끝날 때까지 못 뺀다. 이 모듈은 다른 테스트가
+# import 하므로(수집 때), 한 프로세스에 묶어 돌리면 상관없는 파일의 subprocess.Popen 까지
+# 막혔다(IndependentImportTests 등 - 하위 프로세스로 import 격리를 검사하는 테스트).
+# 그래서 «이 모듈의 테스트를 쓰는 파일»을 실행하는 동안과, pytest 밖(수집·직접 실행)에서만
+# 막는다. 막는 대상·검사 내용은 그대로다.
+_GUARDED_FILES = {
+    'test_admin_commerce_orders.py', 'test_admin_commerce_main_registration.py',
+    'test_admin_commerce_order_list.py', 'test_commerce_fulfillment_http.py',
+    'test_commerce_physical_return_http.py', 'test_commerce_support_http.py',
+    'test_commerce_support_main_registration.py',
+}
+
+
+def _guard_armed():
+    current = os.environ.get('PYTEST_CURRENT_TEST')
+    if not current:
+        return True
+    return current.split('::')[0].replace(chr(92), '/').rsplit('/', 1)[-1] in _GUARDED_FILES
+
+
 def _deny_external(event, args):
+    if not _guard_armed():
+        return
     fallback = getattr(socket, '_fallback_socketpair', None)
     if (event == 'socket.connect' and fallback is not None
             and sys._getframe(1).f_code is fallback.__code__
