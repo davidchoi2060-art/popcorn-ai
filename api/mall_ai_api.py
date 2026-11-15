@@ -62,6 +62,10 @@ _PRICE_QUERY_RE = re.compile(r"[1-9][0-9]{0,11}(?:,[1-9][0-9]{0,11}){0,%d}" % (D
 
 _ALLOWED_FIELDS = ("pd_no", "pd_name", "price", "mileage", "made", "pd_spec",
                    "pd_image_basic", "pd_delivery_price")
+# 문서에 없는 필드 중 사무실 조회 중계기(api/mall_ai_gateway.py)만 받는 내부 가격·재고 값(2026-11-15 사용자 지시).
+# 기본값으로는 읽지 않는다. 읽어도 PriceItem.public() 에는 들어가지 않는다.
+INTERNAL_PRICE_FIELDS = ("pd_cost_price", "dealer1_price", "dealer2_price", "dealer3_price",
+                         "pd_sijung_price", "pd_sobija_price", "pd_remain")
 _OBSERVE_PATTERNS = {
     "stock_like": re.compile(r"stock|qty|soldout|sold_out|inventory|jaego", re.I),
     "currency_like": re.compile(r"currency|curr", re.I),
@@ -506,6 +510,11 @@ class PriceItem:
     delivery_price: Amount = Amount("missing")
     sale_state: str = "unknown"     # 반환됐다고 판매 가능·재고 있음이 아니다
     currency: Optional[str] = None  # 문서에 없다. 원화로 확정하지 않는다
+    internal: Mapping[str, Amount] = field(default_factory=dict, repr=False)    # 요청했을 때만 찬다
+
+    def internal_public(self) -> dict:
+        """내부 가격·재고 값. 사무실 조회 중계기만 부른다. public() 과 섞지 않는다."""
+        return {name: amount.public() for name, amount in self.internal.items()}
 
     def public(self) -> dict:
         return {
@@ -543,19 +552,28 @@ def _response_code(raw: Any) -> str:
     return raw
 
 
-def _price_item(raw: Mapping[str, Any], code: str) -> PriceItem:
+def _price_item(raw: Mapping[str, Any], code: str, internal_fields: tuple[str, ...] = ()) -> PriceItem:
     status, image_url, image_path = classify_image(raw.get("pd_image_basic"))
+    internal = {name: classify_amount(raw, name) for name in internal_fields}
     return PriceItem(
         pd_no=code, found=True, name=plain_text(raw.get("pd_name")), maker=plain_text(raw.get("made")),
         spec_text=plain_text(raw.get("pd_spec"), INTERNAL_MAX_SPEC_TEXT),
         image_status=status, image_url=image_url, image_path=image_path,
         price=classify_amount(raw, "price"), mileage=classify_amount(raw, "mileage"),
-        delivery_price=classify_amount(raw, "pd_delivery_price"),
+        delivery_price=classify_amount(raw, "pd_delivery_price"), internal=internal,
     )
 
 
+def _internal_fields(names: Iterable[str]) -> tuple[str, ...]:
+    names = tuple(names)
+    if any(name not in INTERNAL_PRICE_FIELDS for name in names) or len(set(names)) != len(names):
+        raise ValueError("internal_fields")
+    return names
+
+
 def parse_price_response(response: TransportResponse, requested: tuple[str, ...],
-                         limits: Limits = DEFAULT_LIMITS) -> PriceResult:
+                         limits: Limits = DEFAULT_LIMITS, *, internal_fields: Iterable[str] = ()) -> PriceResult:
+    internal_fields = _internal_fields(internal_fields)
     document = _decode_envelope(response, limits, write=False)
     raw_items = document.get("items")
     if not isinstance(raw_items, list):
@@ -573,7 +591,7 @@ def parse_price_response(response: TransportResponse, requested: tuple[str, ...]
             raise MallApiError("unexpected_item")
         if code in found:
             raise MallApiError("duplicate_item")
-        found[code] = _price_item(raw, code)
+        found[code] = _price_item(raw, code, internal_fields)
         allowed_raw.append({k: raw[k] for k in _ALLOWED_FIELDS if k in raw})
         extra = set(raw) - set(_ALLOWED_FIELDS)
         dropped += len(extra)
@@ -585,13 +603,18 @@ def parse_price_response(response: TransportResponse, requested: tuple[str, ...]
                        observed=observed, allowed_raw=tuple(allowed_raw))
 
 
-def fetch_prices(pd_nos: Iterable[Any], *, transport: Any = None, limits: Limits = DEFAULT_LIMITS) -> PriceResult:
-    """기본 transport 는 offline 이다. 재시도하지 않는다. DB 에 저장하지 않는다."""
+def fetch_prices(pd_nos: Iterable[Any], *, transport: Any = None, limits: Limits = DEFAULT_LIMITS,
+                 internal_fields: Iterable[str] = ()) -> PriceResult:
+    """기본 transport 는 offline 이다. 재시도하지 않는다. DB 에 저장하지 않는다.
+
+    internal_fields 는 INTERNAL_PRICE_FIELDS 안에서만 고른다. 고르지 않으면 원가 계열은 읽지도 않는다.
+    """
+    internal_fields = _internal_fields(internal_fields)
     requested = normalize_price_request(pd_nos)
     url = build_price_url(requested)
     try:
         response = _send(transport or OfflineTransport(), url, limits, write=False)
-        result = parse_price_response(response, requested, limits)
+        result = parse_price_response(response, requested, limits, internal_fields=internal_fields)
     except MallApiError as exc:
         log.warning("mall_ai_api price failed code=%s", exc.code)
         raise
