@@ -124,11 +124,43 @@ class Gateway(unittest.TestCase):
     def test_only_get_and_no_basket_path(self):
         self.assertEqual(self.call(method="post").status_code, 405)
         paths = [r.path for r in G.router.routes]
-        self.assertEqual(paths, ["/api/mall-ai-gateway/price"])
+        self.assertEqual(sorted(paths), ["/api/mall-ai-gateway/lookup", "/api/mall-ai-gateway/price"])
+        self.assertEqual({m for r in G.router.routes for m in r.methods}, {"GET"})
         source = (ROOT / "api/mall_ai_gateway.py").read_text(encoding="utf-8")
         code = "\n".join(l for l in source.splitlines() if not l.lstrip().startswith("#"))
         for word in ("BasketClient", "build_basket_url", "basket_write_allowed", "api_key", "order", "payment"):
             self.assertNotIn(word, code, word)
+
+    def page(self, ip=OFFICE, real_ip="same"):
+        client = TestClient(self.app, client=(ip, 50000))
+        headers = {"X-Real-IP": ip if real_ip == "same" else real_ip} if real_ip else {}
+        return client.get("/api/mall-ai-gateway/lookup", headers=headers)
+
+    def test_lookup_page_uses_the_same_gate(self):
+        res = self.page()
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("text/html", res.headers["content-type"])
+        self.assertEqual(res.headers["cache-control"], "no-store")
+        self.assertIn('data-screen-id="MALL-GW-010"', res.text)
+        self.assertEqual(self.page(ip=HOME).status_code, 200)
+        self.assertEqual(self.page(ip=OTHER).status_code, 403)
+        self.assertEqual(self.page(ip=OTHER, real_ip=OFFICE).status_code, 403)
+        with patch.dict(os.environ, {G.ENABLED_ENV: "0"}):
+            self.assertEqual(self.page().status_code, 404)
+        self.assertEqual(Fake.instances, [])        # 화면을 여는 것만으로는 윈윈을 부르지 않는다
+
+    def test_lookup_page_is_self_contained_and_builds_text_safely(self):
+        html = (ROOT / "templates/mall_ai_gateway_lookup.html").read_text(encoding="utf-8")
+        self.assertIsNone(re.search(r"""(?:src|href)\s*=\s*["']?(?:https?:)?//""", html))   # 외부 자원 0
+        self.assertNotIn("innerHTML", html)                  # 윈윈 문자열은 textContent 로만 넣는다
+        self.assertNotIn("localStorage", html)
+        self.assertIn('"/api/mall-ai-gateway/price?pd_no="', html)
+        for word in ("basket", "api_key", "POST"):
+            self.assertNotIn(word, html, word)
+        quads = set(re.findall(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", html))
+        self.assertEqual(quads, set())
+        for code in ("ip_not_allowed", "busy", "too_many_items", "ip_rejected"):
+            self.assertIn(code, html)
 
     def test_upstream_failure_returns_code_only(self):
         res = self.call(reply=R(200, b" 10.0.0.1 IP ERROR!", "text/html"))

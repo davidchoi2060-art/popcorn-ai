@@ -4,7 +4,8 @@
 윈윈 AI API 는 허용된 IP(GCP 개발 서버)에서만 답한다. 사무실 PC와 대표자 PC에서 가격을
 보려면 그 서버를 거쳐야 해서 이 경로를 둔다.
 
-    GET /api/mall-ai-gateway/price?pd_no=124401,124407
+    GET /api/mall-ai-gateway/price?pd_no=124401,124407     JSON
+    GET /api/mall-ai-gateway/lookup                       사람이 쓰는 조회 화면(표, 엑셀 복사)
 
 ■ 무엇을 하고 무엇을 하지 않는가
   읽기 전용이다. price 만 부른다. basket 경로는 없고 만들지 않는다.
@@ -36,9 +37,10 @@ import logging
 import os
 import threading
 import time
+from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from api import mall_ai_api as M
 
@@ -98,13 +100,28 @@ def _call_upstream(codes, transport=None):
         _upstream.release()
 
 
-@router.get("/api/mall-ai-gateway/price", include_in_schema=False)
-def gateway_price(request: Request, pd_no: str = Query("", max_length=700)):
+def _gate(request: Request) -> None:
     if not _enabled():
         raise HTTPException(404)
     if not _client_allowed(request):
         log.warning("[mall-gw] denied")
         raise HTTPException(403, {"code": "ip_not_allowed", "message": "허용되지 않은 접속 위치입니다."})
+
+
+_PAGE = Path(__file__).resolve().parents[1] / "templates" / "mall_ai_gateway_lookup.html"
+_NO_STORE = {"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"}
+
+
+@router.get("/api/mall-ai-gateway/lookup", include_in_schema=False)
+def gateway_lookup_page(request: Request):
+    """사람이 쓰는 조회 화면. 화면 자체에는 값이 없고 같은 출처의 price 경로를 부른다. 같은 문으로 닫는다."""
+    _gate(request)
+    return HTMLResponse(_PAGE.read_text(encoding="utf-8"), headers=_NO_STORE)
+
+
+@router.get("/api/mall-ai-gateway/price", include_in_schema=False)
+def gateway_price(request: Request, pd_no: str = Query("", max_length=700)):
+    _gate(request)
     try:
         if [k for k, _ in request.query_params.multi_items()] != ["pd_no"]:
             raise M.MallApiError("invalid_query")      # 반복·추가 파라미터는 어느 값을 뜻하는지 모호하다
@@ -125,4 +142,4 @@ def gateway_price(request: Request, pd_no: str = Query("", max_length=700)):
     log.info("[mall-gw] ok requested=%d missing=%d", len(codes), len(result.missing))
     body = {"requested": list(result.requested), "missing": list(result.missing), "items": items,
             "source": "popcornpc ai_api price (read only)"}
-    return JSONResponse(body, headers={"Cache-Control": "no-store"})
+    return JSONResponse(body, headers=_NO_STORE)
