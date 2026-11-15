@@ -161,6 +161,18 @@ class Gateway(unittest.TestCase):
         self.assertEqual(quads, set())
         for code in ("ip_not_allowed", "busy", "too_many_items", "ip_rejected"):
             self.assertIn(code, html)
+        # 윈윈은 없는 번호에도 이름 없는 빈 항목을 준다(2026-11-15 실측). 화면은 그 줄을 정보 없음으로 보여야 한다
+        self.assertIn("if (!it.found || !it.name)", html)
+
+    def test_export_script_is_bom_utf8_and_read_only(self):
+        raw = (ROOT / "tools/mall_price_export.ps1").read_bytes()
+        self.assertTrue(raw.startswith(b"\xef\xbb\xbf"), "Windows PowerShell 5.1 은 BOM 없는 UTF-8 한글을 깨뜨린다")
+        text = raw.decode("utf-8-sig")
+        self.assertIn("/api/mall-ai-gateway/price", text)
+        self.assertIn("-Method Get", text)
+        for word in ("basket", "api_key", "-Method Post", "Invoke-Expression"):
+            self.assertNotIn(word, text, word)
+        self.assertEqual(set(re.findall(r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", text)), set())
 
     def test_upstream_failure_returns_code_only(self):
         res = self.call(reply=R(200, b" 10.0.0.1 IP ERROR!", "text/html"))

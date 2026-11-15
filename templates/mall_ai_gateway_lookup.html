@@ -135,13 +135,15 @@
     var found = 0;
     (data.items || []).forEach(function (it) {
       var tr = document.createElement("tr");
-      if (!it.found) {
+      // 윈윈은 없는 번호에도 빈 항목(상품명 없음, 판매가 0)을 돌려준다(2026-11-15 실측). 같은 줄로 표시한다.
+      if (!it.found || !it.name) {
+        var label = !it.found ? "윈윈 응답에 없는 상품번호" : "윈윈이 빈 값으로 응답 (없는 상품번호일 수 있음)";
         tr.className = "missing";
         cell(tr, it.pd_no, "l num");
-        var td = cell(tr, "윈윈 응답에 없는 상품번호", "l name");
+        var td = cell(tr, label, "l name");
         td.colSpan = 13;
         rowsEl.appendChild(tr);
-        lastTable.push([it.pd_no, "윈윈 응답에 없음"]);
+        lastTable.push([it.pd_no, label]);
         return;
       }
       found += 1;
@@ -161,8 +163,9 @@
       lastTable.push([it.pd_no, it.name || "", it.maker || ""].concat(
         vals.map(function (v) { return v == null ? "" : String(v); }), [remain === "—" ? "" : remain]));
     });
-    $("summary").textContent = "조회 " + (data.requested || []).length + "건 · 응답 " + found + "건" +
-      ((data.missing || []).length ? " · 응답 없음 " + data.missing.length + "건" : "");
+    var asked = (data.requested || []).length;
+    $("summary").textContent = "조회 " + asked + "건 · 정보 있음 " + found + "건" +
+      (asked > found ? " · 정보 없음 " + (asked - found) + "건" : "");
     $("at").textContent = new Date().toLocaleString("ko-KR");
     $("resultCard").hidden = false;
     copyBtn.disabled = lastTable.length < 2;
