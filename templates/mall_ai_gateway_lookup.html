@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>윈윈 가격 조회</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --line:#e3e6ea; --text:#1d2229; --muted:#6b7280; --accent:#3b6fb6; --bad:#b42318; --warn:#9a6700; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.5 -apple-system,"Segoe UI","Malgun Gothic",sans-serif; }
+  main { max-width:1280px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:16px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  textarea { width:100%; min-height:72px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; font:inherit; resize:vertical; }
+  .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  button { font:inherit; padding:7px 16px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  button:disabled { opacity:.5; cursor:default; }
+  .hint { color:var(--muted); font-size:13px; }
+  .msg { margin-top:10px; padding:8px 10px; border-radius:6px; display:none; }
+  .msg.show { display:block; }
+  .msg.error { background:#fdecea; color:var(--bad); }
+  .msg.info { background:#eef4fb; color:var(--accent); }
+  .msg.warn { background:#fff6e0; color:var(--warn); }
+  .tablewrap { overflow-x:auto; }
+  table { border-collapse:collapse; width:100%; min-width:1080px; }
+  th, td { border-bottom:1px solid var(--line); padding:7px 8px; text-align:right; white-space:nowrap; }
+  th { background:#f1f3f6; font-weight:600; position:sticky; top:0; }
+  td.l, th.l { text-align:left; }
+  td.name { white-space:normal; min-width:260px; max-width:420px; }
+  td.na { color:var(--muted); }
+  tr.missing td { color:var(--bad); }
+  .num { font-variant-numeric:tabular-nums; }
+  .warnbox { font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main data-screen-id="MALL-GW-010">
+  <h1>윈윈 가격 조회</h1>
+  <p class="sub">팝콘PC(윈윈) 가격 조회 · 읽기 전용 · 원가 포함 정보이므로 외부 공유 금지</p>
+
+  <section class="card">
+    <label for="codes">상품번호</label>
+    <textarea id="codes" placeholder="예: 124401, 124407, 124409 (쉼표·공백·줄바꿈 구분, 최대 50개)"></textarea>
+    <div class="row">
+      <button id="search" class="primary" type="button">조회</button>
+      <button id="clear" type="button">초기화</button>
+      <button id="copy" type="button" disabled>표 복사</button>
+      <span class="hint">Ctrl+Enter 조회 · 표 복사는 엑셀에 붙여 넣을 수 있는 형식</span>
+    </div>
+    <div id="msg" class="msg" role="status"></div>
+  </section>
+
+  <section class="card" id="resultCard" hidden>
+    <div class="row" style="margin:0 0 10px"><strong id="summary"></strong></div>
+    <div class="tablewrap">
+      <table>
+        <thead>
+          <tr>
+            <th class="l">상품번호</th><th class="l">상품명</th><th class="l">제조사</th>
+            <th>판매가</th><th>원가</th><th>판매가−원가</th>
+            <th>딜러가1</th><th>딜러가2</th><th>딜러가3</th>
+            <th>소비자가</th><th>시중가</th><th>적립금</th><th>배송비</th><th>재고값</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p class="warnbox">「—」 표시는 윈윈 응답에 값이 없거나 0·비정상 값인 경우이다. 재고값(pd_remain)의 의미는 윈윈 확인 전이다. 조회 시점: <span id="at"></span></p>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var API = "/api/mall-ai-gateway/price?pd_no=";
+  var MAX = 50;
+  var $ = function (id) { return document.getElementById(id); };
+  var codesEl = $("codes"), msgEl = $("msg"), rowsEl = $("rows"), searchBtn = $("search"), copyBtn = $("copy");
+  var lastTable = [];
+
+  var MESSAGES = {
+    ip_not_allowed: "허용되지 않은 접속 위치입니다. 관리자에게 이 PC의 공인 IP 등록을 요청하십시오.",
+    busy: "다른 조회가 진행 중입니다. 잠시 후 다시 조회하십시오.",
+    invalid_pd_no: "상품번호 형식이 올바르지 않습니다. 숫자만 입력하십시오.",
+    empty_request: "상품번호를 입력하십시오.",
+    too_many_items: "한 번에 최대 50개까지 조회할 수 있습니다.",
+    ip_rejected: "윈윈 API가 서버 IP를 거부했습니다. 관리자에게 알리십시오.",
+    timeout: "윈윈 API 응답 시간이 초과되었습니다. 다시 조회하십시오.",
+    network: "윈윈 API에 연결하지 못했습니다. 다시 조회하십시오."
+  };
+
+  function show(kind, text) {
+    msgEl.className = "msg show " + kind;
+    msgEl.textContent = text;
+  }
+  function hide() { msgEl.className = "msg"; msgEl.textContent = ""; }
+
+  function parseCodes(raw) {
+    var parts = raw.split(/[\s,，、;]+/).filter(function (s) { return s.length; });
+    var seen = {}, out = [], bad = [];
+    parts.forEach(function (p) {
+      if (!/^[1-9][0-9]{0,11}$/.test(p)) { bad.push(p); return; }
+      if (!seen[p]) { seen[p] = 1; out.push(p); }
+    });
+    return { codes: out, bad: bad };
+  }
+
+  function amountValue(a) {
+    return a && a.status === "ok" && a.value != null ? Number(a.value) : null;
+  }
+  function fmt(n) { return n == null ? "—" : n.toLocaleString("ko-KR"); }
+  function remainText(a) {
+    if (!a) return "—";
+    if (a.status === "ok" || a.status === "zero") return a.value;
+    return "—";
+  }
+
+  function cell(tr, text, cls) {
+    var td = document.createElement("td");
+    td.textContent = text;
+    if (cls) td.className = cls;
+    if (text === "—") td.className = (cls ? cls + " " : "") + "na";
+    tr.appendChild(td);
+    return td;
+  }
+
+  function render(data) {
+    rowsEl.textContent = "";
+    lastTable = [["상품번호", "상품명", "제조사", "판매가", "원가", "판매가-원가", "딜러가1", "딜러가2", "딜러가3",
+                  "소비자가", "시중가", "적립금", "배송비", "재고값"]];
+    var found = 0;
+    (data.items || []).forEach(function (it) {
+      var tr = document.createElement("tr");
+      if (!it.found) {
+        tr.className = "missing";
+        cell(tr, it.pd_no, "l num");
+        var td = cell(tr, "윈윈 응답에 없는 상품번호", "l name");
+        td.colSpan = 13;
+        rowsEl.appendChild(tr);
+        lastTable.push([it.pd_no, "윈윈 응답에 없음"]);
+        return;
+      }
+      found += 1;
+      var inn = it.internal || {};
+      var price = amountValue(it.price), cost = amountValue(inn.pd_cost_price);
+      var diff = price != null && cost != null ? price - cost : null;
+      var vals = [price, cost, diff, amountValue(inn.dealer1_price), amountValue(inn.dealer2_price),
+                  amountValue(inn.dealer3_price), amountValue(inn.pd_sobija_price), amountValue(inn.pd_sijung_price),
+                  amountValue(it.mileage), amountValue(it.delivery_price)];
+      cell(tr, it.pd_no, "l num");
+      cell(tr, it.name || "—", "l name");
+      cell(tr, it.maker || "—", "l");
+      vals.forEach(function (v) { cell(tr, fmt(v), "num"); });
+      var remain = remainText(inn.pd_remain);
+      cell(tr, remain, "num");
+      rowsEl.appendChild(tr);
+      lastTable.push([it.pd_no, it.name || "", it.maker || ""].concat(
+        vals.map(function (v) { return v == null ? "" : String(v); }), [remain === "—" ? "" : remain]));
+    });
+    $("summary").textContent = "조회 " + (data.requested || []).length + "건 · 응답 " + found + "건" +
+      ((data.missing || []).length ? " · 응답 없음 " + data.missing.length + "건" : "");
+    $("at").textContent = new Date().toLocaleString("ko-KR");
+    $("resultCard").hidden = false;
+    copyBtn.disabled = lastTable.length < 2;
+  }
+
+  function search() {
+    hide();
+    var parsed = parseCodes(codesEl.value);
+    if (parsed.bad.length) { show("error", "숫자가 아닌 상품번호가 있습니다: " + parsed.bad.slice(0, 5).join(", ")); return; }
+    if (!parsed.codes.length) { show("error", MESSAGES.empty_request); return; }
+    if (parsed.codes.length > MAX) { show("error", MESSAGES.too_many_items + " (입력 " + parsed.codes.length + "개)"); return; }
+    searchBtn.disabled = true;
+    show("info", "조회 중입니다…");
+    fetch(API + parsed.codes.join(","), { headers: { "Accept": "application/json" }, cache: "no-store" })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (body) { return { res: res, body: body }; });
+      })
+      .then(function (r) {
+        if (r.res.ok) { hide(); render(r.body); return; }
+        var detail = (r.body && r.body.detail) || {};
+        var code = typeof detail === "object" ? detail.code : "";
+        var text = MESSAGES[code] || (detail && detail.message) || ("조회에 실패했습니다. (상태 " + r.res.status + ")");
+        if (r.res.status === 404) text = "조회 기능이 꺼져 있습니다. 관리자에게 문의하십시오.";
+        show(r.res.status === 429 ? "warn" : "error", text);
+      })
+      .catch(function () { show("error", "서버에 연결하지 못했습니다. 인터넷 연결을 확인하십시오."); })
+      .then(function () { searchBtn.disabled = false; });
+  }
+
+  function copyTable() {
+    var tsv = lastTable.map(function (row) {
+      return row.map(function (v) { return String(v).replace(/[\t\r\n]+/g, " "); }).join("\t");
+    }).join("\r\n");
+    var done = function () { show("info", "표를 복사했습니다. 엑셀에 붙여 넣으십시오."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(tsv).then(done, function () { fallback(tsv); done(); });
+    } else { fallback(tsv); done(); }
+  }
+  function fallback(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); } catch (e) { /* 복사 미지원 */ }
+    document.body.removeChild(ta);
+  }
+
+  searchBtn.addEventListener("click", search);
+  copyBtn.addEventListener("click", copyTable);
+  $("clear").addEventListener("click", function () {
+    codesEl.value = ""; rowsEl.textContent = ""; lastTable = []; copyBtn.disabled = true;
+    $("resultCard").hidden = true; hide(); codesEl.focus();
+  });
+  codesEl.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); search(); }
+  });
+  var q = new URLSearchParams(location.search).get("pd_no");
+  if (q) { codesEl.value = q; search(); }
+  codesEl.focus();
+})();
+</script>
+</body>
+</html>
