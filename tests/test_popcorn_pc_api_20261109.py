@@ -507,7 +507,8 @@ class Safety(Base):
             allowed = 1 if path.name == "popcorn_api_runner.py" else 0
             self.assertEqual(len(re.findall(r"basket_write_allowed\s*=\s*True", text)), allowed, path.name)
         for path in list((ROOT / "api").glob("*.py")):
-            if path.name not in ("mall_ai_api.py", "mall_asus_cart.py"):
+            # 사무실 조회 중계기(2026-11-15)만 예외다. 그 모듈의 제한은 test_mall_ai_gateway_20261115 가 지킨다.
+            if path.name not in ("mall_ai_api.py", "mall_asus_cart.py", "mall_ai_gateway.py"):
                 text = path.read_text(encoding="utf-8", errors="replace")
                 self.assertNotIn("mall_ai_api", text, path.name)
                 self.assertNotIn("mall_asus_cart", text, path.name)
