@@ -33,7 +33,7 @@ ATTEMPT_TTL = 600                      # 로그인 시도 · 동의 전 신원 -
 REQUIRED_CONSENTS = ("terms", "privacy", "age14")
 OPTIONAL_CONSENTS = ("marketing",)
 CONSENT_VERSION = "2026-10-13"         # 약관 문구 확정 뒤 그 날짜로 바꾼다(동의 기록에 남는 버전)
-DEFAULT_RETURN = "/mvp3/"
+DEFAULT_RETURN = "/mvp4/"
 
 
 class AuthFlowError(Exception):
@@ -53,7 +53,7 @@ def digest(value: str) -> str:
 
 def safe_return(path) -> str:
     """같은 사이트 고객 화면 경로만(열린 리다이렉트 방지)."""
-    if not isinstance(path, str) or not path.startswith("/mvp3/") or "//" in path or "\\" in path \
+    if not isinstance(path, str) or not path.startswith("/mvp4/") or "//" in path or "\\" in path \
             or len(path) > 300 or any(c in path for c in "\r\n"):
         return DEFAULT_RETURN
     return path
