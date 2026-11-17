@@ -20,6 +20,7 @@ def validate_pins(pins):
     if not isinstance(pins, dict): raise Denied()
     files = {
         'runtime_sha256': 'api/pc_existing_media_import.py',
+        'storage_sha256': 'api/media_storage.py',
         'cli_sha256': 'tools/apply_existing_pc_media.py',
         'gpu_sha256': 'api/pc_media.py',
         'planner_sha256': 'tools/register_existing_pc_media.py',
@@ -29,7 +30,7 @@ def validate_pins(pins):
         if pins.get(field) != hashlib.sha256((ROOT / path).read_bytes()).hexdigest(): raise Denied()
     head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip()
     if pins.get('integrated_baseline') != head: raise Denied()
-    # HEAD alone does not cover uncommitted input changes; all five byte pins do.
+    # HEAD alone does not cover uncommitted input changes; all six byte pins do.
 
 
 def server_runtime():

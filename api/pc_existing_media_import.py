@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 from uuid import UUID, uuid4, uuid5
+from . import media_storage
 
 from tools.register_existing_pc_media import (
     BUCKET, MANIFEST_SHA, Decision, ImportBinding, ImportPlan, OriginalInput,
@@ -54,11 +55,36 @@ class Expected:
 
 @dataclass(frozen=True)
 class ObjectReceipt:
+    """Original logical asset receipt; never rewrite it for a storage replica."""
     bucket: str
     key: str
     sha256: str
     size: int
     generation: str
+
+
+@dataclass(frozen=True)
+class PhysicalObjectReceipt:
+    bucket: str
+    key: str
+    sha256: str
+    size: int
+    generation: str
+
+
+@dataclass(frozen=True)
+class LogicalStorageReceipt:
+    """New registration: logical identity plus its real physical generation."""
+    logical: ObjectReceipt
+    physical: PhysicalObjectReceipt
+
+
+@dataclass(frozen=True)
+class ReplicaReceipt:
+    """Existing immutable receipt and independently verified replica, kept separate."""
+    source: ObjectReceipt
+    physical: PhysicalObjectReceipt
+    binding: media_storage.ReplicaBinding
 
 
 @dataclass(frozen=True)
@@ -196,11 +222,45 @@ def _same(row, wanted):
 
 
 def _receipt_valid(receipt, job, raw):
-    return (type(receipt) is ObjectReceipt and receipt.bucket == BUCKET
-            and receipt.key == f'pc-configurations/{job}/representative.png'
-            and receipt.sha256 == hashlib.sha256(raw).hexdigest()
-            and receipt.size == len(raw) and type(receipt.generation) is str
-            and re.fullmatch('[1-9][0-9]*', receipt.generation) is not None)
+    try:
+        physical_bucket = media_storage.storage_bucket(BUCKET)
+        if type(receipt) is ObjectReceipt:
+            logical = receipt
+            if physical_bucket != BUCKET: return False
+        elif type(receipt) is LogicalStorageReceipt:
+            logical, physical = receipt.logical, receipt.physical
+            if (physical_bucket == BUCKET or type(logical) is not ObjectReceipt
+                    or type(physical) is not PhysicalObjectReceipt or physical.bucket != physical_bucket
+                    or (physical.key,physical.sha256,physical.size,physical.generation)
+                    != (logical.key,logical.sha256,logical.size,logical.generation)): return False
+        elif type(receipt) is ReplicaReceipt:
+            logical, physical = receipt.source, receipt.physical
+            binding = media_storage.verify_binding(receipt.binding)
+            if (type(logical) is not ObjectReceipt or type(physical) is not PhysicalObjectReceipt
+                    or physical.bucket != binding.destination_bucket
+                    or (logical.bucket,logical.key,logical.generation,logical.sha256,logical.size)
+                    != (binding.logical_bucket,binding.key,binding.source_generation,binding.sha256,binding.size)
+                    or (physical.key,physical.generation,physical.sha256,physical.size)
+                    != (binding.key,binding.destination_generation,binding.sha256,binding.size)
+                    or binding.content_type != 'image/png'): return False
+        else:
+            return False
+        return (logical.bucket == BUCKET and logical.key == f'pc-configurations/{job}/representative.png'
+                and logical.sha256 == hashlib.sha256(raw).hexdigest() and logical.size == len(raw)
+                and type(logical.generation) is str
+                and re.fullmatch('[1-9][0-9]*', logical.generation) is not None)
+    except (media_storage.StorageConfigurationError, AttributeError, TypeError):
+        return False
+
+
+def validated_asset(receipt, job, raw, notice):
+    """Serialize only after verification; old source assets remain byte-for-byte equal."""
+    if not _receipt_valid(receipt, job, raw): raise Conflict()
+    if type(receipt) is ReplicaReceipt:
+        return dict(asdict(receipt.source), notice=notice)
+    if type(receipt) is LogicalStorageReceipt:
+        return dict(asdict(receipt.logical), storage_bucket=receipt.physical.bucket, notice=notice)
+    return dict(asdict(receipt), notice=notice)
 
 
 class Runtime:
@@ -263,10 +323,13 @@ class Runtime:
                     or hashlib.sha256(raw).hexdigest() != expected.original_sha256):
                 raise Conflict()
             # No network under any DB transaction/row lock.
-            receipt = (self.objects.verify_existing(job, raw, row['asset'].get('generation'))
-                       if row['status'] == 'ready' else self.objects.create_or_verify(job, raw))
-            if not _receipt_valid(receipt, job, raw): raise Conflict()
-            asset = dict(asdict(receipt), notice=capture.plan.notice)
+            if row['status'] == 'ready':
+                storage = row['asset'].get('storage_bucket')
+                receipt = (self.objects.verify_existing(job, raw, row['asset'].get('generation'), storage_bucket=storage)
+                           if storage is not None else self.objects.verify_existing(job, raw, row['asset'].get('generation')))
+            else:
+                receipt = self.objects.create_or_verify(job, raw)
+            asset = validated_asset(receipt, job, raw, capture.plan.notice)
             if row['status'] == 'ready' and row['asset'] != asset: raise Conflict()
             try:
                 with self.store.transaction(readonly=False) as tx:
@@ -420,14 +483,14 @@ class GcsObjects:
         return AuthorizedSession(credentials)
 
     def _verified(self, session, meta, job, raw):
-        from urllib.parse import quote
         key = f'pc-configurations/{job}/representative.png'
         generation = meta.get('generation')
-        if (meta.get('bucket') != BUCKET or meta.get('name') != key
+        physical = media_storage.storage_bucket(BUCKET)
+        if (meta.get('bucket') != physical or meta.get('name') != key
                 or type(generation) is not str or not re.fullmatch('[1-9][0-9]*', generation)
                 or str(meta.get('size')) != str(len(raw)) or meta.get('contentType') != 'image/png'):
             raise Conflict()
-        url = f'https://storage.googleapis.com/storage/v1/b/{BUCKET}/o/{quote(key, safe="")}'
+        url = media_storage.object_url(BUCKET, key)
         response = session.get(url, params=dict(alt='media', generation=generation),
                                timeout=(10, 30), allow_redirects=False, stream=True)
         response.raise_for_status()
@@ -438,39 +501,53 @@ class GcsObjects:
             chunks.append(chunk)
         data = b''.join(chunks)
         if data != raw: raise Conflict()
-        return ObjectReceipt(BUCKET, key, hashlib.sha256(data).hexdigest(), len(data), generation)
+        return PhysicalObjectReceipt(physical, key, hashlib.sha256(data).hexdigest(), len(data), generation)
 
-    def verify_existing(self, job, raw, generation):
-        from urllib.parse import quote
+    @staticmethod
+    def _new_receipt(physical):
+        logical = ObjectReceipt(BUCKET, physical.key, physical.sha256, physical.size, physical.generation)
+        return logical if physical.bucket == BUCKET else LogicalStorageReceipt(logical, physical)
+
+    def verify_existing(self, job, raw, generation, *, storage_bucket=None):
         if not _uuid(job) or type(generation) is not str or not re.fullmatch('[1-9][0-9]*', generation):
             raise Conflict()
         key = f'pc-configurations/{job}/representative.png'
-        url = f'https://storage.googleapis.com/storage/v1/b/{BUCKET}/o/{quote(key, safe="")}'
         try:
+            physical_bucket = media_storage.storage_bucket(BUCKET)
+            if storage_bucket is not None and storage_bucket != physical_bucket: raise Conflict()
+            binding = (media_storage.replica_binding(BUCKET, key, generation,
+                       hashlib.sha256(raw).hexdigest(), len(raw), 'image/png')
+                       if physical_bucket != BUCKET and storage_bucket is None else None)
+            expected_generation = binding.destination_generation if binding else generation
+            url = media_storage.object_url(BUCKET, key)
             with self._session() as session:
-                response = session.get(url, params=dict(generation=generation),
+                response = session.get(url, params=dict(generation=expected_generation),
                                        timeout=(10, 30), allow_redirects=False)
                 response.raise_for_status()
                 meta = response.json()
-                if meta.get('generation') != generation: raise Conflict()
-                return self._verified(session, meta, job, raw)
+                if meta.get('generation') != expected_generation: raise Conflict()
+                physical = self._verified(session, meta, job, raw)
+                if binding:
+                    source = ObjectReceipt(BUCKET, key, binding.sha256, binding.size, binding.source_generation)
+                    return ReplicaReceipt(source, physical, binding)
+                return self._new_receipt(physical)
+        except media_storage.StorageConfigurationError as error: raise Conflict() from error
         except Conflict: raise
         except Exception as error: raise ObjectUnknown() from error
 
     def create_or_verify(self, job, raw):
-        from urllib.parse import quote
         if not _uuid(job) or type(raw) is not bytes or not raw.startswith(b'\x89PNG\r\n\x1a\n'):
             raise Conflict()
         key = f'pc-configurations/{job}/representative.png'
-        metadata_url = f'https://storage.googleapis.com/storage/v1/b/{BUCKET}/o/{quote(key, safe="")}'
+        metadata_url = media_storage.object_url(BUCKET, key)
         try:
             with self._session() as session:
-                response = session.post(f'https://storage.googleapis.com/upload/storage/v1/b/{BUCKET}/o',
+                response = session.post(media_storage.upload_url(BUCKET),
                     params=dict(uploadType='media', name=key, ifGenerationMatch='0'), data=raw,
                     headers={'Content-Type': 'image/png'}, timeout=(10, 40), allow_redirects=False)
                 if response.status_code == 412:
                     response = session.get(metadata_url, timeout=(10, 30), allow_redirects=False)
                 response.raise_for_status()
-                return self._verified(session, response.json(), job, raw)
+                return self._new_receipt(self._verified(session, response.json(), job, raw))
         except Conflict: raise
         except Exception as error: raise ObjectUnknown() from error

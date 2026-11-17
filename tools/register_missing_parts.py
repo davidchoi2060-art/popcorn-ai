@@ -58,13 +58,13 @@ class Storage:
         self.session, self.bucket = cloud_session, MEDIA_BUCKET
 
     def put(self, key, raw, content_type):
-        from urllib.parse import quote
+        from api import media_storage
         with self.session() as s:
-            r = s.post(f'https://storage.googleapis.com/upload/storage/v1/b/{self.bucket}/o',
+            r = s.post(media_storage.upload_url(self.bucket),
                        params=dict(uploadType='media', name=key, ifGenerationMatch='0'), data=raw,
                        headers={'Content-Type': content_type}, timeout=(10, 60))
             if r.status_code == 412:
-                r = s.get(f'https://storage.googleapis.com/storage/v1/b/{self.bucket}/o/{quote(key, safe="")}?alt=media',
+                r = s.get(media_storage.object_url(self.bucket, key)+'?alt=media',
                           timeout=(10, 60))
                 r.raise_for_status()
                 if hashlib.sha256(r.content).digest() != hashlib.sha256(raw).digest():

@@ -958,3 +958,57 @@ sudo grep -c POPCORN_TEST_HEADER_ENABLED /etc/popcorn-ai.env    # 0 이어야 �
 공개는 `/api/product-images/<code>/detail` 또는 `/thumbnail`만 허용한다. 원본 object URL이나 버킷 전체 공개 권한을 고객에게 주지 않는다. 본문을 제공할 때 SHA256 ETag와 1시간 캐시를 사용한다. 저장소 접근 실패는 503, 없는 상품 이미지는 404로 구분한다.
 
 원본·표시용·썸네일 object key는 변경하지 않고 보존한다. 추후 재가공 규칙이 바뀌면 새 버전 경로를 생성한다. `gcloud storage cp --recursive --no-clobber`로 올린 후 `gcloud storage objects list 'gs://popcorn-ai-product-media-045e861b/**' --format='json(name,size,md5_hash,generation)'` 결과로 apply 도구의 업로드 검증을 수행한다. 실제 배포 후 ADC 읽기까지 별도 확인한다.
+
+---
+
+## 운영 서버 전용 환경변수 (2026-11-17 기록)
+
+운영 서버(2026-10-22 신설)는 이 문서 앞부분의 개발 서버와 **세 가지가 다르다.** 아래 변수는
+운영 서버 설정 파일에만 있고 개발 서버·CI·개인 PC 에는 두지 않는다. **값은 여기 적지 않는다** —
+이름과 뜻만 적는다(공개 저장소다).
+
+| 다른 점 | 개발 서버 | 운영 서버 |
+|---|---|---|
+| DB 접속 | Cloud SQL 에 직접(원격 주소) | Cloud SQL Proxy 를 거쳐 `127.0.0.1:5432` |
+| 미디어 저장 버킷 | 논리 버킷과 다른 개발용 버킷 | 논리 버킷과 다른 운영용 버킷 + 복제 증명 파일 |
+| 코드 반영 | main 푸시 → 러너가 자동 배포 | **자동 배포 없음**(러너·`popcorn-ci` 미설치) |
+
+### 스케줄(쇼핑몰 가격 자동 반영 · 보존기간 파기)이 켜지는 조건 — `api/scheduler_guard.py`
+
+DB 주소가 루프백이면 스케줄은 꺼진다(CI·개인 PC 가 쇼핑몰에 요청을 보내지 않게). 운영은 프록시
+때문에 루프백이므로, **아래가 전부 맞을 때만** 켠다. 하나라도 빠지면 오류 없이 조용히 꺼진다 —
+운영에서 가격이 안 바뀌면 여기부터 본다.
+
+| 변수 | 조건 |
+|---|---|
+| `POPCORN_CLOUD_SQL_PROXY_SCHEDULE_ENABLED` | `1` |
+| `POPCORN_ENVIRONMENT` | `production` |
+| `POPCORN_DEPLOYMENT_PHASE` | `production` |
+| `CLOUD_SQL_INSTANCE_CONNECTION_NAME` | `프로젝트:리전:인스턴스` 형식 |
+| `POPCORN_EXPECTED_DATABASE` | `DATABASE_URL` 의 DB 이름과 같다 |
+| `DATABASE_URL` | PostgreSQL · 호스트 `127.0.0.1` · 포트 `5432` |
+
+각 스케줄의 자체 스위치(`MALL_PRICE_AUTO_SCHEDULE` · `RETENTION_PURGE_SCHEDULE` ·
+`RETENTION_PURGE_APPLY`)는 이 조건과 별개로 그대로 듣는다.
+
+### 미디어 저장 버킷 — `api/media_storage.py`
+
+DB 기록(자산·승인 스냅샷)의 버킷 이름은 **논리 이름 그대로** 두고, 실제 읽기·쓰기 대상만 바꾼다.
+
+| 변수 | 뜻 |
+|---|---|
+| `POPCORN_MEDIA_STORAGE_BUCKET` | 실제 저장 버킷. 없으면 논리 버킷을 쓴다. **버킷 이름만** 적는다 — `gs://` 접두나 끝 `/` 가 있으면 설정 오류로 거부한다(다른 버킷으로 넘어가지 않는다) |
+| `POPCORN_MEDIA_BUCKET` | 폐기된 이름. 논리 버킷과 다른 값이 남아 있으면 **모든 미디어 조회를 거부**한다 — 두지 않는다 |
+| `POPCORN_MEDIA_REPLICA_MANIFEST` | 옛 버킷 → 새 버킷 복제 증명 파일의 절대 경로 |
+| `POPCORN_MEDIA_REPLICA_MANIFEST_SHA256` | 그 파일의 SHA-256. 파일이 한 바이트라도 바뀌면 거부한다 |
+
+복제 증명이 없는 서버(지금의 개발 서버)에서는 **이미 등록이 끝난 기존 PC 이미지의 재검증만** 거부된다
+(2026-11-17 사장님 결정으로 받아들임). 새 등록은 실제 버킷에 올리고 자산에 `storage_bucket` 을
+함께 적으므로 증명 없이 된다. 화면의 이미지·영상 조회는 영향이 없다.
+
+### 운영에 코드를 올릴 때
+
+운영 서버의 작업 폴더는 git 저장소가 아니다(파일 사본). 올릴 때는 **바뀐 파일만** 복사하고,
+복사 전후로 저장소 커밋과 파일 해시를 대조한다. 이 절의 파일들이 저장소에 없던 기간(2026-10-29~
+11-17)에는 저장소 판으로 덮으면 운영 스케줄이 멈췄다 — 서버에서 직접 고친 것은 반드시 저장소로
+되올린다(「서버 코드 직접 수정 금지」의 짝).

@@ -412,13 +412,9 @@ def _loop(stop):
 def scheduler_enabled() -> bool:
     if (os.environ.get("MALL_PRICE_AUTO_SCHEDULE") or "on").lower() in ("off", "0", "false", "no"):
         return False
-    # 루프백 DB(CI · 테스트 · 개인 로컬 DB)에서는 돌지 않는다 — 쇼핑몰에 요청을 보내지 않게.
-    from sqlalchemy.engine import make_url
-    try:
-        host = make_url(os.environ.get("DATABASE_URL") or "").host
-    except Exception:                                               # noqa: BLE001
-        return False
-    return bool(host) and host not in ("127.0.0.1", "localhost", "::1")
+    # Local development stays off; the deployment guard can explicitly identify a production proxy.
+    from .scheduler_guard import database_schedule_allowed
+    return database_schedule_allowed()
 
 
 def start_scheduler() -> None:

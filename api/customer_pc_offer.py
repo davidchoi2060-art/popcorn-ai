@@ -34,7 +34,6 @@ import re
 import threading
 from collections import OrderedDict
 from copy import deepcopy
-from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from PIL import Image, UnidentifiedImageError
@@ -45,12 +44,8 @@ from .customer_bom_gaps import EVIDENCE_SQL as BOM_EVIDENCE_SQL
 from .customer_sold_offer_read import read_customer_sold_offer
 from .pc_publication_source_reader import make_source_reader
 from .part_spec_notes import derived_specs
-from .media_storage import (
-    LOGICAL_MEDIA_BUCKET,
-    get_physical_media_bucket,
-    is_valid_logical_bucket,
-)
 from .product_images import MEDIA_BUCKET, read_image
+from . import media_storage
 from . import pc_media
 
 log = logging.getLogger("customer_pc_offer")
@@ -246,13 +241,11 @@ def attach(products):
 
 def _representative_png(asset, job_id):
     key = f"pc-configurations/{job_id}/representative.png"
-    if not is_valid_logical_bucket(asset.get("bucket")) or asset.get("key") != key:
+    if asset.get("bucket") != MEDIA_BUCKET or asset.get("key") != key:
         raise _not_public()
     try:
-        physical_bucket = get_physical_media_bucket()
         with pc_media.cloud_session() as session:
-            r = session.get(f"https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/"
-                            f"{quote(key, safe='')}?alt=media", timeout=(10, 30))
+            r = session.get(media_storage.object_url(MEDIA_BUCKET, key)+'?alt=media', timeout=(10, 30))
             r.raise_for_status()
             raw = r.content
         if len(raw) > MAX_PNG or hashlib.sha256(raw).hexdigest() != asset.get("sha256"):

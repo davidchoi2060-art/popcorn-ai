@@ -1,9 +1,10 @@
 """Isolated unit tests for the media storage adapter (M1).
 
 Validates:
-1. Bucket name normalization, validation, and rejection of invalid formats.
-2. get_physical_media_bucket behavior when POPCORN_MEDIA_STORAGE_BUCKET is unset, empty, valid, or malformed.
-3. Logical bucket identity verification (is_valid_logical_bucket) ensuring DB audit snapshots remain immutable.
+1. storage_bucket(): physical bucket validation and rejection of invalid formats (no normalization).
+2. storage_bucket() when POPCORN_MEDIA_STORAGE_BUCKET is unset, empty, valid, or malformed, and the
+   obsolete POPCORN_MEDIA_BUCKET override guard.
+3. URL builders (object_url / upload_url / permissions_url) and object key validation.
 4. Product images (api/product_images.py) fetch routing to physical bucket while enforcing logical asset.bucket.
 5. PC media (api/pc_media.py) upload, readback, permission checks, and asset dictionary generation.
 6. PC video (api/pc_video.py) source read, video upload read-after-write, and file serving routing.
@@ -20,117 +21,97 @@ from fastapi import HTTPException
 # Safe dummy PostgreSQL DB URL for importing api modules during isolated mock testing (create_engine is lazy and does not connect on import)
 os.environ.setdefault("DATABASE_URL", "postgresql://popcorn_app:dummy_test@127.0.0.1:5432/popcorn_pc")
 
-from api.media_storage import (
-    LOGICAL_MEDIA_BUCKET,
-    STORAGE_ENV_VAR,
-    normalize_bucket_name,
-    get_physical_media_bucket,
-    is_valid_logical_bucket,
-)
+from api import media_storage
+from api.media_storage import LOGICAL_BUCKET, StorageConfigurationError, storage_bucket
+
+STORAGE_ENV_VAR = "POPCORN_MEDIA_STORAGE_BUCKET"
+OBSOLETE_ENV_VAR = "POPCORN_MEDIA_BUCKET"
+PHYSICAL = "fixture-physical-media-bucket"   # 가짜 이름 - 실제 버킷이 아니다
 import api.product_images as prod_img
 import api.pc_media as pc_media
 import api.pc_video as pc_video
 import api.customer_pc_offer as cust_offer
 
 
-class TestBucketNormalization(unittest.TestCase):
-    def test_valid_bucket_names(self):
-        self.assertEqual(normalize_bucket_name("popcorn-ai-product-media-045e861b"), "popcorn-ai-product-media-045e861b")
-        self.assertEqual(normalize_bucket_name("popcornai-dev-media-990033290003"), "popcornai-dev-media-990033290003")
-        self.assertEqual(normalize_bucket_name("gs://popcornai-dev-media-990033290003"), "popcornai-dev-media-990033290003")
-        self.assertEqual(normalize_bucket_name("gs://popcornai-dev-media-990033290003/"), "popcornai-dev-media-990033290003")
-        self.assertEqual(normalize_bucket_name("  popcorn-dev-123  "), "popcorn-dev-123")
+class _StorageEnv(unittest.TestCase):
+    """Isolate both storage variables; a developer shell must not leak into the test."""
 
-    def test_invalid_bucket_names_raise_value_error(self):
+    def setUp(self):
+        patcher = patch.dict(os.environ)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        os.environ.pop(STORAGE_ENV_VAR, None)
+        os.environ.pop(OBSOLETE_ENV_VAR, None)
+
+
+class TestPhysicalBucketResolution(_StorageEnv):
+    def test_unset_env_returns_logical_default(self):
+        self.assertEqual(storage_bucket(), LOGICAL_BUCKET)
+        self.assertEqual(storage_bucket(LOGICAL_BUCKET), "popcorn-ai-product-media-045e861b")
+
+    def test_configured_valid_env_returns_physical_bucket(self):
+        for value, expected in ((PHYSICAL, PHYSICAL), ("  popcorn-dev-123  ", "popcorn-dev-123"),
+                                ("media.example.co.kr", "media.example.co.kr")):
+            with self.subTest(value=value):
+                os.environ[STORAGE_ENV_VAR] = value
+                self.assertEqual(storage_bucket(), expected)
+
+    def test_invalid_env_is_refused_without_fallback(self):
+        # The deployed adapter validates only: a gs:// prefix or trailing slash is a
+        # configuration error, never silently rewritten and never the old bucket.
         invalid_inputs = [
-            "",
-            "   ",
-            "gs://",
-            "gs:///",
-            "INVALID_UPPERCASE",
-            "-leading-hyphen",
-            "trailing-hyphen-",
-            ".leading-dot",
-            "trailing-dot.",
-            "has space",
-            "has..double.dot",
-            "has.-dash.dot",
-            "has-.dot.dash",
-            "a" * 64,  # too long (>63)
-            "ab",       # too short (<3)
+            "", "   ", "gs://", "gs://" + PHYSICAL, PHYSICAL + "/", "INVALID_UPPERCASE",
+            "-leading-hyphen", "trailing-hyphen-", ".leading-dot", "trailing-dot.",
+            "has space", "has..double.dot", "a" * 64, "ab", "192.168.0.1",
         ]
         for bad in invalid_inputs:
             with self.subTest(bad=bad):
-                with self.assertRaises(ValueError):
-                    normalize_bucket_name(bad)
+                os.environ[STORAGE_ENV_VAR] = bad
+                with self.assertRaises(StorageConfigurationError):
+                    storage_bucket()
+        self.assertTrue(issubclass(StorageConfigurationError, ValueError))
+
+    def test_unknown_logical_bucket_is_refused(self):
+        for bad in (PHYSICAL, None, "", "other-bucket"):
+            with self.subTest(bad=bad), self.assertRaises(StorageConfigurationError):
+                storage_bucket(bad)
+
+    def test_obsolete_logical_override_is_refused(self):
+        os.environ[OBSOLETE_ENV_VAR] = PHYSICAL
+        with self.assertRaises(StorageConfigurationError):
+            storage_bucket()
+        os.environ[OBSOLETE_ENV_VAR] = LOGICAL_BUCKET
+        self.assertEqual(storage_bucket(), LOGICAL_BUCKET)
 
 
-class TestPhysicalBucketResolution(unittest.TestCase):
-    def setUp(self):
-        self.orig_env = os.environ.get(STORAGE_ENV_VAR)
+class TestUrlBuilders(_StorageEnv):
+    def test_urls_target_the_physical_bucket(self):
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
+        self.assertEqual(media_storage.object_url(LOGICAL_BUCKET, "products/1/a b.png"),
+                         f"https://storage.googleapis.com/storage/v1/b/{PHYSICAL}/o/products%2F1%2Fa%20b.png")
+        self.assertEqual(media_storage.upload_url(),
+                         f"https://storage.googleapis.com/upload/storage/v1/b/{PHYSICAL}/o")
+        self.assertEqual(media_storage.permissions_url(),
+                         f"https://storage.googleapis.com/storage/v1/b/{PHYSICAL}/iam/testPermissions")
 
-    def tearDown(self):
-        if self.orig_env is not None:
-            os.environ[STORAGE_ENV_VAR] = self.orig_env
-        else:
-            os.environ.pop(STORAGE_ENV_VAR, None)
-
-    def test_unset_env_returns_logical_default(self):
-        os.environ.pop(STORAGE_ENV_VAR, None)
-        self.assertEqual(get_physical_media_bucket(), LOGICAL_MEDIA_BUCKET)
-
-    def test_empty_or_whitespace_env_raises_value_error(self):
-        os.environ[STORAGE_ENV_VAR] = ""
-        with self.assertRaises(ValueError):
-            get_physical_media_bucket()
-        os.environ[STORAGE_ENV_VAR] = "   "
-        with self.assertRaises(ValueError):
-            get_physical_media_bucket()
-
-    def test_configured_valid_env_returns_physical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "gs://popcornai-dev-media-990033290003"
-        self.assertEqual(get_physical_media_bucket(), "popcornai-dev-media-990033290003")
-
-        os.environ[STORAGE_ENV_VAR] = "popcorn-ai-dev-media-custom"
-        self.assertEqual(get_physical_media_bucket(), "popcorn-ai-dev-media-custom")
-
-    def test_configured_invalid_env_raises_value_error_without_fallback(self):
-        os.environ[STORAGE_ENV_VAR] = "invalid bucket name with spaces!"
-        with self.assertRaises(ValueError):
-            get_physical_media_bucket()
+    def test_object_key_must_be_a_plain_relative_path(self):
+        for bad in ("", "/abs", "a//b", "a/../b", "./a", "a\\b", "a\nb", None, 7):
+            with self.subTest(bad=bad), self.assertRaises(StorageConfigurationError):
+                media_storage.object_url(LOGICAL_BUCKET, bad)
 
 
-class TestLogicalBucketValidation(unittest.TestCase):
-    def test_logical_bucket_identification(self):
-        self.assertTrue(is_valid_logical_bucket(LOGICAL_MEDIA_BUCKET))
-        self.assertTrue(is_valid_logical_bucket("popcorn-ai-product-media-045e861b"))
-        # Physical bucket name MUST NOT pass as logical bucket
-        self.assertFalse(is_valid_logical_bucket("popcornai-dev-media-990033290003"))
-        self.assertFalse(is_valid_logical_bucket(None))
-        self.assertFalse(is_valid_logical_bucket(""))
-        self.assertFalse(is_valid_logical_bucket("other-bucket"))
-
-
-class TestProductImagesRouting(unittest.TestCase):
-    def setUp(self):
-        self.orig_env = os.environ.get(STORAGE_ENV_VAR)
-
-    def tearDown(self):
-        if self.orig_env is not None:
-            os.environ[STORAGE_ENV_VAR] = self.orig_env
-        else:
-            os.environ.pop(STORAGE_ENV_VAR, None)
+class TestProductImagesRouting(_StorageEnv):
 
     def test_image_key_requires_logical_bucket(self):
         asset_valid = {
-            "bucket": LOGICAL_MEDIA_BUCKET,
+            "bucket": LOGICAL_BUCKET,
             "detail_key": "products/1001/0123456789abcdef/detail.png"
         }
         self.assertEqual(prod_img.image_key(asset_valid, 1001, "detail"), "products/1001/0123456789abcdef/detail.png")
 
         # Even if physical bucket is used, asset['bucket'] in DB must be the logical bucket
         asset_polluted = {
-            "bucket": "popcornai-dev-media-990033290003",
+            "bucket": PHYSICAL,
             "detail_key": "products/1001/0123456789abcdef/detail.png"
         }
         with self.assertRaises(HTTPException) as cm:
@@ -141,7 +122,7 @@ class TestProductImagesRouting(unittest.TestCase):
         test_bytes = b"fake-detail-png-bytes"
         expected_sha = hashlib.sha256(test_bytes).hexdigest()
         asset = {
-            "bucket": LOGICAL_MEDIA_BUCKET,
+            "bucket": LOGICAL_BUCKET,
             "detail_key": "products/1001/0123456789abcdef/detail.png",
             "detail_sha256": expected_sha
         }
@@ -158,29 +139,21 @@ class TestProductImagesRouting(unittest.TestCase):
             data = prod_img._fetch(asset, asset["detail_key"], "detail")
             self.assertEqual(data, test_bytes)
             requested_url = mock_session.get.call_args[0][0]
-            self.assertIn(f"/b/{LOGICAL_MEDIA_BUCKET}/o/", requested_url)
+            self.assertIn(f"/b/{LOGICAL_BUCKET}/o/", requested_url)
 
         # 2. Configured env -> physical bucket is new bucket
-        os.environ[STORAGE_ENV_VAR] = "gs://popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         with patch.object(prod_img, "_session", return_value=mock_session):
             data = prod_img._fetch(asset, asset["detail_key"], "detail")
             self.assertEqual(data, test_bytes)
             requested_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", requested_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", requested_url)
 
 
-class TestPCMediaRouting(unittest.TestCase):
-    def setUp(self):
-        self.orig_env = os.environ.get(STORAGE_ENV_VAR)
-
-    def tearDown(self):
-        if self.orig_env is not None:
-            os.environ[STORAGE_ENV_VAR] = self.orig_env
-        else:
-            os.environ.pop(STORAGE_ENV_VAR, None)
+class TestPCMediaRouting(_StorageEnv):
 
     def test_cloud_ready_probes_physical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"permissions": ["storage.objects.create", "storage.objects.get"]}
         mock_session = MagicMock()
@@ -191,10 +164,10 @@ class TestPCMediaRouting(unittest.TestCase):
             mock_cs.return_value.__enter__.return_value = mock_session
             self.assertTrue(pc_media._cloud_ready(0))
             requested_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/iam/testPermissions", requested_url)
+            self.assertIn(f"/b/{PHYSICAL}/iam/testPermissions", requested_url)
 
     def test_upload_writes_to_physical_bucket_and_preserves_logical_asset(self):
-        os.environ[STORAGE_ENV_VAR] = "gs://popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job = {"job_id": str(uuid4())}
         raw_bytes = b"fake-pc-representative-png"
 
@@ -209,14 +182,14 @@ class TestPCMediaRouting(unittest.TestCase):
 
             # Check network upload target
             upload_url = mock_session.post.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o", upload_url)
+            self.assertIn(f"/b/{PHYSICAL}/o", upload_url)
 
-            # Crucial check: returned asset for DB insertion must specify LOGICAL_MEDIA_BUCKET
-            self.assertEqual(asset["bucket"], LOGICAL_MEDIA_BUCKET)
+            # Crucial check: returned asset for DB insertion must specify LOGICAL_BUCKET
+            self.assertEqual(asset["bucket"], LOGICAL_BUCKET)
             self.assertEqual(asset["sha256"], hashlib.sha256(raw_bytes).hexdigest())
 
     def test_image_fetches_from_physical_bucket_and_validates_logical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job_id = uuid4()
         raw_bytes = b"sample-pc-image"
         expected_sha = hashlib.sha256(raw_bytes).hexdigest()
@@ -240,7 +213,7 @@ class TestPCMediaRouting(unittest.TestCase):
 
         with patch.object(pc_media.engine, "connect") as mock_conn:
             mock_conn.return_value.__enter__.return_value.execute.return_value.scalar.return_value = {
-                "bucket": LOGICAL_MEDIA_BUCKET,
+                "bucket": LOGICAL_BUCKET,
                 "key": f"pc-configurations/{job_id}/representative.png",
                 "sha256": expected_sha
             }
@@ -249,25 +222,17 @@ class TestPCMediaRouting(unittest.TestCase):
                 resp = pc_media.image("ident1", job_id)
                 self.assertEqual(resp.body, raw_bytes)
                 fetch_url = mock_session.get.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o/", fetch_url)
+                self.assertIn(f"/b/{PHYSICAL}/o/", fetch_url)
 
 
-class TestPCVideoRouting(unittest.TestCase):
-    def setUp(self):
-        self.orig_env = os.environ.get(STORAGE_ENV_VAR)
-
-    def tearDown(self):
-        if self.orig_env is not None:
-            os.environ[STORAGE_ENV_VAR] = self.orig_env
-        else:
-            os.environ.pop(STORAGE_ENV_VAR, None)
+class TestPCVideoRouting(_StorageEnv):
 
     def test_read_source_fetches_from_physical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "gs://popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job = str(uuid4())
         raw_bytes = b"fake-video-source-image"
         asset = {
-            "bucket": LOGICAL_MEDIA_BUCKET,
+            "bucket": LOGICAL_BUCKET,
             "key": f"pc-configurations/{job}/representative.png",
             "sha256": hashlib.sha256(raw_bytes).hexdigest()
         }
@@ -282,10 +247,10 @@ class TestPCVideoRouting(unittest.TestCase):
             data = pc_video.read_source(asset, job)
             self.assertEqual(data, raw_bytes)
             fetch_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", fetch_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", fetch_url)
 
     def test_upload_file_writes_and_verifies_physical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job = str(uuid4())
         raw_video = b"fake-mp4-stream-data"
         expected_sha = hashlib.sha256(raw_video).hexdigest()
@@ -310,38 +275,34 @@ class TestPCVideoRouting(unittest.TestCase):
 
                 # Check network endpoints
                 upload_url = mock_session.post.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o", upload_url)
+                self.assertIn(f"/b/{PHYSICAL}/o", upload_url)
                 verify_url = mock_session.get.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o/", verify_url)
+                self.assertIn(f"/b/{PHYSICAL}/o/", verify_url)
 
                 # Check logical audit bucket preservation
-                self.assertEqual(res["bucket"], LOGICAL_MEDIA_BUCKET)
+                self.assertEqual(res["bucket"], LOGICAL_BUCKET)
                 self.assertEqual(res["sha256"], expected_sha)
                 self.assertEqual(res["size"], len(raw_video))
 
 
-class TestCustomerPCOfferRouting(unittest.TestCase):
+class TestCustomerPCOfferRouting(_StorageEnv):
     def setUp(self):
-        self.orig_env = os.environ.get(STORAGE_ENV_VAR)
-        with cust_offer._card_cache_lock:
-            cust_offer._card_cache.clear()
-            cust_offer._card_cache_size = 0
+        super().setUp()
+        self.addCleanup(self._clear_cards)
+        self._clear_cards()
 
-    def tearDown(self):
+    @staticmethod
+    def _clear_cards():
         with cust_offer._card_cache_lock:
             cust_offer._card_cache.clear()
             cust_offer._card_cache_size = 0
-        if self.orig_env is not None:
-            os.environ[STORAGE_ENV_VAR] = self.orig_env
-        else:
-            os.environ.pop(STORAGE_ENV_VAR, None)
 
     def test_representative_png_fetches_from_physical_bucket(self):
-        os.environ[STORAGE_ENV_VAR] = "gs://popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job_id = str(uuid4())
         raw_bytes = b"fake-customer-pc-png"
         asset = {
-            "bucket": LOGICAL_MEDIA_BUCKET,
+            "bucket": LOGICAL_BUCKET,
             "key": f"pc-configurations/{job_id}/representative.png",
             "sha256": hashlib.sha256(raw_bytes).hexdigest()
         }
@@ -355,7 +316,7 @@ class TestCustomerPCOfferRouting(unittest.TestCase):
             res = cust_offer._representative_png(asset, job_id)
             self.assertEqual(res, raw_bytes)
             req_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", req_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", req_url)
 
     def test_representative_png_rejects_logical_bucket_mismatch(self):
         job_id = str(uuid4())
@@ -369,7 +330,7 @@ class TestCustomerPCOfferRouting(unittest.TestCase):
         self.assertEqual(cm.exception.status_code, 404)
 
     def test_read_representative_image_cold_cache_regression(self):
-        os.environ[STORAGE_ENV_VAR] = "popcornai-dev-media-990033290003"
+        os.environ[STORAGE_ENV_VAR] = PHYSICAL
         job_id = str(uuid4())
         tiny_png = (
             b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
@@ -380,7 +341,7 @@ class TestCustomerPCOfferRouting(unittest.TestCase):
         mock_job = {
             "job_id": job_id,
             "asset": {
-                "bucket": LOGICAL_MEDIA_BUCKET,
+                "bucket": LOGICAL_BUCKET,
                 "key": f"pc-configurations/{job_id}/representative.png",
                 "sha256": sha
             }
@@ -403,7 +364,7 @@ class TestCustomerPCOfferRouting(unittest.TestCase):
             resp = cust_offer.read_representative_image(1001, mock_request, size="card")
             self.assertEqual(resp.media_type, "image/webp")
             self.assertIn(sha, cust_offer._card_cache)
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", mock_session.get.call_args[0][0])
+            self.assertIn(f"/b/{PHYSICAL}/o/", mock_session.get.call_args[0][0])
 
             # Warm cache: does not call network again
             mock_session.get.reset_mock()

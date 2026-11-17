@@ -194,12 +194,8 @@ def _loop(stop):
 def scheduler_enabled() -> bool:
     if not _on(SCHEDULE_ENV, "on"):
         return False
-    from sqlalchemy.engine import make_url
-    try:
-        host = make_url(os.environ.get("DATABASE_URL") or "").host
-    except Exception:                                               # noqa: BLE001
-        return False
-    return bool(host) and host not in ("127.0.0.1", "localhost", "::1")
+    from .scheduler_guard import database_schedule_allowed
+    return database_schedule_allowed()
 
 
 _scheduler = None

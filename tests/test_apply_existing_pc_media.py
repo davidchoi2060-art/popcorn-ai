@@ -68,6 +68,30 @@ class CliTests(unittest.TestCase):
                       pin_validator=denied, environment={}, output=self.output)
         self.assertEqual(status, 2)
 
+    def test_storage_adapter_is_one_of_the_six_byte_pins(self):
+        import hashlib
+        from tools import apply_existing_pc_media as cli
+        files = {
+            'runtime_sha256': 'api/pc_existing_media_import.py',
+            'storage_sha256': 'api/media_storage.py',
+            'cli_sha256': 'tools/apply_existing_pc_media.py',
+            'gpu_sha256': 'api/pc_media.py',
+            'planner_sha256': 'tools/register_existing_pc_media.py',
+            'schema_sha256': 'db/migrations/versions/0134_pc_media_import_provenance.py',
+        }
+        pins = {field: hashlib.sha256((cli.ROOT / path).read_bytes()).hexdigest()
+                for field, path in files.items()}
+        pins['integrated_baseline'] = 'fixture-head'
+        with patch.object(cli.subprocess, 'check_output', return_value='fixture-head\n'):
+            validate_pins(pins)
+            for field in files:
+                with self.subTest(missing=field), self.assertRaises(Denied):
+                    validate_pins({k: v for k, v in pins.items() if k != field})
+            with self.assertRaises(Denied):
+                validate_pins(dict(pins, storage_sha256='0' * 64))
+            with self.assertRaises(Denied):
+                validate_pins(dict(pins, integrated_baseline='another-head'))
+
     def test_cli_actor_and_authority_cannot_be_injected(self):
         with patch('sys.stderr', io.StringIO()):
             for option in ('--actor', '--authority', '--factory', '--delete'):
