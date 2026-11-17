@@ -147,7 +147,7 @@ class TestProductImagesRouting(_StorageEnv):
             data = prod_img._fetch(asset, asset["detail_key"], "detail")
             self.assertEqual(data, test_bytes)
             requested_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", requested_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", requested_url)
 
 
 class TestPCMediaRouting(_StorageEnv):
@@ -164,7 +164,7 @@ class TestPCMediaRouting(_StorageEnv):
             mock_cs.return_value.__enter__.return_value = mock_session
             self.assertTrue(pc_media._cloud_ready(0))
             requested_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/iam/testPermissions", requested_url)
+            self.assertIn(f"/b/{PHYSICAL}/iam/testPermissions", requested_url)
 
     def test_upload_writes_to_physical_bucket_and_preserves_logical_asset(self):
         os.environ[STORAGE_ENV_VAR] = PHYSICAL
@@ -182,7 +182,7 @@ class TestPCMediaRouting(_StorageEnv):
 
             # Check network upload target
             upload_url = mock_session.post.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o", upload_url)
+            self.assertIn(f"/b/{PHYSICAL}/o", upload_url)
 
             # Crucial check: returned asset for DB insertion must specify LOGICAL_BUCKET
             self.assertEqual(asset["bucket"], LOGICAL_BUCKET)
@@ -222,7 +222,7 @@ class TestPCMediaRouting(_StorageEnv):
                 resp = pc_media.image("ident1", job_id)
                 self.assertEqual(resp.body, raw_bytes)
                 fetch_url = mock_session.get.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o/", fetch_url)
+                self.assertIn(f"/b/{PHYSICAL}/o/", fetch_url)
 
 
 class TestPCVideoRouting(_StorageEnv):
@@ -247,7 +247,7 @@ class TestPCVideoRouting(_StorageEnv):
             data = pc_video.read_source(asset, job)
             self.assertEqual(data, raw_bytes)
             fetch_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", fetch_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", fetch_url)
 
     def test_upload_file_writes_and_verifies_physical_bucket(self):
         os.environ[STORAGE_ENV_VAR] = PHYSICAL
@@ -275,9 +275,9 @@ class TestPCVideoRouting(_StorageEnv):
 
                 # Check network endpoints
                 upload_url = mock_session.post.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o", upload_url)
+                self.assertIn(f"/b/{PHYSICAL}/o", upload_url)
                 verify_url = mock_session.get.call_args[0][0]
-                self.assertIn("/b/popcornai-dev-media-990033290003/o/", verify_url)
+                self.assertIn(f"/b/{PHYSICAL}/o/", verify_url)
 
                 # Check logical audit bucket preservation
                 self.assertEqual(res["bucket"], LOGICAL_BUCKET)
@@ -316,7 +316,7 @@ class TestCustomerPCOfferRouting(_StorageEnv):
             res = cust_offer._representative_png(asset, job_id)
             self.assertEqual(res, raw_bytes)
             req_url = mock_session.get.call_args[0][0]
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", req_url)
+            self.assertIn(f"/b/{PHYSICAL}/o/", req_url)
 
     def test_representative_png_rejects_logical_bucket_mismatch(self):
         job_id = str(uuid4())
@@ -364,7 +364,7 @@ class TestCustomerPCOfferRouting(_StorageEnv):
             resp = cust_offer.read_representative_image(1001, mock_request, size="card")
             self.assertEqual(resp.media_type, "image/webp")
             self.assertIn(sha, cust_offer._card_cache)
-            self.assertIn("/b/popcornai-dev-media-990033290003/o/", mock_session.get.call_args[0][0])
+            self.assertIn(f"/b/{PHYSICAL}/o/", mock_session.get.call_args[0][0])
 
             # Warm cache: does not call network again
             mock_session.get.reset_mock()
