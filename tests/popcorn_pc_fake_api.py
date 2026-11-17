@@ -1,9 +1,18 @@
 # -*- coding: utf-8 -*-
-"""팝콘PC AI API 메모리 가짜. 소켓을 열지 않는다. 가이드 문서가 적은 동작만 흉내 낸다."""
+"""팝콘PC AI API 메모리 가짜. 소켓을 열지 않는다.
+
+price 는 2026-11-17 실측한 새 응답을 흉내 낸다(checked_at, items, not_found). basket 은 가이드 문서 그대로다.
+값은 전부 합성이다.
+"""
 import json
 from urllib.parse import parse_qsl, urlsplit
 
-from api.mall_ai_api import API_PATH, ORIGIN, BASKET_LINK_PATH, DOC_KEY_LENGTH_ERROR, TransportResponse
+from api.mall_ai_api import (API_PATH, ORIGIN, BASKET_LINK_PATH, DOC_KEY_LENGTH_ERROR, PRICE_TOO_MANY_ERROR,
+                             TransportResponse)
+
+CHECKED_AT = "2026-11-17 14:42:35"          # 실측 형식(시간대 표시 없음)
+CHECKED_AT_ISO = "2026-11-17T14:42:35+09:00"    # 명세 형식
+IP_DENIED_ERROR = "허용되지 않은 IP"
 
 
 def json_response(document, status=200):
@@ -12,11 +21,25 @@ def json_response(document, status=200):
 
 
 def product(pd_no, **overrides):
-    item = {"pd_no": pd_no, "pd_name": "합성 상품 %s" % pd_no, "price": 150000, "mileage": 1500,
-            "made": "합성 제조사", "pd_spec": "합성 규격", "pd_image_basic": "/data/pimg/1/%s_600.jpg" % pd_no,
-            "pd_delivery_price": 3000}
+    """새 price 항목. 실측대로 status 는 sold_out, max_qty 는 null 이 기본이다."""
+    item = {"pd_no": pd_no, "name": "합성 상품 %s" % pd_no, "price": 150000, "status": "sold_out", "max_qty": None}
     item.update(overrides)
     return item
+
+
+def price_response(items, not_found=None, checked_at=CHECKED_AT, **extra):
+    """정상 price 봉투. not_found 는 없으면 null 이다([] 가 아니다)."""
+    document = {"checked_at": checked_at, "items": list(items), "not_found": not_found}
+    document.update(extra)
+    return json_response(document)
+
+
+def ip_denied_response():
+    return json_response({"error": IP_DENIED_ERROR}, status=403)
+
+
+def too_many_response():
+    return json_response({"error": PRICE_TOO_MANY_ERROR}, status=400)
 
 
 class FakeMallApi:
@@ -44,8 +67,14 @@ class FakeMallApi:
         return json_response({"result": "fail"})
 
     def _price(self, query):
-        codes = list(dict.fromkeys(int(c) for c in query["pd_no"].split(",")))[:50]
-        return json_response({"result": "ok", "items": [self.catalog[c] for c in codes if c in self.catalog]})
+        try:
+            codes = list(dict.fromkeys(int(c) for c in query["pd_no"].split(",")))
+        except ValueError:
+            return price_response([])       # 실측: pd_no=abc 도 200 에 빈 items, not_found null
+        if len(codes) > 50:
+            return too_many_response()
+        absent = [c for c in codes if c not in self.catalog]
+        return price_response([self.catalog[c] for c in codes if c in self.catalog], absent or None)
 
     def _basket(self, query):
         key = query["api_key"]

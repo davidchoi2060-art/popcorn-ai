@@ -8,7 +8,7 @@
 
   - 상품번호는 50개씩 나눠 묻고, 묶음 사이에 1.2초 쉰다(중계기는 1초에 1회만 받는다).
   - 429(다른 조회 진행 중)는 2초 쉬고 최대 3번 다시 묻는다. 다른 오류는 다시 묻지 않는다.
-  - 결과는 엑셀에서 바로 열리는 CSV(UTF-8 BOM)다. 원가가 들어 있으니 외부에 보내지 않는다.
+  - 결과는 엑셀에서 바로 열리는 CSV(UTF-8 BOM)다. 열은 상품번호·상품명·가격·판매상태·최대수량이다(2026-11-17 윈윈 응답 변경).
   - 실행 기록은 OutDir\mall_price_export.log 에 한 줄씩 남는다(건수와 오류만, 값은 남기지 않는다).
 
 .PARAMETER Codes
@@ -101,24 +101,20 @@ try {
         $chunk = $list.GetRange($i, [Math]::Min($ChunkSize, $list.Count - $i)).ToArray()
         $data = Invoke-Gateway $chunk
         foreach ($it in $data.items) {
-            $in = $it.internal
-            if (-not $it.found -or -not $it.name) { $missing++ }   # 윈윈은 없는 번호에도 빈 항목(이름 없음, 판매가 0)을 돌려준다
+            # 2026-11-17 윈윈 응답 변경: 내부 가격 열(원가·딜러가·시중가·소비자가·재고값)은 더 오지 않는다.
+            # 없는 번호는 not_found 로 온다. 판매상태는 윈윈이 준 값 그대로이고 이 스크립트가 판정한 값이 아니다.
+            if (-not $it.found) { $missing++ }
+            $maxQty = ""
+            if ($it.max_qty -and $it.max_qty.status -eq "ok") { $maxQty = $it.max_qty.value }
             $rows.Add([pscustomobject][ordered]@{
                 "조회시각"   = (Get-Date -Format "yyyy-MM-dd HH:mm")
+                "윈윈조회시각" = $data.checked_at
                 "상품번호"   = $it.pd_no
-                "응답"       = $(if (-not $it.found) { "윈윈 응답에 없음" } elseif (-not $it.name) { "빈 응답(없는 번호일 수 있음)" } else { "있음" })
+                "응답"       = $(if ($it.found) { "있음" } elseif ($it.lookup -eq "not_found") { "윈윈에 없는 번호" } else { "윈윈 응답에서 빠짐" })
                 "상품명"     = $it.name
-                "제조사"     = $it.maker
-                "판매가"     = Get-Amount $it.price
-                "원가"       = Get-Amount $in.pd_cost_price
-                "딜러가1"    = Get-Amount $in.dealer1_price
-                "딜러가2"    = Get-Amount $in.dealer2_price
-                "딜러가3"    = Get-Amount $in.dealer3_price
-                "소비자가"   = Get-Amount $in.pd_sobija_price
-                "시중가"     = Get-Amount $in.pd_sijung_price
-                "적립금"     = Get-Amount $it.mileage
-                "배송비"     = Get-Amount $it.delivery_price
-                "재고값"     = Get-Amount $in.pd_remain
+                "가격"       = Get-Amount $it.price
+                "판매상태(윈윈 값 그대로)" = $it.status_raw
+                "최대수량"   = $maxQty
             })
         }
     }

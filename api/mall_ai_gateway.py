@@ -9,9 +9,11 @@
 
 ■ 무엇을 하고 무엇을 하지 않는가
   읽기 전용이다. price 만 부른다. basket 경로는 없고 만들지 않는다.
-  응답은 문서 필드(api/mall_ai_api 의 PriceItem.public)에 내부 가격·재고 값
-  (mall_ai_api.INTERNAL_PRICE_FIELDS: 원가 · 딜러가 1~3 · 시중가 · 소비자가 · pd_remain)을 더한다.
-  그 밖의 문서 외 필드는 버린다.
+  응답은 api/mall_ai_api 의 PriceItem.public 그대로다(2026-11-17 윈윈 응답 변경 뒤):
+  상품번호 · 상품명 · 가격 · 판매 상태 · 최대 수량, 그리고 조회 시각과 없는 번호.
+  판매 상태는 윈윈이 준 값을 그대로 옮긴다. 이 중계기가 판정한 값이 아니다.
+  윈윈이 더는 내부 가격(원가 · 딜러가 · 시중가 · 소비자가 · 재고값)을 주지 않아 그 열은 없앴다.
+  그 밖의 필드가 와도 버린다.
 
 ■ 세 겹으로 닫혀 있다
   ① MALL_AI_GATEWAY_ENABLED=1 이 아니면 404. 기본은 꺼짐이고 개발 서버에만 켠다.
@@ -27,7 +29,7 @@
   재시도하지 않는다. 캐시하지 않는다(가격은 매번 새로 본다).
 
 ■ 값은 남기지 않는다
-  로그에는 건수와 오류 코드만 남긴다. 상품명·가격·원가·IP 를 찍지 않는다.
+  로그에는 건수와 오류 코드만 남긴다. 상품명·가격·IP 를 찍지 않는다.
   응답에는 Cache-Control: no-store 를 단다.
 """
 from __future__ import annotations
@@ -94,8 +96,7 @@ def _call_upstream(codes, transport=None):
             if wait > 0:
                 time.sleep(wait)
         _last_call["at"] = time.monotonic()
-        return M.fetch_prices(codes, transport=transport or M.LivePriceTransport(max_calls=1),
-                              internal_fields=M.INTERNAL_PRICE_FIELDS)
+        return M.fetch_prices(codes, transport=transport or M.LivePriceTransport(max_calls=1))
     finally:
         _upstream.release()
 
@@ -133,13 +134,12 @@ def gateway_price(request: Request, pd_no: str = Query("", max_length=700)):
     except M.MallApiError as exc:
         log.warning("[mall-gw] upstream failed code=%s requested=%d", exc.code, len(codes))
         raise HTTPException(502, {"code": exc.code, "message": "윈윈 API 조회에 실패했습니다."})
-    items = []
-    for code in result.requested:
-        item = result.items[code]
-        row = item.public()
-        row["internal"] = item.internal_public()
-        items.append(row)
-    log.info("[mall-gw] ok requested=%d missing=%d", len(codes), len(result.missing))
-    body = {"requested": list(result.requested), "missing": list(result.missing), "items": items,
+    items = [result.items[code].public() for code in result.requested]
+    log.info("[mall-gw] ok requested=%d not_found=%d missing=%d unrequested=%d",
+             len(codes), len(result.not_found), len(result.missing), result.unrequested_count)
+    body = {"requested": list(result.requested), "checked_at": result.checked_at,
+            "checked_at_format": result.checked_at_format, "not_found": list(result.not_found),
+            "missing": list(result.missing), "unrequested_count": result.unrequested_count, "items": items,
+            "status_note": "status is the mall's own value, passed through as received",
             "source": "popcornpc ai_api price (read only)"}
     return JSONResponse(body, headers=_NO_STORE)

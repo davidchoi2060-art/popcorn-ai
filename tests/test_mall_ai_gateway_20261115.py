@@ -21,17 +21,18 @@ from fastapi.testclient import TestClient                           # noqa: E402
 from api import mall_ai_api as M                                     # noqa: E402
 from api import mall_ai_gateway as G                                 # noqa: E402
 from api.mall_ai_api import TransportResponse as R                   # noqa: E402
-from tests.popcorn_pc_fake_api import json_response, product        # noqa: E402
+from tests.popcorn_pc_fake_api import (CHECKED_AT, ip_denied_response, price_response, product,  # noqa: E402
+                                       too_many_response)
 
 OFFICE = "198.51.100.7"
 HOME = "203.0.113.9"
 OTHER = "192.0.2.55"
 
 
-def internal_product(pd_no):
-    return product(pd_no, pd_cost_price="6100", dealer1_price="6500", dealer2_price="6600", dealer3_price="6700",
-                   pd_sijung_price="9000", pd_sobija_price="9900", pd_remain="0",
-                   cate1="SECRET-CATE", pd_ment="SECRET-MENT", view_chk="y")
+def noisy_product(pd_no, **overrides):
+    """새 응답 항목에, 와서는 안 되는 옛 내부 필드를 일부러 섞는다(합성 값). 중계기는 전부 버려야 한다."""
+    return product(pd_no, pd_cost_price="6100", dealer1_price="6500", pd_remain="0",
+                   cate1="SECRET-CATE", pd_ment="SECRET-MENT", view_chk="y", **overrides)
 
 
 class Fake:
@@ -58,7 +59,7 @@ class Gateway(unittest.TestCase):
         self.env = patch.dict(os.environ, {G.ENABLED_ENV: "1", G.ALLOW_IPS_ENV: " %s, %s ,bad-entry" % (OFFICE, HOME)})
         self.env.start()
         self.addCleanup(self.env.stop)
-        self.reply = json_response({"result": "ok", "items": [internal_product(124401), internal_product(124407)]})
+        self.reply = price_response([noisy_product(124401), noisy_product(124407)])
         sleep = patch.object(G.time, "sleep", lambda _s: None)
         sleep.start()
         self.addCleanup(sleep.stop)
@@ -78,21 +79,41 @@ class Gateway(unittest.TestCase):
         with live:
             return getattr(client, method)("/api/mall-ai-gateway/price?" + query, headers=headers)
 
-    def test_office_gets_documented_and_internal_fields_only(self):
+    def test_office_gets_the_new_fields_only(self):
         res = self.call()
         self.assertEqual(res.status_code, 200, res.text)
         self.assertEqual(res.headers["cache-control"], "no-store")
         body = res.json()
+        self.assertEqual(sorted(body), ["checked_at", "checked_at_format", "items", "missing", "not_found",
+                                        "requested", "source", "status_note", "unrequested_count"])
         self.assertEqual(body["requested"], ["124401", "124407"])
+        self.assertEqual((body["checked_at"], body["checked_at_format"]), (CHECKED_AT, "local"))
+        self.assertEqual((body["not_found"], body["missing"], body["unrequested_count"]), ([], [], 0))
         item = body["items"][0]
+        self.assertEqual(sorted(item), ["found", "lookup", "max_qty", "name", "pd_no", "price", "status", "status_raw"])
         self.assertEqual(item["price"], {"status": "ok", "value": "150000"})
-        self.assertEqual(item["internal"]["pd_cost_price"], {"status": "ok", "value": "6100"})
-        self.assertEqual(item["internal"]["pd_remain"], {"status": "zero", "value": "0"})
-        self.assertEqual(sorted(item["internal"]), sorted(M.INTERNAL_PRICE_FIELDS))
-        self.assertNotIn("SECRET", res.text)
-        self.assertNotIn("view_chk", res.text)
+        self.assertEqual((item["status"], item["status_raw"]), ("sold_out", "sold_out"))
+        self.assertEqual(item["max_qty"], {"status": "none", "value": None})
+        # 내부 가격 열은 없다. 쇼핑몰이 다시 보내더라도 중계기 응답에 실리지 않는다.
+        for gone in ("internal", "pd_cost_price", "dealer1_price", "pd_remain", "6100", "6500", "SECRET", "view_chk",
+                     "maker", "mileage", "delivery_price"):
+            self.assertNotIn(gone, res.text, gone)
         self.assertEqual(Fake.instances[0].urls, [M.build_price_url(("124401", "124407"))])
         self.assertEqual(Fake.instances[0].kwargs, {"max_calls": 1})
+
+    def test_not_found_missing_unrequested_and_item_values_pass_through(self):
+        reply = price_response([product(124401, name="<font color=red>[특가]</font> 합성 쿨러", price=0, status="paused", max_qty=2),
+                                product(555)], [124407])
+        body = self.call(query="pd_no=124401,124407,124409", reply=reply).json()
+        self.assertEqual((body["not_found"], body["missing"], body["unrequested_count"]), (["124407"], ["124409"], 1))
+        first, second, third = body["items"]
+        self.assertEqual(first["name"], "[특가] 합성 쿨러")
+        self.assertEqual(first["price"], {"status": "zero", "value": "0"})
+        self.assertEqual((first["status"], first["status_raw"]), ("unknown", "paused"))
+        self.assertEqual(first["max_qty"], {"status": "ok", "value": 2})
+        self.assertEqual((second["found"], second["lookup"]), (False, "not_found"))
+        self.assertEqual((third["found"], third["lookup"]), (False, "missing"))
+        self.assertNotIn("555", json.dumps(body))
 
     def test_home_ip_is_allowed_too(self):
         self.assertEqual(self.call(ip=HOME).status_code, 200)
@@ -159,10 +180,34 @@ class Gateway(unittest.TestCase):
             self.assertNotIn(word, html, word)
         quads = set(re.findall(r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", html))
         self.assertEqual(quads, set())
-        for code in ("ip_not_allowed", "busy", "too_many_items", "ip_rejected"):
+        for code in ("ip_not_allowed", "busy", "too_many_items", "ip_rejected", "mall_too_many_items", "bad_shape"):
             self.assertIn(code, html)
-        # 윈윈은 없는 번호에도 이름 없는 빈 항목을 준다(2026-11-15 실측). 화면은 그 줄을 정보 없음으로 보여야 한다
-        self.assertIn("if (!it.found || !it.name)", html)
+        # 2026-11-17 응답 변경: 없는 번호는 not_found 로 온다. 화면은 found 가 아닌 줄을 정보 없음으로 보인다
+        self.assertIn("if (!it.found)", html)
+        self.assertIn('it.lookup === "not_found"', html)
+        # 새 열만 있다. 내부 가격 열은 없다
+        heads = re.findall(r"<th(?:\s[^>]*)?>(.*?)</th>", html, re.S)
+        self.assertEqual([re.sub(r"<small>.*?</small>", "", h) for h in heads], ["상품번호", "상품명", "가격", "판매 상태", "최대 수량"])
+        for gone in ("원가", "딜러가", "시중가", "소비자가", "재고값", "적립금", "배송비", "제조사", "internal", "pd_cost_price", "pd_remain"):
+            self.assertNotIn(gone, html, gone)
+        # 판매 상태가 우리 판정이 아니라 쇼핑몰 값임을 화면이 말한다(머리글, 안내문, 복사되는 표 머리글)
+        self.assertEqual(html.count("쇼핑몰이 준 값 그대로"), 2)
+        self.assertIn("이 화면이 판정한 값이 아니다", html)
+        self.assertIn("it.status_raw", html)
+        self.assertIn("data.checked_at", html)
+        self.assertNotIn("new Date()", html)                 # 조회 시각은 쇼핑몰이 준 값만 보인다
+
+    def test_lookup_page_script_parses(self):
+        import shutil
+        import subprocess
+        node = shutil.which("node")
+        if not node:
+            raise unittest.SkipTest("node 없음")
+        html = (ROOT / "templates/mall_ai_gateway_lookup.html").read_text(encoding="utf-8")
+        script = re.search(r"<script>(.*?)</script>", html, re.S).group(1)
+        run = subprocess.run([node, "-e", "new Function(require('fs').readFileSync(0, 'utf8'))"],
+                             input=script.encode("utf-8"), capture_output=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stderr.decode("utf-8", "replace"))
 
     def test_export_script_is_bom_utf8_and_read_only(self):
         raw = (ROOT / "tools/mall_price_export.ps1").read_bytes()
@@ -179,6 +224,16 @@ class Gateway(unittest.TestCase):
         self.assertEqual(res.status_code, 502)
         self.assertEqual(res.json()["detail"]["code"], "ip_rejected")
         self.assertNotIn("10.0.0.1", res.text)
+        # 2026-11-17 부터의 형태: 403/400 JSON error. 쇼핑몰 문구는 중계기 응답에 싣지 않는다.
+        old_envelope = R(200, b'{"result":"ok","items":[]}', "application/json")
+        for reply, code in ((ip_denied_response(), "ip_rejected"), (too_many_response(), "mall_too_many_items"),
+                            (old_envelope, "bad_shape"),
+                            (price_response([product(124401)], checked_at="yesterday"), "bad_checked_at"),
+                            (R(200, ('{"checked_at":"%s","items":{},"not_found":null}' % CHECKED_AT).encode()), "bad_shape")):
+            res = self.call(reply=reply)
+            self.assertEqual((res.status_code, res.json()["detail"]["code"]), (502, code))
+            self.assertNotIn("허용되지 않은 IP", res.text)
+            self.assertEqual(sorted(res.json()["detail"]), ["code", "message"])
 
     def test_logs_hold_no_values(self):
         records = []
@@ -190,8 +245,8 @@ class Gateway(unittest.TestCase):
         self.call()
         self.call(ip=OTHER)
         text = "\n".join(records)
-        self.assertIn("[mall-gw] ok requested=2", text)
-        for leak in ("6100", "150000", OFFICE, OTHER, HOME, "합성"):
+        self.assertIn("[mall-gw] ok requested=2 not_found=0 missing=0 unrequested=0", text)
+        for leak in ("6100", "150000", OFFICE, OTHER, HOME, "합성", "sold_out", CHECKED_AT):
             self.assertNotIn(leak, text)
 
     def test_overlap_is_429_and_calls_are_spaced(self):
@@ -208,15 +263,17 @@ class Gateway(unittest.TestCase):
         self.assertEqual(len(waits), 1)
         self.assertGreater(waits[0], 0.9)
 
-    def test_library_default_still_reads_no_internal_fields(self):
-        result = M.fetch_prices(["124401"], transport=Fake(json_response({"result": "ok", "items": [internal_product(124401)]})))
-        self.assertEqual(result.items["124401"].internal, {})
-        self.assertNotIn("6100", json.dumps(result.public()))
-        self.assertNotIn("internal", result.items["124401"].public())
-        with self.assertRaises(ValueError):
-            M.fetch_prices(["1"], internal_fields=("pd_ment",))
-        with self.assertRaises(ValueError):
-            M.fetch_prices(["1"], internal_fields=("pd_cost_price", "pd_cost_price"))
+    def test_library_has_no_way_to_read_internal_price_fields(self):
+        result = M.fetch_prices(["124401"], transport=Fake(price_response([noisy_product(124401)])))
+        self.assertFalse(hasattr(result.items["124401"], "internal"))
+        self.assertNotIn("6100", json.dumps(result.public()) + repr(result) + json.dumps(result.allowed_raw))
+        self.assertEqual(result.dropped_field_count, 6)
+        self.assertFalse(hasattr(M, "INTERNAL_PRICE_FIELDS"))
+        with self.assertRaises(TypeError):
+            M.fetch_prices(["1"], internal_fields=("pd_cost_price",))
+        source = (ROOT / "api/mall_ai_gateway.py").read_text(encoding="utf-8")
+        self.assertNotIn("internal_fields", source)
+        self.assertNotIn("internal_public", source)
 
     def test_module_has_no_db_or_shell_imports(self):
         tree = ast.parse((ROOT / "api/mall_ai_gateway.py").read_text(encoding="utf-8"))

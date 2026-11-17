@@ -4,6 +4,93 @@
 
 원격 주소는 운영 쇼핑몰이다. 개발 팝콘AI에서 불러도 쓰기 대상은 운영이다.
 
+> **2026-11-17 price 응답이 바뀌었다.** 아래 「2026-11-17 응답 변경」 절이 현행이다. 그 밖의 절에서 price 응답을 말하는 부분 중 낡은 곳에는 「(낡음 2026-11-17)」 표시를 달았다. basket 서술은 그대로 유효하다.
+
+## 2026-11-17 응답 변경
+
+호출 방식(`GET /shop/ai_api.php?api_id=price&pd_no=1,2,3`)은 그대로다. 인증 헤더와 키는 없다. 허용된 IP만 통과한다. 바뀐 것은 응답이다.
+
+### 새 응답 모양 (실측)
+
+정상은 HTTP 200, `application/json`이다. 봉투에 `result` 키가 없다.
+
+```json
+{
+  "checked_at": "2026-11-17 14:42:35",
+  "items": [
+    {"pd_no": 124401, "name": "상품명", "price": 7700, "status": "sold_out", "max_qty": null}
+  ],
+  "not_found": [999999999]
+}
+```
+
+| 경우 | 응답 |
+|---|---|
+| 허용되지 않은 IP | HTTP 403 `{"error":"허용되지 않은 IP"}`. 예전에는 200 `text/html` `<IP> IP ERROR!`였다 |
+| 상품번호 50개 초과 | HTTP 400 `{"error":"상품번호가 50개를 넘음"}` |
+| 숫자가 아닌 `pd_no` | HTTP 200, `items`는 빈 배열, `not_found`는 `null` |
+
+### 명세와 다른 점 (2026-11-17 실측)
+
+| 항목 | 명세 | 실측 | 클라이언트 처리 |
+|---|---|---|---|
+| `status` | `on_sale` 등 | 모든 상품이 `sold_out` (윈윈 쪽 결함으로 추정) | 값을 그대로 옮긴다. 판매 가능 여부를 판정하지 않는다 |
+| `max_qty` | 수량 | 모든 상품이 `null` | `none`으로 표시한다 |
+| `not_found` | 배열 | 없는 번호가 없으면 `[]`가 아니라 `null` | `null`과 배열을 모두 받는다 |
+| `checked_at` | `+09:00` ISO 형식 | `YYYY-MM-DD HH:MM:SS` (시간대 표시 없음) | 두 형식을 모두 받는다 |
+| `name` | 상품명 | HTML 태그(`<font color=…>` 등)와 판촉 문구가 섞여 온다 | 태그만 벗기고 판촉 문구는 그대로 둔다 |
+| `price` | 금액 | 0인 상품이 있다 | `zero`로 분류한다. 무료로 확정하지 않는다 |
+
+### 공개 필드
+
+`PriceResult.public()`:
+
+| 필드 | 뜻 |
+|---|---|
+| `requested` | 요청한 상품번호(중복 제거, 요청 순서) |
+| `checked_at`, `checked_at_format` | 쇼핑몰이 준 조회 시각 문자열 그대로와 그 형식(`local` 또는 `iso_offset`) |
+| `not_found` | 쇼핑몰이 `not_found`로 답한 번호 중 요청한 것 |
+| `missing` | 요청했는데 `items`에도 `not_found`에도 없는 번호 |
+| `items` | 요청 순서대로 한 줄씩. 없는 번호도 줄이 있다 |
+| `unrequested_count` | 요청하지 않았는데 온 번호 수. 값은 버린다 |
+| `dropped_field_count`, `observed` | 허용 필드 밖의 필드 수와 재고·통화·세금 유사 이름 존재 여부 |
+
+`PriceItem.public()`:
+
+| 필드 | 뜻 |
+|---|---|
+| `pd_no` | 상품번호 문자열 |
+| `found`, `lookup` | `lookup`은 `found`, `not_found`, `missing` 중 하나 |
+| `name` | HTML을 벗긴 상품명. 없으면 `null` |
+| `price` | `{"status", "value"}`. 상태는 아래 「값 처리 규칙」과 같다 |
+| `status`, `status_raw` | `status`는 `on_sale`, `sold_out`, `unknown` 중 하나. `status_raw`는 쇼핑몰이 준 글자(64자까지, 글자로만) |
+| `max_qty` | `{"status", "value"}`. 상태는 `none`(null), `ok`(양의 정수), `missing`(필드 없음), `invalid` |
+
+없어진 공개 필드: `maker`, `spec_text`, `image_status`, `image_url`, `image_path`, `mileage`, `delivery_price`, `sale_state`, `currency`, `internal`. 없어진 상수와 함수: `INTERNAL_PRICE_FIELDS`, `fetch_prices(internal_fields=…)`, `classify_image`.
+
+### 오류 코드
+
+| 코드 | 뜻 |
+|---|---|
+| `ip_rejected` | 403에 JSON `error`, 또는 예전 형태(`<IP> IP ERROR!`, 상태 200 또는 403) |
+| `mall_too_many_items` | 400에 JSON `error`가 실측 문구와 같다 |
+| `mall_request_rejected` | 400에 그 밖의 JSON `error` |
+| `http_4xx` | 그 밖의 4xx. 403과 400도 JSON `error`가 없으면 여기다 |
+| `bad_shape` | `items`가 배열이 아니다, `not_found`가 없거나 배열·null이 아니다, 항목이나 번호 모양이 틀렸다. `detail`에 `items` 또는 `not_found`가 적힌다 |
+| `bad_checked_at` | `checked_at`이 없거나 두 형식 어느 쪽도 아니다 |
+| `inconsistent_response` | 같은 번호가 `items`와 `not_found`에 함께 있다 |
+| `duplicate_item` | 요청한 번호가 `items`에 두 번 있다 |
+| `api_error` | 200인데 `error` 키가 있다 |
+
+`unexpected_item`은 없어졌다. 요청하지 않은 번호는 오류가 아니라 버리고 `unrequested_count`에 센다. `redirect`, `rate_limited`, `http_5xx`, `http_status`, `timeout`, `network`, `response_too_large`, `empty_body`, `bad_encoding`, `html_response`, `bad_json`은 그대로다.
+
+### 그대로인 것
+
+- basket 응답 해석(`result="ok"`, 링크 대조, `outcome_unknown`)은 바꾸지 않았다. basket 응답이 함께 바뀌었는지는 확인하지 않았다.
+- `LivePriceTransport`는 400과 403일 때만 오류 본문을 읽는다. 그 밖의 오류 상태는 예전처럼 본문을 버린다.
+- 로그에는 건수와 오류 코드만 남는다. 상품명, 가격, 조회 시각, 쇼핑몰 오류 문구는 남기지 않는다.
+- 실행기의 basket 시험은 직전 price에 `missing`과 `not_found`가 모두 비어 있을 때만 나간다.
+
 ## 파일
 
 | 파일 | 역할 |
@@ -32,6 +119,8 @@ live 는 문서 예시 3개 상품, 기록부 기준 누적 10회, 호출 간 1�
 
 ## 실서버 관측 (API-010)
 
+(낡음 2026-11-17: 허용되지 않은 IP는 이제 HTTP 403 JSON으로 온다. 예전 형태도 계속 `ip_rejected`로 처리한다. 「2026-11-17 응답 변경」을 본다.)
+
 2026-11-09 현재 이 환경의 호출은 전부 상태 200, `text/html`, `<공인 IPv4> IP ERROR!`를 받는다. 가이드의 "현재 IP 제한 없이"와 다르다. 클라이언트는 이를 `ip_rejected`로 실패 처리한다. 실제 가격은 아직 받은 적이 없다.
 
 ## 쓰기 차단
@@ -51,9 +140,9 @@ live 는 문서 예시 3개 상품, 기록부 기준 누적 10회, 호출 간 1�
 ## 값 처리 규칙
 
 - 금액 상태는 `ok | zero | missing | null | invalid | negative | non_integer`다. `ok`만 금액으로 쓴다. 0을 무료로 확정하지 않는다.
-- `sale_state`는 항상 `unknown`, `currency`는 항상 없음이다. 반환된 상품을 판매 가능으로 판정하지 않는다.
-- `pd_name`, `made`, `pd_spec`은 글자로만 남기지만, 화면에 넣을 때는 여전히 글자로 넣는다(`innerHTML` 금지).
-- 이미지는 몰 https 절대 주소만 `image_url`로 준다. 상대 경로는 기준 주소가 문서에 없어 `image_path`로만 둔다.
+- (낡음 2026-11-17: `sale_state`와 `currency` 필드는 없어졌다. 지금은 쇼핑몰의 `status`를 그대로 옮긴다. 반환된 상품을 판매 가능으로 판정하지 않는 것은 그대로다.) `sale_state`는 항상 `unknown`, `currency`는 항상 없음이다. 반환된 상품을 판매 가능으로 판정하지 않는다.
+- (낡음 2026-11-17: 지금 글자로 남기는 필드는 `name`과 `status_raw`다. `innerHTML` 금지는 그대로다.) `pd_name`, `made`, `pd_spec`은 글자로만 남기지만, 화면에 넣을 때는 여전히 글자로 넣는다(`innerHTML` 금지).
+- (낡음 2026-11-17: 새 응답에 이미지 필드가 없어 이 처리를 없앴다.) 이미지는 몰 https 절대 주소만 `image_url`로 준다. 상대 경로는 기준 주소가 문서에 없어 `image_path`로만 둔다.
 - 응답의 미문서 필드는 값을 버리고 개수와 재고·통화·세금 유사 이름 존재 여부만 남긴다.
 - basket 링크는 `https://popcornpc.co.kr/shop/order_basket_list.html?api_key=<요청 키>`와 한 글자라도 다르면 거부한다.
 - basket 응답이 불명확하면 `outcome_unknown`이다. 자동 재시도가 없고 사람이 다시 누른 경우에만 `confirm_unknown`으로 보낸다.

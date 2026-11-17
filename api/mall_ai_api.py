@@ -12,8 +12,12 @@
   DOC_*        팝콘PC 가이드 문서가 적은 값(해시 86cf99b2...).
   INTERNAL_*   우리 방어 설정. API 공식 보장이 아니다.
 
-문서에 없어 확정하지 않는 것: 오류 상태코드, HTTP 메서드 제한, 중복 상품 병합, 통화, 세금,
+문서에 없어 확정하지 않는 것: HTTP 메서드 제한, 중복 상품 병합, 통화, 세금,
 재고, 응답 상한, 키 문자 집합, 링크 접근 권한. 그래서 판매 가능 여부와 재고를 판정하지 않는다.
+
+2026-11-17 price 응답 변경(실측). 봉투에 result 가 없고 checked_at, items, not_found 로 온다.
+항목은 pd_no, name, price, status, max_qty 뿐이다. status 는 쇼핑몰이 준 값을 그대로 옮긴다
+(우리 판정이 아니다). 403/400 은 JSON {"error": ...} 로 온다. basket 응답 해석은 그대로다.
 """
 from __future__ import annotations
 
@@ -28,6 +32,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from html.parser import HTMLParser
 from typing import Any, Iterable, Mapping, Optional
@@ -50,7 +55,8 @@ INTERNAL_MAX_RESPONSE_BYTES = 2_000_000
 INTERNAL_MAX_QTY = 99
 INTERNAL_MAX_AMOUNT = Decimal(10) ** 12
 INTERNAL_MAX_TEXT = 2000
-INTERNAL_MAX_SPEC_TEXT = 20000
+INTERNAL_MAX_STATUS_TEXT = 64
+INTERNAL_MAX_MAX_QTY = 10 ** 9
 INTERNAL_LIVE_MAX_CALLS = 3
 INTERNAL_LIVE_MIN_INTERVAL_SECONDS = 1.0
 
@@ -60,19 +66,20 @@ _KEY_RE = re.compile(r"[A-Za-z0-9]{%d}" % DOC_KEY_LENGTH)   # 받는 쪽 내부 
 _AMOUNT_RE = re.compile(r"-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?")
 _PRICE_QUERY_RE = re.compile(r"[1-9][0-9]{0,11}(?:,[1-9][0-9]{0,11}){0,%d}" % (DOC_MAX_ITEMS - 1))
 
-_ALLOWED_FIELDS = ("pd_no", "pd_name", "price", "mileage", "made", "pd_spec",
-                   "pd_image_basic", "pd_delivery_price")
-# 문서에 없는 필드 중 사무실 조회 중계기(api/mall_ai_gateway.py)만 받는 내부 가격·재고 값(2026-11-15 사용자 지시).
-# 기본값으로는 읽지 않는다. 읽어도 PriceItem.public() 에는 들어가지 않는다.
-INTERNAL_PRICE_FIELDS = ("pd_cost_price", "dealer1_price", "dealer2_price", "dealer3_price",
-                         "pd_sijung_price", "pd_sobija_price", "pd_remain")
+# 2026-11-17 새 price 응답의 항목 필드. 이 밖의 필드는 값을 버리고 개수만 센다.
+_ALLOWED_FIELDS = ("pd_no", "name", "price", "status", "max_qty")
+_ENVELOPE_FIELDS = ("checked_at", "items", "not_found")
+KNOWN_SALE_STATUSES = ("on_sale", "sold_out")
+# 2026-11-17 실측한 400 본문. 이 문구와 정확히 같을 때만 50개 초과로 구분한다.
+PRICE_TOO_MANY_ERROR = "상품번호가 50개를 넘음"
+_ERROR_BODY_STATUSES = (400, 403)       # 이 상태에서만 오류 본문을 읽는다(JSON error 판정용)
+_CHECKED_AT_LOCAL_RE = re.compile(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
+_CHECKED_AT_ISO_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})")
 _OBSERVE_PATTERNS = {
     "stock_like": re.compile(r"stock|qty|soldout|sold_out|inventory|jaego", re.I),
     "currency_like": re.compile(r"currency|curr", re.I),
     "tax_like": re.compile(r"\btax\b|_tax|tax_|vat", re.I),
 }
-_IMAGE_HOSTS = {"popcornpc.co.kr", "www.popcornpc.co.kr"}
-_IMAGE_PATH_RE = re.compile(r"/?[A-Za-z0-9_\-./%]+\.(?:jpe?g|png|gif|webp)", re.I)
 
 
 class MallApiError(Exception):
@@ -210,6 +217,12 @@ class LivePriceTransport:
         except urllib.error.HTTPError as exc:
             status, ctype = exc.code, ""
             body = b""
+            if status in _ERROR_BODY_STATUSES:      # 403/400 의 JSON error 를 구분하려고 이 둘만 읽는다
+                try:
+                    ctype = (exc.headers.get("Content-Type", "") if exc.headers else "") or ""
+                    body = self._read(exc, max_bytes, deadline)
+                except Exception:   # noqa: BLE001 - 오류 본문을 못 읽어도 상태코드 분류는 남는다
+                    ctype, body = "", b""
             exc.close()
         except (TransportTimeout, TransportTooLarge):
             raise
@@ -329,7 +342,40 @@ def _send(transport: Any, url: str, limits: Limits, *, write: bool) -> Transport
 IP_ERROR_BODY_RE = re.compile(r"\s*\d{1,3}(?:\.\d{1,3}){3} IP ERROR!\s*")
 
 
-def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
+def _json_error_text(body: bytes) -> Optional[str]:
+    """오류 응답 본문이 JSON {"error": "..."} 일 때만 그 문구를 돌려준다. 판정에만 쓰고 어디에도 남기지 않는다."""
+    try:
+        document = json.loads(body.decode("utf-8-sig"))
+    except (UnicodeDecodeError, ValueError, RecursionError):
+        return None
+    if isinstance(document, dict) and isinstance(document.get("error"), str):
+        return document["error"]
+    return None
+
+
+def _price_http_error(response: TransportResponse) -> Optional[MallApiError]:
+    """2026-11-17 실측: 허용되지 않은 IP 는 403, 50개 초과는 400 이고 둘 다 JSON {"error": ...} 다."""
+    status = response.status
+    if status not in _ERROR_BODY_STATUSES:
+        return None
+    body = response.body or b""
+    error = _json_error_text(body)
+    if status == 403:
+        try:
+            old_form = bool(IP_ERROR_BODY_RE.fullmatch(body.decode("utf-8-sig")))
+        except UnicodeDecodeError:
+            old_form = False
+        if error is not None or old_form:
+            return MallApiError("ip_rejected", http_status=status)
+        return None
+    if error is None:
+        return None
+    code = "mall_too_many_items" if error == PRICE_TOO_MANY_ERROR else "mall_request_rejected"
+    return MallApiError(code, http_status=status)
+
+
+def _decode_document(response: TransportResponse, limits: Limits, *, write: bool, price: bool = False) -> dict:
+    """상태코드와 본문을 확인하고 JSON 객체를 돌려준다. 봉투 판정은 부르는 쪽이 한다."""
     def fail(code: str, **kwargs):
         return MallApiError(code, outcome_unknown=write, **kwargs)
 
@@ -339,6 +385,9 @@ def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool
     if status == 429:
         raise fail("rate_limited", http_status=status)
     if 400 <= status < 500:
+        specific = _price_http_error(response) if price else None
+        if specific is not None:
+            raise specific
         raise fail("http_4xx", http_status=status)
     if status >= 500:
         raise fail("http_5xx", http_status=status)
@@ -370,12 +419,51 @@ def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool
         raise fail("bad_json", detail="rejected_value") from None    # 중복 키, NaN, 비정상 숫자
     if not isinstance(document, dict):
         raise fail("bad_shape")
+    return document
+
+
+def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
+    """basket 봉투(result="ok"). 2026-11-17 의 price 변경과 무관하게 그대로 둔다."""
+    def fail(code: str, **kwargs):
+        return MallApiError(code, outcome_unknown=write, **kwargs)
+
+    document = _decode_document(response, limits, write=write)
     if document.get("result") != "ok":
         if "error" in document:
             raise fail("api_key_length" if document["error"] == DOC_KEY_LENGTH_ERROR else "api_error")
         raise fail("bad_result")
     if "error" in document:
         raise fail("bad_result")
+    return document
+
+
+def classify_checked_at(raw: Any) -> Optional[str]:
+    """"local"(YYYY-MM-DD HH:MM:SS, 시간대 표시 없음) | "iso_offset"(명세의 ISO 형식) | None(받지 않는 모양)."""
+    if not isinstance(raw, str):
+        return None
+    try:
+        if _CHECKED_AT_LOCAL_RE.fullmatch(raw):
+            datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+            return "local"
+        if _CHECKED_AT_ISO_RE.fullmatch(raw):
+            datetime.fromisoformat(raw[:-1] + "+00:00" if raw.endswith("Z") else raw)
+            return "iso_offset"
+    except ValueError:
+        return None
+    return None
+
+
+def _decode_price_envelope(response: TransportResponse, limits: Limits) -> dict:
+    """price 봉투(2026-11-17): checked_at 문자열, items 배열, not_found 배열 또는 null. result 키는 없다."""
+    document = _decode_document(response, limits, write=False, price=True)
+    if "error" in document:
+        raise MallApiError("api_error")
+    if not isinstance(document.get("items"), list):
+        raise MallApiError("bad_shape", detail="items")
+    if "not_found" not in document or not (document["not_found"] is None or isinstance(document["not_found"], list)):
+        raise MallApiError("bad_shape", detail="not_found")
+    if classify_checked_at(document.get("checked_at")) is None:
+        raise MallApiError("bad_checked_at")
     return document
 
 
@@ -469,61 +557,57 @@ def plain_text(raw: Any, limit: int = INTERNAL_MAX_TEXT) -> Optional[str]:
     return text[:limit] or None
 
 
-def classify_image(raw: Any) -> tuple[str, Optional[str], Optional[str]]:
-    """(status, image_url, image_path). 절대 주소는 몰 https 만, 상대 경로는 기준 주소 미확정이라 경로로만 둔다."""
-    if raw is None or raw == "":
-        return "none", None, None
-    if not isinstance(raw, str) or len(raw) > 500 or "\\" in raw or ".." in raw or "%2e" in raw.lower():
-        return "rejected", None, None
-    if any(not c.isprintable() or c.isspace() for c in raw) or raw.startswith("//"):
-        return "rejected", None, None
-    if ":" in raw:
-        try:
-            parts = urlsplit(raw)
-            port = parts.port
-        except ValueError:
-            return "rejected", None, None
-        if (parts.scheme != "https" or parts.hostname not in _IMAGE_HOSTS or parts.username is not None
-                or parts.password is not None or port is not None or parts.query or parts.fragment
-                or not _IMAGE_PATH_RE.fullmatch(parts.path)):
-            return "rejected", None, None
-        return "absolute", raw, None
-    if not _IMAGE_PATH_RE.fullmatch(raw):
-        return "rejected", None, None
-    return "relative", None, raw
-
-
 # ---------------------------------------------------------------- price
+
+@dataclass(frozen=True)
+class MaxQty:
+    """status: none | ok | missing | invalid
+
+    none 은 쇼핑몰이 null 을 준 것이다(2026-11-17 현재 전부 null). ok 는 양의 정수다.
+    """
+    status: str
+    value: Optional[int] = None
+
+    def public(self) -> dict:
+        return {"status": self.status, "value": self.value}
+
+
+def classify_max_qty(item: Mapping[str, Any]) -> MaxQty:
+    if "max_qty" not in item:
+        return MaxQty("missing")
+    raw = item["max_qty"]
+    if raw is None:
+        return MaxQty("none")
+    if isinstance(raw, bool) or not isinstance(raw, int) or not 1 <= raw <= INTERNAL_MAX_MAX_QTY:
+        return MaxQty("invalid")
+    return MaxQty("ok", raw)
+
+
+def classify_sale_status(raw: Any) -> tuple[str, Optional[str]]:
+    """(status, status_raw). 아는 값이면 그 값, 아니면 "unknown" 이고 원문은 글자로만 남긴다."""
+    if not isinstance(raw, str):
+        return "unknown", None
+    if raw in KNOWN_SALE_STATUSES:
+        return raw, raw
+    return "unknown", plain_text(raw, INTERNAL_MAX_STATUS_TEXT)
+
 
 @dataclass(frozen=True)
 class PriceItem:
     pd_no: str
     found: bool
-    name: Optional[str] = None
-    maker: Optional[str] = None
-    spec_text: Optional[str] = None
-    image_status: str = "none"
-    image_url: Optional[str] = None
-    image_path: Optional[str] = None
+    lookup: str = "missing"         # found | not_found(쇼핑몰이 없다고 답함) | missing(응답 어디에도 없음)
+    name: Optional[str] = None      # HTML 을 벗긴 글자. 판촉 문구는 그대로 둔다
     price: Amount = Amount("missing")
-    mileage: Amount = Amount("missing")
-    delivery_price: Amount = Amount("missing")
-    sale_state: str = "unknown"     # 반환됐다고 판매 가능·재고 있음이 아니다
-    currency: Optional[str] = None  # 문서에 없다. 원화로 확정하지 않는다
-    internal: Mapping[str, Amount] = field(default_factory=dict, repr=False)    # 요청했을 때만 찬다
-
-    def internal_public(self) -> dict:
-        """내부 가격·재고 값. 사무실 조회 중계기만 부른다. public() 과 섞지 않는다."""
-        return {name: amount.public() for name, amount in self.internal.items()}
+    status: str = "unknown"         # on_sale | sold_out | unknown. 쇼핑몰이 준 값이다. 우리 판정이 아니다
+    status_raw: Optional[str] = None
+    max_qty: MaxQty = MaxQty("missing")
 
     def public(self) -> dict:
         return {
-            "pd_no": self.pd_no, "found": self.found, "name": self.name, "maker": self.maker,
-            "spec_text": self.spec_text, "image_status": self.image_status,
-            "image_url": self.image_url, "image_path": self.image_path,
-            "price": self.price.public(), "mileage": self.mileage.public(),
-            "delivery_price": self.delivery_price.public(),
-            "sale_state": self.sale_state, "currency": self.currency,
+            "pd_no": self.pd_no, "found": self.found, "lookup": self.lookup, "name": self.name,
+            "price": self.price.public(), "status": self.status, "status_raw": self.status_raw,
+            "max_qty": self.max_qty.public(),
         }
 
 
@@ -531,14 +615,21 @@ class PriceItem:
 class PriceResult:
     requested: tuple[str, ...]
     items: Mapping[str, PriceItem]
-    missing: tuple[str, ...]
+    missing: tuple[str, ...]                # 요청했는데 items 에도 not_found 에도 없는 번호
+    not_found: tuple[str, ...] = ()         # 쇼핑몰이 not_found 로 답한 번호(요청한 것만)
+    checked_at: Optional[str] = None        # 쇼핑몰이 준 조회 시각 문자열 그대로
+    checked_at_format: Optional[str] = None     # local | iso_offset
+    unrequested_count: int = 0              # 요청하지 않았는데 온 번호 수(items 와 not_found 합). 값은 버린다
     dropped_field_count: int = 0
     observed: Mapping[str, bool] = field(default_factory=dict)
     allowed_raw: tuple[dict, ...] = field(default=(), repr=False)   # 허용 필드 원값. 증거 저장 전용
 
     def public(self) -> dict:
-        return {"requested": list(self.requested), "missing": list(self.missing),
+        return {"requested": list(self.requested), "checked_at": self.checked_at,
+                "checked_at_format": self.checked_at_format,
+                "not_found": list(self.not_found), "missing": list(self.missing),
                 "items": [self.items[code].public() for code in self.requested],
+                "unrequested_count": self.unrequested_count,
                 "dropped_field_count": self.dropped_field_count, "observed": dict(self.observed)}
 
 
@@ -552,73 +643,70 @@ def _response_code(raw: Any) -> str:
     return raw
 
 
-def _price_item(raw: Mapping[str, Any], code: str, internal_fields: tuple[str, ...] = ()) -> PriceItem:
-    status, image_url, image_path = classify_image(raw.get("pd_image_basic"))
-    internal = {name: classify_amount(raw, name) for name in internal_fields}
-    return PriceItem(
-        pd_no=code, found=True, name=plain_text(raw.get("pd_name")), maker=plain_text(raw.get("made")),
-        spec_text=plain_text(raw.get("pd_spec"), INTERNAL_MAX_SPEC_TEXT),
-        image_status=status, image_url=image_url, image_path=image_path,
-        price=classify_amount(raw, "price"), mileage=classify_amount(raw, "mileage"),
-        delivery_price=classify_amount(raw, "pd_delivery_price"), internal=internal,
-    )
-
-
-def _internal_fields(names: Iterable[str]) -> tuple[str, ...]:
-    names = tuple(names)
-    if any(name not in INTERNAL_PRICE_FIELDS for name in names) or len(set(names)) != len(names):
-        raise ValueError("internal_fields")
-    return names
+def _price_item(raw: Mapping[str, Any], code: str) -> PriceItem:
+    status, status_raw = classify_sale_status(raw.get("status"))
+    return PriceItem(pd_no=code, found=True, lookup="found", name=plain_text(raw.get("name")),
+                     price=classify_amount(raw, "price"), status=status, status_raw=status_raw,
+                     max_qty=classify_max_qty(raw))
 
 
 def parse_price_response(response: TransportResponse, requested: tuple[str, ...],
-                         limits: Limits = DEFAULT_LIMITS, *, internal_fields: Iterable[str] = ()) -> PriceResult:
-    internal_fields = _internal_fields(internal_fields)
-    document = _decode_envelope(response, limits, write=False)
-    raw_items = document.get("items")
-    if not isinstance(raw_items, list):
-        raise MallApiError("bad_shape")
+                         limits: Limits = DEFAULT_LIMITS) -> PriceResult:
+    document = _decode_price_envelope(response, limits)
     found: dict[str, PriceItem] = {}
     allowed_raw: list[dict] = []
     dropped = 0
-    names: set[str] = set(document) - {"result", "items"}
+    unrequested = 0
+    names: set[str] = set(document) - set(_ENVELOPE_FIELDS)
     wanted = set(requested)
-    for raw in raw_items:
+    for raw in document["items"]:
         if not isinstance(raw, dict):
-            raise MallApiError("bad_shape")
+            raise MallApiError("bad_shape", detail="items")
         code = _response_code(raw.get("pd_no"))
         if code not in wanted:
-            raise MallApiError("unexpected_item")
+            unrequested += 1        # 요청하지 않은 번호는 버리고 개수만 남긴다
+            continue
         if code in found:
             raise MallApiError("duplicate_item")
-        found[code] = _price_item(raw, code, internal_fields)
+        found[code] = _price_item(raw, code)
         allowed_raw.append({k: raw[k] for k in _ALLOWED_FIELDS if k in raw})
         extra = set(raw) - set(_ALLOWED_FIELDS)
         dropped += len(extra)
         names |= extra
-    missing = tuple(code for code in requested if code not in found)
-    items = {code: found.get(code) or PriceItem(pd_no=code, found=False) for code in requested}
+    declared: set[str] = set()
+    for raw in document["not_found"] or ():
+        code = _response_code(raw)
+        if code not in wanted:
+            unrequested += 1
+        elif code in found:
+            raise MallApiError("inconsistent_response")     # 같은 번호가 items 와 not_found 에 함께 있다
+        else:
+            declared.add(code)
+    not_found = tuple(code for code in requested if code in declared)
+    missing = tuple(code for code in requested if code not in found and code not in declared)
+    items = {code: found.get(code) or PriceItem(pd_no=code, found=False,
+                                                lookup="not_found" if code in declared else "missing")
+             for code in requested}
     observed = {label: any(p.search(n) for n in names) for label, p in _OBSERVE_PATTERNS.items()}
-    return PriceResult(requested=requested, items=items, missing=missing, dropped_field_count=dropped,
+    checked_at = document["checked_at"]
+    return PriceResult(requested=requested, items=items, missing=missing, not_found=not_found,
+                       checked_at=checked_at, checked_at_format=classify_checked_at(checked_at),
+                       unrequested_count=unrequested, dropped_field_count=dropped,
                        observed=observed, allowed_raw=tuple(allowed_raw))
 
 
-def fetch_prices(pd_nos: Iterable[Any], *, transport: Any = None, limits: Limits = DEFAULT_LIMITS,
-                 internal_fields: Iterable[str] = ()) -> PriceResult:
-    """기본 transport 는 offline 이다. 재시도하지 않는다. DB 에 저장하지 않는다.
-
-    internal_fields 는 INTERNAL_PRICE_FIELDS 안에서만 고른다. 고르지 않으면 원가 계열은 읽지도 않는다.
-    """
-    internal_fields = _internal_fields(internal_fields)
+def fetch_prices(pd_nos: Iterable[Any], *, transport: Any = None, limits: Limits = DEFAULT_LIMITS) -> PriceResult:
+    """기본 transport 는 offline 이다. 재시도하지 않는다. DB 에 저장하지 않는다."""
     requested = normalize_price_request(pd_nos)
     url = build_price_url(requested)
     try:
         response = _send(transport or OfflineTransport(), url, limits, write=False)
-        result = parse_price_response(response, requested, limits, internal_fields=internal_fields)
+        result = parse_price_response(response, requested, limits)
     except MallApiError as exc:
         log.warning("mall_ai_api price failed code=%s", exc.code)
         raise
-    log.info("mall_ai_api price ok requested=%d missing=%d", len(requested), len(result.missing))
+    log.info("mall_ai_api price ok requested=%d not_found=%d missing=%d unrequested=%d",
+             len(requested), len(result.not_found), len(result.missing), result.unrequested_count)
     return result
 
 
