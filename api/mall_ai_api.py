@@ -675,7 +675,15 @@ def parse_price_response(response: TransportResponse, requested: tuple[str, ...]
         names |= extra
     declared: set[str] = set()
     for raw in document["not_found"] or ():
-        code = _response_code(raw)
+        try:
+            code = _response_code(raw)
+        except MallApiError:
+            if type(raw) is not str:
+                raise                                   # 문자열이 아닌 값(true, {}, 목록)은 여전히 모양 오류다
+            # 쇼핑몰은 숫자가 아닌 값("abc")도 그대로 되돌려준다(2026-11-17 재실측). 우리는 숫자만
+            # 요청하므로 요청한 번호일 수 없다 - 조회 전체를 실패시키지 않고 버린 수에 더한다.
+            unrequested += 1
+            continue
         if code not in wanted:
             unrequested += 1
         elif code in found:

@@ -187,7 +187,6 @@ class Price(Base):
                  (b"{" + at + b',"items":[]}', "bad_shape"),                       # not_found 키가 없다
                  (b"{" + at + b',"items":[],"not_found":{}}', "bad_shape"),
                  (b"{" + at + b',"items":[],"not_found":"1"}', "bad_shape"),
-                 (b"{" + at + b',"items":[],"not_found":["x"]}', "bad_shape"),
                  (b"{" + at + b',"items":[],"not_found":[true]}', "bad_shape"),
                  (b'{"items":[],"not_found":null}', "bad_checked_at"),
                  (b'{"checked_at":null,"items":[],"not_found":null}', "bad_checked_at"),
@@ -275,6 +274,13 @@ class PriceResponse20261117(Base):
         self.assertEqual(result.missing, ("7",))
         self.assertEqual([result.items[c].lookup for c in result.requested], ["not_found", "found", "not_found", "missing"])
         self.assertEqual(self.price(ok_price([], []), ("1",)).not_found, ())    # 빈 배열도 받는다
+
+    def test_not_found_echoing_a_non_numeric_value_is_dropped_not_fatal(self):
+        # 2026-11-17 재실측: pd_no=abc 에 {"items":[],"not_found":["abc"]} 가 온다.
+        result = self.price(ok_price([product(1)], ["abc", "", "x y", "2"]), ("1", "2", "3"))
+        self.assertEqual((result.not_found, result.missing), (("2",), ("3",)))
+        self.assertEqual(result.unrequested_count, 3)
+        self.assertEqual(result.items["1"].lookup, "found")
 
     def test_403_json_error_is_ip_rejected_and_old_form_still_is(self):
         with self.assertRaises(MallApiError) as caught:
