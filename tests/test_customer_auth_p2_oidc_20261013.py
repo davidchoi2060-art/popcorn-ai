@@ -52,6 +52,13 @@ def test_authorize_url_has_state_nonce_pkce(keys):
     n = {k: v[0] for k, v in parse_qs(urlparse(OIDC.authorize_url(OIDC.providers()["naver"], state="S", nonce="N",
                                                                   verifier="V")).query).items()}
     assert "nonce" not in n and "code_challenge" not in n and n["state"] == "S"   # 네이버는 OAuth 2.0
+    keys.setenv("KAKAO_REST_API_KEY", "kid")
+    keys.setenv("KAKAO_CLIENT_SECRET", "ksec")
+    k = {key: v[0] for key, v in parse_qs(urlparse(OIDC.authorize_url(OIDC.providers()["kakao"], state="S", nonce="N",
+                                                                      verifier="V" * 43)).query).items()}
+    # 카카오는 scope 에 적은 동의항목만 묻는다 - 닉네임을 ID 토큰으로 받으려면 함께 요청한다(이메일은 받지 않는다, D-3)
+    assert k["scope"] == "openid profile_nickname" and k["nonce"] == "N"
+    assert k["redirect_uri"] == "https://www.popcornai.co.kr/api/auth/kakao/callback"
 
 
 # ── ID 토큰 검증 ──────────────────────────────────────────────────────────────

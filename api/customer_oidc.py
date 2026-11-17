@@ -90,7 +90,7 @@ def providers() -> dict[str, ProviderConfig]:
     if kid and ksec:
         out["kakao"] = ProviderConfig(
             "kakao", "https://kauth.kakao.com", "https://kauth.kakao.com/oauth/authorize",
-            "https://kauth.kakao.com/oauth/token", "openid", kid, ksec, "oidc_id_token",
+            "https://kauth.kakao.com/oauth/token", "openid profile_nickname", kid, ksec, "oidc_id_token",
             jwks_url="https://kauth.kakao.com/.well-known/jwks.json", pkce=True)
     nid, nsec = _env("NAVER_CLIENT_ID"), _env("NAVER_CLIENT_SECRET")
     if nid and nsec:
