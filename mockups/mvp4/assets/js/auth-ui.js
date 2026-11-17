@@ -88,7 +88,10 @@
       if (busy || !box.checked) return; busy = true; submit.disabled = true; notice.hidden = true;
       request('/api/auth/withdraw', {}).then(function (data) {
         if (data.ok !== true) throw new Error('withdraw');
-        window.alert('탈퇴했습니다.'); window.location.href = '/mvp4/';
+        var done = dialog('회원 탈퇴', '<p role="status">탈퇴했습니다.</p><div class="button-row"><button type="button" class="btn btn-primary" data-home>확인</button></div>', null);
+        var home = function () { window.location.href = '/mvp4/'; };
+        done.querySelector('[data-home]').onclick = home;
+        done.addEventListener('close', home);
       }).catch(function (e) {
         if (e.status === 401) { window.location.reload(); return; }
         notice.textContent = '탈퇴를 처리하지 못했습니다. 고객지원으로 문의해 주세요.'; notice.hidden = false;
@@ -97,7 +100,7 @@
   }
   function account(trigger) {
     if (!state.me.authenticated) { login(trigger); return; }
-    var d = dialog(P.h(state.me.member && state.me.member.nickname || '회원'), '<div class="button-row"><button class="btn btn-outline" data-signout>로그아웃</button><button class="btn btn-outline" data-leave>회원 탈퇴</button></div><p class="error" role="alert" hidden></p>', trigger);
+    var d = dialog(P.h(state.me.member && state.me.member.nickname || '회원'), '<div class="button-row"><button type="button" class="btn btn-outline" data-signout>로그아웃</button></div><p class="error" role="alert" hidden></p><button type="button" class="auth-leave" data-leave>회원 탈퇴</button>', trigger);
     d.querySelector('[data-leave]').onclick = function () { withdraw(trigger); };
     var b = d.querySelector('[data-signout]');
     b.onclick = function () {
