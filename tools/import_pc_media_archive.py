@@ -395,7 +395,7 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
     and inside the selection transaction; a change at any point stops the item."""
     from sqlalchemy import text
     from api.pc_media import NOTICE
-    from api.pc_existing_media_import import canonical
+    from api.pc_existing_media_import import canonical, validated_asset, Conflict
     require_apply_env()
     code = product_code(item)
     actor = principal.actor
@@ -428,9 +428,10 @@ def apply_one(engine, objects, item, raw, manifest_sha, auth, principal, select=
         if reason or binding['visual_basis'] != row['visual_basis']:
             return 'stopped', job + ' (업로드 전 중단: ' + (reason or '구성 근거 변경') + ')'
         receipt = objects.create_or_verify(job, raw)
-        if receipt.sha256 != hashlib.sha256(raw).hexdigest() or receipt.size != len(raw):
+        try:
+            asset = validated_asset(receipt, job, raw, NOTICE)
+        except Conflict:
             return 'failed', '클라우드 저장 확인 불일치'
-        asset = dict(asdict(receipt), notice=NOTICE)
         with engine.begin() as conn:
             binding, reason = _verified(conn, auth, principal, item, raw, manifest_sha, False, skus)
             if reason or binding['visual_basis'] != row['visual_basis']:

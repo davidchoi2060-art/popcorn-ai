@@ -3,7 +3,6 @@ import hashlib
 import re
 import threading
 from collections import OrderedDict
-from urllib.parse import quote
 
 import google.auth
 from google.auth.transport.requests import AuthorizedSession
@@ -11,11 +10,7 @@ from fastapi import APIRouter, HTTPException, Request, Response
 from sqlalchemy import text
 
 from .db import engine
-from .media_storage import (
-    LOGICAL_MEDIA_BUCKET,
-    get_physical_media_bucket,
-    is_valid_logical_bucket,
-)
+from . import media_storage
 
 router=APIRouter()
 _sessions=threading.local()
@@ -38,7 +33,7 @@ def _session():
 def image_key(asset, code, variant):
     key=asset.get('detail_key' if variant=='detail' else 'thumbnail_key','')
     suffix='detail.png' if variant=='detail' else 'thumb.webp'
-    if not is_valid_logical_bucket(asset.get('bucket')) or not re.fullmatch(r'products/'+str(code)+r'/[a-f0-9]{16}/'+re.escape(suffix),key):
+    if asset.get('bucket')!=MEDIA_BUCKET or not re.fullmatch(r'products/'+str(code)+r'/[a-f0-9]{16}/'+re.escape(suffix),key):
         raise HTTPException(404,'등록된 표시용 이미지가 없습니다.')
     return key
 
@@ -79,8 +74,7 @@ def read_image(asset, code, variant):
 
 def _fetch(asset, key, variant):
     try:
-        physical_bucket=get_physical_media_bucket()
-        url=f'https://storage.googleapis.com/storage/v1/b/{physical_bucket}/o/{quote(key,safe="")}?alt=media'
+        url=media_storage.object_url(MEDIA_BUCKET,key)+'?alt=media'
         with _session().get(url,timeout=(5,15),stream=True,allow_redirects=False) as response:
             if response.status_code==404:raise HTTPException(404,'이미지 파일을 찾지 못했습니다.')
             response.raise_for_status()
