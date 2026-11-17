@@ -10,13 +10,14 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import text
 from api.db import engine
 from api.product_images import MEDIA_BUCKET
+from api import media_storage
 
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('directory',type=Path);parser.add_argument('--apply',action='store_true');a=parser.parse_args()
     manifest=json.loads((a.directory/'manifest.json').read_text(encoding='utf-8'))
     inventory=json.loads((a.directory/'cloud-inventory.json').read_text(encoding='utf-8-sig'))
-    remote={r['name']:r for r in inventory};ready=[r for r in manifest['items'] if r['status']=='ready']
+    remote=media_storage.inventory_objects(inventory);ready=[r for r in manifest['items'] if r['status']=='ready']
     verified=0
     for r in ready:
         for field in ('original_key','detail_key','thumbnail_key'):
@@ -24,7 +25,8 @@ def main():
             assert len(raw)==int(obj['size']),key
             assert base64.b64encode(hashlib.md5(raw).digest()).decode()==obj['md5_hash'],key
             verified+=1
-    result=dict(verified_files=verified,linked_parts=len(ready),applied=False,bucket=MEDIA_BUCKET)
+    result=dict(verified_files=verified,linked_parts=len(ready),applied=False,bucket=MEDIA_BUCKET,
+                storage_bucket=media_storage.storage_bucket(MEDIA_BUCKET))
     if a.apply:
         backup=a.directory/'image-assets-db-before.json'
         assert not backup.exists(),'Backup exists: do not overwrite a previous application'
