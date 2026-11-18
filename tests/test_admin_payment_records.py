@@ -116,8 +116,10 @@ def test_permissions_follow_shared_gate():
 
 def test_screen_is_reachable_and_returns_to_group():
     from api.admin_page_intro import back_for, entries_for, group_crumb
-    nav = (ROOT / "api" / "admin_nav.py").read_text(encoding="utf-8")
-    assert "'/admin2/payment-records')" in nav
+    # 2026-11-18 메뉴 통합 — 단일 메뉴 「상담·주문」 기본 업무에 정확히 한 번 있다.
+    from api.admin_nav import simple_nav
+    group = next(g for g in simple_nav() if g["title"] == "상담·주문")
+    assert [r["href"] for r in group["basic"]].count("/admin2/payment-records") == 1
     assert back_for("/admin2/payment-records") == {"href": "/admin2/commerce-orders",
                                                    "label": "주문 운영으로 돌아가기"}
     assert group_crumb("/admin2/payment-records")["label"] == "주문 운영"

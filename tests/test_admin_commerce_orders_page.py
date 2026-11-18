@@ -25,7 +25,9 @@ NAV = ROOT / 'api/admin_nav.py'
 # 2026-10-11: 신 관리자 「회원 관리」 묶음에 「후기 관리」(/admin2/member-reviews) 추가로 기대 지문 갱신
 # 2026-10-18 관리자 정리 기획 A05: NAV 「인계 · 성과」에 「보관 기한 · 파기 이력」, 「주문 운영」 경로에
 # /admin2/retention 을 더해 갱신(CI 의 Python 3.12 로 계산). 기존 경로 동작은 위 subTest 가 그대로 대조한다.
-NAV_BASELINE_AST_SHA = 'c35ab06e1e4d37037f2c7da845a550d9cfa9e3dcfd9b80fa471d9a96cc1ff228'  # 2026-11-06 ASUS 기획전 관리(/admin2/asus-campaign) 메뉴 추가
+# 2026-11-06 ASUS 기획전 관리(/admin2/asus-campaign) 메뉴 추가 때 c35ab06e…
+# 2026-11-18 메뉴 통합(신 관리자 메뉴 폐지 · 회원/상담·주문 묶음) — Python 3.12 로 계산
+NAV_BASELINE_AST_SHA = '0ca3b01404e94868f92a45569cfdc17227cf6b2bd90928631cb16097e96490d0'
 FLOW_SCRIPTS = (
     '<script src="/shared/admin-commerce-fulfillment-transport.js?v=20261006-1"></script>'
     '<script src="/shared/admin-commerce-fulfillment.js?v=20261006-1"></script>'
@@ -73,9 +75,12 @@ def renderer(nav):
     path = ROOT / 'api/admin_ui_common.py'
     tree = source_tree(path)
     tree.body = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'render']
-    env = dict(Request=Request, HTMLResponse=HTMLResponse,
-               templates=Jinja2Templates(directory=str(ROOT / 'templates')),
-               nav_for=nav['nav_for'], nav_counts=nav['counts'], new_admin_nav=nav['new_admin_nav'],
+    templates = Jinja2Templates(directory=str(ROOT / 'templates'))
+    # 운영과 같게 셸이 단일 메뉴(simple_nav)를 그린다 — admin_ui_common 의 Jinja 전역과 같은 이름
+    # (2026-11-18 메뉴 통합: 신 관리자 메뉴 폐지).
+    templates.env.globals['simple_nav'] = nav['simple_nav']
+    env = dict(Request=Request, HTMLResponse=HTMLResponse, templates=templates,
+               nav_for=nav['nav_for'], nav_counts=nav['counts'],
                back_for=back_for, entries_for=entries_for, group_crumb=group_crumb)
     return exec_selected(tree, path, env)['render']
 
@@ -247,7 +252,9 @@ class CommerceOrdersPageTests(unittest.TestCase):
         env = page(renderer(navigation()))
         response = env['commerce_orders_page'](request(query='admin=legacy', cookie='admin_ui_mode=legacy'))
         self.assertIn('data-admin-mode="new"', response.body.decode())
-        self.assertIn('admin_ui_mode=new', response.headers['set-cookie'])
+        # 2026-11-18 메뉴 통합: 화면이 스스로 정한 변형은 그 화면에만 쓰고 쿠키에 남기지 않는다
+        # (이 화면을 한 번 연 것만으로 판매가·재고 입고 본문이 바뀌면 안 된다).
+        self.assertNotIn('admin_ui_mode=new', response.headers.get('set-cookie', ''))
         self.assertEqual(response.headers['cache-control'], 'no-cache, no-store, must-revalidate')
         self.assertEqual(response.headers['pragma'], 'no-cache')
     def test_query_values_are_not_injected_as_business_or_customer_context(self):
@@ -265,31 +272,20 @@ class CommerceOrdersPageTests(unittest.TestCase):
             self.assertEqual(client.post('/admin2/commerce-orders').status_code, 405)
         self.assertEqual(render.call_count, 1)
     def test_nav_single_new_item_and_exact_active_trailing_slash(self):
-        nav = navigation()['new_admin_nav']
+        # 2026-11-18 메뉴 통합 — 주문 운영은 단일 메뉴 「상담·주문」 기본 업무에 정확히 한 번 있다.
+        nav = navigation()['simple_nav']
+        def rows(groups): return [r for g in groups for r in g['basic'] + g['advanced']]
         for path in ('/admin2/commerce-orders', '/admin2/commerce-orders/'):
-            items = nav(path)
-            self.assertEqual([i['label'] for i in items if i['active']], ['주문 운영'])
-            self.assertEqual(len([i for i in items if i['href'] == '/admin2/commerce-orders']), 1)
-            self.assertEqual(len({i['href'] for i in items}), len(items))
+            groups = nav(path)
+            self.assertEqual([g['title'] for g in groups if g['active']], ['상담·주문'])
+            self.assertEqual([r['label'] for r in rows(groups) if r['active']], ['주문 운영'])
+            self.assertEqual(len([r for r in rows(groups) if r['href'] == '/admin2/commerce-orders']), 1)
+            self.assertEqual(len({r['href'] for r in rows(groups)}), len(rows(groups)))
         for path in ('/admin2/commerce-orders-other', '/admin2/commerce-orders/unsafe'):
-            self.assertFalse(any(i['active'] for i in nav(path)))
-    def test_every_existing_nav_path_and_active_behavior_preserved(self):
-        tree = source_tree(NAV)
-        fn = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'new_admin_nav')
-        assignment = next(n for n in fn.body if isinstance(n, ast.Assign))
-        # 나중에 승인되어 들어온 항목은 빼고 «원래 항목»의 동작이 그대로인지 본다:
-        # 주문 운영(2026-10-11) · 운영 현황(2026-10-12 사장님 확정, 신 관리자 첫 화면).
-        added = ('/admin2/commerce-orders', '/admin2/')
-        for approved in [n for n in assignment.value.elts if ast.literal_eval(n)[1] in added]:
-            assignment.value.elts.remove(approved)
-        env = exec_selected(tree, NAV, {})
-        old = env['new_admin_nav']; current = navigation()['new_admin_nav']
-        # Execute the original function for every existing accepted alias, not a copied expected map.
-        for _, _, _, paths in ast.literal_eval(assignment.value):
-            for path in paths:
-                with self.subTest(path=path):
-                    self.assertEqual([i for i in current(path) if i['href'] not in added], old(path))
-        digest = hashlib.sha256(ast.dump(tree, include_attributes=False).encode()).hexdigest()
+            self.assertFalse(any(r['active'] for r in rows(nav(path))))
+    def test_nav_definition_fingerprint(self):
+        # admin_nav.py 정의가 바뀌면 이 지문을 같이 갱신한다(메뉴 변경을 조용히 지나가지 않게).
+        digest = hashlib.sha256(ast.dump(source_tree(NAV), include_attributes=False).encode()).hexdigest()
         self.assertEqual(digest, NAV_BASELINE_AST_SHA)
     def test_discovery_actual_function_finds_new_page_and_skips_main_private_helper(self):
         env = page(Mock()); discover, imports, locations = discovery(env)

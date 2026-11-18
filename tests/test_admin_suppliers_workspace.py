@@ -288,17 +288,18 @@ class SupplierWorkspaceTests(unittest.TestCase):
         # 그 뒤 모든 화면이 신 관리자 메뉴로 열렸다. 공급처는 기존 메뉴(NAV)에도 있는 화면이라
         # 들어온 메뉴를 그대로 따라야 하고, 선택을 다시 쓰지 않아야 한다.
         r=self.client.get('/admin2/suppliers');html=r.text
-        self.assertEqual(200,r.status_code);self.assertIn('class="a2-lnb-grp"',html);self.assertNotIn('a2-new-secondary',html)
+        # 2026-11-18 메뉴 통합 — 쿠키와 무관하게 좌측 메뉴는 단일 메뉴(data-admin-shell=simple) 한 벌이다.
+        self.assertEqual(200,r.status_code);self.assertIn('class="a2-lnb-grp"',html);self.assertIn('data-admin-shell="simple"',html)
         self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
         self.client.cookies.set('admin_ui_mode','legacy');r=self.client.get('/admin2/suppliers')
         self.assertIn('class="a2-lnb-grp"',r.text);self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
         self.client.cookies.set('admin_ui_mode','new');r=self.client.get('/admin2/suppliers')
-        self.assertIn('a2-new-secondary',r.text);self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
+        self.assertIn('data-admin-shell="simple"',r.text);self.assertNotIn('admin_ui_mode','\n'.join(r.headers.get_list('set-cookie')))
         self.client.cookies.delete('admin_ui_mode')
 
     def test_new_page_and_viewer_write_controls(self):
         r=self.client.get('/admin2/suppliers?admin=new');html=r.text
-        self.assertEqual(200,r.status_code);self.assertIn('a2-new-secondary',html);self.assertIn('admin_ui_mode=new',r.headers['set-cookie'])
+        self.assertEqual(200,r.status_code);self.assertIn('data-admin-shell="simple"',html);self.assertIn('admin_ui_mode=new',r.headers['set-cookie'])
         self.client.cookies.delete('admin_ui_mode')
         self.assertIn('id="sw-new"',html);self.assertIn('data-can-write="true"',html)
         self.assertNotIn('가온컴퍼니',html);self.assertNotIn('시안용',html);self.assertNotIn('가상 데이터',html)

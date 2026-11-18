@@ -81,7 +81,7 @@ from datetime import datetime
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
-from .admin_ui_common import admin_mode, render, login_required_html
+from .admin_ui_common import render, login_required_html
 from . import admin_home_overview
 from .admin_nav import NAV
 from .admin_dashboard import (
@@ -405,10 +405,16 @@ TODAY_ROWS = (
      "/admin2/reviews", "검수 대기 사양"),
 )
 
+# 운영 현황 대시보드 주소 — 첫 화면(/admin2/)에 이 조건이 붙으면 대시보드를 그린다(2026-11-18).
+OVERVIEW_PARAM, OVERVIEW_VALUE = "view", "overview"
+OVERVIEW_HREF = f"/admin2/?{OVERVIEW_PARAM}={OVERVIEW_VALUE}"
+
 QUICK_LINKS = (
     ("상품 찾기", "상품을 검색하고 상세 정보를 확인합니다.", "/admin2/products"),
     ("상품 등록", "새 상품 한 개를 등록합니다.", "/admin2/product-new"),
     ("상담 신청 확인", "구매 상담 신청 목록을 엽니다.", "/admin2/purchase-inquiries"),
+    # 2026-11-18 — 신 관리자 첫 화면이던 운영 현황 대시보드로 가는 길(메뉴 통합).
+    ("운영 현황", "처리 대기 · 고객 이용 흐름 · 최근 처리 기록을 한 화면에서 확인합니다.", OVERVIEW_HREF),
 )
 
 
@@ -457,11 +463,13 @@ def home(request: Request) -> HTMLResponse:
     if op is None:
         return HTMLResponse(login_required_html(), status_code=401)
 
-    # 신 관리자 첫 화면 = 「운영 현황」(2026-10-12 사장님 확정). 구 관리자는 아래 1b 그대로.
-    if admin_mode(request) == "new":
+    # 2026-11-18 사장님 지시(메뉴 하나로 확정) — 첫 화면은 「오늘 할 일」 하나다. `?admin=new` 로
+    # 갈리던 분기를 없앴다. 운영 현황 대시보드(ADM-DASH-020 · 2026-10-12 확정)는 「오늘 할 일」 안의
+    # 링크 `?view=overview` 로 연다. 화면 변형 쿠키(admin_ui_mode)를 건드리지 않게 admin_mode 를 넘기지 않는다.
+    if request.query_params.get(OVERVIEW_PARAM) == OVERVIEW_VALUE:
         return render(request, "admin/ops_overview.html.j2", screen_id="ADM-DASH-020",
-                      domain="dashboard", crumb_group="신 관리자", crumb_now="운영 현황",
-                      admin_mode="new", ov=admin_home_overview.build())
+                      domain="dashboard", crumb_group="오늘 할 일", crumb_now="운영 현황",
+                      page_intro=None, ov=admin_home_overview.build())
 
     dash, err_dash = _safe("오늘의 흐름 · 최근 활동", _dashboard_data)
     quality, err_quality = _safe("견적 품질 · 재고 정합", _quote_quality_data)

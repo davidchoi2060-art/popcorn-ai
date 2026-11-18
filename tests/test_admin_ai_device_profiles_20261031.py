@@ -27,7 +27,8 @@ class Wiring(unittest.TestCase):
         self.assertIn(PATH, admin_page_intro.INTRO)
         # api/admin_nav.py 전체 AST 는 tests/test_admin_commerce_orders_page.py 의 NAV_BASELINE_AST_SHA 가 고정한다 —
         # 메뉴를 바꾸는 커밋은 그 값을 함께 갱신한다(2026-10-18 보관 기한 화면 때와 같은 절차).
-        self.assertEqual([g['label'] for g in admin_nav.new_admin_nav(PATH) if g['active']], ['부품 관리'])
+        # 2026-11-18 메뉴 통합 — 단일 메뉴에서 「상품」 묶음이 켜진다(신 관리자 「부품 관리」 폐지).
+        self.assertEqual([g['title'] for g in admin_nav.simple_nav(PATH) if g['active']], ['상품'])
         self.assertEqual([r.path for r in UI.router.routes], [PATH])
 
     def test_api_routes(self):

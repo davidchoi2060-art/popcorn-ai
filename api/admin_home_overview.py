@@ -33,7 +33,7 @@ from .db import engine
 from .timeutil import KST
 
 FROM = "overview"          # 카드 → 목록 링크에 붙는 표식. admin_ui_common.render 가 읽는다.
-BACK_HREF = "/admin2/"
+BACK_HREF = "/admin2/?view=overview"   # 2026-11-18 메뉴 통합 — 첫 화면은 「오늘 할 일」, 대시보드는 이 주소
 BACK_LABEL = "운영 현황으로 돌아가기"
 
 NOT_CONNECTED = "아직 집계가 연결되지 않았습니다."

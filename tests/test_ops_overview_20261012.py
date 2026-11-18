@@ -8,7 +8,8 @@ from unittest import mock
 from starlette.requests import Request
 
 from api import admin_home_overview as OV
-from api.admin_nav import new_admin_nav
+from api import admin_ui_home as H
+from api.admin_nav import simple_nav
 from api.admin_ui_common import admin_mode, render
 
 
@@ -129,10 +130,33 @@ class RecentLogs(unittest.TestCase):
 
 
 class Shell(unittest.TestCase):
-    def test_overview_is_first_in_new_menu(self):
-        nav = new_admin_nav('/admin2/')
-        self.assertEqual((nav[0]["label"], nav[0]["href"]), ("운영 현황", "/admin2/"))
-        self.assertEqual(["운영 현황"], [i["label"] for i in nav if i["active"]])
+    # 2026-11-18 메뉴 통합 — 첫 화면은 「오늘 할 일」 하나다. 운영 현황은 그 안의 링크(?view=overview)로 연다.
+    def home_template(self, query='', cookie=''):
+        calls = []
+        def fake_render(req, template, **kw):
+            calls.append(template)
+            return 'sentinel'
+        with mock.patch.object(H, 'resolve_session', return_value={'id': 1}), \
+                mock.patch.object(H, 'render', side_effect=fake_render), \
+                mock.patch.object(H, '_safe', return_value=(None, '조회 실패(시험)')), \
+                mock.patch.object(OV, 'build', return_value=fake_build()):
+            H.home(request('/admin2/', query=query, cookie=cookie))
+        return calls
+
+    def test_today_is_the_only_first_screen(self):
+        today = simple_nav('/admin2/')[0]
+        self.assertEqual((today["title"], today["href"], today["active"]), ("오늘 할 일", "/admin2/", True))
+        for query, cookie in (('', ''), ('admin=new', ''), ('', 'admin_ui_mode=new')):
+            with self.subTest(query=query, cookie=cookie):
+                self.assertEqual(self.home_template(query, cookie), ['admin/home.html.j2'])
+
+    def test_overview_opens_from_today_link(self):
+        self.assertEqual(H.OVERVIEW_HREF, '/admin2/?view=overview')
+        self.assertIn(H.OVERVIEW_HREF, [h for _n, _d, h in H.QUICK_LINKS])
+        for cookie in ('', 'admin_ui_mode=new'):
+            self.assertEqual(self.home_template('view=overview', cookie), ['admin/ops_overview.html.j2'])
+        # 운영 현황을 열어도 「오늘 할 일」 묶음이 켜진다(첫 화면 경로 그대로).
+        self.assertEqual(["오늘 할 일"], [g["title"] for g in simple_nav('/admin2/') if g["active"]])
 
     def test_mode_query_beats_cookie(self):
         self.assertEqual(admin_mode(request(query='admin=new', cookie='admin_ui_mode=legacy')), 'new')
@@ -140,22 +164,27 @@ class Shell(unittest.TestCase):
         self.assertEqual(admin_mode(request(query='admin=zzz')), 'legacy')
 
     def test_page_renders_with_back_to_overview_on_lists(self):
-        html = render(request('/admin2/', cookie='admin_ui_mode=new'), 'admin/ops_overview.html.j2',
-                      admin_mode='new', ov=fake_build()).body.decode()
+        html = render(request('/admin2/', query='view=overview'), 'admin/ops_overview.html.j2',
+                      page_intro=None, ov=fake_build()).body.decode()
         for text in ("운영 현황", "확인이 필요한 상태", "처리할 작업", "고객 공개 전 점검",
                      "고객 이용 흐름", "최근 처리 기록", "자료 바로가기", "아직 집계가 연결되지 않았습니다."):
             self.assertIn(text, html)
         self.assertNotIn("a2BackLink", html)
-        listing = render(request('/admin2/reviews', query='from=overview', cookie='admin_ui_mode=new'),
-                         'admin/new_home.html.j2').body.decode()
-        self.assertIn("운영 현황으로 돌아가기", listing)
+        self.assertIn('href="/admin2/?view=overview">다시 조회', html)
+        self.assertIn('data-admin-shell="simple"', html)
+        for cookie in ('', 'admin_ui_mode=new'):
+            listing = render(request('/admin2/reviews', query='from=overview', cookie=cookie),
+                             'admin/new_home.html.j2').body.decode()
+            self.assertIn("운영 현황으로 돌아가기", listing)
+            self.assertIn('href="/admin2/?view=overview"', listing)
         plain = render(request('/admin2/reviews', cookie='admin_ui_mode=new'),
                        'admin/new_home.html.j2').body.decode()
         self.assertNotIn("운영 현황으로 돌아가기", plain)
 
-    def test_legacy_entry_button_opens_overview(self):
-        html = render(request('/admin2/products'), 'admin/new_home.html.j2').body.decode()
-        self.assertIn('href="/admin2/?admin=new"', html)
+    def test_new_admin_entry_button_is_gone(self):
+        for cookie in ('', 'admin_ui_mode=new'):
+            html = render(request('/admin2/products', cookie=cookie), 'admin/new_home.html.j2').body.decode()
+            self.assertNotIn('href="/admin2/?admin=new"', html)
 
 
 if __name__ == "__main__":

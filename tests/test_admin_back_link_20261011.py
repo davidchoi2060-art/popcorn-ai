@@ -20,8 +20,9 @@ HUB = '/admin2/usage-floors'
 def shell(path, new):
     env = Environment(loader=FileSystemLoader(str(ROOT / 'templates')), autoescape=True)
     t = env.from_string('{% extends "admin/_admin2_shell.html.j2" %}{% block content %}<main></main>{% endblock %}')
-    return t.render(new_admin=new, workspace_nav=admin_nav.new_admin_nav(path) if new else None,
-                    nav=[] if new else admin_nav.nav_for_screens(path), screen_id='X', domain='x',
+    # 2026-11-18 메뉴 통합 — 셸은 모드와 무관하게 같은 메뉴를 받는다(신 관리자 메뉴 폐지).
+    return t.render(new_admin=new, simple_nav=admin_nav.simple_nav,
+                    nav=admin_nav.nav_for_screens(path), screen_id='X', domain='x',
                     crumb_group='g', crumb_now='n', crumb_href=(API.group_crumb(path) or {}).get('href', '') if new else '',
                     page_intro=None, back_link=API.back_for(path),
                     request=SimpleNamespace(url=SimpleNamespace(path=path)))
@@ -37,11 +38,12 @@ class BackLinkTests(unittest.TestCase):
             with self.subTest(href=href):
                 self.assertEqual(API.back_for(href)['href'], HUB)
 
-    def test_back_sources_belong_to_same_new_admin_menu_group(self):
-        for path in API.BACK_LINKS[HUB]['from']:
+    def test_back_sources_and_hub_are_in_single_menu(self):
+        # 2026-11-18 메뉴 통합 — 신 관리자 메뉴 묶음 대조 대신, 허브와 출발 화면이 단일 메뉴에 있는지 본다.
+        hrefs = [r['href'] for g in admin_nav.simple_nav('') for r in g['basic'] + g['advanced']]
+        for path in (HUB,) + tuple(API.BACK_LINKS[HUB]['from']):
             with self.subTest(path=path):
-                active = [i['href'] for i in admin_nav.new_admin_nav(path) if i['active']]
-                self.assertEqual(active, [HUB])
+                self.assertEqual(hrefs.count(path), 1)
 
     def test_hub_and_unrelated_pages_get_no_back_link(self):
         for path in (HUB, HUB + '/', '/admin2/products', '/admin2/', '/admin2/game-copy-review-x'):
@@ -73,10 +75,6 @@ class BackLinkTests(unittest.TestCase):
         for path in ('/admin2/products', '/admin2/', '/admin2/talk-review-x'):
             self.assertIsNone(API.group_crumb(path))
 
-    def test_group_label_matches_new_admin_menu_label(self):
-        labels = {i['href']: i['label'] for i in admin_nav.new_admin_nav('')}
-        self.assertEqual(labels[HUB], API.BACK_LINKS[HUB]['group'])
-
     def test_new_shell_header_crumb_links_to_group_only_in_new_mode(self):
         html = shell('/admin2/talk-patterns', True)
         self.assertIn(f'<a class="a2-crumb" href="{HUB}">', html)
@@ -89,16 +87,16 @@ class BackLinkTests(unittest.TestCase):
         self.assertEqual(API.back_for('/admin2/member-reviews')['href'], '/admin2/members')
         self.assertIsNone(API.group_crumb('/admin2/members'))  # 「회원 관리 › 회원 관리」 겹침 방지
         self.assertEqual(API.group_crumb('/admin2/member-reviews'), {'href': '/admin2/members', 'label': '회원 관리'})
-        active = [i['href'] for i in admin_nav.new_admin_nav('/admin2/member-reviews') if i['active']]
-        self.assertEqual(active, ['/admin2/members'])
+        # 2026-11-18 메뉴 통합 — 두 화면 모두 단일 메뉴 「회원」 묶음에 있고, 후기 관리를 열면 그 묶음이 켜진다.
+        groups = admin_nav.simple_nav('/admin2/member-reviews')
+        self.assertEqual([g['title'] for g in groups if g['active']], ['회원'])
 
-    def test_every_back_link_source_is_in_its_hub_menu_group(self):
+    def test_every_back_link_hub_and_source_is_in_single_menu(self):
+        hrefs = [r['href'] for g in admin_nav.simple_nav('') for r in g['basic'] + g['advanced']]
         for hub, meta in API.BACK_LINKS.items():
-            labels = {i['href']: i['label'] for i in admin_nav.new_admin_nav('')}
-            self.assertEqual(labels[hub], meta['group'])
-            for path in meta['from']:
+            for path in (hub,) + tuple(meta['from']):
                 with self.subTest(path=path):
-                    self.assertEqual([i['href'] for i in admin_nav.new_admin_nav(path) if i['active']], [hub])
+                    self.assertEqual(hrefs.count(path), 1)
 
     def test_member_reviews_page_uses_existing_api_and_no_false_send_claim(self):
         src = (ROOT / 'templates/admin/member_reviews.html.j2').read_text(encoding='utf-8')

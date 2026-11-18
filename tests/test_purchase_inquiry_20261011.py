@@ -90,8 +90,9 @@ class AdminView(unittest.TestCase):
         hrefs = [i[1] for g in admin_nav.NAV for i in g[2]]
         self.assertIn('/admin2/purchase-inquiries', hrefs)
         self.assertIn('/admin2/purchase-inquiries', admin_page_intro.INTRO)
-        groups = admin_nav.new_admin_nav('/admin2/purchase-inquiries')
-        self.assertEqual([g['label'] for g in groups if g['active']], ['주문 운영'])
+        # 2026-11-18 메뉴 통합 — 단일 메뉴 「상담·주문」 묶음(신 관리자 「주문 운영」 폐지).
+        groups = admin_nav.simple_nav('/admin2/purchase-inquiries')
+        self.assertEqual([g['title'] for g in groups if g['active']], ['상담·주문'])
 
     def test_consults_drawer_links_inquiries(self):
         src = (ROOT / 'api/admin_mvp3_consults.py').read_text(encoding='utf-8')

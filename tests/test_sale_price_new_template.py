@@ -10,7 +10,7 @@ def render(new):
     env = Environment(loader=FileSystemLoader(ROOT / 'templates'), autoescape=True)
     return env.get_template('admin/sale_price.html.j2').render(
         new_admin=new, request=SimpleNamespace(url=SimpleNamespace(path='/admin2/sale-price')),
-        nav=[], nav_counts={}, workspace_nav=[], screen_id='ADM-PRC-060', domain='sale-price',
+        nav=[], nav_counts={}, screen_id='ADM-PRC-060', domain='sale-price',
         crumb_group='판매가', crumb_now='판매가 관리')
 
 

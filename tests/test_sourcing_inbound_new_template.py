@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def render(page, new):
     return Environment(loader=FileSystemLoader(ROOT/'templates'),autoescape=True).get_template('admin/'+page+'.html.j2').render(
-        new_admin=new, request=SimpleNamespace(url=SimpleNamespace(path='/admin2/'+page.replace('_','-'))),nav=[],nav_counts={},workspace_nav=[],screen_id='test',domain='sourcing',crumb_group='매입 · 소싱',crumb_now='시안')
+        new_admin=new, request=SimpleNamespace(url=SimpleNamespace(path='/admin2/'+page.replace('_','-'))),nav=[],nav_counts={},screen_id='test',domain='sourcing',crumb_group='매입 · 소싱',crumb_now='시안')
 
 class SourcingInboundNewTemplateTest(unittest.TestCase):
     def test_new_modes_only_load_owned_assets_and_no_legacy_handlers(self):
