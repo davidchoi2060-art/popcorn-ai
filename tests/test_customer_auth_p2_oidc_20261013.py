@@ -52,6 +52,13 @@ def test_authorize_url_has_state_nonce_pkce(keys):
     n = {k: v[0] for k, v in parse_qs(urlparse(OIDC.authorize_url(OIDC.providers()["naver"], state="S", nonce="N",
                                                                   verifier="V")).query).items()}
     assert "nonce" not in n and "code_challenge" not in n and n["state"] == "S"   # 네이버는 OAuth 2.0
+    keys.setenv("KAKAO_REST_API_KEY", "kid")
+    keys.setenv("KAKAO_CLIENT_SECRET", "ksec")
+    k = {key: v[0] for key, v in parse_qs(urlparse(OIDC.authorize_url(OIDC.providers()["kakao"], state="S", nonce="N",
+                                                                      verifier="V" * 43)).query).items()}
+    # 카카오는 scope 에 적은 동의항목만 묻는다 - 닉네임을 ID 토큰으로 받으려면 함께 요청한다(이메일은 받지 않는다, D-3)
+    assert k["scope"] == "openid profile_nickname" and k["nonce"] == "N"
+    assert k["redirect_uri"] == "https://www.popcornai.co.kr/api/auth/kakao/callback"
 
 
 # ── ID 토큰 검증 ──────────────────────────────────────────────────────────────
@@ -160,9 +167,10 @@ def test_token_error_and_missing_code(google):
 
 # ── 발급기 순수 규칙 ──────────────────────────────────────────────────────────
 @pytest.mark.parametrize("path,want", [
-    ("/mvp3/talk.html?x=1", "/mvp3/talk.html?x=1"),
-    ("https://evil.example/", "/mvp3/"), ("//evil.example", "/mvp3/"), ("/admin2/", "/mvp3/"),
-    ("/mvp3/\r\nSet-Cookie:x", "/mvp3/"), (None, "/mvp3/"),
+    ("/mvp4/talk.html?x=1", "/mvp4/talk.html?x=1"),
+    ("https://evil.example/", "/mvp4/"), ("//evil.example", "/mvp4/"), ("/admin2/", "/mvp4/"),
+    ("/mvp4/\r\nSet-Cookie:x", "/mvp4/"), (None, "/mvp4/"),
+    ("/mvp3/talk.html", "/mvp4/"),          # 옛 고객 화면 경로는 더 받지 않는다(2026-11-17 mvp4 전환)
 ])
 def test_safe_return_blocks_open_redirect(path, want):
     assert ISS.safe_return(path) == want
@@ -239,9 +247,9 @@ def test_start_sets_state_cookie_and_redirects(client, keys, monkeypatch):
     keys.setenv("CUSTOMER_AUTH_ENABLED", "on")
     seen = {}
     monkeypatch.setattr(ISS, "begin_attempt", lambda conn, p, ret: seen.update(p=p, ret=ret) or ("ST", "NO", "VE" * 22))
-    r = client.get("/api/auth/google/start?return=/mvp3/talk.html")
+    r = client.get("/api/auth/google/start?return=/mvp4/talk.html")
     assert r.status_code == 302 and r.headers["location"].startswith("https://accounts.google.com/")
-    assert "state=ST" in r.headers["location"] and seen == {"p": "google", "ret": "/mvp3/talk.html"}
+    assert "state=ST" in r.headers["location"] and seen == {"p": "google", "ret": "/mvp4/talk.html"}
     c = r.headers["set-cookie"]
     assert "popcorn_oauth_state=ST" in c and "HttpOnly" in c and "Path=/api/auth/" in c and "samesite=lax" in c.lower()
     assert r.headers["cache-control"] == "no-store"
@@ -255,7 +263,7 @@ def _principal():
 def test_callback_existing_member_gets_session(client, keys, monkeypatch):
     keys.setenv("CUSTOMER_AUTH_ENABLED", "on")
     monkeypatch.setattr(ISS, "consume_attempt", lambda conn, p, s, c: {
-        "nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp3/talk.html"})
+        "nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp4/talk.html"})
     monkeypatch.setattr(OIDC, "verify_callback", lambda cfg, **kw: OIDC.VerifiedLogin(_principal(), "n", None))
     monkeypatch.setattr(ISS, "find_member", lambda conn, p: {"member_id": 5, "identity_id": 9, "auth_revision": 1})
     monkeypatch.setattr(ISS, "issue_session", lambda conn, **kw: "a" * 64)
@@ -263,7 +271,7 @@ def test_callback_existing_member_gets_session(client, keys, monkeypatch):
     monkeypatch.setattr(ISS, "attach_guest", lambda conn, m, **kw: attached.append((m, kw)))
     client.cookies.set("popcorn_oauth_state", "ST", domain="www.popcornai.co.kr", path="/api/auth/")
     r = client.get("/api/auth/google/callback?state=ST&code=C")
-    assert r.status_code == 302 and r.headers["location"] == "/mvp3/talk.html"
+    assert r.status_code == 302 and r.headers["location"] == "/mvp4/talk.html"
     cookies = r.headers.get_list("set-cookie")
     assert any(c.startswith("popcorn_member_session=" + "a" * 64) and "HttpOnly" in c and "Path=/" in c for c in cookies)
     assert attached == [(5, {"user_id": 77, "owner_key_hash": None})]
@@ -272,7 +280,7 @@ def test_callback_existing_member_gets_session(client, keys, monkeypatch):
 def test_callback_new_identity_goes_to_join(client, keys, monkeypatch):
     keys.setenv("CUSTOMER_AUTH_ENABLED", "on")
     monkeypatch.setattr(ISS, "consume_attempt", lambda conn, p, s, c: {
-        "nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp3/"})
+        "nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp4/"})
     monkeypatch.setattr(OIDC, "verify_callback", lambda cfg, **kw: OIDC.VerifiedLogin(_principal(), "n", None))
     monkeypatch.setattr(ISS, "find_member", lambda conn, p: None)
     monkeypatch.setattr(ISS, "create_pending", lambda conn, login, ret: "b" * 64)
@@ -290,7 +298,7 @@ def test_callback_failure_returns_with_reason_only(client, keys, monkeypatch, ra
     def consume(conn, p, s, c):
         if raise_in == "consume":
             raise ISS.AuthFlowError(400, "state_mismatch")
-        return {"nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp3/"}
+        return {"nonce_hash": "nh", "pkce_verifier": "pv", "return_path": "/mvp4/"}
 
     def verify(cfg, **kw):
         raise OIDC.ProviderError("id_token_invalid")
@@ -298,7 +306,7 @@ def test_callback_failure_returns_with_reason_only(client, keys, monkeypatch, ra
     monkeypatch.setattr(OIDC, "verify_callback", verify)
     q = "error=access_denied&state=ST" if raise_in == "cancel" else "state=ST&code=C"
     r = client.get("/api/auth/google/callback?" + q)
-    assert r.status_code == 302 and r.headers["location"] == "/mvp3/?login_error=" + code
+    assert r.status_code == 302 and r.headers["location"] == "/mvp4/?login_error=" + code
     assert not any(c.startswith("popcorn_member_session=") for c in r.headers.get_list("set-cookie"))
 
 
@@ -315,11 +323,11 @@ def test_join_requires_same_origin_and_consents(client, keys, monkeypatch):
 def test_join_issues_session_and_attaches(client, keys, monkeypatch):
     keys.setenv("CUSTOMER_AUTH_ENABLED", "on")
     monkeypatch.setattr(ISS, "join", lambda conn, tok, c, nickname=None: {
-        "member_id": 5, "identity_id": 9, "auth_revision": 1, "principal": _principal(), "return_path": "/mvp3/q.html"})
+        "member_id": 5, "identity_id": 9, "auth_revision": 1, "principal": _principal(), "return_path": "/mvp4/q.html"})
     monkeypatch.setattr(ISS, "issue_session", lambda conn, **kw: "c" * 64)
     monkeypatch.setattr(ISS, "attach_guest", lambda conn, m, **kw: {"quotes": 0, "inquiries": 2, "handoffs": 0})
     r = client.post("/api/auth/join", json={"consents": {"terms": True, "privacy": True, "age14": True}})
-    assert r.status_code == 200 and r.json() == {"ok": True, "return_path": "/mvp3/q.html",
+    assert r.status_code == 200 and r.json() == {"ok": True, "return_path": "/mvp4/q.html",
                                                  "attached": {"quotes": 0, "inquiries": 2, "handoffs": 0}}
     assert any(c.startswith("popcorn_member_session=" + "c" * 64) for c in r.headers.get_list("set-cookie"))
 

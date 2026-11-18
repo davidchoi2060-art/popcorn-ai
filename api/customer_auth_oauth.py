@@ -31,7 +31,7 @@ router = APIRouter(prefix="/api/auth")
 
 STATE_COOKIE = "popcorn_oauth_state"
 PENDING_COOKIE = "popcorn_join_pending"
-JOIN_PAGE = "/mvp3/join.html"                       # 화면은 코덱스 디자인 뒤 P3
+JOIN_PAGE = "/mvp4/join.html"                       # 고객 화면은 mvp4 다(2026-11-17) - 화면은 다음 PR
 PROVIDERS = ("google", "kakao", "naver")
 
 
