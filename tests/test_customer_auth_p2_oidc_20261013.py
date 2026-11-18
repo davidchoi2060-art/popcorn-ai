@@ -47,7 +47,7 @@ def test_authorize_url_has_state_nonce_pkce(keys):
     g = urlparse(OIDC.authorize_url(OIDC.providers()["google"], state="S", nonce="N", verifier="V" * 43))
     q = {k: v[0] for k, v in parse_qs(g.query).items()}
     assert q["state"] == "S" and q["nonce"] == "N" and q["code_challenge_method"] == "S256"
-    assert q["code_challenge"] == OIDC.pkce_challenge("V" * 43) and q["scope"] == "openid email profile"
+    assert q["code_challenge"] == OIDC.pkce_challenge("V" * 43) and q["scope"] == "openid profile"
     assert q["redirect_uri"] == "https://www.popcornai.co.kr/api/auth/google/callback"
     n = {k: v[0] for k, v in parse_qs(urlparse(OIDC.authorize_url(OIDC.providers()["naver"], state="S", nonce="N",
                                                                   verifier="V")).query).items()}
@@ -102,7 +102,7 @@ def test_google_id_token_verified_to_principal(google):
     p = got.principal
     assert type(p) is identity.VerifiedPrincipal
     assert (p.issuer_key, p.issuer, p.subject, p.via) == ("google", "https://accounts.google.com", "g-123", "google")
-    assert (got.display_nickname, got.display_email) == ("홍길동", "a@b.c")
+    assert (got.display_nickname, got.display_email) == ("홍길동", None)   # 공급자가 보내도 이메일은 읽지 않는다
     assert http.calls[0][2]["code_verifier"] == "v"                    # PKCE 보냄
 
 
@@ -131,10 +131,14 @@ def test_forged_signature_refused(google):
     assert e.value.code == "id_token_invalid"
 
 
-def test_unverified_email_not_shown(google):
-    http = _Http({"id_token": _id_token(email_verified=False)})
+def test_email_is_never_read_even_when_provider_sends_it(google, keys):
+    # 2026-11-18 사장님 확정: 3사 모두 이메일을 받지 않는다. 검증된 이메일이 와도 버린다.
+    http = _Http({"id_token": _id_token(email_verified=True)})
     got = OIDC.verify_callback(google, code="c", verifier="v", nonce_hash=OIDC.sha256_hex("N0"), state="S", session=http)
     assert got.display_email is None
+    naver = OIDC.providers()["naver"]
+    nhttp = _Http({"access_token": "AT"}, {"resultcode": "00", "response": {"id": "n-1", "nickname": "n", "email": "x@y.z"}})
+    assert OIDC.verify_callback(naver, code="c", verifier="v", nonce_hash="", state="S", session=nhttp).display_email is None
 
 
 def test_naver_profile_api(keys):
