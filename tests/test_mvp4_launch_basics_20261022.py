@@ -46,7 +46,7 @@ class FooterBusiness(unittest.TestCase):
     def test_footer_shows_confirmed_company_values_from_one_place(self):
         core = (M / "assets/js/core.js").read_text(encoding="utf-8")
         info = (M / "assets/js/info-pages.js").read_text(encoding="utf-8")
-        for v in ("주식회사 팝콘컴퓨터", "이미숙", "794-81-00671", "서울특별시 용산구 원효로 188, 5층", "02)1644-0249"):
+        for v in ("주식회사 팝콘컴퓨터", "이미숙", "794-81-00671", "서울특별시 용산구 원효로 188, 5층", "1644-0249"):
             self.assertIn(v, core)
         for v in ("주식회사 팝콘컴퓨터", "794-81-00671", "원효로 188"):
             self.assertNotIn(v, info)                     # 표 값은 core.js 한 곳(회사정보 화면은 P.COMPANY 를 읽는다)

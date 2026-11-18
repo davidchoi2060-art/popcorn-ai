@@ -21,12 +21,12 @@ class InfoPages(unittest.TestCase):
         # 2026-10-22: 값은 core.js 의 PAI.COMPANY 한 곳으로 옮겼다(하단 사업자 표기와 회사정보 화면이 같이 쓴다).
         core = (M / "assets/js/core.js").read_text(encoding="utf-8")
         for v in ("주식회사 팝콘컴퓨터", "이미숙", "794-81-00671", "서울특별시 용산구 원효로 188, 5층",
-                  "02)1644-0249", "070-8610-0100", "0303-3442-0249"):
+                  "1644-0249", "070-8610-0100", "0303-3442-0249"):
             self.assertIn(v, core)
         self.assertIn("var COMPANY = P.COMPANY;", JS)
         # 2026-11-18 사장님이 대표번호를 고객 문의 창구로 확정했다 - 그 번호 하나만 전화 걸기 링크로 단다(그 전에는 tel: 금지였다).
         self.assertEqual(JS.count("tel:"), 1)
-        self.assertIn('href="tel:0216440249"', JS)
+        self.assertIn('href="tel:16440249"', JS)
 
 
     def test_draft_policy_text_is_not_shipped(self):

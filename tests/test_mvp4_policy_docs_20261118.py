@@ -46,7 +46,7 @@ class PolicyDocs(unittest.TestCase):
     def test_confirmed_values(self):
         for body in (self.terms, self.privacy):
             self.assertIn("2026-11-23", body)
-            self.assertIn("02)1644-0249", body)
+            self.assertIn("1644-0249", body)
             self.assertIn("leon2030@kakao.com", body)
         self.assertIn("서울서부지방법원", self.terms)
         self.assertIn("협력사", self.terms)
@@ -75,9 +75,15 @@ class PolicyDocs(unittest.TestCase):
             html = (MVP4 / page).read_text(encoding="utf-8")
             self.assertLess(html.index("assets/js/info-pages.js"), html.index("assets/js/policy-docs.js"), page)
 
+    def test_representative_number_has_no_area_code(self):
+        # 2026-11-18 사장님 확정 「1644-0249 맞아」 - 전국 대표번호라 지역번호(02)를 붙이면 휴대폰에서 안 걸릴 수 있다.
+        shipped = "".join(p.read_text(encoding="utf-8", errors="ignore") for p in MVP4.rglob("*") if p.suffix in (".js", ".html"))
+        for bad in ("02)1644", "0216440249", "02-1644"):
+            self.assertNotIn(bad, shipped)
+
     def test_company_phone_is_a_call_link(self):
         js = (MVP4 / "assets" / "js" / "info-pages.js").read_text(encoding="utf-8")
-        self.assertIn('href="tel:0216440249"', js)
+        self.assertIn('href="tel:16440249"', js)
 
 
 if __name__ == "__main__":
