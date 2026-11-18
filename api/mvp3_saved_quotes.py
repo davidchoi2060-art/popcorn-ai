@@ -145,6 +145,13 @@ def list_quotes(request: Request, response: Response, limit: int = Query(default
           FROM mvp3_saved_recommendations WHERE user_id=:u AND owner_key_hash=:owner
             AND NOT (product_snapshot ? 'hidden_at')
           ORDER BY saved_at DESC,quote_id DESC LIMIT :n'''), {'u': uid, 'owner': owner, 'n': limit + 1}).mappings().all()
+        # 마지막 이용 시각(0179) -- 「보관 견적은 마지막 이용 뒤 1년에 파기」(2026-11-18 사장님 승인 ·
+        # 개인정보처리방침 2026-11-23, api/retention_purge saved_quote)의 기준. 조회가 곧 이용이다.
+        # 새 보관은 열 기본값(now())이 채운다. 하루 안에 다시 조회하면 고치지 않는다(쓰기 줄이기).
+        conn.execute(text('''UPDATE mvp3_saved_recommendations SET last_used_at = now()
+          WHERE user_id=:u AND owner_key_hash=:owner AND purged_at IS NULL
+            AND NOT (product_snapshot ? 'hidden_at')
+            AND last_used_at < now() - interval '1 day' '''), {'u': uid, 'owner': owner})
     return {'ok': True, 'quotes': with_live_offer([render_quote(r) for r in rows[:limit]]), 'has_more': len(rows) > limit}
 
 

@@ -263,6 +263,13 @@ def withdraw(conn, member_id: int, *, now: int | None = None) -> dict:
         "UPDATE members SET status = 'withdrawn', nickname = :n, email = NULL, withdrawn_at = now(),"
         " auth_revision = COALESCE(auth_revision, 0) + 1 WHERE member_id = :m"),
         {"n": WITHDRAWN_NICKNAME, "m": member_id})
+    # 보관 견적은 회원에 붙어 있는 동안 파기 대상이 아니다(api/retention_purge saved_quote). 연결을 끊는 지금을
+    # 마지막 이용으로 잡아 «탈퇴 뒤 1년»부터 센다(2026-11-18 사장님 승인 · 개인정보처리방침 2026-11-23 · 0179).
+    conn.execute(text("UPDATE mvp3_saved_recommendations SET last_used_at = now() WHERE member_id = :m"),
+                 {"m": member_id})
+    # 회원에 붙은 방문자 행(members.user_id)도 같다 -- 탈퇴 전에는 visitor_key 파기에서 빠진다.
+    conn.execute(text("UPDATE users SET last_used_at = now()"
+                      " WHERE user_id = (SELECT user_id FROM members WHERE member_id = :m)"), {"m": member_id})
     for table in ("mvp3_saved_recommendations", "purchase_inquiries", "handoffs"):
         out[table] = conn.execute(text(f"UPDATE {table} SET member_id = NULL WHERE member_id = :m"),
                                   {"m": member_id}).rowcount

@@ -353,18 +353,22 @@ class Codex1815Cases(unittest.TestCase):
 
     def test_card_and_rrn_numbers_are_masked_before_ai_and_record(self):
         seen = {}
-        r = _parse_raw('카드 1234-5678-9012-3456 이고 주민번호 900101-1234567 이에요',
+        # 2026-11-18 사장님 승인(개인정보처리방침 2026-11-23): 전화번호·이메일도 가린다. 표시는 저장 전 가림과 같은 이름표.
+        r = _parse_raw('카드 1234-5678-9012-3456 이고 주민번호 900101-1234567, 연락 010-1234-5678 a@b.co 이에요',
                        raw_ai=_ai({'pc': None, 'state': {}, 'reply': '네.'}), seen=seen)
-        self.assertNotIn('1234-5678', seen['text_raw'])
-        self.assertNotIn('1234567', seen['text_raw'])
-        self.assertIn(TX.MASK, seen['text_raw'])
+        for raw in ('1234-5678', '1234567', '010-1234', 'a@b.co'):
+            self.assertNotIn(raw, seen['text_raw'])
+        for label in ('[카드번호]', '[주민번호]', '[전화번호]', '[이메일]'):
+            self.assertIn(label, seen['text_raw'])
         self.assertIn('personal_info', r['exceptions'])
         self.assertIn('가려서 읽었어요', r['reply'])
 
     def test_masking_leaves_prices_and_model_numbers(self):
-        for t in ('예산 1500000원', 'RTX 5070 Ti 16GB', '010-1234-5678로 연락 주세요', '2026-10-11 주문'):
+        for t in ('예산 1500000원', 'RTX 5070 Ti 16GB', '2026-10-11 주문'):
             with self.subTest(t=t):
                 self.assertEqual(TX.mask_personal(t), (t, False))
+        # 전화번호는 2026-11-18 부터 가린다(예전 기대값은 「그대로 둔다」였다)
+        self.assertEqual(TX.mask_personal('010-1234-5678로 연락 주세요'), ('[전화번호]로 연락 주세요', True))
 
     def test_privacy_and_order_status_open_human_path(self):
         for n in (36, 37, 39, 41, 42, 43):

@@ -28,6 +28,8 @@
 """
 import re
 
+from . import pii_mask
+
 EXCEPTION_TAG = "예외:"
 
 # (종류 키, 관리자 화면 이름) -- 순서가 곧 고객 문장을 바꿀 때의 우선순위다.
@@ -83,7 +85,7 @@ NOTE_TOO_LONG = ("글이 길어 앞부분과 끝부분을 합쳐 %s자만 읽었
                  " 빠진 내용이 있으면 용도와 예산부터 나눠서 말씀해 주세요.")
 # 2026-10-11 코덱스 예외 55개(1815) 36~55번 대응
 NOTE_PERSONAL = "카드번호·주민번호·비밀번호 같은 정보는 상담 창에 적지 않으셔도 돼요."
-NOTE_PERSONAL_MASKED = " 적어 주신 번호는 가려서 읽었어요."
+NOTE_PERSONAL_MASKED = " 적어 주신 번호·이메일은 가려서 읽었어요."
 NOTE_PRIVACY = ("다른 분의 연락처·주소·주문 내역 같은 개인정보는 알려 드릴 수 없어요."
                 " 문의는 아래 「사람 상담 남기기」로 남겨 주세요.")
 NOTE_ORDER_STATUS = ("주문·결제·환불 처리 상태는 제가 여기서 확인할 수 없어요."
@@ -124,9 +126,12 @@ _ABUSE = re.compile(
     r"꺼\s*져|닥\s*쳐|엿\s*먹|fuck|shit|bitch",
     re.I)
 # 민감 정보 -- 번호 자체(가려서 읽는다)와 그 이름을 꺼낸 말(안내 한 줄)을 따로 본다.
-_RRN = re.compile(r"(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)")
-_CARD = re.compile(r"(?<!\d)\d{4}(?:[\s-]?\d{4}){3}(?!\d)")
+# 번호 모양(주민·카드·전화·이메일·계좌)의 정규식은 `api/pii_mask.py` 하나에만 둔다
+# (2026-11-18 사장님 승인 · 개인정보처리방침 2026-11-23 -- 경로마다 범위가 달랐던 것을 합침).
 _PERSONAL_WORD = re.compile(r"주민\s*(등록)?\s*번호|카드\s*번호|계좌\s*비밀\s*번호|비밀\s*번호|cvc|cvv|보안\s*코드", re.I)
+# 옛 가림 표시. 2026-11-18 부터 가림은 `pii_mask` 의 이름표([주민번호]·[카드번호]·[전화번호]·
+# [이메일]·[계좌번호])로 바뀌었다 -- 남겨 두는 것은 예전 화면(mockups/mvp3/live-flow.js)이
+# 보낸 이력 문장에 이 표시가 섞여 올 수 있어서다(classify 가 그것도 가린 자리로 본다).
 MASK = "[가림]"
 # 남의 개인정보 -- 제3자(사장·직원·다른 고객 …) + 연락처·주소·주문 내역 + 알려/보여 달라는 말
 _PRIVACY_REQ = re.compile(
@@ -207,13 +212,13 @@ def foreign_language(text: str) -> str | None:
 
 
 def mask_personal(text: str) -> tuple[str, bool]:
-    """주민번호·카드번호 모양의 숫자를 가린다 -> (가린 문장, 가렸는가).
+    """주민번호·카드번호·전화번호·이메일·계좌번호를 가린다 -> (가린 문장, 가렸는가).
 
     AI 에게 보내기 전·문의 기록에 남기기 전에 부른다. 번호를 «읽지» 않아도 상담은 된다.
+    2026-11-18 사장님 승인(개인정보처리방침 2026-11-23): 예전에는 주민·카드만 가려 기본 상담이
+    전화·이메일을 AI 사업자에게 그대로 보냈다. 이제 정본 `pii_mask.mask` 를 부른다.
     """
-    t = text or ""
-    out = _CARD.sub(MASK, _RRN.sub(MASK, t))
-    return out, out != t
+    return pii_mask.mask(text)
 
 
 def _norm(t: str) -> str:
@@ -269,7 +274,7 @@ def classify(text: str, *, state=None, pc=None, stage: str | None = None,
         found.add("prompt_injection")
     if _HUMAN.search(t):
         found.add("human")
-    if masked or _PERSONAL_WORD.search(t) or MASK in t:
+    if masked or _PERSONAL_WORD.search(t) or MASK in t or pii_mask.has_label(t):
         found.add("personal_info")
     if _PRIVACY_REQ.search(t):
         found.add("privacy_request")

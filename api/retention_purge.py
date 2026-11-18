@@ -10,6 +10,18 @@
                       (+ contact_purged_at 에 지운 시각)              purge_at
     visitor_contact   mvp3_visitor_contacts.contact_name · phone · email (0158, 견적 보관 연락처)
                       (+ contact_purged_at 에 지운 시각)              purge_at
+    visitor_key       users.anon_key (방문자 식별값, + anon_key_purged_at)  last_used_at 뒤 1년(0179)
+    saved_quote       mvp3_saved_recommendations.owner_key_hash · request_basis = NULL,
+                      product_snapshot · talk_state = {} (+ purged_at)   last_used_at 뒤 1년(0179)
+
+visitor_key · saved_quote 는 2026-11-18 사장님 승인(개인정보처리방침 2026-11-23 「방문자 식별값·보관 견적은
+마지막 이용 뒤 1년에 파기」). 둘 다 행은 남긴다:
+  - users 는 상담·주문·클릭·견적이 FK 로 참조하는 방문자 행이다. anon_key 를 비우면 그 쿠키를 가진 브라우저와의
+    연결만 끊긴다(같은 쿠키로 다시 오면 `visitor.resolve` 가 «새» 방문자 행을 만든다 -- 옛 기록과 이어지지 않는다).
+    탈퇴하지 않은 회원에 붙은 방문자 행(members.user_id, withdrawn_at IS NULL)은 뺀다 -- 회원 기록의 출발점이다.
+  - 보관 견적은 owner_key_hash 를 비워 그 브라우저가 다시 찾지 못하게 하고 내용 열을 비운다. 회원에 붙은 견적
+    (member_id IS NOT NULL)은 뺀다 -- 탈퇴하면 연결이 끊기고(`customer_auth_issuer.withdraw` 가 last_used_at 을
+    그때로 잡는다) 그 뒤 1년이 지나면 여기서 비운다.
 
 운영자 메모(`memo`)는 고객이 쓴 글이 아니라 지우지 않는다. 다만 구매 상담 메모에 옮겨 적힌
 연락처는 기한이 지나면 가린다(inquiry_memo, `_mask_memos`).
@@ -40,6 +52,7 @@ SLOT_KST = 4                           # 매일 04:00 한국 시각
 TICK = 300                             # 몇 초마다 확인하나
 _KST = dt.timezone(dt.timedelta(hours=9))
 _LOCK = "retention_purge"
+IDLE_DAYS = 365                        # 방문자 식별값·보관 견적: 마지막 이용 뒤 1년(개인정보처리방침 2026-11-23)
 
 # (이름, 대상 조건, 지우는 SET) — 조건은 «아직 지울 값이 남은» 행만 고른다(두 번 세지 않는다).
 TARGETS = (
@@ -58,6 +71,16 @@ TARGETS = (
     ("visitor_contact",
      "mvp3_visitor_contacts WHERE purge_at <= :now AND contact_purged_at IS NULL",
      "contact_name = NULL, contact_phone = NULL, contact_email = NULL, contact_purged_at = :now"),
+    # 방문자 식별값(0179). 1년 동안 쓰지 않은 방문자의 쿠키 값만 비운다 -- 행·FK 는 남는다(머리말).
+    ("visitor_key",
+     "users WHERE anon_key IS NOT NULL AND last_used_at <= :idle_before"
+     " AND NOT EXISTS (SELECT 1 FROM members m WHERE m.user_id = users.user_id AND m.withdrawn_at IS NULL)",
+     "anon_key = NULL, anon_key_purged_at = :now"),
+    # 보관 견적(0179). 회원에 붙은 견적은 빼고, 비우지 않은 행만 고른다.
+    ("saved_quote",
+     "mvp3_saved_recommendations WHERE purged_at IS NULL AND member_id IS NULL AND last_used_at <= :idle_before",
+     "owner_key_hash = NULL, request_basis = NULL, product_snapshot = CAST('{}' AS JSONB),"
+     " talk_state = CAST('{}' AS JSONB), purged_at = :now"),
 )
 
 
@@ -84,7 +107,8 @@ def purge(moment="manual", *, apply=None, now=None, slot=None) -> dict:
         raise ValueError("moment")
     apply = apply_enabled() if apply is None else bool(apply)
     now = now or dt.datetime.now(dt.timezone.utc)
-    params = {"now": now, "now_naive": now.astimezone(dt.timezone.utc).replace(tzinfo=None)}
+    params = {"now": now, "now_naive": now.astimezone(dt.timezone.utc).replace(tzinfo=None),
+              "idle_before": now - dt.timedelta(days=IDLE_DAYS)}
     try:
         with engine.begin() as c:
             c.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": _LOCK})

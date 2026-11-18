@@ -197,10 +197,36 @@ from typing import Any, Callable
 from sqlalchemy import inspect as sa_inspect, text
 from sqlalchemy.exc import ProgrammingError
 
+from . import pii_mask
 from .db import engine
 from .timeutil import KST, iso, kst_day_range
 
 log = logging.getLogger("llm")
+
+
+# ── 고객 호출의 개인정보 가림 (2026-11-18 사장님 승인 · 개인정보처리방침 2026-11-23 시행) ──
+# 「AI 사업자로 보내기 전 주민·카드·전화번호·이메일(·계좌)을 가린다」를 호출부마다 맡기면 빠지는
+# 경로가 생긴다(실제로 기본 상담은 전화·이메일을 그대로 보냈다). 그래서 공급자 SDK 로 나가기 직전
+# 이 공통 층에서 한 번 더 가린다. 정규식은 `pii_mask` 하나뿐이고, 가림은 멱등이라 호출부가 먼저
+# 가렸어도 결과가 같다.
+#   대상   customer_facing=True 인 호출만 -- 고객 문장이 들어가는 호출은 전부 이 표시를 단다
+#          (talk s1_parse·answer·pc_advice·agent, pc_builder, configuration_consultation, s2_explain).
+#          관리자 작업(task.ops_assist 등 customer_facing=False)은 바꾸지 않는다 -- 운영자가 넣은
+#          자료를 가리면 결과가 달라진다.
+#   범위   prompt · system · 메시지의 user 문장 · raw 없는 assistant 문장(화면이 보낸 이력).
+#          tool 결과(서버가 만든 상품 자료)와 raw(이 서버가 받은 공급자 원형)는 고객 입력이 아니라 두지 않는다.
+def _mask_text(s):
+    return pii_mask.mask(s)[0] if isinstance(s, str) else s
+
+
+def _mask_messages(messages: list[dict]) -> list[dict]:
+    out = []
+    for m in messages:
+        role = m.get("role")
+        if role == "user" or (role == "assistant" and not m.get("raw")):
+            m = {**m, "text": _mask_text(m.get("text"))}
+        out.append(m)
+    return out
 
 
 # ============================================================================
@@ -1095,6 +1121,8 @@ def call(prompt: str, *, provider: str | None = None, task_key: str | None = Non
     """
     if not prompt or not prompt.strip():
         raise ValueError("prompt is empty")
+    if customer_facing:                      # 개인정보 가림 -- 위 `_mask_messages` 머리말
+        prompt, system = _mask_text(prompt), _mask_text(system)
 
     order, resolved_provider, resolved_model = _route(provider, task_key, model, fallback_order)
     return _try_in_order(order, lambda prov: _call_one(
@@ -1368,6 +1396,8 @@ def call_tools(messages: list[dict], tools: list[dict], *, task_key: str, system
     """
     if not messages:
         raise ValueError("messages is empty")
+    if customer_facing:                      # 개인정보 가림 -- 파일 머리 `_mask_messages`
+        messages, system = _mask_messages(messages), _mask_text(system)
     order, resolved_provider, resolved_model = _route(provider, task_key, model, fallback_order)
     order = [p for p in order if p in _TOOL_CALLERS] or order[:1]
     return _try_in_order(order, lambda prov: _call_one_tools(
