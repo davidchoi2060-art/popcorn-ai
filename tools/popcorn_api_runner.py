@@ -9,7 +9,7 @@
 live 는 운영 몰에 price GET 을 보낸다. 문서 예시 3개 상품만, 기록부 기준 누적 10회까지, 호출 간 1초 이상이다.
 직전 호출이 비정상이면 멈추고, 사유를 적은 --resume-reason 이 있을 때만 같은 기록부에 이어 간다.
 새 기록부는 --init-ledger 를 줘야 만든다. basket 은 사용자가 승인한 1회 시험(--api basket)만 있고 ok 인 price 직후에만 나간다.
-증거에는 허용 필드만 저장한다. 추가 필드 값과 응답 원문은 저장하지 않는다.
+증거에는 허용 필드(2026-11-17 부터 pd_no, name, price, status, max_qty)만 저장한다. 추가 필드 값과 응답 원문은 저장하지 않는다.
 비정상 응답 본문은 메모리에서만 분류하고 고정 종류와 글자 모양만 남긴다. 본문의 단어는 어떤 형태로도 남기지 않는다.
 """
 from __future__ import annotations
@@ -353,11 +353,15 @@ def run_live(call: str | None, ledger: str | None, out: str | None, *, resume_re
             return_code = 1
         else:
             entry.update(recording.meta)
-            entry.update(outcome="ok", missing=list(result.missing), dropped_field_count=result.dropped_field_count)
+            # 2026-11-17 응답 변경: not_found(쇼핑몰이 없다고 답함)와 missing(응답 어디에도 없음)을 나눠 적는다.
+            entry.update(outcome="ok", missing=list(result.missing), not_found=list(result.not_found),
+                         unrequested_count=result.unrequested_count, checked_at_format=result.checked_at_format,
+                         dropped_field_count=result.dropped_field_count)
             evidence.update(outcome="ok", transport=recording.meta, allowed_fields_raw=list(result.allowed_raw),
                             parsed=result.public())
-            print("live ok requested=%d missing=%d dropped_fields=%d observed=%s" % (
-                len(codes), len(result.missing), result.dropped_field_count, dict(result.observed)))
+            print("live ok requested=%d not_found=%d missing=%d unrequested=%d dropped_fields=%d observed=%s" % (
+                len(codes), len(result.not_found), len(result.missing), result.unrequested_count,
+                result.dropped_field_count, dict(result.observed)))
             return_code = 0
         _write_json(str(path), entries)
         _write_json(out, evidence)
@@ -447,7 +451,7 @@ def run_live_basket(call: str | None, ledger: str | None, out: str | None, *, ap
             return 3
         last = entries[-1] if entries else {}
         if not (last.get("api") == "price" and last.get("outcome") == "ok" and last.get("pd_nos") == list(codes)
-                and last.get("missing") == []):
+                and last.get("missing") == [] and not last.get("not_found")):   # 없는 상품이 하나도 없어야 한다
             print("blocked: basket runs only right after an ok price call for the same items", file=sys.stderr)
             return 3
         wait = 1.0 - (time.time() - last["epoch"])

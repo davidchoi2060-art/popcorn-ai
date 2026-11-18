@@ -31,7 +31,9 @@ if str(ROOT) not in sys.path:
 from api import mall_ai_api as M                                       # noqa: E402
 from api import mall_asus_cart as AC                                   # noqa: E402
 from api.mall_ai_api import MallApiError, TransportResponse as R       # noqa: E402
-from tests.popcorn_pc_fake_api import FakeMallApi, ScriptedTransport, json_response, product  # noqa: E402
+from tests.popcorn_pc_fake_api import (CHECKED_AT, CHECKED_AT_ISO, FakeMallApi, ScriptedTransport,  # noqa: E402
+                                       ip_denied_response, json_response, price_response, product,
+                                       too_many_response)
 
 CASE_IDS = (["P%02d" % i for i in range(1, 13)] + ["B%02d" % i for i in range(1, 13)]
             + ["A01", "A02", "A03", "S01", "S02"])
@@ -62,8 +64,14 @@ def tearDownModule():
     assert _net["attempts"] == 0, "소켓 연결 시도 %d회" % _net["attempts"]
 
 
-def ok_price(items):
-    return json_response({"result": "ok", "items": items})
+def ok_price(items, not_found=None, **extra):
+    """2026-11-17 새 price 봉투(checked_at, items, not_found). not_found 는 없으면 null 이다."""
+    return price_response(items, not_found, **extra)
+
+
+def price_body(inner):
+    """items 배열 안쪽을 글자 그대로 넣은 price 응답 바이트. JSON 숫자 표기를 그대로 시험할 때 쓴다."""
+    return ('{"checked_at":"%s","items":[%s],"not_found":null}' % (CHECKED_AT, inner)).encode("utf-8")
 
 
 def ok_basket(items, link=LINK):
@@ -86,7 +94,7 @@ class Base(unittest.TestCase):
 
 class Price(Base):
     def test_P01_single_item_utf8_and_amount(self):
-        t = ScriptedTransport(ok_price([product(124401, pd_name="한글 상품명", price=150000)]))
+        t = ScriptedTransport(ok_price([product(124401, name="한글 상품명", price=150000)]))
         result = M.fetch_prices([124401], transport=t)
         item = result.items["124401"]
         self.assertTrue(item.found)
@@ -98,8 +106,14 @@ class Price(Base):
         reply = ok_price([product(124409), product(124401)])
         result = M.fetch_prices(["124401", "124407", "124409"], transport=ScriptedTransport(reply))
         self.assertEqual(list(result.items), ["124401", "124407", "124409"])
-        self.assertEqual(result.missing, ("124407",))
+        self.assertEqual(result.missing, ("124407",))       # not_found 에도 없으면 missing 이다
+        self.assertEqual(result.not_found, ())
+        self.assertEqual(result.items["124407"].lookup, "missing")
         self.assertTrue(result.items["124409"].found)
+        reply = ok_price([product(124409), product(124401)], [124407])
+        result = M.fetch_prices(["124401", "124407", "124409"], transport=ScriptedTransport(reply))
+        self.assertEqual((result.missing, result.not_found), ((), ("124407",)))
+        self.assertEqual(result.items["124407"].lookup, "not_found")
 
     def test_P03_duplicates_removed_first_order_kept(self):
         fake = FakeMallApi([3, 1, 2])
@@ -132,6 +146,11 @@ class Price(Base):
         self.assertIsNone(item.price.usable)
         self.assertEqual(item.price.status, "missing")
         self.assertEqual(item.public()["price"], {"status": "missing", "value": None})
+        self.assertEqual((item.lookup, item.name, item.status_raw), ("missing", None, None))
+        declared = self.price(ok_price([], [999]), ("999",))
+        self.assertEqual((declared.missing, declared.not_found), ((), ("999",)))
+        self.assertFalse(declared.items["999"].found)
+        self.assertIsNone(declared.items["999"].price.usable)
 
     def test_P07_amount_classification(self):
         cases = [(None, "null", None), ("abc", "invalid", None), ("", "invalid", None), ("1,000", "invalid", None),
@@ -141,27 +160,43 @@ class Price(Base):
         for raw, status, usable in cases:
             amount = self.price(ok_price([product(1, price=raw)]), ("1",)).items["1"].price
             self.assertEqual((amount.status, amount.usable), (status, usable), repr(raw))
-        body = b'{"result":"ok","items":[{"pd_no":1,"price":0.1,"mileage":1e5,"pd_delivery_price":12345678901.10}]}'
-        item = self.price(R(200, body), ("1",)).items["1"]
-        self.assertEqual((item.price.status, item.price.value), ("non_integer", Decimal("0.1")))
-        self.assertEqual(item.mileage.status, "invalid")
-        self.assertEqual(item.delivery_price.value, Decimal("12345678901.10"))
-        self.assertIsNone(item.delivery_price.usable)
+        def raw_price(literal):
+            return self.price(R(200, price_body('{"pd_no":1,"price":%s}' % literal)), ("1",)).items["1"].price
+
+        small = raw_price("0.1")
+        self.assertEqual((small.status, small.value), ("non_integer", Decimal("0.1")))
+        self.assertEqual(raw_price("1e5").status, "invalid")
+        exact = raw_price("12345678901.10")
+        self.assertEqual(exact.value, Decimal("12345678901.10"))
+        self.assertIsNone(exact.usable)
         no_fields = self.price(ok_price([{"pd_no": 1}]), ("1",)).items["1"]
         self.assertEqual(no_fields.price.status, "missing")
-        self.assertEqual(no_fields.delivery_price.status, "missing")
+        self.assertEqual(no_fields.max_qty.status, "missing")
 
     def test_P08_malformed_bodies_fail_explicitly(self):
+        at = b'"checked_at":"2026-11-17 14:42:35"'
         cases = [(b"<html>x</html>", "html_response"), (b"  <!doctype html>", "html_response"), (b"", "empty_body"),
-                 (b"  \n", "empty_body"), (b"{bad", "bad_json"), (b'{"result":"ok","items":[NaN]}', "bad_json"),
-                 (b'{"result":"ok","result":"ok","items":[]}', "bad_json"), (b"[" * 200000, "bad_json"),
+                 (b"  \n", "empty_body"), (b"{bad", "bad_json"),
+                 (b"{" + at + b',"items":[NaN],"not_found":null}', "bad_json"),
+                 (b"{" + at + b',"items":[],"items":[],"not_found":null}', "bad_json"), (b"[" * 200000, "bad_json"),
                  (b"\xff\xfe", "bad_encoding"), ('{"a":"한"}'.encode("cp949"), "bad_encoding"),
-                 (b"[]", "bad_shape"), (b'{"result":"ok"}', "bad_shape"), (b'{"result":"ok","items":{}}', "bad_shape"),
-                 (b'{"result":"ok","items":[1]}', "bad_shape"), (b'{"result":"fail","items":[]}', "bad_result"),
-                 (b'{"items":[]}', "bad_result"), (b'{"result":"ok","error":"x","items":[]}', "bad_result"),
+                 (b"[]", "bad_shape"), (b"{" + at + b',"not_found":null}', "bad_shape"),
+                 (b"{" + at + b',"items":{},"not_found":null}', "bad_shape"),
+                 (b"{" + at + b',"items":null,"not_found":null}', "bad_shape"),
+                 (b"{" + at + b',"items":[1],"not_found":null}', "bad_shape"),
+                 (b"{" + at + b',"items":[]}', "bad_shape"),                       # not_found 키가 없다
+                 (b"{" + at + b',"items":[],"not_found":{}}', "bad_shape"),
+                 (b"{" + at + b',"items":[],"not_found":"1"}', "bad_shape"),
+                 (b"{" + at + b',"items":[],"not_found":[true]}', "bad_shape"),
+                 (b'{"items":[],"not_found":null}', "bad_checked_at"),
+                 (b'{"checked_at":null,"items":[],"not_found":null}', "bad_checked_at"),
+                 (b'{"checked_at":20261117,"items":[],"not_found":null}', "bad_checked_at"),
+                 (b'{"result":"ok","items":[]}', "bad_shape"),                     # 2026-11-17 이전의 옛 봉투
+                 (b'{"result":"fail","items":[]}', "bad_shape"),
+                 (b"{" + at + b',"error":"x","items":[],"not_found":null}', "api_error"),
                  (b'{"error":"anything"}', "api_error")]
         for body, code in cases:
-            self.assertEqual(self.code_of(self.price, R(200, body)), code, body[:40])
+            self.assertEqual(self.code_of(self.price, R(200, body)), code, body[:60])
 
     def test_P09_status_timeout_size_limited_and_not_retried(self):
         cases = [(R(301), "redirect"), (R(302), "redirect"), (R(204), "http_status"), (R(404), "http_4xx"),
@@ -177,40 +212,216 @@ class Price(Base):
     def test_P10_html_and_url_injection_neutralized(self):
         attack = ('<img src=x onerror=alert(1)><script>steal()</script>규격<b>A</b> &lt;script&gt;x&lt;/script&gt; '
                   '&amp;lt;svg onload=y&amp;gt; <a href="javascript:z">t</a> <img src=x')
-        result = self.price(ok_price([product(1, pd_spec=attack, pd_name=attack, made=attack)]), ("1",))
+        result = self.price(ok_price([product(1, name=attack, status=attack)]), ("1",))
         public = json.dumps(result.items["1"].public(), ensure_ascii=False)
         self.assertNotIn("<", public)
         self.assertNotIn("steal()", public)
-        self.assertIn("규격", result.items["1"].spec_text)
-        for bad in ["javascript:alert(1)", "data:image/png;base64,AA", "//evil.test/a.jpg", "http://popcornpc.co.kr/a.jpg",
-                    "https://evil.test/a.jpg", "https://popcornpc.co.kr@evil.test/a.jpg", "https://u:p@popcornpc.co.kr/a.jpg",
-                    "https://popcornpc.co.kr:8443/a.jpg", "https://popcornpc.co.kr/a.svg", "/../../etc/a.jpg", "/a%2e%2e/a.jpg",
-                    "\\\\evil\\a.jpg", "/a b.jpg", "/a.jpg?x=1", "https://popcornpc.co.kr/a.jpg#f", 5]:
-            item = self.price(ok_price([product(1, pd_image_basic=bad)]), ("1",)).items["1"]
-            self.assertEqual((item.image_status, item.image_url, item.image_path), ("rejected", None, None), repr(bad))
-        good = self.price(ok_price([product(1, pd_image_basic="https://www.popcornpc.co.kr/data/pimg/1/1_600.jpg")]), ("1",))
-        self.assertEqual(good.items["1"].image_status, "absolute")
-        relative = self.price(ok_price([product(1, pd_image_basic="data/1_600.jpg")]), ("1",)).items["1"]
-        self.assertEqual((relative.image_status, relative.image_url), ("relative", None))
+        self.assertIn("규격", result.items["1"].name)
+        self.assertEqual(result.items["1"].status, "unknown")       # 모르는 상태 값도 글자로만 남는다
+        self.assertLessEqual(len(result.items["1"].status_raw), M.INTERNAL_MAX_STATUS_TEXT)
+        # 2026-11-17 응답에는 이미지·제조사·규격 필드가 없다. 와도 공개 값에 들어가지 않는다.
+        extra = self.price(ok_price([product(1, pd_image_basic="javascript:alert(1)", pd_spec=attack, made=attack)]), ("1",))
+        public = json.dumps(extra.public(), ensure_ascii=False)
+        self.assertNotIn("javascript", public)
+        self.assertNotIn("onerror", public)
+        self.assertEqual(extra.dropped_field_count, 3)
 
-    def test_P11_unknown_fields_hidden_and_foreign_items_rejected(self):
+    def test_P11_unknown_fields_hidden_and_foreign_items_dropped(self):
         secret = "SUPPLIER-COST-777"
         result = self.price(ok_price([product(1, cost_price=secret, supplier=secret)]), ("1",))
         self.assertNotIn(secret, json.dumps(result.public(), ensure_ascii=False))
         self.assertNotIn(secret, json.dumps(result.allowed_raw, ensure_ascii=False))
         self.assertNotIn(secret, repr(result))
         self.assertEqual(result.dropped_field_count, 2)
-        self.assertEqual(self.code_of(self.price, ok_price([product(1), product(2)]), ("1",)), "unexpected_item")
+        # 요청하지 않은 번호는 버리고 개수만 남긴다(2026-11-17 지시). 값은 어디에도 남지 않는다.
+        mixed = self.price(ok_price([product(1), product(2, name=secret), product(3, name=secret)], [77]), ("1",))
+        self.assertEqual(list(mixed.items), ["1"])
+        self.assertEqual(mixed.unrequested_count, 3)
+        self.assertNotIn(secret, json.dumps(mixed.public(), ensure_ascii=False) + repr(mixed)
+                         + json.dumps(mixed.allowed_raw, ensure_ascii=False))
         self.assertEqual(self.code_of(self.price, ok_price([product(1), product(1)]), ("1",)), "duplicate_item")
+        self.assertEqual(self.code_of(self.price, ok_price([product(1)], [1]), ("1",)), "inconsistent_response")
 
-    def test_P12_stock_currency_tax_never_inferred(self):
+    def test_P12_status_is_the_malls_value_and_stock_currency_tax_never_inferred(self):
         item = self.price(ok_price([product(1)]), ("1",)).items["1"]
-        self.assertEqual(item.sale_state, "unknown")
-        self.assertIsNone(item.currency)
+        self.assertEqual((item.status, item.status_raw), ("sold_out", "sold_out"))     # 쇼핑몰 값 그대로
+        self.assertNotIn("currency", item.public())
+        self.assertNotIn("sale_state", item.public())
         seen = self.price(ok_price([product(1, stock_qty=5, currency="KRW", vat=1)]), ("1",))
         self.assertEqual(dict(seen.observed), {"stock_like": True, "currency_like": True, "tax_like": True})
-        self.assertEqual(seen.items["1"].sale_state, "unknown")
+        self.assertEqual(seen.items["1"].status, "sold_out")        # 재고 유사 필드로 상태를 바꾸지 않는다
         self.assertNotIn("stock_qty", json.dumps(seen.public()))
+        self.assertEqual(dict(self.price(ok_price([product(1)]), ("1",)).observed),
+                         {"stock_like": False, "currency_like": False, "tax_like": False})
+
+
+class PriceResponse20261117(Base):
+    """2026-11-17 실측한 새 price 응답. 케이스 ID(P01~S02) 밖의 추가 시험이다. 값은 전부 합성이다."""
+
+    def one(self, **overrides):
+        return self.price(ok_price([product(1, **overrides)]), ("1",)).items["1"]
+
+    def test_not_found_null_means_none_were_declared(self):
+        reply = R(200, ('{"checked_at":"%s","items":[{"pd_no":1,"name":"n","price":10,"status":"sold_out",'
+                        '"max_qty":null}],"not_found":null}' % CHECKED_AT).encode("utf-8"), "application/json")
+        result = self.price(reply, ("1", "2"))
+        self.assertEqual((result.not_found, result.missing), ((), ("2",)))
+        self.assertEqual(result.public()["not_found"], [])
+
+    def test_not_found_array_of_integers_or_numeric_strings(self):
+        result = self.price(ok_price([product(1)], [999999999, "5", 999999999]), ("5", "1", "999999999", "7"))
+        self.assertEqual(result.not_found, ("5", "999999999"))      # 요청 순서, 중복 없음
+        self.assertEqual(result.missing, ("7",))
+        self.assertEqual([result.items[c].lookup for c in result.requested], ["not_found", "found", "not_found", "missing"])
+        self.assertEqual(self.price(ok_price([], []), ("1",)).not_found, ())    # 빈 배열도 받는다
+
+    def test_not_found_echoing_a_non_numeric_value_is_dropped_not_fatal(self):
+        # 2026-11-17 재실측: pd_no=abc 에 {"items":[],"not_found":["abc"]} 가 온다.
+        result = self.price(ok_price([product(1)], ["abc", "", "x y", "2"]), ("1", "2", "3"))
+        self.assertEqual((result.not_found, result.missing), (("2",), ("3",)))
+        self.assertEqual(result.unrequested_count, 3)
+        self.assertEqual(result.items["1"].lookup, "found")
+
+    def test_403_json_error_is_ip_rejected_and_old_form_still_is(self):
+        with self.assertRaises(MallApiError) as caught:
+            self.price(ip_denied_response())
+        self.assertEqual((caught.exception.code, caught.exception.http_status), ("ip_rejected", 403))
+        self.assertNotIn("IP", str(caught.exception.detail))
+        old_403 = R(403, b" 203.0.113.77 IP ERROR!", "text/html")
+        old_200 = R(200, b" 203.0.113.77 IP ERROR!", "text/html")
+        for reply in (old_403, old_200):
+            self.assertEqual(self.code_of(self.price, reply), "ip_rejected")
+        for reply in (R(403), R(403, b"Forbidden", "text/html"), R(403, b'{"message":"x"}'), R(403, b'{"error":1}'),
+                      R(403, b"\xff\xfe")):
+            self.assertEqual(self.code_of(self.price, reply), "http_4xx")
+
+    def test_400_json_error_is_a_request_error_and_over_50_has_its_own_code(self):
+        with self.assertRaises(MallApiError) as caught:
+            self.price(too_many_response())
+        self.assertEqual((caught.exception.code, caught.exception.http_status), ("mall_too_many_items", 400))
+        other = json_response({"error": "SECRET-WORDS"}, status=400)
+        with self.assertRaises(MallApiError) as caught:
+            self.price(other)
+        self.assertEqual(caught.exception.code, "mall_request_rejected")
+        self.assertNotIn("SECRET", repr(caught.exception) + str(caught.exception.detail))
+        self.assertEqual(self.code_of(self.price, R(400)), "http_4xx")
+        self.assertEqual(self.code_of(self.price, R(400, b"<html>bad</html>")), "http_4xx")
+        # 그 밖의 상태는 본문이 JSON error 여도 기존 분류 그대로다
+        for status, code in ((401, "http_4xx"), (404, "http_4xx"), (429, "rate_limited"), (500, "http_5xx")):
+            self.assertEqual(self.code_of(self.price, json_response({"error": "x"}, status=status)), code)
+
+    def test_basket_error_statuses_are_unchanged(self):
+        for reply in (ip_denied_response(), too_many_response()):
+            with self.assertRaises(MallApiError) as caught:
+                self.basket(reply)
+            self.assertEqual((caught.exception.code, caught.exception.outcome_unknown), ("http_4xx", True))
+
+    def test_name_html_removed_and_promotion_text_kept(self):
+        raw = '<font color=red><b>[특가]</b></font> 합성 쿨러 <span style="color:#00f">회원가 추가할인</span>&nbsp;120mm'
+        item = self.one(name=raw)
+        self.assertEqual(item.name, "[특가] 합성 쿨러 회원가 추가할인 120mm")
+        self.assertIsNone(self.one(name=None).name)
+        self.assertIsNone(self.one(name="<b></b>").name)
+        self.assertIsNone(self.one(name=5).name)
+
+    def test_price_zero_is_zero_not_ok(self):
+        item = self.one(price=0)
+        self.assertEqual((item.price.status, item.price.value, item.price.usable), ("zero", Decimal(0), None))
+        self.assertTrue(item.found)
+        self.assertEqual(item.public()["price"], {"status": "zero", "value": "0"})
+
+    def test_status_known_values_and_unknown_keep_the_original(self):
+        self.assertEqual((self.one(status="on_sale").status, self.one(status="on_sale").status_raw), ("on_sale", "on_sale"))
+        self.assertEqual(self.one(status="sold_out").status, "sold_out")
+        for raw in ("paused", "SOLD_OUT", "on_sale ", "", "판매중지"):
+            item = self.one(status=raw)
+            self.assertEqual(item.status, "unknown", repr(raw))
+            self.assertEqual(item.status_raw, raw.strip() or None, repr(raw))
+        for raw in (None, 1, True, ["on_sale"]):
+            item = self.one(status=raw)
+            self.assertEqual((item.status, item.status_raw), ("unknown", None), repr(raw))
+        missing = self.price(ok_price([{"pd_no": 1, "name": "n", "price": 1}]), ("1",)).items["1"]
+        self.assertEqual((missing.status, missing.status_raw), ("unknown", None))
+
+    def test_max_qty_null_integer_and_invalid(self):
+        self.assertEqual(self.one(max_qty=None).max_qty.public(), {"status": "none", "value": None})
+        self.assertEqual(self.one(max_qty=3).max_qty.public(), {"status": "ok", "value": 3})
+        for raw in (0, -1, True, False, "3", "", [3], {"n": 3}, 10 ** 10):
+            self.assertEqual(self.one(max_qty=raw).max_qty.public(), {"status": "invalid", "value": None}, repr(raw))
+        fraction = self.price(R(200, price_body('{"pd_no":1,"max_qty":2.0}')), ("1",)).items["1"]
+        self.assertEqual(fraction.max_qty.status, "invalid")
+        self.assertTrue(self.one(max_qty="x").found)        # 잘못된 max_qty 가 항목 전체를 버리지 않는다
+
+    def test_checked_at_accepts_measured_and_documented_forms(self):
+        measured = self.price(ok_price([product(1)], checked_at=CHECKED_AT), ("1",))
+        self.assertEqual((measured.checked_at, measured.checked_at_format), (CHECKED_AT, "local"))
+        documented = self.price(ok_price([product(1)], checked_at=CHECKED_AT_ISO), ("1",))
+        self.assertEqual((documented.checked_at, documented.checked_at_format), (CHECKED_AT_ISO, "iso_offset"))
+        self.assertEqual(M.classify_checked_at("2026-11-17T05:42:35Z"), "iso_offset")
+        for bad in ("", "2026-11-17", "2026-13-40 14:42:35", "2026-11-17 25:00:00", "2026-11-17T14:42:35",
+                    "17/11/2026 14:42:35", " 2026-11-17 14:42:35", "<b>2026-11-17 14:42:35</b>", None, 1763358155):
+            self.assertEqual(self.code_of(self.price, ok_price([product(1)], checked_at=bad), ("1",)), "bad_checked_at", repr(bad))
+
+    def test_pd_no_integer_or_numeric_string(self):
+        result = self.price(ok_price([product(124401), product("124407")]), ("124401", "124407"))
+        self.assertEqual(result.missing, ())
+        self.assertEqual([i["pd_no"] for i in result.public()["items"]], ["124401", "124407"])
+        for bad in (None, True, "", "0", "01", "1 ", -1, 0, [1], "abc"):
+            self.assertEqual(self.code_of(self.price, ok_price([product(bad)]), ("1",)), "bad_shape", repr(bad))
+        self.assertEqual(self.code_of(self.price, R(200, price_body('{"pd_no":1.0}')), ("1",)), "bad_shape")
+
+    def test_unrequested_numbers_are_dropped_and_counted(self):
+        result = self.price(ok_price([product(9), product(1), product(8), product(8)], [7, 6]), ("1", "2"))
+        self.assertEqual(list(result.items), ["1", "2"])
+        self.assertEqual((result.unrequested_count, result.missing, result.not_found), (5, ("2",), ()))
+        self.assertEqual(len(result.allowed_raw), 1)
+
+    def test_items_not_an_array_fails_with_a_clear_code(self):
+        for inner in ("null", "{}", '"x"', "0", "false"):
+            body = ('{"checked_at":"%s","items":%s,"not_found":null}' % (CHECKED_AT, inner)).encode()
+            with self.assertRaises(MallApiError) as caught:
+                self.price(R(200, body))
+            self.assertEqual((caught.exception.code, caught.exception.detail), ("bad_shape", "items"), inner)
+
+    def test_log_holds_counts_and_codes_only(self):
+        records = []
+        handler = logging.Handler()
+        handler.emit = lambda record: records.append(record.getMessage())
+        M.log.addHandler(handler)
+        M.log.setLevel(logging.DEBUG)
+        self.addCleanup(M.log.removeHandler, handler)
+        self.price(ok_price([product(1, name="LEAKNAME", price=987654), product(3)], [2]), ("1", "2"))
+        with self.assertRaises(MallApiError):
+            self.price(ip_denied_response())
+        text = "\n".join(records)
+        self.assertIn("price ok requested=2 not_found=1 missing=0 unrequested=1", text)
+        self.assertIn("price failed code=ip_rejected", text)
+        self.assertTrue(text.isascii())
+        for leak in ("LEAKNAME", "987654", CHECKED_AT):
+            self.assertNotIn(leak, text)
+
+    def test_fake_server_behaves_like_the_measured_one(self):
+        fake = FakeMallApi([1, 2])
+        url = M.API_URL + "?api_id=price&pd_no="
+        both = json.loads(fake.get(url + "1,2", timeout=1, max_bytes=1).body)
+        self.assertEqual(sorted(both), ["checked_at", "items", "not_found"])
+        self.assertIsNone(both["not_found"])
+        self.assertEqual(sorted(both["items"][0]), ["max_qty", "name", "pd_no", "price", "status"])
+        self.assertEqual(json.loads(fake.get(url + "1,9", timeout=1, max_bytes=1).body)["not_found"], [9])
+        junk = json.loads(fake.get(url + "abc", timeout=1, max_bytes=1).body)
+        self.assertEqual((junk["items"], junk["not_found"]), ([], None))
+        over = fake.get(url + ",".join(str(n) for n in range(1, 52)), timeout=1, max_bytes=1)
+        self.assertEqual((over.status, json.loads(over.body)), (400, {"error": M.PRICE_TOO_MANY_ERROR}))
+        result = M.fetch_prices([1, 9], transport=fake)
+        self.assertEqual((result.not_found, result.missing), (("9",), ()))
+
+    def test_removed_fields_are_gone(self):
+        for name in ("INTERNAL_PRICE_FIELDS", "classify_image", "INTERNAL_MAX_SPEC_TEXT"):
+            self.assertFalse(hasattr(M, name), name)
+        self.assertEqual(sorted(M.PriceItem(pd_no="1", found=False).public()),
+                         ["found", "lookup", "max_qty", "name", "pd_no", "price", "status", "status_raw"])
+        with self.assertRaises(TypeError):
+            M.fetch_prices(["1"], internal_fields=())
 
 
 class Basket(Base):
@@ -581,6 +792,29 @@ class LiveTransportLocal(Base):
                 M.LivePriceTransport(opener=self.Opener(raiser(exc))).get(self.URL, timeout=1, max_bytes=10)
         self.assertEqual(self.code_of(M.LivePriceTransport(opener=self.Opener(raiser(OSError("x")))).get, self.URL, timeout=1, max_bytes=10), "network")
 
+    def test_error_body_is_read_only_for_400_and_403(self):
+        def raiser(status, body, headers=None):
+            def inner():
+                raise urllib.error.HTTPError(self.URL, status, "x", headers or {"Content-Type": "application/json; charset=utf-8"},
+                                             io.BytesIO(body))
+            return inner
+
+        denied = json.dumps({"error": "허용되지 않은 IP"}, ensure_ascii=False).encode("utf-8")
+        reply = M.LivePriceTransport(opener=self.Opener(raiser(403, denied))).get(self.URL, timeout=1, max_bytes=1000)
+        self.assertEqual((reply.status, reply.body, reply.content_type), (403, denied, "application/json"))
+        live = M.LivePriceTransport(opener=self.Opener(raiser(403, denied)))
+        self.assertEqual(self.code_of(M.fetch_prices, ["124401"], transport=live), "ip_rejected")
+        over = json.dumps({"error": M.PRICE_TOO_MANY_ERROR}, ensure_ascii=False).encode("utf-8")
+        live = M.LivePriceTransport(opener=self.Opener(raiser(400, over)))
+        self.assertEqual(self.code_of(M.fetch_prices, ["124401"], transport=live), "mall_too_many_items")
+        for status in (401, 404, 500, 503):
+            reply = M.LivePriceTransport(opener=self.Opener(raiser(status, b"secret"))).get(self.URL, timeout=1, max_bytes=1000)
+            self.assertEqual((reply.status, reply.body), (status, b""))
+        # 오류 본문이 상한을 넘으면 읽은 것을 버리고 상태코드 분류만 남긴다
+        live = M.LivePriceTransport(opener=self.Opener(raiser(403, b"x" * 50)))
+        reply = live.get(self.URL, timeout=1, max_bytes=10)
+        self.assertEqual((reply.status, reply.body), (403, b""))
+
     def test_size_and_total_deadline(self):
         big = self.Opener(lambda: self.Resp([b"a" * 6, b"b" * 6]))
         with self.assertRaises(M.TransportTooLarge):
@@ -645,6 +879,13 @@ class LiveRunnerLocal(unittest.TestCase):
         self.assertEqual(code, 0)
         text = Path(self.out).read_text(encoding="utf-8")
         self.assertNotIn("SECRET", text)
+        evidence = self.read(self.out)
+        self.assertEqual(sorted(evidence["allowed_fields_raw"][0]), ["max_qty", "name", "pd_no", "price", "status"])
+        self.assertEqual(evidence["parsed"]["checked_at"], CHECKED_AT)
+        self.assertEqual(evidence["parsed"]["items"][0]["status_raw"], "sold_out")
+        entry = self.read(self.ledger)[0]
+        self.assertEqual((entry["missing"], entry["not_found"], entry["unrequested_count"], entry["dropped_field_count"]),
+                         ([], [], 0, 2))
         self.assertEqual(self.read(self.out)["real_basket"], "not_run")
         self.assertEqual(self.read(self.ledger)[0]["outcome"], "ok")
         self.assertEqual(made[0].url, M.build_price_url(("124401",)))
@@ -718,6 +959,15 @@ class LiveRunnerLocal(unittest.TestCase):
         self.assertEqual(code, 3)
         self.assertEqual(len(self.read(self.ledger)), 1)
         self.assertFalse(list(Path(self.dir.name).rglob("key*.txt")))
+
+    def test_basket_blocked_when_price_reported_a_number_as_not_found(self):
+        # 2026-11-17: 쇼핑몰이 not_found 로 답한 번호는 missing 과 따로 적힌다. 그래도 basket 은 막혀야 한다.
+        self.assertEqual(self.run_live(ok_price([], [124401]))[0], 0)
+        entry = self.read(self.ledger)[0]
+        self.assertEqual((entry["missing"], entry["not_found"]), ([], ["124401"]))
+        code, made, _ = self.run_basket(self.basket_reply)
+        self.assertEqual((code, made), (3, []))
+        self.assertEqual(len(self.read(self.ledger)), 1)
 
     def test_basket_failure_records_shape_without_values_and_is_not_retried(self):
         self.assertEqual(self.run_live(ok_price([product(124401)]))[0], 0)
