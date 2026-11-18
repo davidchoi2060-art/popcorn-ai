@@ -398,24 +398,27 @@ def basket_shape(body, key: str) -> dict:
         return {"json": False}
     if not isinstance(document, dict):
         return {"json": True, "top_type": type(document).__name__}
+    # 2026-11-18 v3 봉투(cart_url, added, skipped, total). 옛 키(result, link, items)가 오면 그 사실도 적는다.
     shape = {"json": True, "top_keys": _names(document), "other_top_key_count": len(document) - len(_names(document)),
-             "result_type": type(document.get("result")).__name__, "result_is_ok": document.get("result") == "ok",
-             "has_error": "error" in document}
-    link = document.get("link")
-    shape["link"] = {"type": type(link).__name__}
+             "has_error": "error" in document, "has_legacy_keys": bool({"result", "link", "items"} & set(document)),
+             "total_type": type(document.get("total")).__name__}
+    link = document.get("cart_url")
+    shape["cart_url"] = {"type": type(link).__name__}
     if isinstance(link, str):
         expected = M.expected_link(key)
-        shape["link"].update(equals_expected=link == expected, starts_with_origin=link.startswith(M.ORIGIN + "/"),
-                             has_basket_path=M.BASKET_LINK_PATH in link, has_key=key in link,
-                             length_delta=len(link) - len(expected))
-    items = document.get("items")
-    shape["items"] = {"type": type(items).__name__}
-    if isinstance(items, list):
-        rows = [i for i in items if isinstance(i, dict)]
-        shape["items"].update(count=len(items), dict_count=len(rows),
-                              keys=sorted({k for r in rows for k in _names(r)}),
-                              pd_no_types=sorted({type(r.get("pd_no")).__name__ for r in rows}),
-                              qty_types=sorted({type(r.get("qty")).__name__ for r in rows}))
+        shape["cart_url"].update(equals_expected=link == expected, starts_with_origin=link.startswith(M.ORIGIN + "/"),
+                                 has_basket_path=M.BASKET_LINK_PATH in link, has_key=key in link,
+                                 length_delta=len(link) - len(expected))
+    for name in ("added", "skipped"):
+        items = document.get(name)
+        shape[name] = {"type": type(items).__name__}
+        if isinstance(items, list):
+            rows = [i for i in items if isinstance(i, dict)]
+            shape[name].update(count=len(items), dict_count=len(rows),
+                               keys=sorted({k for r in rows for k in _names(r)}),
+                               pd_no_types=sorted({type(r.get("pd_no")).__name__ for r in rows}),
+                               qty_types=sorted({type(r.get("qty")).__name__ for r in rows}),
+                               scalar_types=sorted({type(i).__name__ for i in items if not isinstance(i, dict)}))
     return shape
 
 

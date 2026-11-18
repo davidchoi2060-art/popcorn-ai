@@ -1,7 +1,9 @@
 /* ASUS 기획전 장바구니 버튼. 완제품 3종을 각 1대 담는 자리다(2026-11-06 사용자 확정).
  * 판매처 연결 전 기본 상태: 버튼 비활성 + 준비 중 안내. 네트워크 쓰기 · 이동 · 브라우저 저장을 하지 않는다.
  * 연결 지점은 setAdapter 하나다. 계약 = docs/asus-ai-pc-v4/CART-ADAPTER.md(내부 제안, 실제 API 명세 아님).
- * 이 파일은 모델 id 와 수량만 넘긴다. 부품 번호와 기획 검토가는 완제품 담기 값이 아니므로 받지도 넘기지도 않는다. */
+ * 이 파일은 모델 id 와 수량만 넘긴다. 부품 번호와 기획 검토가는 완제품 담기 값이 아니므로 받지도 넘기지도 않는다.
+ * 2026-11-18: adapter 에 available(id)·newWindow 가 더해졌다. available 이 false 인 모델은 준비 중과 같이 비활성이고,
+ * newWindow 면 성공 시 현재 화면을 떠나지 않고 새 창(noopener)으로 열며 adapter 가 준 안내 문구를 보인다. */
 (function () {
   'use strict';
   var P = window.PAI, A = P.asus, h = P.h;
@@ -11,21 +13,38 @@
   var PENDING = '담는 중';
   var NOT_READY = '장바구니 준비 중입니다.';
   var FAILED = '장바구니에 담지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  var DONE = '장바구니에 담았습니다.';
+  var OPEN_CART = '장바구니 열기';
 
   var adapter = null;
   var generation = 0;   // setAdapter 마다 증가한다. 앞선 연결의 늦은 응답을 버리는 기준이다.
   var pending = {};
   var failed = {};
+  var done = {};        // 새 창 방식에서 담기가 끝난 모델: { text, url }. 안내 문구와 다시 열 수 있는 링크를 그린다.
+
+  function offline(id) {
+    return !adapter || (adapter.available ? !adapter.available(id) : false);
+  }
 
   function paint(box) {
     var id = box.getAttribute('data-az-cart');
     var button = box.querySelector('button');
     var note = box.querySelector('[data-az-cart-note]');
     var busy = !!pending[id];
-    button.disabled = !adapter || busy;
+    var off = offline(id);
+    button.disabled = off || busy;
     button.textContent = busy ? PENDING : LABEL;
     button.setAttribute('aria-busy', String(busy));
-    note.textContent = !adapter ? NOT_READY : failed[id] ? FAILED : '';
+    note.textContent = off ? NOT_READY : failed[id] ? FAILED : done[id] ? done[id].text : '';
+    if (!off && !failed[id] && done[id]) {
+      var link = document.createElement('a');
+      link.href = done[id].url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = OPEN_CART;
+      note.appendChild(document.createTextNode(' '));
+      note.appendChild(link);
+    }
     note.hidden = !note.textContent;
   }
 
@@ -52,14 +71,24 @@
     } catch (e) { return false; }
   }
 
+  // 새 창 방식의 성공. 현재 화면은 그대로 두고 안내 문구를 보이며 판매처 장바구니를 새 창(noopener)으로 연다.
+  function opened(id, result) {
+    done[id] = { text: result.notice || DONE, url: result.url };
+    refresh();
+    var popup = window.open(result.url, '_blank', 'noopener');
+    if (popup) popup.opener = null;
+  }
+
   function add(id) {
     if (!adapter) return Promise.resolve({ ok: false, code: 'not_connected' });
     if (!A.known(id)) return Promise.resolve({ ok: false, code: 'unknown_model' });
+    if (offline(id)) return Promise.resolve({ ok: false, code: 'unavailable' });
     if (pending[id]) return Promise.resolve({ ok: false, code: 'busy' });
     var mine = adapter;
     var issued = generation;
     pending[id] = true;
     failed[id] = false;
+    done[id] = null;
     refresh();
     var timer;
     var timeout = new Promise(function (resolve) { timer = setTimeout(function () { resolve({ ok: false, code: 'timeout' }); }, TIMEOUT_MS); });
@@ -67,13 +96,14 @@
     try { call = Promise.resolve(mine.add({ modelId: id, quantity: QUANTITY })); } catch (e) { call = Promise.reject(e); }
     return Promise.race([call, timeout]).then(function (r) {
       var url = r && r.ok === true ? allowedUrl(r.url, mine.origins) : null;
-      return url ? { ok: true, url: url } : { ok: false, code: r && r.code || 'bad_result' };
+      return url ? { ok: true, url: url, notice: r && typeof r.notice === 'string' ? r.notice : '' } : { ok: false, code: r && r.code || 'bad_result' };
     }, function () { return { ok: false, code: 'failed' }; }).then(function (result) {
       clearTimeout(timer);
       // 응답 전에 연결이 바뀌거나 해제됐다. 지금 상태를 건드리지 않고 이동도 하지 않는다.
       if (issued !== generation) return { ok: false, code: 'stale' };
       pending[id] = false;
       failed[id] = !result.ok;
+      if (result.ok && mine.newWindow) { opened(id, result); return result; }
       refresh();
       if (result.ok) window.location.assign(result.url);
       return result;
@@ -81,12 +111,15 @@
   }
 
   // 판매처 연결 코드만 부른다. origins = 담은 뒤 이동해도 되는 정규 https 출처 목록.
+  // available(id) 가 있으면 false 인 모델은 비활성(준비 중)이다. newWindow 가 true 면 성공 시 새 창으로 연다.
   function setAdapter(next) {
     if (next !== null && !(next && typeof next.add === 'function' && Array.isArray(next.origins) && next.origins.length && next.origins.every(isHttpsOrigin))) throw new Error('adapter');
+    if (next && next.available != null && typeof next.available !== 'function') throw new Error('adapter');
     generation += 1;
-    adapter = next && { add: next.add, origins: next.origins.slice() };
+    adapter = next && { add: next.add, origins: next.origins.slice(), available: next.available || null, newWindow: next.newWindow === true };
     pending = {};
     failed = {};
+    done = {};
     refresh();
   }
 

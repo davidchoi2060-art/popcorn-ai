@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 """팝콘PC AI API 메모리 가짜. 소켓을 열지 않는다.
 
-price 는 2026-11-17 실측한 새 응답을 흉내 낸다(checked_at, items, not_found). basket 은 가이드 문서 그대로다.
+price 는 2026-11-17 실측한 새 응답을 흉내 낸다(checked_at, items, not_found). basket 은 v3 명세 모양
+{cart_url, added, skipped, total} 이다(윈윈 답변 2026-11-17 - 실측 예시는 11-21 예정이라 항목 모양은 가정이다).
 값은 전부 합성이다.
 """
 import json
@@ -34,6 +35,17 @@ def price_response(items, not_found=None, checked_at=CHECKED_AT, **extra):
     return json_response(document)
 
 
+_EXPECTED_LINK = object()
+
+
+def basket_response(key, added, skipped=(), total=None, link=_EXPECTED_LINK, **extra):
+    """v3 basket 봉투. total 은 added 줄 수가 기본이다(뜻은 11-21 실측 뒤 확정). link 는 None 도 그대로 넣는다."""
+    document = {"cart_url": "%s%s?api_key=%s" % (ORIGIN, BASKET_LINK_PATH, key) if link is _EXPECTED_LINK else link,
+                "added": list(added), "skipped": list(skipped), "total": len(added) if total is None else total}
+    document.update(extra)
+    return json_response(document)
+
+
 def ip_denied_response():
     return json_response({"error": IP_DENIED_ERROR}, status=403)
 
@@ -47,8 +59,9 @@ class FakeMallApi:
 
     basket_write_allowed = True
 
-    def __init__(self, catalog=()):
+    def __init__(self, catalog=(), skip=()):
         self.catalog = {int(c): product(int(c)) for c in catalog}
+        self.skip = {int(c) for c in skip}       # basket 이 skipped 로 답할 번호(합성)
         self.baskets = {}
         self.calls = []
         self.before_reply = None    # 응답 직전 훅(동시성 시험용)
@@ -80,13 +93,15 @@ class FakeMallApi:
         key = query["api_key"]
         if len(key) != 20:
             return json_response({"error": DOC_KEY_LENGTH_ERROR})
-        items = []
+        added, skipped = [], []
         for chunk in query["pd_no"].split(","):
             code, _, qty = chunk.partition(":")
-            items.append({"pd_no": int(code), "qty": int(qty or 1)})
-        self.baskets[key] = items
-        return json_response({"result": "ok", "link": "%s%s?api_key=%s" % (ORIGIN, BASKET_LINK_PATH, key),
-                              "items": items})
+            if int(code) in self.skip:
+                skipped.append({"pd_no": int(code), "reason": "sold_out"})
+            else:
+                added.append({"pd_no": int(code), "qty": int(qty or 1)})
+        self.baskets[key] = added
+        return basket_response(key, added, skipped)
 
     def basket_calls(self):
         return [u for u in self.calls if "api_id=basket" in u]

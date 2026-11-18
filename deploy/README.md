@@ -1006,6 +1006,21 @@ DB 기록(자산·승인 스냅샷)의 버킷 이름은 **논리 이름 그대�
 (2026-11-17 사장님 결정으로 받아들임). 새 등록은 실제 버킷에 올리고 자산에 `storage_bucket` 을
 함께 적으므로 증명 없이 된다. 화면의 이미지·영상 조회는 영향이 없다.
 
+### ASUS 기획전 장바구니 담기 — `api/mall_asus_cart_api.py` (2026-11-18 · 2026-11-23 오픈 포함)
+
+팝콘PC 쇼핑몰(윈윈) AI API 의 basket 호출로 완제품 3종을 담는다. **전부 없으면 경로가 404 라 화면은 연결 전과 같다.**
+값·상품번호는 여기 적지 않는다. 켜는 순서·끄는 법·키 규칙은 `docs/asus-ai-pc-v4/CART-ADAPTER.md` 「2026-11-18 서버 연결」.
+
+| 변수 | 뜻 |
+|---|---|
+| `MALL_ASUS_CART_ENABLED` | `1` 이면 `/api/customer/asus-cart/status`·`/add` 가 열린다. 없으면 둘 다 404 |
+| `MALL_ASUS_CART_SKUS` | `business=<번호>,video=<번호>,local-ai=<번호>` — 완제품 3종의 쇼핑몰 상품번호(쇼핑몰 등록 뒤 받는다). 구성 부품 번호를 넣으면 설정 오류로 기능 전체가 꺼진다 |
+| `MALL_ASUS_CART_MODELS_ON` | 팔 모델 id 목록(`business,video`). 없으면 전부 비활성. 판매 상태는 이 설정이 정한다(윈윈 `status` 는 참고값) |
+| `MALL_ASUS_CART_KEY_SALT` | 장바구니 키(방문자+모델 → 영숫자 20자) 도출에 섞는 서버 비밀, 16자 이상. 없으면 기능이 꺼진다. 바꾸면 기존 키가 전부 바뀐다 |
+| `MALL_BASKET_WRITE_ENABLED` | `1` 이어야 실제 basket 쓰기 transport(`api/mall_ai_api.LiveBasketTransport`)를 만들 수 있다. 없으면 담기가 네트워크 전에 실패한다(가격 조회만 나간다) |
+
+윈윈 API 는 허용된 IP 에서만 답한다 — 운영 서버 IP 가 윈윈 허용 목록에 있어야 한다(403 `ip_rejected` 면 여기부터 본다).
+
 ### 운영에 코드를 올릴 때
 
 운영 서버의 작업 폴더는 git 저장소가 아니다(파일 사본). 올릴 때는 **바뀐 파일만** 복사하고,

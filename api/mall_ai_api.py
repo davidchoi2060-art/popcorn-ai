@@ -5,8 +5,9 @@
 
   price    읽기. 실제 호출은 LivePriceTransport 로만 나간다.
   basket   api_id=basket 는 GET 이어도 실제 쓰기이고 같은 키의 기존 목록을 지우고 교체한다.
-           실제 서버로 나가는 transport 는 이 저장소에 없다. basket_write_allowed 가 True 인
-           가짜 transport 에서만 동작한다. 샌드박스 확인 전 이 값을 켠 transport 를 만들지 않는다.
+           실제 서버로 나가는 transport 는 LiveBasketTransport 하나다(2026-11-18). 환경변수
+           MALL_BASKET_WRITE_ENABLED=1 이 없으면 만들 수 없고, 만들 때 정한 주소 하나를 한 번만 보낸다.
+           그 밖에는 basket_write_allowed 가 True 인 가짜 transport 에서만 동작한다.
 
 제한값의 근거를 나눈다.
   DOC_*        팝콘PC 가이드 문서가 적은 값(해시 86cf99b2...).
@@ -17,12 +18,19 @@
 
 2026-11-17 price 응답 변경(실측). 봉투에 result 가 없고 checked_at, items, not_found 로 온다.
 항목은 pd_no, name, price, status, max_qty 뿐이다. status 는 쇼핑몰이 준 값을 그대로 옮긴다
-(우리 판정이 아니다). 403/400 은 JSON {"error": ...} 로 온다. basket 응답 해석은 그대로다.
+(우리 판정이 아니다). 403/400 은 JSON {"error": ...} 로 온다.
+
+2026-11-18 basket 응답을 v3 명세 모양으로 받는다(윈윈 답변 2026-11-17, 실측 예시는 11-21 예정).
+봉투는 {cart_url, added, skipped, total} 이고 result 키가 없다. added 항목은 {pd_no, qty}(qty 생략은 1),
+skipped 항목은 {pd_no, reason}(reason 은 글자로만 64자) 로 가정했다 - 항목 모양은 명세에 없어 실측 뒤 맞춘다.
+모르는 필드는 버리고 개수만 센다. cart_url 은 기존 링크 검증(허용 호스트·경로·api_key 일치)을 그대로 지난다.
+403/400 의 JSON 오류는 price 와 같은 코드(ip_rejected, mall_request_rejected)다.
 """
 from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import secrets
 import socket
@@ -70,6 +78,11 @@ _PRICE_QUERY_RE = re.compile(r"[1-9][0-9]{0,11}(?:,[1-9][0-9]{0,11}){0,%d}" % (D
 _ALLOWED_FIELDS = ("pd_no", "name", "price", "status", "max_qty")
 _ENVELOPE_FIELDS = ("checked_at", "items", "not_found")
 KNOWN_SALE_STATUSES = ("on_sale", "sold_out")
+# 2026-11-18 basket v3 봉투. 항목 필드는 가정이다(머리말 참고). 이 밖의 필드는 값을 버리고 개수만 센다.
+_BASKET_ENVELOPE_FIELDS = ("cart_url", "added", "skipped", "total")
+_BASKET_ADDED_FIELDS = ("pd_no", "qty")
+_BASKET_SKIPPED_FIELDS = ("pd_no", "reason")
+BASKET_WRITE_ENV = "MALL_BASKET_WRITE_ENABLED"      # 실제 basket 쓰기 transport 를 만들 수 있게 하는 유일한 스위치
 # 2026-11-17 실측한 400 본문. 이 문구와 정확히 같을 때만 50개 초과로 구분한다.
 PRICE_TOO_MANY_ERROR = "상품번호가 50개를 넘음"
 _ERROR_BODY_STATUSES = (400, 403)       # 이 상태에서만 오류 본문을 읽는다(JSON error 판정용)
@@ -251,6 +264,74 @@ class LivePriceTransport:
             chunks.append(chunk)
 
 
+def basket_write_enabled() -> bool:
+    return os.environ.get(BASKET_WRITE_ENV, "").strip() == "1"
+
+
+class LiveBasketTransport(LivePriceTransport):
+    """실제 basket GET 전용(2026-11-18). 만들 때 정한 주소 하나를 정확히 한 번만 보낸다.
+
+    환경변수 MALL_BASKET_WRITE_ENABLED=1 이 없으면 만들 수 없다(basket_write_blocked).
+    basket_write_allowed 는 인스턴스에만 켠다 - 클래스 값은 False 라 다른 경로가 이 클래스를 들고
+    있어도 쓰기가 열리지 않는다. 재시도가 없고 호출 수는 1이다.
+    """
+
+    def __init__(self, key: str, lines: tuple, *, opener: Any = None, clock=time.monotonic, sleep=time.sleep):
+        if not basket_write_enabled():
+            raise MallApiError("basket_write_blocked")
+        super().__init__(max_calls=1, opener=opener, clock=clock, sleep=sleep)
+        self._expected = build_basket_url(validate_quote_key(key), normalize_basket_lines(lines))
+        self.basket_write_allowed = True
+
+    @property
+    def expected_url(self) -> str:
+        return self._expected
+
+    def get(self, url: str, *, timeout: float, max_bytes: int) -> TransportResponse:
+        if url != self._expected or not url.startswith(API_URL + "?api_id=basket&"):
+            raise MallApiError("basket_write_blocked")
+        if not self._lock.acquire(blocking=False):
+            raise MallApiError("concurrent_blocked")
+        try:
+            if self._calls >= self._max_calls:
+                raise MallApiError("basket_write_blocked")      # 같은 주소도 두 번 보내지 않는다(재시도 없음)
+            self._calls += 1
+            self._last = self._clock()
+            return self._send(url, timeout, max_bytes)
+        finally:
+            self._lock.release()
+
+
+class CallPacer:
+    """프로세스 안에서 윈윈 호출을 한 번에 하나, 간격 min_interval 이상으로 띄운다.
+
+    mall_ai_gateway 의 _upstream/_last_call 과 같은 장치를 한 벌로 뺀 것이다. 겹치면 busy 를 던진다(기다리지 않는다).
+    """
+
+    def __init__(self, min_interval: float = INTERNAL_LIVE_MIN_INTERVAL_SECONDS, *, clock=time.monotonic, sleep=time.sleep):
+        self._min_interval = max(float(min_interval), INTERNAL_LIVE_MIN_INTERVAL_SECONDS)
+        self._clock = clock
+        self._sleep = sleep
+        self._lock = threading.Lock()
+        self._last: Optional[float] = None
+
+    def run(self, call):
+        if not self._lock.acquire(blocking=False):
+            raise MallApiError("busy")
+        try:
+            if self._last is not None:
+                wait = self._min_interval - (self._clock() - self._last)
+                if wait > 0:
+                    self._sleep(wait)
+            self._last = self._clock()
+            return call()
+        finally:
+            self._lock.release()
+
+    def reset(self) -> None:
+        self._last = None
+
+
 # ---------------------------------------------------------------- 마스킹
 
 def mask_key(_key: Any) -> str:
@@ -353,8 +434,11 @@ def _json_error_text(body: bytes) -> Optional[str]:
     return None
 
 
-def _price_http_error(response: TransportResponse) -> Optional[MallApiError]:
-    """2026-11-17 실측: 허용되지 않은 IP 는 403, 50개 초과는 400 이고 둘 다 JSON {"error": ...} 다."""
+def _json_http_error(response: TransportResponse) -> Optional[MallApiError]:
+    """2026-11-17 실측: 허용되지 않은 IP 는 403, 50개 초과는 400 이고 둘 다 JSON {"error": ...} 다.
+
+    basket 도 같은 코드로 가른다(2026-11-18). 쓰기 요청의 403/400 은 서버가 거절한 것이라 outcome_unknown 이 아니다.
+    """
     status = response.status
     if status not in _ERROR_BODY_STATUSES:
         return None
@@ -374,7 +458,7 @@ def _price_http_error(response: TransportResponse) -> Optional[MallApiError]:
     return MallApiError(code, http_status=status)
 
 
-def _decode_document(response: TransportResponse, limits: Limits, *, write: bool, price: bool = False) -> dict:
+def _decode_document(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
     """상태코드와 본문을 확인하고 JSON 객체를 돌려준다. 봉투 판정은 부르는 쪽이 한다."""
     def fail(code: str, **kwargs):
         return MallApiError(code, outcome_unknown=write, **kwargs)
@@ -385,7 +469,7 @@ def _decode_document(response: TransportResponse, limits: Limits, *, write: bool
     if status == 429:
         raise fail("rate_limited", http_status=status)
     if 400 <= status < 500:
-        specific = _price_http_error(response) if price else None
+        specific = _json_http_error(response)
         if specific is not None:
             raise specific
         raise fail("http_4xx", http_status=status)
@@ -423,17 +507,26 @@ def _decode_document(response: TransportResponse, limits: Limits, *, write: bool
 
 
 def _decode_envelope(response: TransportResponse, limits: Limits, *, write: bool) -> dict:
-    """basket 봉투(result="ok"). 2026-11-17 의 price 변경과 무관하게 그대로 둔다."""
+    """basket v3 봉투(2026-11-18): cart_url 문자열, added 배열, skipped 배열 또는 null, total 정수. result 키는 없다.
+
+    필수 키가 없으면 bad_shape(detail 에 키 이름)로 실패한다. 조용히 성공으로 치지 않는다.
+    """
     def fail(code: str, **kwargs):
         return MallApiError(code, outcome_unknown=write, **kwargs)
 
     document = _decode_document(response, limits, write=write)
-    if document.get("result") != "ok":
-        if "error" in document:
-            raise fail("api_key_length" if document["error"] == DOC_KEY_LENGTH_ERROR else "api_error")
-        raise fail("bad_result")
     if "error" in document:
-        raise fail("bad_result")
+        error = document["error"]
+        raise fail("api_key_length" if error == DOC_KEY_LENGTH_ERROR else "api_error")
+    if "cart_url" not in document:
+        raise fail("bad_shape", detail="cart_url")      # 있는데 다르면(문자열이 아니어도) _verify_basket 의 bad_link 다
+    if not isinstance(document.get("added"), list):
+        raise fail("bad_shape", detail="added")
+    if "skipped" not in document or not (document["skipped"] is None or isinstance(document["skipped"], list)):
+        raise fail("bad_shape", detail="skipped")
+    total = document.get("total")
+    if isinstance(total, bool) or not isinstance(total, int) or total < 0 or total > INTERNAL_MAX_MAX_QTY:
+        raise fail("bad_shape", detail="total")
     return document
 
 
@@ -455,7 +548,7 @@ def classify_checked_at(raw: Any) -> Optional[str]:
 
 def _decode_price_envelope(response: TransportResponse, limits: Limits) -> dict:
     """price 봉투(2026-11-17): checked_at 문자열, items 배열, not_found 배열 또는 null. result 키는 없다."""
-    document = _decode_document(response, limits, write=False, price=True)
+    document = _decode_document(response, limits, write=False)
     if "error" in document:
         raise MallApiError("api_error")
     if not isinstance(document.get("items"), list):
@@ -727,10 +820,24 @@ class BasketLine:
 
 
 @dataclass(frozen=True)
+class BasketSkipped:
+    pd_no: str
+    reason: Optional[str] = None    # 쇼핑몰이 준 글자를 글자로만 64자. 우리 판정이 아니다
+
+
+@dataclass(frozen=True)
 class BasketReceipt:
     key: str = field(repr=False)
     link: str = field(repr=False)
     lines: tuple[BasketLine, ...] = ()
+    added: tuple[BasketLine, ...] = ()          # 쇼핑몰이 added 로 답한 줄(요청한 것과 같아야 한다)
+    skipped: tuple[BasketSkipped, ...] = ()     # 쇼핑몰이 skipped 로 답한 줄. 요청한 번호가 여기 있으면 성공이 아니다
+    total: int = 0                              # 쇼핑몰이 준 total 그대로. 뜻(줄 수·수량 합)은 11-21 실측 뒤 확정
+    dropped_field_count: int = 0
+
+    def public(self) -> dict:
+        return {"url": self.link, "added": [{"pd_no": l.pd_no, "qty": l.qty} for l in self.added],
+                "skipped": [{"pd_no": s.pd_no, "reason": s.reason} for s in self.skipped], "total": self.total}
 
 
 def new_quote_key() -> str:
@@ -797,28 +904,49 @@ def expected_link(key: str) -> str:
     return "%s%s?api_key=%s" % (ORIGIN, BASKET_LINK_PATH, key)
 
 
-def _verify_basket(document: dict, key: str, lines: tuple[BasketLine, ...]) -> str:
+def _basket_entry(raw: Any, fields: tuple) -> tuple[dict, int]:
+    """added/skipped 한 항목. {pd_no, ...} 객체 또는 번호 하나(가정 - 11-21 실측 뒤 맞춘다). (허용 필드만, 버린 필드 수)."""
+    if isinstance(raw, dict):
+        kept = {k: raw[k] for k in fields if k in raw}
+        return kept, len(set(raw) - set(fields))
+    return {"pd_no": raw}, 0
+
+
+def _verify_basket(document: dict, key: str, lines: tuple[BasketLine, ...]) -> BasketReceipt:
     # 링크는 한 글자도 다르면 거부한다. 외부 원점·userinfo·다른 키·중복 키·상대 경로가 모두 여기서 걸린다.
-    link = document.get("link")
+    link = document["cart_url"]
     if link != expected_link(key):
         raise MallApiError("bad_link", outcome_unknown=True)
-    raw_items = document.get("items")
-    if not isinstance(raw_items, list):
-        raise MallApiError("bad_shape", outcome_unknown=True)
+    dropped = len(set(document) - set(_BASKET_ENVELOPE_FIELDS))
     got: dict[str, int] = {}
+    skipped: list[BasketSkipped] = []
     try:
-        for raw in raw_items:
-            if not isinstance(raw, dict):
-                raise MallApiError("bad_shape")
-            code = _response_code(raw.get("pd_no"))
+        for raw in document["added"]:
+            entry, extra = _basket_entry(raw, _BASKET_ADDED_FIELDS)
+            dropped += extra
+            code = _response_code(entry.get("pd_no"))
             if code in got:
                 raise MallApiError("basket_mismatch")
-            got[code] = _normalize_qty(raw["qty"]) if raw.get("qty") is not None else 0
+            got[code] = _normalize_qty(entry.get("qty"))        # qty 생략은 1(문서의 수량 생략 규칙과 같다)
+        for raw in document["skipped"] or ():
+            entry, extra = _basket_entry(raw, _BASKET_SKIPPED_FIELDS)
+            dropped += extra
+            code = _response_code(entry.get("pd_no"))
+            skipped.append(BasketSkipped(code, plain_text(entry.get("reason"), INTERNAL_MAX_STATUS_TEXT)))
     except MallApiError:
         raise MallApiError("basket_mismatch", outcome_unknown=True) from None
-    if got != {line.pd_no: line.qty for line in lines}:
+    wanted = {line.pd_no: line.qty for line in lines}
+    skipped_codes = {s.pd_no for s in skipped}
+    if skipped_codes & set(got):
+        raise MallApiError("inconsistent_response", outcome_unknown=True)   # 같은 번호가 added 와 skipped 에 함께 있다
+    if skipped_codes & set(wanted):
+        # 쇼핑몰이 요청한 번호를 담지 않았다고 명시했다. 결과는 확정이다(불명이 아니다) - 담기지 않았다.
+        raise MallApiError("basket_skipped")
+    if got != wanted:
         raise MallApiError("basket_mismatch", outcome_unknown=True)
-    return link
+    return BasketReceipt(key=key, link=link, lines=lines,
+                         added=tuple(BasketLine(code, qty) for code, qty in got.items()),
+                         skipped=tuple(skipped), total=document["total"], dropped_field_count=dropped)
 
 
 class BasketClient:
@@ -838,12 +966,13 @@ class BasketClient:
         try:
             response = _send(self._transport, url, self._limits, write=True)
             document = _decode_envelope(response, self._limits, write=True)
-            link = _verify_basket(document, key, normalized)
+            receipt = _verify_basket(document, key, normalized)
         except MallApiError as exc:
             log.warning("mall_ai_api basket failed code=%s unknown=%s", exc.code, exc.outcome_unknown)
             raise
-        log.info("mall_ai_api basket ok lines=%d", len(normalized))
-        return BasketReceipt(key=key, link=link, lines=normalized)
+        log.info("mall_ai_api basket ok lines=%d added=%d skipped=%d total=%d dropped=%d", len(normalized),
+                 len(receipt.added), len(receipt.skipped), receipt.total, receipt.dropped_field_count)
+        return receipt
 
 
 @dataclass
