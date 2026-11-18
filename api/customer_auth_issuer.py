@@ -60,8 +60,23 @@ def safe_return(path) -> str:
 
 
 # ── 로그인 시도 ───────────────────────────────────────────────────────────────
+CLEANUP_AFTER = 86400                  # 로그인 시도 · 가입 대기 행은 하루 뒤 지운다(0156 주석 "하루 뒤 정리")
+
+
+def cleanup_expired(conn, *, now: int | None = None) -> dict:
+    """하루 지난 로그인 시도와 가입 대기 행을 지운다. 둘 다 회원이 아니고 10분 뒤엔 쓸 수 없는 임시 행이다.
+    가입 대기 행에는 공급자가 준 표시용 닉네임이 들어 있어 남겨 둘 이유가 없다(처리방침 1번).
+    로그인 시작마다 한 번 부른다 - 별도 스케줄러 없이도 쌓이지 않는다(created_at_epoch 인덱스)."""
+    cutoff = (now if now is not None else now_epoch()) - CLEANUP_AFTER
+    attempts = conn.execute(text("DELETE FROM oauth_login_attempts WHERE created_at_epoch < :c AND purpose = 'login'"),
+                            {"c": cutoff}).rowcount
+    pending = conn.execute(text("DELETE FROM member_join_pending WHERE created_at_epoch < :c"), {"c": cutoff}).rowcount
+    return {"attempts": attempts, "pending": pending}
+
+
 def begin_attempt(conn, provider: str, return_path: str, *, now: int | None = None):
     """-> (state, nonce, verifier). state 원문은 브라우저 쿠키와 공급자 왕복에만 쓰고 DB 엔 해시만."""
+    cleanup_expired(conn, now=now)
     state, nonce, verifier = OIDC.new_secret(), OIDC.new_secret(), OIDC.new_secret()
     conn.execute(text(
         "INSERT INTO oauth_login_attempts (attempt_id, provider, state_hash, nonce_hash, pkce_verifier, return_path,"
@@ -217,6 +232,41 @@ def session_member(conn, token: str | None, *, now: int | None = None) -> int | 
         " WHERE s.credential_hash = :h AND s.revoked_at_epoch IS NULL AND s.expires_at_epoch > :t"
         " AND m.status = 'active' AND s.issued_auth_revision = m.auth_revision"),
         {"h": digest(token), "t": t}).scalar()
+
+
+WITHDRAWN_NICKNAME = "탈퇴회원"
+
+
+def withdraw(conn, member_id: int, *, now: int | None = None) -> dict:
+    """회원 탈퇴(설계 §7 · 2026-11-18 사장님 확정 「회원 연결만 끊는다」).
+
+    한 트랜잭션에서 ① 세션 전부 철회 ② 간편로그인 신원 철회 + subject 를 묘비 값으로(같은 공급자 ID 로 다시 오면
+    UNIQUE 에 걸리지 않고 새 회원이 된다 - D-5) ③ 동의 기록에 철회 시각 ④ 닉네임·이메일 가림, status='withdrawn',
+    auth_revision +1(남아 있을지 모르는 세션도 해석기에서 떨어진다) ⑤ 견적·문의·인계의 회원 연결 해제.
+    기록 자체는 지우지 않는다 - 보관 기간(180일)이 지나면 보존기간 파기가 값을 비운다.
+    회원 행은 남긴다(원장 FK · 되짚기). 공급자 쪽 연결 끊기 호출은 오픈 뒤 과제다."""
+    t = now if now is not None else now_epoch()
+    row = conn.execute(text("SELECT status FROM members WHERE member_id = :m FOR UPDATE"),
+                       {"m": member_id}).mappings().first()
+    if row is None or row["status"] != "active":
+        raise AuthFlowError(409, "member_inactive")
+    out = {"sessions": conn.execute(text(
+        "UPDATE member_verified_sessions SET revoked_at_epoch = :t WHERE member_id = :m AND revoked_at_epoch IS NULL"),
+        {"t": t, "m": member_id}).rowcount}
+    out["identities"] = conn.execute(text(
+        "UPDATE member_verified_identities SET revoked_at_epoch = :t,"
+        " subject = left('withdrawn:' || identity_id::text || ':' || subject, 255)"
+        " WHERE member_id = :m AND revoked_at_epoch IS NULL"), {"t": t, "m": member_id}).rowcount
+    conn.execute(text("UPDATE member_consents SET withdrawn_at_epoch = :t WHERE member_id = :m AND withdrawn_at_epoch IS NULL"),
+                 {"t": t, "m": member_id})
+    conn.execute(text(
+        "UPDATE members SET status = 'withdrawn', nickname = :n, email = NULL, withdrawn_at = now(),"
+        " auth_revision = COALESCE(auth_revision, 0) + 1 WHERE member_id = :m"),
+        {"n": WITHDRAWN_NICKNAME, "m": member_id})
+    for table in ("mvp3_saved_recommendations", "purchase_inquiries", "handoffs"):
+        out[table] = conn.execute(text(f"UPDATE {table} SET member_id = NULL WHERE member_id = :m"),
+                                  {"m": member_id}).rowcount
+    return out
 
 
 def attach_guest(conn, member_id: int, *, user_id: int | None, owner_key_hash: str | None) -> dict:
