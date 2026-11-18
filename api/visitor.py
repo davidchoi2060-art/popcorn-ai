@@ -27,14 +27,44 @@
   깔때기는 **오늘 이후 발생분**만 센다는 사실을 화면이 먼저 말한다.
 """
 import secrets
+import threading
+import time
 
 from fastapi import Request, Response
 from sqlalchemy import text
 
 from .customer_auth import cookie_secure
+from .db import engine
 
 COOKIE = "pc_vid"
 MAX_AGE = 365 * 24 * 3600      # 1년 — 회원 세션(짧음)과 수명이 다르다
+
+# ■ 마지막 이용 시각(users.last_used_at, 0179) — 2026-11-18 사장님 승인 · 개인정보처리방침 2026-11-23
+#   「방문자 식별값은 마지막 이용 뒤 1년에 파기」(api/retention_purge visitor_key)의 기준 시각이다.
+#   요청마다 쓰지 않는다: 이 프로세스가 같은 방문자를 하루에 한 번만 갱신하고, SQL 도 하루 지난 행만 고친다.
+#   호출부 트랜잭션과 따로 짧게 쓴다 — 읽기 전용 연결(engine.connect)에서 불려도 기록이 남고, 갱신이 실패해도
+#   호출부 트랜잭션이 깨지지 않는다(PostgreSQL 은 실패한 문장 뒤 트랜잭션 전체를 막는다).
+TOUCH_EVERY_SEC = 24 * 3600
+_TOUCH_MAX = 50_000            # 기억해 두는 방문자 수 상한 — 넘으면 비우고 다시 센다(하루 한 번 더 쓸 뿐이다)
+_touched: dict[int, float] = {}
+_touch_lock = threading.Lock()
+
+
+def _touch(uid: int) -> None:
+    now = time.monotonic()
+    with _touch_lock:
+        last = _touched.get(uid)
+        if last is not None and now - last < TOUCH_EVERY_SEC:
+            return
+        if len(_touched) >= _TOUCH_MAX:
+            _touched.clear()
+        _touched[uid] = now
+    try:
+        with engine.begin() as c:
+            c.execute(text("UPDATE users SET last_used_at = now()"
+                           " WHERE user_id = :u AND last_used_at < now() - interval '1 day'"), {"u": uid})
+    except Exception:
+        pass                   # 집계·파기 기준 시각이 상담을 막지 않는다
 
 
 def _new_key() -> str:
@@ -54,6 +84,7 @@ def resolve(conn, request: Request, response: Response | None = None) -> int | N
             row = conn.execute(text(
                 "SELECT user_id FROM users WHERE anon_key = :k"), {"k": key}).first()
             if row:
+                _touch(row[0])
                 return row[0]
             # 쿠키는 있는데 행이 없다(DB 초기화 등). 같은 키로 되살린다 —
             # 새 키를 주면 그 사람의 이전 행동과 끊긴다.

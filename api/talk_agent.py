@@ -156,14 +156,10 @@ class ChatBody(BaseModel):
 
 # ── 출력 검증 ────────────────────────────────────────────────────────────────
 # 연락처는 상담 AI 에게 필요 없다(문의 양식이 따로 받는다) -- 주민·카드번호와 함께 보내기 전에 가린다.
-_PHONE = re.compile(r"(?<!\d)01[016789][\s-]?\d{3,4}[\s-]?\d{4}(?!\d)")
-_EMAIL = re.compile(r"[\w.+-]+@[\w-]+(\.[\w-]+)+")
-
-
+# 정규식은 `api/pii_mask.py` 하나에만 둔다(2026-11-18 사장님 승인 · 개인정보처리방침 2026-11-23).
+# 이 이름은 PC 구성 상담(`pc_builder_advisor`)도 import 해 쓰므로 남긴다.
 def mask(text: str) -> tuple[str, bool]:
-    t, masked = TE.mask_personal(text)
-    out = _EMAIL.sub(TE.MASK, _PHONE.sub(TE.MASK, t))
-    return out, masked or out != t
+    return TE.mask_personal(text)
 
 
 _SENT = re.compile(r"(?<=[.!?。])\s+|\n+")

@@ -1937,7 +1937,7 @@ CHECK 로 종류와 값 칸을 묶는다(예산이면 해상도 칸은 NULL, 해
 
 ### 35. 보관 기한 지난 개인정보 지우기 기록 `retention_purge_runs` (2026-10-11, 0153)
 
-고객 질문 원문(`talk_intent_hits.raw_text`) · AI 답(`talk_reply_reviews.ai_reply`·`shown_reply`·`answer`) · 구매 상담 연락처(`purchase_inquiries.contact_name`·`contact_phone`·`contact_email`·`message`)를 보관 기한이 지나면 비우는 일일 작업(`api/retention_purge.py`, 매일 04:00 KST)의 실행 기록이다. 행은 지우지 않고 값만 비운다. 운영자 메모는 지우지 않되, 구매 상담 메모에 옮겨 적힌 연락처는 기한이 지나면 가린다(`counts.inquiry_memo`). 실패한 정기 실행은 그 시각을 채우지 않아 같은 날 다시 돈다(같은 시각 실패 3번이면 그날은 멈춘다).
+고객 질문 원문(`talk_intent_hits.raw_text`) · AI 답(`talk_reply_reviews.ai_reply`·`shown_reply`·`answer`) · 구매 상담 연락처(`purchase_inquiries.contact_name`·`contact_phone`·`contact_email`·`message`)를 보관 기한이 지나면 비우는 일일 작업(`api/retention_purge.py`, 매일 04:00 KST)의 실행 기록이다. 행은 지우지 않고 값만 비운다. 운영자 메모는 지우지 않되, 구매 상담 메모에 옮겨 적힌 연락처는 기한이 지나면 가린다(`counts.inquiry_memo`). 실패한 정기 실행은 그 시각을 채우지 않아 같은 날 다시 돈다(같은 시각 실패 3번이면 그날은 멈춘다). 2026-11-18(0179)부터 방문자 식별값(`counts.visitor_key`)·보관 견적(`counts.saved_quote`)도 마지막 이용 뒤 1년에 비운다 — §40.
 
 | 컬럼 | 타입 | 설명 |
 |---|---|---|
@@ -1980,6 +1980,25 @@ CHECK: `contact_phone IS NOT NULL OR contact_purged_at IS NOT NULL`. 기한이 �
 ### 39. 가격 확인 기록 유효 종료일 `mall_price_checks.valid_until` (2026-10-19, 0164)
 
 `mall_price_checks.valid_until`(TIMESTAMP, NULL 허용). NULL 이면 지금처럼 확인 후 `EVIDENCE_DAYS`(7일)까지 근거로 쓴다. 값이 있으면 그 시각까지 쓴다(`api/customer_bom_gaps.EVIDENCE_SQL`). 판매가가 바뀌면 그 전에도 바로 무효다. 대표 결정(2026-10-19 「이 두 개만」)으로 109547·127555 두 메모리만 2026-12-31 23:59:59 까지로 연장했다 — 표가 추가만 하므로 기존 행을 고치지 않고 새 확인 행을 하나 쌓는다(가장 최근 bom-gap 기록이 'same' 이고 그 가격이 지금 판매가와 같을 때만). downgrade 는 `valid_until` 이 있는 행이 하나라도 있으면 거부한다.
+
+### 40. 방문자 식별값·보관 견적 마지막 이용 시각과 파기 (2026-11-18, 0179)
+
+근거: 2026-11-18 사장님 승인 · 개인정보처리방침(2026-11-23 시행) 「방문자 식별값·보관 견적은 마지막 이용 뒤 1년이 지나면 파기」. 두 표에는 «마지막 이용»을 판정할 열이 없었다(`users.created_at`·`mvp3_saved_recommendations.saved_at` 은 처음 시각).
+
+| 표 · 컬럼 | 형식 | 설명 |
+|---|---|---|
+| users.last_used_at | TIMESTAMPTZ NOT NULL DEFAULT now() | 마지막 이용. `visitor.resolve` 가 쿠키로 행을 찾을 때 갱신한다(한 프로세스가 같은 방문자를 하루 한 번, SQL 도 하루 지난 행만). 회원 탈퇴 때도 그 시각으로 잡는다. 기존 행은 `created_at` 으로 채웠다 |
+| users.anon_key_purged_at | TIMESTAMPTZ NULL | 방문자 식별값(`anon_key`)을 비운 시각 |
+| mvp3_saved_recommendations.last_used_at | TIMESTAMPTZ NOT NULL DEFAULT now() | 마지막 이용. 새 보관은 기본값, 내 견적 조회(`GET /api/mvp3/saved-quotes`, 숨기지 않은 견적만)와 회원 탈퇴 때 갱신. 기존 행은 `saved_at` 으로 채웠다 |
+| mvp3_saved_recommendations.purged_at | TIMESTAMPTZ NULL | 내용을 비운 시각 |
+
+`mvp3_saved_recommendations.owner_key_hash`·`request_basis` 는 NULL 을 허용하도록 바꿨다. 대신 CHECK `ck_mvp3_saved_live_owner`(`purged_at IS NOT NULL OR (owner_key_hash IS NOT NULL AND request_basis IS NOT NULL)`)로 비우지 않은 행은 둘 다 있어야 한다. `users.anon_key` 는 처음부터 NULL 허용(UNIQUE)이라 제약을 바꾸지 않았다.
+
+일일 지우기 작업(`api/retention_purge.py`, `RETENTION_PURGE_APPLY=on` 일 때만 실제로 비움)의 대상 두 가지 — 행은 지우지 않는다:
+- `visitor_key`: `last_used_at` 이 1년(`IDLE_DAYS`) 지난 방문자 행의 `anon_key` 를 NULL 로, `anon_key_purged_at` 을 채운다. 탈퇴하지 않은 회원에 붙은 방문자 행(`members.user_id`, `withdrawn_at IS NULL`)은 뺀다. 행은 상담·주문·클릭·견적이 FK 로 참조하므로 남기고, 그 쿠키를 가진 브라우저와의 연결만 끊는다 — 같은 쿠키로 다시 오면 `visitor.resolve` 가 새 방문자 행을 만든다.
+- `saved_quote`: `last_used_at` 이 1년 지나고 회원에 붙지 않은(`member_id IS NULL`) 견적의 `owner_key_hash`·`request_basis` 를 NULL, `product_snapshot`·`talk_state` 를 `{}` 로 비우고 `purged_at` 을 채운다. 그 브라우저가 다시 찾지 못한다. 상담 신청(`purchase_inquiries.quote_id`)의 참조는 남는다.
+
+downgrade 는 비운 행이 하나라도 있으면 거부한다.
 
 ## 25. ASUS 기획전 3종 기획 자료 (2026-11-06, 0178)
 

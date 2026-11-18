@@ -68,6 +68,17 @@ class CustomerInput(unittest.TestCase):
         self.assertEqual(m['topics'], list(PI.TOPICS))
         self.assertIn('%d일' % PI.KEEP_DAYS, m['consent_text'])
 
+    def test_consent_text_names_the_fields_the_ai_form_sends(self):
+        # 2026-11-18 사장님 승인(개인정보처리방침 2026-11-23): AI 문의 양식이 문의 내용에 합쳐 보내는 항목
+        # (service-adapters.js message())을 동의 문구가 밝힌다.
+        for word in ('이름·연락처', '회사·기관명', '예산', '수량', '인원', '사용 환경', '180일', '상담 신청은 할 수 없습니다'):
+            with self.subTest(word=word):
+                self.assertIn(word, PI.CONSENT_TEXT)
+        js = (ROOT / 'mockups/mvp4/assets/js/service-adapters.js').read_text(encoding='utf-8')
+        for label in ("'예산'", "'수량'", "'사용 인원'", "'환경'", "'회사'"):
+            with self.subTest(label=label):
+                self.assertIn(label, js)       # 화면이 이 항목을 보내는 동안은 문구도 그것을 말해야 한다
+
     def test_note_does_not_promise_order_or_price(self):
         src = (ROOT / 'api/mvp3_purchase_inquiry.py').read_text(encoding='utf-8')
         for word in ('주문을 받', '결제', '할인해', '확정'):

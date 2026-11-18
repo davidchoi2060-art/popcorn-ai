@@ -37,6 +37,14 @@ TARGET_INFO = {
     "talk_reply": ("고객에게 나간 AI 답", "purge_at", False, None),
     "inquiry_contact": ("구매 상담 신청 연락처 · 내용", "purge_at", False, "contact_purged_at"),
     "visitor_contact": ("견적 보관 등록 연락처", "purge_at", False, "contact_purged_at"),
+    # 2026-11-18 사장님 승인(개인정보처리방침 2026-11-23): 기한 칸이 따로 없고 «마지막 이용 + 1년»이 기한이다(0179).
+    # 회원에 붙은 것은 파기 대상이 아니라 셈에서도 뺀다(_SCOPE) -- 빼지 않으면 「기한 지남 - 값 남음」이 비운 것처럼 보인다.
+    "visitor_key": ("방문자 식별값(쿠키)", f"(last_used_at + interval '{RP.IDLE_DAYS} days')", False, "anon_key_purged_at"),
+    "saved_quote": ("보관 견적", f"(last_used_at + interval '{RP.IDLE_DAYS} days')", False, "purged_at"),
+}
+_SCOPE = {
+    "visitor_key": "NOT EXISTS (SELECT 1 FROM members m WHERE m.user_id = users.user_id AND m.withdrawn_at IS NULL)",
+    "saved_quote": "member_id IS NULL",
 }
 EXTRA_COUNTS = {"inquiry_memo": "구매 상담 메모 속 연락처 가림"}
 
@@ -44,7 +52,8 @@ EXTRA_COUNTS = {"inquiry_memo": "구매 상담 메모 속 연락처 가림"}
 def _params(now):
     naive = now.astimezone(dt.timezone.utc).replace(tzinfo=None)
     soon = dt.timedelta(days=DUE_SOON_DAYS)
-    return {"now": now, "now_naive": naive, "soon": now + soon, "soon_naive": naive + soon}
+    return {"now": now, "now_naive": naive, "soon": now + soon, "soon_naive": naive + soon,
+            "idle_before": now - dt.timedelta(days=RP.IDLE_DAYS)}
 
 
 def _summary(conn, now) -> list[dict]:
@@ -52,6 +61,7 @@ def _summary(conn, now) -> list[dict]:
     out = []
     for name, target, _assign in RP.TARGETS:
         label, col, naive, purged_col = TARGET_INFO[name]
+        scope = f" WHERE {_SCOPE[name]}" if name in _SCOPE else ""
         table, holding_where = RP._split(target)
         n, s = (":now_naive", ":soon_naive") if naive else (":now", ":soon")
         r = conn.execute(text(
@@ -62,7 +72,7 @@ def _summary(conn, now) -> list[dict]:
             f" count(*) FILTER (WHERE {col} IS NULL) AS no_deadline"
             + (f", count(*) FILTER (WHERE {purged_col} IS NOT NULL) AS purged,"
                f" max({purged_col}) AS last_purged_at" if purged_col else "")
-            + f" FROM {table}"), p).mappings().one()
+            + f" FROM {table}{scope}"), p).mappings().one()
         holding = conn.execute(text(f"SELECT count(*) FROM {table} WHERE {holding_where}"), p).scalar()
         out.append({
             "key": name, "label": label, "total": int(r["total"]),

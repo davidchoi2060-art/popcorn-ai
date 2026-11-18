@@ -49,7 +49,11 @@ FIXED_TOPICS = {'quote': 'AI 슈퍼컴퓨터 견적', 'adoption': 'AI 도입 상
 SERVICE_TOPICS = ('기업 AI 업무개선 컨설팅',)
 PURPOSES = {'local-llm': '로컬 AI 모델 실행', 'documents': '사내 문서 검색·업무 활용',
             'development': 'AI 개발·연구', 'other': '그 밖의 용도·아직 미정'}
-CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처·문의 내용을 받고, 신청 후 %d일이 지나면 지웁니다. '
+# 2026-11-18 사장님 승인(개인정보처리방침 2026-11-23): AI 문의 양식은 회사·기관명·예산·수량·인원·사용 환경·활용
+# 목적을 문의 내용에 합쳐 보낸다(mockups/mvp4/assets/js/service-adapters.js message()). 실제로 받는 항목을 문구에 적는다.
+# 화면은 이 값을 GET /form 의 consent_text 로 받아 그대로 쓴다(문구를 화면에 다시 적지 않는다).
+CONSENT_TEXT = ('구매 상담 연락을 위해 이름·연락처와 문의 내용(회사·기관명, 예산·수량·인원·사용 환경 등 입력하신 항목 포함)을 받고, '
+                '신청 후 %d일이 지나면 지웁니다. '
                 '동의하지 않으셔도 되지만, 이 경우 상담 신청은 할 수 없습니다.' % KEEP_DAYS)
 
 
