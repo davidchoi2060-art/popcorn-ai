@@ -845,6 +845,8 @@ def run_turn(text_in: str, history: list[Turn], anchor_code: int | None = None, 
     clean = fix_particles(clean)
     clean = "\n\n".join(x for x in (game_line, lead, psu_line, clean, note, alt_line) if x).strip()
     notes = [TE.NOTE_PERSONAL + TE.NOTE_PERSONAL_MASKED] if (masked or hist_masked or source_masked) else []
+    if notes:                              # 화면이 notes 를 함께 보이므로 AI 가 쓴 같은 뜻 문장은 걷는다(중복 안내)
+        clean = TE.drop_own_privacy_warning(clean)
     meta["elapsed_sec"] = round(time.monotonic() - t0, 3)
     meta["tools"] = book.calls
     return {"ok": status != "failed", "status": status, "reply": clean, "notes": notes,

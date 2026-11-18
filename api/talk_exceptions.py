@@ -337,7 +337,7 @@ def respond(reply: str, kinds: list[str], *, pc, text: str = "", state=None,
         if note not in out:
             out = (out.rstrip() + " " + note).strip()
     if "personal_info" in ks:
-        out = _add(out, NOTE_PERSONAL + (NOTE_PERSONAL_MASKED if masked else ""))
+        out = _add(drop_own_privacy_warning(out), NOTE_PERSONAL + (NOTE_PERSONAL_MASKED if masked else ""))
     # 2026-10-11 개발 서버: AI 의 「알려 드릴 수 없어요」 뒤에 같은 말이 한 번 더 붙었고, 주문 확인
     # 문의에는 결제 안내 넉 줄 뒤에 확인 불가 안내가 또 붙었다. PC 이야기가 아니면 안내 한 줄로 바꾼다.
     if "privacy_request" in ks:
@@ -369,6 +369,28 @@ def _drop_promises(out: str) -> str:
     if kept:      # 걷은 문장을 가리키던 「그전에」는 따라 뺀다
         kept[0] = re.sub(r"^\s*그\s*전에\s*,?\s*", "", kept[0])
     return " ".join([NOTE_COMPETITOR] + kept).strip()
+
+
+# AI 가 스스로 쓴 「주민번호·카드번호는 적지 마세요」류 문장. 서버 고정 안내(NOTE_PERSONAL)가 붙는 답에서는
+# 같은 뜻이 두 번 나오지 않게 이 문장만 걷는다(2026-11-18 개발 서버 실측 · 사장님 승인 「넣어」).
+# 민감 정보 낱말과 «쓰지 말라» 류 서술이 한 문장에 함께 있을 때만 걷는다 - 상품·견적 문장은 건드리지 않는다.
+_SENSITIVE_WORD = re.compile(r"(주민\s*(등록)?\s*번호|카드\s*번호|비밀\s*번호|계좌\s*번호|개인\s*정보)")
+_DONT_SHARE = re.compile(r"(적지|남기지|입력하지|보내지|공유하지|쓰지|알려\s*주지|올리지)\s*(않|말|마)")
+_SENTENCE = re.compile(r"[^.!?\n]*(?:[.!?]+|\n|$)")
+
+
+def drop_own_privacy_warning(text: str) -> str:
+    """서버 안내와 같은 뜻의 AI 문장을 걷는다. 걷을 것이 없거나 다 걷히면 원문을 그대로 돌려준다."""
+    if not text:
+        return text or ""
+    parts = [p for p in _SENTENCE.findall(text) if p]
+    kept = [p for p in parts if not (_SENSITIVE_WORD.search(p) and _DONT_SHARE.search(p))]
+    if len(kept) == len(parts):
+        return text
+    out = "".join(kept).strip()
+    out = re.sub(r"[ \t]+\n", "\n", out)
+    out = re.sub(r"\n{3,}", "\n\n", out)
+    return out or text
 
 
 def _add(out: str, note: str) -> str:
