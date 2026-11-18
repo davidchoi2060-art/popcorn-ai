@@ -7,6 +7,7 @@
   POST /api/auth/join                      동의(필수 3개) -> 회원 + 세션 + 이 브라우저 기록 귀속
   POST /api/auth/attach-guest              로그인 뒤 이 브라우저의 보관 견적을 회원에 붙인다(견적 보관 키 헤더 필요)
   POST /api/auth/signout                   세션 철회 + 쿠키 삭제
+  POST /api/auth/withdraw                  회원 탈퇴(세션·신원 철회, 기록의 회원 연결 해제) + 쿠키 삭제
 
 ★ CUSTOMER_AUTH_ENABLED=on 과 공급자 키가 없으면 전부 503 auth_unavailable(providers 만 enabled:false).
   기존 /api/auth/login(이메일)·/logout 은 customer_auth.py 그대로(503). /me 는 켜지면 customer_auth_runtime 이 실제 해석기로 바꾼다.
@@ -154,6 +155,25 @@ def signout(request: Request):
         with engine.begin() as conn:
             revoked = ISS.revoke_session(conn, request.cookies.get(COOKIE))
     resp = JSONResponse({"ok": True, "revoked": revoked}, headers=NO_STORE)
+    resp.delete_cookie(COOKIE, path="/")
+    return resp
+
+
+@router.post("/withdraw")
+def withdraw(request: Request):
+    if not OIDC.enabled():
+        raise _closed()
+    _same_origin(request)
+    try:
+        with engine.begin() as conn:
+            member_id = ISS.session_member(conn, request.cookies.get(COOKIE))
+            if member_id is None:
+                raise HTTPException(401, detail={"code": "unauthenticated"}, headers=NO_STORE)
+            done = ISS.withdraw(conn, member_id)
+    except ISS.AuthFlowError as e:
+        raise HTTPException(e.status, detail={"code": e.code}, headers=NO_STORE) from None
+    log.info("[customer-auth] withdraw ok sessions=%d identities=%d", done["sessions"], done["identities"])
+    resp = JSONResponse({"ok": True}, headers=NO_STORE)
     resp.delete_cookie(COOKIE, path="/")
     return resp
 
