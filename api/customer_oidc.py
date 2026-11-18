@@ -84,7 +84,7 @@ def providers() -> dict[str, ProviderConfig]:
     if gid and gsec:
         out["google"] = ProviderConfig(
             "google", "https://accounts.google.com", "https://accounts.google.com/o/oauth2/v2/auth",
-            "https://oauth2.googleapis.com/token", "openid email profile", gid, gsec, "oidc_id_token",
+            "https://oauth2.googleapis.com/token", "openid profile", gid, gsec, "oidc_id_token",
             jwks_url="https://www.googleapis.com/oauth2/v3/certs", pkce=True)
     kid, ksec = _env("KAKAO_REST_API_KEY"), _env("KAKAO_CLIENT_SECRET")
     if kid and ksec:
@@ -204,7 +204,8 @@ def _short(value, limit):
 class VerifiedLogin:
     principal: identity.VerifiedPrincipal
     display_nickname: str | None       # 가입 화면 기본값으로만 쓴다(회원 원장 연락처가 아니다)
-    display_email: str | None
+    display_email: str | None          # 항상 None. 2026-11-18 사장님 확정: 3사 모두 이메일을 받지 않는다(D-3).
+                                       # 공급자가 보내더라도 읽지 않는다 - 칸은 저장 구조(0156) 호환으로만 남긴다
 
 
 def verify_callback(cfg: ProviderConfig, *, code: str, verifier: str, nonce_hash: str, state: str,
@@ -218,12 +219,11 @@ def verify_callback(cfg: ProviderConfig, *, code: str, verifier: str, nonce_hash
         claims = _verify_id_token(cfg, str(tokens.get("id_token") or ""), nonce_hash=nonce_hash)
         subject = claims.get("sub")
         nickname = claims.get("nickname") or claims.get("name")
-        email = claims.get("email") if claims.get("email_verified") in (True, "true") else None
     else:
         profile = _naver_profile(cfg, str(tokens.get("access_token") or ""), session=session)
-        subject, nickname, email = profile.get("id"), profile.get("nickname"), profile.get("email")
+        subject, nickname = profile.get("id"), profile.get("nickname")
     if not isinstance(subject, str) or not subject or len(subject) > 255:
         raise ProviderError("subject_missing")
     principal = identity.VerifiedPrincipal._from_server_verifier(cfg.registration(), subject=subject,
                                                                  verified_at=verified_at)
-    return VerifiedLogin(principal, _short(nickname, 100), _short(email, 255))
+    return VerifiedLogin(principal, _short(nickname, 100), None)      # 이메일은 받지 않는다
