@@ -24,7 +24,9 @@ class InfoPages(unittest.TestCase):
                   "02)1644-0249", "070-8610-0100", "0303-3442-0249"):
             self.assertIn(v, core)
         self.assertIn("var COMPANY = P.COMPANY;", JS)
-        self.assertNotIn("tel:", JS)
+        # 2026-11-18 사장님이 대표번호를 고객 문의 창구로 확정했다 - 그 번호 하나만 전화 걸기 링크로 단다(그 전에는 tel: 금지였다).
+        self.assertEqual(JS.count("tel:"), 1)
+        self.assertIn('href="tel:0216440249"', JS)
 
 
     def test_draft_policy_text_is_not_shipped(self):
