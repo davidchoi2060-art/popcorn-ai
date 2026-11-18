@@ -4,7 +4,34 @@
 
 원격 주소는 운영 쇼핑몰이다. 개발 팝콘AI에서 불러도 쓰기 대상은 운영이다.
 
-> **2026-11-17 price 응답이 바뀌었다.** 아래 「2026-11-17 응답 변경」 절이 현행이다. 그 밖의 절에서 price 응답을 말하는 부분 중 낡은 곳에는 「(낡음 2026-11-17)」 표시를 달았다. basket 서술은 그대로 유효하다.
+> **2026-11-17 price 응답이 바뀌었다.** 아래 「2026-11-17 응답 변경」 절이 현행이다. 그 밖의 절에서 price 응답을 말하는 부분 중 낡은 곳에는 「(낡음 2026-11-17)」 표시를 달았다.
+>
+> **2026-11-18 basket 응답 해석을 v3 모양으로 바꿨고 실제 쓰기 transport 와 ASUS 장바구니 경로를 만들었다.** 아래 「2026-11-18 basket v3」 절이 현행이다. 옛 basket 서술(`result="ok"`, `link`, `items`)은 낡았다. 상태 줄 「라이브러리만 존재, 어디서도 부르지 않는다」도 낡았다 — `api/mall_ai_gateway.py`(price)와 `api/mall_asus_cart_api.py`(price + basket)가 부른다.
+
+## 2026-11-18 basket v3
+
+윈윈 답변(2026-11-17): 호출 방식은 그대로(`GET /shop/ai_api.php?api_id=basket&api_key=<영숫자 20자>&pd_no=<번호>:<수량>,…`), 응답은 v3 `{cart_url, added, skipped, total}`. 실측 예시는 2026-11-21 예정이라 **항목 모양은 가정이다.**
+
+| 키 | 받는 모양 | 없거나 틀리면 |
+|---|---|---|
+| `cart_url` | 문자열. `https://popcornpc.co.kr/shop/order_basket_list.html?api_key=<요청 키>` 와 한 글자도 다르면 거부 | 없으면 `bad_shape`(detail `cart_url`), 다르면 `bad_link`(결과 불명) |
+| `added` | 배열. 항목은 `{pd_no, qty}`(가정 — `qty` 생략은 1) 또는 번호 하나. 모르는 필드는 버리고 `dropped_field_count` 에 센다 | `bad_shape`(detail `added`) |
+| `skipped` | 배열 또는 `null`. 항목은 `{pd_no, reason}`(가정 — `reason` 은 글자로만 64자) 또는 번호 하나 | `bad_shape`(detail `skipped`) |
+| `total` | 0 이상 정수. 뜻(줄 수인지 수량 합인지)은 확정하지 않았다 — 그대로 옮긴다 | `bad_shape`(detail `total`) |
+
+판정: 요청한 줄이 전부 `added` 에 같은 수량으로 있어야 성공이다(`BasketReceipt.added/skipped/total/public()`). 요청한 번호가 `skipped` 에 있으면 `basket_skipped` — 담기지 않은 것이 확정이라 `outcome_unknown` 이 아니다. 같은 번호가 양쪽에 있으면 `inconsistent_response`(불명). 그 밖의 불일치는 `basket_mismatch`(불명). 200 인데 `error` 키가 있으면 `api_error`(키 길이 문구면 `api_key_length`). 403/400 의 JSON `error` 는 price 와 같은 코드(`ip_rejected`, `mall_too_many_items`, `mall_request_rejected`)이고 서버가 거절한 것이라 불명이 아니다. JSON `error` 가 없는 4xx 는 그대로 `http_4xx`(불명).
+
+### 실제 쓰기 transport — `LiveBasketTransport`
+
+환경변수 `MALL_BASKET_WRITE_ENABLED=1` 이 없으면 만들 수 없다(`basket_write_blocked`). 만들 때 받은 키와 줄로 주소 하나를 정하고 그 주소만, 정확히 한 번만 보낸다. `basket_write_allowed` 는 인스턴스에만 켜고 클래스 값은 False 다. 재시도가 없다. 이제 `basket_write_allowed = True` 를 적는 자리는 둘이다 — 실행기의 승인 1회 시험용 transport와 이 클래스(`tests/test_popcorn_pc_api_20261109.py` S02 가 센다).
+
+### 호출 간격 — `CallPacer`
+
+프로세스 안에서 윈윈 호출을 한 번에 하나, 간격 1초 이상으로 띄운다. 겹치면 `busy` 를 던지고 기다리지 않는다. `api/mall_ai_gateway.py` 의 `_upstream`/`_last_call` 과 같은 장치를 한 벌로 뺀 것이다(중계기는 그대로 자기 장치를 쓴다).
+
+### ASUS 장바구니 경로
+
+`api/mall_asus_cart_api.py` · 설정과 흐름은 `CART-ADAPTER.md` 「2026-11-18 서버 연결」에 적었다.
 
 ## 2026-11-17 응답 변경
 
@@ -86,7 +113,7 @@
 
 ### 그대로인 것
 
-- basket 응답 해석(`result="ok"`, 링크 대조, `outcome_unknown`)은 바꾸지 않았다. basket 응답이 함께 바뀌었는지는 확인하지 않았다.
+- (낡음 2026-11-18: basket 응답 해석은 v3 로 바꿨다 — 「2026-11-18 basket v3」.) basket 응답 해석(`result="ok"`, 링크 대조, `outcome_unknown`)은 바꾸지 않았다. basket 응답이 함께 바뀌었는지는 확인하지 않았다.
 - `LivePriceTransport`는 400과 403일 때만 오류 본문을 읽는다. 그 밖의 오류 상태는 예전처럼 본문을 버린다.
 - 로그에는 건수와 오류 코드만 남는다. 상품명, 가격, 조회 시각, 쇼핑몰 오류 문구는 남기지 않는다.
 - 실행기의 basket 시험은 직전 price에 `missing`과 `not_found`가 모두 비어 있을 때만 나간다.
@@ -125,7 +152,7 @@ live 는 문서 예시 3개 상품, 기록부 기준 누적 10회, 호출 간 1�
 
 ## 쓰기 차단
 
-- `BasketClient`는 `basket_write_allowed`가 True인 transport에만 주소를 넘긴다. 이 값을 켜는 곳은 테스트의 가짜와 실행기의 `--api basket`(사용자 승인 1회 시험, 2026-11-11)뿐이다. `api/` 안에는 없다.
+- `BasketClient`는 `basket_write_allowed`가 True인 transport에만 주소를 넘긴다. 이 값을 켜는 곳은 테스트의 가짜, 실행기의 `--api basket`(사용자 승인 1회 시험, 2026-11-11), 그리고 환경변수 스위치 뒤의 `LiveBasketTransport`(2026-11-18)다. (낡음 2026-11-18: 「`api/` 안에는 없다」)
 - `LivePriceTransport`는 `assert_price_only_url`을 지나지 않은 주소를 내보내지 않는다.
 - 실제 쓰기를 열려면 샌드박스 확인과 별도 승인이 먼저다(이슈 API-001).
 
@@ -144,12 +171,12 @@ live 는 문서 예시 3개 상품, 기록부 기준 누적 10회, 호출 간 1�
 - (낡음 2026-11-17: 지금 글자로 남기는 필드는 `name`과 `status_raw`다. `innerHTML` 금지는 그대로다.) `pd_name`, `made`, `pd_spec`은 글자로만 남기지만, 화면에 넣을 때는 여전히 글자로 넣는다(`innerHTML` 금지).
 - (낡음 2026-11-17: 새 응답에 이미지 필드가 없어 이 처리를 없앴다.) 이미지는 몰 https 절대 주소만 `image_url`로 준다. 상대 경로는 기준 주소가 문서에 없어 `image_path`로만 둔다.
 - 응답의 미문서 필드는 값을 버리고 개수와 재고·통화·세금 유사 이름 존재 여부만 남긴다.
-- basket 링크는 `https://popcornpc.co.kr/shop/order_basket_list.html?api_key=<요청 키>`와 한 글자라도 다르면 거부한다.
+- basket 링크(`cart_url`)는 `https://popcornpc.co.kr/shop/order_basket_list.html?api_key=<요청 키>`와 한 글자라도 다르면 거부한다.
 - basket 응답이 불명확하면 `outcome_unknown`이다. 자동 재시도가 없고 사람이 다시 누른 경우에만 `confirm_unknown`으로 보낸다.
 
 ## ASUS 연결 전 조건
 
-- `ASUS_COMPLETE_SKUS`는 비어 있다. 완제품 3종 번호를 받기 전까지 전부 `sku_missing`이다.
-- 같은 키는 목록을 교체하므로 모델마다 견적을 나눈다. 세 모델을 한 장바구니에 모으려면 다른 설계가 필요하다.
-- `BasketCoordinator`는 메모리 상태다. 프로세스가 여러 개면 공용 저장소가 필요하다.
-- 공개하려면 서버 경로와 프런트 연결 코드를 새로 만들어야 한다. 이번에는 만들지 않았다.
+- `ASUS_COMPLETE_SKUS`는 비어 있다. 완제품 3종 번호는 코드가 아니라 서버 환경변수 `MALL_ASUS_CART_SKUS` 로 받는다(2026-11-18).
+- 같은 키는 목록을 교체하므로 모델마다 키를 나눈다. 세 모델을 한 장바구니에 모으지 않는다(윈윈 확정).
+- `BasketCoordinator`는 메모리 상태다. ASUS 경로는 키를 방문자+모델로 결정적으로 도출하므로 이 조정자를 쓰지 않고, 같은 키의 동시 요청만 프로세스 안에서 막는다.
+- (낡음 2026-11-18) 공개하려면 서버 경로와 프런트 연결 코드를 새로 만들어야 한다. → `api/mall_asus_cart_api.py` · `mockups/mvp4/assets/js/asus-cart-live.js` 로 만들었다. 설정이 없으면 404 라 화면은 연결 전과 같다.

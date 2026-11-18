@@ -10,6 +10,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
 import shutil
 import socket
@@ -32,8 +33,8 @@ from api import mall_ai_api as M                                       # noqa: E
 from api import mall_asus_cart as AC                                   # noqa: E402
 from api.mall_ai_api import MallApiError, TransportResponse as R       # noqa: E402
 from tests.popcorn_pc_fake_api import (CHECKED_AT, CHECKED_AT_ISO, FakeMallApi, ScriptedTransport,  # noqa: E402
-                                       ip_denied_response, json_response, price_response, product,
-                                       too_many_response)
+                                       basket_response, ip_denied_response, json_response, price_response,
+                                       product, too_many_response)
 
 CASE_IDS = (["P%02d" % i for i in range(1, 13)] + ["B%02d" % i for i in range(1, 13)]
             + ["A01", "A02", "A03", "S01", "S02"])
@@ -74,8 +75,9 @@ def price_body(inner):
     return ('{"checked_at":"%s","items":[%s],"not_found":null}' % (CHECKED_AT, inner)).encode("utf-8")
 
 
-def ok_basket(items, link=LINK):
-    return json_response({"result": "ok", "link": link, "items": items})
+def ok_basket(items, link=LINK, skipped=(), **extra):
+    """v3 basket 봉투(2026-11-18). total 은 added 줄 수로 둔다(뜻은 11-21 실측 뒤 확정)."""
+    return basket_response(KEY, items, skipped, link=link, **extra)
 
 
 class Base(unittest.TestCase):
@@ -310,8 +312,14 @@ class PriceResponse20261117(Base):
         for status, code in ((401, "http_4xx"), (404, "http_4xx"), (429, "rate_limited"), (500, "http_5xx")):
             self.assertEqual(self.code_of(self.price, json_response({"error": "x"}, status=status)), code)
 
-    def test_basket_error_statuses_are_unchanged(self):
-        for reply in (ip_denied_response(), too_many_response()):
+    def test_basket_403_400_json_errors_share_the_price_codes(self):
+        # 2026-11-18: 403/400 의 JSON error 는 서버가 거절한 것이라 쓰기 결과가 불명이 아니다.
+        for reply, code in ((ip_denied_response(), "ip_rejected"), (too_many_response(), "mall_too_many_items"),
+                            (json_response({"error": "다른 거절 사유"}, status=400), "mall_request_rejected")):
+            with self.assertRaises(MallApiError) as caught:
+                self.basket(reply)
+            self.assertEqual((caught.exception.code, caught.exception.outcome_unknown), (code, False))
+        for reply in (R(403, b"forbidden"), R(400, b"")):      # JSON error 가 없으면 그대로 http_4xx 이고 결과 불명이다
             with self.assertRaises(MallApiError) as caught:
                 self.basket(reply)
             self.assertEqual((caught.exception.code, caught.exception.outcome_unknown), ("http_4xx", True))
@@ -556,7 +564,43 @@ class Basket(Base):
             self.assertTrue(caught.exception.outcome_unknown)
         self.assertEqual(self.code_of(self.basket, json_response({"result": "ok", "link": LINK}), lines), "bad_shape")
         self.assertEqual(self.code_of(self.basket, ok_basket([{"pd_no": 1, "qty": 2}], LINK.replace(KEY, OTHER_KEY)), lines), "bad_link")
-        self.basket(ok_basket([{"pd_no": "1", "qty": "2"}]), lines)
+        receipt, _ = self.basket(ok_basket([{"pd_no": "1", "qty": "2"}]), lines)
+        self.assertEqual((receipt.added, receipt.skipped, receipt.total), ((M.BasketLine("1", 2),), (), 1))
+
+    def test_B09_v3_envelope_required_keys_skipped_and_unknown_fields(self):
+        lines = [("1", 2)]
+        good = {"cart_url": LINK, "added": [{"pd_no": 1, "qty": 2}], "skipped": [], "total": 1}
+        # 필수 키가 하나라도 없거나 모양이 틀리면 bad_shape 이고 detail 이 그 키를 가리킨다. 조용히 성공하지 않는다.
+        for missing in ("cart_url", "added", "skipped", "total"):
+            document = {k: v for k, v in good.items() if k != missing}
+            with self.assertRaises(MallApiError) as caught:
+                self.basket(json_response(document), lines)
+            self.assertEqual((caught.exception.code, caught.exception.detail, caught.exception.outcome_unknown),
+                             ("bad_shape", missing, True), missing)
+        for key, bad in (("added", {}), ("skipped", "x"), ("total", "1"), ("total", True), ("total", -1)):
+            with self.assertRaises(MallApiError) as caught:
+                self.basket(json_response({**good, key: bad}), lines)
+            self.assertEqual((caught.exception.code, caught.exception.detail), ("bad_shape", key), (key, bad))
+        # 옛 봉투(result/link/items)는 성공이 아니다.
+        self.assertEqual(self.code_of(self.basket, json_response({"result": "ok", "link": LINK, "items": good["added"]}), lines), "bad_shape")
+        self.assertEqual(self.code_of(self.basket, json_response({**good, "error": "x"}), lines), "api_error")
+        # skipped 는 null 도 받는다. qty 생략은 1. 모르는 필드는 버리고 개수만 센다.
+        receipt, _ = self.basket(json_response({"cart_url": LINK, "added": [{"pd_no": 1, "extra": "x"}], "skipped": None,
+                                                "total": 1, "note": "y"}), [("1", 1)])
+        self.assertEqual((receipt.added, receipt.total, receipt.dropped_field_count), ((M.BasketLine("1", 1),), 1, 2))
+        self.assertEqual(receipt.public(), {"url": LINK, "added": [{"pd_no": "1", "qty": 1}], "skipped": [], "total": 1})
+        # 요청한 번호가 skipped 에 있으면 결과는 확정이다(불명이 아니다) - 담기지 않았다.
+        with self.assertRaises(MallApiError) as caught:
+            self.basket(json_response({"cart_url": LINK, "added": [], "skipped": [{"pd_no": 1, "reason": "<b>sold</b>"}], "total": 0}), lines)
+        self.assertEqual((caught.exception.code, caught.exception.outcome_unknown), ("basket_skipped", False))
+        # 같은 번호가 added 와 skipped 양쪽에 있으면 모순이고 불명이다.
+        with self.assertRaises(MallApiError) as caught:
+            self.basket(json_response({**good, "skipped": [1]}), lines)
+        self.assertEqual((caught.exception.code, caught.exception.outcome_unknown), ("inconsistent_response", True))
+        # 요청하지 않은 다른 번호가 skipped 에 있어도 요청한 줄이 전부 담겼으면 성공이고 그 사실이 남는다.
+        receipt, _ = self.basket(json_response({**good, "skipped": [{"pd_no": 9, "reason": "sold_out"}]}), lines)
+        self.assertEqual(receipt.skipped, (M.BasketSkipped("9", "sold_out"),))
+        self.assertEqual(receipt.public()["skipped"], [{"pd_no": "9", "reason": "sold_out"}])
 
     def test_B10_link_must_match_exactly(self):
         base = "popcornpc.co.kr/shop/order_basket_list.html?api_key=" + KEY
@@ -651,7 +695,7 @@ class Asus(Base):
         for path in list(mvp4.glob("*.html")) + list((mvp4 / "assets/js").glob("*.js")):
             text = path.read_text(encoding="utf-8", errors="replace")
             self.assertNotIn("ai_api", text, path.name)
-            if path.name != "asus-cart.js":
+            if path.name not in ("asus-cart.js", "asus-cart-live.js"):      # 연결 코드는 asus-cart-live.js 하나다(2026-11-18)
                 self.assertNotRegex(text, r"asusCart\.setAdapter|\.setAdapter\(", path.name)
         out = run_cart_js({"video": {"ok": False, "code": "sku_missing"}}, list(AC.ALLOWED_ORIGINS), models=["video"])
         self.assertFalse(out["results"][0]["ok"])
@@ -681,7 +725,8 @@ class Safety(Base):
         leaks = [secret_key, secret_url, "010-1234-5678", "cost=777"]
         sensitive = "%s %s phone=010-1234-5678 cost=777" % (secret_url, secret_key)
         failures = [ConnectionError(sensitive), urllib.error.URLError(sensitive), R(200, json.dumps({"error": sensitive}).encode()),
-                    R(200, json.dumps({"result": "ok", "link": secret_url, "items": []}).encode())]
+                    R(200, json.dumps({"cart_url": secret_url, "added": [], "skipped": [{"pd_no": 1, "reason": sensitive}], "total": 0}).encode()),
+                    R(200, json.dumps({"cart_url": secret_url, "added": [], "skipped": None, "total": 0}).encode())]
         for failure in failures:
             t = ScriptedTransport(failure, basket_write_allowed=True)
             try:
@@ -712,14 +757,18 @@ class Safety(Base):
             names = {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
             names |= {n.module for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
             self.assertFalse(names & forbidden, path)
-        # 쓰기를 켜는 자리는 실행기의 사용자 승인 1회 시험용 transport 하나뿐이다. api/ 에는 없다.
+        # 쓰기를 켜는 자리는 둘이다: 실행기의 사용자 승인 1회 시험용 transport, 그리고 환경변수 스위치 뒤의
+        # LiveBasketTransport(api/mall_ai_api.py, 2026-11-18). 그 밖의 api/·tools/ 에는 없다.
         for path in list((ROOT / "api").glob("*.py")) + list((ROOT / "tools").glob("*.py")):
             text = path.read_text(encoding="utf-8", errors="replace")
-            allowed = 1 if path.name == "popcorn_api_runner.py" else 0
+            allowed = 1 if path.name in ("popcorn_api_runner.py", "mall_ai_api.py") else 0
             self.assertEqual(len(re.findall(r"basket_write_allowed\s*=\s*True", text)), allowed, path.name)
+        self.assertFalse(M.LiveBasketTransport.basket_write_allowed)       # 클래스 값은 꺼져 있다. 인스턴스만 켠다
+        with patch.dict(os.environ, {M.BASKET_WRITE_ENV: ""}):
+            self.assertEqual(self.code_of(M.LiveBasketTransport, KEY, [("1", 1)]), "basket_write_blocked")
         for path in list((ROOT / "api").glob("*.py")):
-            # 사무실 조회 중계기(2026-11-15)만 예외다. 그 모듈의 제한은 test_mall_ai_gateway_20261115 가 지킨다.
-            if path.name not in ("mall_ai_api.py", "mall_asus_cart.py", "mall_ai_gateway.py"):
+            # 사무실 조회 중계기(2026-11-15)와 ASUS 장바구니 경로(2026-11-18)만 예외다. 각자의 테스트가 제한을 지킨다.
+            if path.name not in ("mall_ai_api.py", "mall_asus_cart.py", "mall_ai_gateway.py", "mall_asus_cart_api.py"):
                 text = path.read_text(encoding="utf-8", errors="replace")
                 self.assertNotIn("mall_ai_api", text, path.name)
                 self.assertNotIn("mall_asus_cart", text, path.name)
@@ -929,7 +978,7 @@ class LiveRunnerLocal(unittest.TestCase):
         entry = self.read(self.ledger)[1]
         self.assertEqual((entry["api"], entry["outcome"], entry["actual_basket_calls"], entry["lines"]),
                          ("basket", "ok", 1, 1))
-        self.assertTrue(entry["response_shape"]["link"]["equals_expected"])
+        self.assertTrue(entry["response_shape"]["cart_url"]["equals_expected"])
         self.assertNotIn("body_sha256", [k for k in entry if k != "body_sha256_withheld"])
         stored = Path(self.ledger).read_text(encoding="utf-8") + Path(self.out).read_text(encoding="utf-8") + printed
         self.assertNotIn(key, stored)
@@ -973,15 +1022,18 @@ class LiveRunnerLocal(unittest.TestCase):
         self.assertEqual(self.run_live(ok_price([product(124401)]))[0], 0)
 
         def wrong(url):
-            return json_response({"result": "ok", "link": "https://www.popcornpc.co.kr/x?api_key=SECRETLINKVALUE",
-                                  "items": [{"pd_no": "124401", "qty": "1", "secret_field": "SECRETVALUE"}]})
+            return json_response({"cart_url": "https://www.popcornpc.co.kr/x?api_key=SECRETLINKVALUE",
+                                  "added": [{"pd_no": "124401", "qty": "1", "secret_field": "SECRETVALUE"}],
+                                  "skipped": [], "total": 1})
 
         code, made, printed = self.run_basket(wrong)
         self.assertEqual(code, 1)
         entry = self.read(self.ledger)[1]
         self.assertEqual((entry["code"], entry["outcome_unknown"]), ("bad_link", True))
-        self.assertEqual(entry["response_shape"]["items"]["keys"], ["pd_no", "qty", "secret_field"])
-        self.assertFalse(entry["response_shape"]["link"]["equals_expected"])
+        self.assertEqual(entry["response_shape"]["added"]["keys"], ["pd_no", "qty", "secret_field"])
+        self.assertEqual(entry["response_shape"]["skipped"]["count"], 0)
+        self.assertFalse(entry["response_shape"]["cart_url"]["equals_expected"])
+        self.assertFalse(entry["response_shape"]["has_legacy_keys"])
         stored = Path(self.ledger).read_text(encoding="utf-8") + Path(self.out).read_text(encoding="utf-8") + printed
         self.assertNotIn("SECRETVALUE", stored)
         self.assertNotIn("SECRETLINKVALUE", stored)

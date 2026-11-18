@@ -92,6 +92,7 @@
         if (!A.MODELS.length && !A.UNAVAILABLE.length) { root.innerHTML = statusBox('empty', '지금 표시할 구성이 없습니다.'); return; }
         root.innerHTML = (A.MODELS.length ? '<div class="az-cards">' + A.MODELS.map(card).join('') + '</div>' : '') +
           (A.UNAVAILABLE.length ? statusBox('partial', '일부 구성 정보를 표시할 수 없습니다. 문의해 주시면 안내해 드립니다.') : '');
+        P.asusCart.refresh();   // 장바구니 연결이 먼저 끝났어도 새로 그린 버튼이 그 상태를 받는다
       });
     } };
   }
@@ -185,6 +186,7 @@
         var m = A.find(id);
         if (!m) { root.innerHTML = missing('이 구성 정보를 표시할 수 없습니다.', '다른 구성을 보시거나 잠시 후 다시 확인해 주세요.'); return; }
         root.innerHTML = detailHtml(m);
+        P.asusCart.refresh();
         guardThumbs(root);
         document.title = m.name + ' | ASUS 기획전 | 팝콘AI';
         if (location.hash) { var anchor = document.getElementById(location.hash.slice(1)); if (anchor) anchor.scrollIntoView(); }

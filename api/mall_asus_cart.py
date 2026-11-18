@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""ASUS 완제품 3종 장바구니의 서버 연결 지점 (2026-11-09). 라우터가 없고 어디서도 부르지 않는다.
+"""ASUS 완제품 3종 장바구니의 서버 연결 지점 (2026-11-09). 라우터가 없다.
 
 반환값은 `mockups/mvp4/assets/js/asus-cart.js` setAdapter 계약과 같다.
   요청  {modelId, quantity: 1}
   응답  {ok: true, url} | {ok: false, code}
 
-완제품 번호를 받기 전까지 ASUS_COMPLETE_SKUS 는 비어 있고 전부 sku_missing 이다.
+2026-11-18: 공개 경로는 api/mall_asus_cart_api.py 다. 그 모듈이 여기의 MODEL_IDS·QUANTITY·ALLOWED_ORIGINS 와
+validate_sku_map(구성 부품 번호를 완제품 번호로 쓰면 거부)·component_numbers 를 재사용한다.
+완제품 번호는 코드에 없다 - ASUS_COMPLETE_SKUS 는 비어 있고 서버 환경변수 MALL_ASUS_CART_SKUS 로 받는다.
 구성 부품 번호를 완제품 번호로 쓰지 않는다. 임의 번호도 넣지 않는다.
 
 같은 키는 기존 목록을 교체하므로 모델마다 견적을 나눈다. 세 모델을 한 장바구니에 모으는 동작이 아니다.
