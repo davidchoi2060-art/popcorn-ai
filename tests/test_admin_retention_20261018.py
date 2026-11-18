@@ -105,8 +105,9 @@ class Screen(unittest.TestCase):
         hrefs = [i[1] for g in admin_nav.NAV for i in g[2]]
         self.assertIn("/admin2/retention", hrefs)
         self.assertIn("/admin2/retention", admin_page_intro.INTRO)
-        groups = admin_nav.new_admin_nav("/admin2/retention")
-        self.assertEqual([g["label"] for g in groups if g["active"]], ["주문 운영"])
+        # 2026-11-18 메뉴 통합 — 단일 메뉴 「설정 › 고급 관리」에 있다(신 관리자 「주문 운영」 폐지).
+        groups = admin_nav.simple_nav("/admin2/retention")
+        self.assertEqual([g["title"] for g in groups if g["active"]], ["설정"])
         self.assertNotIn("180일", admin_page_intro.INTRO["/admin2/purchase-inquiries"]["desc"])
 
     def test_expired_is_not_called_purged_on_other_screens(self):

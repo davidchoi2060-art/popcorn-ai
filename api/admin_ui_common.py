@@ -17,7 +17,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from .admin_nav import counts as nav_counts, nav_for, new_admin_nav, simple_nav
+from .admin_nav import counts as nav_counts, nav_for, simple_nav
 from .admin_page_intro import back_for, entries_for, group_crumb, intro_for
 
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
@@ -78,9 +78,9 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
         choice = None
     mode = ctx.pop('admin_mode', None) or choice or request.cookies.get('admin_ui_mode', 'legacy')
     mode = 'new' if mode == 'new' else 'legacy'
+    # `new_admin` 은 이제 **화면 변형 표식**일 뿐이다(판매가·매입 견적·재고 입고의 신 화면 본문).
+    # 좌측 메뉴는 모드와 무관하게 `simple_nav()` 한 벌이다(2026-11-18 사장님 지시 — 메뉴 하나로 확정).
     ctx['new_admin'] = mode == 'new'
-    # Override page-local focused navigation: the shell owns OLD/NEW consistently.
-    ctx['workspace_nav'] = new_admin_nav(request.url.path) if mode == 'new' else None
     ctx.setdefault("nav", nav_for(request.url.path))
     ctx.setdefault("nav_counts", nav_counts())
     # 화면 머리말(제목·설명·같은 묶음 바로가기·작업 순서) — 단일 원천 `admin_page_intro`.
@@ -90,7 +90,7 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     # 「운영 현황」 카드로 들어온 목록이면 그 화면으로 돌아가는 줄을 먼저 단다(2026-10-12).
     # 카드 링크에만 붙는 `from=overview` 를 보고 정한다 — 임의 return URL 은 받지 않는다.
     if request.query_params.get('from') == 'overview' and request.url.path.rstrip('/') != '/admin2':
-        ctx.setdefault("back_link", {"href": "/admin2/", "label": "운영 현황으로 돌아가기"})
+        ctx.setdefault("back_link", {"href": "/admin2/?view=overview", "label": "운영 현황으로 돌아가기"})
     ctx.setdefault("back_link", back_for(request.url.path))
     ctx.setdefault("entry_links", entries_for(request.url.path))
     # 신 관리자 헤더 경로는 신 메뉴 묶음 이름으로 맞춘다 — 「사용·성능 자료 › 현재 화면」.
@@ -101,7 +101,10 @@ def render(request: Request, template: str, *, screen_id: str = "", domain: str 
     ctx.update(screen_id=screen_id, domain=domain, crumb_group=crumb_group, crumb_now=crumb_now,
                crumb_href=crumb_href)
     resp = templates.TemplateResponse(request, template, ctx)
-    if choice or mode != request.cookies.get('admin_ui_mode', 'legacy'):
+    # 쿠키는 운영자가 주소로 직접 고른 경우(?admin=)에만 바꾼다. 화면이 스스로 정한 변형(admin_mode=)은
+    # 그 화면에만 쓰고 남기지 않는다 - 메뉴가 하나로 합쳐진 뒤(2026-11-18) 회원·주문 운영 화면을 한 번
+    # 연 것만으로 판매가·재고 입고 화면 본문이 조용히 바뀌는 일을 막는다.
+    if choice and choice != request.cookies.get('admin_ui_mode', 'legacy'):
         resp.set_cookie('admin_ui_mode', mode, httponly=True, samesite='lax',
                         secure=request.url.scheme == 'https', path='/admin2')
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"

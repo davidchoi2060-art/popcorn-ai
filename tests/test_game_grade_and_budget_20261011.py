@@ -123,8 +123,9 @@ class GameGradeAdmin(unittest.TestCase):
         hrefs = [i[1] for g in admin_nav.NAV for i in g[2]]
         self.assertIn('/admin2/game-grades', hrefs)
         self.assertIn('/admin2/game-grades', admin_page_intro.INTRO)
-        groups = admin_nav.new_admin_nav('/admin2/game-grades')
-        self.assertEqual([g['label'] for g in groups if g['active']], ['사용·성능 자료'])
+        # 2026-11-18 메뉴 통합 — 단일 메뉴 「AI 관리」 묶음(신 관리자 「사용·성능 자료」 폐지).
+        groups = admin_nav.simple_nav('/admin2/game-grades')
+        self.assertEqual([g['title'] for g in groups if g['active']], ['AI 관리'])
 
 
 def _local_url():

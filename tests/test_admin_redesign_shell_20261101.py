@@ -10,7 +10,8 @@ from pathlib import Path
 from starlette.requests import Request
 
 from api import admin_ui_home as H
-from api.admin_nav import NAV, SIMPLE_EXTRA, SIMPLE_MENU, simple_nav
+from api import admin_nav
+from api.admin_nav import NAV, SIMPLE_EXTRA, SIMPLE_LABELS, SIMPLE_MENU, simple_nav
 from api.admin_ui_common import env_label, render
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,24 +27,82 @@ def nav_hrefs():
     return [h for _t, _i, items in NAV for _l, h, _n in items if h]
 
 
+GROUPS = ["오늘 할 일", "상품", "상담·주문", "회원", "가격·재고", "AI 관리", "설정"]
+
+
 class SimpleNavTests(unittest.TestCase):
-    def test_six_groups_in_spec_order(self):
-        self.assertEqual([g["title"] for g in simple_nav()],
-                         ["오늘 할 일", "상품", "상담", "가격·재고", "AI 관리", "설정"])
+    def test_groups_in_spec_order(self):
+        # 2026-11-18 사장님 지시 — 「회원」 묶음 신설 · 「상담」→「상담·주문」.
+        self.assertEqual([g["title"] for g in simple_nav()], GROUPS)
 
     def test_every_nav_path_appears_exactly_once(self):
         got = [r["href"] for g in simple_nav() for r in g["basic"] + g["advanced"]]
         extras = [h for _l, h in SIMPLE_EXTRA]
         screens = [h for h in got if h not in extras]
-        self.assertEqual(sorted(screens), sorted(nav_hrefs()))
+        self.assertEqual(sorted(screens), sorted(nav_hrefs() + list(SIMPLE_LABELS)))
         self.assertEqual(len(screens), len(set(screens)))
+        for h in nav_hrefs():
+            self.assertEqual(got.count(h), 1, h)
+
+    def test_menu_definition_has_no_duplicate_or_unlabeled_path(self):
+        mapped = [p for _t, _i, b, a in SIMPLE_MENU for p in b + a]
+        self.assertEqual(len(mapped), len(set(mapped)))
+        known = set(nav_hrefs()) | set(SIMPLE_LABELS)
+        self.assertEqual([p for p in mapped if p not in known], [])
+        # 메뉴 전용 라벨은 NAV 에 없는 경로만 — 라벨을 두 벌 두지 않는다.
+        self.assertEqual(set(SIMPLE_LABELS) & set(nav_hrefs()), set())
+        self.assertEqual(set(SIMPLE_LABELS) - set(mapped), set())
 
     def test_labels_come_from_nav(self):
         labels = {h: l for _t, _i, items in NAV for l, h, _n in items if h}
+        labels.update(SIMPLE_LABELS)
         for g in simple_nav():
             for r in g["basic"] + g["advanced"]:
                 if r["href"] in labels:
                     self.assertEqual(r["label"], labels[r["href"]])
+
+    def test_directed_paths_are_basic_in_their_groups(self):
+        groups = {g["title"]: g for g in simple_nav()}
+        def basic(t): return [r["href"] for r in groups[t]["basic"]]
+        def all_(t): return basic(t) + [r["href"] for r in groups[t]["advanced"]]
+        self.assertEqual(basic("회원"), ["/admin2/members", "/admin2/member-reviews"])
+        for p in ("/admin2/commerce-orders", "/admin2/payment-records", "/admin2/purchase-inquiries"):
+            self.assertIn(p, basic("상담·주문"))
+        for p in ("/admin2/sale-readiness", "/admin2/new", "/admin2/pc-builder"):
+            self.assertIn(p, basic("상품"))
+        for p in ("/admin2/pc-batch", "/admin2/pc-media", "/admin2/pc-video"):
+            self.assertIn(p, all_("상품"))
+
+    def test_new_admin_paths_all_reachable(self):
+        # 폐지한 신 관리자 메뉴가 들고 있던 경로 전부 — 메뉴 통합이 화면을 숨기지 않는다.
+        former = ("/admin2/", "/admin2/new", "/admin2/pc-workspace", "/admin2/pc-batch",
+                  "/admin2/pc-configurations", "/admin2/pc-media", "/admin2/pc-video",
+                  "/admin2/configuration-consultation", "/admin2/pc-builder", "/admin2/part-explanations",
+                  "/admin2/products", "/admin2/product-new", "/admin2/catalog-import",
+                  "/admin2/ai-device-profiles", "/admin2/asus-campaign", "/admin2/sale-readiness",
+                  "/admin2/commerce-orders", "/admin2/purchase-inquiries", "/admin2/retention",
+                  "/admin2/payment-records", "/admin2/members", "/admin2/member-reviews",
+                  "/admin2/usage-floors", "/admin2/game-copy-review", "/admin2/game-grades",
+                  "/admin2/talk-patterns", "/admin2/shop-notices", "/admin2/talk-review",
+                  "/admin2/product-fit", "/admin2/activity-logs", "/admin2/price-history",
+                  "/admin2/ai-response-log", "/admin2/consult-sessions", "/admin2/mvp3-consults",
+                  "/admin2/handoff-log", "/admin2/swap-click-logs", "/admin2/dash")
+        got = [r["href"] for g in simple_nav() for r in g["basic"] + g["advanced"]]
+        for p in former:
+            self.assertEqual(got.count(p), 1, p)
+
+    def test_removed_menu_functions_have_no_references(self):
+        self.assertFalse(hasattr(admin_nav, "new_admin" + "_nav"))
+        self.assertFalse(hasattr(admin_nav, "workspace" + "_nav"))
+        names = ("new_admin" + "_nav", "workspace" + "_nav", "a2-new-" + "entry", "a2-new-" + "secondary")
+        hits = []
+        for base in ("api", "templates", "tests"):
+            for f in (ROOT / base).rglob("*"):
+                if f.suffix not in (".py", ".j2", ".js", ".cjs", ".html") or not f.is_file():
+                    continue
+                text = f.read_text(encoding="utf-8", errors="ignore")
+                hits += [f"{f.relative_to(ROOT)}:{n}" for n in names if n in text]
+        self.assertEqual(hits, [])
 
     def test_unmapped_nav_path_falls_into_settings_advanced(self):
         mapped = {p for _t, _i, b, a in SIMPLE_MENU for p in b + a}
@@ -64,10 +123,13 @@ class SimpleNavTests(unittest.TestCase):
         self.assertEqual(today["href"], "/admin2/")
         self.assertTrue(today["active"])
 
-    def test_new_admin_entry_is_kept(self):
+    def test_new_admin_entry_is_removed(self):
+        # 2026-11-18 — 「신 관리자(작업 화면)」 링크 폐지. 운영자 매뉴얼만 남는다.
         settings = [r["href"] for r in simple_nav()[-1]["advanced"]]
-        self.assertIn("/admin2/?admin=new", settings)
+        self.assertNotIn("/admin2/?admin=new", settings)
         self.assertIn("/admin2/manual", settings)
+        everything = [r["href"] for g in simple_nav() for r in g["basic"] + g["advanced"]]
+        self.assertFalse([h for h in everything if "admin=" in h])
 
 
 class ShellRenderTests(unittest.TestCase):
@@ -77,12 +139,12 @@ class ShellRenderTests(unittest.TestCase):
     def test_default_mode_draws_simple_shell(self):
         html = self.html("/admin2/reviews")
         self.assertIn('data-admin-shell="simple"', html)
-        for title in ("오늘 할 일", "상품", "상담", "가격·재고", "AI 관리", "설정"):
+        for title in GROUPS:
             self.assertIn(f'title="{title}"', html)
         lnb = html[html.index('id="lnb"'):html.index('id="lnbToggle"')]
         self.assertEqual(lnb.count('aria-current="page"'), 1)
         self.assertIn('class="a2-lnb-mobile-toggle"', html)
-        self.assertNotIn('class="a2-new-entry"', html)
+        self.assertNotIn('class="a2-new-' + 'entry"', html)
 
     def test_advanced_section_hidden_unless_current(self):
         html = self.html("/admin2/reviews")
@@ -93,10 +155,17 @@ class ShellRenderTests(unittest.TestCase):
         html2 = self.html("/admin2/ai-device-profiles")
         self.assertTrue(any(b == "" for b in re.findall(r'<div class="a2-sn-advb" id="lnbAdv\d+" ?(hidden)?>', html2)))
 
-    def test_new_mode_is_unchanged(self):
-        html = self.html("/admin2/pc-configurations", cookie="admin_ui_mode=new")
-        self.assertNotIn('data-admin-shell="simple"', html)
-        self.assertIn('class="a2-new-secondary"', html)
+    def test_new_mode_draws_the_same_menu(self):
+        # 2026-11-18 — ?admin=new · 쿠키 new 여도 좌측 메뉴는 같은 한 벌이다.
+        def lnb(h): return h[h.index('id="lnb"'):h.index('id="lnbToggle"')]
+        for path in ("/admin2/pc-configurations", "/admin2/members", "/admin2/", "/admin2/sale-price"):
+            legacy = self.html(path)
+            for kw in ({"query": "admin=new"}, {"cookie": "admin_ui_mode=new"}):
+                new = self.html(path, **kw)
+                self.assertIn('data-admin-shell="simple"', new)
+                self.assertEqual(lnb(new), lnb(legacy), (path, kw))
+                self.assertNotIn("admin=new", lnb(new))
+                self.assertNotIn("admin=legacy", lnb(new))
 
     def test_env_badge(self):
         self.assertIn('class="a2-env" data-env="개발 환경"', self.html("/admin2/reviews"))
@@ -134,7 +203,9 @@ class TodayRowsTests(unittest.TestCase):
         for h in hrefs.values():
             self.assertIn(h.split("?")[0], live)
         for _n, _d, h in H.QUICK_LINKS:
-            self.assertIn(h, live)
+            self.assertIn(h.split("?")[0], live)
+        # 2026-11-18 — 운영 현황 대시보드는 「자주 하는 작업」 링크로 간다.
+        self.assertIn(H.OVERVIEW_HREF, [h for _n, _d, h in H.QUICK_LINKS])
 
     def test_template_order_and_preserved_metrics(self):
         t = (ROOT / "templates/admin/home.html.j2").read_text(encoding="utf-8")

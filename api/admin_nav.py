@@ -586,36 +586,9 @@ def nav_for_screens(current_path: str = "") -> list:
     return out
 
 
-def workspace_nav():
-    """Focused work navigation; legacy screens remain available in the full admin."""
-    return [dict(label=label, href=href, icon=icon) for label, href, icon in [
-        ('처리할 일', '/admin2/pc-workspace', 'eye'),
-        ('조립PC 제품군', '/admin2/pc-configurations', 'box'),
-        ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu'),
-        ('부품', '/admin2/part-explanations', 'cpu'),
-        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart'),
-        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw'),
-        ('전체 운영 메뉴', '/admin2/dash', 'sliders'),
-    ]]
-
-
-def new_admin_nav(current_path=''):
-    """One shared work menu for NEW; existing page/API implementations are reused."""
-    groups = [
-        # 2026-10-12 사장님 확정 — 「운영 현황」(코덱스 대시보드 기획안 v1)이 신 관리자 첫 화면이다.
-        ('운영 현황', '/admin2/', 'pie-chart', ('/admin2',)),
-        ('처리할 일', '/admin2/new', 'eye', ('/admin2/new', '/admin2/pc-workspace', '/admin2/pc-batch')),
-        ('조립PC 제품군', '/admin2/pc-configurations', 'box', ('/admin2/pc-configurations', '/admin2/pc-media', '/admin2/pc-video', '/admin2/configuration-consultation')),
-        ('신규 조립PC 생성', '/admin2/pc-builder', 'cpu', ('/admin2/pc-builder',)),
-        ('부품 관리', '/admin2/part-explanations', 'cpu', ('/admin2/part-explanations', '/admin2/products', '/admin2/product-new', '/admin2/catalog-import', '/admin2/ai-device-profiles', '/admin2/asus-campaign')),
-        ('판매 준비 현황', '/admin2/sale-readiness', 'eye', ('/admin2/sale-readiness',)),
-        ('주문 운영', '/admin2/commerce-orders', 'box', ('/admin2/commerce-orders', '/admin2/purchase-inquiries', '/admin2/retention', '/admin2/payment-records')),
-        ('회원 관리', '/admin2/members', 'sliders', ('/admin2/members', '/admin2/member-reviews')),
-        ('사용·성능 자료', '/admin2/usage-floors', 'pie-chart', ('/admin2/usage-floors', '/admin2/game-copy-review', '/admin2/game-grades', '/admin2/talk-patterns', '/admin2/shop-notices', '/admin2/talk-review', '/admin2/product-fit')),
-        ('변경 이력', '/admin2/activity-logs', 'rotate-ccw', ('/admin2/activity-logs', '/admin2/price-history', '/admin2/ai-response-log', '/admin2/consult-sessions', '/admin2/mvp3-consults', '/admin2/handoff-log', '/admin2/swap-click-logs')),
-    ]
-    return [dict(label=label, href=href, icon=icon, active=current_path.rstrip('/') in paths)
-            for label, href, icon, paths in groups]
+# 2026-11-18 사장님 지시(「하나로 만들어서 확정」) — 신 관리자 메뉴 함수와 작업 메뉴 함수
+# (`?admin=new` 때 셸이 그리던 두 메뉴)를 지웠다. 좌측 메뉴는 아래 `simple_nav()` 하나뿐이다.
+# 그 두 메뉴에만 있던 화면은 `SIMPLE_MENU` 의 제자리로 옮겼다(라벨은 `SIMPLE_LABELS`).
 
 
 def nav_for(current_path: str = "") -> list:
@@ -671,20 +644,30 @@ def counts() -> dict:
 # ■ `NAV` 에 있는데 아래 표에 없는 경로는 「설정 › 고급 관리」에 자동으로 붙는다 — 메뉴 정리가
 #   화면을 숨기는 일이 되지 않게(테스트가 모든 `NAV` 경로가 정확히 한 번 나오는지 고정한다).
 # ■ 경로·직접 링크는 바뀌지 않는다. 메뉴에서 감추는 것은 권한 검사가 아니다(권한은 화면·API 쪽).
+# ■ 2026-11-18 사장님 지시 — 이 메뉴가 **유일한 정식 메뉴**다(신 관리자 메뉴 · `?admin=new` 메뉴 전환 폐지).
+#   신 관리자 메뉴에만 있던 화면을 제자리로 옮겼다: 「회원」 묶음 신설 · 「상담」→「상담·주문」
+#   (주문 운영 · 결제·정산 기록) · 「상품」에 판매 준비 현황과 조립PC 작업 화면.
+#   운영 현황 대시보드(신 관리자 첫 화면)는 「오늘 할 일」 안의 링크(`/admin2/?view=overview`)로 간다.
 SIMPLE_MENU = (
     ("오늘 할 일", "pie-chart", ("/admin2/",), ()),
     ("상품", "box",
-     ("/admin2/products", "/admin2/product-new", "/admin2/reviews", "/admin2/category-mapping"),
-     ("/admin2/categories-v2", "/admin2/part-explanations", "/admin2/pc-workspace",
-      "/admin2/pc-configurations", "/admin2/configuration-consultation", "/admin2/catalog-import",
+     ("/admin2/products", "/admin2/product-new", "/admin2/reviews", "/admin2/category-mapping",
+      "/admin2/sale-readiness", "/admin2/new", "/admin2/pc-builder"),
+     ("/admin2/categories-v2", "/admin2/part-explanations", "/admin2/pc-workspace", "/admin2/pc-batch",
+      "/admin2/pc-configurations", "/admin2/pc-media", "/admin2/pc-video",
+      "/admin2/configuration-consultation", "/admin2/catalog-import",
       "/admin2/product-fit", "/admin2/ai-device-profiles", "/admin2/asus-campaign", "/admin2/grid", "/admin2/game-matrix",
       "/admin2/deleted-products", "/admin2/build-map", "/admin2/spec-standard",
       "/admin2/spec-field-defs", "/admin2/compat-rules", "/admin2/usage-floors",
       "/admin2/part-grade", "/admin2/policy-weights", "/admin2/candidate-pool")),
-    ("상담", "eye",
-     ("/admin2/purchase-inquiries", "/admin2/mvp3-consults"),
+    ("상담·주문", "eye",
+     ("/admin2/purchase-inquiries", "/admin2/mvp3-consults", "/admin2/commerce-orders",
+      "/admin2/payment-records"),
      ("/admin2/consult-sessions", "/admin2/swap-click-logs", "/admin2/handoff-log",
       "/admin2/funnel-performance")),
+    ("회원", "share-2",
+     ("/admin2/members", "/admin2/member-reviews"),
+     ()),
     ("가격·재고", "dollar-sign",
      ("/admin2/price-review", "/admin2/sale-price", "/admin2/stock-inbound"),
      ("/admin2/suppliers", "/admin2/sourcing", "/admin2/price-import", "/admin2/margin-policy",
@@ -702,8 +685,23 @@ SIMPLE_MENU = (
 # 화면 경로가 아닌 고정 링크 — 「설정 › 고급 관리」 끝에 붙는다(라벨은 여기가 정본).
 SIMPLE_EXTRA = (
     ("운영자 매뉴얼", "/admin2/manual"),
-    ("신 관리자(작업 화면)", "/admin2/?admin=new"),
 )
+
+# `NAV` 에 없는 화면의 메뉴 라벨(2026-11-18) — 신 관리자 메뉴에만 있던 화면들이다. `NAV` 에
+# 같은 경로가 없으므로 라벨이 두 벌이 되지 않는다(테스트가 겹침 0을 고정한다). 라벨은 각 화면의
+# 머리(crumb_now · <title>)를 따랐다. `NAV`(화면 수 셈·매뉴얼·머리말 정본)에 올릴지는 별도 판단이다.
+SIMPLE_LABELS = {
+    "/admin2/sale-readiness": "판매 준비 현황",
+    "/admin2/new": "조립PC 처리할 일",
+    "/admin2/pc-builder": "신규 조립PC 생성",
+    "/admin2/pc-batch": "AI 일괄 보완",
+    "/admin2/pc-media": "대표 이미지 관리",
+    "/admin2/pc-video": "PC 영상",
+    "/admin2/commerce-orders": "주문 운영",
+    "/admin2/payment-records": "결제·정산 기록",
+    "/admin2/members": "회원 관리",
+    "/admin2/member-reviews": "후기 관리",
+}
 
 
 def _same_path(a: str, b: str) -> bool:
@@ -711,12 +709,13 @@ def _same_path(a: str, b: str) -> bool:
 
 
 def simple_nav(current_path: str = "") -> list:
-    """기본 모드 좌측 메뉴 — 6개 묶음. 템플릿이 그대로 그린다.
+    """관리자 좌측 메뉴 — 유일한 정식 메뉴(2026-11-18 확정). 템플릿이 그대로 그린다.
 
     반환: [{title, icon, href, basic:[{label, href, active}], advanced:[...], active,
             advanced_active}]. `href` 는 하위 메뉴가 없는 묶음(오늘 할 일)만 갖는다.
     """
     labels = {href: label for _t, _i, items in NAV for label, href, _n in items if href}
+    labels.update({h: l for h, l in SIMPLE_LABELS.items() if h not in labels})
     placed = set()
     out = []
     for title, icon, basic, advanced in SIMPLE_MENU:
