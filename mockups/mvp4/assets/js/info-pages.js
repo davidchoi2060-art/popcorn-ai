@@ -41,7 +41,7 @@
       '<p class="ip-note">' + icon('info') + '<span>팝콘AI와 팝콘PC는 별도 사업자입니다.</span></p>' +
       '<a class="ip-more" href="purchase-support.html">구매·배송·A/S 안내 보기 ' + icon('arrow-right') + '</a>' +
       // 2026-11-18 사장님이 이 번호를 고객 문의 창구로 확정했다 - 전화 걸기 링크를 단다.
-      '<a class="ip-phone" href="tel:0216440249">' + icon('phone') + '<span>대표번호 <strong>02)1644-0249</strong></span></a></section>';
+      '<a class="ip-phone" href="tel:16440249">' + icon('phone') + '<span>대표번호 <strong>1644-0249</strong></span></a></section>';
     return { html: page(head('company', '회사정보', '팝콘AI를 운영하는 회사 정보를 안내합니다.') +
       '<div class="ip-card ip-company"><section class="ip-co" aria-labelledby="ip-co-name"><h2 id="ip-co-name">' + h(COMPANY.name) + '</h2>' +
       '<p class="ip-sub">팝콘AI 운영사</p><dl class="ip-rows">' + rows + '</dl></section>' + roles + '</div>') };
