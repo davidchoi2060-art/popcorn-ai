@@ -32,7 +32,7 @@ SESSION_DAYS = 14                      # customer_auth.ABSOLUTE_DAYS 와 같은 
 ATTEMPT_TTL = 600                      # 로그인 시도 · 동의 전 신원 -- 10분
 REQUIRED_CONSENTS = ("terms", "privacy", "age14")
 OPTIONAL_CONSENTS = ("marketing",)
-CONSENT_VERSION = "2026-10-13"         # 약관 문구 확정 뒤 그 날짜로 바꾼다(동의 기록에 남는 버전)
+CONSENT_VERSION = "2026-11-23"         # 약관·처리방침 시행일(2026-11-18 사장님 확정). 문구를 바꾸면 이 날짜도 바꾼다
 DEFAULT_RETURN = "/mvp4/"
 
 

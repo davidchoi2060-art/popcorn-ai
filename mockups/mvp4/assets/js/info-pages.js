@@ -1,8 +1,9 @@
 /* /mvp4 회사정보 · 이용약관 · 개인정보처리방침 · 구매·배송·A/S 안내 (2026-10-21 대표 확정 디자인 05·06).
  *
- * 회사정보는 대표가 확정한 값만 쓴다(00-design-handoff.txt 「회사정보 원문 기준」). 대표번호는 착신 확인 전이라 전화 걸기 링크를
- * 걸지 않고 표기만 한다. 정책 세 문서는 v3 검토용 초안이라 공개 화면에 본문을 싣지 않는다 -- P.policyDocs 에 «확정된» 문서가
- * 들어오면 같은 읽기 틀(목차 + 본문)로 그린다. 확정 전 문서를 이 파일에 옮겨 적지 않는다.
+ * 회사정보는 대표가 확정한 값만 쓴다(00-design-handoff.txt 「회사정보 원문 기준」). 대표번호는 2026-11-18 문의 창구로 확정돼
+ * 전화 걸기 링크를 단다(그 전에는 착신 확인 전이라 표기만 했다). 정책 문서는 P.policyDocs 에 «확정된» 문서가 들어오면 같은 읽기 틀
+ * (목차 + 본문)로 그린다. 이용약관·개인정보처리방침은 2026-11-18 확정분이 policy-docs.js 에 있다(시행 2026-11-23).
+ * 구매·배송·A/S 안내는 아직 확정 문서가 없어 안내 문구만 보인다. 확정 전 문서를 옮겨 적지 않는다.
  */
 (function () {
   'use strict';
@@ -39,8 +40,8 @@
       '<li><span class="ip-role-icon">' + icon('package') + '</span><div><strong>제휴사 팝콘PC</strong><p>상품 판매 · 결제 · 배송 · 교환 · 반품 · 환급 · 제품 A/S · 회원관리</p></div></li></ul>' +
       '<p class="ip-note">' + icon('info') + '<span>팝콘AI와 팝콘PC는 별도 사업자입니다.</span></p>' +
       '<a class="ip-more" href="purchase-support.html">구매·배송·A/S 안내 보기 ' + icon('arrow-right') + '</a>' +
-      // 착신 확인 전 -- 버튼 모양이지만 전화를 걸지 않는다(00-design-handoff.txt).
-      '<p class="ip-phone">' + icon('phone') + '<span>대표번호 <strong>02)1644-0249</strong></span></p></section>';
+      // 2026-11-18 사장님이 이 번호를 고객 문의 창구로 확정했다 - 전화 걸기 링크를 단다.
+      '<a class="ip-phone" href="tel:0216440249">' + icon('phone') + '<span>대표번호 <strong>02)1644-0249</strong></span></a></section>';
     return { html: page(head('company', '회사정보', '팝콘AI를 운영하는 회사 정보를 안내합니다.') +
       '<div class="ip-card ip-company"><section class="ip-co" aria-labelledby="ip-co-name"><h2 id="ip-co-name">' + h(COMPANY.name) + '</h2>' +
       '<p class="ip-sub">팝콘AI 운영사</p><dl class="ip-rows">' + rows + '</dl></section>' + roles + '</div>') };

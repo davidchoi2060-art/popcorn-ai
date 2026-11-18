@@ -31,7 +31,7 @@ body[data-page=company] .site-footer,body[data-page=terms] .site-footer,body[dat
 .ip-note{display:flex;align-items:center;gap:10px;margin-top:22px;color:#3c4558;font-size:16px}
 .ip-more{display:inline-flex;align-items:center;gap:8px;margin:14px 0 0 34px;color:var(--ip-cobalt);font-weight:700;text-decoration:underline;text-underline-offset:5px}
 .ip-more .icon{width:18px;height:18px}
-.ip-phone{display:flex;align-items:center;gap:10px;width:fit-content;margin:22px 0 0 auto;padding:12px 22px;border:1.5px solid var(--ip-cobalt);border-radius:10px;color:var(--ip-cobalt);font-size:16px}
+.ip-phone{display:flex;align-items:center;gap:10px;width:fit-content;margin:22px 0 0 auto;padding:12px 22px;border:1.5px solid var(--ip-cobalt);border-radius:10px;color:var(--ip-cobalt);font-size:16px;text-decoration:none}
 .ip-roles .ip-phone strong{display:inline;font-size:16px;color:inherit;font-weight:700;letter-spacing:0}
 .ip-doc{display:grid;grid-template-columns:300px minmax(0,1fr);gap:0;padding:34px 40px}
 .ip-toc{position:sticky;top:110px;align-self:start;padding-right:28px;border-right:1px solid var(--ip-line)}
