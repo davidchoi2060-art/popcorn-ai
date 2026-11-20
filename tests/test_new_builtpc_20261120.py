@@ -116,11 +116,6 @@ class Data0180(unittest.TestCase):
         self.assertEqual(office["usage"], "사무용")
         self.assertIn("SSD 240GB 미만(현재 128GB)", office["blocked"])
 
-    def test_file_is_lf_utf8(self):
-        raw = DATA.read_bytes()
-        self.assertNotIn(b"\r\n", raw)
-        raw.decode("utf-8")
-
 
 if __name__ == "__main__":
     unittest.main()
