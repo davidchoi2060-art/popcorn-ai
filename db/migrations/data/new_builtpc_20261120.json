@@ -1,0 +1,872 @@
+{
+ "source": "팝콘PC 몰 공개 상품 페이지 수집 2026-11-20 (tools/mall_builtpc_fetch.py) + tools/product_fit.py",
+ "evaluated_at": "2026-11-20",
+ "products": [
+  {
+   "code": 130855,
+   "name": "ASUS 스페셜 NO.09.130855 [9800X3D/64G/2TB/RTX5080]",
+   "sale_price": 8744500,
+   "market_price": 10050000,
+   "spec_source_text": "프로세서(CPU)@@[AMD] 라이젠7 그래니트 릿지 9800X3D [Turbo 5.2GHz, 8코어/16쓰레드, AMD Radeon Graphics] ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 블랙 ,@@메모리(RAM)@@[TeamGroup] DDR5-5600 CL46 Elite 64GB [32G x 2] ,@@메인보드@@ASUS TUF Gaming X870E-PLUS WIFI7 대원씨티에스 ,@@그래픽(VGA)@@ASUS ProArt 지포스 RTX 5080 OC D7 16GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@키오시아 EXCERIA PLUS G4 M.2 NVMe (2TB) ,@@케이스@@ASUS ROG Cronox ARGB (블랙) ,@@파워@@ASUS TUF Gaming 1000W GOLD [회원가입 계좌이체 맞춤할인 -2.5%] ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=130855",
+   "includes": null,
+   "spec": {
+    "cpu": "라이젠7 9800X3D",
+    "gpu": "RTX 5080",
+    "ram_gb": 64,
+    "ssd_gb": 2000,
+    "cpu_mt": 23000,
+    "cpu_st": 2100,
+    "gpu_idx": 225,
+    "vram_gb": 16
+   },
+   "balance": null,
+   "dominated_by": 131544,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 30,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 30,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "4K",
+     "blocked": []
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 130856,
+   "name": "ASUS 스페셜 NO.07.130856 [9800X3D/32G/1TB/RTX5070Ti]",
+   "sale_price": 5314700,
+   "market_price": 6110000,
+   "spec_source_text": "프로세서(CPU)@@[AMD] 라이젠7 그래니트 릿지 9800X3D [Turbo 5.2GHz, 8코어/16쓰레드, AMD Radeon Graphics] ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 블랙 ,@@메모리(RAM)@@[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2] ,@@메인보드@@ASUS TUF Gaming B850M-PLUS WIFI7 대원씨티에스 ,@@그래픽(VGA)@@[ASUS] PRIME 지포스 RTX 5070 Ti OC D7 16GB ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@[Western Digital] WD BLACK SN850X M.2 NVMe 1TB ,@@케이스@@ASUS ROG STRIX HELIOS II (블랙) ,@@파워@@ASUS ROG STRIX 850W Platinum 인텍앤컴퍼니 ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=130856",
+   "includes": null,
+   "spec": {
+    "cpu": "라이젠7 9800X3D",
+    "gpu": "RTX 5070 Ti",
+    "ram_gb": 32,
+    "ssd_gb": 1000,
+    "cpu_mt": 23000,
+    "cpu_st": 2100,
+    "gpu_idx": 195,
+    "vram_gb": 16
+   },
+   "balance": null,
+   "dominated_by": 131546,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 30,000 미만(현재 23,000)",
+      "램 64GB 미만(현재 32GB)"
+     ]
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 23,000)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 30,000 미만(현재 23,000)",
+      "램 64GB 미만(현재 32GB)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 195)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "램 64GB 미만(현재 32GB)",
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131542,
+   "name": "ASUS 스페셜 NO.05.131542 [7800X3D/32G/1TB/RTX5070]",
+   "sale_price": 3796200,
+   "market_price": 4360000,
+   "spec_source_text": "프로세서(CPU)@@[AMD] 라이젠7 라파엘 7800X3D [Turbo 5.0GHz, 8코어/16쓰레드, AMD Radeon Graphics] ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 블랙 ,@@메모리(RAM)@@[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2] ,@@메인보드@@ASUS TUF Gaming B850M-PLUS WIFI7 대원씨티에스 ,@@그래픽(VGA)@@ASUS PRIME 지포스 RTX 5070 OC D7 12GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@[Western Digital] WD BLACK SN850X M.2 NVMe 1TB ,@@케이스@@ASUS ProArt PA401 우드 에디션 메탈 ,@@파워@@ASUS PRIME 750W Bronze ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131542",
+   "includes": null,
+   "spec": {
+    "cpu": "라이젠7 7800X3D",
+    "gpu": "RTX 5070",
+    "ram_gb": 32,
+    "ssd_gb": 1000,
+    "cpu_mt": 18000,
+    "cpu_st": 1800,
+    "gpu_idx": 150,
+    "vram_gb": 12
+   },
+   "balance": null,
+   "dominated_by": 131543,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "기본",
+     "blocked": [
+      "CPU 싱글 지수 1,850 미만(현재 1,800)"
+     ]
+    },
+    {
+     "usage": "영상편집",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 18,000)",
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "기본",
+     "blocked": [
+      "CPU 싱글 지수 1,950 미만(현재 1,800)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 150)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "램 64GB 미만(현재 32GB)",
+      "그래픽 메모리 24GB 미만(현재 12GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131543,
+   "name": "ASUS 스페셜 NO.05.131543 [7800X3D/32G/1TB/RTX5070]",
+   "sale_price": 3783400,
+   "market_price": 4350000,
+   "spec_source_text": "프로세서(CPU)@@[AMD] 라이젠7 라파엘 7800X3D [Turbo 5.0GHz, 8코어/16쓰레드, AMD Radeon Graphics] ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 블랙 ,@@메모리(RAM)@@[ESSENCORE] KLEVV DDR5-5600 CL46 32GB [16G x 2] ,@@메인보드@@ASUS TUF Gaming B850M-PLUS WIFI7 대원씨티에스 ,@@그래픽(VGA)@@ASUS PRIME 지포스 RTX 5070 OC D7 12GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@[Western Digital] WD BLACK SN850X M.2 NVMe 1TB ,@@케이스@@ASUS A32 PLUS (블랙) ,@@파워@@ASUS PRIME 750W Bronze ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131543",
+   "includes": null,
+   "spec": {
+    "cpu": "라이젠7 7800X3D",
+    "gpu": "RTX 5070",
+    "ram_gb": 32,
+    "ssd_gb": 1000,
+    "cpu_mt": 18000,
+    "cpu_st": 1800,
+    "gpu_idx": 150,
+    "vram_gb": 12
+   },
+   "balance": null,
+   "dominated_by": null,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "기본",
+     "blocked": [
+      "CPU 싱글 지수 1,850 미만(현재 1,800)"
+     ]
+    },
+    {
+     "usage": "영상편집",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 24,000 미만(현재 18,000)",
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "기본",
+     "blocked": [
+      "CPU 싱글 지수 1,950 미만(현재 1,800)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "기본",
+     "blocked": [
+      "CPU 멀티 지수 20,000 미만(현재 18,000)"
+     ]
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 150)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "램 64GB 미만(현재 32GB)",
+      "그래픽 메모리 24GB 미만(현재 12GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131544,
+   "name": "ASUS 스페셜 NO.09.131544 [270K+/64G/2TB/RTX5080]",
+   "sale_price": 8587400,
+   "market_price": 9870000,
+   "spec_source_text": "프로세서(CPU)@@[인텔] 15세대 코어 울트라7 270K Plus [Turbo 5.5GHz, 24코어(8+16), 인텔 Xe Graphics]™ NEW ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 화이트 ,@@메모리(RAM)@@[TeamGroup] DDR5-5600 CL46 Elite 64GB [32G x 2] ,@@메인보드@@[ASUS] TUF Gaming Z890-PLUS WIFI ,@@그래픽(VGA)@@ASUS ProArt 지포스 RTX 5080 OC D7 16GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@키오시아 EXCERIA PLUS G4 M.2 NVMe (2TB) ,@@케이스@@ASUS ROG Cronox ARGB (화이트) ,@@파워@@ASUS TUF Gaming 1000W GOLD [회원가입 계좌이체 맞춤할인 -2.5%] ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131544",
+   "includes": null,
+   "spec": {
+    "cpu": "코어 울트라7 270K Plus",
+    "gpu": "RTX 5080",
+    "ram_gb": 64,
+    "ssd_gb": 2000,
+    "cpu_mt": 40000,
+    "cpu_st": 2250,
+    "gpu_idx": 225,
+    "vram_gb": 16
+   },
+   "balance": null,
+   "dominated_by": null,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "쾌적",
+     "blocked": [
+      "그래픽 지수 280 미만(현재 225)",
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "4K",
+     "blocked": []
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131545,
+   "name": "ASUS 스페셜 NO.07.131545 [270K+/32G/1TB/RTX5070Ti]",
+   "sale_price": 6058000,
+   "market_price": 6960000,
+   "spec_source_text": "프로세서(CPU)@@[인텔] 15세대 코어 울트라7 270K Plus [Turbo 5.5GHz, 24코어(8+16), 인텔 Xe Graphics]™ NEW ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 화이트 ,@@메모리(RAM)@@[TeamGroup] DDR5-5600 CL46 Elite 64GB [32G x 2] ,@@메인보드@@[ASUS] ROG STRIX B860-G GAMING WIFI ,@@그래픽(VGA)@@[ASUS] PRIME 지포스 RTX 5070 Ti OC D7 16GB ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@[Western Digital] WD BLACK SN850X M.2 NVMe 1TB ,@@케이스@@ASUS ROG STRIX HELIOS II (화이트) ,@@파워@@ASUS ROG STRIX 850W Platinum 인텍앤컴퍼니 ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131545",
+   "includes": null,
+   "spec": {
+    "cpu": "코어 울트라7 270K Plus",
+    "gpu": "RTX 5070 Ti",
+    "ram_gb": 64,
+    "ssd_gb": 1000,
+    "cpu_mt": 40000,
+    "cpu_st": 2250,
+    "gpu_idx": 195,
+    "vram_gb": 16
+   },
+   "balance": "상품명은 램 32GB 인데 기본 구성은 64GB",
+   "dominated_by": null,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "쾌적",
+     "blocked": [
+      "SSD 1900GB 미만(현재 1000GB)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "쾌적",
+     "blocked": [
+      "SSD 1900GB 미만(현재 1000GB)",
+      "그래픽 지수 280 미만(현재 195)",
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 195)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "그래픽 메모리 24GB 미만(현재 16GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131546,
+   "name": "ASUS 스페셜 NO.05.131546 [250K+/32G/1TB/RTX5070]",
+   "sale_price": 4833600,
+   "market_price": 5550000,
+   "spec_source_text": "프로세서(CPU)@@[인텔] 15세대 코어 울트라5 250K Plus [Turbo 5.3GHz, 18코어(6+12), 인텔 Xe Graphics]™ NEW ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 블랙 ,@@메모리(RAM)@@[TeamGroup] DDR5-5600 CL46 Elite 64GB [32G x 2] ,@@메인보드@@[ASUS] ROG STRIX B860-G GAMING WIFI ,@@그래픽(VGA)@@ASUS PRIME 지포스 RTX 5070 OC D7 12GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@키오시아 EXCERIA PLUS G4 M.2 NVMe (2TB) ,@@케이스@@ASUS ProArt PA401 우드 에디션 강화유리 (베이지) ,@@파워@@ASUS PRIME 750W Bronze ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131546",
+   "includes": null,
+   "spec": {
+    "cpu": "코어 울트라5 250K Plus",
+    "gpu": "RTX 5070",
+    "ram_gb": 64,
+    "ssd_gb": 2000,
+    "cpu_mt": 30000,
+    "cpu_st": 2200,
+    "gpu_idx": 150,
+    "vram_gb": 12
+   },
+   "balance": "상품명은 램 32GB 인데 기본 구성은 64GB · 상품명은 SSD 1000GB 인데 기본 구성은 2000GB",
+   "dominated_by": null,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 33,000 미만(현재 30,000)",
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "쾌적",
+     "blocked": [
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 150)",
+      "CPU 게임 등급 1.2 미만(현재 1.15)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "그래픽 메모리 24GB 미만(현재 12GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131547,
+   "name": "ASUS 스페셜 NO.05.131547 [250K+/32G/1TB/RTX5070]",
+   "sale_price": 4837500,
+   "market_price": 5560000,
+   "spec_source_text": "프로세서(CPU)@@[인텔] 15세대 코어 울트라5 250K Plus [Turbo 5.3GHz, 18코어(6+12), 인텔 Xe Graphics]™ NEW ,@@CPU쿨러@@[3RSystem] 라니 SF 360 ARGB 화이트 ,@@메모리(RAM)@@[TeamGroup] DDR5-5600 CL46 Elite 64GB [32G x 2] ,@@메인보드@@[ASUS] ROG STRIX B860-G GAMING WIFI ,@@그래픽(VGA)@@ASUS PRIME 지포스 RTX 5070 WHITE OC D7 12GB 코잇 ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@키오시아 EXCERIA PLUS G4 M.2 NVMe (2TB) ,@@케이스@@ASUS A32 PLUS (화이트) ,@@파워@@ASUS PRIME 750W Bronze ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131547",
+   "includes": null,
+   "spec": {
+    "cpu": "코어 울트라5 250K Plus",
+    "gpu": "RTX 5070",
+    "ram_gb": 64,
+    "ssd_gb": 2000,
+    "cpu_mt": 30000,
+    "cpu_st": 2200,
+    "gpu_idx": 150,
+    "vram_gb": 12
+   },
+   "balance": "상품명은 램 32GB 인데 기본 구성은 64GB · 상품명은 SSD 1000GB 인데 기본 구성은 2000GB",
+   "dominated_by": 131546,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "개발",
+     "level": "전문",
+     "blocked": []
+    },
+    {
+     "usage": "디자인·조판",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "영상편집",
+     "level": "쾌적",
+     "blocked": [
+      "CPU 멀티 지수 33,000 미만(현재 30,000)",
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": "기본",
+     "blocked": [
+      "그래픽 지수 195 미만(현재 150)",
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": "쾌적",
+     "blocked": [
+      "그래픽 메모리 16GB 미만(현재 12GB)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": "쾌적",
+     "blocked": []
+    },
+    {
+     "usage": "게임",
+     "level": "QHD",
+     "blocked": [
+      "그래픽 지수 225 미만(현재 150)",
+      "CPU 게임 등급 1.2 미만(현재 1.15)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": "기본",
+     "blocked": [
+      "그래픽 메모리 24GB 미만(현재 12GB)"
+     ]
+    }
+   ]
+  },
+  {
+   "code": 131676,
+   "name": "오피스 NO.03.131676 초슬림/미니타워[3000G/8G/128G/Radeon 3]",
+   "sale_price": 308300,
+   "market_price": 350000,
+   "spec_source_text": "프로세서(CPU)@@[AMD] 애슬론 3000G [Base 3.5GHz, 2코어/4쓰레드, Radeon 3] ,@@CPU쿨러@@[AMD] 라이젠 프로세서에 포함 ,@@메모리(RAM)@@HIKSEMI DDR4-3200 CL18 HIKER (8GB) ,@@메인보드@@[ASUS] PRIME A520M-K [라이젠 AM4 / M-ATX / 64GB] ,@@그래픽(VGA)@@[AMD] Radeon Graphics ,@@랜/사운드@@[사운드/랜카드] 6/8채널 사운드 / 기가비트 랜 내장 ,@@초고속(SSD)@@[앱코] AGM 128GB (S128) ,@@케이스@@[DARKFLASH] DMO11 블랙 ,@@파워@@[현대] PRIME 620K [정격 230W] ,@@사은품@@팝콘피씨 게이밍 장패드 ,@@조립비+AS@@제작 및 3년 하드웨어 무상서비스 (1년출장 + 2년택배) ,@@배송@@[택배 배송 + 발포제](내부공간 채워 배송파손 예방 발포제)을 선택하셔요. ,@@",
+   "url": "https://www.popcornpc.co.kr/shop/system_detail.html?pd_no=131676",
+   "includes": null,
+   "spec": {
+    "cpu": "애슬론 3000G (2코어)",
+    "gpu": "AMD Radeon(내장 2CU)",
+    "ram_gb": 8,
+    "ssd_gb": 128,
+    "cpu_mt": 2300,
+    "cpu_st": 950,
+    "gpu_idx": 5,
+    "vram_gb": 0
+   },
+   "balance": null,
+   "dominated_by": null,
+   "fit": [
+    {
+     "usage": "사무용",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 5,000 미만(현재 2,300)",
+      "SSD 240GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "주식·트레이딩",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 10,000 미만(현재 2,300)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 240GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "개발",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 12,000 미만(현재 2,300)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "디자인·조판",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 12,000 미만(현재 2,300)",
+      "CPU 싱글 지수 1,750 미만(현재 950)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "영상편집",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 12,000 미만(현재 2,300)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)",
+      "그래픽 지수 100 미만(현재 5)",
+      "외장 그래픽 없음"
+     ]
+    },
+    {
+     "usage": "3D 렌더링",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 16,000 미만(현재 2,300)",
+      "램 32GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)",
+      "그래픽 지수 100 미만(현재 5)",
+      "그래픽 메모리 8GB 미만",
+      "외장 그래픽 없음"
+     ]
+    },
+    {
+     "usage": "캐드·설계",
+     "level": null,
+     "blocked": [
+      "CPU 싱글 지수 1,700 미만(현재 950)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "음악 작업",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 12,000 미만(현재 2,300)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)"
+     ]
+    },
+    {
+     "usage": "방송·스트리밍",
+     "level": null,
+     "blocked": [
+      "CPU 멀티 지수 12,000 미만(현재 2,300)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 480GB 미만(현재 128GB)",
+      "그래픽 지수 100 미만(현재 5)",
+      "CPU 게임 등급 1.0 미만(현재 0.45)",
+      "엔비디아 그래픽 아님"
+     ]
+    },
+    {
+     "usage": "게임",
+     "level": null,
+     "blocked": [
+      "그래픽 지수 25 미만(현재 5)",
+      "램 16GB 미만(현재 8GB)",
+      "SSD 240GB 미만(현재 128GB)",
+      "CPU 게임 등급 0.9 미만(현재 0.45)"
+     ]
+    },
+    {
+     "usage": "로컬 AI",
+     "level": null,
+     "blocked": [
+      "램 32GB 미만(현재 8GB)",
+      "SSD 960GB 미만(현재 128GB)",
+      "그래픽 메모리 12GB 미만",
+      "엔비디아 그래픽 아님"
+     ]
+    }
+   ]
+  }
+ ]
+}
